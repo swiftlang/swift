@@ -1,4 +1,4 @@
-import Namespace
+import Namespaces
 
 extension Namespace.Parent {
   public static func test() -> Int { 42 }

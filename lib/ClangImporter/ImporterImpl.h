@@ -53,6 +53,7 @@
 #include <functional>
 #include <set>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 namespace llvm {
@@ -613,13 +614,9 @@ public:
   llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
                   std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
 
-  /// Keep track of cxx function names, params etc in order to
-  /// allow for de-duping functions that differ strictly on "constness".
-  llvm::DenseMap<llvm::StringRef,
-                 std::pair<
-                     llvm::DenseSet<clang::FunctionDecl *>,
-                     llvm::DenseSet<clang::FunctionDecl *>>>
-      cxxMethods;
+  // Keep track of the decls that were already cloned for this specific class.
+  llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
+      clonedBaseMembers;
 
   // Cache for already-specialized function templates and any thunks they may
   // have.
@@ -765,7 +762,7 @@ public:
   /// Tracks macro definitions from the bridging header.
   std::vector<clang::IdentifierInfo *> BridgeHeaderMacros;
   /// Tracks included headers from the bridging header.
-  llvm::DenseSet<const clang::FileEntry *> BridgeHeaderFiles;
+  llvm::DenseSet<clang::FileEntryRef> BridgeHeaderFiles;
 
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
@@ -1359,6 +1356,51 @@ public:
       bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
       ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType);
 
+  struct ImportParameterTypeResult {
+    /// The imported parameter Swift type.
+    swift::Type swiftTy;
+    /// If the parameter is or not inout.
+    bool isInOut;
+    /// If the parameter is implicitly unwrapped or not.
+    bool isParamTypeImplicitlyUnwrapped;
+  };
+
+  /// Import a parameter type
+  ///
+  /// \param param The underlaying parameter declaraction.
+  /// \param optionalityOfParam The kind of optionality for the parameter
+  ///        being imported.
+  /// \param allowNSUIntegerAsInt If true, NSUInteger will be import as Int
+  ///        in certain contexts. If false, it will always be import as UInt.
+  /// \param isNSDictionarySubscriptGetter If true, the parameter is being
+  ///        imported as part of an NSDictionary subscript getter. If false,
+  ///        the parameter belongs to some other kind of method/function.
+  /// \param paramIsError If true, the parameter being imported is an NSError
+  ///        parameter. If false, the parameter is not an error parameter.
+  /// \param paramIsCompletionHandler If true, the parameter being imported is
+  ///        a completion handler. If false, the parameter is not a completion
+  ///        handler.
+  /// \param completionHandlerErrorParamIndex If it contains a value, the value
+  ///        indicates the index of the completion handler whose error
+  ///        parameter is used to indicate throwing. If None, the function does
+  ///        not have such parameter.
+  /// \param genericParams For C++ functions, an array of the generic type
+  ///        parameters of the function. For the rest of cases, an empty array
+  ///        can be provided.
+  /// \param addImportDiagnosticFn A function that can be called to add import
+  ///        diagnostics to the declaration being imported. This can be any
+  ///        lambda or callable object, but it's designed to be compatible
+  ///        with \c ImportDiagnosticAdder .
+  ///
+  /// \returns The imported parameter result on success, or None on failure.
+  Optional<ImportParameterTypeResult> importParameterType(
+      const clang::ParmVarDecl *param, OptionalTypeKind optionalityOfParam,
+      bool allowNSUIntegerAsInt, bool isNSDictionarySubscriptGetter,
+      bool paramIsError, bool paramIsCompletionHandler,
+      Optional<unsigned> completionHandlerErrorParamIndex,
+      ArrayRef<GenericTypeParamDecl *> genericParams,
+      llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
+
   ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                                   bool isFromSystemModule);
 
@@ -1602,6 +1644,9 @@ public:
   /// about the directly-parsed headers.
   SwiftLookupTable *findLookupTable(const clang::Module *clangModule);
 
+  /// Find the lookup table that should contain the given Clang declaration.
+  SwiftLookupTable *findLookupTable(const clang::Decl *decl);
+
   /// Visit each of the lookup tables in some deterministic order.
   ///
   /// \param fn Invoke the given visitor for each table. If the
@@ -1698,8 +1743,8 @@ public:
   void dumpSwiftLookupTables();
 
   void setSinglePCHImport(Optional<std::string> PCHFilename) {
-    if (PCHFilename.hasValue()) {
-      assert(llvm::sys::path::extension(PCHFilename.getValue())
+    if (PCHFilename.has_value()) {
+      assert(llvm::sys::path::extension(PCHFilename.value())
                  .endswith(file_types::getExtension(file_types::TY_PCH)) &&
              "Single PCH imported filename doesn't have .pch extension!");
     }
@@ -1710,7 +1755,7 @@ public:
   /// files, we can provide the PCH filename for declaration caching,
   /// especially in code completion.
   StringRef getSinglePCHImport() const {
-    if (SinglePCHImport.hasValue())
+    if (SinglePCHImport.has_value())
       return *SinglePCHImport;
     return StringRef();
   }
@@ -1858,6 +1903,26 @@ inline Optional<const clang::EnumDecl *> findAnonymousEnumForTypedef(
   if (found != foundDecls.end())
     return cast<clang::EnumDecl>(found->get<clang::NamedDecl *>());
 
+  // If a swift_private attribute has been attached to the enum, its name will
+  // be prefixed with two underscores
+  llvm::SmallString<32> swiftPrivateName;
+  swiftPrivateName += "__";
+  swiftPrivateName += typedefDecl->getName();
+  foundDecls = lookupTable->lookup(
+      SerializedSwiftName(ctx.getIdentifier(swiftPrivateName)),
+      EffectiveClangContext());
+
+  auto swiftPrivateFound =
+      llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
+        return decl.is<clang::NamedDecl *>() &&
+               isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>()) &&
+               decl.get<clang::NamedDecl *>()
+                   ->hasAttr<clang::SwiftPrivateAttr>();
+      });
+
+  if (swiftPrivateFound != foundDecls.end())
+    return cast<clang::EnumDecl>(swiftPrivateFound->get<clang::NamedDecl *>());
+
   return None;
 }
 
@@ -1875,6 +1940,15 @@ inline bool requiresCPlusPlus(const clang::Module *module) {
   return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
     return req.first == "cplusplus";
   });
+}
+
+inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  if (OperatorToken == Spelling) {                                             \
+    return "__operator" #Name;                                                 \
+  };
+#include "clang/Basic/OperatorKinds.def"
+  return "None";
 }
 
 }

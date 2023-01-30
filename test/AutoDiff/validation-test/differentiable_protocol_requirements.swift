@@ -1,8 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// Disabled due to test failure with `-O`: SR-13250.
-// SR-13250 is tracking the fix for compiling this test with optimizations.
+// FIXME: Disabled due to test failure with `-O` (https://github.com/apple/swift/issues/55690).
 // XFAIL: swift_test_mode_optimize
 // XFAIL: swift_test_mode_optimize_size
 // XFAIL: swift_test_mode_optimize_unchecked

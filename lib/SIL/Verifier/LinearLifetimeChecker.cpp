@@ -295,7 +295,7 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
   // If we do not have any consuming uses in the same block as our
   // consuming user, then we can not have a same block use-after-free.
   auto iter = blocksWithNonConsumingUses.find(userBlock);
-  if (!iter.hasValue()) {
+  if (!iter.has_value()) {
     return;
   }
 
@@ -314,9 +314,10 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
                        }) == userBlock->end()) {
         continue;
       }
-    } else if (auto borrowingOperand = BorrowingOperand(nonConsumingUse)) {
-      assert(borrowingOperand.isReborrow());
-      // a reborrow is expected to be consumed by the same phi.
+    } else if (nonConsumingUse->getOperandOwnership() ==
+                   OperandOwnership::Reborrow ||
+               nonConsumingUse->getOperandOwnership() ==
+                   OperandOwnership::GuaranteedForwarding) {
       continue;
     }
 

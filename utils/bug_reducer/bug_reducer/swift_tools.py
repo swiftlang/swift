@@ -157,8 +157,8 @@ class SILOptInvoker(SILConstantInputToolInvoker):
         return self.tools.sil_opt
 
     def _cmdline(self, input_file, passes, emit_sib, output_file='-'):
-        assert(isinstance(emit_sib, bool))
-        assert(isinstance(output_file, str))
+        assert isinstance(emit_sib, bool)
+        assert isinstance(output_file, str)
         base_args = self.base_args(emit_sib)
         sanity_check_file_exists(input_file)
         base_args.extend([input_file, '-o', output_file])
@@ -189,12 +189,12 @@ class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
 
     def _cmdline(self, input_file, funclist_path, emit_sib, output_file='-',
                  invert=False):
-        assert(isinstance(emit_sib, bool))
-        assert(isinstance(output_file, str))
+        assert isinstance(emit_sib, bool)
+        assert isinstance(output_file, str)
 
         sanity_check_file_exists(input_file)
         sanity_check_file_exists(funclist_path)
-        assert(isinstance(funclist_path, str))
+        assert isinstance(funclist_path, str)
         base_args = self.base_args(emit_sib)
         base_args.extend([input_file, '-o', output_file,
                           '-func-file=%s' % funclist_path])
@@ -204,7 +204,7 @@ class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
 
     def _invoke(self, input_file, funclist_path, output_filename,
                 invert=False):
-        assert(isinstance(funclist_path, str))
+        assert isinstance(funclist_path, str)
         cmdline = self._cmdline(input_file,
                                 funclist_path,
                                 True,
@@ -214,7 +214,7 @@ class SILFuncExtractorInvoker(SILConstantInputToolInvoker):
 
     def invoke_with_functions(self, funclist_path, output_filename,
                               invert=False):
-        assert(isinstance(funclist_path, str))
+        assert isinstance(funclist_path, str)
         return self._invoke(self.input_file, funclist_path, output_filename,
                             invert)
 
@@ -236,5 +236,5 @@ class SILNMInvoker(SILToolInvoker):
         output = subprocess.check_output(cmdline)
         for line in output.split("\n")[:-1]:
             t = tuple(line.split(" "))
-            assert(len(t) == 2)
+            assert len(t) == 2
             yield t

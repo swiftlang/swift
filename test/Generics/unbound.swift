@@ -137,3 +137,19 @@ do {
   assertExactType(of: x1, is: Generic<Int, Bool>.self)
   assertExactType(of: x2, is: Generic<Int, Bool>.self)
 }
+
+// https://github.com/apple/swift/issues/60922
+
+enum E<T> {}
+// expected-note@-1 2 {{generic type 'E' declared here}}
+
+extension E? {}
+// expected-error@-1{{reference to generic type 'E' requires arguments in <...>}}
+extension Optional<E> {}
+// expected-error@-1{{reference to generic type 'E' requires arguments in <...>}}
+
+struct G<T> {}
+// expected-note@-1{{generic type 'G' declared here}}
+
+extension G? {}
+// expected-error@-1{{reference to generic type 'G' requires arguments in <...>}}

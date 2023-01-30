@@ -6,16 +6,16 @@ add_custom_command(
   COMMAND
     ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/diagnostics/ ${CMAKE_BINARY_DIR}/share/swift/diagnostics/
   COMMAND
-    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swift-def-to-yaml-converter"
+    "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swift-def-to-strings-converter"
       --output-directory ${CMAKE_BINARY_DIR}/share/swift/diagnostics/
   COMMAND
     "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swift-serialize-diagnostics"
-      --input-file-path ${CMAKE_BINARY_DIR}/share/swift/diagnostics/en.yaml
+      --input-file-path ${CMAKE_BINARY_DIR}/share/swift/diagnostics/en.strings
       --output-directory ${CMAKE_BINARY_DIR}/share/swift/diagnostics/
   COMMAND
     ${CMAKE_COMMAND} -E touch ${diagnostic_witness}
   DEPENDS
-    swift-def-to-yaml-converter
+    swift-def-to-strings-converter
     swift-serialize-diagnostics
     # Add files in diagnostics subdirectory when they're created
 )
@@ -31,4 +31,5 @@ swift_install_in_component(
   FILES_MATCHING
   PATTERN "*.db"
   PATTERN "*.yaml"
+  PATTERN "*.strings"
 )

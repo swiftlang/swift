@@ -79,10 +79,8 @@ struct SymbolGraph {
    */
   bool IsForSingleNode;
 
-  SymbolGraph(SymbolGraphASTWalker &Walker,
-              ModuleDecl &M,
-              Optional<ModuleDecl *> ExtendedModule,
-              markup::MarkupContext &Ctx,
+  SymbolGraph(SymbolGraphASTWalker &Walker, ModuleDecl &M,
+              Optional<ModuleDecl *> ExtendedModule, markup::MarkupContext &Ctx,
               Optional<llvm::VersionTuple> ModuleVersion = None,
               bool IsForSingleNode = false);
 

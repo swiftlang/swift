@@ -113,25 +113,16 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
     if (SILValue NewValue = TI->getUniqueNonTrivialElt())
       return NewValue;
 
-  // Any SILArgument with a single predecessor from a "phi" perspective is
-  // dead. In such a case, the SILArgument must be rc-identical.
-  //
-  // This is the easy case. The difficult case is when you have an argument with
-  // /multiple/ predecessors.
-  //
-  // We do not need to insert this SILArgument into the visited SILArgument set
-  // since we will only visit it twice if we go around a back edge due to a
-  // different SILArgument that is actually being used for its phi node like
-  // purposes.
-  if (auto *A = dyn_cast<SILPhiArgument>(V)) {
-    if (SILValue Result = A->getSingleTerminatorOperand()) {
-      // In case the terminator is a conditional cast, Result is the source of
-      // the cast.
-      auto dynCast = SILDynamicCastInst::getAs(A->getSingleTerminator());
-      if (dynCast && !dynCast.isRCIdentityPreserving())
-        return SILValue();
-      return Result;
-    }
+  if (auto *result = SILArgument::isTerminatorResult(V)) {
+    if (auto *forwardedOper = result->forwardedTerminatorResultOperand())
+      return forwardedOper->get();
+  }
+
+  // Handle useless single-predecessor phis for legacy reasons. (Although these
+  // should have been removed as a standard SIL cleanup).
+  if (auto phi = PhiValue(V)) {
+    if (auto *singlePred = phi.phiBlock->getSinglePredecessorBlock())
+      return phi.getOperand(singlePred)->get();
   }
 
   return SILValue();
@@ -252,8 +243,8 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
 
     // If we found either a signal of a payloaded or a non-payloaded enum,
     // return that value.
-    if (Result.hasValue())
-      return Result.getValue();
+    if (Result.has_value())
+      return Result.value();
 
     // If we didn't reach RCIdentityBB, keep processing up the DomTree.
     if (DominatingBB != RCIdentityBB)

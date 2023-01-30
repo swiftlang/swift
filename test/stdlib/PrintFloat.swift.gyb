@@ -768,8 +768,9 @@ PrintTests.test("Printable_Float") {
   // Second-worst case for shortness:
   expectDescription("7.038531e-26", Float("7.038531e-26")!)
   // Note: The above test computes the reference value from a
-  // string because `7.038531e-26 as Float` is broken:
-  // See https://bugs.swift.org/browse/SR-7124
+  // string because `7.038531e-26 as Float` is broken.
+  //
+  // See https://github.com/apple/swift/issues/49672.
 
   // NaNs require special care in testing:
   // NaN is printed with additional detail to debugDescription, but not description

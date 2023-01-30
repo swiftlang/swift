@@ -36,7 +36,7 @@ static bool hasOnlyIncidentalUses(SILInstruction *inst,
 /// its operand or may produce scoped results that require cleaning up. E.g.
 /// begin_borrow, begin_access, copy_value, a call that produces a owned value
 /// are scoped instructions. The scope of the results of the first two
-/// instructions end with an end_borrow/acess instruction, while those of the
+/// instructions end with an end_borrow/access instruction, while those of the
 /// latter two end with a consuming operation like destroy_value instruction.
 /// These instruction may also end the scope of its operand e.g. a call could
 /// consume owned arguments thereby ending its scope. Dead-code eliminating a
@@ -180,7 +180,7 @@ void InstructionDeleter::forceTrackAsDead(SILInstruction *inst) {
 /// operands.
 ///
 /// \p forceDeleteUsers allows deleting an instruction with non-incidental,
-/// non-destoy uses, such as a store.
+/// non-destroy uses, such as a store.
 ///
 /// Does not call callbacks.notifyWillBeDeleted for \p inst. But does
 /// for any other instructions that become dead as a result.

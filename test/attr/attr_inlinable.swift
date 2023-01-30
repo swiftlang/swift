@@ -219,7 +219,9 @@ class Derived2 : Middle2 {
 }
 
 
-// Even more inherited initializers - https://bugs.swift.org/browse/SR-10940
+// https://github.com/apple/swift/issues/53331
+// Even more inherited initializers.
+
 @_fixed_layout
 public class Base3 {}
 // expected-note@-1 {{initializer 'init()' is not '@usableFromInline' or public}}
@@ -330,7 +332,8 @@ public struct PrivateInlinableCrash {
   }
 }
 
-// https://bugs.swift.org/browse/SR-12404
+// https://github.com/apple/swift/issues/54842
+
 @inlinable public func inlinableOuterFunction() {
   func innerFunction1(x: () = privateFunction()) {}
   // expected-error@-1 {{global function 'privateFunction()' is private and cannot be referenced from a default argument value}}

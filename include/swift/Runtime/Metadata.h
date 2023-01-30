@@ -18,9 +18,9 @@
 #define SWIFT_RUNTIME_METADATA_H
 
 #include "swift/ABI/Metadata.h"
-#include "swift/Reflection/Records.h"
+#include "swift/RemoteInspection/Records.h"
 #include "swift/Runtime/Once.h"
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 
 namespace swift {
 
@@ -142,7 +142,13 @@ SWIFT_RUNTIME_EXPORT
 const ValueWitnessTable
   VALUE_WITNESS_SYM(FUNCTION_MANGLING);     // () -> ()
 
-// The @escaping () -> () table can be used for arbitrary escaping function types.
+// The @differentiable(reverse) () -> () table can be used for differentiable
+// function types.
+SWIFT_RUNTIME_EXPORT
+const ValueWitnessTable
+  VALUE_WITNESS_SYM(DIFF_FUNCTION_MANGLING); // @differentiable(reverse) () -> ()
+
+// The @noescape () -> () table can be used for arbitrary noescaping function types.
 SWIFT_RUNTIME_EXPORT
 const ValueWitnessTable
   VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING);     // @noescape () -> ()
@@ -307,7 +313,7 @@ swift_getGenericMetadata(MetadataRequest request,
 ///   - installing new v-table entries and overrides; and
 ///   - registering the class with the runtime under ObjC interop.
 /// Most of this work can be achieved by calling swift_initClassMetadata.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 ClassMetadata *
 swift_allocateGenericClassMetadata(const ClassDescriptor *description,
                                    const void *arguments,
@@ -316,7 +322,7 @@ swift_allocateGenericClassMetadata(const ClassDescriptor *description,
 /// Allocate a generic value metadata object.  This is intended to be
 /// called by the metadata instantiation function of a generic struct or
 /// enum.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 ValueMetadata *
 swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
                                    const void *arguments,
@@ -348,6 +354,11 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
                       const Metadata *type,
                       const void * const *instantiationArgs);
 
+const WitnessTable *
+swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *conformance,
+                      const Metadata *type,
+                      const void * const *instantiationArgs);
+
 /// Retrieve an associated type witness from the given witness table.
 ///
 /// \param wtable The witness table.
@@ -358,6 +369,13 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
 /// \returns metadata for the associated type witness.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_getAssociatedTypeWitness(
+                                          MetadataRequest request,
+                                          WitnessTable *wtable,
+                                          const Metadata *conformingType,
+                                          const ProtocolRequirement *reqBase,
+                                          const ProtocolRequirement *assocType);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse swift_getAssociatedTypeWitnessRelative(
                                           MetadataRequest request,
                                           WitnessTable *wtable,
                                           const Metadata *conformingType,
@@ -376,6 +394,14 @@ MetadataResponse swift_getAssociatedTypeWitness(
 /// \returns corresponding witness table.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 const WitnessTable *swift_getAssociatedConformanceWitness(
+                                  WitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance);
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+const WitnessTable *swift_getAssociatedConformanceWitnessRelative(
                                   WitnessTable *wtable,
                                   const Metadata *conformingType,
                                   const Metadata *assocType,

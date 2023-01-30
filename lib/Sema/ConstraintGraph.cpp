@@ -1135,7 +1135,7 @@ namespace {
             if (cs.isDebugMode()) {
               auto &log = llvm::errs();
               if (cs.solverState)
-                log.indent(cs.solverState->depth * 2);
+                log.indent(cs.solverState->getCurrentIndent());
 
               log << "Collapsing one-way components for $T"
                   << edge.first->getID() << " and $T" << edge.second->getID()
@@ -1438,12 +1438,12 @@ bool ConstraintGraph::contractEdges() {
     auto rep2 = CS.getRepresentative(tyvar2);
 
     if (CS.isDebugMode()) {
-      auto &log = llvm::errs();
-      if (CS.solverState)
-        log.indent(CS.solverState->depth * 2);
+      auto indent = CS.solverState ? CS.solverState->getCurrentIndent() : 0;
+      auto &log = llvm::errs().indent(indent);
 
       log << "Contracting constraint ";
-      constraint->print(log, &CS.getASTContext().SourceMgr);
+      constraint->print(log.indent(indent), &CS.getASTContext().SourceMgr,
+                        indent);
       log << "\n";
     }
 
@@ -1488,7 +1488,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
 
     for (auto constraint : sortedConstraints) {
       out.indent(indent + 4);
-      constraint->print(out, &TypeVar->getASTContext().SourceMgr);
+      constraint->print(out, &TypeVar->getASTContext().SourceMgr, indent + 4);
       out << "\n";
     }
   }
@@ -1545,7 +1545,8 @@ void ConstraintGraph::print(ArrayRef<TypeVariableType *> typeVars,
   PO.PrintTypesForDebugging = true;
 
   for (auto typeVar : typeVars) {
-    (*this)[typeVar].print(out, 2, PO);
+    (*this)[typeVar].print(
+        out, (CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2, PO);
     out << "\n";
   }
 }
@@ -1558,6 +1559,123 @@ void ConstraintGraph::dump(llvm::raw_ostream &out) {
   print(CS.getTypeVariables(), out);
 }
 
+void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
+                                             unsigned indent) {
+  if (Changes.empty())
+    return;
+
+  // Collect Changes for printing.
+  std::map<TypeVariableType *, TypeBase *> tvWithboundTypes;
+  std::vector<TypeVariableType *> addedTypeVars;
+  std::vector<TypeVariableType *> equivTypeVars;
+  std::set<Constraint *> addedConstraints;
+  std::set<Constraint *> removedConstraints;
+  for (unsigned int i = ActiveScope->getStartIdx(); i < Changes.size(); i++) {
+    auto change = Changes[i];
+    switch (change.Kind) {
+    case ChangeKind::BoundTypeVariable:
+      tvWithboundTypes.insert(std::pair<TypeVariableType *, TypeBase *>(
+          change.Binding.TypeVar, change.Binding.FixedType));
+      break;
+    case ChangeKind::AddedTypeVariable:
+      addedTypeVars.push_back(change.TypeVar);
+      break;
+    case ChangeKind::ExtendedEquivalenceClass:
+      equivTypeVars.push_back(change.EquivClass.TypeVar);
+      break;
+    case ChangeKind::AddedConstraint:
+      addedConstraints.insert(change.TheConstraint);
+      break;
+    case ChangeKind::RemovedConstraint:
+      removedConstraints.insert(change.TheConstraint);
+      break;
+    }
+  }
+
+  // If there are any constraints that were both added and removed in this set
+  // of Changes, remove them from both.
+  std::set<Constraint *> intersects;
+  set_intersection(addedConstraints.begin(), addedConstraints.end(),
+                   removedConstraints.begin(), removedConstraints.end(),
+                   std::inserter(intersects, intersects.begin()));
+  llvm::set_subtract(addedConstraints, intersects);
+  llvm::set_subtract(removedConstraints, intersects);
+
+  // Print out Changes.
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  out.indent(indent);
+  out << "(Changes:\n";
+  if (!tvWithboundTypes.empty()) {
+    out.indent(indent + 2);
+    out << "(Newly Bound: \n";
+    for (const auto &tvWithType : tvWithboundTypes) {
+      out.indent(indent + 4);
+      out << "> $T" << tvWithType.first->getImpl().getID() << " := ";
+      tvWithType.second->print(out, PO);
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
+  if (!addedTypeVars.empty()) {
+    out.indent(indent + 2);
+    auto heading = (addedTypeVars.size() > 1) ? "(New Type Variables: \n"
+                                              : "(New Type Variable: \n";
+    out << heading;
+    for (const auto &typeVar : addedTypeVars) {
+      out.indent(indent + 4);
+      out << "> $T" << typeVar->getImpl().getID();
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
+  if (!equivTypeVars.empty()) {
+    out.indent(indent + 2);
+    auto heading = (equivTypeVars.size() > 1) ? "(New Equivalences: \n"
+                                              : "(New Equivalence: \n";
+    out << heading;
+    for (const auto &typeVar : equivTypeVars) {
+      out.indent(indent + 4);
+      out << "> $T" << typeVar->getImpl().getID();
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
+  if (!addedConstraints.empty()) {
+    out.indent(indent + 2);
+    auto heading = (addedConstraints.size() > 1) ? "(Added Constraints: \n"
+                                                 : "(Added Constraint: \n";
+    out << heading;
+    for (const auto &constraint : addedConstraints) {
+      out.indent(indent + 4);
+      out << "> ";
+      constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
+  if (!removedConstraints.empty()) {
+    out.indent(indent + 2);
+    auto heading = (removedConstraints.size() > 1) ? "(Removed Constraints: \n"
+                                                   : "(Removed Constraint: \n";
+    out << heading;
+    for (const auto &constraint : removedConstraints) {
+      out.indent(indent + 4);
+      out << "> ";
+      constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
+  out.indent(indent);
+  out << ")\n";
+}
+
 void ConstraintGraph::printConnectedComponents(
     ArrayRef<TypeVariableType *> typeVars,
     llvm::raw_ostream &out) {
@@ -1565,7 +1683,7 @@ void ConstraintGraph::printConnectedComponents(
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
   for (const auto& component : components) {
-    out.indent(2);
+    out.indent((CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2);
     out << component.solutionIndex << ": ";
     SWIFT_DEFER {
       out << '\n';

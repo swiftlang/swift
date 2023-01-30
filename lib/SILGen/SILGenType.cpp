@@ -193,7 +193,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
       SILLinkage::Private, name, overrideInfo.SILFnType,
       genericEnv, loc,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
-      IsNotDistributed, ProfileCounter(), IsThunk);
+      IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);
@@ -477,9 +477,9 @@ private:
     // substitute the witness's derivative generic signature in its derivative
     // function identifier.
     if (requirementRef.isAutoDiffDerivativeFunction()) {
-      auto *reqrRerivativeId = requirementRef.getDerivativeFunctionIdentifier();
+      auto *reqrDerivativeId = requirementRef.getDerivativeFunctionIdentifier();
       auto *witnessDerivativeId = AutoDiffDerivativeFunctionIdentifier::get(
-          reqrRerivativeId->getKind(), reqrRerivativeId->getParameterIndices(),
+          reqrDerivativeId->getKind(), reqrDerivativeId->getParameterIndices(),
           witness.getDerivativeGenericSignature(), witnessRef.getASTContext());
       witnessRef = witnessRef.asAutoDiffDerivativeFunction(witnessDerivativeId);
     }
@@ -707,10 +707,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
        !requirement.getFuncDecl()->isDistributed() &&
        witnessRef.hasDecl() && witnessRef.getFuncDecl() &&
        witnessRef.getFuncDecl()->isDistributed());
-  // We only need to use thunks when we go cross-actor:
-  shouldUseDistributedThunkWitness = shouldUseDistributedThunkWitness &&
-                                     getActorIsolation(requirement.getDecl()) !=
-                                         getActorIsolation(witness.getDecl());
   if (shouldUseDistributedThunkWitness) {
     auto thunkDeclRef = SILDeclRef(
         witnessRef.getFuncDecl()->getDistributedThunk(),
@@ -732,7 +728,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
     reqtOrigTy->substGenericArgs(reqtSubMap)
-      ->getCanonicalType(genericSig));
+      ->getReducedType(genericSig));
 
   // Generic signatures where all parameters are concrete are lowered away
   // at the SILFunctionType level.
@@ -821,8 +817,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto *f = builder.createFunction(
       linkage, nameBuffer, witnessSILFnType, genericEnv,
       SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent, isSerialized,
-      IsNotDynamic, IsNotDistributed, ProfileCounter(), IsThunk,
-      SubclassScope::NotApplicable, InlineStrategy);
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(),
+      IsThunk, SubclassScope::NotApplicable, InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
@@ -870,7 +866,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   // Open the protocol type.
   auto openedType = OpenedArchetypeType::get(
-      protocol->getExistentialType()->getCanonicalType(), GenericSignature());
+      protocol->getDeclaredExistentialType()->getCanonicalType(),
+      GenericSignature());
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,
@@ -895,8 +892,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   auto *f = builder.createFunction(
       linkage, name, witnessSILFnType, genericEnv,
       SILLocation(requirement.getDecl()), IsNotBare, IsTransparent,
-      IsSerialized, IsNotDynamic, IsNotDistributed, ProfileCounter(), IsThunk,
-      SubclassScope::NotApplicable, InlineDefault);
+      IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
+      ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineDefault);
 
   f->setDebugScope(new (SGM.M)
                    SILDebugScope(RegularLocation(requirement.getDecl()), f));
@@ -1118,6 +1115,14 @@ public:
       if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
         SGM.getWitnessTable(normal);
     }
+
+    // Emit `init(for:storage)` initializer as it would be used
+    // by DI and IRGen later on.
+    if (auto typeWrapperInfo = theType->getTypeWrapper()) {
+      auto *ctor = typeWrapperInfo->Wrapper->getTypeWrapperInitializer();
+      assert(ctor);
+      (void)SGM.getFunction(SILDeclRef(ctor), NotForDefinition);
+    }
   }
 
   //===--------------------------------------------------------------------===//
@@ -1125,7 +1130,8 @@ public:
   //===--------------------------------------------------------------------===//
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *otd) {}
-  void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
+  void visitGenericTypeParamDecl(GenericTypeParamDecl *d) {}
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *d) {}
   void visitModuleDecl(ModuleDecl *md) {}
   void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
@@ -1145,9 +1151,17 @@ public:
         !isa<ProtocolDecl>(cd->getDeclContext()))
       SGM.emitObjCConstructorThunk(cd);
   }
+
   void visitDestructorDecl(DestructorDecl *dd) {
-    assert(isa<ClassDecl>(theType) && "destructor in a non-class type");
-    SGM.emitDestructor(cast<ClassDecl>(theType), dd);
+    if (auto *cd = dyn_cast<ClassDecl>(theType))
+      return SGM.emitDestructor(cast<ClassDecl>(theType), dd);
+    if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
+      if (nom->isMoveOnly()) {
+        return SGM.emitMoveOnlyDestructor(nom, dd);
+      }
+    }
+    assert(isa<ClassDecl>(theType) &&
+           "destructor in a non-class, non-moveonly type");
   }
 
   void visitEnumCaseDecl(EnumCaseDecl *ecd) {}
@@ -1215,6 +1229,19 @@ public:
       visitFuncDecl(accessor);
     });
   }
+
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in SILGen");
+  }
+
+  void visitMacroDecl(MacroDecl *md) {
+    llvm_unreachable("macros aren't allowed in types");
+  }
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
+    for (auto *rewritten : med->getRewritten())
+      visit(rewritten);
+  }
 };
 
 } // end anonymous namespace
@@ -1234,8 +1261,20 @@ public:
 
   /// Emit SIL functions for all the members of the extension.
   void emitExtension(ExtensionDecl *e) {
+    // Arguably, we should divert to SILGenType::emitType() here if it's an
+    // @_objcImplementation extension, but we don't actually need to do any of
+    // the stuff that it currently does.
+
     for (Decl *member : e->getABIMembers())
       visit(member);
+    
+    // If this is a main-interface @_objcImplementation extension and the class
+    // has a synthesized destructor, emit it now.
+    if (auto cd = dyn_cast_or_null<ClassDecl>(e->getImplementedObjCDecl())) {
+      auto dd = cd->getDestructor();
+      if (dd->getDeclContext() == cd)
+        visit(dd);
+    }
 
     if (!isa<ProtocolDecl>(e->getExtendedNominal())) {
       // Emit witness tables for protocol conformances introduced by the
@@ -1254,7 +1293,8 @@ public:
   //===--------------------------------------------------------------------===//
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *tad) {}
-  void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
+  void visitGenericTypeParamDecl(GenericTypeParamDecl *d) {}
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *d) {}
   void visitModuleDecl(ModuleDecl *md) {}
   void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
@@ -1294,14 +1334,18 @@ public:
       SGM.emitObjCConstructorThunk(cd);
   }
   void visitDestructorDecl(DestructorDecl *dd) {
+    auto contextInterface = dd->getDeclContext()->getImplementedObjCContext();
+    if (auto cd = dyn_cast<ClassDecl>(contextInterface)) {
+      SGM.emitDestructor(cd, dd);
+      return;
+    }
     llvm_unreachable("destructor in extension?!");
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
     for (auto i : range(pd->getNumPatternEntries())) {
-      if (pd->getExecutableInit(i)) {
-        assert(pd->isStatic() && "stored property in extension?!");
+      if (pd->getExecutableInit(i) && pd->isStatic()) {
         SGM.emitGlobalInitialization(pd, i);
       }
     }
@@ -1309,6 +1353,17 @@ public:
 
   void visitVarDecl(VarDecl *vd) {
     if (vd->hasStorage()) {
+      if (!vd->isStatic()) {
+        // Is this a stored property of an @_objcImplementation extension?
+        auto ed = cast<ExtensionDecl>(vd->getDeclContext());
+        if (auto cd =
+                dyn_cast_or_null<ClassDecl>(ed->getImplementedObjCDecl())) {
+          // Act as though we declared it on the class.
+          SILGenType(SGM, cd).visitVarDecl(vd);
+          return;
+        }
+      }
+
       bool hasDidSetOrWillSetDynamicReplacement =
           vd->hasDidSetOrWillSetDynamicReplacement();
       assert((vd->isStatic() || hasDidSetOrWillSetDynamicReplacement) &&
@@ -1351,6 +1406,19 @@ public:
     asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
+  }
+
+  void visitMissingDecl(MissingDecl *missing) {
+    llvm_unreachable("missing decl in SILGen");
+  }
+
+  void visitMacroDecl(MacroDecl *md) {
+    llvm_unreachable("macros aren't allowed in extensions");
+  }
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
+    for (auto *rewritten : med->getRewritten())
+      visit(rewritten);
   }
 };
 

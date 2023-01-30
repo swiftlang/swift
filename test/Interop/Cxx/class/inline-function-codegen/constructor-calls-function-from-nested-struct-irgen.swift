@@ -11,5 +11,5 @@ let b = HoldMemberThatHoldsMemberThatHolds42()
 
 let sum = a.holder.m + b.holder.holder.m
 
-// CHECK-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z9incrementi|"\?increment@@YAHH@Z"}}(i32 %t)
-// CHECK-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z5get42v|"\?get42@@YAHXZ"}}
+// CHECK-DAG: define {{.*}}i32 @{{_Z9incrementi|"\?increment@@YAHH@Z"}}(i32 {{.*}})
+// CHECK-DAG: define {{.*}}i32 @{{_Z5get42v|"\?get42@@YAHXZ"}}

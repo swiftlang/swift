@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/setter-in-cxx.swift -typecheck -module-name Properties -clang-header-expose-public-decls -emit-clang-header-path %t/properties.h
+// RUN: %target-swift-frontend %S/setter-in-cxx.swift -typecheck -module-name Properties -clang-header-expose-decls=all-public -emit-clang-header-path %t/properties.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-props-execution.o
 // RUN: %target-interop-build-swift %S/setter-in-cxx.swift -o %t/swift-props-execution -Xlinker %t/swift-props-execution.o -module-name Properties -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -47,5 +47,21 @@ int main() {
 
   smallStructWithProps.setLargeStructWithProps(largeStructWithProps);
 // CHECK-NEXT: SET: LargeStruct(x1: 0, x2: 2, x3: -72, x4: 3, x5: 4, x6: 5), FirstSmallStruct(x: 999)
+
+  auto propsInClass = createPropsInClass(-1234);
+  assert(propsInClass.getStoredInt() == -1234);
+  propsInClass.setStoredInt(45);
+  assert(propsInClass.getStoredInt() == 45);
+  propsInClass.setComputedInt(-11);
+  assert(propsInClass.getComputedInt() == -11);
+  assert(propsInClass.getStoredInt() == -13);
+
+  {
+    auto x = LargeStruct::getStaticX();
+    assert(x == 0);
+    LargeStruct::setStaticX(13);
+    x = LargeStruct::getStaticX();
+    assert(x == 13);
+  }
   return 0;
 }

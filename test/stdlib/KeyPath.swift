@@ -986,24 +986,24 @@ keyPath.test("key path literal closures") {
   expectEqual(3, variadicFn("a", "b", "c"))
 }
 
-// SR-6096
+// https://github.com/apple/swift/issues/48651
 
-protocol Protocol6096 {}
-struct Value6096<ValueType> {}
-extension Protocol6096 {
+protocol P_48651 {}
+struct S_48651<ValueType> {}
+extension P_48651 {
     var asString: String? {
         return self as? String
     }
 }
-extension Value6096 where ValueType: Protocol6096 {
+extension S_48651 where ValueType: P_48651 {
     func doSomething() {
         _ = \ValueType.asString?.endIndex
     }
 }
-extension Int: Protocol6096 {}
+extension Int: P_48651 {}
 
 keyPath.test("optional chaining component that needs generic instantiation") {
-  Value6096<Int>().doSomething()
+  S_48651<Int>().doSomething()
 }
 
 // Nested generics.

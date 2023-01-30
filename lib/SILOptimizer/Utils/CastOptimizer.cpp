@@ -630,7 +630,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     auto result = findBridgeToObjCFunc(functionBuilder, dynamicCast);
     if (!result)
       return nullptr;
-    std::tie(bridgedFunc, subMap) = result.getValue();
+    std::tie(bridgedFunc, subMap) = result.value();
   }
 
   SILType SubstFnTy = bridgedFunc->getLoweredType().substGenericArgs(
@@ -679,7 +679,6 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     break;
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
     // Currently this
     // cannot appear, because the _bridgeToObjectiveC protocol witness method
     // always receives the this pointer (= the source) as guaranteed.
@@ -1354,7 +1353,7 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    auto *Trap = Builder.createBuiltinTrap(Loc);
+    auto *Trap = Builder.createUnconditionalFail(Loc, "failed cast");
     Inst->replaceAllUsesWithUndef();
     eraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
@@ -1366,7 +1365,7 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     deleteInstructionsAfterUnreachable(UnreachableInst, Trap);
 
     willFailAction();
-    return Trap;
+    return nullptr;
   }
 
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
@@ -1546,7 +1545,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    auto *TrapI = Builder.createBuiltinTrap(Loc);
+    auto *TrapI = Builder.createUnconditionalFail(Loc, "failed cast");
     eraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(TrapI->getIterator()));
     auto *UnreachableInst =

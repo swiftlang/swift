@@ -3,8 +3,8 @@
 // their bridged type.
 //
 // This is particularly important for `CGFloat`, which has a native Swift decl
-// in the CoreGraphics overlay that shadows the imported Clang decl, so relying
-// solely on whether or not the decl has a Clang node is not sufficient.
+// in the CoreFoundation overlay that shadows the imported Clang decl, so
+// relying solely on whether or not the decl has a Clang node is not sufficient.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck %s -parse-as-library -emit-objc-header-path %t/swift.h
@@ -17,8 +17,6 @@
 
 import CoreGraphics
 import Foundation
-
-// CHECK: @import CoreGraphics;
 
 // CHECK-NOT: @class NSNumber;
 

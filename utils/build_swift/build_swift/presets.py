@@ -116,7 +116,7 @@ class PresetError(Exception):
 
 
 class DuplicatePresetError(PresetError):
-    """Raised when an existing preset would be overriden.
+    """Raised when an existing preset would be overridden.
     """
 
     def __init__(self, preset_name):
@@ -306,7 +306,7 @@ class PresetParser(object):
     @_catch_duplicate_option_error
     @_catch_duplicate_section_error
     def read_string(self, string):
-        """Reads and parses a string containing preset definintions.
+        """Reads and parses a string containing preset definitions.
         """
 
         fp = io.StringIO(string)
@@ -352,9 +352,9 @@ class PresetParser(object):
     def _interpolate_preset_vars(self, preset, vars):
         interpolated_options = []
         for (name, value) in preset.options:
-            # If the option is a key-value pair, e.g. 
+            # If the option is a key-value pair, e.g.
             # install-destdir=%(install_dir)s
-            # interpolate the value. If it is a raw option, e.g. 
+            # interpolate the value. If it is a raw option, e.g.
             # %(some_flag)s
             # is a raw option without a value, expand the name.
             if value:

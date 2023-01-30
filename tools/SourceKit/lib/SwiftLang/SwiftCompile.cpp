@@ -15,7 +15,7 @@
 
 #include "SourceKit/Support/FileSystemProvider.h"
 
-#include "swift/IDE/CompileInstance.h"
+#include "swift/IDETool/CompileInstance.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 

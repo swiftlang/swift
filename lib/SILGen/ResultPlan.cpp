@@ -68,9 +68,10 @@ public:
     assert(box && "buffer never emitted before activating cleanup?!");
     auto theBox = box;
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      auto *bbi = cast<BeginBorrowInst>(theBox);
-      SGF.B.createEndBorrow(loc, bbi);
-      theBox = bbi->getOperand();
+      if (auto *bbi = cast<BeginBorrowInst>(theBox)) {
+        SGF.B.createEndBorrow(loc, bbi);
+        theBox = bbi->getOperand();
+      }
     }
     SGF.B.createDeallocBox(loc, theBox);
   }
@@ -96,7 +97,7 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
   SmallVector<Requirement, 2> requirements;
   for (const unsigned i : indices(openedTypes)) {
     auto *param = GenericTypeParamType::get(
-        /*type sequence*/ false, /*depth*/ 0, /*index*/ i, ctx);
+        /*isParameterPack*/ false, /*depth*/ 0, /*index*/ i, ctx);
     params.push_back(param);
 
     Type constraintTy = openedTypes[i]->getExistentialType();
@@ -179,7 +180,7 @@ public:
         layoutSubs.getGenericSignature().getCanonicalSignature();
     auto boxLayout =
         SILLayout::get(SGF.getASTContext(), layoutSig,
-                       SILField(layoutTy->getCanonicalType(layoutSig), true),
+                       SILField(layoutTy->getReducedType(layoutSig), true),
                        /*captures generics*/ false);
 
     resultBox = SGF.B.createAllocBox(loc,
@@ -526,8 +527,8 @@ public:
     // Get the current continuation for the task.
     bool throws =
         calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
-            .hasValue() ||
-        calleeTypeInfo.foreign.error.hasValue();
+            .has_value() ||
+        calleeTypeInfo.foreign.error.has_value();
 
     continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
                                calleeTypeInfo.substResultType, throws);
@@ -576,8 +577,8 @@ public:
     SILFunction *impl =
         SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
             cast<SILFunctionType>(
-                impFnTy->mapTypeOutOfContext()->getCanonicalType(sig)),
-            continuationTy->mapTypeOutOfContext()->getCanonicalType(sig),
+                impFnTy->mapTypeOutOfContext()->getReducedType(sig)),
+            continuationTy->mapTypeOutOfContext()->getReducedType(sig),
             origFormalType, sig, *calleeTypeInfo.foreign.async,
             calleeTypeInfo.foreign.error);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
@@ -614,8 +615,8 @@ public:
     SILBasicBlock *errorBlock = nullptr;
     bool throws =
         calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
-            .hasValue() ||
-        calleeTypeInfo.foreign.error.hasValue();
+            .has_value() ||
+        calleeTypeInfo.foreign.error.has_value();
     if (throws) {
       errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);
     }
@@ -660,7 +661,7 @@ public:
         auto sig = env ? env->getGenericSignature().getCanonicalSignature()
                        : CanGenericSignature();
         auto mappedContinuationTy =
-            continuationBGT->mapTypeOutOfContext()->getCanonicalType(sig);
+            continuationBGT->mapTypeOutOfContext()->getReducedType(sig);
         auto resumeType =
             cast<BoundGenericType>(mappedContinuationTy).getGenericArgs()[0];
         auto continuationTy = continuationBGT->getCanonicalType();
@@ -891,7 +892,7 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
       subPlan = ResultPlanPtr(
           new ForeignAsyncInitializationPlan(SGF, loc, calleeTypeInfo));
     } else {
-      subPlan = build(init, calleeTypeInfo.origResultType.getValue(),
+      subPlan = build(init, calleeTypeInfo.origResultType.value(),
                       calleeTypeInfo.substResultType);
     }
     return ResultPlanPtr(new ForeignErrorInitializationPlan(
@@ -903,7 +904,7 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
         new ForeignAsyncInitializationPlan(SGF, loc, calleeTypeInfo));
   } else {
     // Otherwise, we can just call build.
-    return build(init, calleeTypeInfo.origResultType.getValue(),
+    return build(init, calleeTypeInfo.origResultType.value(),
                  calleeTypeInfo.substResultType);
   }
 }
@@ -990,7 +991,7 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
   // If the tuple is address-only, we'll get much better code if we
   // emit into a single buffer.
   auto &substTL = SGF.getTypeLowering(substType);
-  if (substTL.isAddressOnly()) {
+  if (substTL.isAddressOnly() && SGF.F.getConventions().useLoweredAddresses()) {
     // Create a temporary.
     auto temporary = SGF.emitTemporary(loc, substTL);
 

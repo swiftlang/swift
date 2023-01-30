@@ -205,7 +205,7 @@ func testFallbackPostfix() {
 // doesn't match the already-provided parameters (missing `name` label argument
 // and closure does not return `String`). However, we are not type-checking at
 // the stage at which we complete argument labels, so we can't rule it out for
-// now (SR-14450).
+// now. (https://github.com/apple/swift/issues/56806)
 // INIT_FALLBACK_1: Begin completions, 3 items
 // INIT_FALLBACK_1-DAG: Pattern/Local/Flair[ArgLabels]:     {#arg3: () -> _ {|}#}[#() -> _#]
 // INIT_FALLBACK_1-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];

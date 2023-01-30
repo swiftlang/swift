@@ -1,0 +1,50 @@
+// RUN: %target-sil-opt -sil-move-only-object-checker -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
+
+sil_stage raw
+
+@_moveOnly
+class Klass {}
+
+sil @classUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @chainErrorTest : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-NOT: copy_value
+// CHECK: explicit_copy_value
+// CHECK-NOT: copy_value
+// CHECK: explicit_copy_value
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'chainErrorTest'
+sil [ossa] @chainErrorTest : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copy_value %0 : $Klass
+  %2 = mark_must_check [no_copy] %1 : $Klass
+  debug_value %2 : $Klass, let, name "x", argno 1
+  %4 = copy_value %2 : $Klass
+  %5 = move_value [lexical] %4 : $Klass
+  %6 = mark_must_check [no_implicit_copy] %5 : $Klass
+  debug_value %6 : $Klass, let, name "x2"
+  %8 = copy_value %6 : $Klass
+  %9 = move_value [lexical] %8 : $Klass
+  %10 = mark_must_check [no_implicit_copy] %9 : $Klass
+  debug_value %10 : $Klass, let, name "y2"
+  %12 = copy_value %10 : $Klass
+  %13 = move_value [lexical] %12 : $Klass
+  %14 = mark_must_check [no_implicit_copy] %13 : $Klass
+  debug_value %14 : $Klass, let, name "k2"
+  %16 = copy_value %6 : $Klass
+  %17 = move_value [lexical] %16 : $Klass
+  %18 = mark_must_check [no_implicit_copy] %17 : $Klass
+  debug_value %18 : $Klass, let, name "k3"
+  %20 = copy_value %18 : $Klass
+  %21 = move_value %20 : $Klass
+  destroy_value %21 : $Klass
+  %23 = function_ref @classUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed Klass) -> ()
+  %24 = apply %23(%14) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %18 : $Klass
+  destroy_value %14 : $Klass
+  destroy_value %10 : $Klass
+  destroy_value %6 : $Klass
+  destroy_value %2 : $Klass
+  %30 = tuple ()
+  return %30 : $()
+}

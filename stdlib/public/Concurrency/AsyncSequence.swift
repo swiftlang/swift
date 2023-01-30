@@ -27,10 +27,10 @@ import Swift
 /// over `Counter`, a custom `AsyncSequence` that produces `Int` values from
 /// `1` up to a `howHigh` value:
 ///
-///     for await i in Counter(howHigh: 10) {
-///         print(i, terminator: " ")
+///     for await number in Counter(howHigh: 10) {
+///         print(number, terminator: " ")
 ///     }
-///     // Prints "1 2 3 4 5 6 7 8 9 10"
+///     // Prints "1 2 3 4 5 6 7 8 9 10 "
 ///
 /// An `AsyncSequence` doesn't generate or contain the values; it just defines
 /// how you access them. Along with defining the type of values as an associated
@@ -69,7 +69,7 @@ import Swift
 ///     for await s in stream {
 ///         print(s, terminator: " ")
 ///     }
-///     // Prints "Odd Even Odd Even Odd Even Odd Even Odd Even"
+///     // Prints "Odd Even Odd Even Odd Even Odd Even Odd Even "
 ///
 @available(SwiftStdlib 5.1, *)
 @rethrows

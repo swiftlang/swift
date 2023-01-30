@@ -698,7 +698,7 @@ func conditionalCast<T>(_ x: Any, to: T.Type) -> T? {
   return x as? T
 }
 
-// SR-1562
+// https://github.com/apple/swift/issues/44171
 ErrorBridgingTests.test("Error archetype identity") {
   let myError = NSError(domain: "myErrorDomain", code: 0,
                         userInfo: [ "one" : 1 ])
@@ -723,7 +723,8 @@ ErrorBridgingTests.test("Error archetype identity") {
     === nsError)
 }
 
-// SR-9389
+// https://github.com/apple/swift/issues/51855
+
 class ParentA: NSObject {
   @objc(ParentAError) enum Error: Int, Swift.Error {
     case failed
@@ -794,7 +795,8 @@ ErrorBridgingTests.test("error-to-NSObject casts") {
   }
 }
 
-// SR-7732: Casting CFError or NSError to Error results in a memory leak
+// https://github.com/apple/swift-corelibs-foundation/issues/3701
+// Casting 'CFError' or 'NSError' to 'Error' results in a memory leak
 ErrorBridgingTests.test("NSError-to-Error casts") {
   func should_not_leak_nserror() {
     let something: Any? = NSError(domain: "Foo", code: 1)
@@ -821,11 +823,13 @@ ErrorBridgingTests.test("CFError-to-Error casts") {
   }
 }
 
+// https://github.com/apple/swift/issues/51697
+
 enum MyError: Error {
   case someThing
 }
 
-ErrorBridgingTests.test("SR-9207 crash in failed cast to NSError") {
+ErrorBridgingTests.test("Crash in failed cast to 'NSError'") {
 
   if #available(SwiftStdlib 5.2, *) {
     let error = MyError.someThing
@@ -837,7 +841,7 @@ ErrorBridgingTests.test("SR-9207 crash in failed cast to NSError") {
   }
 }
 
-// SR-7652
+// https://github.com/apple/swift/issues/50193
 
 enum SwiftError: Error, CustomStringConvertible {
   case something

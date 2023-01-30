@@ -178,7 +178,7 @@ func test_magic_defaults() {
   let _: String = generic_with_magic()
 }
 
-// SR-16069
+// https://github.com/apple/swift/issues/58330
 func test_allow_same_type_between_dependent_types() {
   struct Default : P {
     typealias X = Int
@@ -208,7 +208,7 @@ protocol StorageType {
   var identifier: String { get }
 }
 
-class Storage {
+class Storage { // expected-note {{class 'Storage' is not public}}
 }
 
 extension Storage {
@@ -232,4 +232,37 @@ class BaseStorage<T> : Storage, StorageType {
 }
 
 final class CustomStorage<T>: BaseStorage<T> { // Ok - no crash typechecking inherited init
+}
+
+// https://github.com/apple/swift/issues/61061
+
+struct S61061<T> where T:Hashable { // expected-note{{'T' declared as parameter to type 'S61061'}}
+  init(x:[[T: T]] = [:]) {} // expected-error{{default argument value of type '[AnyHashable : Any]' cannot be converted to type '[[T : T]]'}}
+  // expected-error@-1{{generic parameter 'T' could not be inferred}}
+}
+
+struct S61061_1<T> where T:Hashable { // expected-note{{'T' declared as parameter to type 'S61061_1'}}
+  init(x:[(T, T)] = [:]) {} // expected-error{{default argument value of type '[AnyHashable : Any]' cannot be converted to type '[(T, T)]'}}
+  // expected-error@-1{{generic parameter 'T' could not be inferred}}
+}
+
+struct S61061_2<T> where T:Hashable {
+  init(x:[(T, T)] = [(1, "")]) {} // expected-error{{conflicting arguments to generic parameter 'T' ('String' vs. 'Int')}}
+}
+
+struct S61061_3<T> where T:Hashable {
+  init(x:[(T, T)] = [(1, 1)]) {} // OK
+}
+
+// https://github.com/apple/swift/issues/62025
+// Syntactic checks are not run on the default argument expressions
+public struct MyStruct {} // expected-note {{initializer 'init()' is not public}}
+public func issue62025_with_init<T>(_: T = MyStruct()) {}
+// expected-error@-1 {{initializer 'init()' is internal and cannot be referenced from a default argument value}}
+public func issue62025_with_type<T>(_: T = Storage.self) {}
+// expected-error@-1 {{class 'Storage' is internal and cannot be referenced from a default argument value}}
+do {
+  func default_with_dup_keys<T>(_: T = ["a": 1, "a": 2]) {}
+  // expected-warning@-1 {{dictionary literal of type '[String : Int]' has duplicate entries for string literal key 'a'}}
+  // expected-note@-2 2 {{duplicate key declared here}}
 }

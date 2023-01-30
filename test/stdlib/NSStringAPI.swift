@@ -210,9 +210,10 @@ NSStringAPIs.test("init(contentsOf:usedEncoding:error:)") {
 }
 
 NSStringAPIs.test("init(cString_:encoding:)") {
-  expectEqual("foo, a basmati bar!",
-      String(cString: 
-          "foo, a basmati bar!", encoding: String.defaultCStringEncoding))
+  "foo, a basmati bar!".withCString {
+    expectEqual("foo, a basmati bar!",
+        String(cString: $0, encoding: String.defaultCStringEncoding))
+  }
 }
 
 NSStringAPIs.test("init(utf8String:)") {

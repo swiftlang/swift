@@ -4,6 +4,8 @@
 // REQUIRES: objc_interop
 
 import Foundation
+ 
+_ = JSONDecoder()
 
 class Canary: NSObject {
   deinit {

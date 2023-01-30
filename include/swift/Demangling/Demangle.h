@@ -23,8 +23,10 @@
 #include "swift/Demangling/NamespaceMacros.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
+
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -646,6 +648,11 @@ ManglingErrorOr<const char *> mangleNodeAsObjcCString(NodePointer node,
 ///
 std::string nodeToString(NodePointer Root,
                          const DemangleOptions &Options = DemangleOptions());
+
+/// Transforms a mangled key path accessor thunk helper
+/// into the identfier/subscript that would be used to invoke it in swift code.
+std::string keyPathSourceString(const char *MangledName,
+                                size_t MangledNameLength);
 
 /// A class for printing to a std::string.
 class DemanglerPrinter {

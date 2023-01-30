@@ -178,8 +178,10 @@ public let benchmarks = [
     replaceBuffer($0*100, data: medium, subrange:431..<809, with: medium) },
     tags: d, legacyFactor: 100),
   BenchmarkInfo(name: "DataReplaceLargeBuffer", runFunction: {
-    replaceBuffer($0*10, data: medium, subrange:431..<809, with: large) },
-    tags: d),
+    replaceBuffer($0*100, data: medium, subrange:431..<809, with: large) },
+    tags: d + [.skip]),
+    // Large buffer replacement is too dependent on the system state
+    // to produce a meaningful benchmark score. 30% variation is common.
 
   BenchmarkInfo(name: "DataAppendSequence",
     runFunction: { append($0*100, sequenceLength: 809, to: medium) },

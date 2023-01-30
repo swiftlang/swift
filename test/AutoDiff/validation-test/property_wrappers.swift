@@ -46,7 +46,7 @@ PropertyWrapperTests.test("SimpleStruct") {
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
               gradient(at: Struct(), 2, of: setter))
 
-  // TODO(SR-12640): Support `modify` accessors.
+  // TODO: Support `modify` accessors (https://github.com/apple/swift/issues/55084).
   /*
   func modify(_ s: Struct, _ x: Tracked<Float>) -> Tracked<Float> {
     var s = s
@@ -86,7 +86,7 @@ PropertyWrapperTests.test("GenericStruct") {
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
               gradient(at: GenericStruct<Tracked<Float>>(y: 20), 2, of: setter))
 
-  // TODO(SR-12640): Support `modify` accessors.
+  // TODO: Support `modify` accessors (https://github.com/apple/swift/issues/55084).
   /*
   func modify<T>(_ s: GenericStruct<T>, _ x: Tracked<Float>) -> Tracked<Float> {
     var s = s
@@ -131,7 +131,7 @@ PropertyWrapperTests.test("SimpleClass") {
               gradient(at: Class(), 2, of: setter))
   */
 
-  // TODO(SR-12640): Support `modify` accessors.
+  // TODO: Support `modify` accessors (https://github.com/apple/swift/issues/55084).
   /*
   func modify(_ c: Class, _ x: Tracked<Float>) -> Tracked<Float> {
     var c = c

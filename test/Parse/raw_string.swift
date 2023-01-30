@@ -76,7 +76,7 @@ _ = ##"""
 /// then you may need to tweak how to test for single-line string literals that
 /// resemble a multiline delimiter in `advanceIfMultilineDelimiter` so that it
 /// passes again.
-/// See https://bugs.swift.org/browse/SR-8678
+/// See https://github.com/apple/swift/issues/51192.
 _ = #"​"​"#
 // CHECK: "​\"​"
 

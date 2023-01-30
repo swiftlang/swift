@@ -53,15 +53,13 @@ struct StructOfInt {
 // CHECK: bb0(%0 : $@thin StructOfInt.Type):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var StructOfInt }, var, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [rootself] [[BOX]] : ${ var StructOfInt }
-// CHECK:   [[UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[UNINIT]]
-// CHECK:   [[PROJ:%.*]] = project_box [[UNINIT_LIFETIME]] : ${ var StructOfInt }, 0
+// CHECK:   [[PROJ:%.*]] = project_box [[UNINIT]] : ${ var StructOfInt }, 0
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]] : $*StructOfInt
 // CHECK:   [[ADR:%.*]] = struct_element_addr [[ACCESS]] : $*StructOfInt, #StructOfInt.i
 // CHECK:   assign %{{.*}} to [[ADR]] : $*Int
 // CHECK:   end_access [[ACCESS]] : $*StructOfInt
 // CHECK-NOT: begin_access
 // CHECK:   [[VAL:%.*]] = load [trivial] [[PROJ]] : $*StructOfInt
-// CHECK:   end_borrow [[UNINIT_LIFETIME]]
 // CHECK:   destroy_value [[UNINIT]] : ${ var StructOfInt }
 // CHECK:   return [[VAL]] : $StructOfInt
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify11StructOfIntVACycfC'
@@ -222,12 +220,11 @@ func testCaptureLocal() -> ()->() {
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify16testCaptureLocalyycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
 // CHECK: bb0:
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var Int }, var, name "x"
-// CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
-// CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
+// CHECK:   [[PROJ:%.*]] = project_box [[BOX]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]] : $*Int
 // CHECK:   store %{{.*}} to [trivial] [[ACCESS]]
 // CHECK:   end_access
-// CHECK:   [[CAPTURE:%.*]] = copy_value [[LIFETIME]] : ${ var Int }
+// CHECK:   [[CAPTURE:%.*]] = copy_value [[BOX]] : ${ var Int }
 // CHECK:   partial_apply [callee_guaranteed] %{{.*}}([[CAPTURE]]) : $@convention(thin) (@guaranteed { var Int }) -> ()
 // CHECK:   begin_access [read] [unknown] [[PROJ]]
 // CHECK:   [[VAL:%.*]] = load [trivial]
@@ -268,16 +265,16 @@ func testInitLValue(p: HasIntGetter) -> Int {
   var x = p.x
   return x
 }
-// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify14testInitLValue1pSiAA12HasIntGetter_p_tF : $@convention(thin) (@in_guaranteed HasIntGetter) -> Int {
-// CHECK: bb0(%0 : $*HasIntGetter):
+// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify14testInitLValue1pSiAA12HasIntGetter_p_tF : $@convention(thin) (@in_guaranteed any HasIntGetter) -> Int {
+// CHECK: bb0(%0 : $*any HasIntGetter):
 // CHECK:   alloc_box ${ var Int }, var, name "x"
 // CHECK:   [[PROJ:%.*]] = project_box
 // CHECK:   [[OPENED:%.*]] = open_existential_addr immutable_access %0
 // CHECK:   [[X:%.*]] = alloc_stack $@opened
 // CHECK-NOT: begin_access
-// CHECK:   copy_addr %{{.*}} to [initialization] [[X]] : $*@opened
+// CHECK:   copy_addr %{{.*}} to [init] [[X]] : $*@opened
 // CHECK:   witness_method $@opened
-// CHECK:   apply %{{.*}}<@opened("{{.*}}") HasIntGetter>([[X]]) : $@convention(witness_method: HasIntGetter) <τ_0_0 where τ_0_0 : HasIntGetter> (@in_guaranteed τ_0_0) -> Int
+// CHECK:   apply %{{.*}}<@opened("{{.*}}", any HasIntGetter) Self>([[X]]) : $@convention(witness_method: HasIntGetter) <τ_0_0 where τ_0_0 : HasIntGetter> (@in_guaranteed τ_0_0) -> Int
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]] : $*Int
 // CHECK:   store %{{.*}} to [trivial] [[ACCESS]] : $*Int
 // CHECK:   end_access
@@ -296,7 +293,7 @@ func testCopyS(_ arg: StructOfInt) -> StructOfInt {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify9testCopySyAA11StructOfIntVADF : $@convention(thin) (StructOfInt) -> StructOfInt {
 // CHECK: bb0(%0 : $StructOfInt):
-// CHECK:   alloc_stack [lexical] $StructOfInt, let, name "lhs"
+// CHECK:   alloc_stack $StructOfInt, let, name "lhs"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [var]
 // CHECK-NOT: begin_access
 // CHECK:   assign %0 to [[UNINIT]] : $*StructOfInt
@@ -337,11 +334,11 @@ func testInitGenericEnum<T>(t: T) -> GenericEnum<T>? {
 // CHECK:   [[PROJ:%.*]] = project_box
 // CHECK:   [[ADR1:%.*]] = alloc_stack $T
 // CHECK-NOT: begin_access
-// CHECK:   copy_addr %1 to [initialization] [[ADR1]] : $*T
+// CHECK:   copy_addr %1 to [init] [[ADR1]] : $*T
 // CHECK:   [[STK:%.*]] = alloc_stack $GenericEnum<T>
 // CHECK:   [[ENUMDATAADDR:%.*]] = init_enum_data_addr [[STK]]
 // CHECK:   [[ACCESSENUM:%.*]] = begin_access [modify] [unsafe] [[ENUMDATAADDR]] : $*T
-// CHECK:   copy_addr [take] [[ADR1]] to [initialization] [[ACCESSENUM]] : $*T
+// CHECK:   copy_addr [take] [[ADR1]] to [init] [[ACCESSENUM]] : $*T
 // CHECK:   end_access [[ACCESSENUM]] : $*T
 // CHECK:   inject_enum_addr
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]]
@@ -349,7 +346,7 @@ func testInitGenericEnum<T>(t: T) -> GenericEnum<T>? {
 // CHECK:   end_access [[ACCESS]] : $*GenericEnum<T>
 // CHECK:   [[ADR2:%.*]] = init_enum_data_addr %0
 // CHECK-NOT: begin_access
-// CHECK:   copy_addr %{{.*}} to [initialization] [[ADR2]] : $*GenericEnum<T>
+// CHECK:   copy_addr %{{.*}} to [init] [[ADR2]] : $*GenericEnum<T>
 // CHECK:   inject_enum_addr %0 : $*Optional<GenericEnum<T>>, #Optional.some!enumelt
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify11GenericEnumO1tACyxGSgx_tcfC'
 
@@ -566,10 +563,10 @@ enum OptionalWithMap<Wrapped> {
     }
   }
 }
-// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify15OptionalWithMapO3mapyqd__Sgqd__xKXEKlF : $@convention(method) <Wrapped><U> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error Error) for <Wrapped, U>, @in_guaranteed OptionalWithMap<Wrapped>) -> (@out Optional<U>, @error Error)
+// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify15OptionalWithMapO3mapyqd__Sgqd__xKXEKlF : $@convention(method) <Wrapped><U> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <Wrapped, U>, @in_guaranteed OptionalWithMap<Wrapped>) -> (@out Optional<U>, @error any Error)
 // CHECK: [[STK:%.]] = alloc_stack $OptionalWithMap<Wrapped>
 // CHECK-NOT: begin_access
-// CHECK: copy_addr %2 to [initialization] [[STK]] : $*OptionalWithMap<Wrapped>
+// CHECK: copy_addr %2 to [init] [[STK]] : $*OptionalWithMap<Wrapped>
 // CHECK: switch_enum_addr [[STK]] : $*OptionalWithMap<Wrapped>, case #OptionalWithMap.some!enumelt: [[BBSOME:bb.*]], case #OptionalWithMap.none!enumelt: bb
 //
 // CHECK: [[BBSOME]]:
@@ -577,7 +574,7 @@ enum OptionalWithMap<Wrapped> {
 // CHECK: [[ADR:%.*]] = unchecked_take_enum_data_addr [[STK]]
 // CHECK: alloc_stack [lexical] $Wrapped, let, name "y"
 // CHECK-NOT: begin_access
-// CHECK: copy_addr [take] [[ADR]] to [initialization]
+// CHECK: copy_addr [take] [[ADR]] to [init]
 // ----- call transform.
 // CHECK: try_apply
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify15OptionalWithMapO3mapyqd__Sgqd__xKXEKlF'
@@ -652,7 +649,7 @@ var globalString2 = globalString1
 // CHECK: [[PTR:%.*]] = pointer_to_address
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[PTR]] : $*String
 // CHECK: [[INIT:%.*]] = begin_access [modify] [unsafe] [[GA]] : $*String
-// CHECK: copy_addr [[ACCESS]] to [initialization] [[INIT]] : $*String
+// CHECK: copy_addr [[ACCESS]] to [init] [[INIT]] : $*String
 // CHECK: end_access [[INIT]] : $*String
 // CHECK: end_access [[ACCESS]] : $*String
 // CHECK-NOT: end_access
@@ -826,14 +823,14 @@ func testWriteback() {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify13testWritebackyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   %0 = alloc_stack $P
+// CHECK:   %0 = alloc_stack $any P
 // CHECK: [[GETTER:%.*]] = apply
-// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] %0 : $*P
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] %0 : $*any P
 // Call takesInoutP
-// CHECK: apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@inout P) -> ()
+// CHECK: apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@inout any P) -> ()
 // Call addressOnly.setter
-// CHECK: apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@in P) -> ()
-// CHECK: end_access [[ACCESS]] : $*P
+// CHECK: apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@in any P) -> ()
+// CHECK: end_access [[ACCESS]] : $*any P
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify13testWritebackyyF'
 
 // --- writeback temp.
@@ -869,18 +866,18 @@ protocol HasClassGetter {
 func testMixedTuple(p: HasClassGetter) -> (BaseClass, Any) {
   return (p.c, p.c)
 }
-// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF : $@convention(thin) (@in_guaranteed HasClassGetter) -> (@owned BaseClass, @out Any) {
-// CHECK: bb0(%0 : $*Any, %1 : $*HasClassGetter):
-// CHECK: [[P1:%.*]] = open_existential_addr immutable_access %1 : $*HasClassGetter to $*@opened
+// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF : $@convention(thin) (@in_guaranteed any HasClassGetter) -> (@owned BaseClass, @out Any) {
+// CHECK: bb0(%0 : $*Any, %1 : $*any HasClassGetter):
+// CHECK: [[P1:%.*]] = open_existential_addr immutable_access %1 : $*any HasClassGetter to $*@opened
 // CHECK: [[TEMP1:%.*]] = alloc_stack $@opened
 // CHECK-NOT: begin_access
-// CHECK: copy_addr [[P1]] to [initialization] [[TEMP1]] : $*@opened
+// CHECK: copy_addr [[P1]] to [init] [[TEMP1]] : $*@opened
 // CHECK-NOT: begin_access
 // CHECK: [[OUTC:%.*]] = apply {{.*}} $@convention(witness_method: HasClassGetter) <τ_0_0 where τ_0_0 : HasClassGetter> (@in_guaranteed τ_0_0) -> @owned BaseClass
-// CHECK: [[P2:%.*]] = open_existential_addr immutable_access %1 : $*HasClassGetter to $*@opened
+// CHECK: [[P2:%.*]] = open_existential_addr immutable_access %1 : $*any HasClassGetter to $*@opened
 // CHECK: [[TEMP2:%.*]] = alloc_stack $@opened
 // CHECK-NOT: begin_access
-// CHECK: copy_addr [[P2]] to [initialization] [[TEMP2]] : $*@opened
+// CHECK: copy_addr [[P2]] to [init] [[TEMP2]] : $*@opened
 // CHECK-NOT: begin_access
 // CHECK: apply {{.*}} $@convention(witness_method: HasClassGetter) <τ_0_0 where τ_0_0 : HasClassGetter> (@in_guaranteed τ_0_0) -> @owned BaseClass
 // CHECK: [[OUTANY:%.*]] = init_existential_addr %0 : $*Any, $BaseClass
@@ -904,19 +901,19 @@ internal struct CanCastStruct<Base : Hashable> : CanCast {
 // CHECK: bb0(%0 : $*Optional<T>, %1 : $*CanCastStruct<Base>):
 // CHECK: [[OUT_ENUM:%.*3]] = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
 // CHECK: [[TEMP_SUB:%.*]] = alloc_stack $Optional<CanCastStruct<T>>
-// CHECK: [[TEMP_BASE:%.*]] = alloc_stack $CanCast
-// CHECK: [[TEMP_BASE_ADR:%.*]] = init_existential_addr [[TEMP_BASE]] : $*CanCast, $CanCastStruct<Base>
+// CHECK: [[TEMP_BASE:%.*]] = alloc_stack $any CanCast
+// CHECK: [[TEMP_BASE_ADR:%.*]] = init_existential_addr [[TEMP_BASE]] : $*any CanCast, $CanCastStruct<Base>
 // CHECK-NOT: begin_access
-// CHECK: copy_addr %1 to [initialization] [[TEMP_BASE_ADR]] : $*CanCastStruct<Base>
+// CHECK: copy_addr %1 to [init] [[TEMP_BASE_ADR]] : $*CanCastStruct<Base>
 // CHECK-NOT: begin_access
 // CHECK: [[TEMP_SUB_ADR:%.*]] = init_enum_data_addr [[TEMP_SUB]] : $*Optional<CanCastStruct<T>>, #Optional.some!enumelt
 // CHECK-NOT: begin_access
-// CHECK: checked_cast_addr_br take_always CanCast in [[TEMP_BASE]] : $*CanCast to CanCastStruct<T> in [[TEMP_SUB_ADR]] : $*CanCastStruct<T>
+// CHECK: checked_cast_addr_br take_always any CanCast in [[TEMP_BASE]] : $*any CanCast to CanCastStruct<T> in [[TEMP_SUB_ADR]] : $*CanCastStruct<T>
 // CHECK-NOT: begin_access
 // CHECK: [[TEMP_DATA:%.*]] = unchecked_take_enum_data_addr [[TEMP_SUB]] : $*Optional<CanCastStruct<T>>, #Optional.some!enumelt
 // CHECK-NOT: begin_access
 // CHECK: [[BASE_ADR:%.*]] = struct_element_addr [[TEMP_DATA]] : $*CanCastStruct<T>, #CanCastStruct.base
-// CHECK: copy_addr [[BASE_ADR]] to [initialization] [[OUT_ENUM]] : $*T
+// CHECK: copy_addr [[BASE_ADR]] to [init] [[OUT_ENUM]] : $*T
 // CHECK-NOT: begin_access
 // CHECK: inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify13CanCastStructV5unboxqd__SgySHRd__lF'
@@ -930,34 +927,34 @@ func testOpenExistential(p: PBar) {
     q.bar()
   }
 }
-// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify19testOpenExistential1pyAA4PBar_p_tF : $@convention(thin) (@in_guaranteed PBar) -> () {
-// CHECK: bb0(%0 : $*PBar):
-// CHECK: [[Q0:%.*]] = alloc_stack [lexical] $Optional<Q>, let, name "q0"
-// CHECK: [[PBAR:%.*]] = alloc_stack $PBar
+// CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify19testOpenExistential1pyAA4PBar_p_tF : $@convention(thin) (@in_guaranteed any PBar) -> () {
+// CHECK: bb0(%0 : $*any PBar):
+// CHECK: [[Q0:%.*]] = alloc_stack [lexical] $Optional<any Q>, let, name "q0"
+// CHECK: [[PBAR:%.*]] = alloc_stack $any PBar
 // CHECK-NOT: begin_access
-// CHECK: copy_addr %0 to [initialization] [[PBAR]] : $*PBar
+// CHECK: copy_addr %0 to [init] [[PBAR]] : $*any PBar
 // CHECK-NOT: begin_access
-// CHECK: [[Q0_DATA:%.*]] = init_enum_data_addr [[Q0]] : $*Optional<Q>, #Optional.some!enumelt
+// CHECK: [[Q0_DATA:%.*]] = init_enum_data_addr [[Q0]] : $*Optional<any Q>, #Optional.some!enumelt
 // CHECK-NOT: begin_access
-// CHECK: checked_cast_addr_br take_always PBar in [[PBAR]] : $*PBar to Q in [[Q0_DATA]] : $*Q, bb1, bb2
+// CHECK: checked_cast_addr_br take_always any PBar in [[PBAR]] : $*any PBar to any Q in [[Q0_DATA]] : $*any Q, bb1, bb2
 // CHECK-NOT: begin_access
-// CHECK: inject_enum_addr [[Q0]] : $*Optional<Q>, #Optional.some!enumelt
+// CHECK: inject_enum_addr [[Q0]] : $*Optional<any Q>, #Optional.some!enumelt
 // CHECK-NOT: begin_access
-// CHECK: apply %{{.*}}<Q>([[Q0]], {{.*}}) : $@convention(method) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, _OptionalNilComparisonType, @thin Optional<τ_0_0>.Type) -> Bool
-// CHECK: [[Q:%.*]] = alloc_stack [lexical] $Q, let, name "q"
-// CHECK: [[OPT_Q:%.*]] = alloc_stack $Optional<Q>
+// CHECK: apply %{{.*}}<any Q>([[Q0]], {{.*}}) : $@convention(method) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, _OptionalNilComparisonType, @thin Optional<τ_0_0>.Type) -> Bool
+// CHECK: [[Q:%.*]] = alloc_stack [lexical] $any Q, let, name "q"
+// CHECK: [[OPT_Q:%.*]] = alloc_stack $Optional<any Q>
 // CHECK-NOT: begin_access
-// CHECK: copy_addr [[Q0]] to [initialization] [[OPT_Q]] : $*Optional<Q>
+// CHECK: copy_addr [[Q0]] to [init] [[OPT_Q]] : $*Optional<any Q>
 // CHECK-NOT: begin_access
-// CHECK: switch_enum_addr [[OPT_Q]] : $*Optional<Q>, case #Optional.some!enumelt: bb
+// CHECK: switch_enum_addr [[OPT_Q]] : $*Optional<any Q>, case #Optional.some!enumelt: bb
 // CHECK-NOT: begin_access
-// CHECK: [[OPT_Q_ADR:%.*]] = unchecked_take_enum_data_addr [[OPT_Q]] : $*Optional<Q>, #Optional.some!enumelt
+// CHECK: [[OPT_Q_ADR:%.*]] = unchecked_take_enum_data_addr [[OPT_Q]] : $*Optional<any Q>, #Optional.some!enumelt
 // CHECK-NOT: begin_access
-// CHECK: copy_addr [take] [[OPT_Q_ADR]] to [initialization] [[Q]] : $*Q
+// CHECK: copy_addr [take] [[OPT_Q_ADR]] to [init] [[Q]] : $*any Q
 // CHECK-NOT: begin_access
-// CHECK: [[Q_ADR:%.*]] = open_existential_addr immutable_access [[Q]] : $*Q to $*@opened("{{.*}}") Q
-// CHECK: witness_method $@opened("{{.*}}") Q, #PBar.bar
-// CHECK: apply %{{.*}}<@opened("{{.*}}") Q>([[Q_ADR]])
+// CHECK: [[Q_ADR:%.*]] = open_existential_addr immutable_access [[Q]] : $*any Q to $*@opened("{{.*}}", any Q) Self
+// CHECK: witness_method $@opened("{{.*}}", any Q) Self, #PBar.bar
+// CHECK: apply %{{.*}}<@opened("{{.*}}", any Q) Self>([[Q_ADR]])
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify19testOpenExistential1pyAA4PBar_p_tF'
 
 // --- local existential
@@ -972,18 +969,18 @@ func testLocalExistential() {
   _ = p
 }
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify20testLocalExistentialyyF : $@convention(thin) () -> () {
-// CHECK: alloc_box ${ var P }, var, name "p"
-// CHECK: [[PROJ:%.*]] = project_box %{{.*}} : ${ var P }, 0
+// CHECK: alloc_box ${ var any P }, var, name "p"
+// CHECK: [[PROJ:%.*]] = project_box %{{.*}} : ${ var any P }, 0
 // CHECK-NOT: begin_access
-// CHECK: apply %{{.*}}([[PROJ]]) : $@convention(thin) () -> @out P
+// CHECK: apply %{{.*}}([[PROJ]]) : $@convention(thin) () -> @out any P
 // CHECK-NOT: begin_access
-// CHECK: partial_apply [callee_guaranteed] %{{.*}}([[PROJ]]) : $@convention(thin) (@inout_aliasable P) -> ()
+// CHECK: partial_apply [callee_guaranteed] %{{.*}}([[PROJ]]) : $@convention(thin) (@inout_aliasable any P) -> ()
 // CHECK-NOT: begin_access
 // CHECK: apply
-// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJ]] : $*P
-// CHECK: [[COPY:%.*]] = alloc_stack $P
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJ]] : $*any P
+// CHECK: [[COPY:%.*]] = alloc_stack $any P
 // CHECK-NOT: begin_access
-// CHECK: copy_addr [[ACCESS]] to [initialization] [[COPY]] : $*P
+// CHECK: copy_addr [[ACCESS]] to [init] [[COPY]] : $*any P
 // CHECK: end_access
 // CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify20testLocalExistentialyyF'
@@ -1047,9 +1044,9 @@ class testInitExistentialGlobal {
 }
 // CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ : $@convention(c) (Builtin.RawPointer) -> () {
 // CHECK:   alloc_global @$s20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ
-// CHECK:   [[GADR:%.*]] = global_addr @$s20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ : $*P
+// CHECK:   [[GADR:%.*]] = global_addr @$s20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ : $*any P
 // CHECK:   %{{.*}} = apply %{{.*}}({{.*}}) : $@convention(method) (@thin StructP.Type) -> StructP
-// CHECK:   [[EADR:%.*]] = init_existential_addr [[GADR]] : $*P, $StructP
+// CHECK:   [[EADR:%.*]] = init_existential_addr [[GADR]] : $*any P, $StructP
 // CHECK:   store %{{.*}} to [trivial] [[EADR]] : $*StructP
 // CHECK-LABEL: } // end sil function '{{.*}}WZ
 
@@ -1061,20 +1058,20 @@ public enum SomeError: Swift.Error {
 public func testInitBox() throws {
     throw SomeError.error
 }
-// CHECK-LABEL: sil [ossa] @$s20access_marker_verify11testInitBoxyyKF : $@convention(thin) () -> @error Error {
-// CHECK: [[BOXALLOC:%.*]] = alloc_existential_box $Error, $SomeError
-// CHECK: [[PROJ:%.*]] = project_existential_box $SomeError in [[BOXALLOC]] : $Error
+// CHECK-LABEL: sil [ossa] @$s20access_marker_verify11testInitBoxyyKF : $@convention(thin) () -> @error any Error {
+// CHECK: [[BOXALLOC:%.*]] = alloc_existential_box $any Error, $SomeError
+// CHECK: [[PROJ:%.*]] = project_existential_box $SomeError in [[BOXALLOC]] : $any Error
 // CHECK: store [[BOXALLOC]] to [init] [[BOXBUF:%.*]] :
 // CHECK: store %{{.*}} to [trivial] [[PROJ]] : $*SomeError
 // CHECK: [[BOXALLOC2:%.*]] = load [take] [[BOXBUF]]
-// CHECK: throw [[BOXALLOC2]] : $Error
+// CHECK: throw [[BOXALLOC2]] : $any Error
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify11testInitBoxyyKF'
 
 public final class HasStaticProp {
   public static let empty: HasStaticProp = HasStaticProp()
 }
 
-// A global addressor produces an unenforced RawPointer. This looke
+// A global addressor produces an unenforced RawPointer. This looks
 // like an Unidentified access with no access marker. Ensure that
 // verification doesn't assert.
 public func getStaticProp() -> HasStaticProp {

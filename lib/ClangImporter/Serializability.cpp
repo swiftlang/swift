@@ -68,8 +68,8 @@ private:
     // We've almost certainly imported this declaration, look for it.
     Optional<Decl *> swiftDeclOpt =
       Impl.importDeclCached(decl, Impl.CurrentVersion);
-    if (swiftDeclOpt.hasValue() && swiftDeclOpt.getValue()) {
-      auto swiftDecl = swiftDeclOpt.getValue();
+    if (swiftDeclOpt.has_value() && swiftDeclOpt.value()) {
+      auto swiftDecl = swiftDeclOpt.value();
       // The serialization code doesn't allow us to cross-reference
       // typealias declarations directly.  We could fix that, but it's
       // easier to just avoid doing so and fall into the external-path code.

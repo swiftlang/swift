@@ -166,7 +166,15 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #endif
 
 // Bring in visibility attribute macros
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
+
+// Temporary definitions to allow compilation on clang-15.
+#if defined(__cplusplus)
+#define SWIFT_EXTERN_C extern "C"
+#else
+#define SWIFT_EXTERN_C
+#endif
+#define SWIFT_RUNTIME_EXPORT_ATTRIBUTE SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore)
 
 // Define mappings for calling conventions.
 

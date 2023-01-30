@@ -58,7 +58,7 @@ class NestedSemanticFunctionCheck : public SILFunctionTransform {
   //
   // This could be a very large set. It is built gradually during bottom-up
   // function transforms, then deleted once all functions are processed before
-  // excuting the next pass pipeline.
+  // executing the next pass pipeline.
   llvm::SmallPtrSet<SILFunction *, 8> mayCallSemanticFunctions;
 
   // Mark semantic functions and wrappers around semantic calls.

@@ -30,7 +30,7 @@
 // KW_DECL-DAG: Keyword/None: override{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: postfix{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: prefix{{; name=.+$}}
-// KW_DECL_DAG: Keyword[precedencegroup]: precedencegroup{{; name=.+$}}
+// KW_DECL-DAG: Keyword[precedencegroup]: precedencegroup{{; name=.+$}}
 // KW_DECL-DAG: Keyword[private]/None: private{{; name=.+$}}
 // KW_DECL-DAG: Keyword[protocol]/None: protocol{{; name=.+$}}
 // KW_DECL-DAG: Keyword[public]/None: public{{; name=.+$}}

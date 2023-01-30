@@ -79,8 +79,9 @@ func basictest() {
   bind_test2() // expected-error {{cannot call value of non-function type 'Int'}}{{13-15=}}
 }
 
-// <https://bugs.swift.org/browse/SR-3522>
-func testUnusedLiterals_SR3522() {
+// https://github.com/apple/swift/issues/46110
+// Test unused literals.
+do {
   42 // expected-warning {{integer literal is unused}}
   2.71828 // expected-warning {{floating-point literal is unused}}
   true // expected-warning {{boolean literal is unused}}
@@ -92,11 +93,11 @@ func testUnusedLiterals_SR3522() {
   #column // expected-warning {{#column literal is unused}}
   #function // expected-warning {{#function literal is unused}}
   #dsohandle // expected-warning {{#dsohandle literal is unused}}
-  __FILE__ // expected-error {{__FILE__ has been replaced with #file in Swift 3}} expected-warning {{#file literal is unused}}
-  __LINE__ // expected-error {{__LINE__ has been replaced with #line in Swift 3}} expected-warning {{#line literal is unused}}
-  __COLUMN__ // expected-error {{__COLUMN__ has been replaced with #column in Swift 3}} expected-warning {{#column literal is unused}}
-  __FUNCTION__ // expected-error {{__FUNCTION__ has been replaced with #function in Swift 3}} expected-warning {{#function literal is unused}}
-  __DSO_HANDLE__ // expected-error {{__DSO_HANDLE__ has been replaced with #dsohandle in Swift 3}} expected-warning {{#dsohandle literal is unused}}
+  __FILE__ // expected-error {{cannot find '__FILE__' in scope}}
+  __LINE__ // expected-error {{cannot find '__LINE__' in scope}}
+  __COLUMN__ // expected-error {{cannot find '__COLUMN__' in scope}}
+  __FUNCTION__ // expected-error {{cannot find '__FUNCTION__' in scope}}
+  __DSO_HANDLE__ // expected-error {{cannot find '__DSO_HANDLE__' in scope}}
 
   nil // expected-error {{'nil' requires a contextual type}}
   #fileLiteral(resourceName: "what.txt") // expected-error {{could not infer type of file reference literal}} expected-note * {{}}
@@ -171,7 +172,7 @@ var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
-func test2(_ a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{34-37=}} expected-note {{did you mean 'a'?}} expected-note {{did you mean 'b'?}}
+func test2(_ a: Int, b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}}
  _ = a+b
  a+b+c // expected-error{{cannot find 'c' in scope}}
  return a+b
@@ -529,7 +530,7 @@ func testSingleQuoteStringLiterals() {
 }
 
 // <rdar://problem/17128913>
-var s = "" // expected-note {{did you mean 's'?}}
+var s = ""
 s.append(contentsOf: ["x"])
 
 //===----------------------------------------------------------------------===//
@@ -610,7 +611,7 @@ var ruleVar: Rule
 ruleVar = Rule("a") // expected-error {{missing argument label 'target:' in call}}
 // expected-error@-1 {{missing argument for parameter 'dependencies' in call}}
 
-class C { // expected-note {{did you mean 'C'?}}
+class C {
   var x: C?
   init(other: C?) { x = other }
 
@@ -658,11 +659,6 @@ func iterators() {
 //===----------------------------------------------------------------------===//
 
 func magic_literals() {
-  _ = __FILE__  // expected-error {{__FILE__ has been replaced with #file in Swift 3}}
-  _ = __LINE__  // expected-error {{__LINE__ has been replaced with #line in Swift 3}}
-  _ = __COLUMN__  // expected-error {{__COLUMN__ has been replaced with #column in Swift 3}}
-  _ = __DSO_HANDLE__  // expected-error {{__DSO_HANDLE__ has been replaced with #dsohandle in Swift 3}}
-
   _ = #file
   _ = #line + #column
   var _: UInt8 = #line + #column
@@ -752,8 +748,9 @@ func invalidDictionaryLiteral() {
 
 
 [4].joined(separator: [1])
-// expected-error@-1 {{cannot convert value of type 'Int' to expected element type 'String'}}
-// expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'String'}}
+// expected-error@-1 {{no exact matches in call to instance method 'joined'}}
+// expected-note@-2 {{found candidate with type '(String) -> String'}}
+// There is one more note here - candidate requires that 'Int' conform to 'Sequence' (requirement specified as 'Self.Element' : 'Sequence') pointing to Sequence extension
 
 [4].joined(separator: [[[1]]])
 // expected-error@-1 {{cannot convert value of type 'Int' to expected element type 'String'}}
@@ -766,6 +763,11 @@ _ = Int.self == nil  // expected-warning {{comparing non-optional value of type 
 _ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
 _ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
 _ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
+
+_ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns false}}
+_ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns false}}
+_ = Int.self != .none  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns true}}
+_ = .none != Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns true}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
@@ -899,7 +901,8 @@ func r22913570() {
   f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
 }
 
-// SR-628 mixing lvalues and rvalues in tuple expression
+// https://github.com/apple/swift/issues/43245
+// Mixing lvalues and rvalues in tuple expression
 do {
   var x = 0
   var y = 1
@@ -911,8 +914,9 @@ do {
   x = (x,(3,y)).1.1
 }
 
-// SR-3439 subscript with pound expressions.
-Sr3439: do {
+// https://github.com/apple/swift/issues/46027
+// Subscripting with pound expressions
+do {
   class B {
     init() {}
     subscript(x: Int) -> Int { return x }

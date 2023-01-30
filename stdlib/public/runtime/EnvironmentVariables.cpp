@@ -242,7 +242,17 @@ bool swift_COWChecksEnabled() {
   return runtime::environment::SWIFT_DEBUG_ENABLE_COW_CHECKS();
 }
 
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableCooperativeQueues() {
+  return runtime::environment::
+      SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES();
+}
+
+
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableJobDispatchIntegration() {
   return runtime::environment::
       SWIFT_ENABLE_ASYNC_JOB_DISPATCH_INTEGRATION();
+}
+
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations() {
+  return runtime::environment::SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS();
 }

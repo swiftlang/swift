@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/IndexTrie.h"
@@ -32,6 +33,7 @@
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILProperty.h"
 #include "swift/SIL/SILType.h"
@@ -161,6 +163,7 @@ public:
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
   using DifferentiabilityWitnessListType =
       llvm::ilist<SILDifferentiabilityWitness>;
+  using SILMoveOnlyDeinitListType = llvm::ArrayRef<SILMoveOnlyDeinit *>;
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
   using BasicBlockNameMapType =
@@ -191,6 +194,7 @@ private:
   friend SILProperty;
   friend SILUndef;
   friend SILWitnessTable;
+  friend SILMoveOnlyDeinit;
   friend Lowering::SILGenModule;
   friend Lowering::TypeConverter;
   class SerializationCallback;
@@ -213,7 +217,7 @@ private:
   /// This avoids dangling instruction pointers within the run of a pass and in
   /// analysis caches. Note that the analysis invalidation mechanism ensures
   /// that analysis caches are invalidated before flushDeletedInsts().
-  llvm::iplist<SILInstruction> scheduledForDeletion;
+  std::vector<SILInstruction*> scheduledForDeletion;
 
   /// The swift Module associated with this SILModule.
   ModuleDecl *TheSwiftModule;
@@ -270,6 +274,13 @@ private:
 
   /// The list of SILDifferentiabilityWitnesses in the module.
   DifferentiabilityWitnessListType differentiabilityWitnesses;
+
+  /// Lookup table for SIL vtables from class decls.
+  llvm::DenseMap<const NominalTypeDecl *, SILMoveOnlyDeinit *>
+      MoveOnlyDeinitMap;
+
+  /// The list of move only deinits in the module.
+  std::vector<SILMoveOnlyDeinit *> moveOnlyDeinits;
 
   /// Declarations which are externally visible.
   ///
@@ -334,22 +345,22 @@ private:
   /// projections, shared between all functions in the module.
   std::unique_ptr<IndexTrieNode> indexTrieRoot;
 
-  /// A mapping from root opened archetypes to the instructions which define
+  /// A mapping from root local archetypes to the instructions which define
   /// them.
   ///
-  /// The value is either a SingleValueInstruction or a PlaceholderValue, in case
-  /// an opened archetype definition is looked up during parsing or
-  /// deserializing SIL, where opened archetypes can be forward referenced.
+  /// The value is either a SingleValueInstruction or a PlaceholderValue,
+  /// in case a local archetype definition is looked up during parsing or
+  /// deserializing SIL, where local archetypes can be forward referenced.
   ///
   /// In theory we wouldn't need to have the SILFunction in the key, because
-  /// opened archetypes \em should be unique across the module. But currently
-  /// in some rare cases SILGen re-uses the same opened archetype for multiple
+  /// local archetypes \em should be unique across the module. But currently
+  /// in some rare cases SILGen re-uses the same local archetype for multiple
   /// functions.
-  using OpenedArchetypeKey = std::pair<OpenedArchetypeType *, SILFunction *>;
-  llvm::DenseMap<OpenedArchetypeKey, SILValue> RootOpenedArchetypeDefs;
+  using LocalArchetypeKey = std::pair<LocalArchetypeType *, SILFunction *>;
+  llvm::DenseMap<LocalArchetypeKey, SILValue> RootLocalArchetypeDefs;
 
-  /// The number of PlaceholderValues in RootOpenedArchetypeDefs.
-  int numUnresolvedOpenedArchetypes = 0;
+  /// The number of PlaceholderValues in RootLocalArchetypeDefs.
+  int numUnresolvedLocalArchetypes = 0;
 
   /// The options passed into this SILModule.
   const SILOptions &Options;
@@ -433,31 +444,31 @@ public:
     regDeserializationNotificationHandlerForAllFuncOME = true;
   }
 
-  /// Returns the instruction which defines the given root opened archetype,
+  /// Returns the instruction which defines the given root local archetype,
   /// e.g. an open_existential_addr.
   ///
-  /// In case the opened archetype is not defined yet (e.g. during parsing or
+  /// In case the local archetype is not defined yet (e.g. during parsing or
   /// deserialization), a PlaceholderValue is returned. This should not be the
   /// case outside of parsing or deserialization.
-  SILValue getRootOpenedArchetypeDef(CanOpenedArchetypeType archetype,
-                                     SILFunction *inFunction);
+  SILValue getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
+                                    SILFunction *inFunction);
 
-  /// Returns the instruction which defines the given root opened archetype,
+  /// Returns the instruction which defines the given root local archetype,
   /// e.g. an open_existential_addr.
   ///
-  /// In contrast to getOpenedArchetypeDef, it is required that all opened
+  /// In contrast to getLocalArchetypeDef, it is required that all local
   /// archetypes are resolved.
   SingleValueInstruction *
-  getRootOpenedArchetypeDefInst(CanOpenedArchetypeType archetype,
-                                SILFunction *inFunction) {
+  getRootLocalArchetypeDefInst(CanLocalArchetypeType archetype,
+                               SILFunction *inFunction) {
     return cast<SingleValueInstruction>(
-        getRootOpenedArchetypeDef(archetype, inFunction));
+        getRootLocalArchetypeDef(archetype, inFunction));
   }
 
-  /// Returns true if there are unresolved opened archetypes in the module.
+  /// Returns true if there are unresolved local archetypes in the module.
   ///
   /// This should only be the case during parsing or deserialization.
-  bool hasUnresolvedOpenedArchetypeDefinitions();
+  bool hasUnresolvedLocalArchetypeDefinitions();
 
   /// Get a unique index for a struct or class field in layout order.
   ///
@@ -613,6 +624,25 @@ public:
   vtable_iterator vtable_end() { return getVTables().end(); }
   vtable_const_iterator vtable_begin() const { return getVTables().begin(); }
   vtable_const_iterator vtable_end() const { return getVTables().end(); }
+
+  ArrayRef<SILMoveOnlyDeinit *> getMoveOnlyDeinits() const {
+    return ArrayRef<SILMoveOnlyDeinit *>(moveOnlyDeinits);
+  }
+  using moveonlydeinit_iterator = SILMoveOnlyDeinitListType::iterator;
+  using moveonlydeinit_const_iterator =
+      SILMoveOnlyDeinitListType::const_iterator;
+  moveonlydeinit_iterator moveonlydeinit_begin() {
+    return getMoveOnlyDeinits().begin();
+  }
+  moveonlydeinit_iterator moveonlydeinit_end() {
+    return getMoveOnlyDeinits().end();
+  }
+  moveonlydeinit_const_iterator moveonlydeinit_begin() const {
+    return getMoveOnlyDeinits().begin();
+  }
+  moveonlydeinit_const_iterator moveonlydeinit_end() const {
+    return getMoveOnlyDeinits().end();
+  }
 
   using witness_table_iterator = WitnessTableListType::iterator;
   using witness_table_const_iterator = WitnessTableListType::const_iterator;
@@ -799,6 +829,15 @@ public:
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
 
+  /// Look up the deinit mapped to the given move only nominal type decl.
+  /// Returns null on failure.
+  SILMoveOnlyDeinit *lookUpMoveOnlyDeinit(const NominalTypeDecl *nomDecl,
+                                          bool deserializeLazily = true);
+
+  /// Look up the function mapped to the given move only nominal type decl.
+  /// Returns null on failure.
+  SILFunction *lookUpMoveOnlyDeinitFunction(const NominalTypeDecl *nomDecl);
+
   /// Look up the differentiability witness with the given name.
   SILDifferentiabilityWitness *lookUpDifferentiabilityWitness(StringRef name);
 
@@ -835,7 +874,12 @@ public:
   /// True if SIL conventions force address-only to be passed by address.
   bool useLoweredAddresses() const { return loweredAddresses; }
 
-  void setLoweredAddresses(bool val) { loweredAddresses = val; }
+  void setLoweredAddresses(bool val) {
+    loweredAddresses = val;
+    if (val) {
+      Types.setLoweredAddresses();
+    }
+  }
 
   llvm::IndexedInstrProfReader *getPGOReader() const { return PGOReader.get(); }
 

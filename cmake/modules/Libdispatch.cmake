@@ -14,6 +14,9 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
           $<TARGET_FILE_DIR:clang>/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
         set(SWIFT_LIBDISPATCH_CXX_COMPILER
           $<TARGET_FILE_DIR:clang>/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+      elseif(DEFINED SWIFT_CLANG_LOCATION)
+        set(SWIFT_LIBDISPATCH_C_COMPILER ${SWIFT_CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+        set(SWIFT_LIBDISPATCH_CXX_COMPILER ${SWIFT_CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
       else()
         set(SWIFT_LIBDISPATCH_C_COMPILER clang-cl${CMAKE_EXECUTABLE_SUFFIX})
         set(SWIFT_LIBDISPATCH_CXX_COMPILER clang-cl${CMAKE_EXECUTABLE_SUFFIX})
@@ -47,7 +50,8 @@ endif()
 # Build any target libdispatch if needed.
 foreach(sdk ${SWIFT_SDKS})
   # Darwin targets have libdispatch available, do not build it.
-  # Wasm/WASI doesn't support libdispatch yet. See https://bugs.swift.org/browse/SR-12097 for more details.
+  # Wasm/WASI doesn't support libdispatch yet.
+  # See https://github.com/apple/swift/issues/54533 for more details.
   if(NOT "${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS AND NOT "${sdk}" STREQUAL WASI)
     list(APPEND DISPATCH_SDKS "${sdk}")
   endif()

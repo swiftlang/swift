@@ -1,5 +1,6 @@
 
 import Submodule
+import PrivateCModule
 
 public func incrementByThree(_ x: Int) -> Int {
   return incrementByOne(x) + 2
@@ -27,3 +28,15 @@ public func moduleKlassMember() -> Int {
   return k.i
 }
 
+public struct ModuleStruct {
+  public static var publicFunctionPointer: (Int) -> (Int) = incrementByThree
+  public static var privateFunctionPointer: (Int) -> (Int) = { $0 }
+}
+
+public func callPrivateCFunc() -> Int {
+  return Int(privateCFunc())
+}
+
+public func usePrivateCVar() -> Int {
+  return Int(privateCVar);
+}

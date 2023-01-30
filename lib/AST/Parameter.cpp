@@ -60,6 +60,7 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   SmallVector<ParamDecl*, 8> params(begin(), end());
 
   // Remap the ParamDecls inside of the ParameterList.
+  unsigned i = 0;
   for (auto &decl : params) {
     auto defaultArgKind = decl->getDefaultArgumentKind();
 
@@ -69,8 +70,11 @@ ParameterList *ParameterList::clone(const ASTContext &C,
 
     // If the argument isn't named, give the parameter a name so that
     // silgen will produce a value for it.
-    if (decl->getName().empty() && (options & NamedArguments))
-      decl->setName(C.getIdentifier("argument"));
+    if (decl->getName().empty() && (options & NamedArguments)) {
+      llvm::SmallString<16> s;
+      { llvm::raw_svector_ostream(s) << "__argument" << ++i; }
+      decl->setName(C.getIdentifier(s));
+    }
     
     // If we're inheriting a default argument, mark it as such.
     // FIXME: Figure out how to clone default arguments as well.

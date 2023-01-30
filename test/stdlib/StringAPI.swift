@@ -364,8 +364,10 @@ StringTests.test("[String].joined() -> String") {
 }
 
 StringTests.test("UnicodeScalarView.Iterator.Lifetime") {
-  // Tests that String.UnicodeScalarView.Iterator is maintaining the lifetime of
-  // an underlying String buffer. https://bugs.swift.org/browse/SR-5401
+  // https://github.com/apple/swift/issues/47975
+  //
+  // Tests that 'String.UnicodeScalarView.Iterator' is maintaining the lifetime
+  // of an underlying 'String' buffer.
   //
   // WARNING: it is very easy to write this test so it produces false negatives
   // (i.e. passes even when the code is broken).  The array, for example, seems

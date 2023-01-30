@@ -1445,11 +1445,11 @@ bbEnd:
 // Just make sure that we do not crash on this code and convert the 2nd load
 // [copy] to a load_borrow.
 //
-// CHECK-LABEL: sil [ossa] @inproper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK-LABEL: sil [ossa] @improper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
 // CHECK: load_borrow
 // CHECK: load_borrow
-// CHECK: } // end sil function 'inproper_dead_end_block_crasher_test'
-sil [ossa] @inproper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK: } // end sil function 'improper_dead_end_block_crasher_test'
+sil [ossa] @improper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
   %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Klass
   %2 = load_borrow %1 : $*Klass
@@ -1492,13 +1492,13 @@ sil @use_hasclassproperty : $@convention(method) <τ_0_0 where τ_0_0 : HasClass
 sil [ossa] @use_class_property_wrapper : $@convention(thin) (@inout HasClassPropertyWrapper) -> () {
 bb0(%0 : $*HasClassPropertyWrapper):
   %1 = struct_element_addr %0 : $*HasClassPropertyWrapper, #HasClassPropertyWrapper.h
-  %2 = open_existential_addr mutable_access %1 : $*HasClassProperty to $*@opened("85AB1D00-DF62-11EB-A413-ACDE48001122") HasClassProperty
+  %2 = open_existential_addr mutable_access %1 : $*HasClassProperty to $*@opened("85AB1D00-DF62-11EB-A413-ACDE48001122", HasClassProperty) Self
   %3 = function_ref @use_hasclassproperty : $@convention(method) <τ_0_0 where τ_0_0 : HasClassProperty> (@inout τ_0_0) -> (@owned Builtin.NativeObject, @error Error)
   %4 = struct_element_addr %0 : $*HasClassPropertyWrapper, #HasClassPropertyWrapper.otherProperty
   %5 = load [copy] %4 : $*Builtin.NativeObject
   %f2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %f2(%5) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  try_apply %3<@opened("85AB1D00-DF62-11EB-A413-ACDE48001122") HasClassProperty>(%2) : $@convention(method) <τ_0_0 where τ_0_0 : HasClassProperty> (@inout τ_0_0) -> (@owned Builtin.NativeObject, @error Error), normal bb1, error bb2
+  try_apply %3<@opened("85AB1D00-DF62-11EB-A413-ACDE48001122", HasClassProperty) Self>(%2) : $@convention(method) <τ_0_0 where τ_0_0 : HasClassProperty> (@inout τ_0_0) -> (@owned Builtin.NativeObject, @error Error), normal bb1, error bb2
 
 bb1(%str : @owned $Builtin.NativeObject):
   destroy_value %str : $Builtin.NativeObject
@@ -1518,7 +1518,7 @@ bb3:
 // Make sure we don't crash on this code. We used to crash for @out args on the access path to the load
 sil [ossa] @test_opt_out_arg : $@convention(thin)(@in NonTrivialStruct) -> (@out NonTrivialStruct) {
 bb0(%0 : $*NonTrivialStruct, %1 : $*NonTrivialStruct):
-  copy_addr %1 to [initialization] %0 : $*NonTrivialStruct
+  copy_addr %1 to [init] %0 : $*NonTrivialStruct
   %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
   %ld = load [copy] %ele : $*Klass
   destroy_value %ld : $Klass

@@ -29,7 +29,7 @@ enum class BodyInitKind;
 struct BodyInitKindAndExpr;
 class BraceStmt;
 class ClosureExpr;
-class CodeCompletionCallbacksFactory;
+class IDEInspectionCallbacksFactory;
 class ConstructorDecl;
 class CustomAttr;
 class Decl;
@@ -82,6 +82,7 @@ enum class ImplicitMemberAction : uint8_t;
 struct FingerprintAndMembers;
 class Identifier;
 class BodyAndFingerprint;
+struct ConstValueTypeInfo;
 
 // Define the AST type zone (zone 1)
 #define SWIFT_TYPEID_ZONE AST

@@ -271,7 +271,7 @@ bool ObjectOutliner::getObjectInitVals(SILValue Val,
         if (auto *IA = dyn_cast<IndexAddrInst>(TailUser)) {
           // An index_addr yields the address of any tail element. Only if the
           // second operand (the index) is an integer literal we can figure out
-          // which tail element is refereneced.
+          // which tail element is referenced.
           int TailIdx = -1;
           if (auto *Index = dyn_cast<IntegerLiteralInst>(IA->getIndex()))
             TailIdx = Index->getValue().getZExtValue();

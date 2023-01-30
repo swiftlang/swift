@@ -229,7 +229,7 @@ protected:
 
   llvm::raw_ostream &getDebugLogger(bool indent = true) const {
     auto &log = llvm::errs();
-    return indent ? log.indent(CS.solverState->depth * 2) : log;
+    return indent ? log.indent(CS.solverState->getCurrentIndent()) : log;
   }
 };
 
@@ -466,11 +466,29 @@ private:
     // to preliminary modify constraint system or log anything.
     if (IsSingle)
       return;
-
-    if (CS.isDebugMode())
-      getDebugLogger() << "(solving component #" << Index << '\n';
-
+    
+    if (CS.isDebugMode()) {
+      auto &log = getDebugLogger();
+      log << "(solving component #" << Index << '\n';
+    }
+    
     ComponentScope = std::make_unique<Scope>(*this);
+    
+    if (CS.isDebugMode()) {
+      auto &log = getDebugLogger();
+      log << "Type variables in scope = "
+          << "[";
+      auto typeVars = CS.getTypeVariables();
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
+      interleave(typeVars, [&](TypeVariableType *typeVar) {
+                   Type(typeVar).print(log, PO);
+                 },
+                 [&] {
+                   log << ", ";
+                 });
+      log << "]" << '\n';
+    }
 
     // If this component has orphaned constraint attached,
     // let's return it to the graph.
@@ -519,7 +537,7 @@ public:
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
         log << "(attempting ";
-        choice->print(log, &CS.getASTContext().SourceMgr, CS.solverState->depth * 2 + 2);
+        choice->print(log, &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent() + 2);
         log << '\n';
       }
 
@@ -527,6 +545,13 @@ public:
         auto scope = std::make_unique<Scope>(CS);
         if (attempt(*choice)) {
           ActiveChoice.emplace(std::move(scope), *choice);
+
+          if (CS.isDebugMode()) {
+            auto &log = llvm::errs();
+            auto &CG = CS.getConstraintGraph();
+            CG.dumpActiveScopeChanges(log, CS.solverState->getCurrentIndent());
+          }
+          
           return suspend(std::make_unique<SplitterStep>(CS, Solutions));
         }
       }
@@ -607,6 +632,14 @@ protected:
   bool attempt(const TypeVariableBinding &choice) override;
 
   bool shouldSkip(const TypeVariableBinding &choice) const override {
+    // Let's always attempt types inferred from "defaultable" constraints
+    // in diagnostic mode. This allows the solver to attempt i.e. `Any`
+    // for collection literals and produce better diagnostics for for-in
+    // statements like `for (x, y, z) in [] { ... }` when pattern type
+    // could not be inferred.
+    if (CS.shouldAttemptFixes())
+      return false;
+
     // If this is a defaultable binding and we have found solutions,
     // don't explore the default binding.
     return AnySolved && choice.isDefaultable();
@@ -674,7 +707,8 @@ public:
 
   void print(llvm::raw_ostream &Out) override {
     Out << "DisjunctionStep for ";
-    Disjunction->print(Out, &CS.getASTContext().SourceMgr);
+    Disjunction->print(Out, &CS.getASTContext().SourceMgr,
+                       CS.solverState->getCurrentIndent());
     Out << '\n';
   }
 
@@ -932,6 +966,11 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// in isolated mode.
   SmallVector<Solution, 4> IsolatedSolutions;
 
+  /// If \c ConjunctionStep::attempt modified the constraint system options,
+  /// it will store the original options in this \c llvm::SaveAndRestore.
+  /// Upon \c resume, these values will be restored.
+  Optional<llvm::SaveAndRestore<ConstraintSystemOptions>> ModifiedOptions;
+
 public:
   ConjunctionStep(ConstraintSystem &cs, Constraint *conjunction,
                   SmallVectorImpl<Solution> &solutions)
@@ -974,16 +1013,14 @@ public:
       auto remainingTime = OuterTimeRemaining->second;
       CS.Timer.emplace(anchor, CS, remainingTime);
     }
-    
-    if (CS.isDebugMode())
-      getDebugLogger() << ")\n";
   }
 
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
     Out << "ConjunctionStep for ";
-    Conjunction->print(Out, &CS.getASTContext().SourceMgr);
+    Conjunction->print(Out, &CS.getASTContext().SourceMgr,
+                       CS.solverState->getCurrentIndent());
     Out << '\n';
   }
 

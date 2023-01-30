@@ -451,9 +451,11 @@ static SILValue createIndexAddrFrom(IndexRawPointerInst *I,
       Builder.createBuiltin(I->getLoc(), TruncOrBitCast->getName(),
                              TruncOrBitCast->getType(), {}, Distance);
 
-  auto *NewIAI = Builder.createIndexAddr(I->getLoc(), NewPTAI, DistanceAsWord);
+  auto *NewIAI = Builder.createIndexAddr(I->getLoc(), NewPTAI, DistanceAsWord,
+                                         /*needsStackProtection=*/ false);
   auto *NewATPI =
-    Builder.createAddressToPointer(I->getLoc(), NewIAI, RawPointerTy);
+    Builder.createAddressToPointer(I->getLoc(), NewIAI, RawPointerTy,
+                                   /*needsStackProtection=*/ false);
   return NewATPI;
 }
 
@@ -601,7 +603,7 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
   if (!AndOp)
     return nullptr;
 
-  uint64_t andBits = AndOp.getValue();
+  uint64_t andBits = AndOp.value();
 
   // TODO: It's bad that we have to hardcode the payload bit mask here.
   // Instead we should introduce builtins (or instructions) to extract the
@@ -634,7 +636,7 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
             // Note that it is a requirement that the or'd bits of the left
             // operand are initially zero.
             if (auto opVal = getIntConst(B->getArguments()[1])) {
-              setBits |= opVal.getValue();
+              setBits |= opVal.value();
             } else {
               return nullptr;
             }

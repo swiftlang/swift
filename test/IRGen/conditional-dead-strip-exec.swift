@@ -6,6 +6,7 @@
 // RUN: %target-build-swift -Xfrontend -conditional-runtime-records %s -emit-ir -o %t/main.ll
 
 // RUN: %target-clang %t/main.ll -isysroot %sdk -L%swift_obj_root/lib/swift/%target-sdk-name -flto -o %t/main
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 // RUN: %llvm-nm --defined-only %t/main | %FileCheck %s --check-prefix=NM

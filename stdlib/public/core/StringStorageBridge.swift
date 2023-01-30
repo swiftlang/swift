@@ -14,8 +14,8 @@ import SwiftShims
 
 #if _runtime(_ObjC)
 
-internal let _cocoaASCIIEncoding:UInt = 1 /* NSASCIIStringEncoding */
-internal let _cocoaUTF8Encoding:UInt = 4 /* NSUTF8StringEncoding */
+internal var _cocoaASCIIEncoding:UInt { 1 } /* NSASCIIStringEncoding */
+internal var _cocoaUTF8Encoding:UInt { 4 } /* NSUTF8StringEncoding */
 
 extension String {
   @available(SwiftStdlib 5.6, *)

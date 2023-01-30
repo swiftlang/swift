@@ -65,8 +65,8 @@ static Identifier getVarNameForCoding(VarDecl *var,
   if (auto originalVar = var->getOriginalWrappedProperty())
     identifier = originalVar->getName();
 
-  if (identifier.empty() && paramIndex.hasValue())
-    return C.getIdentifier("_" + std::to_string(paramIndex.getValue()));
+  if (identifier.empty() && paramIndex.has_value())
+    return C.getIdentifier("_" + std::to_string(paramIndex.value()));
 
   return identifier;
 }
@@ -702,8 +702,8 @@ static ThrowStmt *createThrowCodingErrorStmt(ASTContext &C, Expr *containerExpr,
   auto *contextInitCallExpr = CallExpr::createImplicit(C, contextInitCall,
                                                        initArgList);
   llvm::SmallVector<Expr *, 2> arguments;
-  if (argument.hasValue()) {
-    arguments.push_back(argument.getValue());
+  if (argument.has_value()) {
+    arguments.push_back(argument.value());
   }
   arguments.push_back(contextInitCallExpr);
 
@@ -897,8 +897,8 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
     auto *method = UnresolvedDeclRefExpr::createImplicit(C, C.Id_superEncoder);
 
     // container.superEncoder()
-    auto *superEncoderRef =
-        DotSyntaxCallExpr::create(C, containerExpr, SourceLoc(), method);
+    auto *superEncoderRef = DotSyntaxCallExpr::create(
+        C, method, SourceLoc(), Argument::unlabeled(containerExpr));
 
     // encode(to:) expr
     auto *encodeDeclRef = new (C) DeclRefExpr(ConcreteDeclRef(encodeDecl),
@@ -909,8 +909,8 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
                                           SourceLoc(), /*Implicit=*/true);
 
     // super.encode(to:)
-    auto *encodeCall =
-        DotSyntaxCallExpr::create(C, superRef, SourceLoc(), encodeDeclRef);
+    auto *encodeCall = DotSyntaxCallExpr::create(C, encodeDeclRef, SourceLoc(),
+                                                 Argument::unlabeled(superRef));
 
     // super.encode(to: container.superEncoder())
     auto *args = ArgumentList::forImplicitSingle(C, C.Id_to, superEncoderRef);

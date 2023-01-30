@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library -g -emit-ir -o - %s | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library -g -c %s -o %t/out.o
+// RUN: %target-swift-frontend -enable-experimental-move-only -parse-as-library -g -emit-ir -o - %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-move-only -parse-as-library -g -c %s -o %t/out.o
 // RUN: %llvm-dwarfdump --show-children %t/out.o | %FileCheck -check-prefix=DWARF %s
 
 // This test checks that:
@@ -14,7 +14,6 @@
 // slightly differently on other platforms.
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64 || CPU=arm64
-// REQUIRES: optimized_stdlib
 
 //////////////////
 // Declarations //
@@ -81,7 +80,7 @@ public var falseValue: Bool { false }
 public func copyableValueTest() {
     let k = Klass()
     k.doSomething()
-    let m = _move(k)
+    let m = _move k
     m.doSomething()
 }
 
@@ -127,7 +126,7 @@ public func copyableValueTest() {
 // DWARF-NEXT: DW_AT_type	(
 public func copyableArgTest(_ k: __owned Klass) {
     k.doSomething()
-    let m = _move(k)
+    let m = _move k
     m.doSomething()
 }
 
@@ -169,7 +168,7 @@ public func copyableArgTest(_ k: __owned Klass) {
 public func copyableVarTest() {
     var k = Klass()
     k.doSomething()
-    let m = _move(k)
+    let m = _move k
     m.doSomething()
     k = Klass()
     k.doSomething()
@@ -212,7 +211,7 @@ public func copyableVarTest() {
 // DWARF-NEXT: DW_AT_type	(
 public func copyableVarArgTest(_ k: inout Klass) {
     k.doSomething()
-    let m = _move(k)
+    let m = _move k
     m.doSomething()
     k = Klass()
     k.doSomething()
@@ -262,7 +261,7 @@ public func copyableVarArgTest(_ k: inout Klass) {
 public func addressOnlyValueTest<T : P>(_ x: T) {
     let k = x
     k.doSomething()
-    let m = _move(k)
+    let m = _move k
     m.doSomething()
 }
 
@@ -304,7 +303,7 @@ public func addressOnlyValueTest<T : P>(_ x: T) {
 // DWARF-NEXT: DW_AT_type      (
 public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
     k.doSomething()
-    let m = _move(k)
+    let m = _move k
     m.doSomething()
 }
 
@@ -349,7 +348,7 @@ public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
 public func addressOnlyVarTest<T : P>(_ x: T) {
     var k = x
     k.doSomething()
-    let m = _move(k)
+    let m = _move k
     m.doSomething()
     k = x
     k.doSomething()
@@ -394,7 +393,7 @@ public func addressOnlyVarTest<T : P>(_ x: T) {
 // DWARF-NEXT: DW_AT_artificial        (true)
 public func addressOnlyVarArgTest<T : P>(_ k: inout T, _ x: T) {
     k.doSomething()
-    let m = _move(k)
+    let m = _move k
     m.doSomething()
     k = x
     k.doSomething()
@@ -417,7 +416,7 @@ public func copyableValueCCFlowTest() {
     let k = Klass()
     k.doSomething()
     if trueValue {
-        let m = _move(k)
+        let m = _move k
         m.doSomething()
     }
 }
@@ -434,7 +433,7 @@ public func copyableValueCCFlowTest() {
 public func copyableValueArgCCFlowTest(_ k: __owned Klass) {
     k.doSomething()
     if trueValue {
-        let m = _move(k)
+        let m = _move k
         m.doSomething()
     }
 }
@@ -464,7 +463,7 @@ public func copyableVarTestCCFlowReinitOutOfBlockTest() {
     var k = Klass()
     k.doSomething()
     if trueValue {
-        let m = _move(k)
+        let m = _move k
         m.doSomething()
     }
     k = Klass()
@@ -494,7 +493,7 @@ public func copyableVarTestCCFlowReinitOutOfBlockTest() {
 public func copyableVarArgTestCCFlowReinitOutOfBlockTest(_ k: inout Klass) {
     k.doSomething()
     if trueValue {
-        let m = _move(k)
+        let m = _move k
         m.doSomething()
     }
     k = Klass()
@@ -529,7 +528,7 @@ public func copyableVarTestCCFlowReinitInBlockTest() {
     var k = Klass()
     k.doSomething()
     if trueValue {
-        let m = _move(k)
+        let m = _move k
         m.doSomething()
         k = Klass()
     }
@@ -563,7 +562,7 @@ public func copyableVarTestCCFlowReinitInBlockTest() {
 public func copyableVarArgTestCCFlowReinitInBlockTest(_ k: inout Klass) {
     k.doSomething()
     if trueValue {
-        let m = _move(k)
+        let m = _move k
         m.doSomething()
         k = Klass()
     }
@@ -595,7 +594,7 @@ public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
     var k = T.value
     k.doSomething()
     if trueValue {
-        let m = _move(k)
+        let m = _move k
         m.doSomething()
     }
     k = T.value
@@ -626,7 +625,7 @@ public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
 public func addressOnlyVarArgTestCCFlowReinitOutOfBlockTest<T : P>(_ k: inout (any P), _ x: T.Type) {
     k.doSomething()
     if trueValue {
-        let m = _move(k)
+        let m = _move k
         m.doSomething()
     }
     k = T.value
@@ -660,7 +659,7 @@ public func addressOnlyVarTestCCFlowReinitInBlockTest<T : P>(_ x: T.Type) {
     var k = T.value
     k.doSomething()
     if trueValue {
-        let m = _move(k)
+        let m = _move k
         m.doSomething()
         k = T.value
     }
@@ -693,7 +692,7 @@ public func addressOnlyVarTestCCFlowReinitInBlockTest<T : P>(_ x: T.Type) {
 public func addressOnlyVarArgTestCCFlowReinitInBlockTest<T : P>(_ k: inout (any P), _ x: T.Type) {
     k.doSomething()
     if trueValue {
-        let m = _move(k)
+        let m = _move k
         m.doSomething()
         k = T.value
     }

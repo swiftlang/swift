@@ -18,6 +18,10 @@
 
 import pre_specialized_module
 
+// Helper to prevent return values from getting optimized away
+@inline(never)
+public func consume<T>(_ x: T) {}
+
 // Make sure we generate the public pre-specialized entry points.
 
 // OPT-DAG: sil @$s14pre_specialize10testPublic1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
@@ -42,8 +46,8 @@ public func testPublic<T>(t: T) {
 // OPT-DAG: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
 // OPT-DAG: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSi_Ts5 : $@convention(thin) (Int) -> () {
 
-// NONE: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
-// NONE: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSi_Ts5 : $@convention(thin) (Int) -> () {
+// NONE-DAG: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
+// NONE-DAG: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSi_Ts5 : $@convention(thin) (Int) -> () {
 
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where T == Float)
@@ -95,6 +99,18 @@ public func usePrespecializedEntryPoints() {
   useInternalEmitIntoClientPrespecialized(2.0)
   useInternalThing(2)
 }
+
+// OPT: sil @$s14pre_specialize34usePrespecializedThrowsEntryPointsyyKF : $@convention(thin) () -> @error any Error {
+// OPT:   [[F1:%.*]] = function_ref @$s22pre_specialized_module26publicPrespecializedThrowsyxxKlFSi_Ts5 : $@convention(thin) (Int) -> (Int, @error any Error)
+// OPT:   try_apply [[F1]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error any Error)
+// OPT-macosx:   [[F2:%.*]] = function_ref @$s22pre_specialized_module26publicPrespecializedThrowsyxxKlFAA8SomeDataV_Tg5 : $@convention(thin) (SomeData) -> (SomeData, @error any Error)
+// OPT-macosx:   try_apply [[F2]]({{%.*}}) : $@convention(thin) (SomeData) -> (SomeData, @error any Error)
+// OPT: } // end sil function '$s14pre_specialize34usePrespecializedThrowsEntryPointsyyKF'
+public func usePrespecializedThrowsEntryPoints() throws {
+  consume(try publicPrespecializedThrows(1))
+  consume(try publicPrespecializedThrows(SomeData()))
+}
+
 // OPT-macosx: sil [available 10.50] @$s14pre_specialize40usePrespecializedEntryPointsAvailabilityyyF : $@convention(thin) () -> () {
 // OPT-macosx:  [[F1:%.*]] = function_ref @$s22pre_specialized_module20publicPrespecializedyyxlFAA8SomeDataV_Ts5 : $@convention(thin) (SomeData) -> ()
 // OPT-macosx:  apply [[F1]](

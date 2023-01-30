@@ -12,6 +12,7 @@
 
 import Swift
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// An asynchronous sequence generated from an error-throwing closure that
 /// calls a continuation to produce new elements.
 ///
@@ -474,3 +475,112 @@ extension AsyncThrowingStream.Continuation {
 
 @available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream: @unchecked Sendable where Element: Sendable { }
+#else
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+public struct AsyncThrowingStream<Element, Failure: Error> {
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public struct Continuation: Sendable {
+    @available(SwiftStdlib 5.1, *)
+    @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+    public enum Termination {
+      case finished(Failure?)
+      case cancelled
+    }
+    @available(SwiftStdlib 5.1, *)
+    @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+    public enum YieldResult {
+      case enqueued(remaining: Int)
+      case dropped(Element)
+      case terminated
+    }
+    @available(SwiftStdlib 5.1, *)
+    @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+    public enum BufferingPolicy {
+      case unbounded
+      case bufferingOldest(Int)
+      case bufferingNewest(Int)
+    }
+    @discardableResult
+    @available(SwiftStdlib 5.1, *)
+    @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+    public func yield(_ value: __owned Element) -> YieldResult {
+      fatalError("Unavailable in task-to-thread concurrency model")
+    }
+    @available(SwiftStdlib 5.1, *)
+    @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+    public func finish(throwing error: __owned Failure? = nil) {
+      fatalError("Unavailable in task-to-thread concurrency model")
+    }
+    @available(SwiftStdlib 5.1, *)
+    @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+    public var onTermination: (@Sendable (Termination) -> Void)? {
+      get {
+        fatalError("Unavailable in task-to-thread concurrency model")
+      }
+      nonmutating set {
+        fatalError("Unavailable in task-to-thread concurrency model")
+      }
+    }
+  }
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    _ elementType: Element.Type = Element.self,
+    bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
+    _ build: (Continuation) -> Void
+  ) where Failure == Error {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(
+    unfolding produce: @escaping () async throws -> Element?
+  ) where Failure == Error {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+extension AsyncThrowingStream {
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public struct Iterator {
+    @available(SwiftStdlib 5.1, *)
+    @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+    public mutating func next() async throws -> Element? {
+      fatalError("Unavailable in task-to-thread concurrency model")
+    }
+  }
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public func makeAsyncIterator() -> Iterator {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+extension AsyncThrowingStream.Continuation {
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public func yield(
+    with result: Result<Element, Failure>
+  ) -> YieldResult where Failure == Error {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public func yield() -> YieldResult where Element == Void {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+extension AsyncThrowingStream: @unchecked Sendable where Element: Sendable { }
+#endif

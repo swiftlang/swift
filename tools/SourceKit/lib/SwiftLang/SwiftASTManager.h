@@ -41,7 +41,7 @@
 // operation already be finished, the consumer is directly called with the
 // result. Otherwise, a new ASTBuildOperation is created, the consumer is added
 // to it and the ASTBuildOperation is scheduled on
-// SwiftASTManager::Implemenation::ASTBuildQueue. This ensures that only one
+// SwiftASTManager::Implementation::ASTBuildQueue. This ensures that only one
 // AST is built at a time.
 // The SwiftASTManager keeps a weak reference to the consumer, so that the
 // consumer can be cancelled if new requests come in (see implementation of
@@ -161,7 +161,7 @@ public:
   void requestCancellation() {
     llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
     IsCancelled = true;
-    if (CancellationRequestCallback.hasValue()) {
+    if (CancellationRequestCallback.has_value()) {
       (*CancellationRequestCallback)(shared_from_this());
       CancellationRequestCallback = None;
     }
@@ -177,7 +177,7 @@ public:
   void setCancellationRequestCallback(
       std::function<void(std::shared_ptr<SwiftASTConsumer>)> NewCallback) {
     llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
-    assert(!CancellationRequestCallback.hasValue() &&
+    assert(!CancellationRequestCallback.has_value() &&
            "Can't set two cancellation callbacks on a SwiftASTConsumer");
     if (IsCancelled) {
       NewCallback(shared_from_this());
@@ -199,7 +199,7 @@ public:
   /// An AST was produced that the consumer should handle.
   virtual void handlePrimaryAST(ASTUnitRef AstUnit) = 0;
 
-  /// Creation of the AST failed due to \p Error. The request corresonding to
+  /// Creation of the AST failed due to \p Error. The request corresponding to
   /// this consumer should fail.
   virtual void failed(StringRef Error);
 
@@ -262,8 +262,10 @@ public:
                   SourceKitCancellationToken CancellationToken,
                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem);
 
-  std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
-                                                      std::string &Error);
+  std::unique_ptr<llvm::MemoryBuffer>
+  getMemoryBuffer(StringRef Filename,
+                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+                  std::string &Error);
 
   bool initCompilerInvocation(swift::CompilerInvocation &Invocation,
                               ArrayRef<const char *> Args,

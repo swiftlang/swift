@@ -166,7 +166,7 @@ shortlexCompare(const Symbol *lhsBegin, const Symbol *lhsEnd,
     ++rhsBegin;
 
     Optional<int> result = lhs.compare(rhs, ctx);
-    if (!result.hasValue() || *result != 0) {
+    if (!result.has_value() || *result != 0) {
       assert(lhs != rhs);
       return result;
     }

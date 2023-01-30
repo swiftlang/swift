@@ -54,6 +54,7 @@ namespace swift {
 /// call will *not* receive a \c walkTo*Post call.
 /// If \c walkTo*Post returns \c true, the traversal continues.
 class SourceEntityWalker {
+  // TODO: Switch to using explicit ASTWalker actions.
 public:
   /// Walks the provided source file.
   /// \returns true if traversal was aborted, false otherwise.

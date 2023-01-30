@@ -10,8 +10,8 @@ import Builtin
 // CHECK: [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG2]]
 // CHECK: end_borrow [[BORROWED_ARG2]]
 // CHECK: [[MEM:%.*]] = alloc_stack $Builtin.NativeObject
-// CHECK: store_borrow [[ARG2]] to [[MEM]] : $*Builtin.NativeObject
-// CHECK: end_borrow [[MEM]] : $*Builtin.NativeObject
+// CHECK: [[SB:%.*]] = store_borrow [[ARG2]] to [[MEM]] : $*Builtin.NativeObject
+// CHECK: end_borrow [[SB]] : $*Builtin.NativeObject
 // CHECK: } // end sil function 'borrow_test'
 sil [ossa] @borrow_test : $@convention(thin) (@in Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
@@ -19,8 +19,8 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
   end_borrow %2 : $Builtin.NativeObject
 
   %3 = alloc_stack $Builtin.NativeObject
-  store_borrow %1 to %3 : $*Builtin.NativeObject
-  end_borrow %3 : $*Builtin.NativeObject
+  %sb = store_borrow %1 to %3 : $*Builtin.NativeObject
+  end_borrow %sb : $*Builtin.NativeObject
   dealloc_stack %3 : $*Builtin.NativeObject
   destroy_addr %0 : $*Builtin.NativeObject
 

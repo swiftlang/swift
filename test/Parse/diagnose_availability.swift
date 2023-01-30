@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift 
 
-// SR-4231: Misleading/wrong error message for malformed @available
+// https://github.com/apple/swift/issues/46814
+// Misleading/wrong error message for malformed '@available'
 
 @available(OSX 10.6, *) // no error
 func availableSince10_6() {}
@@ -28,7 +29,8 @@ func availableOnMultiplePlatforms() {}
 func twoShorthandsFollowedByDeprecated() {}
 
 
-// SR-8598: Missing/wrong warning message for '*' or 'swift' platform.
+// https://github.com/apple/swift/issues/51114
+// Missing/wrong warning message for '*' or 'swift' platform.
 
 @available(*, deprecated: 4.2)
 // expected-warning@-1 {{unexpected version number in 'available' attribute for non-specific platform '*'}} {{25-30=}}

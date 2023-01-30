@@ -13,6 +13,9 @@ typedef void (^CompletionHandler)(NSInteger);
 
 -(void)asyncImportSame:(NSInteger)arg completionHandler:(void (^)(NSInteger))handler;
 -(void)asyncImportSame:(NSInteger)arg replyTo:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
+
+-(void)simpleOnMainActorWithCompletionHandler:(void (^)(NSInteger))handler __attribute__((swift_attr("@MainActor")));
+
 @end
 
 #pragma clang assume_nonnull end

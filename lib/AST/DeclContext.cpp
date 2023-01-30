@@ -283,9 +283,44 @@ ModuleDecl *DeclContext::getParentModule() const {
 
 SourceFile *DeclContext::getParentSourceFile() const {
   const DeclContext *DC = this;
-  while (!DC->isModuleScopeContext())
+  SourceLoc loc;
+  while (!DC->isModuleScopeContext()) {
+    // If we don't have a source location yet, try to grab one from this
+    // context.
+    if (loc.isInvalid()) {
+      switch (DC->getContextKind()) {
+      case DeclContextKind::AbstractClosureExpr:
+        loc = cast<AbstractClosureExpr>(DC)->getLoc();
+        break;
+
+      case DeclContextKind::AbstractFunctionDecl:
+      case DeclContextKind::EnumElementDecl:
+      case DeclContextKind::ExtensionDecl:
+      case DeclContextKind::GenericTypeDecl:
+      case DeclContextKind::MacroDecl:
+      case DeclContextKind::SubscriptDecl:
+      case DeclContextKind::TopLevelCodeDecl:
+        loc = DC->getAsDecl()->getLoc(/*SerializedOK=*/false);
+        break;
+
+      case DeclContextKind::Initializer:
+      case DeclContextKind::FileUnit:
+      case DeclContextKind::Module:
+      case DeclContextKind::SerializedLocal:
+        break;
+      }
+    }
+
     DC = DC->getParent();
-  return const_cast<SourceFile *>(dyn_cast<SourceFile>(DC));
+  }
+
+  auto fallbackSF = const_cast<SourceFile *>(dyn_cast<SourceFile>(DC));
+  if (auto module = DC->getParentModule()) {
+    if (auto sf = module->getSourceFileContainingLocation(loc))
+      return sf;
+  }
+
+  return fallbackSF;
 }
 
 DeclContext *DeclContext::getModuleScopeContext() const {
@@ -530,6 +565,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return cast<SubscriptDecl>(this)->walk(Walker);
   case DeclContextKind::EnumElementDecl:
     return cast<EnumElementDecl>(this)->walk(Walker);
+  case DeclContextKind::MacroDecl:
+    return cast<MacroDecl>(this)->walk(Walker);
   case DeclContextKind::SerializedLocal:
     llvm_unreachable("walk is unimplemented for deserialized contexts");
   case DeclContextKind::Initializer:
@@ -624,6 +661,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     break;
   case DeclContextKind::SubscriptDecl:    Kind = "SubscriptDecl"; break;
   case DeclContextKind::EnumElementDecl:  Kind = "EnumElementDecl"; break;
+  case DeclContextKind::MacroDecl:    Kind = "MacroDecl"; break;
   }
   OS.indent(Depth*2 + indent) << (void*)this << " " << Kind;
 
@@ -690,6 +728,15 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
       OS << " : (no type set)";
     break;
   }
+  case DeclContextKind::MacroDecl: {
+    auto *MD = cast<MacroDecl>(this);
+    OS << " name=" << MD->getBaseName();
+    if (MD->hasInterfaceType())
+      OS << " : " << MD->getInterfaceType();
+    else
+      OS << " : (no type set)";
+    break;
+  }
   case DeclContextKind::Initializer:
     switch (cast<Initializer>(this)->getInitializerKind()) {
     case InitializerKind::PatternBinding: {
@@ -715,6 +762,15 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
         break;
       }
       break;
+    }
+
+    case InitializerKind::RuntimeAttribute: {
+      auto init = cast<RuntimeAttributeInitializer>(this);
+      auto *decl = init->getAttachedToDecl();
+
+      OS << "RuntimeAttribute attachedTo="
+         << init->getAttachedToDecl()->getName() << ", attribute=";
+      init->getAttr()->print(OS, decl);
     }
     }
     break;
@@ -928,6 +984,11 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
     if (getASTContext().SourceMgr.isBeforeInBuffer(prevEnd, nextStart))
       return;
 
+    // Synthesized member macros can add new members in a macro expansion buffer.
+    auto *memberSourceFile = member->getInnermostDeclContext()->getParentSourceFile();
+    if (memberSourceFile->getFulfilledMacroRole() == MacroRole::SynthesizedMembers)
+      return;
+
     llvm::errs() << "Source ranges out of order in addMember():\n";
     prev->dump(llvm::errs());
     next->dump(llvm::errs());
@@ -1124,11 +1185,13 @@ getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
   return lastExtension ? lastExtension : DC;
 }
 
-AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
-    : Value(DC, isPrivate) {
-  if (isPrivate) {
+AccessScope::AccessScope(const DeclContext *DC, AccessLimitKind limitKind)
+    : Value(DC, limitKind) {
+  auto isPrivate = false;
+  if (limitKind == AccessLimitKind::Private) {
     DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
     Value.setPointer(DC);
+    isPrivate = true;
   }
   if (!DC || isa<ModuleDecl>(DC))
     assert(!isPrivate && "public or internal scope can't be private");
@@ -1224,6 +1287,8 @@ DeclContextKind DeclContext::getContextKind() const {
       return DeclContextKind::EnumElementDecl;
     case DeclKind::Extension:
       return DeclContextKind::ExtensionDecl;
+    case DeclKind::Macro:
+      return DeclContextKind::MacroDecl;
     default:
       llvm_unreachable("Unhandled Decl kind");
     }
@@ -1256,6 +1321,7 @@ bool DeclContext::isAsyncContext() const {
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::Module:
   case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::MacroDecl:
     return false;
   case DeclContextKind::FileUnit:
     if (const SourceFile *sf = dyn_cast<SourceFile>(this))
@@ -1288,6 +1354,7 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::SubscriptDecl:
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::MacroDecl:
     return extractNearestSourceLoc(dc->getAsDecl());
 
   case DeclContextKind::AbstractClosureExpr: {

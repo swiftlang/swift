@@ -80,6 +80,9 @@ public struct PublicStruct: LibProtocol {
   public init() { }
 
   public var nonWrappedVar: String = "some text"
+
+  @IoiPropertyWrapper("some text")
+  private var wrappedVar: String
 }
 
 struct StructWithOverride: HiddenProtocolWithOverride {

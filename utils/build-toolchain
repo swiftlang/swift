@@ -36,7 +36,7 @@ function usage() {
   echo "Customize the preset invoked by prepending a prefix"
   echo ""
   echo "--use-os-runtime"
-  echo "Require this toolchain to link against against the OS runtime rather than the toolchains packaged runtime"
+  echo "Require this toolchain to link against the OS runtime rather than the toolchains packaged runtime"
   echo ""
 }
 

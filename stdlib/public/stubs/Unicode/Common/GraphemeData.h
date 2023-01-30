@@ -16,7 +16,7 @@
 #ifndef GRAPHEME_DATA_H
 #define GRAPHEME_DATA_H
 
-#include "SwiftShims/SwiftStdint.h"
+#include "swift/shims/SwiftStdint.h"
 
 #define GRAPHEME_BREAK_DATA_COUNT 621
 

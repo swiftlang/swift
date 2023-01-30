@@ -180,7 +180,7 @@ func opt_to_opt_reference(_ x : C!) -> C? { return x }
 // CHECK-LABEL: sil hidden [ossa] @$s4main07opt_to_B12_addressOnly{{[_0-9a-zA-Z]*}}F
 // CHECK:       bb0(%0 : $*Optional<T>, %1 : $*Optional<T>):
 // CHECK-NEXT:  debug_value %1 : $*Optional<T>, let, name "x", {{.*}} expr op_deref
-// CHECK-NEXT:  copy_addr %1 to [initialization] %0
+// CHECK-NEXT:  copy_addr %1 to [init] %0
 // CHECK-NOT:  destroy_addr %1
 func opt_to_opt_addressOnly<T>(_ x : T!) -> T? { return x }
 
@@ -201,10 +201,8 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
 // CHECK-NEXT: [[X:%.*]] = alloc_box ${ var Optional<Int> }, var, name "x"
-// CHECK-NEXT: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
-// CHECK-NEXT: [[PB:%.*]] = project_box [[X_LIFETIME]]
+// CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT: store %0 to [trivial] [[PB]] : $*Optional<Int>
-// CHECK-NEXT: end_borrow [[X_LIFETIME]]
 // CHECK-NEXT: destroy_value [[X]] : ${ var Optional<Int> }
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a

@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-notifications"
+
 #include "swift/SIL/Notifications.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -49,6 +51,7 @@ DNS_CHAIN_METHOD(DeserializeDefaultWitnessTableEntries, ModuleDecl *,
                  SILDefaultWitnessTable *)
 DNS_CHAIN_METHOD(Deserialize, ModuleDecl *, SILGlobalVariable *)
 DNS_CHAIN_METHOD(Deserialize, ModuleDecl *, SILVTable *)
+DNS_CHAIN_METHOD(Deserialize, ModuleDecl *, SILMoveOnlyDeinit *)
 DNS_CHAIN_METHOD(Deserialize, ModuleDecl *, SILWitnessTable *)
 DNS_CHAIN_METHOD(Deserialize, ModuleDecl *, SILDefaultWitnessTable *)
 #undef DNS_CHAIN_METHOD

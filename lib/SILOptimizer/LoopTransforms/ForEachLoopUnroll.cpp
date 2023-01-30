@@ -21,7 +21,7 @@
 //    initializer annotated "array.uninitialized_intrinsic". This is done in
 //    `run` method.
 //
-// 2. For every "array.uninintialized_intrinsic" initializer call, try
+// 2. For every "array.uninitialized_intrinsic" initializer call, try
 //    extracting the elements with which the array is initialized, and classify
 //    the uses of the array into incidental uses, forEach calls and uses that
 //    can write into the array. If any of the following conditions hold, give
@@ -47,7 +47,7 @@
 //
 //    Secondly, the body closure uses @in_guaranteed convention for the
 //    parameter. Therefore, an alloc_stack is created before the unrolled code
-//    begins to hold the elements, and is destoryed once the unrolled code ends.
+//    begins to hold the elements, and is destroyed once the unrolled code ends.
 //
 //    Thirdly, the body closure throws. Hence, it has to be try_applied. This
 //    means that we need to chain the try_applies in such a way that when the
@@ -249,7 +249,7 @@ static FixLifetimeInst *isFixLifetimeUseOfArray(SILInstruction *user,
   AllocStackInst *alloc = dyn_cast<AllocStackInst>(storeUser->getDest());
   if (!alloc)
     return nullptr;
-  auto fixLifetimeUsers = alloc->getUsersOfType<FixLifetimeInst>();
+  auto fixLifetimeUsers = storeUser->getUsersOfType<FixLifetimeInst>();
   if (fixLifetimeUsers.empty())
     return nullptr;
   auto firstUser = fixLifetimeUsers.begin();
@@ -278,7 +278,7 @@ static TryApplyInst *isForEachUseOfArray(SILInstruction *user, SILValue array) {
   AllocStackInst *alloc = dyn_cast<AllocStackInst>(storeUser->getDest());
   if (!alloc)
     return nullptr;
-  auto applyUsers = alloc->getUsersOfType<TryApplyInst>();
+  auto applyUsers = storeUser->getUsersOfType<TryApplyInst>();
   if (applyUsers.empty())
     return nullptr;
   auto firstUser = applyUsers.begin();
@@ -368,7 +368,7 @@ void ArrayInfo::getLastDestroys(
   for (SILInstruction *frontierInst : frontier) {
     // Skip frontier instructions at the start of a basic block as they do not
     // follow a destroy_value of the array. Note that the goal is to collect
-    // the last destroys, which must always immediately preceed a frontier
+    // the last destroys, which must always immediately precede a frontier
     // instruction as it marks the end of the use of the array.
     if (frontierInst == &frontierInst->getParent()->front())
       continue;
@@ -385,12 +385,11 @@ void ArrayInfo::getLastDestroys(
 /// not clean up any resulting dead instructions.
 static void removeForEachCall(TryApplyInst *forEachCall,
                               InstructionDeleter &deleter) {
-  AllocStackInst *allocStack =
-      dyn_cast<AllocStackInst>(forEachCall->getArgument(1));
-  assert(allocStack);
+  auto *sbi = cast<StoreBorrowInst>(forEachCall->getArgument(1));
+  auto *asi = cast<AllocStackInst>(sbi->getDest());
   // The allocStack will be used in the forEach call and also in a store
   // instruction and a dealloc_stack instruction. Force delete all of them.
-  deleter.recursivelyForceDeleteUsersAndFixLifetimes(allocStack);
+  deleter.recursivelyForceDeleteUsersAndFixLifetimes(asi);
 }
 
 /// Unroll the \c forEachCall on an array, using the information in
@@ -410,7 +409,7 @@ static void removeForEachCall(TryApplyInst *forEachCall,
 ///      that contains the forEach call.
 ///    - store_borrow the element e_i into the alloc_stack A. Note that we
 ///      can use the owned copy of e_i created in the previous step.
-///    - try_apply the forEach's body closure on the the alloc_stack A.
+///    - try_apply the forEach's body closure on the alloc_stack A.
 ///      If i is not the last index, jump to b_i+1 in the normal case of the
 ///      try_apply. If i is the last index of the array jump to the normal
 ///      target of the forEach call. Jump to a new error block: err_i in the
@@ -502,12 +501,15 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
   // "error" branch of a try_apply. The error block created here will always
   // jump to the error target of the original forEach.
   auto errorTargetGenerator = [&](SILBasicBlock *insertionBlock,
-                                  SILValue borrowedElem ) {
+                                  SILValue borrowedElem, SILValue storeBorrow) {
     SILBasicBlock *newErrorBB = fun->createBasicBlockBefore(insertionBlock);
     SILValue argument = newErrorBB->createPhiArgument(
         errorArgument->getType(), errorArgument->getOwnershipKind());
     // Make the errorBB jump to the error target of the original forEach.
     SILBuilderWithScope builder(newErrorBB, forEachCall);
+    if (storeBorrow) {
+      builder.createEndBorrow(forEachLoc, storeBorrow);
+    }
     if (borrowedElem) {
       builder.createEndBorrow(forEachLoc, borrowedElem);
     }
@@ -536,39 +538,46 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
     SILBasicBlock *currentBB = num > 1 ? normalTargetGenerator(nextNormalBB)
                                        : forEachCall->getParentBlock();
     SILBuilderWithScope unrollBuilder(currentBB, forEachCall);
+    SILBuilderWithScope normalBuilder(&nextNormalBB->front(), forEachCall);
     SILValue borrowedElem;
+    SILValue addr;
+
     if (arrayElementType.isTrivial(*fun)) {
       unrollBuilder.createStore(forEachLoc, elementCopy, allocStack,
                                 StoreOwnershipQualifier::Trivial);
+      addr = allocStack;
     } else {
       // Borrow the elementCopy and store it in the allocStack. Note that the
       // element's copy is guaranteed to be alive until the array is alive.
       // Therefore it is okay to use a borrow here.
       borrowedElem = unrollBuilder.createBeginBorrow(forEachLoc, elementCopy);
-      unrollBuilder.createStoreBorrow(forEachLoc, borrowedElem, allocStack);
-
-      SILBuilderWithScope(&nextNormalBB->front(), forEachCall)
-        .createEndBorrow(forEachLoc, borrowedElem);
+      addr =
+          unrollBuilder.createStoreBorrow(forEachLoc, borrowedElem, allocStack);
+      normalBuilder.createEndBorrow(forEachLoc, addr);
+      normalBuilder.createEndBorrow(forEachLoc, borrowedElem);
     }
 
     SILBasicBlock *errorTarget =
-      errorTargetGenerator(nextNormalBB, borrowedElem);
+        errorTargetGenerator(nextNormalBB, borrowedElem,
+                             isa<StoreBorrowInst>(addr) ? addr : SILValue());
     // Note that the substitution map must be empty as we are not supporting
     // elements of address-only type. All elements in the array are guaranteed
     // to be loadable. TODO: generalize this to address-only types.
     unrollBuilder.createTryApply(forEachLoc, forEachBodyClosure,
-                                 SubstitutionMap(), allocStack,
-                                 nextNormalBB, errorTarget);
+                                 SubstitutionMap(), addr, nextNormalBB,
+                                 errorTarget);
+
+    if (nextNormalBB == normalBB) {
+      // Dealloc the stack in the normalBB and also in errorBB. Note that every
+      // try_apply created during the unrolling must pass through these blocks.
+      normalBuilder.createDeallocStack(forEachLoc, allocStack);
+    }
     nextNormalBB = currentBB;
   }
-
   // Dealloc the stack in the normalBB and also in errorBB. Note that every
   // try_apply created during the unrolling must pass through these blocks.
-  SILBuilderWithScope(&normalBB->front())
-      .createDeallocStack(forEachLoc, allocStack);
   SILBuilderWithScope(&errorBB->front())
       .createDeallocStack(forEachLoc, allocStack);
-
   // Remove the forEach call as it has now been unrolled.
   removeForEachCall(forEachCall, deleter);
 }

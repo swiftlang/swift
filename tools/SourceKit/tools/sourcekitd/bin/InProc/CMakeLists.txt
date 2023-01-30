@@ -51,7 +51,9 @@ else()
 endif()
 target_link_libraries(sourcekitdInProc PRIVATE
   SourceKitSwiftLang
-  sourcekitdAPI)
+  sourcekitdAPI
+  sourcekitdService
+  swiftIDETool)
 
 # While it is possible to build this as a static library,
 # to get the runtime paths correct, it must be linked into a binary

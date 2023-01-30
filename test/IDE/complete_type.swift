@@ -52,14 +52,14 @@ typealias FooTypealias = Int
 // WITH_GLOBAL_TYPES_EXPR-DAG: Decl[TypeAlias]/CurrModule: FooTypealias[#Int#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES_EXPR: End completions
 
-// GLOBAL_NEGATIVE-NOT: fooObject
-// GLOBAL_NEGATIVE-NOT: fooFunc
+// GLOBAL_NEGATIVE-NOT: Decl.*: fooObject
+// GLOBAL_NEGATIVE-NOT: Decl.*: fooFunc
 
-// WITHOUT_GLOBAL_TYPES-NOT: FooStruct
-// WITHOUT_GLOBAL_TYPES-NOT: FooEnum
-// WITHOUT_GLOBAL_TYPES-NOT: FooClass
-// WITHOUT_GLOBAL_TYPES-NOT: FooProtocol
-// WITHOUT_GLOBAL_TYPES-NOT: FooTypealias
+// WITHOUT_GLOBAL_TYPES-NOT: Decl.*: FooStruct
+// WITHOUT_GLOBAL_TYPES-NOT: Decl.*: FooEnum
+// WITHOUT_GLOBAL_TYPES-NOT: Decl.*: FooClass
+// WITHOUT_GLOBAL_TYPES-NOT: Decl.*: FooProtocol
+// WITHOUT_GLOBAL_TYPES-NOT: Decl.*: FooTypealias
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions

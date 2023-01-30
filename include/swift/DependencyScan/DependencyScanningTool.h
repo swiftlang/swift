@@ -23,10 +23,33 @@
 
 namespace swift {
 namespace dependencies {
+class DependencyScanningTool;
+
+/// Diagnostic consumer that simply collects the diagnostics emitted so-far
+class DependencyScannerDiagnosticCollectingConsumer : public DiagnosticConsumer {
+public:
+  friend DependencyScanningTool;
+  DependencyScannerDiagnosticCollectingConsumer() {}
+  void reset() { Diagnostics.clear(); }
+private:
+  struct ScannerDiagnosticInfo {
+    std::string Message;
+    llvm::SourceMgr::DiagKind Severity;
+  };
+  
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override;
+  ScannerDiagnosticInfo convertDiagnosticInfo(SourceManager &SM,
+                                              const DiagnosticInfo &Info);
+  void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
+  std::vector<ScannerDiagnosticInfo> Diagnostics;
+};
+
 
 /// Given a set of arguments to a print-target-info frontend tool query, produce the
 /// JSON target info.
-llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command);
+llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command,
+                                                    const char *main_executable_path);
 
 /// The high-level implementation of the dependency scanner that runs on
 /// an individual worker thread.
@@ -63,11 +86,15 @@ public:
 
   /// Writes the current `SharedCache` instance to a specified FileSystem path.
   void serializeCache(llvm::StringRef path);
-  /// Loads an instance of a `GlobalModuleDependenciesCache` to serve as the `SharedCache`
+  /// Loads an instance of a `SwiftDependencyScanningService` to serve as the `SharedCache`
   /// from a specified FileSystem path.
   bool loadCache(llvm::StringRef path);
   /// Discard the tool's current `SharedCache` and start anew.
   void resetCache();
+  
+  const std::vector<DependencyScannerDiagnosticCollectingConsumer::ScannerDiagnosticInfo>& getDiagnostics() const { return CDC.Diagnostics; }
+  /// Discared the collection of diagnostics encountered so far.
+  void resetDiagnostics();
 
 private:
   /// Using the specified invocation command, initialize the scanner instance
@@ -82,14 +109,14 @@ private:
 
   /// Shared cache of module dependencies, re-used by individual full-scan queries
   /// during the lifetime of this Tool.
-  std::unique_ptr<GlobalModuleDependenciesCache> SharedCache;
+  std::unique_ptr<SwiftDependencyScanningService> ScanningService;
 
   /// Shared cache of compiler instances created during batch scanning, corresponding to
   /// command-line options specified in the batch scan input entry.
   std::unique_ptr<CompilerArgInstanceCacheMap> VersionedPCMInstanceCacheCache;
 
-  /// A shared consumer that, for now, just prints the encountered diagnostics.
-  PrintingDiagnosticConsumer PDC;
+  /// A shared consumer that accumulates encountered diagnostics.
+  DependencyScannerDiagnosticCollectingConsumer CDC;
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver;
 };

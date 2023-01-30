@@ -104,7 +104,7 @@ void RuleBuilder::initWithProtocolSignatureRequirements(
 
     // If completion failed, we'll have a totally empty requirement signature,
     // but to maintain invariants around what constitutes a valid rewrite term
-    // between getTypeForTerm() and isValidTypeInContext(), we need to add rules
+    // between getTypeForTerm() and isValidTypeParameter(), we need to add rules
     // for inherited protocols.
     if (reqs.getErrors().contains(GenericSignatureErrorFlags::CompletionFailed)) {
       for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
@@ -284,7 +284,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
     llvm::dbgs() << "\n";
   }
 
-  assert(!substitutions.hasValue() || proto == nullptr && "Can't have both");
+  assert(!substitutions.has_value() || proto == nullptr && "Can't have both");
 
   // Compute the left hand side.
   auto subjectType = CanType(req.getFirstType());
@@ -298,6 +298,26 @@ void RuleBuilder::addRequirement(const Requirement &req,
   MutableTerm constraintTerm;
 
   switch (req.getKind()) {
+  case RequirementKind::SameShape: {
+    // A same-shape requirement T.shape == U.shape
+    // becomes a rewrite rule:
+    //
+    //    T.[shape] => U.[shape]
+    auto otherType = CanType(req.getSecondType());
+    assert(otherType->isParameterPack());
+
+    constraintTerm = (substitutions
+                      ? Context.getRelativeTermForType(
+                            otherType, *substitutions)
+                      : Context.getMutableTermForType(
+                            otherType, proto));
+
+    // Add the [shape] symbol to both sides.
+    subjectTerm.add(Symbol::forShape(Context));
+    constraintTerm.add(Symbol::forShape(Context));
+    break;
+  }
+
   case RequirementKind::Conformance: {
     // A conformance requirement T : P becomes a rewrite rule
     //

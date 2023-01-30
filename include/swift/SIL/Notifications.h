@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -68,6 +69,9 @@ public:
   virtual void didDeserialize(ModuleDecl *mod,
                               SILDefaultWitnessTable *wtable) = 0;
 
+  /// Observe that we deserialized a move only deinit declaration.
+  virtual void didDeserialize(ModuleDecl *mod, SILMoveOnlyDeinit *deinit) = 0;
+
   virtual ~DeserializationNotificationHandlerBase() = default;
 };
 
@@ -108,6 +112,10 @@ public:
   /// Observe that we deserialized a default witness-table declaration.
   virtual void didDeserialize(ModuleDecl *mod,
                               SILDefaultWitnessTable *wtable) override {}
+
+  /// Observe that we deserialized a move only deinit declaration.
+  virtual void didDeserialize(ModuleDecl *mod,
+                              SILMoveOnlyDeinit *deinit) override {}
 
   virtual StringRef getName() const = 0;
 
@@ -239,6 +247,7 @@ public:
   void didDeserialize(ModuleDecl *mod, SILWitnessTable *wtable) override;
   void didDeserialize(ModuleDecl *mod,
                       SILDefaultWitnessTable *wtable) override;
+  void didDeserialize(ModuleDecl *mod, SILMoveOnlyDeinit *deinit) override;
 };
 } // namespace swift
 

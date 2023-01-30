@@ -583,20 +583,22 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   }
 }
 
-struct SR15530_Struct<T> {}
-extension SR15530_Struct: Differentiable where T: Differentiable {}
+// https://github.com/apple/swift/issues/57833
 
-extension SR15530_Struct {
-  // expected-note @+1 {{candidate instance method does not have type equal to or less constrained than '<T where T : Differentiable> (inout SR15530_Struct<T>) -> (Int, @differentiable(reverse) (inout T) -> Void) -> Void'}}
-  mutating func sr15530_update<D>(at index: Int, byCalling closure: (inout T, D) -> Void, withArgument: D) {
+struct Struct2<T> {}
+extension Struct2: Differentiable where T: Differentiable {}
+
+extension Struct2 {
+  // expected-note @+1 {{candidate instance method does not have type equal to or less constrained than '<T where T : Differentiable> (inout Struct2<T>) -> (Int, @differentiable(reverse) (inout T) -> Void) -> Void'}}
+  mutating func update<D>(at index: Int, byCalling closure: (inout T, D) -> Void, withArgument: D) {
     fatalError("Stop")
   }
 }
 
-extension SR15530_Struct where T: Differentiable {
-  // expected-error @+1 {{referenced declaration 'sr15530_update' could not be resolved}}
-  @derivative(of: sr15530_update)
-  mutating func vjp_sr15530_update(
+extension Struct2 where T: Differentiable {
+  // expected-error @+1 {{referenced declaration 'update' could not be resolved}}
+  @derivative(of: update)
+  mutating func vjp_update(
     at index: Int,
     byCalling closure: @differentiable(reverse) (inout T) -> Void
   ) -> (value: Void, pullback: (inout Self.TangentVector) -> Void) {
@@ -624,7 +626,8 @@ extension Class where T: Differentiable {
     return (1, { _ in .zero })
   }
 
-  // FIXME(SR-13096): Enable derivative registration for class property/subscript setters.
+  // FIXME: Enable derivative registration for class property/subscript setters (https://github.com/apple/swift/issues/55542).
+  //
   // This requires changing derivative type calculation rules for functions with
   // class-typed parameters. We need to assume that all functions taking
   // class-typed operands may mutate those operands.

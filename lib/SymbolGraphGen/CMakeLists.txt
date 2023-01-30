@@ -10,5 +10,5 @@ add_swift_host_library(swiftSymbolGraphGen STATIC
 
 target_link_libraries(swiftSymbolGraphGen PRIVATE
   swiftAST
-  swiftFrontend
+  swiftIDE
   swiftMarkup)

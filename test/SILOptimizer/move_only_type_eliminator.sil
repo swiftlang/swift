@@ -165,19 +165,20 @@ bb0(%0 : $Trivial):
   %alloc = alloc_stack $@moveOnly Trivial
   %1 = copyable_to_moveonlywrapper [owned] %0 : $Trivial
   %1a = begin_borrow %1 : $@moveOnly Trivial
-  store_borrow %1a to %alloc : $*@moveOnly Trivial
-  %2 = load [copy] %alloc : $*@moveOnly Trivial
+  %sb = store_borrow %1a to %alloc : $*@moveOnly Trivial
+  %2 = load [copy] %sb : $*@moveOnly Trivial
   %2a = begin_borrow %2 : $@moveOnly Trivial
   %3 = moveonlywrapper_to_copyable [guaranteed] %2a : $@moveOnly Trivial
   apply %f(%3) : $@convention(thin) (Trivial) -> ()
   end_borrow %2a : $@moveOnly Trivial
   destroy_value %2 : $@moveOnly Trivial
 
-  %4 = load_borrow %alloc : $*@moveOnly Trivial
+  %4 = load_borrow %sb : $*@moveOnly Trivial
   %5 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly Trivial
   apply %f(%5) : $@convention(thin) (Trivial) -> ()
   end_borrow %4 : $@moveOnly Trivial
 
+  end_borrow %sb : $*@moveOnly Trivial
   end_borrow %1a : $@moveOnly Trivial
   destroy_value %1 : $@moveOnly Trivial
   dealloc_stack %alloc : $*@moveOnly Trivial
@@ -418,18 +419,19 @@ bb0(%0 : @guaranteed $Klass):
   %1aa = copy_value %0 : $Klass
   %1 = copyable_to_moveonlywrapper [owned] %1aa : $Klass
   %1a = begin_borrow %1 : $@moveOnly Klass
-  store_borrow %1a to %alloc : $*@moveOnly Klass
-  %2 = load [copy] %alloc : $*@moveOnly Klass
+  %sb = store_borrow %1a to %alloc : $*@moveOnly Klass
+  %2 = load [copy] %sb : $*@moveOnly Klass
   %2a = begin_borrow %2 : $@moveOnly Klass
   %3 = moveonlywrapper_to_copyable [guaranteed] %2a : $@moveOnly Klass
   apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
   end_borrow %2a : $@moveOnly Klass
   destroy_value %2 : $@moveOnly Klass
 
-  %4 = load_borrow %alloc : $*@moveOnly Klass
+  %4 = load_borrow %sb : $*@moveOnly Klass
   %5 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly Klass
   apply %f(%5) : $@convention(thin) (@guaranteed Klass) -> ()
   end_borrow %4 : $@moveOnly Klass
+  end_borrow %sb : $*@moveOnly Klass
 
   end_borrow %1a : $@moveOnly Klass
   destroy_value %1 : $@moveOnly Klass

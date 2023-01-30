@@ -48,11 +48,14 @@ func negativeShift(_ u8: UInt8) {
   _ = (u8 << -1)
 }
 
-func sr5176(description: String = "unambiguous Int32.init(bitPattern:)") {
+// https://github.com/apple/swift/issues/47752
+// Ambiguous 'Int32.init(bitPattern:)'
+do {
   _ = Int32(bitPattern: 0) // should compile without ambiguity
 }
 
-func sr6634(x: UnsafeBufferPointer<UInt8>) -> Int {
+// https://github.com/apple/swift/issues/49183
+func f_49183(x: UnsafeBufferPointer<UInt8>) -> Int {
   return x.lazy.filter { $0 > 127 || $0 == 0 }.count // should be unambiguous
 }
 

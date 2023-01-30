@@ -211,6 +211,7 @@ bb3(%13 : $@noescape @callee_guaranteed () -> ()):
 // CHECK-LABEL: sil [ossa] @test_lifetime_extension_until_function_exit :
 // CHECK: [[NONE1:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
 // CHECK: [[NONE2:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+// CHECK: [[BORROWNONE:%.*]] = begin_borrow [[NONE2]] : $Optional<@callee_guaranteed () -> ()>
 // CHECK: cond_br undef, bb1, bb2
 // CHECK: bb1:
 // CHECK:  [[ORIG:%.*]] = function_ref @originalClosure : $@convention(thin) () -> ()
@@ -255,3 +256,47 @@ bb3:
   return %25 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_alloc_stack_arg_with_frontier_outside_try_apply_successors : $@convention(thin) <Self> (@in_guaranteed Self) -> @error any Error {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $Self
+// CHECK:         try_apply undef() {{.*}}, normal [[SUCCESS_1:bb[0-9]+]], error [[FAILURE_1:bb[0-9]+]]
+// CHECK:       [[SUCCESS_1]]
+// CHECK:         copy_addr [[INSTANCE]] to [init] [[STACK]] : $*Self
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] undef<Self>([[STACK]])
+// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [[CLOSURE]] {{.*}} on [[STACK]]
+// CHECK:         try_apply undef([[DEPENDENCY]]) {{.*}}, normal [[SUCCESS_2:bb[0-9]+]], error [[FAILURE_2:bb[0-9]+]]
+// CHECK:       [[SUCCESS_2]]
+// CHECK:         dealloc_stack [[CLOSURE]]
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         dealloc_stack [[STACK]] : $*Self
+// CHECK:       [[FAILURE_1]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK:         throw
+// CHECK:       [[FAILURE_2]]
+// CHECK-NOT:     dealloc_stack
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'test_alloc_stack_arg_with_frontier_outside_try_apply_successors'
+sil [ossa] @test_alloc_stack_arg_with_frontier_outside_try_apply_successors : $@convention(thin) <Self> (@in_guaranteed Self) -> (@error any Error) {
+bb0(%2 : $*Self):
+  %4 = alloc_stack $Self
+  try_apply undef() : $@convention(thin) () -> (@error any Error), normal bb1, error bb3
+
+bb1(%10 : $()):
+  copy_addr %2 to [init] %4 : $*Self
+  %13 = partial_apply [callee_guaranteed] undef<Self>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %15 = convert_escape_to_noescape [not_guaranteed] %13 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  try_apply undef(%15) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> (@error any Error), normal bb2, error bb4
+
+bb2(%18 : $()):
+  destroy_value %13 : $@callee_guaranteed () -> ()
+  %21 = tuple ()
+  dealloc_stack %4 : $*Self
+  return %21 : $()
+
+bb3(%25 : @owned $any Error):
+  dealloc_stack %4 : $*Self
+  throw %25 : $any Error
+
+bb4(%29 : @owned $any Error):
+  unreachable
+}

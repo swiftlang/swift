@@ -65,7 +65,7 @@ static std::string identifierForContext(const DeclContext *DC) {
   }
 
   const auto *ext = cast<ExtensionDecl>(DC);
-  auto fp = ext->getBodyFingerprint().getValueOr(Fingerprint::ZERO());
+  auto fp = ext->getBodyFingerprint().value_or(Fingerprint::ZERO());
   auto typeStr = Mangler.mangleTypeAsContextUSR(ext->getExtendedNominal());
   return (typeStr + "@" + fp.getRawValue()).str();
 }
@@ -188,6 +188,10 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::Protocol:
     // Nominal types are referenced by name.
     return cast<NominalTypeDecl>(decl)->getName().str();
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("Should never appear in source file");
+
   case DeclKind::Extension:
     // FIXME: We ought to provide an identifier for extensions so we can
     // register type body fingerprints for them.
@@ -203,6 +207,7 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::AssociatedType:
   case DeclKind::Param:
   case DeclKind::OpaqueType:
+  case DeclKind::Macro:
     return cast<ValueDecl>(decl)->getBaseName().userFacingName();
 
   case DeclKind::Import:
@@ -211,8 +216,10 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::TopLevelCode:
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
+  case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Module:
+  case DeclKind::MacroExpansion:
     return "";
   }
 

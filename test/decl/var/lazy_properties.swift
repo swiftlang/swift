@@ -124,7 +124,8 @@ struct Outer {
   }
 }
 
-// https://bugs.swift.org/browse/SR-2616
+// https://github.com/apple/swift/issues/45221
+
 struct Construction {
   init(x: Int, y: Int? = 42) { }
 }

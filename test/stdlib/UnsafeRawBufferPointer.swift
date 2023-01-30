@@ -651,6 +651,7 @@ UnsafeRawBufferPointerTestSuite.test("copy.sequence.overflow")
 
 UnsafeRawBufferPointerTestSuite.test("copy.overlap") {
   let bytes = UnsafeMutableRawBufferPointer.allocate(byteCount: 4, alignment: MemoryLayout<UInt>.alignment)
+  defer { bytes.deallocate() }
   // Right Overlap
   bytes[0] = 1
   bytes[1] = 2

@@ -104,7 +104,20 @@ struct RelationshipKind {
   static inline RelationshipKind OptionalRequirementOf() {
     return RelationshipKind { "optionalRequirementOf" };
   }
-  
+
+  /**
+   A symbol A extends a symbol B with members or conformances.
+
+   This relationship describes the connection between extension blocks
+   (swift.extension symbols) and the type they extend.
+
+   The implied inverse of this relationship is a symbol B that is extended
+   by an extension block symbol A.
+   */
+  static inline RelationshipKind ExtensionTo() {
+    return RelationshipKind{"extensionTo"};
+  }
+
   bool operator==(const RelationshipKind &Other) const {
     return Name == Other.Name;
   }

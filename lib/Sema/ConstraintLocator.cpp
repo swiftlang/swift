@@ -56,7 +56,8 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::MemberRefBase:
   case ConstraintLocator::UnresolvedMember:
   case ConstraintLocator::ParentType:
-  case ConstraintLocator::ExistentialSuperclassType:
+  case ConstraintLocator::ExistentialConstraintType:
+  case ConstraintLocator::ProtocolCompositionSuperclassType:
   case ConstraintLocator::LValueConversion:
   case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
@@ -96,8 +97,12 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::SyntacticElement:
   case ConstraintLocator::PackType:
   case ConstraintLocator::PackElement:
+  case ConstraintLocator::PackShape:
+  case ConstraintLocator::PackExpansionPattern:
   case ConstraintLocator::PatternBindingElement:
   case ConstraintLocator::NamedPatternDecl:
+  case ConstraintLocator::AnyPatternDecl:
+  case ConstraintLocator::GlobalActorType:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -120,6 +125,9 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   auto dumpReqKind = [&out](RequirementKind kind) {
     out << " (";
     switch (kind) {
+    case RequirementKind::SameShape:
+      out << "same_shape";
+      break;
     case RequirementKind::Conformance:
       out << "conformance";
       break;
@@ -246,8 +254,12 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "parent type";
     break;
 
-  case ConstraintLocator::ExistentialSuperclassType:
-    out << "existential superclass type";
+  case ConstraintLocator::ExistentialConstraintType:
+    out << "existential constraint type";
+    break;
+
+  case ConstraintLocator::ProtocolCompositionSuperclassType:
+    out << "protocol composition superclass type";
     break;
 
   case ConstraintLocator::LValueConversion:
@@ -425,13 +437,25 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     break;
   }
 
-  case ConstraintLocator::ConstraintLocator::PackType:
-    out << "pack type";
+  case ConstraintLocator::ConstraintLocator::PackType: {
+    auto packElt = elt.castTo<LocatorPathElt::PackType>();
+    out << "pack type '" << packElt.getType()->getString(PO) << "'";
     break;
+  }
 
   case ConstraintLocator::PackElement: {
     auto packElt = elt.castTo<LocatorPathElt::PackElement>();
     out << "pack element #" << llvm::utostr(packElt.getIndex());
+    break;
+  }
+
+  case ConstraintLocator::PackShape: {
+    out << "pack shape";
+    break;
+  }
+
+  case ConstraintLocator::PackExpansionPattern: {
+    out << "pack expansion pattern";
     break;
   }
 
@@ -445,6 +469,16 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::NamedPatternDecl: {
     out << "named pattern decl";
+    break;
+  }
+
+  case ConstraintLocator::AnyPatternDecl: {
+    out << "'_' pattern decl";
+    break;
+  }
+
+  case ConstraintLocator::GlobalActorType: {
+    out << "global actor type";
     break;
   }
   }
@@ -563,6 +597,10 @@ bool ConstraintLocator::isForResultBuilderBodyResult() const {
   return isFirstElement<LocatorPathElt::ResultBuilderBodyResult>();
 }
 
+bool ConstraintLocator::isForMacroExpansion() const {
+  return directlyAt<MacroExpansionExpr>();
+}
+
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?
@@ -592,19 +630,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
   
   out << "locator@" << (void*) this << " [";
 
-  if (auto *expr = anchor.dyn_cast<Expr *>()) {
-    out << Expr::getKindName(expr->getKind());
-    if (sm) {
-      out << '@';
-      expr->getLoc().print(out, *sm);
-    }
-  } else if (auto *pattern = anchor.dyn_cast<Pattern *>()) {
-    out << Pattern::getKindName(pattern->getKind()) << "Pattern";
-    if (sm) {
-      out << '@';
-      pattern->getLoc().print(out, *sm);
-    }
-  }
+  constraints::dumpAnchor(anchor, sm, out);
 
   for (auto elt : getPath()) {
     out << " -> ";

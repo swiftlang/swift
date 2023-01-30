@@ -393,7 +393,8 @@ struct Bar<U: P32> {}
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P34>
 func conditionalConformance2<V>(_: Bar<Foo<V>>) {}
 
-// Mentioning a nested type that is conditional should infer that requirement (SR 6850)
+// https://github.com/apple/swift/issues/49399
+// Mentioning a nested type that is conditional should infer that requirement.
 
 protocol P35 {}
 protocol P36 {

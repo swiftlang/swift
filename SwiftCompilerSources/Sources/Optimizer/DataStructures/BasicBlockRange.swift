@@ -46,7 +46,7 @@ import SIL
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct BasicBlockRange : CustomStringConvertible, CustomReflectable {
+struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
 
   /// The dominating begin block.
   let begin: BasicBlock
@@ -66,7 +66,7 @@ struct BasicBlockRange : CustomStringConvertible, CustomReflectable {
   private var inExclusiveRange: BasicBlockSet
   private var worklist: BasicBlockWorklist
   
-  init(begin: BasicBlock, _ context: PassContext) {
+  init(begin: BasicBlock, _ context: some Context) {
     self.begin = begin
     self.inclusiveRange = Stack(context)
     self.inserted = Stack(context)
@@ -78,8 +78,7 @@ struct BasicBlockRange : CustomStringConvertible, CustomReflectable {
 
   /// Insert a potential end block.
   mutating func insert(_ block: BasicBlock) {
-    if !wasInserted.contains(block) {
-      wasInserted.insert(block)
+    if wasInserted.insert(block) {
       inserted.append(block)
     }
     worklist.pushIfNotVisited(block)
@@ -111,7 +110,7 @@ struct BasicBlockRange : CustomStringConvertible, CustomReflectable {
 
   /// Returns true if the range is valid and that's iff the begin block dominates all blocks of the range.
   var isValid: Bool {
-    let entry = begin.function.entryBlock
+    let entry = begin.parentFunction.entryBlock
     return begin == entry ||
       // If any block in the range is not dominated by `begin`, the range propagates back to the entry block.
       !inclusiveRangeContains(entry)
@@ -149,8 +148,6 @@ struct BasicBlockRange : CustomStringConvertible, CustomReflectable {
       interiors: \(interiors)
       """
   }
-
-  var customMirror: Mirror { Mirror(self, children: []) }
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {

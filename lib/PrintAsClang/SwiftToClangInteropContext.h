@@ -13,8 +13,11 @@
 #ifndef SWIFT_PRINTASCLANG_SWIFTTOCLANGINTEROPCONTEXT_H
 #define SWIFT_PRINTASCLANG_SWIFTTOCLANGINTEROPCONTEXT_H
 
-#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSet.h"
 #include <memory>
 
 namespace swift {
@@ -23,6 +26,8 @@ class Decl;
 class IRABIDetailsProvider;
 class IRGenOptions;
 class ModuleDecl;
+class ExtensionDecl;
+class NominalTypeDecl;
 
 /// The \c SwiftToClangInteropContext class is responsible for providing
 /// access to the other required subsystems of the compiler during the emission
@@ -36,15 +41,23 @@ public:
   IRABIDetailsProvider &getIrABIDetails();
 
   // Runs the given function if we haven't emitted some context-specific stub
-  // for the given declaration yet.
-  void runIfStubForDeclNotEmitted(const Decl *d,
+  // for the given concrete stub name.
+  void runIfStubForDeclNotEmitted(llvm::StringRef stubName,
                                   llvm::function_ref<void(void)> function);
+
+  void recordExtensions(const NominalTypeDecl *typeDecl,
+                        const ExtensionDecl *ext);
+
+  llvm::ArrayRef<const ExtensionDecl *>
+  getExtensionsForNominalType(const NominalTypeDecl *typeDecl) const;
 
 private:
   ModuleDecl &mod;
   const IRGenOptions &irGenOpts;
   std::unique_ptr<IRABIDetailsProvider> irABIDetails;
-  llvm::DenseSet<const Decl *> emittedStubs;
+  llvm::StringSet<> emittedStubs;
+  llvm::DenseMap<const NominalTypeDecl *, std::vector<const ExtensionDecl *>>
+      extensions;
 };
 
 } // end namespace swift

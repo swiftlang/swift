@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -40,6 +41,50 @@ StringRef Stmt::getKindName(StmtKind K) {
 #include "swift/AST/StmtNodes.def"
   }
   llvm_unreachable("bad StmtKind");
+}
+
+StringRef Stmt::getDescriptiveKindName(StmtKind K) {
+  switch (K) {
+  case StmtKind::Brace:
+    return "brace";
+  case StmtKind::Return:
+    return "return";
+  case StmtKind::Yield:
+    return "yield";
+  case StmtKind::Defer:
+    return "defer";
+  case StmtKind::If:
+    return "if";
+  case StmtKind::Guard:
+    return "guard";
+  case StmtKind::While:
+    return "while";
+  case StmtKind::Do:
+    return "do";
+  case StmtKind::DoCatch:
+    return "do-catch";
+  case StmtKind::RepeatWhile:
+    return "repeat-while";
+  case StmtKind::ForEach:
+    return "for-in";
+  case StmtKind::Switch:
+    return "switch";
+  case StmtKind::Case:
+    return "case";
+  case StmtKind::Break:
+    return "break";
+  case StmtKind::Continue:
+    return "continue";
+  case StmtKind::Fallthrough:
+    return "fallthrough";
+  case StmtKind::Fail:
+    return "return";
+  case StmtKind::Throw:
+    return "throw";
+  case StmtKind::PoundAssert:
+    return "#assert";
+  }
+  llvm_unreachable("Unhandled case in switch!");
 }
 
 // Helper functions to check statically whether a method has been
@@ -156,6 +201,38 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
 }
 
+SourceLoc BraceStmt::getStartLoc() const {
+  if (LBLoc) {
+    return LBLoc;
+  }
+  return getContentStartLoc();
+}
+
+SourceLoc BraceStmt::getEndLoc() const {
+  if (RBLoc) {
+    return RBLoc;
+  }
+  return getContentEndLoc();
+}
+
+SourceLoc BraceStmt::getContentStartLoc() const {
+  for (auto elt : getElements()) {
+    if (auto loc = elt.getStartLoc()) {
+      return loc;
+    }
+  }
+  return SourceLoc();
+}
+
+SourceLoc BraceStmt::getContentEndLoc() const {
+  for (auto elt : llvm::reverse(getElements())) {
+    if (auto loc = elt.getEndLoc()) {
+      return loc;
+    }
+  }
+  return SourceLoc();
+}
+
 ASTNode BraceStmt::findAsyncNode() {
   // TODO: Statements don't track their ASTContext/evaluator, so I am not making
   // this a request. It probably should be a request at some point.
@@ -168,41 +245,41 @@ ASTNode BraceStmt::findAsyncNode() {
   class FindInnerAsync : public ASTWalker {
     ASTNode AsyncNode;
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // If we've found an 'await', record it and terminate the traversal.
       if (isa<AwaitExpr>(expr)) {
         AsyncNode = expr;
-        return {false, nullptr};
+        return Action::Stop();
       }
 
       // Do not recurse into other closures.
       if (isa<ClosureExpr>(expr))
-        return {false, expr};
+        return Action::SkipChildren(expr);
 
-      return {true, expr};
+      return Action::Continue(expr);
     }
 
-    bool walkToDeclPre(Decl *decl) override {
+    PreWalkAction walkToDeclPre(Decl *decl) override {
       // Do not walk into function or type declarations.
       if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
         if (patternBinding->isAsyncLet())
           AsyncNode = patternBinding;
 
-        return true;
+        return Action::Continue();
       }
 
-      return false;
+      return Action::SkipChildren();
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
         if (forEach->getAwaitLoc().isValid()) {
           AsyncNode = forEach;
-          return {false, nullptr};
+          return Action::Stop();
         }
       }
 
-      return {true, stmt};
+      return Action::Continue(stmt);
     }
 
   public:
@@ -368,6 +445,8 @@ SourceRange StmtConditionElement::getSourceRange() const {
     return getBoolean()->getSourceRange();
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getSourceRange();
+  case StmtConditionElement::CK_HasSymbol:
+    return getHasSymbolInfo()->getSourceRange();
   case StmtConditionElement::CK_PatternBinding:
     SourceLoc Start;
     if (IntroducerLoc.isValid())
@@ -386,6 +465,15 @@ SourceRange StmtConditionElement::getSourceRange() const {
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
+PoundHasSymbolInfo *PoundHasSymbolInfo::create(ASTContext &Ctx,
+                                               SourceLoc PoundLoc,
+                                               SourceLoc LParenLoc,
+                                               Expr *SymbolExpr,
+                                               SourceLoc RParenLoc) {
+  return new (Ctx)
+      PoundHasSymbolInfo(PoundLoc, LParenLoc, SymbolExpr, RParenLoc);
+}
+
 SourceLoc StmtConditionElement::getStartLoc() const {
   switch (getKind()) {
   case StmtConditionElement::CK_Boolean:
@@ -394,6 +482,8 @@ SourceLoc StmtConditionElement::getStartLoc() const {
     return getAvailability()->getStartLoc();
   case StmtConditionElement::CK_PatternBinding:
     return getSourceRange().Start;
+  case StmtConditionElement::CK_HasSymbol:
+    return getHasSymbolInfo()->getStartLoc();
   }
 
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
@@ -407,6 +497,8 @@ SourceLoc StmtConditionElement::getEndLoc() const {
     return getAvailability()->getEndLoc();
   case StmtConditionElement::CK_PatternBinding:
     return getSourceRange().End;
+  case StmtConditionElement::CK_HasSymbol:
+    return getHasSymbolInfo()->getEndLoc();
   }
 
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
@@ -479,7 +571,7 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
     new (&items[i]) CaseLabelItem(caseLabelItems[i]);
     items[i].getPattern()->markOwnedByStatement(this);
   }
-  for (auto *vd : caseBodyVariables.getValueOr(MutableArrayRef<VarDecl *>())) {
+  for (auto *vd : caseBodyVariables.value_or(MutableArrayRef<VarDecl *>())) {
     vd->setParentPatternStmt(this);
   }
 }
@@ -499,6 +591,24 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
   return ::new (mem)
       CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
                body, caseVarDecls, implicit, fallthroughStmt);
+}
+
+DoStmt *DoStmt::createImplicit(ASTContext &C, LabeledStmtInfo labelInfo,
+                               ArrayRef<ASTNode> body) {
+  return new (C) DoStmt(labelInfo, /*doLoc=*/SourceLoc(),
+                        BraceStmt::createImplicit(C, body),
+                        /*implicit=*/true);
+}
+
+SourceLoc DoStmt::getStartLoc() const {
+  if (auto LabelOrDoLoc = getLabelLocOrKeywordLoc(DoLoc)) {
+    return LabelOrDoLoc;
+  }
+  return Body->getStartLoc();
+}
+
+SourceLoc DoStmt::getEndLoc() const {
+  return Body->getEndLoc();
 }
 
 namespace {
@@ -562,6 +672,20 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
     caseStmt->setParentStmt(theSwitch);
 
   return theSwitch;
+}
+
+LabeledStmt *BreakStmt::getTarget() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, BreakTargetRequest{this}, nullptr);
+}
+
+LabeledStmt *ContinueStmt::getTarget() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, ContinueTargetRequest{this}, nullptr);
+}
+
+SourceLoc swift::extractNearestSourceLoc(const Stmt *S) {
+  return S->getStartLoc();
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Stmts, is

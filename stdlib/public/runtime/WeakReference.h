@@ -17,8 +17,8 @@
 #ifndef SWIFT_RUNTIME_WEAKREFERENCE_H
 #define SWIFT_RUNTIME_WEAKREFERENCE_H
 
-#include "../../../stdlib/public/SwiftShims/Target.h"
-#include "../SwiftShims/Visibility.h"
+#include "swift/shims/Target.h"
+#include "swift/shims/Visibility.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"

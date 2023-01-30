@@ -301,7 +301,9 @@ func genericResult<T>(completion: @escaping (T?, Error?) -> Void) where T: Numer
 // GENERIC-RESULT-NEXT: }
 // GENERIC-RESULT: func genericResult<T>() async throws -> T where T: Numeric { }
 
-// FIXME: This doesn't compile after refactoring because we aren't using the generic argument `E` in the async method (SR-14560)
+// FIXME: This doesn't compile after refactoring because we aren't using the
+// generic argument 'E' in the async method
+// (https://github.com/apple/swift/issues/56912).
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=GENERIC-ERROR %s
 func genericError<E>(completion: @escaping (String?, E?) -> Void) where E: Error { }
 // GENERIC-ERROR: {

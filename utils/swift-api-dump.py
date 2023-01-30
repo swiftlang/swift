@@ -106,6 +106,8 @@ def create_parser():
                         help='Enable experimental distributed actors.')
     parser.add_argument('--enable-experimental-string-processing', action='store_true',
                         help='Enable experimental string processing.')
+    parser.add_argument('--enable-experimental-reflection', action='store_true',
+                        help='Enable experimental reflection.')
     parser.add_argument('-swift-version', metavar='N',
                         help='the Swift version to use')
     parser.add_argument('-show-overlay', action='store_true',
@@ -127,6 +129,7 @@ def run_command(args):
     proc = subprocess.Popen(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
+    out = out.decode('UTF8')
     exitcode = proc.returncode
     return (exitcode, out, err)
 

@@ -1,6 +1,6 @@
 // RUN: %scale-test --begin 3 --end 8 --step 1 --select NumLeafScopes %s
 // REQUIRES: asserts,no_asan
-// FIXME: https://bugs.swift.org/browse/SR-6997
+// FIXME: https://github.com/apple/swift/issues/49545
 // REQUIRES: SR6997,no_asan
 
 _ = MemoryLayout<Int>.size

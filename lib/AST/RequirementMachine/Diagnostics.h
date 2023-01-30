@@ -34,8 +34,12 @@ struct RequirementError {
     /// A type requirement on a trivially invalid subject type,
     /// e.g. Bool: Collection.
     InvalidRequirementSubject,
+    /// An invalid shape requirement, e.g. T.shape == Int.shape
+    InvalidShapeRequirement,
     /// A pair of conflicting requirements, T == Int, T == String
     ConflictingRequirement,
+    /// A recursive requirement, e.g. T == G<T.A>.
+    RecursiveRequirement,
     /// A redundant requirement, e.g. T == T.
     RedundantRequirement,
   } kind;
@@ -71,6 +75,11 @@ public:
     return {Kind::InvalidRequirementSubject, req, loc};
   }
 
+  static RequirementError forInvalidShapeRequirement(Requirement req,
+                                                     SourceLoc loc) {
+    return {Kind::InvalidShapeRequirement, req, loc};
+  }
+
   static RequirementError forConflictingRequirement(Requirement req,
                                                     SourceLoc loc) {
     return {Kind::ConflictingRequirement, req, loc};
@@ -85,6 +94,11 @@ public:
   static RequirementError forRedundantRequirement(Requirement req,
                                                   SourceLoc loc) {
     return {Kind::RedundantRequirement, req, loc};
+  }
+
+  static RequirementError forRecursiveRequirement(Requirement req,
+                                                  SourceLoc loc) {
+    return {Kind::RecursiveRequirement, req, loc};
   }
 };
 

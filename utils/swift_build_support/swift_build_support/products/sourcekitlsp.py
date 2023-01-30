@@ -37,6 +37,10 @@ class SourceKitLSP(product.Product):
     def is_before_build_script_impl_product(cls):
         return False
 
+    @classmethod
+    def is_swiftpm_unified_build_product(cls):
+        return True
+
     def should_build(self, host_target):
         return True
 

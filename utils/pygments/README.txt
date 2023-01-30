@@ -30,7 +30,7 @@ Copy the `swift.py` file to this directory.
 
 Execute the Pygments config script:
 
-    $ python _mapping.py
+    $ python3 _mapping.py
 
 Usage
 =====

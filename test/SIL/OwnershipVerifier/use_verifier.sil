@@ -127,7 +127,8 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 sil [ossa] @store_borrow_result : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
-  store_borrow %0 to %1 : $*Builtin.NativeObject
+  %sb = store_borrow %0 to %1 : $*Builtin.NativeObject
+  end_borrow %sb : $*Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -230,8 +231,8 @@ bb0(%0 : @owned $SomeError):
   %2 = project_existential_box $SomeError in %1 : $Error
   store %0 to [init] %2 : $*SomeError
   %1a = begin_borrow %1 : $Error
-  %4 = open_existential_box %1a : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
-  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  %4 = open_existential_box %1a : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
+  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
   end_borrow %1a : $Error
   dealloc_existential_box %1 : $Error, $SomeError
   %9999 = tuple()
@@ -307,18 +308,6 @@ bb0:
   %0 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
   %1 = function_ref @three_differing_payload_enum_user : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
   apply %1(%0, %0, %0) : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-sil [ossa] @unsafeGuaranteedTest : $@convention(thin) (@owned Ref) -> () {
-bb0(%0 : @owned $Ref):
-  %1 = builtin "unsafeGuaranteed"(%0 : $Ref) : $(Ref, Builtin.Int8)
-  %2 = begin_borrow %1 : $(Ref, Builtin.Int8)
-  %3 = tuple_extract %2 : $(Ref, Builtin.Int8), 1
-  end_borrow %2 : $(Ref, Builtin.Int8)
-  builtin "unsafeGuaranteedEnd"(%3 : $Builtin.Int8) : $()
-  destroy_value %1 : $(Ref, Builtin.Int8)
   %9999 = tuple()
   return %9999 : $()
 }
@@ -789,21 +778,21 @@ bb9:
 
 sil [ossa] @dynamic_method_br_test : $@convention(thin) (@owned AnyObject, @thick AnyObject.Type) -> () {
 bb0(%0 : @owned $AnyObject, %1 : $@thick AnyObject.Type):
-  %2 = open_existential_ref %0 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
-  dynamic_method_br %2 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject, #X.f!foreign, bb1, bb2
+  %2 = open_existential_ref %0 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000", AnyObject) Self
+  dynamic_method_br %2 : $@opened("01234567-89ab-cdef-0123-000000000000", AnyObject) Self, #X.f!foreign, bb1, bb2
 
-bb1(%4 : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-000000000000") AnyObject) -> ()):
+bb1(%4 : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-000000000000", AnyObject) Self) -> ()):
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  destroy_value %2 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
-  %5 = open_existential_metatype %1 : $@thick AnyObject.Type to $@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type
-  dynamic_method_br %5 : $@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type, #X.g!foreign, bb4, bb5
+  destroy_value %2 : $@opened("01234567-89ab-cdef-0123-000000000000", AnyObject) Self
+  %5 = open_existential_metatype %1 : $@thick AnyObject.Type to $@thick (@opened("01234567-89ab-cdef-0123-000000000001", AnyObject) Self).Type
+  dynamic_method_br %5 : $@thick (@opened("01234567-89ab-cdef-0123-000000000001", AnyObject) Self).Type, #X.g!foreign, bb4, bb5
 
-bb4(%6 : $@convention(objc_method) (@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type) -> ()):
+bb4(%6 : $@convention(objc_method) (@thick (@opened("01234567-89ab-cdef-0123-000000000001", AnyObject) Self).Type) -> ()):
   br bb6
 
 bb5:
@@ -877,8 +866,7 @@ bb2:
 
 bb3:
   %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %0 : $Builtin.NativeObject
-  %2a = begin_borrow %2 : $ThreeDifferingPayloadEnum
-  br bb5(%2a : $ThreeDifferingPayloadEnum)
+  br bb5(%2 : $ThreeDifferingPayloadEnum)
 
 bb4:
   %3 = integer_literal $Builtin.Int32, 0
@@ -887,7 +875,6 @@ bb4:
 
 bb5(%5 : @guaranteed $ThreeDifferingPayloadEnum):
   %6 = copy_value %5 : $ThreeDifferingPayloadEnum
-  end_borrow %5 : $ThreeDifferingPayloadEnum
   return %6 : $ThreeDifferingPayloadEnum
 }
 
@@ -905,18 +892,15 @@ bb2:
 
 bb3:
   %3 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %1 : $Builtin.NativeObject
-  %3a = begin_borrow %3 : $ThreeDifferingPayloadEnum
-  br bb5(%3a : $ThreeDifferingPayloadEnum)
+  br bb5(%3 : $ThreeDifferingPayloadEnum)
 
 bb4:
   %4 = integer_literal $Builtin.Int32, 0
   %5 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt, %4 : $Builtin.Int32
-  %5a = begin_borrow %5 : $ThreeDifferingPayloadEnum
-  br bb5(%5a : $ThreeDifferingPayloadEnum)
+  br bb5(%5 : $ThreeDifferingPayloadEnum)
 
 bb5(%6 : @guaranteed $ThreeDifferingPayloadEnum):
   %7 = copy_value %6 : $ThreeDifferingPayloadEnum
-  end_borrow %6 : $ThreeDifferingPayloadEnum
   end_borrow %1 : $Builtin.NativeObject
   br bb6(%7 : $ThreeDifferingPayloadEnum)
 
@@ -1029,10 +1013,10 @@ bb0:
 sil [ossa] @dependent_type : $@convention(thin) (@owned SwiftKlassP) -> () {
 bb0(%0 : @owned $SwiftKlassP):
   %1 = begin_borrow %0 : $SwiftKlassP
-  %2 = open_existential_ref %1 : $SwiftKlassP to $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP
-  %cast = unchecked_ref_cast %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP to $Builtin.NativeObject
-  %3 = witness_method $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP, #SwiftKlassP.foo, %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
-  apply %3<@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP>(%2) : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
+  %2 = open_existential_ref %1 : $SwiftKlassP to $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610", SwiftKlassP) Self
+  %cast = unchecked_ref_cast %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610", SwiftKlassP) Self to $Builtin.NativeObject
+  %3 = witness_method $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610", SwiftKlassP) Self, #SwiftKlassP.foo, %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610", SwiftKlassP) Self : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
+  apply %3<@opened("3B64717A-E2B3-11E6-9646-985AEB89C610", SwiftKlassP) Self>(%2) : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
   end_borrow %1 : $SwiftKlassP
   destroy_value %0 : $SwiftKlassP
   %9999 = tuple()
@@ -1383,7 +1367,6 @@ bb2:
   br bb3(%f2thick : $@callee_owned () -> ())
 
 bb3(%fUnknown : @guaranteed $@callee_owned () -> ()):
-  end_borrow %fUnknown : $@callee_owned () -> ()
   %9999 = tuple()
   return %9999 : $()
 }
@@ -1448,4 +1431,25 @@ sil [ossa] @nontrivial_enum_unchecked_enum_data_trivial_payload_unowned : $@conv
 bb0(%0 : @unowned $ThreeDifferingPayloadEnum):
   %1 = unchecked_enum_data %0 : $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt
   return %1 : $Builtin.Int32
+}
+
+sil [ossa] @test_select_value : $@convention(thin) (Builtin.Word) -> Builtin.Word {
+bb0(%0 : $Builtin.Word):
+
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = integer_literal $Builtin.Word, 4
+  %5 = integer_literal $Builtin.Word, 5
+  %6 = integer_literal $Builtin.Word, 6
+  %11 = integer_literal $Builtin.Word, 11
+  %22 = integer_literal $Builtin.Word, 22
+  %33 = integer_literal $Builtin.Word, 33
+  %44 = integer_literal $Builtin.Word, 44
+  %55 = integer_literal $Builtin.Word, 55
+  %66 = integer_literal $Builtin.Word, 66
+
+  %10 = select_value %1: $Builtin.Word, case %1: %11, case %2: %22, case %4: %44, case %5: %55, case %6: %66, default %33 : $Builtin.Word
+
+  return %10 : $Builtin.Word
 }

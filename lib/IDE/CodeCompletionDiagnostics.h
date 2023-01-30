@@ -29,13 +29,17 @@ bool getContextFreeCompletionDiagnostics(
     ContextFreeNotRecommendedReason reason, const ValueDecl *D,
     CodeCompletionDiagnosticSeverity &severity, llvm::raw_ostream &Out);
 
-/// Populate \p severity and \p Out with the contextual diagnostics for \p D.
+/// Populate \p severity and \p Out with the contextual for \p reason.
+/// \p NameForDiagnostic is the name of the decl that produced this diagnostic.
+/// \p Ctx is a context that's purely used to have a reference to a diagnostic
+/// engine.
 /// See \c NotRecommendedReason for an explaination of context-free vs.
 /// contextual diagnostics.
 /// Returns \c true if it fails to generate the diagnostics.
 bool getContextualCompletionDiagnostics(
-    ContextualNotRecommendedReason reason, const ValueDecl *D,
-    CodeCompletionDiagnosticSeverity &severity, llvm::raw_ostream &Out);
+    ContextualNotRecommendedReason Reason, StringRef NameForDiagnostics,
+    CodeCompletionDiagnosticSeverity &Severity, llvm::raw_ostream &Out,
+    const ASTContext &Ctx);
 
 } // namespace ide
 } // namespace swift

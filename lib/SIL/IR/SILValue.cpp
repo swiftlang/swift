@@ -80,6 +80,16 @@ SILInstruction *ValueBase::getDefiningInstruction() {
   return nullptr;
 }
 
+SILInstruction *ValueBase::getDefiningInstructionOrTerminator() {
+  if (auto *inst = dyn_cast<SingleValueInstruction>(this))
+    return inst;
+  if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
+    return result->getParent();
+  if (auto *result = SILArgument::isTerminatorResult(this))
+    return result->getSingleTerminator();
+  return nullptr;
+}
+
 SILInstruction *ValueBase::getDefiningInsertionPoint() {
   if (auto *inst = getDefiningInstruction())
     return inst;
@@ -106,12 +116,25 @@ ValueBase::getDefiningInstructionResult() {
 }
 
 bool ValueBase::isLexical() const {
-  if (auto *argument = dyn_cast<SILFunctionArgument>(this))
-    return argument->getOwnershipKind() == OwnershipKind::Owned;
+  if (auto *argument = dyn_cast<SILFunctionArgument>(this)) {
+    // TODO: Recognize guaranteed arguments as lexical too.
+    return argument->getOwnershipKind() == OwnershipKind::Owned &&
+           argument->getLifetime().isLexical();
+  }
   if (auto *bbi = dyn_cast<BeginBorrowInst>(this))
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
     return mvi->isLexical();
+  return false;
+}
+
+bool ValueBase::hasDebugTrace() const {
+  for (auto *op : getUses()) {
+    if (auto *debugValue = dyn_cast<DebugValueInst>(op->getUser())) {
+      if (debugValue->hasTrace())
+        return true;
+    }
+  }
   return false;
 }
 
@@ -202,7 +225,6 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
 
   switch (Convention) {
   case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Constant:
     value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
                                                     : OwnershipKind::Owned;
     break;
@@ -244,9 +266,9 @@ ValueOwnershipKind::ValueOwnershipKind(StringRef S)
                     .Case("guaranteed", OwnershipKind::Guaranteed)
                     .Case("none", OwnershipKind::None)
                     .Default(None);
-  if (!Result.hasValue())
+  if (!Result.has_value())
     llvm_unreachable("Invalid string representation of ValueOwnershipKind");
-  value = Result.getValue();
+  value = Result.value();
 }
 
 ValueOwnershipKind
@@ -417,8 +439,8 @@ StringRef OperandOwnership::asString() const {
     return "forwarding-consume";
   case OperandOwnership::InteriorPointer:
     return "interior-pointer";
-  case OperandOwnership::ForwardingBorrow:
-    return "forwarding-borrow";
+  case OperandOwnership::GuaranteedForwarding:
+    return "guaranteed-forwarding";
   case OperandOwnership::EndBorrow:
     return "end-borrow";
   case OperandOwnership::Reborrow:

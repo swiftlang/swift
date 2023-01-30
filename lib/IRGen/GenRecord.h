@@ -295,7 +295,7 @@ public:
 
   // The extra inhabitants of a record are determined from its fields.
   bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-    if (!MayHaveExtraInhabitants.hasValue()) {
+    if (!MayHaveExtraInhabitants.has_value()) {
       MayHaveExtraInhabitants = false;
       for (auto &field : asImpl().getFields())
         if (field.getTypeInfo().mayHaveExtraInhabitants(IGM)) {
@@ -422,7 +422,7 @@ public:
 
   const FieldImpl *
   getFixedExtraInhabitantProvidingField(IRGenModule &IGM) const {
-    if (!ExtraInhabitantProvidingField.hasValue()) {
+    if (!ExtraInhabitantProvidingField.has_value()) {
       unsigned mostExtraInhabitants = 0;
       const FieldImpl *fieldWithMost = nullptr;
       const FieldImpl *singleNonFixedField = nullptr;
@@ -630,7 +630,7 @@ public:
     value.appendClearBits(field.getFixedByteOffset().getValueInBits());
     value.append(fieldTI.getFixedExtraInhabitantValue(IGM, fieldSize, index));
     value.padWithClearBitsTo(bits);
-    return value.build().getValue();
+    return value.build().value();
   }
 
   APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
@@ -649,7 +649,7 @@ public:
     mask.appendClearBits(field->getFixedByteOffset().getValueInBits());
     mask.append(fieldTI.getFixedExtraInhabitantMask(IGM));
     mask.padWithClearBitsTo(targetSize);
-    return mask.build().getValue();
+    return mask.build().value();
   }
 
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,

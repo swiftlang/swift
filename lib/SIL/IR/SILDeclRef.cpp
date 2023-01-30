@@ -16,6 +16,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -123,16 +124,19 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        bool isDistributed, bool isKnownToBeLocal,
+                       bool isRuntimeAccessible,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
     : loc(vd), kind(kind), isForeign(isForeign), 
       isDistributed(isDistributed), isKnownToBeLocal(isKnownToBeLocal),
+      isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
       pointer(derivativeId) {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
                        bool asDistributed, bool asDistributedKnownToBeLocal)
-    : backDeploymentKind(SILDeclRef::BackDeploymentKind::None),
+    : isRuntimeAccessible(false),
+      backDeploymentKind(SILDeclRef::BackDeploymentKind::None),
       defaultArgIndex(0),
       pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
@@ -195,16 +199,34 @@ Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
   llvm_unreachable("Unhandled case in switch");
 }
 
-ASTContext &SILDeclRef::getASTContext() const {
+DeclContext *SILDeclRef::getInnermostDeclContext() const {
+  if (!loc)
+    return nullptr;
   switch (getLocKind()) {
   case LocKind::Decl:
-    return getDecl()->getASTContext();
+    return getDecl()->getInnermostDeclContext();
   case LocKind::Closure:
-    return getAbstractClosureExpr()->getASTContext();
+    return getAbstractClosureExpr();
   case LocKind::File:
-    return getFileUnit()->getASTContext();
+    return getFileUnit();
   }
   llvm_unreachable("Unhandled case in switch");
+}
+
+ASTContext &SILDeclRef::getASTContext() const {
+  auto *DC = getInnermostDeclContext();
+  assert(DC && "Must have a decl context");
+  return DC->getASTContext();
+}
+
+Optional<AvailabilityContext> SILDeclRef::getAvailabilityForLinkage() const {
+  // Back deployment thunks and fallbacks don't have availability since they
+  // are non-ABI.
+  // FIXME: Generalize this check to all kinds of non-ABI functions.
+  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
+    return None;
+
+  return getDecl()->getAvailabilityForLinkage();
 }
 
 bool SILDeclRef::isThunk() const {
@@ -266,45 +288,261 @@ bool SILDeclRef::isImplicit() const {
   llvm_unreachable("Unhandled case in switch");
 }
 
-SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
+bool SILDeclRef::hasUserWrittenCode() const {
+  // Non-implicit decls generally have user-written code.
+  if (!isImplicit()) {
+    switch (kind) {
+    case Kind::PropertyWrapperBackingInitializer: {
+      // Only has user-written code if any of the property wrappers have
+      // arguments to apply. Otherwise, it's just a forwarding initializer for
+      // the wrappedValue.
+      auto *var = cast<VarDecl>(getDecl());
+      return llvm::any_of(var->getAttachedPropertyWrappers(), [&](auto *attr) {
+        return attr->hasArgs();
+      });
+    }
+    case Kind::PropertyWrapperInitFromProjectedValue:
+      // Never has user-written code, is just a forwarding initializer.
+      return false;
+    default:
+      // TODO: This checking is currently conservative, we ought to
+      // exhaustively handle all the cases here, and use emitOrDelayFunction
+      // in more cases to take advantage of it.
+      return true;
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+
+  // Implicit decls generally don't have user-written code, but some splice
+  // user code into their body.
+  switch (kind) {
+  case Kind::Func: {
+    if (getAbstractClosureExpr()) {
+      // Auto-closures have user-written code.
+      if (auto *ACE = getAutoClosureExpr()) {
+        // Currently all types of auto-closures can contain user code. Note this
+        // logic does not affect delayed emission, as we eagerly emit all
+        // closure definitions. This does however affect profiling.
+        switch (ACE->getThunkKind()) {
+        case AutoClosureExpr::Kind::None:
+        case AutoClosureExpr::Kind::SingleCurryThunk:
+        case AutoClosureExpr::Kind::DoubleCurryThunk:
+        case AutoClosureExpr::Kind::AsyncLet:
+          return true;
+        }
+        llvm_unreachable("Unhandled case in switch!");
+      }
+      // Otherwise, assume an implicit closure doesn't have user code.
+      return false;
+    }
+
+    // Lazy getters splice in the user-written initializer expr.
+    if (auto *accessor = dyn_cast<AccessorDecl>(getFuncDecl())) {
+      auto *storage = accessor->getStorage();
+      if (accessor->isGetter() && !storage->isImplicit() &&
+          storage->getAttrs().hasAttribute<LazyAttr>()) {
+        return true;
+      }
+    }
+    return false;
+  }
+  case Kind::StoredPropertyInitializer: {
+    // Property wrapper initializers for the implicit backing storage can splice
+    // in the user-written initializer on the original property.
+    auto *var = cast<VarDecl>(getDecl());
+    if (auto *originalProperty = var->getOriginalWrappedProperty()) {
+      if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
+        return true;
+    }
+    return false;
+  }
+  case Kind::Allocator:
+  case Kind::Initializer:
+  case Kind::EnumElement:
+  case Kind::Destroyer:
+  case Kind::Deallocator:
+  case Kind::GlobalAccessor:
+  case Kind::DefaultArgGenerator:
+  case Kind::IVarInitializer:
+  case Kind::IVarDestroyer:
+  case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrapperInitFromProjectedValue:
+  case Kind::EntryPoint:
+  case Kind::AsyncEntryPoint:
+  case Kind::RuntimeAttributeGenerator:
+    // Implicit decls for these don't splice in user-written code.
+    return false;
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
+namespace {
+enum class LinkageLimit {
+  /// No limit.
+  None,
+  /// The linkage should behave as if the decl is private.
+  Private,
+  /// The declaration is emitted on-demand; it should end up with internal
+  /// or shared linkage.
+  OnDemand,
+  /// The declaration should never be made public.
+  NeverPublic,
+  /// The declaration should always be emitted into the client,
+  AlwaysEmitIntoClient,
+};
+} // end anonymous namespace
+
+/// Compute the linkage limit for a given SILDeclRef. This augments the
+/// mapping of access level to linkage to provide a maximum or minimum linkage.
+static LinkageLimit getLinkageLimit(SILDeclRef constant) {
+  using Limit = LinkageLimit;
+  using Kind = SILDeclRef::Kind;
+
+  auto *d = constant.getDecl();
+
+  // Back deployment thunks and fallbacks are emitted into the client.
+  if (constant.backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
+    return Limit::AlwaysEmitIntoClient;
+
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(d)) {
+    // Native-to-foreign thunks for top-level decls are created on-demand,
+    // unless they are marked @_cdecl, in which case they expose a dedicated
+    // entry-point with the visibility of the function.
+    //
+    // Native-to-foreign thunks for methods are always just private, since
+    // they're anchored by Objective-C metadata.
+    auto &attrs = fn->getAttrs();
+    if (constant.isNativeToForeignThunk() && !attrs.hasAttribute<CDeclAttr>()) {
+      auto isTopLevel = fn->getDeclContext()->isModuleScopeContext();
+      return isTopLevel ? Limit::OnDemand : Limit::Private;
+    }
+  }
+
+  if (auto fn = constant.getFuncDecl()) {
+    // Forced-static-dispatch functions are created on-demand and have
+    // at best shared linkage.
+    if (fn->hasForcedStaticDispatch())
+      return Limit::OnDemand;
+  }
+  
+  if (auto dd = dyn_cast<DestructorDecl>(d)) {
+    // The destructor of a class implemented with @_objcImplementation is only
+    // ever called by its ObjC thunk, so it should not be public.
+    if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
+      return Limit::OnDemand;
+  }
+
+  switch (constant.kind) {
+  case Kind::Func:
+  case Kind::Allocator:
+  case Kind::Initializer:
+  case Kind::Deallocator:
+  case Kind::Destroyer: {
+    // @_alwaysEmitIntoClient declarations are like the default arguments of
+    // public functions; they are roots for dead code elimination and have
+    // serialized bodies, but no public symbol in the generated binary.
+    if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      return Limit::AlwaysEmitIntoClient;
+    if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+      auto *storage = accessor->getStorage();
+      if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+        return Limit::AlwaysEmitIntoClient;
+    }
+    break;
+  }
+  case Kind::EnumElement:
+    return Limit::OnDemand;
+
+  case Kind::GlobalAccessor:
+    return cast<VarDecl>(d)->isResilient() ? Limit::NeverPublic : Limit::None;
+
+  case Kind::DefaultArgGenerator:
+    // If the default argument is to be serialized, only use non-ABI public
+    // linkage. If the argument is not to be serialized, don't use a limit.
+    // This actually means that default arguments *can be ABI public* if
+    // `isSerialized()` returns false and the effective access level is public,
+    // which happens under `-enable-testing` with an internal decl.
+    return constant.isSerialized() ? Limit::AlwaysEmitIntoClient : Limit::None;
+
+  case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrapperInitFromProjectedValue: {
+    if (!d->getDeclContext()->isTypeContext()) {
+      // If the backing initializer is to be serialized, only use non-ABI public
+      // linkage. If the initializer is not to be serialized, don't use a limit.
+      // This actually means that it *can be ABI public* if `isSerialized()`
+      // returns false and the effective access level is public, which happens
+      // under `-enable-testing` with an internal decl.
+      return constant.isSerialized() ? Limit::AlwaysEmitIntoClient
+                                     : Limit::None;
+    }
+    // Otherwise, regular property wrapper backing initializers (for properties)
+    // are treated just like stored property intializers.
+    LLVM_FALLTHROUGH;
+  }
+  case Kind::StoredPropertyInitializer: {
+    // Stored property initializers get the linkage of their containing type.
+    // There are three cases:
+    //
+    // 1) Type is formally @_fixed_layout/@frozen. Root initializers can be
+    //    declared @inlinable. The property initializer must only reference
+    //    public symbols, and is serialized, so we give it PublicNonABI linkage.
+    //
+    // 2) Type is not formally @_fixed_layout/@frozen and the module is not
+    //    resilient. Root initializers can be declared @inlinable. This is the
+    //    annoying case. We give the initializer public linkage if the type is
+    //    public.
+    //
+    // 3) Type is resilient. The property initializer is never public because
+    //    root initializers cannot be @inlinable.
+    //
+    // FIXME: Get rid of case 2 somehow.
+    if (constant.isSerialized())
+      return Limit::AlwaysEmitIntoClient;
+
+    // FIXME: This should always be true.
+    if (d->getModuleContext()->isResilient())
+      return Limit::NeverPublic;
+
+    break;
+  }
+  case Kind::IVarInitializer:
+  case Kind::IVarDestroyer:
+    // ivar initializers and destroyers are completely contained within the
+    // class from which they come, and never get seen externally.
+    return Limit::NeverPublic;
+
+  case Kind::RuntimeAttributeGenerator:
+    return Limit::NeverPublic;
+
+  case Kind::EntryPoint:
+  case Kind::AsyncEntryPoint:
+    llvm_unreachable("Already handled");
+  }
+  return Limit::None;
+}
+
+SILLinkage SILDeclRef::getDefinitionLinkage() const {
+  using Limit = LinkageLimit;
+
+  auto privateLinkage = [&]() {
+    // Private decls may still be serialized if they are e.g in an inlinable
+    // function. In such a case, they receive shared linkage.
+    return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
+  };
 
   // Prespecializations are public.
-  if (getSpecializedSignature()) {
+  if (getSpecializedSignature())
     return SILLinkage::Public;
-  }
 
-  if (getAbstractClosureExpr()) {
-    return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
-  }
+  // Closures can only be referenced from the same file.
+  if (getAbstractClosureExpr())
+    return privateLinkage();
 
   // The main entry-point is public.
   if (kind == Kind::EntryPoint)
     return SILLinkage::Public;
   if (kind == Kind::AsyncEntryPoint)
     return SILLinkage::Hidden;
-
-  // Add External to the linkage (e.g. Public -> PublicExternal) if this is a
-  // declaration not a definition.
-  auto maybeAddExternal = [&](SILLinkage linkage) {
-    return forDefinition ? linkage : addExternalToLinkage(linkage);
-  };
-
-  ValueDecl *d = getDecl();
-
-  // Property wrapper generators of public functions have PublicNonABI linkage
-  if (isPropertyWrapperBackingInitializer() && isa<ParamDecl>(d)) {
-    if (isSerialized())
-      return maybeAddExternal(SILLinkage::PublicNonABI);
-  }
-
-  // Function-local declarations have private linkage, unless serialized.
-  DeclContext *moduleContext = d->getDeclContext();
-  while (!moduleContext->isModuleScopeContext()) {
-    if (moduleContext->isLocalContext()) {
-      return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
-    }
-    moduleContext = moduleContext->getParent();
-  }
 
   // Calling convention thunks have shared linkage.
   if (isForeignToNativeThunk())
@@ -314,141 +552,85 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isClangImported())
     return SILLinkage::Shared;
 
-  // Default argument generators of Public functions have PublicNonABI linkage
-  // if the function was type-checked in Swift 4 mode.
-  if (kind == SILDeclRef::Kind::DefaultArgGenerator) {
-    if (isSerialized())
-      return maybeAddExternal(SILLinkage::PublicNonABI);
-  }
+  const auto limit = getLinkageLimit(*this);
+  if (limit == Limit::Private)
+    return privateLinkage();
 
-  // Back deployment thunks and fallbacks are emitted into the client and
-  // therefore have PublicNonABI linkage.
-  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
-    return maybeAddExternal(SILLinkage::PublicNonABI);
+  auto *decl = getDecl();
 
-  enum class Limit {
-    /// No limit.
-    None,
-    /// The declaration is emitted on-demand; it should end up with internal
-    /// or shared linkage.
-    OnDemand,
-    /// The declaration should never be made public.
-    NeverPublic,
-    /// The declaration should always be emitted into the client,
-    AlwaysEmitIntoClient,
-  };
-  auto limit = Limit::None;
+  if (isPropertyWrapperBackingInitializer()) {
+    auto *dc = decl->getDeclContext();
 
-  // @_alwaysEmitIntoClient declarations are like the default arguments of
-  // public functions; they are roots for dead code elimination and have
-  // serialized bodies, but no public symbol in the generated binary.
-  if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-    limit = Limit::AlwaysEmitIntoClient;
-  if (auto accessor = dyn_cast<AccessorDecl>(d)) {
-    auto *storage = accessor->getStorage();
-    if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-      limit = Limit::AlwaysEmitIntoClient;
-  }
+    // External property wrapper backing initializers have linkage based
+    // on the access level of their function.
+    if (isa<ParamDecl>(decl)) {
+      if (isa<AbstractClosureExpr>(dc))
+        return privateLinkage();
 
-  // ivar initializers and destroyers are completely contained within the class
-  // from which they come, and never get seen externally.
-  if (isIVarInitializerOrDestroyer()) {
-    limit = Limit::NeverPublic;
-  }
-
-  // Stored property initializers get the linkage of their containing type.
-  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
-    // Three cases:
-    //
-    // 1) Type is formally @_fixed_layout/@frozen. Root initializers can be
-    //    declared @inlinable. The property initializer must only reference
-    //    public symbols, and is serialized, so we give it PublicNonABI linkage.
-    //
-    // 2) Type is not formally @_fixed_layout/@frozen and the module is not
-    //    resilient. Root initializers can be declared @inlinable. This is the 
-    //    annoying case. We give the initializer public linkage if the type is
-    //    public.
-    //
-    // 3) Type is resilient. The property initializer is never public because
-    //    root initializers cannot be @inlinable.
-    //
-    // FIXME: Get rid of case 2 somehow.
-    if (isSerialized())
-      return maybeAddExternal(SILLinkage::PublicNonABI);
-
-    d = cast<NominalTypeDecl>(d->getDeclContext());
-
-    // FIXME: This should always be true.
-    if (d->getModuleContext()->isResilient())
-      limit = Limit::NeverPublic;
-  }
-
-  // The global addressor is never public for resilient globals.
-  if (kind == Kind::GlobalAccessor) {
-    if (cast<VarDecl>(d)->isResilient()) {
-      limit = Limit::NeverPublic;
+      decl = cast<ValueDecl>(dc->getAsDecl());
     }
+
+    // Property wrappers in types have linkage based on the access level of
+    // their nominal.
+    if (dc->isTypeContext())
+      decl = cast<NominalTypeDecl>(dc);
   }
 
-  if (auto fn = dyn_cast<FuncDecl>(d)) {
-    // Forced-static-dispatch functions are created on-demand and have
-    // at best shared linkage.
-    if (fn->hasForcedStaticDispatch()) {
-      limit = Limit::OnDemand;
-    }
-  }
+  // Stored property initializers have linkage based on the access level of
+  // their nominal.
+  if (isStoredPropertyInitializer())
+    decl = cast<NominalTypeDecl>(
+               decl->getDeclContext()->getImplementedObjCContext());
 
-  if (auto fn = dyn_cast<AbstractFunctionDecl>(d)) {
-    // Native-to-foreign thunks for top-level decls are created on-demand,
-    // unless they are marked @_cdecl, in which case they expose a dedicated
-    // entry-point with the visibility of the function.
-    //
-    // Native-to-foreign thunks for methods are always just private, since
-    // they're anchored by Objective-C metadata.
-    if (isNativeToForeignThunk() && !fn->getAttrs().hasAttribute<CDeclAttr>()) {
-      if (fn->getDeclContext()->isModuleScopeContext())
-        limit = Limit::OnDemand;
-      else
-        return SILLinkage::Private;
-    }
-  }
+  // Compute the effective access level, taking e.g testable into consideration.
+  auto effectiveAccess = decl->getEffectiveAccess();
 
-  if (isEnumElement()) {
-    limit = Limit::OnDemand;
-  }
-
-  auto effectiveAccess = d->getEffectiveAccess();
-  
   // Private setter implementations for an internal storage declaration should
   // be at least internal as well, so that a dynamically-writable
   // keypath can be formed from other files in the same module.
-  if (auto accessor = dyn_cast<AccessorDecl>(d)) {
-    if (accessor->isSetter()
-       && accessor->getStorage()->getEffectiveAccess() >= AccessLevel::Internal)
+  if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+    auto storageAccess = accessor->getStorage()->getEffectiveAccess();
+    if (accessor->isSetter() && storageAccess >= AccessLevel::Internal)
       effectiveAccess = std::max(effectiveAccess, AccessLevel::Internal);
   }
 
   switch (effectiveAccess) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
-    return SILLinkage::Private;
+    return privateLinkage();
 
   case AccessLevel::Internal:
+    assert(!isSerialized() &&
+           "Serialized decls should either be private (for decls in inlinable "
+           "code), or they should be public");
     if (limit == Limit::OnDemand)
       return SILLinkage::Shared;
-    return maybeAddExternal(SILLinkage::Hidden);
+    return SILLinkage::Hidden;
 
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
-    if (limit == Limit::OnDemand)
+    switch (limit) {
+    case Limit::None:
+      return SILLinkage::Public;
+    case Limit::AlwaysEmitIntoClient:
+      return SILLinkage::PublicNonABI;
+    case Limit::OnDemand:
       return SILLinkage::Shared;
-    if (limit == Limit::NeverPublic)
-      return maybeAddExternal(SILLinkage::Hidden);
-    if (limit == Limit::AlwaysEmitIntoClient)
-      return maybeAddExternal(SILLinkage::PublicNonABI);
-    return maybeAddExternal(SILLinkage::Public);
+    case Limit::NeverPublic:
+      return SILLinkage::Hidden;
+    case Limit::Private:
+      llvm_unreachable("Already handled");
+    }
   }
   llvm_unreachable("unhandled access");
+}
+
+SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
+  // Add external to the linkage of the definition
+  // (e.g. Public -> PublicExternal) if this is a declaration.
+  auto linkage = getDefinitionLinkage();
+  return forDefinition ? linkage : addExternalToLinkage(linkage);
 }
 
 SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
@@ -491,6 +673,16 @@ SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
   SILDeclRef result;
   result.loc = file;
   result.kind = Kind::EntryPoint;
+  return result;
+}
+
+SILDeclRef SILDeclRef::getRuntimeAttributeGenerator(CustomAttr *attr,
+                                                    ValueDecl *decl) {
+  SILDeclRef result;
+  result.loc = decl;
+  result.kind = Kind::RuntimeAttributeGenerator;
+  result.isRuntimeAccessible = true;
+  result.pointer = attr;
   return result;
 }
 
@@ -625,7 +817,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // marked as @frozen.
   if (isStoredPropertyInitializer() || (isPropertyWrapperBackingInitializer() &&
                                         d->getDeclContext()->isTypeContext())) {
-    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
+    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext()->getImplementedObjCContext());
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
                                     /*treatUsableFromInlineAsPublic=*/true);
@@ -768,11 +960,6 @@ bool SILDeclRef::isBackDeployed() const {
   return false;
 }
 
-bool SILDeclRef::isAnyThunk() const {
-  return isForeignToNativeThunk() || isNativeToForeignThunk() ||
-         isDistributedThunk() || isBackDeploymentThunk();
-}
-
 bool SILDeclRef::isForeignToNativeThunk() const {
   // If this isn't a native entry-point, it's not a foreign-to-native thunk.
   if (isForeign)
@@ -827,13 +1014,20 @@ bool SILDeclRef::isDistributedThunk() const {
 bool SILDeclRef::isBackDeploymentFallback() const {
   if (backDeploymentKind != BackDeploymentKind::Fallback)
     return false;
-  return kind == Kind::Func;
+  return kind == Kind::Func || kind == Kind::Initializer ||
+         kind == Kind::Allocator;
 }
 
 bool SILDeclRef::isBackDeploymentThunk() const {
   if (backDeploymentKind != BackDeploymentKind::Thunk)
     return false;
-  return kind == Kind::Func;
+  return kind == Kind::Func || kind == Kind::Initializer ||
+         kind == Kind::Allocator;
+}
+
+bool SILDeclRef::isRuntimeAccessibleFunction() const {
+  return isRuntimeAccessible &&
+         (kind == Kind::Func || kind == Kind::RuntimeAttributeGenerator);
 }
 
 /// Use the Clang importer to mangle a Clang declaration.
@@ -863,7 +1057,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         silConfig);
   }
 
-  // As a special case, Clang functions and globals don't get mangled at all.
+  // As a special case, Clang functions and globals don't get mangled at all
+  // - except \c objc_direct decls.
   if (hasDecl()) {
     if (auto clangDecl = getDecl()->getClangDecl()) {
       if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
@@ -881,7 +1076,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
           }
           return namedClangDecl->getName().str();
         } else if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-          if (objcDecl->isDirectMethod()) {
+          if (objcDecl->isDirectMethod() && isForeign) {
             std::string storage;
             llvm::raw_string_ostream SS(storage);
             clang::ASTContext &ctx = clangDecl->getASTContext();
@@ -936,7 +1131,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // Use the SILGen name only for the original non-thunked, non-curried entry
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
-      if (!NameA->Name.empty() && !isAnyThunk()) {
+      if (!NameA->Name.empty() && !isThunk()) {
         return NameA->Name.str();
       }
       
@@ -1011,13 +1206,17 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::EntryPoint: {
     return getASTContext().getEntryPointFunctionName();
   }
+
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
+    return mangler.mangleRuntimeAttributeGeneratorEntity(
+        loc.get<ValueDecl *>(), pointer.get<CustomAttr *>(), SKind);
   }
 
   llvm_unreachable("bad entity kind!");
 }
 
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
-// FIXME(SR-14131): Also consider derived declaration `@derivative` attributes.
+// FIXME(https://github.com/apple/swift/issues/54833): Also consider derived declaration `@derivative` attributes.
 static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
   assert(declRef.getDerivativeFunctionIdentifier() &&
          "Expected a derivative function SILDeclRef");
@@ -1064,11 +1263,7 @@ bool SILDeclRef::requiresNewVTableEntry() const {
 }
 
 bool SILDeclRef::requiresNewWitnessTableEntry() const {
-  return requiresNewWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-}
-
-bool SILDeclRef::requiresNewWitnessTableEntry(AbstractFunctionDecl *func) {
-  return func->getOverriddenDecls().empty();
+  return cast<AbstractFunctionDecl>(getDecl())->requiresNewWitnessTableEntry();
 }
 
 SILDeclRef SILDeclRef::getOverridden() const {
@@ -1324,6 +1519,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
     // SILModule, so we don't need to do anything.
     return SubclassScope::NotApplicable;
   case AccessLevel::Internal:
+  case AccessLevel::Package:
   case AccessLevel::Public:
     // If the class is internal or public, it can only be subclassed from
     // the same AST Module, but possibly a different SILModule.
@@ -1337,6 +1533,45 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   llvm_unreachable("Unhandled access level in switch.");
 }
 
+Expr *SILDeclRef::getInitializationExpr() const {
+  switch (kind) {
+  case Kind::StoredPropertyInitializer: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto *pbd = var->getParentPatternBinding();
+    unsigned idx = pbd->getPatternEntryIndexForVarDecl(var);
+    auto *init = pbd->getInit(idx);
+    assert(!pbd->isInitializerSubsumed(idx));
+
+    // If this is the backing storage for a property with an attached wrapper
+    // that was initialized with `=`, use that expression as the initializer.
+    if (auto originalProperty = var->getOriginalWrappedProperty()) {
+      if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
+        auto wrapperInfo =
+            originalProperty->getPropertyWrapperInitializerInfo();
+        auto *placeholder = wrapperInfo.getWrappedValuePlaceholder();
+        init = placeholder->getOriginalWrappedValue();
+        assert(init);
+      }
+    }
+    return init;
+  }
+  case Kind::PropertyWrapperBackingInitializer: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
+    assert(wrapperInfo.hasInitFromWrappedValue());
+    return wrapperInfo.getInitFromWrappedValue();
+  }
+  case Kind::PropertyWrapperInitFromProjectedValue: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
+    assert(wrapperInfo.hasInitFromProjectedValue());
+    return wrapperInfo.getInitFromProjectedValue();
+  }
+  default:
+    return nullptr;
+  }
+}
+
 unsigned SILDeclRef::getParameterListCount() const {
   // Only decls can introduce currying.
   if (!hasDecl())
@@ -1344,7 +1579,7 @@ unsigned SILDeclRef::getParameterListCount() const {
 
   // Always uncurried even if the underlying function is curried.
   if (kind == Kind::DefaultArgGenerator || kind == Kind::EntryPoint ||
-      kind == Kind::AsyncEntryPoint)
+      kind == Kind::AsyncEntryPoint || kind == Kind::RuntimeAttributeGenerator)
     return 1;
 
   auto *vd = getDecl();

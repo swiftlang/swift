@@ -12,7 +12,8 @@
 // RUN: rm -rf %t/mixed-target/
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/../Inputs/custom-modules -enable-objc-interop -typecheck %s -verify
 
-// REQUIRES: SR7768
+// FIXME: Disabled due to https://github.com/apple/swift/issues/50307.
+// REQUIRES: issue_50307
 
 import MixedWithHeader
 

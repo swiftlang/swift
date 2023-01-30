@@ -26,7 +26,7 @@ extension Int: P {
 // CHECK: entry:
 // CHECK:   %0 = load i8*, i8** getelementptr inbounds (%swift.dyn_repl_link_entry, %swift.dyn_repl_link_entry* @"$s1A3baryQrSiFQOMk", i32 0, i32 0)
 // CHECK:   %1 = bitcast i8* %0 to %swift.type_descriptor* ()*
-// CHECK:   %2 = call i64 @llvm.ptrauth.blend.i64(i64 ptrtoint (%swift.dyn_repl_link_entry* @"$s1A3baryQrSiFQOMk" to i64), i64 44678)
+// CHECK:   %2 = call i64 @llvm.ptrauth.blend(i64 ptrtoint (%swift.dyn_repl_link_entry* @"$s1A3baryQrSiFQOMk" to i64), i64 44678)
 // CHECK:   %3 = tail call swiftcc %swift.type_descriptor* %1() [ "ptrauth"(i32 0, i64 %2) ]
 // CHECK:   ret %swift.type_descriptor* %3
 // CHECK: }

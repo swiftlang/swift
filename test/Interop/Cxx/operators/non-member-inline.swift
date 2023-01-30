@@ -151,6 +151,24 @@ OperatorsTestSuite.test("greater equal (>=)") {
   expectEqual(true, result)
 }
 
+OperatorsTestSuite.test("slash equal (/=)") {
+  var lhs = LoadableIntWrapper(value: 8)
+  let rhs = LoadableIntWrapper(value: 2)
+
+  lhs /= rhs
+
+  expectEqual(lhs.value, 4)
+}
+
+OperatorsTestSuite.test("star equal (*=)") {
+  var lhs = LoadableIntWrapper(value: 8)
+  let rhs = LoadableIntWrapper(value: 2)
+
+  lhs *= rhs
+
+  expectEqual(lhs.value, 16)
+}
+
 OperatorsTestSuite.test("amp amp (&&)") {
   let lhs = LoadableBoolWrapper(value: true)
   let rhs = LoadableBoolWrapper(value: false)

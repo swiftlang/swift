@@ -12,20 +12,21 @@
 
 #ifdef SWIFT_ENABLE_REFLECTION
 
-#include "swift/Basic/Lazy.h"
-#include "swift/Runtime/Reflection.h"
-#include "swift/Runtime/Casting.h"
-#include "swift/Runtime/Config.h"
-#include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Enum.h"
-#include "swift/Basic/Unreachable.h"
-#include "swift/Demangling/Demangle.h"
-#include "swift/Runtime/Debug.h"
-#include "swift/Runtime/Portability.h"
+#include "ImageInspection.h"
 #include "Private.h"
 #include "WeakReference.h"
-#include "../SwiftShims/Reflection.h"
+#include "swift/Basic/Lazy.h"
+#include "swift/Basic/Unreachable.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/Runtime/Casting.h"
+#include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Enum.h"
+#include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Portability.h"
+#include "swift/Runtime/Reflection.h"
+#include "swift/shims/Reflection.h"
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
@@ -37,24 +38,6 @@
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
 #include "SwiftObject.h"
-#endif
-
-#if defined(_WIN32)
-#include <stdarg.h>
-
-namespace {
-char *strndup(const char *s, size_t n) {
-  size_t length = std::min(strlen(s), n);
-
-  char *buffer = reinterpret_cast<char *>(malloc(length + 1));
-  if (buffer == nullptr)
-    return buffer;
-
-  strncpy(buffer, s, length);
-  buffer[length] = '\0';
-  return buffer;
-}
-}
 #endif
 
 using namespace swift;
@@ -260,7 +243,12 @@ struct TupleImpl : ReflectionMirrorImpl {
 
       // If we have a label, create it.
       if (labels && space && labels != space) {
-        *outName = strndup(labels, space - labels);
+        size_t labelLen = space - labels;
+        char *label = (char *)malloc(labelLen + 1);
+        memcpy(label, labels, labelLen);
+        label[labelLen] = '\0'; // 0-terminate the string
+
+        *outName = label;
         hasLabel = true;
       }
     }
@@ -1125,5 +1113,32 @@ id swift_reflectionMirror_quickLookObject(OpaqueValue *value, const Metadata *T)
   return call(value, T, nullptr, [](ReflectionMirrorImpl *impl) { return impl->quickLookObject(); });
 }
 #endif
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const char *swift_keyPath_copySymbolName(void *address) {
+  if (auto info = SymbolInfo::lookup(address)) {
+    if (info->getSymbolName()) {
+      return strdup(info->getSymbolName());
+    }
+  }
+  return nullptr;
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift_keyPath_freeSymbolName(const char *symbolName) {
+  free(const_cast<char *>(symbolName));
+}
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_INTERNAL const
+    char *swift_keyPathSourceString(char *name) {
+  size_t length = strlen(name);
+  std::string mangledName = keyPathSourceString(name, length);
+  if (mangledName == "") {
+    return 0;
+  } else {
+    return strdup(mangledName.c_str());
+  }
+}
 
 #endif  // SWIFT_ENABLE_REFLECTION

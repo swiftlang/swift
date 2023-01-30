@@ -28,7 +28,7 @@ c.spiMethod()
 c.spiVar = "write"
 print(c.spiVar)
 
-let s = SPIStruct()
+var s = SPIStruct()
 s.spiMethod()
 s.spiInherit()
 s.spiDontInherit() // expected-error {{'spiDontInherit' is inaccessible due to '@_spi' protection level}}
@@ -40,6 +40,7 @@ print(s.spiVar)
 
 SPIEnum().spiMethod()
 SPIEnum.A.spiMethod()
+_ = PublicEnum.spiCase
 
 var ps = PublicStruct()
 let _ = PublicStruct(alt_init: 1)

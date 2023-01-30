@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
-// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o %s -o %t.out
+// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o %s -o %t.out -Xfrontend -disable-deserialization-safety
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
@@ -790,7 +790,7 @@ ObjCConformsToProtocolTestSuite.test("cast/metatype") {
   expectTrue(SomeSubclass.self is SomeObjCProto.Type)
 }
 
-// SR-7357
+// https://github.com/apple/swift/issues/49905
 
 extension Optional where Wrapped == NSData {
     private class Inner {

@@ -422,9 +422,8 @@ static ParameterConvention
 getParameterConvention(ImplParameterConvention conv) {
   switch (conv) {
   case Demangle::ImplParameterConvention::Indirect_In:
-    return ParameterConvention::Indirect_In;
   case Demangle::ImplParameterConvention::Indirect_In_Constant:
-    return ParameterConvention::Indirect_In_Constant;
+    return ParameterConvention::Indirect_In;
   case Demangle::ImplParameterConvention::Indirect_In_Guaranteed:
     return ParameterConvention::Indirect_In_Guaranteed;
   case Demangle::ImplParameterConvention::Indirect_Inout:
@@ -635,6 +634,8 @@ Type ASTBuilder::createConstrainedExistentialType(
   llvm::SmallDenseMap<Identifier, Type> cmap;
   for (const auto &req : constraints) {
     switch (req.getKind()) {
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::Layout:
@@ -674,7 +675,7 @@ Type ASTBuilder::createMetatypeType(Type instance,
 
 Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
                                                 unsigned index) {
-  return GenericTypeParamType::get(/*type sequence*/ false, depth, index, Ctx);
+  return GenericTypeParamType::get(/*isParameterPack*/ false, depth, index, Ctx);
 }
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
@@ -1041,7 +1042,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
     if (privateDiscriminator.empty()) {
       if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
         return findForeignTypeDecl(name, relatedEntityKind,
-                                    foreignModuleKind.getValue(),
+                                    foreignModuleKind.value(),
                                     node->getKind());
       }
     }

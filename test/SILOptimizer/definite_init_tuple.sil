@@ -20,7 +20,7 @@ bb0(%0 : $*S<T>, %1 : $@thin S<T>.Type):
   %7 = tuple_element_addr %5 : $*(T, T), 0
   %8 = tuple_element_addr %5 : $*(T, T), 1
   %9 = apply %6<T>(%7, %8) : $@convention(thin) <τ_0_0> () -> (@out τ_0_0, @out τ_0_0)
-  copy_addr %4 to [initialization] %0 : $*S<T>
+  copy_addr %4 to [init] %0 : $*S<T>
   destroy_value %3 : $<τ_0_0> { var S<τ_0_0> } <T>
   %12 = tuple ()
   return %12 : $()

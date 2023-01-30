@@ -1193,4 +1193,101 @@ UnsafeRawBufferPointerTestSuite.test("assumingMemoryBound") {
   expectEqual(mutableArray[3], array[3]+1)
 }
 
+UnsafeMutableBufferPointerTestSuite.test("UMBP.initialize.collection.overflow")
+.skip(.custom({
+  if #available(SwiftStdlib 5.8, *) { return false } else { return true }
+}, reason: "Requires standard library from Swift 5.8"))
+.code {
+  let s = Array<Int>(0..<8)
+  let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: s.count-1)
+  defer { b.deallocate() }
+  expectCrash {
+    _ = b.initialize(fromContentsOf: s)
+  }
+}
+
+UnsafeMutableBufferPointerTestSuite.test("UMBP.update.collection.overflow")
+.skip(.custom({
+  if #available(SwiftStdlib 5.8, *) { return false } else { return true }
+}, reason: "Requires standard library from Swift 5.8"))
+.code {
+  let s = Array(0..<8)
+  var b = Array(repeating: 0, count: s.count-1)
+  b.withUnsafeMutableBufferPointer { b in
+    expectCrash {
+      _ = b.update(fromContentsOf: s)
+    }
+  }
+}
+
+UnsafeMutableBufferPointerTestSuite.test("UMBP.moveInitialize.overflow")
+.skip(.custom({
+  if #available(SwiftStdlib 5.8, *) { return false } else { return true }
+}, reason: "Requires standard library from Swift 5.8"))
+.code {
+  let s = UnsafeMutableBufferPointer<Int>.allocate(capacity: 8)
+  defer { s.deallocate() }
+  s.initialize(fromContentsOf: 0..<s.count)
+
+  let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: s.count-1)
+  defer { b.deallocate() }
+  expectCrash {
+    _ = b.moveInitialize(fromContentsOf: s)
+  }
+}
+
+UnsafeMutableBufferPointerTestSuite.test("UMBP.moveUpdate.overflow")
+.skip(.custom({
+  if #available(SwiftStdlib 5.8, *) { return false } else { return true }
+}, reason: "Requires standard library from Swift 5.8"))
+.code {
+  let s = UnsafeMutableBufferPointer<Int>.allocate(capacity: 8)
+  defer { s.deallocate() }
+  s.initialize(fromContentsOf: 0..<s.count)
+
+  var b = Array(repeating: 0, count: s.count-1)
+  b.withUnsafeMutableBufferPointer { b in
+    expectCrash {
+      _ = b.moveUpdate(fromContentsOf: s)
+    }
+  }
+}
+
+UnsafeMutableRawBufferPointerTestSuite.test("UMRBP.initializeMemory.collection.overflow")
+.skip(.custom({
+  if #available(SwiftStdlib 5.8, *) { return false } else { return true }
+}, reason: "Requires standard library from Swift 5.8"))
+.code {
+  let s = Array<Int>(0..<8)
+  let b = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int>.stride * (s.count-1),
+    alignment: MemoryLayout<Int>.alignment
+  )
+  defer { b.deallocate() }
+  expectCrash {
+    let i = b.initializeMemory(as: Int.self, fromContentsOf: s)
+    i.deinitialize()
+  }
+}
+
+UnsafeMutableRawBufferPointerTestSuite.test("UMRBP.moveInitializeMemory.overflow")
+.skip(.custom({
+  if #available(SwiftStdlib 5.8, *) { return false } else { return true }
+}, reason: "Requires standard library from Swift 5.8"))
+.code {
+  let s = UnsafeMutableBufferPointer<Int>.allocate(capacity: 8)
+  defer { s.deallocate() }
+  s.initialize(fromContentsOf: 0..<s.count)
+
+  let b = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int>.stride * (s.count-1),
+    alignment: MemoryLayout<Int>.alignment
+  )
+  defer { b.deallocate() }
+  expectCrash {
+    let i = b.moveInitializeMemory(as: Int.self, fromContentsOf: s)
+    i.deinitialize()
+  }
+}
+
 runAllTests()

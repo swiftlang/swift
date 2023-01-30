@@ -322,7 +322,7 @@ func dependentMemberTypes<T : BaseIntAndP2>(
   _: T.FullyConcrete,
 
   _: BaseIntAndP2.DependentInConcreteConformance, // FIXME expected-error {{}}
-  _: BaseIntAndP2.DependentProtocol, // expected-error {{type alias 'DependentProtocol' can only be used with a concrete type or generic parameter base}}
+  _: BaseIntAndP2.DependentProtocol, // expected-error {{cannot access type alias 'DependentProtocol' from 'BaseIntAndP2' (aka 'Base<Int> & P2'); use a concrete type or generic parameter base instead}}
   _: BaseIntAndP2.DependentClass,
   _: BaseIntAndP2.FullyConcrete) {}
 

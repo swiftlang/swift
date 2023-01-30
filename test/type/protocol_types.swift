@@ -96,7 +96,7 @@ func testHasAssoc(_ x: Any, _: HasAssoc) { // expected-error {{use of protocol '
   }
 }
 
-// SR-38
+// https://github.com/apple/swift/issues/42661
 var b: HasAssoc // expected-error {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
 
 // Further generic constraint error testing - typealias used inside statements

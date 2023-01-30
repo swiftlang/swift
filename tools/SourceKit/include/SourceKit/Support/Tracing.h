@@ -116,22 +116,22 @@ public:
 
   void start(const SwiftInvocation &Inv,
              const StringPairs &OpArgs = StringPairs()) {
-    assert(!OpId.hasValue());
+    assert(!OpId.has_value());
     OpId = startOperation(OpKind, Inv, OpArgs);
   }
 
   void finish() {
-    if (OpId.hasValue()) {
+    if (OpId.has_value()) {
       SmallVector<DiagnosticEntryInfo, 8> Diagnostics;
-      if (DiagProvider.hasValue())
+      if (DiagProvider.has_value())
         (*DiagProvider)(Diagnostics);
-      operationFinished(OpId.getValue(), OpKind, Diagnostics);
+      operationFinished(OpId.value(), OpKind, Diagnostics);
       OpId.reset();
     }
   }
 
   void setDiagnosticProvider(DiagnosticProvider &&DiagProvider) {
-    assert(!this->DiagProvider.hasValue());
+    assert(!this->DiagProvider.has_value());
     this->DiagProvider = std::move(DiagProvider);
   }
 };

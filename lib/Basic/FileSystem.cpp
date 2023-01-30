@@ -137,14 +137,14 @@ std::error_code swift::atomicallyWritingToFile(
       temporaryPath = tryToOpenTemporaryFile(OS, outputPath);
 
       if (!temporaryPath) {
-        assert(!OS.hasValue());
+        assert(!OS.has_value());
         // If we failed to create the temporary, fall back to writing to the
         // file directly. This handles the corner case where we cannot write to
         // the directory, but can write to the file.
       }
     }
 
-    if (!OS.hasValue()) {
+    if (!OS.has_value()) {
       std::error_code error;
       OS.emplace(outputPath, error, fs::OF_None);
       if (error) {
@@ -152,17 +152,17 @@ std::error_code swift::atomicallyWritingToFile(
       }
     }
 
-    action(OS.getValue());
+    action(OS.value());
     // In addition to scoping the use of 'OS', ending the scope here also
     // ensures that it's been flushed (by destroying it).
   }
 
-  if (!temporaryPath.hasValue()) {
+  if (!temporaryPath.has_value()) {
     // If we didn't use a temporary, we're done!
     return std::error_code();
   }
 
-  return swift::moveFileIfDifferent(temporaryPath.getValue(), outputPath);
+  return swift::moveFileIfDifferent(temporaryPath.value(), outputPath);
 }
 
 llvm::ErrorOr<FileDifference>

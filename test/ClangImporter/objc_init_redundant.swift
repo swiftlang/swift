@@ -1,10 +1,11 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules) -import-underlying-module -import-objc-header %S/Inputs/objc_init_redundant_bridging.h -emit-sil %s -verify
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules) -import-underlying-module -import-objc-header %S/Inputs/objc_init_redundant_bridging.h -emit-sil %s > %t.log 2>&1
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules -F %S/Inputs/frameworks) -import-underlying-module -import-objc-header %S/Inputs/objc_init_redundant_bridging.h -emit-sil %s -verify
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules -F %S/Inputs/frameworks) -import-underlying-module -import-objc-header %S/Inputs/objc_init_redundant_bridging.h -emit-sil %s > %t.log 2>&1
 // RUN: %FileCheck %s < %t.log
 
 // REQUIRES: objc_interop
 
 import Foundation
+@_implementationOnly import objc_init_redundant_Private
 
 // rdar://problem/17687082
 extension NSObject {
@@ -26,5 +27,10 @@ extension MyObject {
 
 // ...or the bridging header
 extension MyBridgedObject {
+  @objc func implementedInSwift() {}
+}
+
+// ...or the private module
+extension MyPrivateObject {
   @objc func implementedInSwift() {}
 }

@@ -1337,7 +1337,16 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
     if (!flags.isEscaping()) {
       Data.ValueWitnesses = &VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING);
     } else {
-      Data.ValueWitnesses = &VALUE_WITNESS_SYM(FUNCTION_MANGLING);
+      switch (key.getDifferentiabilityKind().Value) {
+      case FunctionMetadataDifferentiabilityKind::Reverse:
+        Data.ValueWitnesses = &VALUE_WITNESS_SYM(DIFF_FUNCTION_MANGLING);
+        break;
+      default:
+        swift_unreachable("unsupported function witness");
+      case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+        Data.ValueWitnesses = &VALUE_WITNESS_SYM(FUNCTION_MANGLING);
+        break;
+      }
     }
     break;
 
@@ -1489,7 +1498,7 @@ public:
 class TupleCacheStorage :
   public LockingConcurrentMapStorage<TupleCacheEntry, TupleCacheTag> {
 public:
-// FIXME: https://bugs.swift.org/browse/SR-1155
+// FIXME: https://github.com/apple/swift/issues/43763.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
   static TupleCacheEntry *
@@ -5762,13 +5771,11 @@ static Result performOnMetadataCache(const Metadata *metadata,
     swift_unreachable("bad metadata initialization kind");
   }
 
-  auto &generics = description->getFullGenericContextHeader();
-
   auto genericArgs =
     reinterpret_cast<const void * const *>(
                                     description->getGenericArguments(metadata));
   auto &cache = getCache(*description);
-  assert(generics.Base.NumKeyArguments == cache.SigLayout.sizeInWords());
+  assert(description->getFullGenericContextHeader().Base.NumKeyArguments == cache.SigLayout.sizeInWords());
   auto key = MetadataCacheKey(cache.SigLayout, genericArgs);
 
   return std::move(callbacks).forGenericMetadata(metadata, description,

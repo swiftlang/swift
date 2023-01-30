@@ -485,7 +485,7 @@ tests.test("rdar://problem/27905230") {
 }
 
 tests.test("verbatimBridged/Base/withUnsafeBufferPointer") {
-  // https://bugs.swift.org/browse/SR-14663
+  // https://github.com/apple/swift/issues/57014
   // This tests a bad precondition that was fixed in
   // https://github.com/apple/swift/pull/37960
   guard #available(SwiftStdlib 5.5, *) else { return }
@@ -504,7 +504,7 @@ tests.test("verbatimBridged/Base/withUnsafeBufferPointer") {
 }
 
 tests.test("verbatimBridged/AnyObject/withUnsafeBufferPointer") {
-  // https://bugs.swift.org/browse/SR-14663
+  // https://github.com/apple/swift/issues/57014
   // This tests a bad precondition that was fixed in
   // https://github.com/apple/swift/pull/37960
   guard #available(SwiftStdlib 5.5, *) else { return }

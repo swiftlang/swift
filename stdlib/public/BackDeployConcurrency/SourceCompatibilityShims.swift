@@ -54,6 +54,7 @@ extension TaskPriority {
 
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
+@available(*, deprecated, renamed: "withTaskCancellationHandler(operation:onCancel:)")
 public func withTaskCancellationHandler<T>(
   handler: @Sendable () -> Void,
   operation: () async throws -> T

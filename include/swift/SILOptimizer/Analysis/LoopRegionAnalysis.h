@@ -237,8 +237,7 @@ public:
 
   /// An iterator that knows how to iterate over the subregion indices of a
   /// region.
-  class subregion_iterator :
-    public std::iterator<std::bidirectional_iterator_tag, unsigned> {
+  class subregion_iterator {
     friend struct SubregionData;
     llvm::SmallVectorImpl<SubregionID>::const_iterator InnerIter;
     const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> *Subloops;
@@ -323,8 +322,7 @@ public:
 
   /// An iterator that knows how to iterate over the backedge indices of a
   /// region.
-  class backedge_iterator
-      : public std::iterator<std::bidirectional_iterator_tag, unsigned> {
+  class backedge_iterator {
     friend struct SubregionData;
     using InnerIterTy = llvm::SmallVectorImpl<unsigned>::const_iterator;
     llvm::Optional<InnerIterTy> InnerIter;
@@ -345,7 +343,7 @@ public:
     /// results in an unreachable being hit.
     backedge_iterator() : InnerIter() {}
 
-    bool hasValue() const { return InnerIter.hasValue(); }
+    bool hasValue() const { return InnerIter.has_value(); }
 
     /// Return the index of the current backedge index.
     unsigned operator*() const { return **InnerIter; }
@@ -369,11 +367,11 @@ public:
       return iter;
     }
     bool operator==(backedge_iterator rhs) const {
-      if (InnerIter.hasValue() != rhs.InnerIter.hasValue())
+      if (InnerIter.has_value() != rhs.InnerIter.has_value())
         llvm_unreachable("Comparing uncomparable iterators");
       // Now we know that the two either both have values or both do not have
       // values.
-      if (!InnerIter.hasValue())
+      if (!InnerIter.has_value())
         return true;
       return *InnerIter == *rhs.InnerIter;
     }

@@ -28,9 +28,11 @@ func f(_: Double) -> Y { return Y() }
 
 func testCallCommonType() {
   // CHECK: overload set choice binding $T{{[0-9]+}} := (Int) -> X
-  // CHECK-NEXT: (common result type for $T{{[0-9]+}} is Int)
+  // CHECK: (considering -> $T{{[0-9]+}}[.g: value] == [[G:\$T[0-9]+]]
+  // CHECK: (common result type for [[G]] is Int)
   // CHECK: (overload set choice binding $T{{[0-9]+}} := (Double) -> Y)
-  // CHECK-NEXT: (common result type for $T{{[0-9]+}} is Double)
+  // CHECK: (considering -> $T{{[0-9]+}}[.g: value] == [[F:\$T[0-9]+]]
+  // CHECK: (common result type for [[F]] is Double)
   _ = f(0).g(0)
 }
 

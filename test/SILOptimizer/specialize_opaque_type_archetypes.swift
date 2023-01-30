@@ -6,6 +6,7 @@
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
+// REQUIRES: swift_in_compiler
 
 import External
 import External2
@@ -288,7 +289,7 @@ public func useExternalResilient3() {
   useP(e.myValue3())
 }
 
-// Check that we can look throught two layers of inlinable resilient functions.
+// Check that we can look through two layers of inlinable resilient functions.
 // CHECK-LABEL: sil @$s1A21useExternalResilient4yyF
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
 // CHECK:   [[FUN:%.*]] = function_ref @$s9External3040inlinableExternalResilientCallsInlinablecD0QryF : $@convention(thin) @substituted {{.*}} for <Int64>
@@ -372,11 +373,22 @@ public func testResilientInlinablePropertyCallsResilientInlinable() {
   useP(r.inlineablePropertyCallsResilientInlineable.myValue3())
 }
 
+// RESILIENT-LABEL: sil {{.*}}@$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlFSi_Tgq5 : {{.*}}{
+// RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : $Int, {{%[^,]+}} : @_eagerMove $
+// RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlFSi_Tgq5'
+
+// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF : {{.*}} {
+// RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : $*T, {{%[^,]+}} : @_eagerMove $
+// RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF'
+
+// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV26eagerMoveInlineableContextyyF : $@convention(method) (@in_guaranteed ResilientContainer) -> () {
+// RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove $
+// RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV26eagerMoveInlineableContextyyF'
+
 // RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV17inlineableContextyyF
 // RESILIENT:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // RESILIENT:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV16computedPropertyQrvg
 // RESILIENT:  apply [[FUN]]([[RES]], %0)
-
 
 public protocol P4 {
   associatedtype AT
@@ -387,6 +399,19 @@ public protocol P4 {
 struct PA : P4 {
   func foo(_ x: Int64)  -> some P {
     return Int64(x)
+  }
+}
+
+public class K {}
+
+public protocol P4EM {
+  associatedtype AT
+  func foo(@_eagerMove _ x: K) -> AT
+}
+
+struct PAEM : P4EM {
+  func foo(@_eagerMove _ x: K)  -> some P {
+    return 5 as Int64
   }
 }
 
@@ -414,7 +439,7 @@ func testIt<T>(cl: (Int64) throws -> T) {
 // CHECK:  store %0 to [[PA]] : $*PA
 // CHECK:  [[F:%.*]] = function_ref @$s1A16testPartialApplyyyxAA2P4RzlF2ATQzs5Int64Vcxcfu_AeGcfu0_AA2PAV_TG5 : $@convention(thin) (Int64, @in_guaranteed PA) -> @out Int64
 // CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[PA]]) : $@convention(thin) (Int64, @in_guaranteed PA) -> @out Int64
-// CHECK:  convert_function [[C]] : $@callee_guaranteed (Int64) -> @out Int64 to $@callee_guaranteed @substituted <τ_0_0> (Int64) -> (@out τ_0_0, @error Error) for <Int64>
+// CHECK:  convert_function [[C]] : $@callee_guaranteed (Int64) -> @out Int64 to $@callee_guaranteed @substituted <τ_0_0> (Int64) -> (@out τ_0_0, @error any Error) for <Int64>
 @inline(never)
 func testPartialApply<T: P4>(_ t: T) {
   let fun = t.foo
@@ -424,6 +449,28 @@ func testPartialApply<T: P4>(_ t: T) {
 
 public func testPartialApply() {
   testPartialApply(PA())
+}
+
+// CHECK-LABEL: sil shared [noinline] @$s1A25testPartialApplyEagerMoveyyxAA4P4EMRzlFAA4PAEMV_Tg5 : {{.*}}{
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove $
+// CHECK-LABEL: } // end sil function '$s1A25testPartialApplyEagerMoveyyxAA4P4EMRzlFAA4PAEMV_Tg5'
+
+@inline(never)
+func testItEagerMove<T>(cl: (K) throws -> T) {
+ do {
+   print(try cl(K()))
+ } catch (_) {}
+}
+
+@inline(never)
+func testPartialApplyEagerMove<T: P4EM>(@_eagerMove _ t: T) {
+  let fun = t.foo
+  testItEagerMove(cl: fun)
+  print(fun(K()))
+}
+
+public func testPartialApplyEagerMove() {
+  testPartialApplyEagerMove(PAEM())
 }
 
 struct Trivial<T> {

@@ -1,0 +1,220 @@
+// RUN: %target-sil-opt -module-name Swift -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+
+class SuperKlass {}
+
+class Klass : SuperKlass {}
+
+struct WrapperStruct {
+  var val: Klass
+}
+
+struct Wrapper1 {
+  var val1: Wrapper2
+}
+
+struct Wrapper2 {
+  var val2: Klass
+}
+
+sil @use_superklass : $@convention(thin) (@guaranteed SuperKlass) -> ()
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test1'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %1 = begin_borrow %0 : $WrapperStruct
+// CHECK: Consuming User:   end_borrow %1 : $WrapperStruct
+// CHECK: Non Consuming User:   %5 = apply %4(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: Block: bb0
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test1'
+sil [ossa] @test1 : $@convention(thin) (@owned WrapperStruct) -> () {
+bb0(%0 : @owned $WrapperStruct):
+  %b = begin_borrow %0 : $WrapperStruct
+  %ex1 = struct_extract %b : $WrapperStruct, #WrapperStruct.val
+  end_borrow %b : $WrapperStruct
+  %func = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %func(%ex1) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %0  : $WrapperStruct
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK: Error#: 0. Begin Error in Function: 'test2'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %1 = begin_borrow %0 : $Klass
+// CHECK: Consuming User:   end_borrow %1 : $Klass
+// CHECK: Non Consuming User:   %8 = apply %7(%5) : $@convention(thin) (@guaranteed SuperKlass) -> ()
+// CHECK: Block: bb2
+// CHECK: Error#: 0. End Error in Function: 'test2'
+sil [ossa] @test2 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %outer = begin_borrow %0 : $Klass
+  br bb1
+
+bb1:
+  %cast1 = unchecked_ref_cast %outer : $Klass to $SuperKlass
+  br bb2(%cast1 : $SuperKlass)
+
+bb2(%phi : @guaranteed $SuperKlass):
+  end_borrow %outer : $Klass
+  %func = function_ref @use_superklass : $@convention(thin) (@guaranteed SuperKlass) -> ()
+  apply %func(%phi) : $@convention(thin) (@guaranteed SuperKlass) -> ()
+  destroy_value %0 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK: Error#: 0. Begin Error in Function: 'test3'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %9 = argument of bb3 : $Klass
+// CHECK: Consuming User:   destroy_value %9 : $Klass
+// CHECK: Non Consuming User:   end_borrow %10 : $Klass
+// CHECK: Block: bb3
+// CHECK: Error#: 0. End Error in Function: 'test3'
+sil [ossa] @test3 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0 = copy_value %0 : $Klass
+  %borrow0 = begin_borrow %copy0 : $Klass
+  br bb3(%copy0 : $Klass, %borrow0 : $Klass)
+
+bb2:
+  %copy1 = copy_value %1 : $Klass
+  %borrow1 = begin_borrow %copy1 : $Klass
+  br bb3(%copy1 : $Klass, %borrow1 : $Klass)
+
+bb3(%phi : @owned $Klass, %gphi : @guaranteed $Klass):
+  %func = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %func(%phi) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %phi : $Klass
+  end_borrow %gphi : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK: Error#: 0. Begin Error in Function: 'test4'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %15 = argument of bb4 : $Wrapper1
+// CHECK: Consuming User:   end_borrow %15 : $Wrapper1
+// CHECK: Non Consuming User:   %18 = apply %17(%14) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: Block: bb4
+// CHECK: Error#: 0. End Error in Function: 'test4'
+sil [ossa] @test4 : $@convention(thin) (@owned Wrapper1, @owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1, %1 : @owned $Wrapper1):
+  %b1 = begin_borrow %0 : $Wrapper1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %ex1 = struct_extract %b1 : $Wrapper1, #Wrapper1.val1
+  br bb3(%ex1 : $Wrapper2, %b1 : $Wrapper1)
+
+bb2:
+  end_borrow %b1 : $Wrapper1
+  %b2 = begin_borrow %1 : $Wrapper1
+  %ex2 = struct_extract %b2 : $Wrapper1, #Wrapper1.val1
+  br bb3(%ex2 : $Wrapper2, %b2 : $Wrapper1)
+
+bb3(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
+  %ex3 = struct_extract %phi1 : $Wrapper2, #Wrapper2.val2
+  br bb4(%ex3 : $Klass, %phi2 : $Wrapper1)
+
+bb4(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
+  end_borrow %phi4 : $Wrapper1
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %0 : $Wrapper1
+  destroy_value %1 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test5'
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value: %5 = argument of bb2 : $SuperKlass
+// CHECK: User:   destroy_value %5 : $SuperKlass
+// CHECK: Operand Number: 0
+// CHECK: Conv: guaranteed
+// CHECK: Constraint:
+// CHECK: <Constraint Kind:owned LifetimeConstraint:LifetimeEnding>
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test5'
+sil [ossa] @test5 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %outer = begin_borrow %0 : $Klass
+  br bb1
+
+bb1:
+  %cast1 = unchecked_ref_cast %outer : $Klass to $SuperKlass
+  br bb2(%cast1 : $SuperKlass)
+
+bb2(%phi : @guaranteed $SuperKlass):
+  destroy_value %phi : $SuperKlass
+  end_borrow %outer : $Klass
+  destroy_value %0 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test6'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %1 = load_borrow %0 : $*Klass
+// CHECK: Consuming User:   end_borrow %1 : $Klass
+// CHECK: Non Consuming User:   %8 = apply %7(%5) : $@convention(thin) (@guaranteed SuperKlass) -> ()
+// CHECK: Block: bb2
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test6'
+sil [ossa] @test6 : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  %outer = load_borrow %0 : $*Klass
+  br bb1
+
+bb1:
+  %cast1 = unchecked_ref_cast %outer : $Klass to $SuperKlass
+  br bb2(%cast1 : $SuperKlass)
+
+bb2(%phi : @guaranteed $SuperKlass):
+  end_borrow %outer : $Klass
+  %func = function_ref @use_superklass : $@convention(thin) (@guaranteed SuperKlass) -> ()
+  apply %func(%phi) : $@convention(thin) (@guaranteed SuperKlass) -> ()
+  destroy_addr %0 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK: Error#: 0. Begin Error in Function: 'test7'
+// CHECK: Malformed @guaranteed phi!
+// CHECK: Phi: %7 = argument of bb3 : $SuperKlass
+// CHECK: Guaranteed forwarding operands not found on all paths!
+// CHECK: Error#: 0. End Error in Function: 'test7'
+sil [ossa] @test7 : $@convention(thin) (@guaranteed Klass, @owned SuperKlass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @owned $SuperKlass):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = unchecked_ref_cast %0 : $Klass to $SuperKlass
+  br bb3(%3 : $SuperKlass)
+
+bb2:
+  %5 = begin_borrow %1 : $SuperKlass
+  br bb3(%5 : $SuperKlass)
+
+bb3(%7 : @guaranteed $SuperKlass):
+  %8 = function_ref @use_superklass : $@convention(thin) (@guaranteed SuperKlass) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed SuperKlass) -> ()
+  end_borrow %7 : $SuperKlass
+  destroy_value %1 : $SuperKlass
+  %12 = tuple ()
+  return %12 : $()
+}
+
+enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
+sil [ossa] @end_borrow_test1 : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  end_borrow %0 : $FakeOptional<Klass>
+  %r = tuple ()
+  return %r : $()
+}

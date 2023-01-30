@@ -260,9 +260,6 @@ public:
 ///
 /// The fully general form of this is something like:
 ///    label: (pattern) = initexpr
-///
-/// The Init and DefArgKind fields are only used in argument lists for
-/// functions.  They are not parsed as part of normal pattern grammar.
 class TuplePatternElt {
   Identifier Label;
   SourceLoc LabelLoc;
@@ -277,10 +274,6 @@ public:
 
   Identifier getLabel() const { return Label; }
   SourceLoc getLabelLoc() const { return LabelLoc; }
-  void setLabel(Identifier I, SourceLoc Loc) {
-    Label = I;
-    LabelLoc = Loc;
-  }
 
   Pattern *getPattern() { return ThePattern; }
   const Pattern *getPattern() const {

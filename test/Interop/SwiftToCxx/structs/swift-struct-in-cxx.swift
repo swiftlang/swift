@@ -1,13 +1,26 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-private-field -Wno-unused-function)
 
-// CHECK: namespace Structs {
+// CHECK: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
 // CHECK: namespace _impl {
 
-// CHECK: namespace Structs {
+// CHECK: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
+
+// CHECK: class SWIFT_SYMBOL("s:7Structs18StructWithIntFieldV") StructWithIntField;
+// CHECK-NEXT: } // end namespace
+
+// CHECK: namespace swift {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::StructWithIntField> = true;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: } // namespace swift
+
+// CHECK: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
 
 // CHECK:      namespace _impl {
 // CHECK-EMPTY:
@@ -19,13 +32,13 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: }
 
-// CHECK:      class StructWithIntField final {
+// CHECK:      class SWIFT_SYMBOL("s:7Structs18StructWithIntFieldV") StructWithIntField final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   inline ~StructWithIntField() {
 // CHECK:        }
 // CHECK-NEXT:   inline StructWithIntField(const StructWithIntField &other) {
 // CHECK:        }
-// CHECK-NEXT:   inline StructWithIntField(StructWithIntField &&) = default;
+// CHECK-NEXT:   noreturn]] inline StructWithIntField(StructWithIntField &&) { abort(); }
 // CHECK-NEXT: private:
 // CHECK-NEXT:   inline StructWithIntField() {}
 // CHECK-NEXT:   static inline StructWithIntField _make() { return StructWithIntField(); }
@@ -61,12 +74,35 @@
 // CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: } // end namespace
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: struct TypeMetadataTrait<Structs::StructWithIntField>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   return Structs::_impl::$s7Structs18StructWithIntFieldVMa(0)._0;
+// CHECK-NEXT: }
+// CHECK-NEXT: };
+// CHECK-NEXT: namespace _impl{
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isValueType<Structs::StructWithIntField> = true;
+// CHECK-NEXT: template<>
+// CHECK-NEXT: struct implClassFor<Structs::StructWithIntField> { using type = Structs::_impl::_impl_StructWithIntField; };
+// CHECK-NEXT: } // namespace
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: } // namespace swift
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
+
 public struct StructWithIntField {
   let field: Int64
 }
 
 // Special name gets renamed in C++.
-// CHECK: class register_ final {
+// CHECK: class SWIFT_SYMBOL({{.*}}) register_ final {
 // CHECK: alignas(8) char _storage[16];
 // CHECK-NEXT:   friend class
 // CHECK-NEXT: };

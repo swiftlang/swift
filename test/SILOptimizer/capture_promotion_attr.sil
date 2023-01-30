@@ -1,0 +1,62 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-prop | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class C {}
+
+sil [ossa] @getC : $@convention(thin) () -> @owned C
+
+sil [ossa] @test_capture_propagation : $@convention(thin) () -> () {
+bb0:
+  %addr = alloc_stack $C                           
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %c1 = apply %getC() : $@convention(thin) () -> @owned C
+  store %c1 to [init] %addr : $*C                        
+  
+  %closure = function_ref @closure : $@convention(thin) (@owned C) -> () 
+  %thick_closure = thin_to_thick_function %closure : $@convention(thin) (@owned C) -> () to $@callee_owned (@owned C) -> () 
+  
+  %thunk = function_ref @thunk : $@convention(thin) (@in C, @owned @callee_owned (@owned C) -> ()) -> () 
+  %thunked_closure = partial_apply %thunk(%thick_closure) : $@convention(thin) (@in C, @owned @callee_owned (@owned C) -> ()) -> () 
+  
+  %apply_closure = function_ref @apply_closure : $@convention(thin) (@in C, @owned @callee_owned (@in C) -> ()) -> () 
+  apply %apply_closure(%addr, %thunked_closure) : $@convention(thin) (@in C, @owned @callee_owned (@in C) -> ()) -> ()
+
+  dealloc_stack %addr : $*C       
+  %retval = tuple ()                                  
+  return %retval : $()                                
+}
+
+
+sil [ossa] @closure : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  destroy_value %0 : $C
+  %retval = tuple ()                                   
+  return %retval : $()                                 
+}
+
+// CHECK-LABEL: sil {{.*}}@$s5thunk7closureTf3npf_n : {{.*}}{
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove $
+// CHECK-LABEL: } // end sil function '$s5thunk7closureTf3npf_n'
+sil [ossa] [transparent] @thunk : $@convention(thin) (@in C, @owned @callee_owned (@owned C) -> ()) -> () {
+bb0(%addr : @_eagerMove $*C, %closure : @owned $@callee_owned (@owned C) -> ()):
+  %instance = load [take] %addr : $*C                            
+  apply %closure(%instance) : $@callee_owned (@owned C) -> ()  
+  %retval = tuple ()                                   
+  return %retval : $()                                 
+}
+
+
+sil [ossa] [noinline] @apply_closure : $@convention(thin) (@in C, @owned @callee_owned (@in C) -> ()) -> () {
+bb0(%addr : $*C, %closure : @owned $@callee_owned (@in C) -> ()):
+  %stack_addr = alloc_stack $C                           
+  %instance = load [take] %addr : $*C                            
+  store %instance to [init] %stack_addr : $*C                        
+  apply %closure(%stack_addr) : $@callee_owned (@in C) -> ()
+  dealloc_stack %stack_addr : $*C       
+  %retval = tuple ()                                   
+  return %retval : $()                                 
+}

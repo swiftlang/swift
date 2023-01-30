@@ -94,7 +94,9 @@ public:
   
   bool empty() const { return Pointer == nullptr; }
 
-  bool is(StringRef string) const { return str().equals(string); }
+  LLVM_ATTRIBUTE_USED bool is(StringRef string) const {
+    return str().equals(string);
+  }
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
@@ -124,6 +126,10 @@ public:
 
   bool isNilCoalescingOperator() const {
     return is("??");
+  }
+
+  bool isExpansionOperator() const {
+    return is("...");
   }
 
   /// isOperatorStartCodePoint - Return true if the specified code point is a
@@ -778,8 +784,7 @@ public:
   llvm::raw_ostream &printPretty(llvm::raw_ostream &os) const;
 
   /// Dump this name to standard error.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 inline DeclNameRef DeclNameRef::getFromOpaqueValue(void *p) {

@@ -91,12 +91,7 @@ public:
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  void notifyWillDeleteFunction(SILFunction *f) override {
-    invalidateAllInfo(f);
-    recomputeFunctionList.remove(f);
-    // Now that we have invalidated all references to the function, delete it.
-    funcInfos.erase(f);
-  }
+  void notifyWillDeleteFunction(SILFunction *f) override;
 
   /// Notify the analysis about changed witness or vtables.
   ///
@@ -107,6 +102,9 @@ public:
 
   /// Look up the function info that we have stored for f, recomputing all
   /// invalidating parts of the call graph.
+  ///
+  /// Warning: The returned FunctionInfo is only alive until the next call to
+  /// `getFunctionInfo`.
   const FunctionInfo &getFunctionInfo(SILFunction *f) const;
 
   SWIFT_DEBUG_DUMP;
@@ -146,7 +144,7 @@ private:
   void invalidateKnownCallees(SILFunction *caller, FunctionInfo &callerInfo);
 
   /// Invalidate both the known callees of f and the known callers of f.
-  void invalidateAllInfo(SILFunction *f);
+  void invalidateAllInfo(SILFunction *f, FunctionInfo &fInfo);
 
   /// Helper method that reprocesses all elements of recomputeFunctionList and
   /// then clears the function list.
@@ -182,7 +180,7 @@ private:
   void verify(SILFunction *caller, const FunctionInfo &callerInfo) const;
 };
 
-/// Auxillary information that we store about a specific caller.
+/// Auxiliary information that we store about a specific caller.
 struct CallerAnalysis::CallerInfo {
   /// Given a SILFunction F that contains at least one partial apply of the
   /// given function, map F to the minimum number of partial applied
@@ -319,7 +317,7 @@ public:
     for (const auto &iter : callerStates) {
       if (auto numArgs = iter.second.getNumPartiallyAppliedArguments()) {
         foundArg = true;
-        minArgs = std::min(minArgs, numArgs.getValue());
+        minArgs = std::min(minArgs, numArgs.value());
       }
     }
 

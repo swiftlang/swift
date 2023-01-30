@@ -54,7 +54,8 @@ class InheritsDynamic: Foo {
   override func notDynamic() {}
 }
 
-// SR-5317
+// https://github.com/apple/swift/issues/47892
+
 @objcMembers
 class ObjCMemberCheck {
   dynamic var s = NotObjCAble(c: Foo())

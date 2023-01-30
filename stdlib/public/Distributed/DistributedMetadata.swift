@@ -108,3 +108,13 @@ func _getWitnessTablesFor(
   environment: UnsafeRawPointer,
   genericArguments: UnsafeRawPointer
 ) -> (UnsafeRawPointer, Int)
+
+@available(SwiftStdlib 5.7, *)
+@_silgen_name("swift_distributed_makeDistributedTargetAccessorNotFoundError")
+internal // SPI Distributed
+func _makeDistributedTargetAccessorNotFoundError() -> Error {
+  /// We don't include the name of the target in case the input was compromised.
+  return ExecuteDistributedTargetError(
+    message: "Failed to locate distributed function accessor",
+    errorCode: .targetAccessorNotFound)
+}

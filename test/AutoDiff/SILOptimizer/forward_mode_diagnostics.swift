@@ -119,7 +119,7 @@ func activeInoutParamMutatingMethod(_ x: Mut) -> Mut {
 // Subset parameter differentiation thunks
 //===----------------------------------------------------------------------===//
 
-// FIXME(SR-13046): Non-differentiability diagnostic crash due to invalid source location.
+// FIXME: Non-differentiability diagnostic crash due to invalid source location (https://github.com/apple/swift/issues/55492).
 /*
 func testNoDerivativeParameter(_ f: @differentiable(reverse) (Float, @noDerivative Float) -> Float) -> Float {
   return derivative(at: 2, 3) { (x, y) in f(x * x, y) }
@@ -238,7 +238,7 @@ final class ClassTangentPropertyWrongType: Differentiable {
   func move(by offset: TangentVector) {}
 }
 
-// SR-13464: Missing support for classes in forward-mode AD
+// FIXME: Missing support for classes in forward-mode AD causes crash (https://github.com/apple/swift/issues/55906).
 /*
 // xpected-error @+2 {{function is not differentiable}}
 // xpected-note @+3 {{when differentiating this function definition}}
@@ -287,7 +287,7 @@ final class ClassTangentPropertyNotStored: Differentiable {
   func move(by offset: TangentVector) {}
 }
 
-// SR-13464: Missing support for classes in forward-mode AD
+// FIXME: Missing support for classes in forward-mode AD causes crash (https://github.com/apple/swift/issues/55906).
 /*
 // xpected-error @+2 {{function is not differentiable}}
 // xpected-note @+3 {{when differentiating this function definition}}

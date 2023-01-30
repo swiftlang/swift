@@ -455,7 +455,7 @@ Hindley-Milner type inference algorithm requires exponential time, and
 the Swift type system introduces additional complications, especially
 overload resolution. However, the problem size for any particular
 expression is still fairly small, and the constraint solver can employ
-a number of tricks to improve performance. The Performance_ section
+a number of tricks to improve performance. The [Performance](#Performance) section
 describes some tricks that have been implemented or are planned, and
 it is expected that the solver will be extended with additional tricks
 going forward.
@@ -530,7 +530,7 @@ The member name may refer to a set of overloaded declarations. In this
 case, the type ``C`` is a fresh type variable (call it ``T0``). A
 disjunction constraint is introduced, each term of which new overload
 set binds a different declaration's type to ``T0``, as described in
-the section on Overloading_.
+the section on [Overloading](#Overloading).
 
 The kind of member constraint---type or value---also affects the
 declaration type ``C``. A type constraint can only refer to member
@@ -677,7 +677,7 @@ resolved overloads explicit. This application process walks the
 expression tree from the leaves to the root, rewriting each expression
 node based on the kind of expression:
 
-*Declaration references*
+#### *Declaration references*
   Declaration references are rewritten with the precise type of the
   declaration as referenced. For overloaded declaration references, the
   ``Overload*Expr`` node is replaced with a simple declaration
@@ -685,19 +685,20 @@ node based on the kind of expression:
   members of generic types, a ``SpecializeExpr`` node is introduced to
   provide substitutions for all of the generic parameters.
 
-*Member references*
+#### *Member references*
   References to members are similar to declaration
   references. However, they have the added constraint that the base
   expression needs to be a reference. Therefore, an rvalue of
   non-reference type will be materialized to produce the necessary
   reference.
 
-*Literals*
+#### *Literals*
   Literals are converted to the appropriate literal type, which
   typically involves introducing calls to the witnesses for the
   appropriate literal protocols.
 
-*Closures*
+#### *Closures*
+
   Since the closure has acquired a complete function type,
   the body of the closure is type-checked with that
   complete function type.

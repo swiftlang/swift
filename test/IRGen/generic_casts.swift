@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-os
 
 // REQUIRES: CPU=x86_64
 
@@ -12,9 +12,14 @@ import gizmo
 // CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$__TtP13generic_casts10ObjCProto1_" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL__TtP13generic_casts10ObjCProto1_ to i8*), section {{"__DATA,__objc_protolist,coalesced,no_dead_strip"|"objc_protolist"|".objc_protolist\$B"}}
 // CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL__TtP13generic_casts10ObjCProto1_ to i8*), section {{"__DATA,__objc_protorefs,coalesced,no_dead_strip"|"objc_protorefs"|".objc_protorefs\$B"}}
 
-// CHECK: @_PROTOCOL_NSRuncing = weak hidden constant
-// CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section {{"__DATA,__objc_protolist,coalesced,no_dead_strip"|"objc_protolist"|".objc_protolist\$B"}}
-// CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section {{"__DATA,__objc_protorefs,coalesced,no_dead_strip"|"objc_protorefs"|".objc_protorefs\$B"}}
+// CHECK-macosx: @"_OBJC_PROTOCOL_$_NSRuncing" = weak hidden global
+// CHECK-macosx: @"\01l_OBJC_LABEL_PROTOCOL_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @"_OBJC_PROTOCOL_$_NSRuncing" to i8*), section {{"__DATA,__objc_protolist,coalesced,no_dead_strip"|"objc_protolist"|".objc_protolist\$B"}}
+// CHECK-macosx: @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @"_OBJC_PROTOCOL_$_NSRuncing" to i8*), section {{"__DATA,__objc_protorefs,coalesced,no_dead_strip"|"objc_protorefs"|".objc_protorefs\$B"}}
+
+
+// CHECK-linux: @_PROTOCOL_NSRuncing = weak hidden constant
+// CHECK-linux: @"\01l_OBJC_LABEL_PROTOCOL_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section {{"__DATA,__objc_protolist,coalesced,no_dead_strip"|"objc_protolist"|".objc_protolist\$B"}}
+// CHECK-linux: @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section {{"__DATA,__objc_protorefs,coalesced,no_dead_strip"|"objc_protorefs"|".objc_protorefs\$B"}}
 
 // CHECK: @_PROTOCOLS__TtC13generic_casts10ObjCClass2 = internal constant { i64, [1 x i8*] } {
 // CHECK:   i64 1, 
@@ -42,7 +47,7 @@ func allToInt<T>(_ x: T) -> Int {
   // CHECK: [[T_TMP:%.*]] = bitcast i8* [[T_ALLOCA]] to %swift.opaque*
   // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}(%swift.opaque* noalias [[T_TMP]], %swift.opaque* noalias %0, %swift.type* %T)
   // CHECK: [[T0:%.*]] = bitcast %TSi* [[INT_TEMP]] to %swift.opaque*
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[T_TMP]], %swift.type* %T, %swift.type* @"$sSiN", i64 7)
+  // CHECK: call zeroext i1 @swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[T_TMP]], %swift.type* %T, %swift.type* @"$sSiN", i64 7)
   // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, %TSi* [[INT_TEMP]], i32 0, i32 0
   // CHECK: [[INT_RESULT:%.*]] = load i64, i64* [[T0]],
   // CHECK: ret i64 [[INT_RESULT]]
@@ -54,7 +59,7 @@ func intToAll<T>(_ x: Int) -> T {
   // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, %TSi* [[INT_TEMP]], i32 0, i32 0
   // CHECK: store i64 %1, i64* [[T0]],
   // CHECK: [[T0:%.*]] = bitcast %TSi* [[INT_TEMP]] to %swift.opaque*
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[T0]], %swift.type* @"$sSiN", %swift.type* %T, i64 7)
+  // CHECK: call zeroext i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[T0]], %swift.type* @"$sSiN", %swift.type* %T, i64 7)
   return x as! T
 }
 
@@ -98,7 +103,7 @@ func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
   // CHECK: [[LOCAL:%.*]] = alloca %T13generic_casts10ObjCProto1P
   // CHECK: [[LOCAL_OPAQUE:%.*]] = bitcast %T13generic_casts10ObjCProto1P* [[LOCAL]] to %swift.opaque*
   // CHECK: [[PROTO_TYPE:%.*]] = call {{.*}}@"$s13generic_casts10ObjCProto1_pMD"
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[LOCAL_OPAQUE]], %swift.type* [[PROTO_TYPE]], %swift.type* %T, i64 7)
+  // CHECK: call zeroext i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[LOCAL_OPAQUE]], %swift.type* [[PROTO_TYPE]], %swift.type* %T, i64 7)
   return x as! T
 }
 

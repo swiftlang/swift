@@ -42,28 +42,11 @@ namespace swift {
 /// NecessaryBindings - The set of metadata that must be saved in
 /// order to perform some set of operations on a type.
 class NecessaryBindings {
-  enum class Kind {
-    /// Are the bindings to be computed for a partial apply forwarder.
-    /// In the case this is true we need to store/restore the conformance of a
-    /// specialized type with conditional conformance because the conditional
-    /// requirements are not available in the partial apply forwarder.
-    PartialApply,
-    AsyncFunction,
-  };
-  Kind kind;
   llvm::SetVector<GenericRequirement> RequirementsSet;
-  llvm::SmallVector<GenericRequirement, 2> RequirementsVector;
   llvm::DenseMap<GenericRequirement, ProtocolConformanceRef> Conformances;
 
   void addRequirement(GenericRequirement requirement) {
-    switch (kind) {
-    case Kind::PartialApply:
-      RequirementsSet.insert(requirement);
-      break;
-    case Kind::AsyncFunction:
-      RequirementsVector.push_back(requirement);
-      break;
-    }
+    RequirementsSet.insert(requirement);
   }
 
   void addAbstractConditionalRequirements(
@@ -74,9 +57,6 @@ public:
   
   /// Collect the necessary bindings to invoke a function with the given
   /// signature.
-  static NecessaryBindings
-  forAsyncFunctionInvocation(IRGenModule &IGM, CanSILFunctionType origType,
-                             SubstitutionMap subs);
   static NecessaryBindings forPartialApplyForwarder(IRGenModule &IGM,
                                                     CanSILFunctionType origType,
                                                     SubstitutionMap subs,
@@ -88,13 +68,7 @@ public:
 
   /// Get the requirement from the bindings at index i.
   const GenericRequirement &operator[](size_t i) const {
-    switch (kind) {
-    case Kind::PartialApply:
-      return RequirementsSet[i];
-    case Kind::AsyncFunction:
-      return RequirementsVector[i];
-    }
-    llvm_unreachable("covered switch");
+    return RequirementsSet[i];
   }
 
   ProtocolConformanceRef
@@ -124,23 +98,13 @@ public:
   void restore(IRGenFunction &IGF, Address buffer, MetadataState state) const;
 
   const llvm::ArrayRef<GenericRequirement> getRequirements() const {
-    switch (kind) {
-    case Kind::PartialApply:
-      return RequirementsSet.getArrayRef();
-    case Kind::AsyncFunction:
-      return RequirementsVector;
-    }
-    llvm_unreachable("unhandled case");
+    return RequirementsSet.getArrayRef();
   }
-
-  bool forPartialApply() const { return kind == Kind::PartialApply; }
-  bool forAsyncFunction() const { return kind == Kind::AsyncFunction; }
 
 private:
   static NecessaryBindings computeBindings(IRGenModule &IGM,
                                            CanSILFunctionType origType,
                                            SubstitutionMap subs,
-                                           bool forPartialApplyForwarder,
                                            bool considerParameterSources = true);
 };
 

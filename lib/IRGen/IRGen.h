@@ -44,6 +44,8 @@ namespace irgen {
 /// store vectors of spare bits.
 using SpareBitVector = ClusteredBitVector;
 
+enum class StackProtectorMode : bool { NoStackProtector, StackProtector };
+
 class Size;
 
 enum IsPOD_t : bool { IsNotPOD, IsPOD };

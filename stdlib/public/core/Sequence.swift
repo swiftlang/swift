@@ -355,6 +355,33 @@ public protocol Sequence<Element> {
   ///   In this case, see the documentation of `Collection.underestimatedCount`.
   var underestimatedCount: Int { get }
 
+  /// Sequences whose `Element` is `Equatable` and that are able to quickly
+  /// check if they contain a particular value can implement this requirement
+  /// to speed up the standard `contains` method.
+  ///
+  /// The default implementation returns nil, indicating that `contains` should
+  /// fall back to the standard linear search algorithm.
+  ///
+  /// `Sequence` and `Collection` algorithms other than `contains` itself may
+  /// adapt their behavior based on whether or not this function returns nil.
+  /// For example, a generic algorithm that needs to do containment checks for
+  /// many different values may decide not to copy items into a temporary `Set`
+  /// if it sees that the sequence implements this method. Therefore, sequences
+  /// should only implement this method if they can do it in better than linear
+  /// time.
+  ///
+  /// For sequences that are destructively consumed by iteration, calling this
+  /// method must not consume any elements. (Such sequences usually leave this
+  /// method with its default, `nil`-returning implementation, which trivially
+  /// satisfies this requirement.)
+  ///
+  /// - Returns: `nil` if containment cannot be verified in better than linear
+  ///    time; otherwise, the method returns a boolean value indicating whether
+  ///    or not the item is an element of this sequence.
+  ///
+  /// - Complexity: If this function returns `nil`, it must do so in constant
+  ///    (O(1)) time. If this returns non-`nil`, then it must have better than linear
+  ///    (O(*n*)) complexity.
   func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool?

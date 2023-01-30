@@ -123,7 +123,7 @@ struct X<T> {
 let testXa: X<Int> = .foo(i: 0)
 let testXb: X<Int> = .bar
 
-// SR-10062
+// https://github.com/apple/swift/issues/52464
 
 var aLiteral = 1
 let bLiteral = 2
@@ -175,16 +175,21 @@ let fooThing5 = Foo(a: 0, d: 1, h: nil) // expected-error {{missing arguments fo
 let fooThing6 = Foo(a: 0, d: 1, e: 2, h: nil) // expected-error {{missing argument for parameter 'f' in call}}
                                               // expected-note@-29 {{'init(a:b:d:e:f:g:h:)' declared here}}
 
-// SR-11085
-func sr_11085(x: Int) {}
-func sr_11085(line: String = #line) {} // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
-sr_11085()
+// https://github.com/apple/swift/issues/53477
+  do {
+  func f(x: Int) {}
+  func f(line: String = #line) {} // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
+  f()
 
-class SR_11085_C { init(line: String = #line) {} } // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
-let _ = SR_11085_C()
+  class C { init(line: String = #line) {} } // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
+  let _ = C()
+}
 
-// SR-11623
-func badGenericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #function) -> T { x } // expected-error {{default argument value of type 'String' cannot be converted to type 'T'}}
+// https://github.com/apple/swift/issues/54034
+
+// FIXME: Bad diagnostic
+// expected-error@+1 {{default argument value of type 'String' cannot be converted to type 'T'}}
+func badGenericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #function) -> T { x }
 let _: Int = badGenericMagicLiteral()
 
 func genericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #line) -> T { x } // expected-note {{where 'T' = 'String'}}

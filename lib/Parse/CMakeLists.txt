@@ -10,9 +10,6 @@ add_swift_host_library(swiftParse STATIC
   Confusables.cpp
   Lexer.cpp
   ParseDecl.cpp
-  ParsedRawSyntaxNode.cpp
-  ParsedRawSyntaxRecorder.cpp
-  ParsedTrivia.cpp
   ParseExpr.cpp
   ParseGeneric.cpp
   ParseIfConfig.cpp
@@ -22,19 +19,57 @@ add_swift_host_library(swiftParse STATIC
   ParseRequests.cpp
   ParseStmt.cpp
   ParseType.cpp
-  PersistentParserState.cpp
-  SyntaxParsingCache.cpp
-  SyntaxParsingContext.cpp)
-_swift_gyb_target_sources(swiftParse PRIVATE
-    ParsedSyntaxBuilders.cpp.gyb
-    ParsedSyntaxNodes.cpp.gyb
-    ParsedSyntaxRecorder.cpp.gyb)
+  ParseVersion.cpp
+  PersistentParserState.cpp)
 target_link_libraries(swiftParse PRIVATE
   swiftAST
-  swiftSyntax
-  swiftSyntaxParse
 )
 
-add_dependencies(swiftParse swift-parse-syntax-generated-headers)
+if (SWIFT_SWIFT_PARSER)
+  # Link against the SwiftSyntax parser and libraries it depends on. The actual
+  # formulation of this is a hack to work around a CMake bug in Ninja file
+  # generation that results in multiple Ninja targets producing the same file in
+  # a downstream SourceKit target. This should be expressed as:
+  #
+  #   target_link_libraries(swiftParse
+  #     PRIVATE
+  #     SwiftSyntax::SwiftParser
+  #     ...
+  #   )
+  target_link_libraries(swiftParse
+    PRIVATE
+    SwiftSyntax::SwiftBasicFormat
+    SwiftSyntax::SwiftParser
+    SwiftSyntax::SwiftParserDiagnostics
+    SwiftSyntax::SwiftDiagnostics
+    SwiftSyntax::SwiftSyntax
+    SwiftSyntax::SwiftOperators
+    SwiftSyntax::SwiftSyntaxBuilder
+    SwiftSyntax::_SwiftSyntaxMacros
+    $<TARGET_OBJECTS:swiftASTGen>
+  )
+
+  add_dependencies(swiftParse
+    SwiftSyntax::SwiftBasicFormat
+    SwiftSyntax::SwiftParser
+    SwiftSyntax::SwiftParserDiagnostics
+    SwiftSyntax::SwiftDiagnostics
+    SwiftSyntax::SwiftSyntax
+    SwiftSyntax::SwiftOperators
+    SwiftSyntax::SwiftSyntaxBuilder
+    SwiftSyntax::_SwiftSyntaxMacros
+    swiftASTGen
+  )
+
+  target_compile_definitions(swiftParse
+    PRIVATE
+    SWIFT_SWIFT_PARSER
+  )
+endif()
+
+if(SWIFT_COMPILER_VERSION)
+  set_property(SOURCE ParseVersion.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+    " -DSWIFT_COMPILER_VERSION=\"\\\"${SWIFT_COMPILER_VERSION}\\\"\"")
+endif()
 
 set_swift_llvm_is_available(swiftParse)

@@ -66,6 +66,7 @@ namespace swift {
   enum class Associativity : unsigned char;
   class AvailabilityContext;
   class BoundGenericType;
+  class BuiltinTupleDecl;
   class ClangModuleLoader;
   class ClangNode;
   class ClangTypeConverter;
@@ -86,7 +87,8 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
-  class ModuleDependencies;
+  struct MacroDiscriminatorContext;
+  class ModuleDependencyInfo;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class SourceFile;
@@ -105,6 +107,7 @@ namespace swift {
   class NormalProtocolConformance;
   class OpaqueTypeDecl;
   class InheritedProtocolConformance;
+  class RootProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
   enum class BuiltinConformanceKind;
@@ -139,10 +142,6 @@ namespace namelookup {
 
 namespace rewriting {
   class RewriteContext;
-}
-
-namespace syntax {
-  class SyntaxArena;
 }
 
 namespace ide {
@@ -290,6 +289,11 @@ public:
 
   ide::TypeCheckCompletionCallback *CompletionCallback = nullptr;
 
+  /// A callback that will be called when the constraint system found a
+  /// solution. Called multiple times if the constraint system has ambiguous
+  /// solutions.
+  ide::TypeCheckCompletionCallback *SolutionCallback = nullptr;
+
   /// The request-evaluator that is used to process various requests.
   Evaluator evaluator;
 
@@ -304,6 +308,10 @@ public:
 
   /// The name of the SwiftShims module "SwiftShims".
   Identifier SwiftShimsModuleName;
+
+  /// Should we globally ignore swiftmodule files adjacent to swiftinterface
+  /// files?
+  bool IgnoreAdjacentModules = false;
 
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
@@ -491,9 +499,6 @@ public:
                               setVector.size());
   }
 
-  /// Retrieve the syntax node memory manager for this context.
-  llvm::IntrusiveRefCntPtr<syntax::SyntaxArena> getSyntaxArena() const;
-
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);
 
@@ -599,6 +604,12 @@ public:
 
   /// Get AsyncSequence.makeAsyncIterator().
   FuncDecl *getAsyncSequenceMakeAsyncIterator() const;
+
+  /// Get IteratorProtocol.next().
+  FuncDecl *getIteratorNext() const;
+
+  /// Get AsyncIteratorProtocol.next().
+  FuncDecl *getAsyncIteratorNext() const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
@@ -952,7 +963,7 @@ public:
   const CanType TheIEEE80Type;            /// 80-bit IEEE floating point
   const CanType TheIEEE128Type;           /// 128-bit IEEE floating point
   const CanType ThePPC128Type;            /// 128-bit PowerPC 2xDouble
-  
+
   /// Adds a search path to SearchPathOpts, unless it is already present.
   ///
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
@@ -981,17 +992,20 @@ public:
 
   /// Retrieve the module dependencies for the module with the given name.
   ///
-  /// \param isUnderlyingClangModule When true, only look for a Clang module
-  /// with the given name, ignoring any Swift modules.
-  Optional<ModuleDependencies> getModuleDependencies(
+  Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName,
-      bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
-      bool cacheOnly = false);
+      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = None);
+
+  /// Retrieve the module dependencies for the Clang module with the given name.
+  Optional<const ModuleDependencyInfo*> getClangModuleDependencies(
+      StringRef moduleName,
+      ModuleDependenciesCache &cache,
+      InterfaceSubContextDelegate &delegate);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
-  Optional<ModuleDependencies> getSwiftModuleDependencies(
+  Optional<const ModuleDependencyInfo*> getSwiftModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate);
@@ -1056,6 +1070,11 @@ public:
   void loadDerivativeFunctionConfigurations(
       AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
       llvm::SetVector<AutoDiffConfig> &results);
+
+  /// Retrieve the next macro expansion discriminator within the given
+  /// name and context.
+  unsigned getNextMacroDiscriminator(MacroDiscriminatorContext context,
+                                     DeclBaseName baseName);
 
   /// Retrieve the Clang module loader for this ASTContext.
   ///
@@ -1127,9 +1146,12 @@ public:
   ///
   /// \param ModulePath The module's \c ImportPath which describes
   /// the name of the module being loaded, possibly including submodules.
-
+  /// \param AllowMemoryCached Should we allow reuse of an already loaded
+  /// module or force reloading from disk, defaults to true.
+  ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  ModuleDecl *getModule(ImportPath::Module ModulePath);
+  ModuleDecl *
+  getModule(ImportPath::Module ModulePath, bool AllowMemoryCached = true);
 
   /// Attempts to load the matching overlay module for the given clang
   /// module into this ASTContext.
@@ -1156,7 +1178,10 @@ public:
   /// in this context.
   void addLoadedModule(ModuleDecl *M);
 
-public:
+  /// Change the behavior of all loaders to ignore swiftmodules next to
+  /// swiftinterfaces.
+  void setIgnoreAdjacentModules(bool value);
+
   /// Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
   /// lookup tables.
@@ -1245,7 +1270,7 @@ public:
   /// specialized conformance from the generic conformance.
   ProtocolConformance *
   getSpecializedConformance(Type type,
-                            ProtocolConformance *generic,
+                            RootProtocolConformance *generic,
                             SubstitutionMap substitutions);
 
   /// Produce an inherited conformance, for subclasses of a type
@@ -1254,7 +1279,7 @@ public:
   /// \param type The type for which we are retrieving the conformance.
   ///
   /// \param inherited The inherited conformance.
-  InheritedProtocolConformance *
+  ProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
   /// Get the lazy data for the given declaration.
@@ -1324,6 +1349,10 @@ public:
   bool isRecursivelyConstructingRequirementMachine(
       const ProtocolDecl *proto);
 
+  /// Retrieve a generic parameter list with a single parameter named `Self`.
+  /// This is for parsing @opened archetypes in textual SIL.
+  GenericParamList *getSelfGenericParamList(DeclContext *dc) const;
+
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
@@ -1338,11 +1367,25 @@ public:
   /// particular, the opened archetype signature does not have requirements for
   /// conformances inherited from superclass constraints while existential
   /// values do.
-  CanGenericSignature getOpenedArchetypeSignature(Type type,
-                                                  GenericSignature parentSig);
+  CanGenericSignature getOpenedExistentialSignature(Type type,
+                                                    GenericSignature parentSig);
+
+  /// Get a generic signature where the generic parameter τ_d_i represents
+  /// the element of the pack generic parameter τ_d_i… in \p baseGenericSig.
+  ///
+  /// This drops the parameter pack bit from each generic parameter,
+  /// and converts same-element requirements to same-type requirements.
+  CanGenericSignature getOpenedElementSignature(CanGenericSignature baseGenericSig,
+                                                CanType shapeClass);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);
+
+  GenericSignature
+  getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
+                              const NominalTypeDecl *derivedNominal,
+                              GenericSignature baseGenericSig,
+                              const GenericParamList *derivedParams);
 
   enum class OverrideGenericSignatureReqCheck {
     /// Base method's generic requirements are satisfied by derived method
@@ -1402,6 +1445,17 @@ public:
   /// invocation decoder of the given distributed actor.
   FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
 
+  /// The special Builtin.TheTupleType, which parents tuple extensions and
+  /// conformances.
+  BuiltinTupleDecl *getBuiltinTupleDecl();
+
+  /// The declared interface type of Builtin.TheTupleType.
+  BuiltinTupleType *getBuiltinTupleType();
+
+  /// Finds the address of the given symbol. If `libraryHandleHint` is non-null,
+  /// search within the library.
+  void *getAddressOfSymbol(const char *name, void *libraryHandleHint = nullptr);
+
 private:
   friend Decl;
 
@@ -1413,6 +1467,8 @@ private:
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
+
+  void loadCompilerPlugins();
 
   friend TypeBase;
   friend ArchetypeType;

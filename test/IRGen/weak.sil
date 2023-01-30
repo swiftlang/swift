@@ -81,7 +81,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
 sil @test_weak_alloc_stack : $@convention(thin) (Optional<P>) -> () {
 bb0(%0 : $Optional<P>):
   %1 = alloc_stack $@sil_weak Optional<P>
-  store_weak %0 to [initialization] %1 : $*@sil_weak Optional<P>
+  store_weak %0 to [init] %1 : $*@sil_weak Optional<P>
   destroy_addr %1 : $*@sil_weak Optional<P>
   dealloc_stack %1 : $*@sil_weak Optional<P>
   %4 = tuple ()

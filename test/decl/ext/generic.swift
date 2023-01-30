@@ -175,7 +175,7 @@ extension Array2 where QQQ : VVV {}
 // expected-error@-1 {{cannot find type 'QQQ' in scope}}
 // expected-error@-2 {{cannot find type 'VVV' in scope}}
 
-// https://bugs.swift.org/browse/SR-9009
+// https://github.com/apple/swift/issues/51512
 func foo() {
   extension Array where Element : P1 {
   // expected-error@-1 {{declaration is only valid at file scope}}

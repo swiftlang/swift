@@ -112,6 +112,7 @@
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/YAMLTraits.h"
 
 namespace clang {
 class CompilerInstance;
@@ -151,8 +152,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
                   bool skipBuildingInterface, bool IsFramework) override;
 
-  bool canImportModule(ImportPath::Module named, llvm::VersionTuple version,
-                       bool underlyingVersion) override;
+  bool canImportModule(ImportPath::Module named,
+                       ModuleVersionInfo *versionInfo) override;
 
   bool isCached(StringRef DepPath) override { return false; };
 
@@ -172,19 +173,24 @@ public:
   ~ExplicitSwiftModuleLoader();
 };
 
-/// Information about explicitly specified Swift module files.
+/// Information about explicitly specified Swift and Clang module files.
 struct ExplicitModuleInfo {
-  // Path of the .swiftmodule file.
+  // Path of the .swiftmodule file. Empty for pure Clang modules.
   std::string modulePath;
-  // Path of the .swiftmoduledoc file.
+  // Path of the .swiftmoduledoc file. Empty for pure Clang modules.
   std::string moduleDocPath;
-  // Path of the .swiftsourceinfo file.
+  // Path of the .swiftsourceinfo file. Empty for pure Clang modules.
   std::string moduleSourceInfoPath;
   // A flag that indicates whether this module is a framework
-  bool isFramework;
+  bool isFramework = false;
   // A flag that indicates whether this module is a system module
   // Set the default to be false.
   bool isSystem = false;
+  // Path of the Clang module map file. Empty for pure Swift modules.
+  std::string clangModuleMapPath;
+  // Path of a compiled Clang explicit module file. Empty for pure Swift
+  // modules.
+  std::string clangModulePath;
 };
 
 /// Parser of explicit module maps passed into the compiler.
@@ -193,15 +199,19 @@ struct ExplicitModuleInfo {
 //      "moduleName": "A",
 //      "modulePath": "A.swiftmodule",
 //      "docPath": "A.swiftdoc",
-//      "sourceInfoPath": "A.swiftsourceinfo"
-//      "isFramework": false
+//      "sourceInfoPath": "A.swiftsourceinfo",
+//      "isFramework": false,
+//      "clangModuleMapPath": "A/module.modulemap",
+//      "clangModulePath": "A.pcm",
 //    },
 //    {
 //      "moduleName": "B",
 //      "modulePath": "B.swiftmodule",
 //      "docPath": "B.swiftdoc",
-//      "sourceInfoPath": "B.swiftsourceinfo"
-//      "isFramework": false
+//      "sourceInfoPath": "B.swiftsourceinfo",
+//      "isFramework": false,
+//      "clangModuleMapPath": "B/module.modulemap",
+//      "clangModulePath": "B.pcm",
 //    }
 //  ]
 class ExplicitModuleMapParser {
@@ -278,6 +288,10 @@ private:
         result.isFramework = parseBoolValue(val);
       } else if (key == "isSystem") {
         result.isSystem = parseBoolValue(val);
+      } else if (key == "clangModuleMapPath") {
+        result.clangModuleMapPath = val.str();
+      } else if (key == "clangModulePath") {
+        result.clangModulePath = val.str();
       } else {
         // Being forgiving for future fields.
         continue;
@@ -300,6 +314,7 @@ struct ModuleInterfaceLoaderOptions {
   bool disableImplicitSwiftModule = false;
   bool disableBuildingInterface = false;
   bool downgradeInterfaceVerificationError = false;
+  bool strictImplicitModuleContext = false;
   std::string mainExecutablePath;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
@@ -307,6 +322,7 @@ struct ModuleInterfaceLoaderOptions {
     disableImplicitSwiftModule(Opts.DisableImplicitModules),
     disableBuildingInterface(Opts.DisableBuildingInterface),
     downgradeInterfaceVerificationError(Opts.DowngradeInterfaceVerificationError),
+    strictImplicitModuleContext(Opts.StrictImplicitModuleContext),
     mainExecutablePath(Opts.MainExecutablePath)
   {
     switch (Opts.RequestedAction) {
@@ -439,7 +455,23 @@ public:
       StringRef OutPath, StringRef ABIOutputPath,
       bool SerializeDependencyHashes,
       bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
-      RequireOSSAModules_t RequireOSSAModules);
+      RequireOSSAModules_t RequireOSSAModules,
+      bool silenceInterfaceDiagnostics);
+
+  /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
+  /// a swiftmodule file).
+  ///
+  /// Unlike the above `buildSwiftModuleFromSwiftInterface`, this method
+  /// bypasses the instantiation of a `CompilerInstance` from the compiler
+  /// configuration flags in the interface and instead directly uses the
+  /// supplied \p Instance
+  static bool buildExplicitSwiftModuleFromSwiftInterface(
+      CompilerInstance &Instance, const StringRef moduleCachePath,
+      const StringRef backupInterfaceDir, const StringRef prebuiltCachePath,
+      const StringRef ABIDescriptorPath, StringRef interfacePath,
+      StringRef outputPath, bool ShouldSerializeDeps,
+      ArrayRef<std::string> CompiledCandidates,
+      DependencyTracker *tracker = nullptr);
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
@@ -452,22 +484,19 @@ private:
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
   CompilerInvocation genericSubInvocation;
+  llvm::Triple ParentInvocationTarget;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
                               SourceLoc diagnosticLoc,
                               Diag<ArgTypes...> ID,
-                        typename detail::PassArgument<ArgTypes>::type... Args) {
-    SourceLoc loc = diagnosticLoc;
-    if (diagnosticLoc.isInvalid()) {
-      // Diagnose this inside the interface file, if possible.
-      loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
-    }
-    return Diags->diagnose(loc, ID, std::move(Args)...);
+                              typename detail::PassArgument<ArgTypes>::type... Args) {
+    return InterfaceSubContextDelegateImpl::diagnose(interfacePath, diagnosticLoc, SM, Diags, ID, std::move(Args)...);
   }
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
+                                     bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            SmallVectorImpl<const char *> &SubArgs,
@@ -484,6 +513,22 @@ public:
       StringRef backupModuleInterfaceDir,
       bool serializeDependencyHashes, bool trackSystemDependencies,
       RequireOSSAModules_t requireOSSAModules);
+
+  template<typename ...ArgTypes>
+  static InFlightDiagnostic diagnose(StringRef interfacePath,
+                                     SourceLoc diagnosticLoc,
+                                     SourceManager &SM,
+                                     DiagnosticEngine *Diags,
+                                     Diag<ArgTypes...> ID,
+                                     typename detail::PassArgument<ArgTypes>::type... Args) {
+    SourceLoc loc = diagnosticLoc;
+    if (diagnosticLoc.isInvalid()) {
+      // Diagnose this inside the interface file, if possible.
+      loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
+    }
+    return Diags->diagnose(loc, ID, std::move(Args)...);
+  }
+
   std::error_code runInSubContext(StringRef moduleName,
                                   StringRef interfacePath,
                                   StringRef outputPath,
@@ -495,6 +540,7 @@ public:
                                            StringRef interfacePath,
                                            StringRef outputPath,
                                            SourceLoc diagLoc,
+                                           bool silenceErrors,
     llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) override;
 
   ~InterfaceSubContextDelegateImpl() = default;

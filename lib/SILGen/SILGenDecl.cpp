@@ -30,6 +30,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebuggerClient.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILSymbolVisitor.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
@@ -299,9 +300,10 @@ public:
             ForUnwind_t forUnwind) override {
     auto box = Box;
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      auto *bbi = cast<BeginBorrowInst>(box);
-      SGF.B.createEndBorrow(l, bbi);
-      box = bbi->getOperand();
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(box)) {
+        SGF.B.createEndBorrow(l, bbi);
+        box = bbi->getOperand();
+      }
     }
     SGF.B.createDeallocBox(l, box);
   }
@@ -364,13 +366,22 @@ public:
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (kind)
-      Box = SGF.B.createMarkUninitialized(decl, Box, kind.getValue());
+      Box = SGF.B.createMarkUninitialized(decl, Box, kind.value());
 
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      Box = SGF.B.createBeginBorrow(decl, Box, /*isLexical=*/true);
+      auto loweredType = SGF.getTypeLowering(decl->getType()).getLoweredType();
+      auto lifetime = SGF.F.getLifetime(decl, loweredType);
+      if (lifetime.isLexical()) {
+        Box = SGF.B.createBeginBorrow(decl, Box, /*isLexical=*/true);
+      }
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
+    if (Addr->getType().isMoveOnly()) {
+      // TODO: Handle no implicit copy here.
+      Addr = SGF.B.createMarkMustCheckInst(
+          decl, Addr, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+    }
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
@@ -445,7 +456,7 @@ public:
   LetValueInitialization(VarDecl *vd, SILGenFunction &SGF) : vd(vd) {
     const TypeLowering *lowering = nullptr;
     if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
-        vd->getAttrs().hasAttribute<NoImplicitCopyAttr>()) {
+        vd->isNoImplicitCopy()) {
       lowering = &SGF.getTypeLowering(
           SILMoveOnlyWrappedType::get(vd->getType()->getCanonicalType()));
     } else {
@@ -482,18 +493,19 @@ public:
     // Make sure that we have a non-address only type when binding a
     // @_noImplicitCopy let.
     if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
-        lowering->isAddressOnly() &&
-        vd->getAttrs().hasAttribute<NoImplicitCopyAttr>()) {
+        lowering->isAddressOnly() && vd->isNoImplicitCopy()) {
       auto d = diag::noimplicitcopy_used_on_generic_or_existential;
       diagnose(SGF.getASTContext(), vd->getLoc(), d);
     }
 
     if (needsTemporaryBuffer) {
-      bool isLexical =
+      bool lexicalLifetimesEnabled =
           SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule());
+      auto lifetime = SGF.F.getLifetime(vd, lowering->getLoweredType());
+      auto isLexical = lexicalLifetimesEnabled && lifetime.isLexical();
       address =
           SGF.emitTemporaryAllocation(vd, lowering->getLoweredType(),
-                                      false /*hasDynamicLifetime*/, isLexical);
+                                      /*hasDynamicLifetime=*/false, isLexical);
       if (isUninitialized)
         address = SGF.B.createMarkUninitializedVar(vd, address);
       DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, *lowering);
@@ -559,11 +571,21 @@ public:
                                              SILValue value, bool wasPlusOne) {
     // If we have none...
     if (value->getOwnershipKind() == OwnershipKind::None) {
-      // ... and we don't have a no implicit copy trivial type, just return
-      // value.
-      if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) ||
-          !vd->getAttrs().hasAttribute<NoImplicitCopyAttr>() ||
-          !value->getType().isTrivial(SGF.F))
+      // If we don't have move only features enabled, just return, we are done.
+      if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly))
+        return value;
+
+      // Then check if we have a pure move only type. In that case, we need to
+      // insert a no implicit copy
+      if (value->getType().isPureMoveOnly()) {
+        value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+        return SGF.B.createMarkMustCheckInst(
+            PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+      }
+
+      // Otherwise, if we don't have a no implicit copy trivial type, just
+      // return value.
+      if (!vd->isNoImplicitCopy() || !value->getType().isTrivial(SGF.F))
         return value;
 
       // Otherwise, we have a no implicit copy trivial type, so wrap it in the
@@ -575,9 +597,14 @@ public:
           PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
     }
 
-    // Then if we don't have move only, just perform a lexical borrow.
-    if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly))
-      return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
+    // Then if we don't have move only, just perform a lexical borrow if the
+    // lifetime is lexical.
+    if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly)) {
+      if (SGF.F.getLifetime(vd, value->getType()).isLexical())
+        return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
+      else
+        return value;
+    }
 
     // Otherwise, we need to perform some additional processing. First, if we
     // have an owned moveonly value that had a cleanup, then create a move_value
@@ -612,10 +639,14 @@ public:
           PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
     }
 
-    // Otherwise, if we do not have a no implicit copy variable, just do a
-    // borrow lexical. This is the "normal path".
-    if (!vd->getAttrs().hasAttribute<NoImplicitCopyAttr>())
-      return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
+    // Otherwise, if we do not have a no implicit copy variable, just follow
+    // the "normal path": perform a lexical borrow if the lifetime is lexical.
+    if (!vd->isNoImplicitCopy()) {
+      if (SGF.F.getLifetime(vd, value->getType()).isLexical())
+        return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
+      else
+        return value;
+    }
 
     // If we have a no implicit copy lexical, emit the instruction stream so
     // that the move checker knows to check this variable.
@@ -965,7 +996,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
           // We must treat the boxed value as +0 since it may be shared. Copy it
           // if nontrivial.
           //
-          // NOTE: The APIs that we are usinng here will ensure that if we have
+          // NOTE: The APIs that we are using here will ensure that if we have
           // a trivial value, the load_borrow will become a load [trivial] and
           // the copies will be "automagically" elided.
           if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
@@ -1281,7 +1312,8 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     SILLocation loc(PBD);
     SILValue resultBuf = emitTemporaryAllocation(loc, initLoweredTy);
     SILValue resultBufPtr = B.createAddressToPointer(loc, resultBuf,
-                          SILType::getPrimitiveObjectType(C.TheRawPointerType));
+                          SILType::getPrimitiveObjectType(C.TheRawPointerType),
+                          /*needsStackProtection=*/ false);
     
     // Emit the closure for the child task.
     // Prepare the opaque `AsyncLet` representation.
@@ -1315,29 +1347,107 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
-  if (auto *Init = PBD->getExecutableInit(idx)) {
+  auto getWrappedValueExpr = [&](VarDecl *var) -> Expr * {
+    if (auto *orig = var->getOriginalWrappedProperty()) {
+      auto initInfo = orig->getPropertyWrapperInitializerInfo();
+      if (auto *placeholder = initInfo.getWrappedValuePlaceholder()) {
+        return placeholder->getOriginalWrappedValue();
+      }
+    }
+    return nullptr;
+  };
+
+  auto emitInitializer = [&](Expr *initExpr, VarDecl *var, bool forLocalContext,
+                             InitializationPtr &initialization) {
     // If an initial value expression was specified by the decl, emit it into
     // the initialization.
-    FullExpr Scope(Cleanups, CleanupLocation(Init));
+    FullExpr Scope(Cleanups, CleanupLocation(initExpr));
 
-    auto *var = PBD->getSingleVar();
-    if (var && var->getDeclContext()->isLocalContext()) {
+    if (forLocalContext) {
       if (auto *orig = var->getOriginalWrappedProperty()) {
-        auto initInfo = orig->getPropertyWrapperInitializerInfo();
-        if (auto *placeholder = initInfo.getWrappedValuePlaceholder()) {
-          Init = placeholder->getOriginalWrappedValue();
-
-          auto value = emitRValue(Init);
-          emitApplyOfPropertyWrapperBackingInitializer(SILLocation(PBD), orig,
-                                                       getForwardingSubstitutionMap(),
-                                                       std::move(value))
+        if (auto *initExpr = getWrappedValueExpr(var)) {
+          auto value = emitRValue(initExpr);
+          emitApplyOfPropertyWrapperBackingInitializer(
+            PBD, orig, getForwardingSubstitutionMap(), std::move(value))
             .forwardInto(*this, SILLocation(PBD), initialization.get());
           return;
         }
       }
     }
 
-    emitExprInto(Init, initialization.get(), SILLocation(PBD));
+    emitExprInto(initExpr, initialization.get(), SILLocation(PBD));
+  };
+
+  auto *singleVar = PBD->getSingleVar();
+  if (auto *Init = PBD->getExecutableInit(idx)) {
+    // If an initial value expression was specified by the decl, emit it into
+    // the initialization.
+    bool isLocalVar =
+        singleVar && singleVar->getDeclContext()->isLocalContext();
+    emitInitializer(Init, singleVar, isLocalVar, initialization);
+  } else if (singleVar &&
+             singleVar->isTypeWrapperLocalStorageForInitializer()) {
+    // If any of the type wrapper managed properties had default initializers
+    // we need to emit them as assignments to `_storage` elements as part
+    // of its initialization.
+
+    auto storageVarType = singleVar->getType()->castTo<TupleType>();
+    auto *wrappedDecl = cast<NominalTypeDecl>(
+        singleVar->getDeclContext()->getInnermostTypeContext());
+
+    SmallVector<std::pair<VarDecl *, Expr *>, 2> fieldsToInitialize;
+    fieldsToInitialize.resize_for_overwrite(storageVarType->getNumElements());
+
+    unsigned numInitializable = 0;
+    for (auto member : wrappedDecl->getMembers()) {
+      auto *PBD = dyn_cast<PatternBindingDecl>(member);
+      // Check every member that is managed by the type wrapper.
+      if (!(PBD && PBD->getSingleVar() &&
+            PBD->getSingleVar()->isAccessedViaTypeWrapper()))
+        continue;
+
+      auto *field = PBD->getSingleVar();
+      auto fieldNo = storageVarType->getNamedElementId(field->getName());
+
+      if (auto *initExpr = PBD->getInit(/*index=*/0)) {
+        fieldsToInitialize[fieldNo] = {PBD->getSingleVar(), initExpr};
+        ++numInitializable;
+      }
+    }
+
+    if (numInitializable == 0) {
+      initialization->finishUninitialized(*this);
+      return;
+    }
+
+    // If there are any initializable fields, let's split _storage into
+    // element initializers and emit initializations for individual fields.
+
+    assert(initialization->canSplitIntoTupleElements());
+
+    SmallVector<InitializationPtr, 4> scratch;
+    auto fieldInits = initialization->splitIntoTupleElements(
+        *this, PBD, storageVarType->getCanonicalType(), scratch);
+
+    for (unsigned i : range(fieldInits.size())) {
+      VarDecl *field;
+      Expr *initExpr;
+
+      std::tie(field, initExpr) = fieldsToInitialize[i];
+
+      auto &fieldInit = fieldInits[i];
+      if (initExpr) {
+        // If there is wrapped value expression, we have to emit a
+        // backing property initializer call, otherwise let's use
+        // default expression (which is just `.init()` call).
+        emitInitializer(initExpr, field, bool(getWrappedValueExpr(field)),
+                        fieldInit);
+      } else {
+        fieldInit->finishUninitialized(*this);
+      }
+    }
+
+    initialization->finishInitialization(*this);
   } else {
     // Otherwise, mark it uninitialized for DI to resolve.
     initialization->finishUninitialized(*this);
@@ -1386,9 +1496,9 @@ emitVersionLiterals(SILLocation loc, SILGenBuilder &B, ASTContext &ctx,
                     llvm::VersionTuple Vers) {
   unsigned major = Vers.getMajor();
   unsigned minor =
-      (Vers.getMinor().hasValue() ? Vers.getMinor().getValue() : 0);
+      (Vers.getMinor().has_value() ? Vers.getMinor().value() : 0);
   unsigned subminor =
-      (Vers.getSubminor().hasValue() ? Vers.getSubminor().getValue() : 0);
+      (Vers.getSubminor().has_value() ? Vers.getSubminor().value() : 0);
 
   SILType wordType = SILType::getBuiltinWordType(ctx);
 
@@ -1468,7 +1578,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       booleanTestLoc = expr;
       break;
     }
-    case StmtConditionElement::CK_Availability:
+
+    case StmtConditionElement::CK_Availability: {
       // Check the running OS version to determine whether it is in the range
       // specified by elt.
       PoundAvailableInfo *availability = elt.getAvailability();
@@ -1498,6 +1609,37 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
         }
       }
       break;
+    }
+
+    case StmtConditionElement::CK_HasSymbol: {
+      auto info = elt.getHasSymbolInfo();
+      if (info->isInvalid()) {
+        // This condition may have referenced a decl that isn't valid in some
+        // way but for developer convenience wasn't treated as an error. Just
+        // emit a 'true' condition value.
+        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
+        booleanTestValue = B.createIntegerLiteral(loc, i1, 1);
+        break;
+      }
+
+      auto expr = info->getSymbolExpr();
+      auto declRef = info->getReferencedDecl();
+      assert(declRef);
+
+      auto decl = declRef.getDecl();
+      booleanTestValue = B.createHasSymbol(expr, decl);
+      booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
+      booleanTestLoc = expr;
+
+      // Ensure that function declarations for each function associated with
+      // the decl are emitted so that they can be referenced during IRGen.
+      enumerateFunctionsForHasSymbol(
+          getModule(), decl, [this](SILDeclRef declRef) {
+            (void)SGM.getFunction(declRef, NotForDefinition);
+          });
+
+      break;
+    }
     }
 
     // Now that we have a boolean test as a Builtin.i1, emit the branch.
@@ -1830,10 +1972,13 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
       return;
     }
 
-    auto *bbi = cast<BeginBorrowInst>(loc.box);
-    B.createEndBorrow(silLoc, bbi);
-    B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+    if (auto *bbi = dyn_cast<BeginBorrowInst>(loc.box)) {
+      B.createEndBorrow(silLoc, bbi);
+      B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+      return;
+    }
 
+    B.emitDestroyValueOperation(silLoc, loc.box);
     return;
   }
 
@@ -1852,6 +1997,11 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   }
 
   if (Val->getOwnershipKind() == OwnershipKind::None) {
+    return;
+  }
+
+  if (!F.getLifetime(vd, Val->getType()).isLexical()) {
+    B.emitDestroyValueOperation(silLoc, Val);
     return;
   }
 
@@ -1915,4 +2065,22 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   }
 
   llvm_unreachable("unhandled case");
+}
+
+void BlackHoleInitialization::copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                                                  ManagedValue value, bool isInit) {
+  // Normally we do not do anything if we have a black hole
+  // initialization... but if we have a move only object, insert a move value.
+  if (!value.getType().isMoveOnly())
+    return;
+
+  // If we have an address, then this will create a new temporary allocation
+  // which will trigger the move checker. If we have an object though, we need
+  // to insert an extra move_value to make sure the object checker behaves
+  // correctly.
+  value = value.ensurePlusOne(SGF, loc);
+  if (value.getType().isAddress())
+    return;
+
+  value = SGF.B.createMoveValue(loc, value);
 }

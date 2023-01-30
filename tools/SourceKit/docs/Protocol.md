@@ -751,14 +751,15 @@ type checking and the necessary compiler arguments to help resolve all dependenc
 
 ```
 {
-    <key.request>:            (UID)     <source.request.expression.type>,
-    <key.sourcefile>:         (string)  // Absolute path to the file.
-    <key.compilerargs>:       [string*] // Array of zero or more strings for the compiler arguments,
-                                        // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
-                                        // these must include the path to that file.
-    <key.expectedtypes>:      [string*] // A list of interested protocol USRs.
-                                        // When empty, we report all expressions in the file.
-                                        // When non-empty, we report expressions whose types conform to any of the give protocols.
+    <key.request>:                  (UID)     <source.request.expression.type>,
+    <key.sourcefile>:               (string)  // Absolute path to the file.
+    <key.compilerargs>:             [string*] // Array of zero or more strings for the compiler arguments,
+                                              // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
+                                              // these must include the path to that file.
+    <key.expectedtypes>:            [string*] // A list of interested protocol USRs.
+                                              // When empty, we report all expressions in the file.
+                                              // When non-empty, we report expressions whose types conform to any of the give protocols.
+    [opt] <key.fully_qualified>:    (bool)    // True when fully qualified type should be returned. Defaults to False.
 }
 ```
 
@@ -795,13 +796,14 @@ type checking and the necessary compiler arguments to help resolve all dependenc
 
 ```
 {
-    <key.request>:            (UID)     <source.request.variable.type>,
-    <key.sourcefile>:         (string)  // Absolute path to the file.
-    <key.compilerargs>:       [string*] // Array of zero or more strings for the compiler arguments,
-                                        // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
-                                        // these must include the path to that file.
-    [opt] <key.offset>:       (int64)   // Offset of the requested range. Defaults to zero.
-    [opt] <key.length>:       (int64)   // Length of the requested range. Defaults to the entire file.
+    <key.request>:                  (UID)     <source.request.variable.type>,
+    <key.sourcefile>:               (string)  // Absolute path to the file.
+    <key.compilerargs>:             [string*] // Array of zero or more strings for the compiler arguments,
+                                              // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
+                                              // these must include the path to that file.
+    [opt] <key.offset>:             (int64)   // Offset of the requested range. Defaults to zero.
+    [opt] <key.length>:             (int64)   // Length of the requested range. Defaults to the entire file.
+    [opt] <key.fully_qualified>:    (bool)    // True when fully qualified type should be returned. Defaults to False.
 }
 ```
 

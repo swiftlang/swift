@@ -191,7 +191,7 @@ extension String.UTF8View: BidirectionalCollection {
       }
       _precondition(result >= 0 && result <= _guts.count,
         "String index is out of bounds")
-      return Index(_encodedOffset: result)
+      return Index(_encodedOffset: result)._knownUTF8
     }
 
     return _foreignIndex(i, offsetBy: n, limitedBy: limit)
@@ -443,7 +443,7 @@ extension String.UTF8View {
   // (referring to a continuation byte) and returns `idx`. Otherwise, this will
   // scalar-align the index. This is needed because we may be passed a
   // non-scalar-aligned foreign index from the UTF16View.
-  @inline(__always)
+  @_alwaysEmitIntoClient @inline(__always)
   internal func _utf8AlignForeignIndex(_ idx: String.Index) -> String.Index {
     _internalInvariant(_guts.isForeign)
     guard idx.transcodedOffset == 0 else { return idx }

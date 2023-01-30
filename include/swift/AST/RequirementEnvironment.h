@@ -22,6 +22,8 @@
 
 namespace swift {
 
+class RootProtocolConformance;
+
 /// Describes the environment of a requirement that will be used when
 /// matching witnesses against the requirement and to form the resulting
 /// \c Witness value.
@@ -99,7 +101,7 @@ public:
                          GenericSignature reqSig,
                          ProtocolDecl *proto,
                          ClassDecl *covariantSelf,
-                         ProtocolConformance *conformance);
+                         RootProtocolConformance *conformance);
 
   /// Retrieve the generic signature of the requirement.
   GenericSignature getRequirementSignature() const {

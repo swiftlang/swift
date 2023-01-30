@@ -69,7 +69,7 @@ public struct UnownedJob: Sendable {
 /// without making other changes.
 @available(SwiftStdlib 5.1, *)
 @frozen
-public struct UnsafeContinuation<T, E: Error> {
+public struct UnsafeContinuation<T, E: Error>: Sendable {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
   @_alwaysEmitIntoClient
@@ -143,9 +143,6 @@ public struct UnsafeContinuation<T, E: Error> {
 #endif
   }
 }
-
-@available(SwiftStdlib 5.1, *)
-extension UnsafeContinuation: Sendable where T: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 extension UnsafeContinuation {
@@ -257,6 +254,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 ///
 /// - Returns: The value passed to the continuation by the closure.
 @available(SwiftStdlib 5.1, *)
+@_unsafeInheritExecutor
 @_alwaysEmitIntoClient
 public func withUnsafeContinuation<T>(
   _ fn: (UnsafeContinuation<T, Never>) -> Void
@@ -277,6 +275,7 @@ public func withUnsafeContinuation<T>(
 /// If `resume(throwing:)` is called on the continuation,
 /// this function throws that error.
 @available(SwiftStdlib 5.1, *)
+@_unsafeInheritExecutor
 @_alwaysEmitIntoClient
 public func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeContinuation<T, Error>) -> Void

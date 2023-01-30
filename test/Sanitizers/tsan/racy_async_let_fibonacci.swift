@@ -12,7 +12,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // rdar://86825277
-// SR-15805
+// https://github.com/apple/swift/issues/58082
 // UNSUPPORTED: CPU=arm64 || CPU=arm64e
 
 // Disabled because this test is flaky rdar://76542113

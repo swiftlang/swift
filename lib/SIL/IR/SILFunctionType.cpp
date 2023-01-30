@@ -263,6 +263,35 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
   return IndexSubset::get(getASTContext(), numSemanticResults, resultIndices);
 }
 
+CanSILFunctionType SILFunctionType::getDifferentiableComponentType(
+    NormalDifferentiableFunctionTypeComponent component, SILModule &module) {
+  assert(getDifferentiabilityKind() == DifferentiabilityKind::Reverse &&
+         "Must be a `@differentiable(reverse)` function");
+  auto originalFnTy = getWithoutDifferentiability();
+  if (auto derivativeKind = component.getAsDerivativeFunctionKind()) {
+    return originalFnTy->getAutoDiffDerivativeFunctionType(
+        getDifferentiabilityParameterIndices(),
+        getDifferentiabilityResultIndices(), *derivativeKind, module.Types,
+        LookUpConformanceInModule(module.getSwiftModule()));
+  }
+  return originalFnTy;
+}
+
+CanSILFunctionType SILFunctionType::getLinearComponentType(
+    LinearDifferentiableFunctionTypeComponent component, SILModule &module) {
+  assert(getDifferentiabilityKind() == DifferentiabilityKind::Linear &&
+         "Must be a `@differentiable(linear)` function");
+  auto originalFnTy = getWithoutDifferentiability();
+  switch (component) {
+  case LinearDifferentiableFunctionTypeComponent::Original:
+    return originalFnTy;
+  case LinearDifferentiableFunctionTypeComponent::Transpose:
+    return originalFnTy->getAutoDiffTransposeFunctionType(
+        getDifferentiabilityParameterIndices(), module.Types,
+        LookUpConformanceInModule(module.getSwiftModule()));
+  }
+}
+
 CanSILFunctionType
 SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
                                           IndexSubset *parameterIndices,
@@ -463,7 +492,7 @@ static CanType getAutoDiffTangentTypeForLinearMap(
   // Otherwise, the tangent type is a new generic parameter substituted for the
   // tangent type.
   auto gpIndex = substGenericParams.size();
-  auto gpType = CanGenericTypeParamType::get(/*type sequence*/ false,
+  auto gpType = CanGenericTypeParamType::get(/*isParameterPack*/ false,
                                              0, gpIndex, context);
   substGenericParams.push_back(gpType);
   substReplacements.push_back(tanType);
@@ -485,7 +514,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -513,7 +542,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -633,7 +662,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -664,7 +693,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
-    tanType = tanType->getCanonicalType(sig);
+    tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
@@ -682,7 +711,6 @@ static CanSILFunctionType getAutoDiffPullbackType(
       break;
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
       conv = ResultConvention::Indirect;
@@ -801,7 +829,7 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
   newParameters.reserve(original->getNumParameters());
   for (auto &param : original->getParameters()) {
     newParameters.push_back(
-        param.getWithInterfaceType(param.getInterfaceType()->getCanonicalType(
+        param.getWithInterfaceType(param.getInterfaceType()->getReducedType(
             constrainedInvocationGenSig)));
   }
 
@@ -809,7 +837,7 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
   newResults.reserve(original->getNumResults());
   for (auto &result : original->getResults()) {
     newResults.push_back(
-        result.getWithInterfaceType(result.getInterfaceType()->getCanonicalType(
+        result.getWithInterfaceType(result.getInterfaceType()->getReducedType(
             constrainedInvocationGenSig)));
   }
   return SILFunctionType::get(
@@ -973,7 +1001,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
       break;
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
       newConv = ResultConvention::Indirect;
@@ -1474,11 +1501,8 @@ private:
         // Expand the tuple.
         for (auto i : indices(substTupleTy.getElementTypes())) {
           auto &elt = substTupleTy->getElement(i);
-          auto ownership = elt.getParameterFlags().getValueOwnership();
-          assert(ownership == ValueOwnership::Default);
-          assert(!elt.isVararg());
-          visit(ownership, forSelf, origType.getTupleElementType(i),
-                CanType(elt.getRawType()), false);
+          visit(ValueOwnership::Default, forSelf,
+                origType.getTupleElementType(i), CanType(elt.getType()), false);
         }
         return;
       case ValueOwnership::InOut:
@@ -1500,7 +1524,10 @@ private:
       convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
                                      origType, substTLConv);
       assert(isIndirectFormalParameter(convention));
-    } else if (substTL.isTrivial()) {
+    } else if (substTL.isTrivial() ||
+               // Foreign reference types are passed trivially.
+               (substType->getClassOrBoundGenericClass() &&
+                substType->isForeignReferenceType())) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       // If we are no implicit copy, our ownership is always Owned.
@@ -1535,7 +1562,7 @@ private:
 
     CanType foreignCHTy =
         TopLevelOrigType.getObjCMethodAsyncCompletionHandlerForeignType(
-            Foreign.async.getValue(), TC);
+            Foreign.async.value(), TC);
     auto completionHandlerOrigTy = TopLevelOrigType.getObjCMethodAsyncCompletionHandlerType(foreignCHTy);
     auto completionHandlerTy = TC.getLoweredType(completionHandlerOrigTy,
                                                  foreignCHTy, expansion)
@@ -1683,7 +1710,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto selfMetatype = MetatypeType::get(dynamicSelfInterfaceType,
                                             MetatypeRepresentation::Thick);
 
-      auto canSelfMetatype = selfMetatype->getCanonicalType(origGenericSig);
+      auto canSelfMetatype = selfMetatype->getReducedType(origGenericSig);
       SILParameterInfo param(canSelfMetatype, convention);
       inputs.push_back(param);
 
@@ -1693,7 +1720,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
     if (capture.isOpaqueValue()) {
       OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
       auto canType = opaqueValue->getType()->mapTypeOutOfContext()
-          ->getCanonicalType(origGenericSig);
+          ->getReducedType(origGenericSig);
       auto &loweredTL =
           TC.getTypeLowering(AbstractionPattern(genericSig, canType),
                              canType, expansion);
@@ -1713,7 +1740,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
     auto *VD = capture.getDecl();
     auto type = VD->getInterfaceType();
-    auto canType = type->getCanonicalType(origGenericSig);
+    auto canType = type->getReducedType(origGenericSig);
 
     auto &loweredTL =
         TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
@@ -1963,9 +1990,12 @@ static CanSILFunctionType getSILFunctionType(
 
     if (reqtSubs) {
       valueType = valueType.subst(*reqtSubs);
+      coroutineSubstYieldType = valueType->getReducedType(
+          genericSig);
+    } else {
+      coroutineSubstYieldType = valueType->getReducedType(
+          accessor->getGenericSignature());
     }
-
-    coroutineSubstYieldType = valueType->getCanonicalType(genericSig);
   }
 
   bool shouldBuildSubstFunctionType = [&]{
@@ -2094,7 +2124,7 @@ static CanSILFunctionType getSILFunctionType(
       params.push_back(ty);
     clangType = TC.Context.getClangFunctionType(
         params, substFnInterfaceType.getResult(),
-        convertRepresentation(silRep).getValue());
+        convertRepresentation(silRep).value());
   }
   auto silExtInfo = extInfoBuilder.withClangFunctionType(clangType)
                         .withIsPseudogeneric(pseudogeneric)
@@ -2169,11 +2199,15 @@ enum class NormalParameterConvention { Owned, Guaranteed };
 /// The default Swift conventions.
 class DefaultConventions : public Conventions {
   NormalParameterConvention normalParameterConvention;
+  ResultConvention resultConvention;
 
 public:
-  DefaultConventions(NormalParameterConvention normalParameterConvention)
+  DefaultConventions(
+      NormalParameterConvention normalParameterConvention,
+      ResultConvention resultConvention = ResultConvention::Owned)
       : Conventions(ConventionsKind::Default),
-        normalParameterConvention(normalParameterConvention) {}
+        normalParameterConvention(normalParameterConvention),
+        resultConvention(resultConvention) {}
 
   bool isNormalParameterConventionGuaranteed() const {
     return normalParameterConvention == NormalParameterConvention::Guaranteed;
@@ -2201,7 +2235,7 @@ public:
   }
 
   ResultConvention getResult(const TypeLowering &tl) const override {
-    return ResultConvention::Owned;
+    return resultConvention;
   }
 
   ParameterConvention
@@ -2379,6 +2413,9 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::AsyncEntryPoint:
       return getSILFunctionTypeForConventions(
           DefaultConventions(NormalParameterConvention::Guaranteed));
+    case SILDeclRef::Kind::RuntimeAttributeGenerator:
+      return getSILFunctionTypeForConventions(DefaultConventions(
+          NormalParameterConvention::Guaranteed, ResultConvention::Indirect));
     case SILDeclRef::Kind::EntryPoint:
       llvm_unreachable("Handled by getSILFunctionTypeForAbstractCFunction");
     }
@@ -2449,7 +2486,7 @@ buildThunkSignature(SILFunction *fn,
 
   // Add a new generic parameter to replace the opened existential.
   auto *newGenericParam =
-      GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
+      GenericTypeParamType::get(/*isParameterPack*/ false, depth, 0, ctx);
 
   assert(openedExistential->isRoot());
   auto constraint = openedExistential->getExistentialType();
@@ -2648,7 +2685,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   }
 
   auto mapTypeOutOfContext = [&](CanType type) -> CanType {
-    return type->mapTypeOutOfContext()->getCanonicalType(genericSig);
+    return type->mapTypeOutOfContext()->getCanonicalType();
   };
 
   // Map the parameter and expected types out of context to get the interface
@@ -2705,6 +2742,8 @@ static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
 static ParameterConvention getIndirectCParameterConvention(clang::QualType type) {
   // Non-trivial C++ types would be Indirect_Inout (at least in Itanium).
   // A trivial const * parameter in C should be considered @in.
+  if (type->isReferenceType() && type->getPointeeType().isConstQualified())
+    return ParameterConvention::Indirect_In_Guaranteed;
   return ParameterConvention::Indirect_In;
 }
 
@@ -3206,6 +3245,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
@@ -3476,6 +3516,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   switch (c.kind) {
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::DefaultArgGenerator:
+    case SILDeclRef::Kind::RuntimeAttributeGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
@@ -4123,7 +4164,10 @@ public:
   }
 
   CanType visitPackExpansionType(CanPackExpansionType origType) {
-    llvm_unreachable("Unimplemented!");
+    CanType patternType = visit(origType.getPatternType());
+    CanType countType = visit(origType.getCountType());
+
+    return CanType(PackExpansionType::get(patternType, countType));
   }
 
   /// Tuples need to have their component types substituted by these
@@ -4335,6 +4379,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::Deallocator:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
+  case SILDeclRef::Kind::RuntimeAttributeGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:

@@ -97,6 +97,7 @@ SEMANTICS_ATTR(PROGRAMTERMINATION_POINT, "programtermination_point")
 SEMANTICS_ATTR(CONVERT_TO_OBJECTIVE_C, "convertToObjectiveC")
 
 SEMANTICS_ATTR(KEYPATH_KVC_KEY_PATH_STRING, "keypath.kvcKeyPathString")
+SEMANTICS_ATTR(KEYPATH_MUST_BE_VALID_FOR_KVO, "keypath.mustBeValidForKVO")
 
 /// The prefix used to force opt-remarks to be emitted in a specific function.
 ///

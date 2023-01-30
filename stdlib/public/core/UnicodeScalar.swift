@@ -192,6 +192,10 @@ extension Unicode.Scalar :
   ///   ASCII characters; otherwise, pass `false`.
   /// - Returns: A string representation of the scalar.
   public func escaped(asASCII forceASCII: Bool) -> String {
+    _escaped(asASCII: forceASCII) ?? String(self)
+  }
+
+  internal func _escaped(asASCII forceASCII: Bool) -> String? {
     func lowNibbleAsHex(_ v: UInt32) -> String {
       let nibble = v & 15
       if nibble < 10 {
@@ -208,7 +212,7 @@ extension Unicode.Scalar :
     } else if self == "\"" {
       return "\\\""
     } else if _isPrintableASCII {
-      return String(self)
+      return nil
     } else if self == "\0" {
       return "\\0"
     } else if self == "\n" {
@@ -222,7 +226,7 @@ extension Unicode.Scalar :
         + lowNibbleAsHex(UInt32(self) >> 4)
         + lowNibbleAsHex(UInt32(self)) + "}"
     } else if !forceASCII {
-      return String(self)
+      return nil
     } else if UInt32(self) <= 0xFFFF {
       var result = "\\u{"
       result += lowNibbleAsHex(UInt32(self) >> 12)
@@ -524,7 +528,7 @@ extension Unicode.Scalar {
 
     // The first code unit is in the least significant byte of codeUnits.
     codeUnits = codeUnits.littleEndian
-    return try Swift.withUnsafePointer(to: &codeUnits) {
+    return try Swift._withUnprotectedUnsafePointer(to: &codeUnits) {
       return try $0.withMemoryRebound(to: UInt8.self, capacity: 4) {
         return try body(UnsafeBufferPointer(start: $0, count: utf8Count))
       }

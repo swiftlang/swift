@@ -46,6 +46,7 @@ namespace swift {
   class NormalProtocolConformance;
   class OpaqueValueExpr;
   class OperatorDecl;
+  class PackConformance;
   class Pattern;
   class ProtocolDecl;
   class ProtocolConformance;
@@ -133,6 +134,7 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::Expr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::CaptureListExpr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::AbstractClosureExpr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::OpaqueValueExpr, swift::ExprAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::PackConformance, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolConformance, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::NormalProtocolConformance,
                             swift::DeclAlignInBits)

@@ -75,6 +75,35 @@ public:
     return true;
   }
 
+  bool VisitCXXBindTemporaryExpr(clang::CXXBindTemporaryExpr *BTE) {
+    // This is a temporary value with a custom destructor. C++ will implicitly
+    // call the destructor at some point. Make sure we emit IR for it.
+    callback(BTE->getTemporary()->getDestructor());
+    return true;
+  }
+
+  bool VisitCXXNewExpr(clang::CXXNewExpr *NE) {
+    callback(NE->getOperatorNew());
+    return true;
+  }
+
+  bool VisitBindingDecl(clang::BindingDecl *BD) {
+    if (auto *holdingVar = BD->getHoldingVar()) {
+      if (holdingVar->hasInit())
+        TraverseStmt(holdingVar->getInit());
+    }
+    return true;
+  }
+
+  // Do not traverse unevaluated expressions. Doing to might result in compile
+  // errors if we try to instantiate an un-instantiatable template.
+
+  bool VisitCXXNoexceptExpr(clang::CXXNoexceptExpr *NEE) { return false; }
+
+  bool VisitCXXTypeidExpr(clang::CXXTypeidExpr *TIE) {
+    return TIE->isPotentiallyEvaluated();
+  }
+
   bool shouldVisitTemplateInstantiations() const { return true; }
   bool shouldVisitImplicitCode() const { return true; }
 };
@@ -149,17 +178,27 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
 
   ClangDeclFinder refFinder(callback);
 
+  auto &clangSema = Context.getClangModuleLoader()->getClangSema();
+
   while (!stack.empty()) {
     auto *next = const_cast<clang::Decl *>(stack.pop_back_val());
+
+    // If this is a static member of a class, it might be defined out of line.
+    // If the class is templated, the definition of its static member might be
+    // templated as well. If it is, instantiate it here.
+    if (auto var = dyn_cast<clang::VarDecl>(next)) {
+      if (var->isStaticDataMember() &&
+          var->getTemplateSpecializationKind() ==
+              clang::TemplateSpecializationKind::TSK_ImplicitInstantiation)
+        clangSema.InstantiateVariableDefinition(var->getLocation(), var);
+    }
 
     // If a function calls another method in a class template specialization, we
     // need to instantiate that other function. Do that here.
     if (auto *fn = dyn_cast<clang::FunctionDecl>(next)) {
       // Make sure that this method is part of a class template specialization.
       if (fn->getTemplateInstantiationPattern())
-        Context.getClangModuleLoader()
-            ->getClangSema()
-            .InstantiateFunctionDefinition(fn->getLocation(), fn);
+        clangSema.InstantiateFunctionDefinition(fn->getLocation(), fn);
     }
 
     if (clang::Decl *executableDecl = getDeclWithExecutableCode(next)) {
@@ -182,6 +221,17 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
         if (auto baseCxxRecord = base.getType()->getAsCXXRecordDecl())
           if (auto *baseDtor = baseCxxRecord->getDestructor())
             callback(baseDtor);
+      }
+    }
+
+    // If something from a C++ class is used, emit all virtual methods of this
+    // class because they might be emitted in the vtable even if not used
+    // directly from Swift.
+    if (auto *record = dyn_cast<clang::CXXRecordDecl>(next->getDeclContext())) {
+      for (auto *method : record->methods()) {
+        if (method->isVirtual()) {
+          callback(method);
+        }
       }
     }
 

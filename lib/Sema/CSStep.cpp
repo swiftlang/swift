@@ -105,13 +105,14 @@ void SplitterStep::computeFollowupSteps(
 
   if (CS.isDebugMode()) {
     auto &log = getDebugLogger();
+    auto indent = CS.solverState->getCurrentIndent();
     // Verify that the constraint graph is valid.
     CG.verify();
 
-    log << "---Constraint graph---\n";
+    log.indent(indent) << "---Constraint graph---\n";
     CG.print(CS.getTypeVariables(), log);
 
-    log << "---Connected components---\n";
+    log.indent(indent) << "---Connected components---\n";
     CG.printConnectedComponents(CS.getTypeVariables(), log);
   }
 
@@ -241,8 +242,12 @@ bool SplitterStep::mergePartialSolutions() const {
       // Finalize this solution.
       auto solution = CS.finalize();
       solutionMemory += solution.getTotalMemory();
-      if (CS.isDebugMode())
-        getDebugLogger() << "(composed solution " << CS.CurrentScore << ")\n";
+      if (CS.isDebugMode()) {
+        auto &log = getDebugLogger();
+        log << "(composed solution:";
+        CS.CurrentScore.print(log);
+        log << ")\n";
+      }
 
       // Save this solution.
       Solutions.push_back(std::move(solution));
@@ -342,36 +347,94 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   /// Try to figure out what this step is going to be,
   /// after the scope has been established.
-  auto *disjunction = CS.selectDisjunction();
-  auto bestBindings = CS.determineBestBindings();
+  SmallString<64> potentialBindings;
+  llvm::raw_svector_ostream bos(potentialBindings);
 
-  if (CS.shouldAttemptFixes()) {
-    if ((bestBindings &&
-         (bestBindings->forClosureResult() ||
-          bestBindings->forGenericParameter()) &&
-         bestBindings->isHole()) &&
-        !disjunction) {
-      if (auto *conjunction = CS.selectConjunction()) {
-        return suspend(
-            std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
-      }
+  auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
+    if (CS.isDebugMode() && bindings.hasViableBindings()) {
+      bos.indent(CS.solverState->getCurrentIndent() + 2);
+      bos << "(";
+      bindings.dump(bos, CS.solverState->getCurrentIndent() + 2);
+      bos << ")\n";
+    }
+  });
+
+  auto *disjunction = CS.selectDisjunction();
+  auto *conjunction = CS.selectConjunction();
+
+  if (CS.isDebugMode()) {
+    SmallVector<Constraint *, 4> disjunctions;
+    CS.collectDisjunctions(disjunctions);
+    std::vector<std::string> overloadDisjunctions;
+    for (const auto &disjunction : disjunctions) {
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
+
+      auto constraints = disjunction->getNestedConstraints();
+      if (constraints[0]->getKind() == ConstraintKind::BindOverload)
+        overloadDisjunctions.push_back(
+            constraints[0]->getFirstType()->getString(PO));
+    }
+
+    if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
+      auto &log = getDebugLogger();
+      log << "(Potential Binding(s): " << '\n';
+      log << potentialBindings;
+    }
+
+    if (!overloadDisjunctions.empty()) {
+      auto &log = getDebugLogger();
+      log.indent(CS.solverState->getCurrentIndent() + 2);
+      log << "Disjunction(s) = [";
+      interleave(overloadDisjunctions, log, ", ");
+      log << "]\n";
+    }
+
+    if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
+      auto &log = getDebugLogger();
+      log << ")\n";
     }
   }
 
-  if (bestBindings &&
-      (!disjunction || bestBindings->favoredOverDisjunction(disjunction))) {
-    // Produce a type variable step.
-    return suspend(
-        std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
-  } else if (disjunction) {
-    // Produce a disjunction step.
-    return suspend(
-        std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
-  } else if (auto *conjunction = CS.selectConjunction()) {
-    return suspend(
-        std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
-  } else if (!CS.solverState->allowsFreeTypeVariables() &&
-             CS.hasFreeTypeVariables()) {
+  enum class StepKind { Binding, Disjunction, Conjunction };
+
+  auto chooseStep = [&]() -> Optional<StepKind> {
+    // Bindings usually happen first, but sometimes we want to prioritize a
+    // disjunction or conjunction.
+    if (bestBindings) {
+      if (disjunction && !bestBindings->favoredOverDisjunction(disjunction))
+        return StepKind::Disjunction;
+
+      if (conjunction && !bestBindings->favoredOverConjunction(conjunction))
+        return StepKind::Conjunction;
+
+      return StepKind::Binding;
+    }
+    if (disjunction)
+      return StepKind::Disjunction;
+
+    if (conjunction)
+      return StepKind::Conjunction;
+
+    return None;
+  };
+
+  if (auto step = chooseStep()) {
+    switch (*step) {
+    case StepKind::Binding:
+      return suspend(
+          std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
+    case StepKind::Disjunction:
+      return suspend(
+          std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+    case StepKind::Conjunction:
+      return suspend(
+          std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+
+  if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
     // If there are no disjunctions or type variables to bind
     // we can't solve this system unless we have free type variables
     // allowed in the solution.
@@ -380,7 +443,9 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   auto printConstraints = [&](const ConstraintList &constraints) {
     for (auto &constraint : constraints)
-      constraint.print(getDebugLogger(), &CS.getASTContext().SourceMgr);
+      constraint.print(
+          getDebugLogger().indent(CS.solverState->getCurrentIndent()),
+          &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent());
   };
 
   // If we don't have any disjunction or type variable choices left, we're done
@@ -429,8 +494,12 @@ StepResult ComponentStep::take(bool prevFailed) {
   }
 
   auto solution = CS.finalize();
-  if (CS.isDebugMode())
-    getDebugLogger() << "(found solution " << getCurrentScore() << ")\n";
+  if (CS.isDebugMode()) {
+    auto &log = getDebugLogger();
+    log << "(found solution:";
+    getCurrentScore().print(log);
+    log << ")\n";
+  }
 
   Solutions.push_back(std::move(solution));
   return finalize(/*isSuccess=*/true);
@@ -478,23 +547,6 @@ StepResult ComponentStep::finalize(bool isSuccess) {
 
 void TypeVariableStep::setup() {
   ++CS.solverState->NumTypeVariablesBound;
-  if (CS.isDebugMode()) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    auto &log = getDebugLogger();
-
-    auto initialBindings = Producer.getCurrentBindings();
-    log << "Initial bindings: ";
-    interleave(
-        initialBindings.begin(), initialBindings.end(),
-        [&](const Binding &binding) {
-          log << TypeVar->getString(PO)
-              << " := " << binding.BindingType->getString(PO);
-        },
-        [&log] { log << ", "; });
-
-    log << '\n';
-  }
 }
 
 bool TypeVariableStep::attempt(const TypeVariableBinding &choice) {
@@ -635,8 +687,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping " + reason + " ";
-      choice.print(log, &ctx.SourceMgr);
-      log << '\n';
+      choice.print(log, &ctx.SourceMgr, CS.solverState->getCurrentIndent());
+      log << ")\n";
     }
 
     return true;
@@ -828,6 +880,17 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
     CS.Timer.emplace(element.getLocator(), CS);
   }
 
+  assert(!ModifiedOptions.has_value() &&
+         "Previously modified options should have been restored in resume");
+  if (CS.isForCodeCompletion() &&
+      !element.mightContainCodeCompletionToken(CS)) {
+    ModifiedOptions.emplace(CS.Options);
+    // If we know that this conjunction element doesn't contain the code
+    // completion token, type check it in normal mode without any special
+    // behavior that is intended for the code completion token.
+    CS.Options -= ConstraintSystemFlags::ForCodeCompletion;
+  }
+
   auto success = element.attempt(CS);
 
   // If element attempt has failed, mark whole conjunction
@@ -839,10 +902,17 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
 }
 
 StepResult ConjunctionStep::resume(bool prevFailed) {
+  // Restore the old ConstraintSystemOptions if 'attempt' modified them.
+  ModifiedOptions.reset();
+
   // Return from the follow-up splitter step that
   // attempted to apply information gained from the
   // isolated constraint to the outer context.
   if (Snapshot && Snapshot->isScoped()) {
+    Snapshot.reset();
+    if (CS.isDebugMode())
+      getDebugLogger() << ")\n";
+    
     return done(/*isSuccess=*/!prevFailed);
   }
 
@@ -957,7 +1027,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
           // Transform all of the unbound outer variables into
           // placeholders since we are not going to solve for
-          // each ambguous solution.
+          // each ambiguous solution.
           {
             unsigned numHoles = 0;
             for (auto *typeVar : CS.getTypeVariables()) {

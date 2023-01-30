@@ -32,35 +32,35 @@ func genericNoOptional<T>(_: T) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlF
 func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   let _ = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   let _: P = p.p
-  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcAaC_pcfu_ : $@convention(thin) (@in_guaranteed P) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
+  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcAaC_pcfu_ : $@convention(thin) (@in_guaranteed any P) -> @owned @callee_guaranteed (@in_guaranteed any P) -> ()
   let _: (P) -> () = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   let _: P? = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   let _: Any = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   let _: Any? = p.p
 
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   // CHECK: function_ref @$s7ranking15genericOverloadyyxlF
   genericOverload(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.q!getter
   // CHECK: function_ref @$s7ranking15genericOverloadyyxSglF
   genericOverload(p.q)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
   genericOptional(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.q!getter
   // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
   genericOptional(p.q)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
   genericNoOptional(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.q!getter
   // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
   genericNoOptional(p.q)
 
@@ -68,7 +68,7 @@ func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
   let _ = t.p
   // CHECK: witness_method $T, #P.p!getter
   let _: P = t.p
-  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcxcfu1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
+  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcxcfu1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed any P) -> ()
   let _: (P) -> () = t.p
   // CHECK: witness_method $T, #P.p!getter
   let _: P? = t.p
@@ -103,7 +103,7 @@ extension P {
     let _ = self.p
     // CHECK: witness_method $Self, #P.p!getter
     let _: P = self.p
-    // CHECK: function_ref @$s7ranking1PPAAE22propertyVersusFunctionyyFyAaB_pcxcfu_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
+    // CHECK: function_ref @$s7ranking1PPAAE22propertyVersusFunctionyyFyAaB_pcxcfu_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed any P) -> ()
     let _: (P) -> () = self.p
     // CHECK: witness_method $Self, #P.p!getter
     let _: P? = self.p
@@ -311,7 +311,7 @@ struct S2 {
     // We currently prefer the non-variadic init due to having
     // "less effective parameters", and we don't compare the types for ranking due
     // to the difference in variadic-ness.
-    // CHECK: function_ref @$s7ranking2S2VyAcA1R_pcfC : $@convention(method) (@in R, @thin S2.Type) -> S2
+    // CHECK: function_ref @$s7ranking2S2VyAcA1R_pcfC : $@convention(method) (@in any R, @thin S2.Type) -> S2
     _ = S2(0)
   }
 }

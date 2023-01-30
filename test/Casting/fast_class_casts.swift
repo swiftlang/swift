@@ -11,7 +11,7 @@
 
 // 2. check if the generated IR looks like expected:
 
-// RUN: %target-swift-frontend -module-name=Main -I%t %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -module-name=Main -I%t %s -emit-ir -g -o - | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-objc-interop
 
 // REQUIRES: executable_test
 
@@ -48,6 +48,7 @@ func castToFinal(_ b: Classes.Base) -> Classes.Final? {
 }
 
 // CHECK-LABEL: define {{.*}} @"$s4Main24unconditionalCastToFinaly7Classes0E0CAC4BaseCF"
+// CHECK-NOT:     call {{.*}}@object_getClass
 // CHECK-NOT:     @swift_dynamicCastClass
 // CHECK:       }
 @inline(never)
@@ -64,6 +65,8 @@ func castToResilientFinal(_ b: ResilientClasses.Base) -> ResilientClasses.Final?
 }
 
 // CHECK-LABEL: define {{.*}} @"$s4Main19castProtocolToFinaly7Classes0E0CSgAC1P_pF"
+// CHECK-objc:    call {{.*}}@object_getClass
+// CHECK-nonobjc: load
 // CHECK-NOT:     @swift_dynamicCastClass
 // CHECK:       }
 @inline(never)

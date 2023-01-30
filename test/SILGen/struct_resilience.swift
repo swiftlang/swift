@@ -13,10 +13,10 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
   // Stored properties of resilient structs from outside our resilience
   // domain are accessed through accessors
 
-// CHECK:         copy_addr %1 to [initialization] [[OTHER_SIZE_BOX:%[0-9]*]] : $*Size
+// CHECK:         copy_addr %1 to [init] [[OTHER_SIZE_BOX:%[0-9]*]] : $*Size
   var s2 = s
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
+// CHECK:         copy_addr %1 to [init] [[SIZE_BOX:%.*]] : $*Size
 // CHECK:         [[GETTER:%.*]] = function_ref @$s16resilient_struct4SizeV1wSivg : $@convention(method) (@in_guaranteed Size) -> Int
 // CHECK:         [[RESULT:%.*]] = apply [[GETTER]]([[SIZE_BOX]])
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] [[OTHER_SIZE_BOX]] : $*Size
@@ -24,7 +24,7 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK:         apply [[SETTER]]([[RESULT]], [[WRITE]])
   s2.w = s.w
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
+// CHECK:         copy_addr %1 to [init] [[SIZE_BOX:%.*]] : $*Size
 // CHECK:         [[FN:%.*]] = function_ref @$s16resilient_struct4SizeV1hSivg : $@convention(method) (@in_guaranteed Size) -> Int
 // CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
   _ = s.h
@@ -138,7 +138,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   // Stored properties of resilient structs from inside our resilience
   // domain are accessed directly
 
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%[0-9]*]] : $*MySize
+// CHECK:         copy_addr %1 to [init] [[SIZE_BOX:%[0-9]*]] : $*MySize
   var s2 = s
 
 // CHECK:         [[SRC_ADDR:%.*]] = struct_element_addr %1 : $*MySize, #MySize.w
@@ -165,7 +165,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   // other resilience domains, we have to use accessors
 
 // CHECK:         [[SELF:%.*]] = alloc_stack $MySize
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[SELF]]
+// CHECK-NEXT:    copy_addr %0 to [init] [[SELF]]
 
 // CHECK:         [[GETTER:%.*]] = function_ref @$s17struct_resilience6MySizeV1wSivg
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SELF]])
@@ -206,7 +206,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   // other resilience domains, we have to use accessors
 
 // CHECK:         [[SELF:%.*]] = alloc_stack $MySize
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[SELF]]
+// CHECK-NEXT:    copy_addr %0 to [init] [[SELF]]
 
 // CHECK:         [[GETTER:%.*]] = function_ref @$s17struct_resilience6MySizeV1wSivg
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SELF]])
@@ -264,7 +264,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 
 // CHECK-LABEL: sil [serialized] [ossa] @$s17struct_resilience18inlinableInoutTestyyAA6MySizeVzF : $@convention(thin) (@inout MySize) -> ()
 @inlinable public func inlinableInoutTest(_ s: inout MySize) {
-  // Inlinable functions can be inlined in other resiliene domains.
+  // Inlinable functions can be inlined in other resilience domains.
   //
   // Make sure we use modify for an inout access of a resilient struct
   // property inside an inlinable function.

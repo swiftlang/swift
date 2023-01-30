@@ -8,7 +8,7 @@
 
 // CHECK: [[ADR:%.*]] = ref_element_addr %{{.*}} : $RecursibleDirectoryContentsGenerator, #RecursibleDirectoryContentsGenerator.fileSystem, loc {{.*}}:39:5, scope 2
 // CHECK: [[ADR_ACCESS:%.*]] = begin_access [deinit] [static] [[ADR]]
-// CHECK: destroy_addr [[ADR_ACCESS]] : $*FileSystem, loc {{.*}}:39:5, scope 2
+// CHECK: destroy_addr [[ADR_ACCESS]] : $*any FileSystem, loc {{.*}}:39:5, scope 2
 
 
 import Foundation

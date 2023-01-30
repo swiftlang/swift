@@ -5176,7 +5176,7 @@ DictionaryTestSuite.test("updateValue") {
 
 DictionaryTestSuite.test("localHashSeeds") {
   // With global hashing, copying elements in hash order between hash tables
-  // can become quadratic. (See https://bugs.swift.org/browse/SR-3268)
+  // can become quadratic (see https://github.com/apple/swift/issues/45856).
   //
   // We defeat this by mixing the local storage capacity into the global hash
   // seed, thereby breaking the correlation between bucket indices across

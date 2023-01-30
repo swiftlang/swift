@@ -45,6 +45,9 @@ class RewriteContext final {
   /// Folding set for uniquing symbols.
   llvm::FoldingSet<Symbol::Storage> Symbols;
 
+  /// The singleton storage for shape symbols.
+  Symbol::Storage *TheShapeSymbol;
+
   /// Folding set for uniquing terms.
   llvm::FoldingSet<Term::Storage> Terms;
 

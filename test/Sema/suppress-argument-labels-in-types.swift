@@ -205,7 +205,7 @@ class C0 {
 // Check diagnostics changes.
 let _ = min(Int(3), Float(2.5)) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}
 
-// SR-11429
+// https://github.com/apple/swift/issues/53830
 func testIntermediateCoercions() {
   _ = (f1 as (Int, Int) -> Int)(a: 0, b: 1) // expected-error {{extraneous argument labels 'a:b:' in call}}
   _ = (f1 as (Int, Int) -> Int)(0, 1)

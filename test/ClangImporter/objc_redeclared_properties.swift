@@ -33,6 +33,7 @@ func test(obj: RPFoo) {
   obj.accessorInProto = nil // okay
 }
 
-func sr8490(obj: RPSub) {
+// https://github.com/apple/swift/issues/51011
+func f_51011(obj: RPSub) {
   obj.accessorInProto = nil
 }

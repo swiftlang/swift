@@ -611,12 +611,6 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   }
 }
 
-bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
-  // If the root class was implemented in Objective-C, use Objective-C's
-  // allocation methods because they may have been overridden.
-  return theClass->getObjectModel() == ReferenceCounting::ObjC;
-}
-
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   assert(!ctor->isFactoryInit() && "factories should not be emitted here");
 
@@ -694,8 +688,6 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
                                                   initTy, subMap, args);
-
-  emitProfilerIncrement(ctor->getTypecheckedBody());
 
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation(Loc), initedSelfValue);

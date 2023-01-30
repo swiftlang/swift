@@ -87,7 +87,7 @@ func blibble(blobble: some P) {}
 func blib() -> P & some Q { return 1 } // expected-error{{'some' should appear at the beginning}}
 func blab() -> some P? { return 1 } // expected-error{{must specify only}} expected-note{{did you mean to write an optional of an 'opaque' type?}}
 func blorb<T: some P>(_: T) { } // expected-error{{'some' types are only permitted}}
-func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only permitted}} expected-error{{cannot convert}}
+func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only permitted}}
 
 protocol OP: some P {} // expected-error{{'some' types are only permitted}}
 
@@ -537,12 +537,14 @@ func test_diagnostic_with_contextual_generic_params() {
   }
 }
 
-// SR-10988 - Suggest `return` when the last statement of a multi-statement function body would be a valid return value
+// https://github.com/apple/swift/issues/53378
+// Suggest `return` when the last statement of a multi-statement function body
+// would be a valid return value
 protocol P1 {
 }
 protocol P2 {
 }
-func sr10988() {
+do {
   func test() -> some Numeric {
     // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
     let x = 0
@@ -569,4 +571,22 @@ func sr10988() {
     let x = S2()
     x // expected-warning {{expression of type 'S2' is unused}}
   }
+
+  func test5() -> some P1 {
+    // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+    let x = invalid // expected-error {{cannot find 'invalid' in scope}}
+    x
+  }
+}
+
+// https://github.com/apple/swift/issues/62787
+func f62787() -> Optional<some Collection<Int>> {
+  return nil // expected-error{{cannot infer concrete type for opaque result 'Optional<some Collection<Int>>' from return expression}}
+}
+
+func f62787_1(x: Bool) -> Optional<some Collection<Int>> {
+  if x {
+    return nil // expected-error{{cannot infer concrete type for opaque result 'Optional<some Collection<Int>>' from return expression}}
+  } 
+  return nil // expected-error{{cannot infer concrete type for opaque result 'Optional<some Collection<Int>>' from return expression}}
 }

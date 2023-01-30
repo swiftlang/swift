@@ -178,7 +178,7 @@ ForwardModeTests.test("Generics") {
   let a = SIMD3<Double>(1, 2, 3)
   let g = SIMD3<Double>(1, 1, 1)
 
-  // FIXME(SR-13210): Fix forward-mode SIL verification error.
+  // FIXME: Fix forward-mode SIL verification error (https://github.com/apple/swift/issues/55650).
   /*
   func testInit<Scalar, SIMDType: SIMD>(x: Scalar) -> SIMDType
     where SIMDType.Scalar == Scalar,

@@ -116,7 +116,7 @@ public:
   findExistingOrCreateIfNew(KeyT key,
                             function_ref<ValueT(const KeyT &)> createFn) {
     if (auto existing = findExisting(key))
-      return existing.getValue();
+      return existing.value();
     ValueT v = createFn(key);
     (void)insert(key, v);
     return v;
@@ -324,10 +324,10 @@ public:
                                 unsigned index)>
                   verifyFn) const {
     map1.verify([&](const Key1 &k1, const Key2 &k2, Value v) {
-      assertConsistent(map2.find(k2, k1).getValue(), v);
+      assertConsistent(map2.find(k2, k1).value(), v);
     });
     map2.verify([&](const Key2 &k2, const Key1 &k1, Value v) {
-      assertConsistent(map1.find(k1, k2).getValue(), v);
+      assertConsistent(map1.find(k1, k2).value(), v);
     });
     map1.verify([&](const Key1 &k1, const Key2 &k2, Value v) {
       verifyFn(k1, k2, v, 0);

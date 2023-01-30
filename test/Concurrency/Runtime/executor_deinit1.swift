@@ -6,7 +6,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// https://bugs.swift.org/browse/SR-14461
+// https://github.com/apple/swift/issues/56817
 // UNSUPPORTED: OS=linux-gnu
 
 // REQUIRES: rdar78325660

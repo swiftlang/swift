@@ -88,6 +88,7 @@ void MapOpaqueArchetypes::replace() {
     SILType mappedType = remapType(origArg->getType());
     auto *NewArg = clonedEntryBlock->createFunctionArgument(
         mappedType, origArg->getDecl(), true);
+    NewArg->copyFlags(cast<SILFunctionArgument>(origArg));
     entryArgs.push_back(NewArg);
   }
 
@@ -310,10 +311,12 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::TestSpecificationInst:
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
   case SILInstructionKind::Store##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::CopyAddrInst:
+  case SILInstructionKind::ExplicitCopyAddrInst:
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::EndLifetimeInst:
@@ -335,13 +338,36 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
   case SILInstructionKind::AwaitAsyncContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
+  case SILInstructionKind::HasSymbolInst:
     // Handle by operand and result check.
     break;
+
+  case SILInstructionKind::DynamicPackIndexInst:
+  case SILInstructionKind::PackPackIndexInst:
+  case SILInstructionKind::ScalarPackIndexInst:
+    return opaqueArchetypeWouldChange(context,
+              cast<AnyPackIndexInst>(&inst)->getIndexedPackType());
+
+  case SILInstructionKind::OpenPackElementInst: {
+    auto open = cast<OpenPackElementInst>(&inst);
+    bool wouldChange = false;
+    open->getOpenedGenericEnvironment()
+        ->forEachPackElementBinding([&](ElementArchetypeType *elementType,
+                                        PackType *packSubstitution) {
+      if (!wouldChange) {
+        if (opaqueArchetypeWouldChange(context,
+                                       packSubstitution->getCanonicalType()))
+          wouldChange = true;
+      }
+    });
+    return wouldChange;
+  }
 
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::PartialApplyInst:
@@ -417,7 +443,7 @@ class SerializeSILPass : public SILModuleTransform {
       // underlying type. Update the function's opaque archetypes.
       if (wasSerialized && F.isDefinition()) {
         updateOpaqueArchetypes(F);
-        invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
+        invalidateAnalysis(&F, SILAnalysis::InvalidationKind::FunctionBody);
       }
 
       // After serialization we don't need to keep @alwaysEmitIntoClient

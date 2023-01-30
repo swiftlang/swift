@@ -25,7 +25,7 @@ func foo() {}
 // SEMA_1: 1 {{.*}} source.statistic.num-asts-in-memory
 // SEMA_1: 1 {{.*}} source.statistic.max-asts-in-memory
 // SEMA_1: 0 {{.*}} source.statistic.num-ast-cache-hits
-// SEMA_1: 0 {{.*}} source.statistic.num-ast-snaphost-uses
+// SEMA_1: 0 {{.*}} source.statistic.num-ast-snapshot-uses
 
 // RUN: %sourcekitd-test -req=sema %s -- -Xfrontend -disable-implicit-concurrency-module-import  %s == -req=edit -pos=1:1 -replace=" " %s == -req=stats | %FileCheck %s -check-prefix=SEMA_2
 
@@ -37,7 +37,7 @@ func foo() {}
 // in which case we may trigger an extra processLatestSnapshotAsync() which will
 // hit the cache, and/or keep the first AST in memory long enough to be reported
 // here.
-// SEMA_2: 0 {{.*}} source.statistic.num-ast-snaphost-uses
+// SEMA_2: 0 {{.*}} source.statistic.num-ast-snapshot-uses
 
 // RUN: %sourcekitd-test -req=sema %s -- -Xfrontend -disable-implicit-concurrency-module-import  %s == -req=cursor -pos=1:6 %s -- -Xfrontend -disable-implicit-concurrency-module-import  %s == -req=stats | %FileCheck %s -check-prefix=SEMA_3
 
@@ -47,7 +47,7 @@ func foo() {}
 // SEMA_3: 1 {{.*}} source.statistic.num-asts-in-memory
 // SEMA_3: 1 {{.*}} source.statistic.max-asts-in-memory
 // SEMA_3: 1 {{.*}} source.statistic.num-ast-cache-hits
-// SEMA_3: 0 {{.*}} source.statistic.num-ast-snaphost-uses
+// SEMA_3: 0 {{.*}} source.statistic.num-ast-snapshot-uses
 
 // RUN: %sourcekitd-test -req=sema %s -- -Xfrontend -disable-implicit-concurrency-module-import  %s == -req=related-idents -pos=1:6 %s -- -Xfrontend -disable-implicit-concurrency-module-import  %s == -req=stats | %FileCheck %s -check-prefix=SEMA_4
 
@@ -57,7 +57,7 @@ func foo() {}
 // SEMA_4: 1 {{.*}} source.statistic.num-asts-in-memory
 // SEMA_4: 1 {{.*}} source.statistic.max-asts-in-memory
 // SEMA_4: 1 {{.*}} source.statistic.num-ast-cache-hits
-// SEMA_4: 0 {{.*}} source.statistic.num-ast-snaphost-uses
+// SEMA_4: 0 {{.*}} source.statistic.num-ast-snapshot-uses
 
 // Test that we can have two files open and don't need to rebuild an AST when doing the cursor info request on '%s' after opening '10bytes.swift'
 // RUN: %sourcekitd-test \

@@ -16,7 +16,7 @@
 #ifndef WORD_DATA_H
 #define WORD_DATA_H
 
-#include "SwiftShims/SwiftStdint.h"
+#include "swift/shims/SwiftStdint.h"
 
 static const __swift_uint32_t _swift_stdlib_words[1100] = {
   0x200020, 0x20002C, 0x20002E, 0x1400030, 0x20003A, 0x20003B, 0x3400041, 0x20005F, 0x3400061,

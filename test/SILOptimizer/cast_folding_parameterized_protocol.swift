@@ -15,69 +15,69 @@ func use<T>(_ t: T) {}
 
 // CHECK-LABEL: sil @$s35cast_folding_parameterized_protocol23concrete_to_existentialyyAA1XV_AA1YVyxGAFySiGtlF : $@convention(thin) <T> (X, Y<T>, Y<Int>) -> ()
 public func concrete_to_existential<T>(_ x: X, _ yt: Y<T>, _ yi: Y<Int>) {
-  // CHECK:{{%.*}} = init_existential_addr %6 : $*P, $X
+  // CHECK:{{%.*}} = init_existential_addr %6 : $*any P, $X
   use(x as! any P)
-  // CHECK: unconditional_checked_cast_addr X in {{%.*}} : $*X to P<T> in {{%.*}} : $*P<T>
+  // CHECK: unconditional_checked_cast_addr X in {{%.*}} : $*X to any P<T> in {{%.*}} : $*any P<T>
   use(x as! any P<T>)
-  // CHECK: unconditional_checked_cast_addr X in {{%.*}} : $*X to P<Int> in {{%.*}} : $*P<Int>
+  // CHECK: unconditional_checked_cast_addr X in {{%.*}} : $*X to any P<Int> in {{%.*}} : $*any P<Int>
   use(x as! any P<Int>)
-  // CHECK: unconditional_checked_cast_addr X in {{%.*}} : $*X to P<String> in {{%.*}} : $*P<String>
+  // CHECK: unconditional_checked_cast_addr X in {{%.*}} : $*X to any P<String> in {{%.*}} : $*any P<String>
   use(x as! any P<String>)
-  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*Q, $X
+  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*any Q, $X
   use(x as! any Q)
 
-  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*P, $Y<T>
+  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*any P, $Y<T>
   use(yt as! any P)
-  // CHECK: unconditional_checked_cast_addr Y<T> in {{%.*}} : $*Y<T> to P<T> in {{%.*}} : $*P<T>
+  // CHECK: unconditional_checked_cast_addr Y<T> in {{%.*}} : $*Y<T> to any P<T> in {{%.*}} : $*any P<T>
   use(yt as! any P<T>)
-  // CHECK: unconditional_checked_cast_addr Y<T> in {{%.*}} : $*Y<T> to P<Int> in {{%.*}} : $*P<Int>
+  // CHECK: unconditional_checked_cast_addr Y<T> in {{%.*}} : $*Y<T> to any P<Int> in {{%.*}} : $*any P<Int>
   use(yt as! any P<Int>)
-  // CHECK: unconditional_checked_cast_addr Y<T> in {{%.*}} : $*Y<T> to P<String> in {{%.*}} : $*P<String>
+  // CHECK: unconditional_checked_cast_addr Y<T> in {{%.*}} : $*Y<T> to any P<String> in {{%.*}} : $*any P<String>
   use(yt as! any P<String>)
-  // CHECK: unconditional_checked_cast_addr Y<T> in {{%.*}} : $*Y<T> to Q in {{%.*}} : $*Q
+  // CHECK: unconditional_checked_cast_addr Y<T> in {{%.*}} : $*Y<T> to any Q in {{%.*}} : $*any Q
   use(yt as! any Q)
 
-  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*P, $Y<Int>
+  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*any P, $Y<Int>
   use(yi as! any P)
-  // CHECK: unconditional_checked_cast_addr Y<Int> in {{%.*}} : $*Y<Int> to P<T> in {{%.*}} : $*P<T>
+  // CHECK: unconditional_checked_cast_addr Y<Int> in {{%.*}} : $*Y<Int> to any P<T> in {{%.*}} : $*any P<T>
   use(yi as! any P<T>)
-  // CHECK: unconditional_checked_cast_addr Y<Int> in {{%.*}} : $*Y<Int> to P<Int> in {{%.*}} : $*P<Int>
+  // CHECK: unconditional_checked_cast_addr Y<Int> in {{%.*}} : $*Y<Int> to any P<Int> in {{%.*}} : $*any P<Int>
   use(yi as! any P<Int>)
-  // CHECK: unconditional_checked_cast_addr Y<Int> in {{%.*}} : $*Y<Int> to P<String> in {{%.*}} : $*P<String>
+  // CHECK: unconditional_checked_cast_addr Y<Int> in {{%.*}} : $*Y<Int> to any P<String> in {{%.*}} : $*any P<String>
   use(yi as! any P<String>)
-  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*Q, $Y<Int>
+  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*any Q, $Y<Int>
   use(yi as! any Q)
 }
 
-// CHECK-LABEL: sil @$s35cast_folding_parameterized_protocol23existential_to_concreteyyxm_AA1P_px1TRts_XPtlF : $@convention(thin) <T> (@thick T.Type, @in_guaranteed P<T>) -> ()
+// CHECK-LABEL: sil @$s35cast_folding_parameterized_protocol23existential_to_concreteyyxm_AA1P_px1TRts_XPtlF : $@convention(thin) <T> (@thick T.Type, @in_guaranteed any P<T>) -> ()
 public func existential_to_concrete<T>(_: T.Type, _ p: any P<T>) {
-  // CHECK: unconditional_checked_cast_addr P<T> in {{%.*}} : $*P<T> to X in {{%.*}} : $*X
+  // CHECK: unconditional_checked_cast_addr any P<T> in {{%.*}} : $*any P<T> to X in {{%.*}} : $*X
   _ = p as! X
-  // CHECK: unconditional_checked_cast_addr P<T> in {{%.*}} : $*P<T> to Y<T> in {{%.*}} : $*Y<T>
+  // CHECK: unconditional_checked_cast_addr any P<T> in {{%.*}} : $*any P<T> to Y<T> in {{%.*}} : $*Y<T>
   _ = p as! Y<T>
-  // CHECK: unconditional_checked_cast_addr P<T> in {{%.*}} : $*P<T> to Y<Int> in {{%.*}} : $*Y<Int>
+  // CHECK: unconditional_checked_cast_addr any P<T> in {{%.*}} : $*any P<T> to Y<Int> in {{%.*}} : $*Y<Int>
   _ = p as! Y<Int>
-  // CHECK: unconditional_checked_cast_addr P<T> in {{%.*}} : $*P<T> to Y<String> in {{%.*}} : $*Y<String>
+  // CHECK: unconditional_checked_cast_addr any P<T> in {{%.*}} : $*any P<T> to Y<String> in {{%.*}} : $*Y<String>
   _ = p as! Y<String>
 }
 
-// CHECK-LABEL: sil @$s35cast_folding_parameterized_protocol015existential_to_E0yyAA1P_px1TRts_XP_AA1Q_ptlF : $@convention(thin) <T> (@in_guaranteed P<T>, @in_guaranteed Q) -> ()
+// CHECK-LABEL: sil @$s35cast_folding_parameterized_protocol015existential_to_E0yyAA1P_px1TRts_XP_AA1Q_ptlF : $@convention(thin) <T> (@in_guaranteed any P<T>, @in_guaranteed any Q) -> ()
 public func existential_to_existential<T>(_ p: any P<T>, _ q: any Q) {
-  // CHECK: unconditional_checked_cast_addr P<T> in {{%.*}} : $*P<T> to Q in {{%.*}} : $*Q
+  // CHECK: unconditional_checked_cast_addr any P<T> in {{%.*}} : $*any P<T> to any Q in {{%.*}} : $*any Q
   _ = p as! any Q
-  // CHECK: unconditional_checked_cast_addr P<T> in {{%.*}} : $*P<T> to P in {{%.*}} : $*P
+  // CHECK: unconditional_checked_cast_addr any P<T> in {{%.*}} : $*any P<T> to any P in {{%.*}} : $*any P
   _ = p as! any P
-  // CHECK: unconditional_checked_cast_addr P<T> in {{%.*}} : $*P<T> to P<Int> in {{%.*}} : $*P<Int>
+  // CHECK: unconditional_checked_cast_addr any P<T> in {{%.*}} : $*any P<T> to any P<Int> in {{%.*}} : $*any P<Int>
   _ = p as! any P<Int>
-  // CHECK: unconditional_checked_cast_addr P<T> in {{%.*}} : $*P<T> to P<String> in {{%.*}} : $*P<String>
+  // CHECK: unconditional_checked_cast_addr any P<T> in {{%.*}} : $*any P<T> to any P<String> in {{%.*}} : $*any P<String>
   _ = p as! any P<String>
 
-  // CHECK: unconditional_checked_cast_addr Q in {{%.*}} : $*Q to P in {{%.*}} : $*P
+  // CHECK: unconditional_checked_cast_addr any Q in {{%.*}} : $*any Q to any P in {{%.*}} : $*any P
   _ = q as! any P
-  // CHECK: unconditional_checked_cast_addr Q in {{%.*}} : $*Q to P<T> in {{%.*}} : $*P<T>
+  // CHECK: unconditional_checked_cast_addr any Q in {{%.*}} : $*any Q to any P<T> in {{%.*}} : $*any P<T>
   _ = q as! any P<T>
-  // CHECK: unconditional_checked_cast_addr Q in {{%.*}} : $*Q to P<Int> in {{%.*}} : $*P<Int>
+  // CHECK: unconditional_checked_cast_addr any Q in {{%.*}} : $*any Q to any P<Int> in {{%.*}} : $*any P<Int>
   _ = q as! any P<Int>
-  // CHECK: unconditional_checked_cast_addr Q in {{%.*}} : $*Q to P<String> in {{%.*}} : $*P<String>
+  // CHECK: unconditional_checked_cast_addr any Q in {{%.*}} : $*any Q to any P<String> in {{%.*}} : $*any P<String>
   _ = q as! any P<String>
 }

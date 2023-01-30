@@ -1,7 +1,7 @@
-// SR-8789
-
 // RUN: %target-swift-emit-silgen -verify -import-objc-header %S/Inputs/objc_init_iuo_override.h %s
 // REQUIRES: objc_interop
+
+// https://github.com/apple/swift/issues/51297
 
 class ChildClass: ParentClass {}
 

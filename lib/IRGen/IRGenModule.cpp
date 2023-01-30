@@ -35,6 +35,7 @@
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
@@ -84,13 +85,6 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
                                   name, packed);
 }
 
-/// A helper for creating pointer-to-struct types.
-static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
-                                                  StringRef name,
-                                  std::initializer_list<llvm::Type*> types) {
-  return createStructType(IGM, name, types)->getPointerTo(DefaultAS);
-}
-
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                  llvm::LLVMContext &LLVMContext,
                                                       const IRGenOptions &Opts,
@@ -102,6 +96,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &ClangContext = Importer->getClangASTContext();
 
   auto &CGO = Importer->getClangCodeGenOpts();
+  if (CGO.OpaquePointers)
+    LLVMContext.setOpaquePointers(true);
+
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
   CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
@@ -137,12 +134,19 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.TrapFuncName = Opts.TrapFuncName;
   }
 
+  // We don't need to perform coverage mapping for any Clang decls we've
+  // synthesized, as they have no user-written code. This is also needed to
+  // avoid a Clang crash when attempting to emit coverage for decls without
+  // source locations (rdar://100172217).
+  CGO.CoverageMapping = false;
+
+  auto &VFS = Importer->getClangInstance().getVirtualFileSystem();
   auto &HSI = Importer->getClangPreprocessor()
                   .getHeaderSearchInfo()
                   .getHeaderSearchOpts();
   auto &PPO = Importer->getClangPreprocessor().getPreprocessorOpts();
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
-                                                ModuleName, HSI, PPO, CGO,
+                                                ModuleName, &VFS, HSI, PPO, CGO,
                                                 LLVMContext);
   ClangCodeGen->Initialize(ClangContext);
   return ClangCodeGen;
@@ -261,9 +265,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
 
   // For now, references storage types are just pointers.
-#define CHECKED_REF_STORAGE(Name, name, ...) \
-  Name##ReferencePtrTy = \
-    createStructPointerType(*this, "swift." #name, { RefCountedPtrTy });
+#define CHECKED_REF_STORAGE(Name, name, ...)                                   \
+  Name##ReferenceStructTy =                                                    \
+      createStructType(*this, "swift." #name, {RefCountedPtrTy});              \
+  Name##ReferencePtrTy = Name##ReferenceStructTy->getPointerTo(0);
 #include "swift/AST/ReferenceStorage.def"
 
   // A type metadata record is the structure pointed to by the canonical
@@ -331,13 +336,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     TypeMetadataPtrTy,      // Metadata *Type;
     Int32Ty                 // int32_t Offset;
   });
-  TupleTypeMetadataPtrTy = createStructPointerType(*this, "swift.tuple_type", {
-    TypeMetadataStructTy,   // (base)
-    SizeTy,                 // size_t NumElements;
-    Int8PtrTy,              // const char *Labels;
-    llvm::ArrayType::get(tupleElementTy, 0) // Element Elements[];
-  });
-
+  TupleTypeMetadataTy = createStructType(
+      *this, "swift.tuple_type",
+      {
+          TypeMetadataStructTy,                   // (base)
+          SizeTy,                                 // size_t NumElements;
+          Int8PtrTy,                              // const char *Labels;
+          llvm::ArrayType::get(tupleElementTy, 0) // Element Elements[];
+      });
+  TupleTypeMetadataPtrTy = TupleTypeMetadataTy->getPointerTo();
   // A full type metadata record is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
@@ -614,6 +621,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                        {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
                         RelativeAddressTy, Int32Ty});
 
+  RuntimeDiscoverableAttributeTy =
+    createStructType(*this, "swift.runtime_attr",
+                     {Int32Ty, RelativeAddressTy, Int32Ty});
+
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = llvm::StructType::create(getLLVMContext(), "swift.context");
@@ -676,16 +687,37 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       *this, "swift.async_task_and_context",
       { SwiftTaskPtrTy, SwiftContextPtrTy });
 
-  ContinuationAsyncContextTy = createStructType(
-      *this, "swift.continuation_context",
-      {SwiftContextTy,       // AsyncContext header
-       SizeTy,               // flags
-       SizeTy,               // await synchronization
-       ErrorPtrTy,           // error result pointer
-       OpaquePtrTy,          // normal result address
-       SwiftExecutorTy});    // resume to executor
+  if (Context.LangOpts.isConcurrencyModelTaskToThread()) {
+    ContinuationAsyncContextTy = createStructType(
+        *this, "swift.continuation_context",
+        {SwiftContextTy,       // AsyncContext header
+         SizeTy,               // flags
+         SizeTy,               // await synchronization
+         ErrorPtrTy,           // error result pointer
+         OpaquePtrTy,          // normal result address
+         SwiftExecutorTy,      // resume to executor
+         SizeTy                // pointer to condition variable
+         });
+  } else {
+    ContinuationAsyncContextTy = createStructType(
+        *this, "swift.continuation_context",
+        {SwiftContextTy,       // AsyncContext header
+         SizeTy,               // flags
+         SizeTy,               // await synchronization
+         ErrorPtrTy,           // error result pointer
+         OpaquePtrTy,          // normal result address
+         SwiftExecutorTy       // resume to executor
+         });
+  }
   ContinuationAsyncContextPtrTy =
     ContinuationAsyncContextTy->getPointerTo(DefaultAS);
+
+  ClassMetadataBaseOffsetTy = llvm::StructType::get(
+      getLLVMContext(), {
+                            SizeTy,  // Immediate members offset
+                            Int32Ty, // Negative size in words
+                            Int32Ty  // Positive size in words
+                        });
 
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
@@ -696,8 +728,6 @@ IRGenModule::~IRGenModule() {
   destroyPointerAuthCaches();
   delete &Types;
 }
-
-static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 
 // Explicitly listing these constants is an unfortunate compromise for
 // making the database file much more compact.
@@ -889,6 +919,20 @@ bool IRGenModule::isStandardLibrary() const {
   return ::isStandardLibrary(Module);
 }
 
+llvm::FunctionType *swift::getRuntimeFnType(llvm::Module &Module,
+                                           llvm::ArrayRef<llvm::Type*> retTypes,
+                                           llvm::ArrayRef<llvm::Type*> argTypes) {
+  llvm::Type *retTy;
+  if (retTypes.size() == 1)
+    retTy = *retTypes.begin();
+  else
+    retTy = llvm::StructType::get(Module.getContext(),
+                                  {retTypes.begin(), retTypes.end()},
+                                  /*packed*/ false);
+  return llvm::FunctionType::get(retTy, {argTypes.begin(), argTypes.end()},
+                                 /*isVararg*/ false);
+}
+
 llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       llvm::Constant *&cache,
                       const char *name,
@@ -955,9 +999,9 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
         && !::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
 
-    llvm::AttrBuilder buildFnAttr;
-    llvm::AttrBuilder buildRetAttr;
-    llvm::AttrBuilder buildFirstParamAttr;
+    llvm::AttrBuilder buildFnAttr(Module.getContext());
+    llvm::AttrBuilder buildRetAttr(Module.getContext());
+    llvm::AttrBuilder buildFirstParamAttr(Module.getContext());
 
     for (auto Attr : attrs) {
       if (isReturnAttribute(Attr))
@@ -996,6 +1040,9 @@ llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
       LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
 }
 
+static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
+static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr);
+
 #ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
 void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
                                          const char *funcName) {
@@ -1023,13 +1070,35 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define NO_ATTRS {}
 #define EFFECT(...) { __VA_ARGS__ }
 
-#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT)\
+#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,        \
+                      EFFECT)                                                  \
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     registerRuntimeEffect(EFFECT, #NAME);                                      \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
-                        AVAILABILITY(this->Context),                           \
-                        RETURNS, ARGS, ATTRS, this);                           \
+                        AVAILABILITY(this->Context), RETURNS, ARGS, ATTRS,     \
+                        this);                                                 \
+  }                                                                            \
+  FunctionPointer IRGenModule::get##ID##FunctionPointer() {                    \
+    using namespace RuntimeConstants;                                          \
+    auto fn = get##ID##Fn();                                                   \
+    auto fnTy = get##ID##FnType();                                             \
+    llvm::AttributeList attrs;                                                 \
+    SmallVector<llvm::Attribute::AttrKind, 8> theAttrs(ATTRS);                 \
+    for (auto Attr : theAttrs) {                                               \
+      if (isReturnAttribute(Attr))                                             \
+        attrs = attrs.addRetAttribute(getLLVMContext(), Attr);                 \
+      else if (isReturnedAttribute(Attr))                                      \
+        attrs = attrs.addParamAttribute(getLLVMContext(), 0, Attr);            \
+      else                                                                     \
+        attrs = attrs.addFnAttribute(getLLVMContext(), Attr);                  \
+    }                                                                          \
+    auto sig = Signature(fnTy, attrs, CC);                                     \
+    return FunctionPointer::forDirect(FunctionPointer::Kind::Function, fn,     \
+                                      nullptr, sig);                           \
+  }                                                                            \
+  llvm::FunctionType *IRGenModule::get##ID##FnType() {                         \
+    return getRuntimeFnType(Module, RETURNS, ARGS);                            \
   }
 
 #include "swift/Runtime/RuntimeFunctions.def"
@@ -1088,8 +1157,7 @@ llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
 
   if (ObjCInterop) {
     // struct objc_cache _objc_empty_cache;
-    ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
-                                                 OpaquePtrTy->getElementType());
+    ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache", OpaqueTy);
     ApplyIRLinkage(IRLinkage::ExternalImport)
         .to(cast<llvm::GlobalVariable>(ObjCEmptyCachePtr));
   } else {
@@ -1125,7 +1193,13 @@ Address IRGenModule::getAddrOfObjCISAMask() {
     ApplyIRLinkage(IRLinkage::ExternalImport)
         .to(cast<llvm::GlobalVariable>(ObjCISAMaskPtr));
   }
-  return Address(ObjCISAMaskPtr, getPointerAlignment());
+  return Address(ObjCISAMaskPtr, IntPtrTy, getPointerAlignment());
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfAccessibleFunctionRecord(SILFunction *accessibleFn) {
+  auto entity = LinkEntity::forAccessibleFunctionRecord(accessibleFn);
+  return getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 }
 
 ModuleDecl *IRGenModule::getSwiftModule() const {
@@ -1240,14 +1314,15 @@ void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
 }
 
 void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(getLLVMContext());
   setHasNoFramePointer(b);
   F->addFnAttrs(b);
 }
 
 /// Construct initial function attributes from options.
-void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
-                                               OptimizationMode FuncOptMode) {
+void IRGenModule::constructInitialFnAttributes(
+    llvm::AttrBuilder &Attrs, OptimizationMode FuncOptMode,
+    StackProtectorMode stackProtector) {
   // Add the default attributes for the Clang configuration.
   clang::CodeGen::addDefaultFunctionDefinitionAttributes(getClangCGM(), Attrs);
 
@@ -1261,10 +1336,14 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
     Attrs.removeAttribute(llvm::Attribute::MinSize);
     Attrs.removeAttribute(llvm::Attribute::OptimizeForSize);
   }
+  if (stackProtector == StackProtectorMode::StackProtector) {
+    Attrs.addAttribute(llvm::Attribute::StackProtectReq);
+    Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
+  }
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(getLLVMContext());
   constructInitialFnAttributes(b);
   return llvm::AttributeList().addFnAttributes(getLLVMContext(), b);
 }
@@ -1619,6 +1698,7 @@ static llvm::GlobalObject *createForceImportThunk(IRGenModule &IGM) {
     auto BB = llvm::BasicBlock::Create(IGM.getLLVMContext(), "", ForceImportThunk);
     llvm::IRBuilder<> IRB(BB);
     IRB.CreateRetVoid();
+    IGM.addUsedGlobal(ForceImportThunk);
     return ForceImportThunk;
   }
 }
@@ -1795,6 +1875,13 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
 }
 
 bool IRGenModule::canMakeStaticObjectsReadOnly() {
+  // Unconditionally disable this until we can fix the metadata.
+  // The trick of using the Empty array metadata for static arrays
+  // breaks Obj-C interop quite badly.
+  // rdar://101126543
+  return false;
+
+#if 0
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
@@ -1805,6 +1892,7 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
 
   return getAvailabilityContext().isContainedIn(
           Context.getImmortalRefCountSymbolsAvailability());
+#endif
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
@@ -1814,6 +1902,17 @@ void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
     PrimaryIGM = IGM;
   }
   Queue.push_back(IGM);
+}
+
+IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
+  // If we're emitting for a single module, or a single file, we always use the
+  // primary IGM.
+  if (GenModules.size() == 1)
+    return getPrimaryIGM();
+
+ IRGenModule *IGM = GenModules[SF];
+ assert(IGM);
+ return IGM;
 }
 
 IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {

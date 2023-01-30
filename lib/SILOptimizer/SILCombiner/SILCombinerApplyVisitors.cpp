@@ -169,7 +169,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       Args.push_back(UAC);
     } else if (OldOpType.getASTType() != NewOpType.getASTType()) {
       auto URC =
-          Builder.createUncheckedBitCast(AI.getLoc(), Op, NewOpType);
+          Builder.createUncheckedForwardingCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
       Args.push_back(Op);
@@ -221,8 +221,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       for (auto e = newOpResultTypes.end(); newRetI != e;
            ++oldRetI, ++newRetI, ++origArgI) {
         auto arg = normalBB->createPhiArgument(*newRetI, (*origArgI)->getOwnershipKind());
-        auto converted = Builder.createUncheckedBitCast(AI.getLoc(),
-                                                                arg, *oldRetI);
+        auto converted =
+          Builder.createUncheckedForwardingCast(AI.getLoc(), arg, *oldRetI);
         branchArgs.push_back(converted);
       }
       
@@ -246,7 +246,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   SILInstruction *result = NAI;
   
   if (oldResultTy != newResultTy) {
-    result = Builder.createUncheckedBitCast(AI.getLoc(), NAI, oldResultTy);
+    result =
+      Builder.createUncheckedForwardingCast(AI.getLoc(), NAI, oldResultTy);
   }
   
   return result;
@@ -342,8 +343,11 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
 
   KeyPathPattern *pattern = kp->getPattern();
   SubstitutionMap patternSubs = kp->getSubstitutions();
-  CanType rootTy = pattern->getRootType().subst(patternSubs)->getCanonicalType();
-  CanType parentTy = rootTy;
+  SILFunction *f = AI->getFunction();
+  SILType rootTy = f->getLoweredType(Lowering::AbstractionPattern::getOpaque(),
+      pattern->getRootType().subst(patternSubs)->getCanonicalType());
+
+  SILType parentTy = rootTy;
   
   // First check if _storedInlineOffset would return an offset or nil. Basically
   // only stored struct and tuple elements produce an offset. Everything else
@@ -380,14 +384,15 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       hasOffset = false;
       break;
     }
-    parentTy = component.getComponentType();
+    parentTy = f->getLoweredType(Lowering::AbstractionPattern::getOpaque(),
+                                 component.getComponentType());
   }
 
   SILLocation loc = AI->getLoc();
   SILValue result;
 
   if (hasOffset) {
-    SILType rootAddrTy = SILType::getPrimitiveAddressType(rootTy);
+    SILType rootAddrTy = rootTy.getAddressType();
     SILValue rootAddr = Builder.createBaseAddrForOffset(loc, rootAddrTy);
 
     auto projector = KeyPathProjector::create(kp, rootAddr, loc, Builder);
@@ -398,7 +403,8 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
     SILType ptrType = SILType::getRawPointerType(Builder.getASTContext());
     SILValue offsetPtr;
     projector->project(KeyPathProjector::AccessType::Get, [&](SILValue addr) {
-      offsetPtr = Builder.createAddressToPointer(loc, addr, ptrType);
+      offsetPtr = Builder.createAddressToPointer(loc, addr, ptrType,
+                                          /*needsStackProtection=*/ false);
     });
 
     // The result of the _storedInlineOffset call should be Optional<Int>. If
@@ -666,7 +672,6 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
       auto Arg = FAS.getArgument(i);
       switch (PI.getConvention()) {
         case ParameterConvention::Indirect_In:
-        case ParameterConvention::Indirect_In_Constant:
         case ParameterConvention::Direct_Owned:
           Builder.emitDestroyOperation(FAS.getLoc(), Arg);
           break;
@@ -760,7 +765,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
   if (!PCA->getSoleConformingType(PD, CHA, ConcreteType))
     return None;
 
-  // Determine OpenedArchetypeDef and SubstituionMap.
+  // Determine OpenedArchetypeDef and SubstitutionMap.
   ConcreteOpenedExistentialInfo COAI(ArgOperand, ConcreteType, PD);
   if (!COAI.CEI)
     return None;
@@ -853,9 +858,9 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
 
     auto OptionalCOEI =
         buildConcreteOpenedExistentialInfo(Apply.getArgumentOperands()[ArgIdx]);
-    if (!OptionalCOEI.hasValue())
+    if (!OptionalCOEI.has_value())
       continue;
-    auto COEI = OptionalCOEI.getValue();
+    auto COEI = OptionalCOEI.value();
     assert(COEI.isValid());
     COEIs.try_emplace(ArgIdx, COEI);
   }
@@ -888,7 +893,7 @@ static bool canReplaceCopiedArg(FullApplySite Apply, SILValue Arg,
   //
   // It's possible for an address to be initialized/deinitialized/reinitialized.
   // Rather than keeping track of liveness, we very conservatively check that
-  // all deinitialization occures after the call.
+  // all deinitialization occurs after the call.
   auto isDestroy = [](Operand *use) {
     switch (use->getUser()->getKind()) {
     default:
@@ -990,7 +995,7 @@ bool SILCombiner::canReplaceArg(FullApplySite Apply,
   return true;
 }
 
-/// Track temporary copies required for argument substitution when rewritting an
+/// Track temporary copies required for argument substitution when rewriting an
 /// apply's argument types from an opened existential types to concrete types.
 ///
 /// This is relevant for non-mutating arguments that are consumed by the call
@@ -1017,10 +1022,10 @@ struct ConcreteArgumentCopy {
       return None;
 
     SILValue origArg = apply.getArgument(argIdx);
-    // FIXME_opaque: With SIL opaque values, a formally indirect argument may be
-    // passed as a SIL object. In this case, generate a copy_value for the new
-    // argument and a destroy_value for the old argument, as should also be done
-    // for owned references.
+    // TODO_sil_opaque: With SIL opaque values, a formally indirect argument
+    // may be passed as a SIL object. In this case, generate a copy_value for
+    // the new argument and a destroy_value for the old argument, as should
+    // also be done for owned references.
     assert(origArg->getType().isAddress() == paramInfo.isFormalIndirect());
 
     // If argument convention is direct, then the existential reference was
@@ -1085,7 +1090,7 @@ SILValue SILCombiner::canCastArg(FullApplySite Apply,
   return Builder.createUncheckedAddrCast(
       Apply.getLoc(), Apply.getArgument(ArgIdx), CEI.ConcreteValue->getType());
 }
-/// Rewrite the given method apply instruction in terms of the provided conrete
+/// Rewrite the given method apply instruction in terms of the provided concrete
 /// type information.
 ///
 /// If the rewrite is successful, the original apply will be removed and the new
@@ -1319,7 +1324,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   // init_existential or looking up sole conforming type.
   //
   // buildConcreteOpenedExistentialInfo takes a SILBuilderContext because it may
-  // insert an uncheched cast to the concrete type, and it tracks the defintion
+  // insert an unchecked cast to the concrete type, and it tracks the definition
   // of any opened archetype needed to use the concrete type.
   SILBuilderContext BuilderCtx(Builder.getModule(), Builder.getTrackingList());
   llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> COEIs;

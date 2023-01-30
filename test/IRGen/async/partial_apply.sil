@@ -255,6 +255,7 @@ bb0(%0 : $Base):
 }
 
 sil public_external @receive_closure : $@async @convention(thin) <C where C : Base> (@owned @async @callee_guaranteed () -> (@owned C)) -> ()
+sil public_external @receive_closure2 : $@async @convention(thin) <C where C : Base> (@owned @async @callee_guaranteed (@owned Base) -> (@owned C)) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @test_partial_apply(
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s26parametric_casting_closureTA"(
@@ -266,8 +267,10 @@ bb0(%0 : $Base):
  %2 = partial_apply [callee_guaranteed] %1<Sub>(%0) : $@async @convention(thin) <C where C : Base> (@owned Base) -> @owned C
  %3 = function_ref @receive_closure : $@async @convention(thin) <C where C : Base> (@owned @async @callee_guaranteed () -> (@owned C)) -> ()
  %4 = apply %3<Sub>(%2) : $@async @convention(thin) <C where C : Base> (@owned @async @callee_guaranteed () -> (@owned C)) -> ()
- %5 = tuple ()
- return %5 : $()
+ %5 = function_ref @receive_closure2 : $@async @convention(thin) <C where C : Base> (@owned @async @callee_guaranteed (@owned Base) -> (@owned C)) -> ()
+ %8 = apply %5<Sub>(%6) : $@async @convention(thin) <C where C : Base> (@owned @async @callee_guaranteed (@owned Base) -> (@owned C)) -> ()
+ %7 = tuple ()
+ return %7 : $()
 }
 
 
@@ -281,10 +284,14 @@ entry(%i : $Int):
   unreachable
 }
 
+sil public_external @receive_closure3 : $@async @convention(thin) (@owned @async @callee_guaranteed () -> ()) -> ()
+
 sil @partial_apply_complex_generic_function : $@async @convention(thin) <T where T : P2, T.Y : P2> (Int) -> () {
 bb0(%0 : $Int):
   %fn = function_ref @complex_generic_function : $@async @convention(thin) <T where T : P2, T.Y : P2> (Int) -> ()
   %pa = partial_apply [callee_guaranteed] %fn <T>(%0) : $@async @convention(thin) <T where T : P2, T.Y : P1, T.Y : P2> (Int) -> ()
+  %fn2 = function_ref @receive_closure3 : $@async @convention(thin)  (@owned @async @callee_guaranteed () -> ()) -> ()
+  apply %fn2(%pa) : $@async @convention(thin) (@owned @async @callee_guaranteed () -> ()) -> ()
   %result = tuple ()
   return %result : $()
 }
@@ -292,8 +299,9 @@ bb0(%0 : $Int):
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s24complex_generic_functionTA"(
 struct ComplexBoundedType<T: P2> {}
 
-// SR-901: Ensure that a partial_apply which captures bound generic type
-// metadata doesn't crash when restoring the generic context.
+// https://github.com/apple/swift/issues/43513
+// Ensure that a 'partial_apply' which captures bound generic type metadata
+// doesn't crash when restoring the generic context.
 
 sil hidden @generic_function : $@async @convention(thin) <T> () -> () {
   %0 = builtin "int_trap"() : $Never
@@ -555,9 +563,9 @@ entry(%0 : $EmptyType, %1: $*SomeType):
   store %0 to %5 : $*EmptyType
   %31 = function_ref @foo : $@async @convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
   %32 = alloc_stack $EmptyType
-  copy_addr %5 to [initialization] %32 : $*EmptyType
+  copy_addr %5 to [init] %32 : $*EmptyType
   %34 = alloc_stack $SomeType
-  copy_addr %1 to [initialization] %34 : $*SomeType // id: %35
+  copy_addr %1 to [init] %34 : $*SomeType // id: %35
   %36 = partial_apply [callee_guaranteed] %31<EmptyType, SomeType>(%32, %34) : $@async @convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
   release_value %36: $@async @callee_guaranteed () ->()
   dealloc_stack %34 : $*SomeType
@@ -585,9 +593,9 @@ entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
   store %3 to %7 : $*FixedType
   %31 = function_ref @foo2 : $@async @convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> ()
   %32 = alloc_stack $EmptyType
-  copy_addr %5 to [initialization] %32 : $*EmptyType
+  copy_addr %5 to [init] %32 : $*EmptyType
   %34 = alloc_stack $SomeType
-  copy_addr %1 to [initialization] %34 : $*SomeType // id: %35
+  copy_addr %1 to [init] %34 : $*SomeType // id: %35
   %36 = partial_apply [callee_guaranteed] %31<FixedType, EmptyType, SomeType>(%7, %32, %34) : $@async @convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> ()
   release_value %36: $@async @callee_guaranteed () ->()
   dealloc_stack %34 : $*SomeType
@@ -606,7 +614,6 @@ bb0(%thick : $@callee_guaranteed @async @convention(thick) (Int64, Int32) -> Int
   return %pa_f : $@async @callee_guaranteed (Int64) -> Int64
 }
 
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$sTA.{{[0-9]+}}"(
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$sTA.{{[0-9]+}}"(
 
 sil @external_closure : $@convention(thin) @async (Int, Int) -> (Int, @error Error)

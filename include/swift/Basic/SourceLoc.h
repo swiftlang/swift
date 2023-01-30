@@ -248,7 +248,7 @@ public:
 } // end namespace swift
 
 namespace llvm {
-template <typename T> struct DenseMapInfo;
+template <typename T, typename Enable> struct DenseMapInfo;
 
 template <> struct DenseMapInfo<swift::SourceLoc> {
   static swift::SourceLoc getEmptyKey() {

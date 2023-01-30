@@ -50,8 +50,6 @@ class BuildScriptInvocation(object):
             source_root=SWIFT_SOURCE_ROOT,
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
-        self.build_libparser_only = args.build_libparser_only
-
         clear_log_time()
 
     @property
@@ -106,7 +104,6 @@ class BuildScriptInvocation(object):
             "--darwin-deployment-version-watchos=%s" % (
                 args.darwin_deployment_version_watchos),
             "--cmake", toolchain.cmake,
-            "--cmark-build-type", args.cmark_build_variant,
             "--llvm-build-type", args.llvm_build_variant,
             "--swift-build-type", args.swift_build_variant,
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
@@ -129,6 +126,7 @@ class BuildScriptInvocation(object):
             "--cross-compile-append-host-target-to-destdir", str(
                 args.cross_compile_append_host_target_to_destdir).lower(),
             "--build-jobs", str(args.build_jobs),
+            "--lit-jobs", str(args.lit_jobs),
             "--common-cmake-options=%s" % ' '.join(
                 pipes.quote(opt) for opt in cmake.common_options()),
             "--build-args=%s" % ' '.join(
@@ -177,6 +175,11 @@ class BuildScriptInvocation(object):
                     "--{}-cmake-options={}".format(
                         product_name, ' '.join(cmake_opts))
                 ]
+
+        if args.build_toolchain_only:
+            impl_args += [
+                "--build-toolchain-only=1"
+            ]
 
         if args.build_stdlib_deployment_targets:
             impl_args += [
@@ -245,11 +248,18 @@ class BuildScriptInvocation(object):
             args.extra_cmake_options.append(
                 '-DSWIFT_BACK_DEPLOY_CONCURRENCY:BOOL=TRUE')
 
+        swift_syntax_src = os.path.join(self.workspace.source_root,
+                                        "swift-syntax")
+        args.extra_cmake_options.append(
+            '-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH={}'.format(swift_syntax_src))
+
+        if args.build_early_swiftsyntax:
+            impl_args += ["--swift-earlyswiftsyntax"]
+
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.
         conditional_subproject_configs = [
-            (args.build_cmark, "cmark"),
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
             (args.build_foundation, "foundation"),
@@ -289,7 +299,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-swift"]
         if not args.test:
             impl_args += [
-                "--skip-test-cmark",
                 "--skip-test-lldb",
                 "--skip-test-llbuild",
                 "--skip-test-xctest",
@@ -311,8 +320,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--only-executable-test"]
         if not args.benchmark:
             impl_args += ["--skip-test-benchmarks"]
-        if args.build_libparser_only:
-            impl_args += ["--build-libparser-only"]
         if args.android:
             impl_args += [
                 "--android-arch", args.android_arch,
@@ -529,7 +536,7 @@ class BuildScriptInvocation(object):
                 "SWIFT_TEST_TARGETS": " ".join(
                     config.swift_test_run_targets),
                 "SWIFT_FLAGS": config.swift_flags,
-                "SWIFT_TARGET_CMAKE_OPTIONS": config.cmake_options,
+                "SWIFT_TARGET_CMAKE_OPTIONS": " ".join(config.cmake_options),
             }
 
         return options
@@ -548,12 +555,16 @@ class BuildScriptInvocation(object):
         builder = ProductPipelineListBuilder(self.args)
 
         builder.begin_pipeline()
+
+        builder.add_product(products.EarlySwiftSyntax,
+                            is_enabled=self.args.build_early_swiftsyntax)
+
         # If --skip-early-swift-driver is passed in, swift will be built
         # as usual, but relying on its own C++-based (Legacy) driver.
         # Otherwise, we build an "early" swift-driver using the host
         # toolchain, which the later-built compiler will forward
         # `swiftc` invocations to. That is, if we find a Swift compiler
-        # in the host toolchain. If the host toolchain is not equpipped with
+        # in the host toolchain. If the host toolchain is not equipped with
         # a Swift compiler, a warning is emitted. In the future, it may become
         # mandatory that the host toolchain come with its own `swiftc`.
         builder.add_product(products.EarlySwiftDriver,
@@ -561,6 +572,12 @@ class BuildScriptInvocation(object):
 
         builder.add_product(products.CMark,
                             is_enabled=self.args.build_cmark)
+
+        # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
+        # Swift still needs a few LLVM targets like tblgen to be built for it to be
+        # configured. Instead, handle this in the product for now.
+        builder.add_product(products.LLVM,
+                            is_enabled=True)
 
         builder.add_product(products.LibXML2,
                             is_enabled=self.args.build_libxml2)
@@ -579,11 +596,6 @@ class BuildScriptInvocation(object):
         # test, install like a normal build-script product.
         builder.begin_impl_pipeline(should_run_epilogue_operations=False)
 
-        # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
-        # Swift still needs a few LLVM targets like tblgen to be built for it to be
-        # configured. Instead, handle this in build-script-impl for now.
-        builder.add_impl_product(products.LLVM,
-                                 is_enabled=True)
         builder.add_impl_product(products.LibCXX,
                                  is_enabled=self.args.build_libcxx)
         builder.add_impl_product(products.LibICU,
@@ -636,7 +648,7 @@ class BuildScriptInvocation(object):
         builder.add_product(products.SwiftDocC,
                             is_enabled=self.args.build_swiftdocc)
         builder.add_product(products.SwiftDocCRender,
-                            is_enabled=self.args.install_swiftdocc)                  
+                            is_enabled=self.args.install_swiftdocc)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully
@@ -692,7 +704,7 @@ class BuildScriptInvocation(object):
             if is_impl:
                 self._execute_impl(pipeline, all_hosts, perform_epilogue_opts)
             else:
-                assert(index != last_impl_index)
+                assert index != last_impl_index
                 if index > last_impl_index:
                     non_darwin_cross_compile_hostnames = [
                         target for target in self.args.cross_compile_hosts if not

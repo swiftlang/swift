@@ -340,7 +340,9 @@ class DerivedClass : BaseClass {
   }
 }
 
-// https://bugs.swift.org/browse/SR-3847: Resolve members in inner types.
+// https://github.com/apple/swift/issues/46432
+// Resolve members in inner types.
+//
 // This first extension isn't necessary; we could have put 'originalValue' in
 // the original declaration.
 extension OuterNonGenericClass.InnerNonGenericBase {
@@ -372,7 +374,8 @@ extension OuterGeneric.MidGeneric where D == Int, F == String {
   }
 }
 
-// https://bugs.swift.org/browse/SR-4672
+// https://github.com/apple/swift/issues/47249
+
 protocol ExpressibleByCatLiteral {}
 protocol ExpressibleByDogLiteral {}
 
@@ -393,10 +396,10 @@ func something<T>() -> T {
   while true {}
 }
 
-func test() {
+do {
   let _: Claws<Kitten>.Fangs<Puppy> = pets(fur: Puppy())
 
-  // <https://bugs.swift.org/browse/SR-5600>
+  // https://github.com/apple/swift/issues/48172
   let _: Claws.Fangs<Puppy> = pets(fur: Puppy())
   let _: Claws.Fangs<Puppy> = Claws<Kitten>.Fangs()
   let _: Claws.Fangs<Puppy> = Claws.Fangs()
@@ -410,7 +413,7 @@ func test() {
   // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}} {{12-12=<<#A: ExpressibleByCatLiteral#>>}}
 }
 
-// https://bugs.swift.org/browse/SR-4379
+// https://github.com/apple/swift/issues/46958
 extension OuterGeneric.MidNonGeneric {
   func doStuff() -> OuterGeneric {
     return OuterGeneric()

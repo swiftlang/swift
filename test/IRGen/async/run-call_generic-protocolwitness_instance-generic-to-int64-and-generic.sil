@@ -42,7 +42,7 @@ bb0(%out_addr : $*T, %in_addr : $*T, %self : $I):
   %printGeneric_result = apply %printGeneric<I>(%self_addr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   dealloc_stack %self_addr : $*I
   %value = struct_extract %self : $I, #I.int
-  copy_addr %in_addr to [initialization] %out_addr : $*T
+  copy_addr %in_addr to [init] %out_addr : $*T
   return %value : $Int64
 }
 

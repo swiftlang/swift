@@ -13,7 +13,7 @@ public struct MyResilientInt {
   public init(i: Int) { self.i = i }
 }
 
-public class NeedsIVarDetroyer : Base {
+public class NeedsIVarDestroyer : Base {
   var x = ResilientInt(i: 0)
 }
 
@@ -21,13 +21,13 @@ public class DoesNotNeedIVarDestroyer : Base {
   var x = MyResilientInt(i: 0)
 }
 
-// CHECK-LABEL: sil_vtable NeedsIVarDetroyer {
+// CHECK-LABEL: sil_vtable NeedsIVarDestroyer {
 // CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base
-// CHECK-NEXT: #NeedsIVarDetroyer.x!getter: (NeedsIVarDetroyer) -> () -> resilient_struct.ResilientInt
-// CHECK-NEXT: #NeedsIVarDetroyer.x!setter: (NeedsIVarDetroyer) -> (resilient_struct.ResilientInt) -> ()
-// CHECK-NEXT: #NeedsIVarDetroyer.x!modify: (NeedsIVarDetroyer) -> () -> ()
-// CHECK-NEXT: #NeedsIVarDetroyer.deinit!deallocator
-// CHECK-NEXT: #NeedsIVarDetroyer!ivardestroyer
+// CHECK-NEXT: #NeedsIVarDestroyer.x!getter: (NeedsIVarDestroyer) -> () -> resilient_struct.ResilientInt
+// CHECK-NEXT: #NeedsIVarDestroyer.x!setter: (NeedsIVarDestroyer) -> (resilient_struct.ResilientInt) -> ()
+// CHECK-NEXT: #NeedsIVarDestroyer.x!modify: (NeedsIVarDestroyer) -> () -> ()
+// CHECK-NEXT: #NeedsIVarDestroyer.deinit!deallocator
+// CHECK-NEXT: #NeedsIVarDestroyer!ivardestroyer
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable DoesNotNeedIVarDestroyer {

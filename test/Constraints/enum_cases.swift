@@ -172,7 +172,8 @@ struct EnumElementPatternFromContextualType<T> {
   }
 }
 
-// SR-14408
+// https://github.com/apple/swift/issues/56765
+
 enum CompassPoint {
     case North(Int)
     case South

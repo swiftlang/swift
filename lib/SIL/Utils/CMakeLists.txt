@@ -4,6 +4,7 @@ target_sources(swiftSIL PRIVATE
   DebugUtils.cpp
   Dominance.cpp
   DynamicCasts.cpp
+  FieldSensitivePrunedLiveness.cpp
   GenericSpecializationMangler.cpp
   InstructionUtils.cpp
   LoopInfo.cpp
@@ -14,6 +15,7 @@ target_sources(swiftSIL PRIVATE
   PrettyStackTrace.cpp
   Projection.cpp
   PrunedLiveness.cpp
+  ScopedAddressUtils.cpp
   SILBridging.cpp
   SILInstructionWorklist.cpp
   SILRemarkStreamer.cpp

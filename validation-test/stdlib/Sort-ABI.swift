@@ -20,7 +20,8 @@ SortABITestSuite.test("_merge-ABI") {
     }
   }
   // The return value is legacy ABI. It was originally added as a
-  // workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
+  // workaround for a compiler bug (now fixed). See
+  // https://github.com/apple/swift/issues/57100 (rdar://45044610).
   // `_merge` always returns `true`
   expectEqual(result, true)
 }
@@ -36,7 +37,8 @@ SortABITestSuite.test("_mergeRuns-ABI") {
     }
   }
   // The return value is legacy ABI. It was originally added as a
-  // workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
+  // workaround for a compiler bug (now fixed). See
+  // https://github.com/apple/swift/issues/57100 (rdar://45044610).
   // `_mergeRuns` always returns `true`
   expectEqual(result, true)
 }
@@ -52,7 +54,8 @@ SortABITestSuite.test("_mergeTopRuns-ABI") {
     }
   }
   // The return value is legacy ABI. It was originally added as a
-  // workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
+  // workaround for a compiler bug (now fixed). See
+  // https://github.com/apple/swift/issues/57100 (rdar://45044610).
   // `_mergeTopRuns` always returns `true`
   expectEqual(result, true)
 }
@@ -68,7 +71,8 @@ SortABITestSuite.test("_finalizeRuns-ABI") {
     }
   }
   // The return value is legacy ABI. It was originally added as a
-  // workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
+  // workaround for a compiler bug (now fixed). See
+  // https://github.com/apple/swift/issues/57100 (rdar://45044610).
   // `_finalizeRuns` always returns `true`
   expectEqual(result, true)
 }

@@ -20,12 +20,8 @@ import MyModule
 
 func testSync() -> Int{
     #^GLOBAL_IN_SYNC^#
-// FIXME: 'globalAsyncFunc()' *should* be "NotRecommended" because  it's 'async'
-// The curently behavior is due to completion cache. We should remember
-// 'async'-ness in the cache. (rdar://78317170)
-
 // GLOBAL_IN_SYNC: Begin completions
-// GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/TypeRelation[Convertible]: globalAsyncFunc()[' async'][#Int#];
+// GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended/TypeRelation[Convertible]: globalAsyncFunc()[' async'][#Int#];
 // GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended: deprecatedFunc()[#Void#];
 // GLOBAL_IN_SYNC-DAG: Decl[Actor]/OtherModule[MyModule]:  MyActor[#MyActor#];
 // GLOBAL_IN_SYNC: End completions

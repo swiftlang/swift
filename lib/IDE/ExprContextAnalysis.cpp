@@ -119,24 +119,26 @@ public:
 
   Expr *get() const { return FoundExpr; }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (TargetRange == E->getSourceRange() && !shouldIgnore(E)) {
       assert(!FoundExpr && "non-nullptr for found expr");
       FoundExpr = E;
-      return {false, nullptr};
+      return Action::Stop();
     }
-    return {isInterstingRange(E), E};
+    return Action::VisitChildrenIf(isInterstingRange(E), E);
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
-    return {isInterstingRange(P), P};
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+    return Action::VisitChildrenIf(isInterstingRange(P), P);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    return {isInterstingRange(S), S};
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    return Action::VisitChildrenIf(isInterstingRange(S), S);
   }
 
-  bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    return Action::SkipChildren();
+  }
 };
 } // anonymous namespace
 
@@ -195,21 +197,21 @@ public:
     return E;
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (Removed)
-      return {false, nullptr};
+      return Action::Stop();
     E = visit(E);
-    return {!Removed, E};
+    return Action::SkipChildrenIf(Removed, E);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (Removed)
-      return {false, nullptr};
-    return {true, S};
+      return Action::Stop();
+    return Action::Continue(S);
   }
 
-  bool walkToDeclPre(Decl *D) override {
-    return !Removed;
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    return Action::SkipChildrenIf(Removed);
   }
 };
 }
@@ -253,7 +255,7 @@ void swift::ide::collectPossibleReturnTypesFromContext(
           const auto type = swift::performTypeResolution(
               CE->getExplicitResultTypeRepr(), DC->getASTContext(),
               /*isSILMode=*/false, /*isSILType=*/false,
-              DC->getGenericEnvironmentOfContext(), /*GenericParams=*/nullptr,
+              DC->getGenericSignatureOfContext(), /*GenericParams=*/nullptr,
               const_cast<DeclContext *>(DC), /*diagnostics=*/false);
 
           if (!type->hasError()) {
@@ -301,59 +303,59 @@ public:
                    std::function<bool(ParentTy, ParentTy)> Predicate)
       : ChildExpr(ChildExpr), Predicate(Predicate) {}
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     // Finish if we found the target. 'ChildExpr' might have been replaced
     // with typechecked expression. In that case, match the position.
     if (E == ChildExpr || arePositionsSame(E, ChildExpr))
-      return {false, nullptr};
+      return Action::Stop();
 
     if (E != ChildExpr && Predicate(E, Parent)) {
       Ancestors.push_back(E);
-      return {true, E};
+      return Action::Continue(E);
     }
-    return {true, E};
+    return Action::Continue(E);
   }
 
-  Expr *walkToExprPost(Expr *E) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     if (Predicate(E, Parent))
       Ancestors.pop_back();
-    return E;
+    return Action::Continue(E);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (Predicate(S, Parent))
       Ancestors.push_back(S);
-    return {true, S};
+    return Action::Continue(S);
   }
 
-  Stmt *walkToStmtPost(Stmt *S) override {
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
     if (Predicate(S, Parent))
       Ancestors.pop_back();
-    return S;
+    return Action::Continue(S);
   }
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (Predicate(D, Parent))
       Ancestors.push_back(D);
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToDeclPost(Decl *D) override {
+  PostWalkAction walkToDeclPost(Decl *D) override {
     if (Predicate(D, Parent))
       Ancestors.pop_back();
-    return true;
+    return Action::Continue();
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
     if (Predicate(P, Parent))
       Ancestors.push_back(P);
-    return {true, P};
+    return Action::Continue(P);
   }
 
-  Pattern *walkToPatternPost(Pattern *P) override {
+  PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) override {
     if (Predicate(P, Parent))
       Ancestors.pop_back();
-    return P;
+    return Action::Continue(P);
   }
 };
 
@@ -880,7 +882,7 @@ class ExprContextAnalyzer {
               *DC, originalArgs, ParsedExpr, typeAndDecl.Type->getParams(),
               /*lenient=*/false);
           posInParams.push_back(pos);
-          found |= pos.hasValue();
+          found |= pos.has_value();
         }
         if (!found) {
           // If applicable overload is not found, retry with considering
@@ -895,7 +897,7 @@ class ExprContextAnalyzer {
       assert(posInParams.size() == Candidates.size());
 
       for (auto i : indices(Candidates)) {
-        if (!posInParams[i].hasValue()) {
+        if (!posInParams[i].has_value()) {
           // If the argument doesn't have a matching position in the parameters,
           // indicate that with optional nullptr param.
           if (seenArgs.insert({Identifier(), CanType()}).second)
@@ -1014,8 +1016,8 @@ class ExprContextAnalyzer {
       }
       break;
     }
-    case ExprKind::If: {
-      auto *IE = cast<IfExpr>(Parent);
+    case ExprKind::Ternary: {
+      auto *IE = cast<TernaryExpr>(Parent);
       if (IE->isFolded() &&
           SM.rangeContains(IE->getCondExpr()->getSourceRange(),
                            ParsedExpr->getSourceRange())) {
@@ -1214,6 +1216,11 @@ class ExprContextAnalyzer {
       recordPossibleType(AFD->mapTypeIntoContext(var->getInterfaceType()));
       break;
     }
+
+    case InitializerKind::RuntimeAttribute: {
+      // This never appears in AST.
+      break;
+    }
     }
   }
 
@@ -1289,7 +1296,7 @@ public:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
         case ExprKind::Dictionary:
-        case ExprKind::If:
+        case ExprKind::Ternary:
           return true;
         case ExprKind::Array:
           return (!Parent.getAsExpr() ||

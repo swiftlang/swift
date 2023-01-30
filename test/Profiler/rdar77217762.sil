@@ -1,0 +1,47 @@
+
+// rdar://77217762 – The increment_profiler_counter in $foo gets optimized out by
+// LLVM function optimization, but make sure we still emit the name data which
+// is required by the coverage record.
+
+// Make sure both the legacy and new pass manager work.
+// We need to disable SIL optimizations to ensure LLVM optimizes out the
+// profiler increment.
+// RUN: %target-swift-frontend -emit-ir -profile-generate -profile-coverage-mapping -O -disable-sil-perf-optzns -disable-new-llvm-pass-manager %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -profile-generate -profile-coverage-mapping -O -disable-sil-perf-optzns -enable-new-llvm-pass-manager %s | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// CHECK-DAG: @__covrec
+// CHECK-DAG: @__llvm_coverage_mapping
+// CHECK-DAG: @__llvm_prf_nm
+
+sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
+}
+
+sil [ossa] @$foo : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int1, 0
+  cond_br %1, bb1, bb2
+
+bb1:
+  increment_profiler_counter 0, "$foo", num_counters 1, hash 0
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil_coverage_map "main.swift" "$foo" "$foo" 0 {
+  10:6 -> 10:11 : 0
+}

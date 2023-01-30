@@ -1,7 +1,7 @@
 // Try and schedule the cancel the cancellation as fast as possible to cancel during the first pass
 // RUN: not %sourcekitd-test -req=complete -pos 15:35 %s -id=complete -async -- %s == -cancel=complete 2>&1 | %FileCheck --check-prefix=CANCEL_NO_CACHE %s
 
-// Wait 1 second for the first pass to complet and try to cancel during the second pass. This relies on the fact that the expression in line 12 is slow to type check (rdar://80582770)
+// Wait 1 second for the first pass to complete and try to cancel during the second pass. This relies on the fact that the expression in line 12 is slow to type check (rdar://80582770)
 // RUN: not %sourcekitd-test -req=complete -pos 15:35 %s -id=complete -async -- %s == -shell -- sleep 1 == -cancel=complete 2>&1 | %FileCheck --check-prefix=CANCEL_NO_CACHE %s
 
 // Built an AST inside `fast(a:)` then complete the slow operation and try to cancel it.

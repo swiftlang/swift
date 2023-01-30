@@ -162,11 +162,25 @@ class NonObjC {}
   }
 }
 
-// https://bugs.swift.org/browse/SR-9889
+// https://github.com/apple/swift/issues/52295
+
 @objc class NonOptionalWeak {
   // expected-error@+3 {{@IBOutlet property has non-optional type 'OX'}}
   // expected-note @+2 {{add '?' to form the optional type 'OX?'}}
   // expected-note @+1 {{add '!' to form an implicitly unwrapped optional}}
   @IBOutlet weak var something: OX
   init() { }
+}
+
+@propertyWrapper
+struct MyWrapper {
+  var wrappedValue: AnyObject {
+    get { fatalError() }
+    set { }
+  }
+}
+
+@objc class WrappedIBOutlet {
+  // Non-optional types are okay with property wrappers.
+  @IBOutlet @MyWrapper var value: AnyObject
 }

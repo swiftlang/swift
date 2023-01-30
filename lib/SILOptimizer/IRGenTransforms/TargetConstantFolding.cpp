@@ -26,6 +26,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -71,9 +72,9 @@ private:
       for (SILBasicBlock &block : function) {
         InstructionDeleter deleter;
 
-        for (SILInstruction *inst : deleter.updatingRange(&block)) {
-          if (constFold(inst, IGM)) {
-            deleter.forceDelete(inst);
+        for (SILInstruction &inst : block.deletableInstructions()) {
+          if (constFold(&inst, IGM)) {
+            deleter.forceDelete(&inst);
             changed = true;
           }
         }

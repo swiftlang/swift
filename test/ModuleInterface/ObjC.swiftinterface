@@ -4,7 +4,7 @@
 
 // FIXME: This test is self-contained, so it shouldn't require objc_interop
 // (just -enable-objc-interop), but it's failing in Linux SILGen.
-// https://bugs.swift.org/browse/SR-8877
+// https://github.com/apple/swift/issues/51383
 // REQUIRES: objc_interop
 
 import Foundation

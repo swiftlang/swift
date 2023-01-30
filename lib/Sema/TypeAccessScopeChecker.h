@@ -43,7 +43,7 @@ class TypeAccessScopeChecker {
 
     auto AS = VD->getFormalAccessScope(File, TreatUsableFromInlineAsPublic);
     Scope = Scope->intersectWith(AS);
-    return Scope.hasValue();
+    return Scope.has_value();
   }
 
 public:
@@ -51,7 +51,7 @@ public:
   getAccessScope(TypeRepr *TR, const DeclContext *useDC,
                  bool treatUsableFromInlineAsPublic = false) {
     TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
-    TR->walk(TypeReprIdentFinder([&](const ComponentIdentTypeRepr *typeRepr) {
+    TR->walk(TypeReprIdentFinder([&](const IdentTypeRepr *typeRepr) {
       return checker.visitDecl(typeRepr->getBoundDecl());
     }));
     return checker.Scope;

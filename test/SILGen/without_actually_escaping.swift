@@ -22,7 +22,7 @@ func letEscape(f: () -> ()) -> () -> () {
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
 
 // CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping14letEscapeThrow1fyycyycyKXE_tKF
-// CHECK: bb0([[ARG:%.*]] : $@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)):
+// CHECK: bb0([[ARG:%.*]] : $@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error any Error)):
 // CHECK: [[CVT:%.*]] = function_ref @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR
 // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CVT]]([[ARG]])
 // CHECK:  [[MD:%.*]] = mark_dependence [[CLOSURE]] : {{.*}} on [[ARG]]
@@ -37,10 +37,10 @@ func letEscape(f: () -> ()) -> () -> () {
 // CHECK:   destroy_value [[MD]]
 // CHECK:   return [[RES]]
 //
-// CHECK: bb2([[ERR:%.*]] : @owned $Error):
+// CHECK: bb2([[ERR:%.*]] : @owned $any Error):
 // CHECK:   end_borrow [[BORROW]]
 // CHECK:   destroy_value [[MD]]
-// CHECK:   throw [[ERR]] : $Error
+// CHECK:   throw [[ERR]] : $any Error
 // CHECK: }
 
 func letEscapeThrow(f: () throws -> () -> ()) throws -> () -> () {
@@ -49,7 +49,7 @@ func letEscapeThrow(f: () throws -> () -> ()) throws -> () -> () {
 
 // thunk for @callee_guaranteed () -> (@owned @escaping @callee_guaranteed () -> (), @error @owned Error)
 // The thunk must be [without_actually_escaping].
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR : $@convention(thin) (@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)) -> (@owned @callee_guaranteed () -> (), @error Error) {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR : $@convention(thin) (@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error any Error)) -> (@owned @callee_guaranteed () -> (), @error any Error) {
 
 // We used to crash on this example because we would use the wrong substitution
 // map.

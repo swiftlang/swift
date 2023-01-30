@@ -94,3 +94,32 @@ entry(%0 : @owned $Builtin.NativeObject):
   %res = apply %callee_move_value(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
   return %res : $Builtin.NativeObject
 }
+
+sil [ossa] @callee_debug_value : $@convention(thin) (@owned X) -> @owned X {
+entry(%0 : @owned $X):
+  debug_value [trace] %0 : $X
+  return %0 : $X
+}
+
+sil [ossa] @caller_debug_value : $@convention(thin) (@owned X) -> @owned X {
+entry(%0 : @owned $X):
+  %callee_debug_value = function_ref @callee_debug_value : $@convention(thin) (@owned X) -> @owned X
+  %res = apply %callee_debug_value(%0) : $@convention(thin) (@owned X) -> @owned X
+  return %res : $X
+}
+
+// CHECK-LABEL: sil [ossa] @caller_test_specification : {{.*}} {
+// CHECK:         test_specification "foo bar baz"
+// CHECK-LABEL: } // end sil function 'caller_test_specification'
+sil [always_inline] [ossa] @callee_test_specification : $@convention(thin) () -> () {
+entry:
+  test_specification "foo bar baz"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @caller_test_specification : $@convention(thin) () -> () {
+  %callee = function_ref @callee_test_specification : $@convention(thin) () -> ()
+  %retval = apply %callee() : $@convention(thin) () -> ()
+  return %retval : $()
+}

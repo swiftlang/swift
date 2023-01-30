@@ -459,7 +459,7 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
 
       SILInstruction *branchInst = op->getUser();
       SILBuilder builder(branchInst);
-      auto *strExtract = builder.createStructExtract(loc.getValue(),
+      auto *strExtract = builder.createStructExtract(loc.value(),
                                                      op->get(), field, newType);
       op->set(strExtract);
     }

@@ -6,7 +6,7 @@
 // to validateDecl() getting called on a declaration. In this case, we
 // did not infer @objc from witnessed protocol requirements as required.
 //
-// https://bugs.swift.org/browse/SR-10257
+// https://github.com/apple/swift/issues/52657
 
 @objc public protocol P {
   @objc optional func f()

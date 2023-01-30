@@ -10,7 +10,7 @@ class C {
   // CHECK-NEXT: [[@LINE+1]]:10 -> [[@LINE+1]]:12
   init() {}
 
-  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.C.__deallocating_deinit
+  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.C.deinit
   // CHECK-NEXT: [[@LINE+1]]:10 -> [[@LINE+1]]:12
   deinit {}
 }
@@ -51,12 +51,4 @@ struct S2 {
   // CHECK-NEXT: [[@LINE+2]]:26 -> [[@LINE+2]]:27 : (0 - 1)
   // CHECK-NEXT: [[@LINE+1]]:17 -> [[@LINE+1]]:27 : 0
   var m1: Int = g1 ? 0 : 1
-}
-
-// Test that the crash from SR-8429 is avoided. Follow-up work is
-// needed to generate the correct coverage mapping here. Coverage for
-// `offset` should be associated with its getter, not the class
-// constructor.
-class C2 {
-  lazy var offset: Int = true ? 30 : 55
 }

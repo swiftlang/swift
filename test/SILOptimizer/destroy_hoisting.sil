@@ -86,14 +86,14 @@ bb1:
 
 // CHECK-LABEL: sil [ossa] @combine_copy_addr
 // CHECK:      bb0(%0 : $*S, %1 : $*S):
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %0
 // CHECK-NEXT:   br bb1
 // CHECK:      bb1:
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 sil [ossa] @combine_copy_addr : $@convention(thin) (@in S) -> @out S {
 bb0(%0 : $*S, %1 : $*S):
-  copy_addr %1 to [initialization] %0 : $*S
+  copy_addr %1 to [init] %0 : $*S
   br bb1
 bb1:
   destroy_addr %1 : $*S
@@ -355,7 +355,7 @@ bb0(%0 :  $*X):
 sil [ossa] @test_switch_enum_addr : $@convention(thin) (@in TwoCases) -> () {
 bb0(%0 : $*TwoCases):
   %2 = alloc_stack $TwoCases
-  copy_addr %0 to [initialization] %2 : $*TwoCases
+  copy_addr %0 to [init] %2 : $*TwoCases
   switch_enum_addr %2 : $*TwoCases, case #TwoCases.A!enumelt: bb1, case #TwoCases.B!enumelt: bb2
 
 bb1:
@@ -381,7 +381,7 @@ bb3:
 sil [ossa] @test_load_borrow1 : $@convention(thin) (@in TwoCases) -> () {
 bb0(%0 : $*TwoCases):
   %2 = alloc_stack $TwoCases
-  copy_addr %0 to [initialization] %2 : $*TwoCases
+  copy_addr %0 to [init] %2 : $*TwoCases
   %ld = load_borrow %2 : $*TwoCases
   br bb1(%ld : $TwoCases)
 
@@ -407,7 +407,7 @@ bb3:
 sil [ossa] @test_load_borrow2 : $@convention(thin) (@in TwoCases) -> () {
 bb0(%0 : $*TwoCases):
   %2 = alloc_stack $TwoCases
-  copy_addr %0 to [initialization] %2 : $*TwoCases
+  copy_addr %0 to [init] %2 : $*TwoCases
   %ld = load_borrow %2 : $*TwoCases
   cond_br undef, bb1, bb2
 

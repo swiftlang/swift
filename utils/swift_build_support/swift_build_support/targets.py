@@ -11,6 +11,7 @@
 import os
 import platform
 
+from . import cmake
 from . import shell
 
 try:
@@ -78,7 +79,7 @@ class Platform(object):
         """
         CMake flags to build for a platform, useful for cross-compiling
         """
-        return ''
+        return cmake.CMakeOptions()
 
     def swiftpm_config(self, args, output_dir, swift_toolchain, resource_path):
         """
@@ -121,13 +122,7 @@ class DarwinPlatform(Platform):
         # The names match up with the xcrun SDK names.
         xcrun_sdk_name = self.name
 
-        # 32-bit iOS and iOS simulator are supported, but are not covered
-        # by the SDK settings. Handle this special case here.
-        if (xcrun_sdk_name == 'iphoneos' and
-           (arch == 'armv7' or arch == 'armv7s')):
-            return True
-
-        if (xcrun_sdk_name == 'iphonesimulator' and arch == 'i386'):
+        if (xcrun_sdk_name == 'watchos' and arch == 'armv7k'):
             return True
 
         sdk_path = xcrun.sdk_path(sdk=xcrun_sdk_name, toolchain=toolchain)
@@ -169,12 +164,13 @@ class AndroidPlatform(Platform):
         return flags
 
     def cmake_options(self, args):
-        options = '-DCMAKE_SYSTEM_NAME=Android '
-        options += '-DCMAKE_SYSTEM_VERSION=%s ' % (args.android_api_level)
-        options += '-DCMAKE_SYSTEM_PROCESSOR=%s ' % (args.android_arch if not
-                                                     args.android_arch == 'armv7'
-                                                     else 'armv7-a')
-        options += '-DCMAKE_ANDROID_NDK:PATH=%s' % (args.android_ndk)
+        options = cmake.CMakeOptions()
+        options.define('CMAKE_SYSTEM_NAME', 'Android')
+        options.define('CMAKE_SYSTEM_VERSION' , args.android_api_level)
+        options.define('CMAKE_SYSTEM_PROCESSOR', args.android_arch if not
+                       args.android_arch == 'armv7'
+                       else 'armv7-a')
+        options.define('CMAKE_ANDROID_NDK:PATH', args.android_ndk)
         return options
 
     def ndk_toolchain_path(self, args):
@@ -214,6 +210,14 @@ class AndroidPlatform(Platform):
         return config_file
 
 
+class OpenBSDPlatform(Platform):
+    def cmake_options(self, args):
+        toolchain_file = os.getenv('OPENBSD_USE_TOOLCHAIN_FILE')
+        if not toolchain_file:
+            return ''
+        return f'-DCMAKE_TOOLCHAIN_FILE="${toolchain_file}"'
+
+
 class Target(object):
     """
     Abstract representation of a target Swift can run on.
@@ -234,14 +238,11 @@ class StdlibDeploymentTarget(object):
     OSX = DarwinPlatform("macosx", archs=["x86_64", "arm64"],
                          sdk_name="OSX")
 
-    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64", "arm64e"],
+    iOS = DarwinPlatform("iphoneos", archs=["arm64", "arm64e"],
                          sdk_name="IOS")
-    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64", "arm64"],
+    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["x86_64", "arm64"],
                                   sdk_name="IOS_SIMULATOR",
                                   is_simulator=True)
-
-    # Never build/test benchmarks on iOS armv7s.
-    iOS.armv7s.supports_benchmark = False
 
     AppleTV = DarwinPlatform("appletvos", archs=["arm64"],
                              sdk_name="TVOS")
@@ -277,7 +278,7 @@ class StdlibDeploymentTarget(object):
 
     FreeBSD = Platform("freebsd", archs=["x86_64"])
 
-    OpenBSD = Platform("openbsd", archs=["amd64"])
+    OpenBSD = OpenBSDPlatform("openbsd", archs=["amd64"])
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
 
@@ -434,7 +435,7 @@ def install_prefix():
 
 def darwin_toolchain_prefix(darwin_install_prefix):
     """
-    Given the install prefix for a Darwin system, and assuming that that path
+    Given the install prefix for a Darwin system, and assuming that path
     is to a .xctoolchain directory, return the path to the .xctoolchain
     directory.
     """
@@ -443,7 +444,7 @@ def darwin_toolchain_prefix(darwin_install_prefix):
 
 def toolchain_path(install_destdir, install_prefix):
     """
-    Given the install prefix for a Darwin system, and assuming that that path
+    Given the install prefix for a Darwin system, and assuming that path
     is to a .xctoolchain directory, return the path to the .xctoolchain
     directory in the given install directory.
     This toolchain is being populated during the build-script invocation.

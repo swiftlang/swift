@@ -61,7 +61,7 @@ do {
 }
 
 do {
-  // FIXME: https://bugs.swift.org/browse/SR-9762
+  // FIXME: https://github.com/apple/swift/issues/52190
   // let x1: Proto.Alias<String> = 0
   // let x2: Proto.OtherAlias<String> = 0
 

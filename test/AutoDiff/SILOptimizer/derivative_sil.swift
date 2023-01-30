@@ -89,7 +89,8 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   return [[DX]] : $Float
 // CHECK-SIL: }
 
-// Check the conventions of the generated functions for a method (SR-13945).
+// https://github.com/apple/swift/issues/56342
+// Check the conventions of the generated functions for a method.
 struct ExampleStruct {
   @_silgen_name("fooMethod")
   @differentiable(reverse)

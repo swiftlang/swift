@@ -39,7 +39,7 @@
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 
 using namespace swift;
 
@@ -88,6 +88,14 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     SILBuilderWithScope b(si);
     b.emitStoreValueOperation(si->getLoc(), si->getSrc(), si->getDest(),
                               StoreOwnershipQualifier::Trivial);
+    SmallVector<EndBorrowInst *, 4> endBorrows;
+    for (auto *ebi : si->getUsersOfType<EndBorrowInst>()) {
+      endBorrows.push_back(ebi);
+    }
+    for (auto *ebi : endBorrows) {
+      eraseFromParent(ebi);
+    }
+    si->replaceAllUsesWith(si->getDest());
     return eraseFromParent(si);
   }
 
@@ -175,19 +183,32 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(DestroyAddr)
   NO_UPDATE_NEEDED(DeallocStack)
   NO_UPDATE_NEEDED(Branch)
-  NO_UPDATE_NEEDED(UncheckedAddrCast)
   NO_UPDATE_NEEDED(RefElementAddr)
-  NO_UPDATE_NEEDED(Upcast)
   NO_UPDATE_NEEDED(CheckedCastBranch)
   NO_UPDATE_NEEDED(Object)
   NO_UPDATE_NEEDED(OpenExistentialRef)
   NO_UPDATE_NEEDED(ConvertFunction)
   NO_UPDATE_NEEDED(RefToBridgeObject)
   NO_UPDATE_NEEDED(BridgeObjectToRef)
-  NO_UPDATE_NEEDED(UnconditionalCheckedCast)
   NO_UPDATE_NEEDED(ClassMethod)
 #undef NO_UPDATE_NEEDED
 
+  bool eliminateIdentityCast(SingleValueInstruction *svi) {
+    if (svi->getOperand(0)->getType() != svi->getType())
+      return false;
+    svi->replaceAllUsesWith(svi->getOperand(0));
+    eraseFromParent(svi);
+    return true;
+  }
+
+#define ELIMINATE_POTENTIAL_IDENTITY_CAST(NAME) \
+  bool visit##NAME##Inst(NAME##Inst *cast) { \
+    return eliminateIdentityCast(cast); \
+  }
+  ELIMINATE_POTENTIAL_IDENTITY_CAST(Upcast)
+  ELIMINATE_POTENTIAL_IDENTITY_CAST(UncheckedAddrCast)
+  ELIMINATE_POTENTIAL_IDENTITY_CAST(UnconditionalCheckedCast)
+#undef ELIMINATE_POTENTIAL_IDENTITY_CAST
   // We handle apply sites by just inserting a convert_function that converts
   // the original function type into a function type without move only. This is
   // safe since adding/removing moveonlywrapped types is ABI neutral.

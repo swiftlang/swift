@@ -112,7 +112,8 @@ bb0(%0 : @owned $Builtin.NativeObject):
   end_borrow %1 : $Builtin.NativeObject
   %2 = alloc_stack $Builtin.NativeObject
   %3 = begin_borrow %0 : $Builtin.NativeObject
-  store_borrow %3 to %2 : $*Builtin.NativeObject
+  %4 = store_borrow %3 to %2 : $*Builtin.NativeObject
+  end_borrow %4 : $*Builtin.NativeObject
   end_borrow %3 : $Builtin.NativeObject
   dealloc_stack %2 : $*Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
@@ -375,6 +376,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   %result = store_borrow %0 to %1 : $*Builtin.NativeObject
   %f = function_ref @use_native_object_inguaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
   apply %f(%result) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  end_borrow %result : $*Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()

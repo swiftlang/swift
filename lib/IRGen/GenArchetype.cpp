@@ -51,6 +51,7 @@
 #include "ProtocolInfo.h"
 #include "ResilientTypeInfo.h"
 #include "TypeInfo.h"
+#include "TypeLayout.h"
 
 using namespace swift;
 using namespace irgen;
@@ -59,6 +60,8 @@ MetadataResponse
 irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
                                     CanArchetypeType archetype,
                                     DynamicMetadataRequest request) {
+  assert(!isa<PackArchetypeType>(archetype));
+
   // Check for an existing cache entry.
   if (auto response = IGF.tryGetLocalTypeMetadata(archetype, request))
     return response;
@@ -133,7 +136,7 @@ class ClassArchetypeTypeInfo
                          Size size, const SpareBitVector &spareBits,
                          Alignment align,
                          ReferenceCounting refCount)
-    : HeapTypeInfo(storageType, size, spareBits, align),
+    : HeapTypeInfo(refCount, storageType, size, spareBits, align),
       RefCount(refCount)
   {}
 
@@ -191,8 +194,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
 
   auto environment = archetype->getGenericEnvironment();
 
-  // Otherwise, ask the generic signature for the environment for the best
-  // path to the conformance.
+  // Otherwise, ask the generic signature for the best path to the conformance.
   // TODO: this isn't necessarily optimal if the direct conformance isn't
   // concretely available; we really ought to be comparing the full paths
   // to this conformance from concrete sources.
@@ -200,8 +202,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   auto signature = environment->getGenericSignature().getCanonicalSignature();
   auto archetypeDepType = archetype->getInterfaceType();
 
-  auto astPath = signature->getConformanceAccessPath(archetypeDepType,
-                                                     protocol);
+  auto astPath = signature->getConformancePath(archetypeDepType, protocol);
 
   auto i = astPath.begin(), e = astPath.end();
   assert(i != e && "empty path!");
@@ -344,7 +345,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   }
 
   // Otherwise, for now, always use an opaque indirect type.
-  llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
+  llvm::Type *storageType = IGM.OpaqueTy;
 
   // Opaque result types can be private and from a different module. In this
   // case we can't access their type metadata from another module.
@@ -412,9 +413,9 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
   llvm::Value *metadata =
     emitArchetypeTypeMetadataRef(IGF, archetype, MetadataState::Complete)
       .getMetadata();
-  return IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
-                                {addr.getAddress(), metadata,
-                                 llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0)});
+  return IGF.Builder.CreateCall(
+      IGF.IGM.getGetDynamicTypeFunctionPointer(),
+      {addr.getAddress(), metadata, llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0)});
 }
 
 static void
@@ -436,14 +437,15 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
     enumerateGenericSignatureRequirements(
         opaqueDecl->getGenericSignature().getCanonicalSignature(),
         [&](GenericRequirement reqt) {
-          auto ty = reqt.TypeParameter.subst(archetype->getSubstitutions())
-                        ->getCanonicalType(opaqueDecl->getGenericSignature());
-          if (reqt.Protocol) {
+          auto ty = reqt.getTypeParameter().subst(archetype->getSubstitutions())
+                        ->getReducedType(opaqueDecl->getGenericSignature());
+          if (reqt.isWitnessTable()) {
             auto ref =
-                ProtocolConformanceRef(reqt.Protocol)
-                    .subst(reqt.TypeParameter, archetype->getSubstitutions());
+                ProtocolConformanceRef(reqt.getProtocol())
+                    .subst(reqt.getTypeParameter(), archetype->getSubstitutions());
             args.push_back(emitWitnessTableRef(IGF, ty, ref));
           } else {
+            assert(reqt.isMetadata());
             args.push_back(IGF.emitAbstractTypeMetadataRef(ty));
           }
           types.push_back(args.back()->getType());
@@ -507,7 +509,7 @@ getAddressOfOpaqueTypeDescriptor(IRGenFunction &IGF,
 MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           DynamicMetadataRequest request) {
-  auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFn();
+  auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFunctionPointer();
   auto opaqueDecl = archetype->getDecl();
   auto genericParam = archetype->getInterfaceType()
       ->castTo<GenericTypeParamType>();
@@ -534,7 +536,7 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
 llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           ProtocolDecl *protocol) {
-  auto accessorFn = IGF.IGM.getGetOpaqueTypeConformanceFn();
+  auto accessorFn = IGF.IGM.getGetOpaqueTypeConformanceFunctionPointer();
   auto opaqueDecl = archetype->getDecl();
   assert(archetype->isRoot() && "Can only follow from the root");
 

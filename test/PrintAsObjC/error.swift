@@ -7,9 +7,10 @@
 
 import Foundation
 
-// TODO: Ideally we'd output invalid decls regardless (so that they could eg. be used in code
-// completion), but we avoid doing so for now to prevent crashes. Revisit later to handle a possibly
-// invalid AST while printing the ObjectiveC header - see SR-15088.
+// TODO: Ideally we'd output invalid decls regardless (so that they could eg. be
+// used in code completion), but we avoid doing so for now to prevent crashes.
+// Revisit later to handle a possibly invalid AST while printing the ObjectiveC
+// header - see https://github.com/apple/swift/issues/57414.
 
 @objc class ErrorClass: NSObject {
 // CHECK: @interface ErrorClass

@@ -150,6 +150,23 @@ public:
     return cast<AutoClosureExpr>(ACE)->getBody();
   }
 
+  void setParsedBody(BraceStmt *stmt, bool isSingleExpression) {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::Parsed);
+      AFD->setHasSingleExpressionBody(isSingleExpression);
+      return;
+    }
+
+    auto *ACE = TheFunction.get<AbstractClosureExpr *>();
+    if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+      CE->setBody(stmt, isSingleExpression);
+      CE->setBodyState(ClosureExpr::BodyState::ReadyForTypeChecking);
+      return;
+    }
+
+    llvm_unreachable("autoclosures don't have statement bodies");
+  }
+
   void setTypecheckedBody(BraceStmt *stmt, bool isSingleExpression) {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::TypeChecked);
@@ -159,7 +176,9 @@ public:
 
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-      return CE->setBody(stmt, isSingleExpression);
+      CE->setBody(stmt, isSingleExpression);
+      CE->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
+      return;
     }
 
     llvm_unreachable("autoclosures don't have statement bodies");

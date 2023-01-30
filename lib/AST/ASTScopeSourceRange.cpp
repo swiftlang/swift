@@ -51,9 +51,8 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
 
   auto range = getCharSourceRangeOfScope(sourceMgr);
 
-  auto childCharRange = child->getCharSourceRangeOfScope(sourceMgr);
-
-  bool childContainedInParent = [&]() {
+  std::function<bool(CharSourceRange)> containedInParent;
+  containedInParent = [&](CharSourceRange childCharRange) {
     // HACK: For code completion. Handle replaced range.
     for (const auto &pair : sourceMgr.getReplacedRanges()) {
       auto originalRange =
@@ -65,10 +64,28 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
         return true;
     }
 
-    return range.contains(childCharRange);
-  }();
+    if (range.contains(childCharRange))
+      return true;
 
-  if (!childContainedInParent) {
+    // If this is from a macro expansion, look at the where the expansion
+    // occurred.
+    auto childBufferID =
+      sourceMgr.findBufferContainingLoc(childCharRange.getStart());
+    auto generatedInfo = sourceMgr.getGeneratedSourceInfo(childBufferID);
+    if (!generatedInfo)
+      return false;
+
+    SourceRange expansionRange = generatedInfo->originalSourceRange;
+    if (expansionRange.isInvalid())
+      return false;
+
+    return containedInParent(
+        Lexer::getCharSourceRangeFromSourceRange(sourceMgr, expansionRange));
+  };
+
+  auto childCharRange = child->getCharSourceRangeOfScope(sourceMgr);
+
+  if (!containedInParent(childCharRange)) {
     auto &out = verificationError() << "child not contained in its parent:\n";
     child->print(out);
     out << "\n***Parent node***\n";
@@ -122,6 +139,11 @@ SourceRange SubscriptDeclScope::getSourceRangeOfThisASTNode(
   return decl->getSourceRangeIncludingAttrs();
 }
 
+SourceRange MacroDeclScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return decl->getSourceRangeIncludingAttrs();
+}
+
 SourceRange
 EnumElementScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   return decl->getSourceRange();
@@ -140,7 +162,7 @@ SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
 SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   SourceRange range = getPatternEntry().getSourceRange();
-  if (endLoc.hasValue())
+  if (endLoc.has_value())
     range.End = *endLoc;
   return range;
 }
@@ -181,12 +203,12 @@ SourceRange ASTSourceFileScope::getSourceRangeOfThisASTNode(
     return SourceRange(charRange.getStart(), charRange.getEnd());
   }
 
-  if (SF->getTopLevelDecls().empty())
+  if (SF->getTopLevelItems().empty())
     return SourceRange();
 
   // Use the source ranges of the declarations in the file.
-  return SourceRange(SF->getTopLevelDecls().front()->getStartLoc(),
-                     SF->getTopLevelDecls().back()->getEndLoc());
+  return SourceRange(SF->getTopLevelItems().front().getStartLoc(),
+                     SF->getTopLevelItems().back().getEndLoc());
 }
 
 SourceRange GenericTypeOrExtensionScope::getSourceRangeOfThisASTNode(
@@ -283,9 +305,12 @@ SourceRange
 BraceStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   // The brace statements that represent closures start their scope at the
   // 'in' keyword, when present.
-  if (auto closure = parentClosureIfAny()) {
-    if (closure.get()->getInLoc().isValid())
-      return SourceRange(closure.get()->getInLoc(), endLoc);
+  if (auto anyClosure = parentClosureIfAny()) {
+    if (auto closure = dyn_cast<ClosureExpr>(parentClosureIfAny().get())) {
+      if (closure->getInLoc().isValid()) {
+        return SourceRange(closure->getInLoc(), endLoc);
+      }
+    }
   }
   return SourceRange(stmt->getStartLoc(), endLoc);
 }
@@ -302,7 +327,10 @@ SourceRange ConditionalClausePatternUseScope::getSourceRangeOfThisASTNode(
 
 SourceRange
 CaptureListScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  auto *closureExpr = expr->getClosureBody();
+  if (auto autoClosure = dyn_cast<AutoClosureExpr>(expr->getClosureBody())) {
+    return autoClosure->getSourceRange();
+  }
+  auto closureExpr = cast<ClosureExpr>(expr->getClosureBody());
   if (!omitAssertions)
     ASTScopeAssert(closureExpr->getInLoc().isValid(),
                    "We don't create these if no in loc");
@@ -311,10 +339,16 @@ CaptureListScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
 
 SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  if (closureExpr->getInLoc().isValid())
-    return SourceRange(closureExpr->getInLoc(), closureExpr->getEndLoc());
+  if (auto autoClosure = dyn_cast<AutoClosureExpr>(closureExpr)) {
+    return autoClosure->getSourceRange();
+  }
+  auto explicitClosureExpr = cast<ClosureExpr>(closureExpr);
+  if (explicitClosureExpr->getInLoc().isValid()) {
+    return SourceRange(explicitClosureExpr->getInLoc(),
+                       explicitClosureExpr->getEndLoc());
+  }
 
-  return closureExpr->getSourceRange();
+  return explicitClosureExpr->getSourceRange();
 }
 
 SourceRange AttachedPropertyWrapperScope::getSourceRangeOfThisASTNode(
@@ -352,7 +386,7 @@ ASTScopeImpl::getCharSourceRangeOfScope(SourceManager &SM,
 }
 
 bool ASTScopeImpl::isCharSourceRangeCached() const {
-  return cachedCharSourceRange.hasValue();
+  return cachedCharSourceRange.has_value();
 }
 
 SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *const ext) {

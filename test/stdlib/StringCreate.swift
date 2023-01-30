@@ -40,7 +40,8 @@ StringCreateTests.test("String(decoding:as:)") {
     validateDecodingAs(simpleString.rawValue)
   }
 
-  // Corner-case: UBP with null pointer (https://bugs.swift.org/browse/SR-9869)
+  // https://github.com/apple/swift/issues/52275
+  // Corner-case: UBP with null pointer.
   expectEqual(
     "", String(decoding: UnsafeBufferPointer(_empty: ()), as: UTF8.self))
   expectEqual(

@@ -105,6 +105,20 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
+    case RequirementError::Kind::InvalidShapeRequirement: {
+      if (error.requirement.hasError())
+        break;
+
+      auto lhs = error.requirement.getFirstType();
+      auto rhs = error.requirement.getSecondType();
+
+      // FIXME: Add tailored messages for specific issues.
+      ctx.Diags.diagnose(loc, diag::invalid_shape_requirement,
+                         lhs, rhs);
+      diagnosedError = true;
+      break;
+    }
+
     case RequirementError::Kind::ConflictingRequirement: {
       auto requirement = error.requirement;
       auto conflict = error.conflictingRequirement;
@@ -137,6 +151,26 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
+    case RequirementError::Kind::RecursiveRequirement: {
+      auto requirement = error.requirement;
+
+      if (requirement.hasError())
+        break;
+
+      assert(requirement.getKind() == RequirementKind::SameType ||
+             requirement.getKind() == RequirementKind::Superclass);
+
+      ctx.Diags.diagnose(loc,
+                         (requirement.getKind() == RequirementKind::SameType ?
+                          diag::recursive_same_type_constraint :
+                          diag::recursive_superclass_constraint),
+                         requirement.getFirstType(),
+                         requirement.getSecondType());
+
+      diagnosedError = true;
+      break;
+    }
+
     case RequirementError::Kind::RedundantRequirement: {
       // We only emit redundant requirement warnings if the user passed
       // the -warn-redundant-requirements frontend flag.
@@ -148,6 +182,9 @@ bool swift::rewriting::diagnoseRequirementErrors(
         break;
 
       switch (requirement.getKind()) {
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
+
       case RequirementKind::SameType:
         ctx.Diags.diagnose(loc, diag::redundant_same_type_to_concrete,
                            requirement.getFirstType(),
@@ -245,7 +282,7 @@ void RewriteSystem::computeRedundantRequirementDiagnostics(
 
     auto requirementID = rule.getRequirementID();
 
-    if (!requirementID.hasValue()) {
+    if (!requirementID.has_value()) {
       if (!rule.isRedundant())
         nonExplicitNonRedundantRules.insert(ruleID);
 
@@ -390,7 +427,7 @@ getRequirementForDiagnostics(Type subject, Symbol property,
   }
 }
 
-void RewriteSystem::computeConflictDiagnostics(
+void RewriteSystem::computeConflictingRequirementDiagnostics(
     SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc,
     const PropertyMap &propertyMap,
     TypeArrayView<GenericTypeParamType> genericParams) {
@@ -427,11 +464,30 @@ void RewriteSystem::computeConflictDiagnostics(
   }
 }
 
+void RewriteSystem::computeRecursiveRequirementDiagnostics(
+    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc,
+    const PropertyMap &propertyMap,
+    TypeArrayView<GenericTypeParamType> genericParams) {
+  for (unsigned ruleID : RecursiveRules) {
+    const auto &rule = getRule(ruleID);
+
+    assert(isInMinimizationDomain(rule.getRHS()[0].getRootProtocol()));
+
+    Type subjectType = propertyMap.getTypeForTerm(rule.getRHS(), genericParams);
+    errors.push_back(RequirementError::forRecursiveRequirement(
+        getRequirementForDiagnostics(subjectType, *rule.isPropertyRule(),
+                                     propertyMap, genericParams, MutableTerm()),
+        signatureLoc));
+  }
+}
+
 void RequirementMachine::computeRequirementDiagnostics(
     SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc) {
   System.computeRedundantRequirementDiagnostics(errors);
-  System.computeConflictDiagnostics(errors, signatureLoc, Map,
-                                    getGenericParams());
+  System.computeConflictingRequirementDiagnostics(errors, signatureLoc, Map,
+                                                  getGenericParams());
+  System.computeRecursiveRequirementDiagnostics(errors, signatureLoc, Map,
+                                                getGenericParams());
 }
 
 std::string RequirementMachine::getRuleAsStringForDiagnostics(

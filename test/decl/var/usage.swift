@@ -330,7 +330,9 @@ func test(_ a : Int?, b : Any) {
   if let x = b as? Int {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{16-19=is}}
   }
 
-  // SR-14646. Special case, turn this into an 'is' test with optional value. 
+  // Special case, turn these into an 'is' test with optional value.
+  // https://github.com/apple/swift/issues/56998
+
   let bb: Any? = 3
   if let bbb = bb as? Int {}  // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{19-22=is}}
   if let bbb = (bb) as? Int {}  // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{21-24=is}}
@@ -367,7 +369,8 @@ func test(_ a : Int?, b : Any) {
   let cc: (Any?, Any) = (1, 2)
   if let (cc1, cc2) = cc as? (Int, Int) {} // expected-warning {{immutable value 'cc1' was never used; consider replacing with '_' or removing it}} expected-warning {{immutable value 'cc2' was never used; consider replacing with '_' or removing it}}
 
-  // SR-1112
+  // https://github.com/apple/swift/issues/43725
+
   let xxx: Int? = 0
 
   if let yyy = xxx { } // expected-warning{{with boolean test}} {{6-16=}} {{19-19= != nil}}
@@ -404,14 +407,14 @@ for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; cons
    print("")
 }
 
-// Tests fix to SR-2421
-func sr2421() {
+// https://github.com/apple/swift/issues/45026
+do {
   let x: Int // expected-warning {{immutable value 'x' was never used; consider removing it}}
   x = 42
 }
 
-// Tests fix to SR-964
-func sr964() {
+// Thttps://github.com/apple/swift/issues/43576
+do {
   var noOpSetter: String {
     get { return "" }
     set { } // No warning
@@ -540,7 +543,8 @@ func testVariablesBoundInPatterns() {
     break
   }
 }
-// Tests fix to SR-14646
+
+// https://github.com/apple/swift/issues/56998
 func testUselessCastWithInvalidParam(foo: Any?) -> Int {
   class Foo { }
   if let bar = foo as? Foo { return 42 } // expected-warning {{value 'bar' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{20-23=is}}

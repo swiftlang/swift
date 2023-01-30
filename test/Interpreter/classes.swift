@@ -208,7 +208,7 @@ func makeOne<T : Makeable>(_: T.Type) -> T {
 
 makeOne(Child.self).doSomething() // CHECK: Heaven!
 
-// https://bugs.swift.org/browse/SR-3840
+// https://github.com/apple/swift/issues/46425
 
 class BaseProperty {
   var value: Int {

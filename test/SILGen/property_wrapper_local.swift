@@ -17,17 +17,16 @@ func testLocalWrapper() {
   @Wrapper var value: Int
   // CHECK: [[A:%.*]] = alloc_box ${ var Wrapper<Int> }, var, name "_value"
   // CHECK: [[W:%.*]] = mark_uninitialized [var] [[A]] : ${ var Wrapper<Int> }
-  // CHECK: [[L:%[^,]+]] = begin_borrow [lexical] [[W]]
-  // CHECK: [[P:%.*]] = project_box [[L]] : ${ var Wrapper<Int> }
+  // CHECK: [[P:%.*]] = project_box [[W]] : ${ var Wrapper<Int> }
 
   value = 10
   // CHECK: [[I:%.*]] = function_ref @$s22property_wrapper_local16testLocalWrapperyyF5valueL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
   // CHECK: [[IPA:%.*]] = partial_apply [callee_guaranteed] [[I]]() : $@convention(thin) (Int) -> Wrapper<Int>
   // CHECK: [[S:%.*]] = function_ref @$s22property_wrapper_local16testLocalWrapperyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
-  // CHECK-NEXT: [[C:%.*]] = copy_value [[L]] : ${ var Wrapper<Int> }
+  // CHECK-NEXT: [[C:%.*]] = copy_value [[W]] : ${ var Wrapper<Int> }
   // CHECK-NOT: mark_function_escape
   // CHECK-NEXT: [[SPA:%.*]] = partial_apply [callee_guaranteed] [[S]]([[C]]) : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
-  // CHECK-NEXT: assign_by_wrapper {{%.*}} : $Int to [[P]] : $*Wrapper<Int>, init [[IPA]] : $@callee_guaranteed (Int) -> Wrapper<Int>, set [[SPA]] : $@callee_guaranteed (Int) -> ()
+  // CHECK-NEXT: assign_by_wrapper origin property_wrapper, {{%.*}} : $Int to [[P]] : $*Wrapper<Int>, init [[IPA]] : $@callee_guaranteed (Int) -> Wrapper<Int>, set [[SPA]] : $@callee_guaranteed (Int) -> ()
 
   _ = value
   // CHECK: mark_function_escape [[P]] : $*Wrapper<Int>
@@ -46,7 +45,7 @@ func testLocalWrapper() {
   // CHECK: [[OP:%.*]] = function_ref @$sSi2peoiyySiz_SitFZ : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
   // CHECK: apply [[OP]]({{%.*}}) : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
   // CHECK: [[RESULT:%.*]] = load [trivial] [[TMP]] : $*Int
-  // CHECK: assign_by_wrapper [[RESULT]] : $Int to [[P]]
+  // CHECK: assign_by_wrapper origin property_wrapper, [[RESULT]] : $Int to [[P]]
 
   // Check local property wrapper backing initializer and accessors
 

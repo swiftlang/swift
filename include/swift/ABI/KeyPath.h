@@ -22,7 +22,7 @@
 
 #include <cstdint>
 #include <cassert>
-#include "../../../stdlib/public/SwiftShims/KeyPath.h"
+#include "swift/shims/KeyPath.h"
 
 namespace swift {
 

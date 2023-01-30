@@ -91,9 +91,11 @@ actor MyGlobalActor {
   static let shared = MyGlobalActor()
 }
 
+@available(SwiftStdlib 5.1, *)
 @MyGlobalActor
 class C3 { }
 
+@available(SwiftStdlib 5.1, *)
 class C4: C3 { }
 
 // Make Sendable unavailable, but be sure not to diagnose it.
@@ -104,6 +106,7 @@ struct S2 {
 @available(*, unavailable)
 extension S2: Sendable { }
 
+@available(SwiftStdlib 5.1, *)
 func testCV(
   c1: C1, c2: C2, c3: C3, c4: C4, s1: S1, e1: E1, e2: E2,
   gs1: GS1<Int>, gs2: GS2<Int>,

@@ -16,16 +16,18 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "../../SILGen/SILGen.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/BridgingUtils.h"
@@ -40,23 +42,33 @@ using namespace Lowering;
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
+                                     GenericSignature unerasedSpecializedSig,
+                                     ArrayRef<Type> typeErasedParams,
                                      SILFunction *target, Identifier spiGroup,
                                      const ModuleDecl *spiModule,
                                      AvailabilityContext availability)
     : kind(kind), exported(exported), specializedSignature(specializedSig),
-      spiGroup(spiGroup), availability(availability), spiModule(spiModule), targetFunction(target) {
+      unerasedSpecializedSignature(unerasedSpecializedSig),
+      typeErasedParams(typeErasedParams.begin(), typeErasedParams.end()),
+      spiGroup(spiGroup), availability(availability), spiModule(spiModule),
+      targetFunction(target) {
   if (targetFunction)
     targetFunction->incrementRefCount();
 }
 
 SILSpecializeAttr *
 SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
+                          ArrayRef<Type> typeErasedParams,
                           bool exported, SpecializationKind kind,
                           SILFunction *target, Identifier spiGroup,
                           const ModuleDecl *spiModule,
                           AvailabilityContext availability) {
+  auto erasedSpecializedSig = specializedSig.typeErased(typeErasedParams);
+
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
-  return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig, target,
+
+  return ::new (buf) SILSpecializeAttr(exported, kind, erasedSpecializedSig,
+                                       specializedSig, typeErasedParams, target,
                                        spiGroup, spiModule, availability);
 }
 
@@ -88,6 +100,7 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
                     IsSerialized_t isSerialized, ProfileCounter entryCount,
                     IsDynamicallyReplaceable_t isDynamic,
                     IsDistributed_t isDistributed,
+                    IsRuntimeAccessible_t isRuntimeAccessible,
                     IsExactSelfClass_t isExactSelfClass,
                     IsThunk_t isThunk,
                     SubclassScope classSubclassScope, Inline_t inlineStrategy,
@@ -108,17 +121,17 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
     // Resurrect a zombie function.
     // This happens for example if a specialized function gets dead and gets
     // deleted. And afterwards the same specialization is created again.
-    fn->init(linkage, name, loweredType, genericEnv, loc, isBareSILFunction,
-             isTrans, isSerialized, entryCount, isThunk, classSubclassScope,
+    fn->init(linkage, name, loweredType, genericEnv, isBareSILFunction, isTrans,
+             isSerialized, entryCount, isThunk, classSubclassScope,
              inlineStrategy, E, debugScope, isDynamic, isExactSelfClass,
-             isDistributed);
+             isDistributed, isRuntimeAccessible);
     assert(fn->empty());
   } else {
-    fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
-                                isBareSILFunction, isTrans, isSerialized,
-                                entryCount, isThunk, classSubclassScope,
-                                inlineStrategy, E, debugScope,
-                                isDynamic, isExactSelfClass, isDistributed);
+    fn = new (M) SILFunction(
+        M, linkage, name, loweredType, genericEnv, isBareSILFunction, isTrans,
+        isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy,
+        E, debugScope, isDynamic, isExactSelfClass, isDistributed,
+        isRuntimeAccessible);
   }
   if (entry) entry->setValue(fn);
 
@@ -136,27 +149,26 @@ static FunctionRegisterFn destroyFunction = nullptr;
 static FunctionWriteFn writeFunction = nullptr;
 static FunctionParseFn parseFunction = nullptr;
 static FunctionCopyEffectsFn copyEffectsFunction = nullptr;
-static FunctionGetEffectFlagsFn getEffectFlagsFunction = nullptr;
+static FunctionGetEffectInfoFn getEffectInfoFunction = nullptr;
+static FunctionGetMemBehviorFn getMemBehvaiorFunction = nullptr;
 
-SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
-                         CanSILFunctionType LoweredType,
-                         GenericEnvironment *genericEnv,
-                         Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
-                         IsTransparent_t isTrans, IsSerialized_t isSerialized,
-                         ProfileCounter entryCount, IsThunk_t isThunk,
-                         SubclassScope classSubclassScope,
-                         Inline_t inlineStrategy, EffectsKind E,
-                         const SILDebugScope *DebugScope,
-                         IsDynamicallyReplaceable_t isDynamic,
-                         IsExactSelfClass_t isExactSelfClass,
-                         IsDistributed_t isDistributed)
+SILFunction::SILFunction(
+    SILModule &Module, SILLinkage Linkage, StringRef Name,
+    CanSILFunctionType LoweredType, GenericEnvironment *genericEnv,
+    IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+    IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
+    SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
+    const SILDebugScope *DebugScope, IsDynamicallyReplaceable_t isDynamic,
+    IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
+    IsRuntimeAccessible_t isRuntimeAccessible)
     : SwiftObjectHeader(functionMetatype), Module(Module),
       index(Module.getNewFunctionIndex()),
       Availability(AvailabilityContext::alwaysAvailable()) {
-  init(Linkage, Name, LoweredType, genericEnv, Loc, isBareSILFunction, isTrans,
-       isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy,
-       E, DebugScope, isDynamic, isExactSelfClass, isDistributed);
-  
+  init(Linkage, Name, LoweredType, genericEnv, isBareSILFunction, isTrans,
+       isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy, E,
+       DebugScope, isDynamic, isExactSelfClass, isDistributed,
+       isRuntimeAccessible);
+
   // Set our BB list to have this function as its parent. This enables us to
   // splice efficiently basic blocks in between functions.
   BlockList.Parent = this;
@@ -164,18 +176,15 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
     initFunction({this}, &libswiftSpecificData, sizeof(libswiftSpecificData));
 }
 
-void SILFunction::init(SILLinkage Linkage, StringRef Name,
-                         CanSILFunctionType LoweredType,
-                         GenericEnvironment *genericEnv,
-                         Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
-                         IsTransparent_t isTrans, IsSerialized_t isSerialized,
-                         ProfileCounter entryCount, IsThunk_t isThunk,
-                         SubclassScope classSubclassScope,
-                         Inline_t inlineStrategy, EffectsKind E,
-                         const SILDebugScope *DebugScope,
-                         IsDynamicallyReplaceable_t isDynamic,
-                         IsExactSelfClass_t isExactSelfClass,
-                         IsDistributed_t isDistributed) {
+void SILFunction::init(
+    SILLinkage Linkage, StringRef Name, CanSILFunctionType LoweredType,
+    GenericEnvironment *genericEnv, IsBare_t isBareSILFunction,
+    IsTransparent_t isTrans, IsSerialized_t isSerialized,
+    ProfileCounter entryCount, IsThunk_t isThunk,
+    SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
+    const SILDebugScope *DebugScope, IsDynamicallyReplaceable_t isDynamic,
+    IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
+    IsRuntimeAccessible_t isRuntimeAccessible) {
   setName(Name);
   this->LoweredType = LoweredType;
   this->GenericEnv = genericEnv;
@@ -191,10 +200,12 @@ void SILFunction::init(SILLinkage Linkage, StringRef Name,
   this->InlineStrategy = inlineStrategy;
   this->Linkage = unsigned(Linkage);
   this->HasCReferences = false;
-  this->IsWeakImported = false;
+  this->IsAlwaysWeakImported = false;
   this->IsDynamicReplaceable = isDynamic;
   this->ExactSelfClass = isExactSelfClass;
   this->IsDistributed = isDistributed;
+  this->IsRuntimeAccessible = isRuntimeAccessible;
+  this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
   this->HasOwnership = true,
@@ -244,12 +255,12 @@ void SILFunction::createSnapshot(int id) {
   assert(id != 0 && "invalid snapshot ID");
   assert(!getSnapshot(id) && "duplicate snapshot");
 
-  SILFunction *newSnapshot = new (Module) SILFunction(Module,
-    getLinkage(), getName(), getLoweredFunctionType(), getGenericEnvironment(),
-    getLocation(), isBare(), isTransparent(), isSerialized(),
-    getEntryCount(), isThunk(), getClassSubclassScope(),
-    getInlineStrategy(), getEffectsKind(), getDebugScope(),
-    isDynamicallyReplaceable(), isExactSelfClass(), isDistributed());
+  SILFunction *newSnapshot = new (Module) SILFunction(
+      Module, getLinkage(), getName(), getLoweredFunctionType(),
+      getGenericEnvironment(), isBare(), isTransparent(), isSerialized(),
+      getEntryCount(), isThunk(), getClassSubclassScope(), getInlineStrategy(),
+      getEffectsKind(), getDebugScope(), isDynamicallyReplaceable(),
+      isExactSelfClass(), isDistributed(), isRuntimeAccessible());
 
   // Copy all relevant properties.
   // TODO: It's really unfortunate that this needs to be done manually. It would
@@ -269,7 +280,7 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->perfConstraints = perfConstraints;
   newSnapshot->GlobalInitFlag = GlobalInitFlag;
   newSnapshot->HasCReferences = HasCReferences;
-  newSnapshot->IsWeakImported = IsWeakImported;
+  newSnapshot->IsAlwaysWeakImported = IsAlwaysWeakImported;
   newSnapshot->HasOwnership = HasOwnership;
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
   newSnapshot->OptMode = OptMode;
@@ -330,10 +341,25 @@ void SILFunction::deleteSnapshot(int ID) {
   } while ((f = f->snapshots) != nullptr);
 }
 
-void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
-                                 ForDefinition_t forDefinition) {
+void SILFunction::createProfiler(SILDeclRef Ref) {
   assert(!Profiler && "Function already has a profiler");
-  Profiler = SILProfiler::create(Module, forDefinition, Root, forDecl);
+  assert(Ref && "Must have non-null SILDeclRef");
+
+  Profiler = SILProfiler::create(Module, Ref);
+  if (!Profiler)
+    return;
+
+  // If we loaded a profile, set the entry counts for functions and closures
+  // for PGO to use.
+  if (Ref.isFunc()) {
+    if (auto *Closure = Ref.getAbstractClosureExpr()) {
+      setEntryCount(Profiler->getExecutionCount(Closure));
+    } else {
+      auto *FD = Ref.getFuncDecl();
+      assert(FD);
+      setEntryCount(Profiler->getExecutionCount(FD->getBody()));
+    }
+  }
 }
 
 bool SILFunction::hasForeignBody() const {
@@ -461,7 +487,11 @@ bool SILFunction::isTypeABIAccessible(SILType type) const {
   return getModule().isTypeABIAccessible(type, TypeExpansionContext(*this));
 }
 
-bool SILFunction::isWeakImported() const {
+bool SILFunction::isWeakImported(ModuleDecl *module) const {
+  if (auto *parent = getParentModule())
+    if (module->isImportedAsWeakLinked(parent))
+      return true;
+
   // For imported functions check the Clang declaration.
   if (ClangNodeOwner)
     return ClangNodeOwner->getClangDecl()->isWeakImported();
@@ -480,7 +510,7 @@ bool SILFunction::isWeakImported() const {
   auto deploymentTarget =
       AvailabilityContext::forDeploymentTarget(getASTContext());
 
-  if (getASTContext().LangOpts.EnableAdHocAvailability)
+  if (getASTContext().LangOpts.WeakLinkAtTarget)
     return !Availability.isSupersetOf(deploymentTarget);
 
   return !deploymentTarget.isContainedIn(Availability);
@@ -752,6 +782,9 @@ bool SILFunction::hasDynamicSelfMetadata() const {
       selfTy = dynamicSelfTy.getSelfType();
   }
 
+  if (selfTy.isForeignReferenceType())
+    return false;
+
   return !!selfTy.getClassOrBoundGenericClass();
 }
 
@@ -798,6 +831,9 @@ SILFunction::isPossiblyUsedExternally() const {
     return true;
 
   if (isDistributed() && isThunk())
+    return true;
+
+  if (isRuntimeAccessible())
     return true;
 
   // Declaration marked as `@_alwaysEmitIntoClient` that
@@ -908,23 +944,53 @@ void Function_register(SwiftMetatype metatype,
             FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
             FunctionWriteFn writeFn, FunctionParseFn parseFn,
             FunctionCopyEffectsFn copyEffectsFn,
-            FunctionGetEffectFlagsFn getEffectFlagsFn) {
+            FunctionGetEffectInfoFn effectInfoFn,
+            FunctionGetMemBehviorFn memBehaviorFn) {
   functionMetatype = metatype;
   initFunction = initFn;
   destroyFunction = destroyFn;
   writeFunction = writeFn;
   parseFunction = parseFn;
   copyEffectsFunction = copyEffectsFn;
-  getEffectFlagsFunction = getEffectFlagsFn;
+  getEffectInfoFunction = effectInfoFn;
+  getMemBehvaiorFunction = memBehaviorFn;
 }
 
-std::pair<const char *, int> SILFunction::
-parseEffects(StringRef attrs, bool fromSIL, bool isDerived,
-             ArrayRef<StringRef> paramNames) {
+std::pair<const char *, int>  SILFunction::
+parseArgumentEffectsFromSource(StringRef effectStr, ArrayRef<StringRef> paramNames) {
   if (parseFunction) {
     BridgedParsingError error = parseFunction(
-        {this}, attrs, (SwiftInt)fromSIL, (SwiftInt)isDerived,
+        {this}, effectStr, ParseArgumentEffectsFromSource, -1,
         {(const unsigned char *)paramNames.data(), paramNames.size()});
+    return {(const char *)error.message, (int)error.position};
+  }
+  return {nullptr, 0};
+}
+
+std::pair<const char *, int>  SILFunction::
+parseArgumentEffectsFromSIL(StringRef effectStr, int argumentIndex) {
+  if (parseFunction) {
+    BridgedParsingError error = parseFunction(
+        {this}, effectStr, ParseArgumentEffectsFromSIL, argumentIndex, {nullptr, 0});
+    return {(const char *)error.message, (int)error.position};
+  }
+  return {nullptr, 0};
+}
+
+std::pair<const char *, int>  SILFunction::parseGlobalEffectsFromSIL(StringRef effectStr) {
+  if (parseFunction) {
+    BridgedParsingError error = parseFunction(
+        {this}, effectStr, ParseGlobalEffectsFromSIL, -1, {nullptr, 0});
+    return {(const char *)error.message, (int)error.position};
+  }
+  return {nullptr, 0};
+}
+
+std::pair<const char *, int>  SILFunction::
+parseMultipleEffectsFromSIL(StringRef effectStr) {
+  if (parseFunction) {
+    BridgedParsingError error = parseFunction(
+        {this}, effectStr, ParseMultipleEffectsFromSIL, -1, {nullptr, 0});
     return {(const char *)error.message, (int)error.position};
   }
   return {nullptr, 0};
@@ -943,30 +1009,35 @@ void SILFunction::copyEffects(SILFunction *from) {
 }
 
 bool SILFunction::hasArgumentEffects() const {
-  if (getEffectFlagsFunction) {
-    return getEffectFlagsFunction({const_cast<SILFunction *>(this)}, 0) != 0;
+  if (getEffectInfoFunction) {
+    BridgedFunction f = {const_cast<SILFunction *>(this)};
+    return getEffectInfoFunction(f, 0).isValid;
   }
   return false;
 }
 
 void SILFunction::
-visitArgEffects(std::function<void(int, bool, ArgEffectKind)> c) const {
-  if (!getEffectFlagsFunction)
+visitArgEffects(std::function<void(int, int, bool)> c) const {
+  if (!getEffectInfoFunction)
     return;
     
   int idx = 0;
   BridgedFunction bridgedFn = {const_cast<SILFunction *>(this)};
-  while (int flags = getEffectFlagsFunction(bridgedFn, idx)) {
-    ArgEffectKind kind = ArgEffectKind::Unknown;
-    if (flags & EffectsFlagEscape)
-      kind = ArgEffectKind::Escape;
-
-    c(idx, (flags & EffectsFlagDerived) != 0, kind);
+  while (true) {
+    BridgedEffectInfo ei = getEffectInfoFunction(bridgedFn, idx);
+    if (!ei.isValid)
+      return;
+    if (!ei.isEmpty) {
+      c(idx, ei.argumentIndex, ei.isDerived);
+    }
     idx++;
   }
 }
 
-SILFunction *SILFunction::getFunction(SILDeclRef ref, SILModule &M) {
-  swift::Lowering::SILGenModule SILGenModule(M, ref.getModuleContext());
-  return SILGenModule.getFunction(ref, swift::NotForDefinition);
+SILInstruction::MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetains) {
+  if (!getMemBehvaiorFunction)
+    return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+
+  auto b = getMemBehvaiorFunction({this}, observeRetains);
+  return (SILInstruction::MemoryBehavior)b;
 }

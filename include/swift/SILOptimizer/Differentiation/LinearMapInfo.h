@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Linear map struct and branching trace enum information for differentation.
+// Linear map struct and branching trace enum information for differentiation.
 //
 //===----------------------------------------------------------------------===//
 
@@ -33,7 +33,7 @@ namespace autodiff {
 class ADContext;
 
 /// Linear map struct and branching trace enum information for an original
-/// function and and derivative function (JVP or VJP).
+/// function and derivative function (JVP or VJP).
 ///
 /// Linear map structs contain all callee linear maps produced in a JVP/VJP
 /// basic block. A linear map struct is created for each basic block in the
@@ -81,7 +81,7 @@ private:
   /// corresponding linear map field declaration in the linear map struct.
   llvm::DenseMap<ApplyInst *, VarDecl *> linearMapFieldMap;
 
-  /// Mapping from predecessor-succcessor basic block pairs in the original
+  /// Mapping from predecessor-successor basic block pairs in the original
   /// function to the corresponding branching trace enum case.
   llvm::DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, EnumElementDecl *>
       branchingTraceEnumCases;
@@ -165,7 +165,7 @@ public:
         derivative->getLoweredFunctionType()->getSubstGenericSignature();
     auto *linMapStruct = getLinearMapStruct(origBB);
     auto linMapStructType =
-        linMapStruct->getDeclaredInterfaceType()->getCanonicalType(
+        linMapStruct->getDeclaredInterfaceType()->getReducedType(
             derivativeGenSig);
     Lowering::AbstractionPattern pattern(derivativeGenSig, linMapStructType);
     return typeConverter.getLoweredType(pattern, linMapStructType,

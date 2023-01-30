@@ -888,7 +888,7 @@ dwTests.test("Magnitude") {
 
   expectTrue(DWI16.min.magnitude == Int16.min.magnitude)
   expectTrue((-42 as DWI16).magnitude == (-42 as Int16).magnitude)
-  expectTrue(DWI16().magnitude == Int16(0).magnitude) // See SR-6602.
+  expectTrue(DWI16().magnitude == Int16(0).magnitude) // See https://github.com/apple/swift/issues/49152.
   expectTrue((42 as DWI16).magnitude == (42 as Int16).magnitude)
   expectTrue(DWI16.max.magnitude == Int16.max.magnitude)
 }

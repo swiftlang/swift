@@ -46,7 +46,8 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   /// The module that this symbol graph will represent.
   const ModuleDecl &M;
-    
+
+  // FIXME: these should be tracked per-graph, rather than at the top level
   const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
 
   const llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedExportedImports;
@@ -109,6 +110,15 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   /// Returns whether the given module is an `@_exported import` module.
   virtual bool isExportedImportedModule(const ModuleDecl *M) const;
+
+  /// Returns whether the given module is the main module, or is an `@_exported import` module.
+  virtual bool isOurModule(const ModuleDecl *M) const;
+
+public:
+  /// Returns whether the given ExtensionDecl is to be recorded as an extra
+  /// extension block symbol, or if its members should be directly associated
+  /// with its extended nominal.
+  virtual bool shouldBeRecordedAsExtension(const ExtensionDecl *ED) const;
 };
 
 } // end namespace symbolgraphgen

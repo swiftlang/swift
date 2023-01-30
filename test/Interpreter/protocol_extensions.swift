@@ -284,7 +284,8 @@ ProtocolExtensionTestSuite.test("ClassInitializer") {
   expectTrue(Sub.self == metatypes[3].1)
 }
 
-// https://bugs.swift.org/browse/SR-617
+// https://github.com/apple/swift/issues/43234
+
 protocol SelfMetadataTest {
   associatedtype T = Int
 

@@ -1,5 +1,6 @@
 module CustomSequence {
   header "custom-iterator.h" // TODO: extract into another module
   header "custom-sequence.h"
+  header "custom-collection.h"
   requires cplusplus
 }

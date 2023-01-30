@@ -1,47 +1,50 @@
 // RUN: %target-typecheck-verify-swift -dump-ast > %t.dump
 // RUN: %FileCheck %s < %t.dump
 
-// SR-13815
+// https://github.com/apple/swift/issues/56212
+
 extension Optional {
-    func sr13815() -> SR13815? { SR13815() }
-    static func sr13815_2() -> SR13815? { SR13815() }
-    static func sr13815_3() -> SR13815? { SR13815() }
-    static var sr13815_wrongType: Int { 0 }
-    static var sr13815_overload: SR13815 { SR13815() }
-    init(overloaded: Void) { self = nil }
+    func member1() -> S1? {}
+    static func member2() -> S1? {}
+    static func member3() -> S1? {}
+    static var member_wrongType: Int { get {} }
+    static var member_overload: S1 { get {} }
+
+    init(overloaded: Void) {}
 }
 
-struct SR13815 {
-    static var sr13815: SR13815? = SR13815()
-    static var sr13815_2: SR13815? = SR13815()
-    static var sr13815_wrongType: SR13815? { SR13815() }
-    static var p_SR13815: SR13815? { SR13815() }
-    static func sr13815_3() -> SR13815? { SR13815() }
-    static var sr13815_overload: SR13815? { SR13815() }
+protocol P1 {}
+extension Optional: P1 where Wrapped: Equatable {
+    static func member4() {}
+}
+
+struct S1 {
+    static var member1: S1? = S1()
+    static var member2: S1? = S1()
+    static func member3() -> S1? {}
+    static var member4: S1? { get {} }
+    static var member_wrongType: S1? { get {} }
+    static var member_overload: S1? { get {} }
+
     init(overloaded: Void) {}
     init?(failable: Void) {}
     init() {}
 }
 
-protocol P_SR13815 {}
-extension Optional: P_SR13815 where Wrapped: Equatable {
-    static func p_SR13815() {}
-}
-
-let _: SR13815? = .sr13815
-let _: SR13815? = .sr13815_wrongType
-let _: SR13815? = .init()
-let _: SR13815? = .sr13815() // expected-error {{instance member 'sr13815' cannot be used on type 'SR13815?'}}
-let _: SR13815? = .sr13815_2()
-let _: SR13815? = .init(SR13815())
-let _: SR13815? = .init(overloaded: ())
+let _: S1? = .member1
+let _: S1? = .member_wrongType
+let _: S1? = .init()
+let _: S1? = .member1() // expected-error {{instance member 'member1' cannot be used on type 'S1?'}}
+let _: S1? = .member2()
+let _: S1? = .init(S1())
+let _: S1? = .init(overloaded: ())
 // If members exist on Optional and Wrapped, always choose the one on optional
-// CHECK: declref_expr {{.*}} location={{.*}}optional_overload.swift:37
+// CHECK: declref_expr {{.*}} location={{.*}}optional_overload.swift:40
 // CHECK-SAME: decl=optional_overload.(file).Optional extension.init(overloaded:)
-let _: SR13815? = .sr13815_overload
+let _: S1? = .member_overload
 // Should choose the overload from Optional even if the Wrapped overload would otherwise have a better score
-// CHECK: member_ref_expr {{.*}} location={{.*}}optional_overload.swift:41
-// CHECK-SAME: decl=optional_overload.(file).Optional extension.sr13815_overload
-let _: SR13815? = .init(failable: ())
-let _: SR13815? = .sr13815_3()
-let _: SR13815? = .p_SR13815
+// CHECK: member_ref_expr {{.*}} location={{.*}}optional_overload.swift:44
+// CHECK-SAME: decl=optional_overload.(file).Optional extension.member_overload
+let _: S1? = .init(failable: ())
+let _: S1? = .member3()
+let _: S1? = .member4

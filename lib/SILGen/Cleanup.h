@@ -17,6 +17,7 @@
 #ifndef SWIFT_SILGEN_CLEANUP_H
 #define SWIFT_SILGEN_CLEANUP_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
@@ -280,8 +281,7 @@ public:
   bool hasAnyActiveCleanups(CleanupsDepth from);
 
   /// Dump the output of each cleanup on this stack.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Dump the given cleanup handle if it is on the current stack.
   void dump(CleanupHandle handle) const;

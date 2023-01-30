@@ -169,7 +169,9 @@ class CircularValidationWithTypo {
   }
 }
 
-// Crash with invalid extension that has not been bound -- https://bugs.swift.org/browse/SR-8984
+// https://github.com/apple/swift/issues/51488
+// Crash with invalid extension that has not been bound
+
 protocol PP {}
 
 func boo() {

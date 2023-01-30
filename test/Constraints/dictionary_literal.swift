@@ -139,6 +139,7 @@ func testDefaultExistentials() {
            "b": ["a", 2, 3.14159],
            "c": ["a": 2, "b": 3.5]]
   // expected-error@-3{{heterogeneous collection literal could only be inferred to '[String : Any]'; add explicit type annotation if this is intentional}}
+  // expected-warning@-3{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
 
   let d3 = ["b" : B(), "c" : C()]
   let _: Int = d3 // expected-error{{value of type '[String : A]'}}
@@ -150,7 +151,9 @@ func testDefaultExistentials() {
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[AnyHashable : String]'}}
 }
 
-// SR-4952, rdar://problem/32330004 - Assertion failure during swift::ASTVisitor<::FailureDiagnosis,...>::visit
+/// rdar://problem/32330004
+/// https://github.com/apple/swift/issues/47529
+/// Assertion failure during `swift::ASTVisitor<::FailureDiagnosis,...>::visit`
 func rdar32330004_1() -> [String: Any] {
   return ["a""one": 1, "two": 2, "three": 3] // expected-note {{did you mean to use a dictionary literal instead?}}
   // expected-error@-1 {{expected ',' separator}}

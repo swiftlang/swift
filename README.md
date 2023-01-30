@@ -1,4 +1,7 @@
-<img src="https://swift.org/assets/images/swift.svg" alt="Swift logo" height="70" >
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://www.swift.org/assets/images/swift~dark.svg">
+  <img src="https://www.swift.org/assets/images/swift.svg" alt="Swift logo" height="70">
+</picture>
 
 # Swift Programming Language
 
@@ -14,6 +17,7 @@
 | **CentOS 7** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-centos-7/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-centos-7)|
 | **Amazon Linux 2** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2)|
 | **Amazon Linux 2** | AArch64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2-aarch64/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2-aarch64)|
+| **Universal Base Image 9** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubi-9/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubi-9)|
 
 **Swift Community-Hosted CI Platforms**
 
@@ -22,14 +26,13 @@
 |**[Ubuntu 20.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/wasm32_ubuntu_20.04.json)** | wasm32 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-20.04-webassembly/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-20.04-webassembly)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | ARMv7 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64)|
-|**[Windows 2019 (VS 2017)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_windows_2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64)|
 |**[Windows 2019 (VS 2019)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_windows_2019_VS2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019)|
 
 ## Welcome to Swift
 
 Swift is a high-performance system programming language.  It has a clean
 and modern syntax, offers seamless access to existing C and Objective-C code
-and frameworks, and is memory safe by default.
+and frameworks, and is memory-safe by default.
 
 Although inspired by Objective-C and many other languages, Swift is not itself a
 C-derived language. As a complete and independent language, Swift packages core
@@ -114,7 +117,7 @@ More options may be added over time. Please pass ``--help`` to
 On macOS if one wants to install such a toolchain into Xcode:
 
 1. Untar and copy the toolchain to one of `/Library/Developer/Toolchains/` or
-   `~/Library/Developer/Toolchains/`. E.x.:
+   `~/Library/Developer/Toolchains/`. E.g.:
 
 ```
   $ sudo tar -xzf swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz -C /

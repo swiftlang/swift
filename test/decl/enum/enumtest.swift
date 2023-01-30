@@ -299,7 +299,8 @@ func testSimpleEnum() {
   let _ : SimpleEnum=.X    // expected-error {{'=' must have consistent whitespace on both sides}}
 }
 
-enum SR510: String {
+// https://github.com/apple/swift/issues/43127
+enum E_43127: String {
     case Thing = "thing"
     case Bob = {"test"} // expected-error {{raw value for enum case must be a literal}}
 }
@@ -337,7 +338,8 @@ enum HasVariadic {
   case variadic(x: Int...) // expected-error {{variadic enum cases are not supported}}
 }
 
-// SR-2176
+// https://github.com/apple/swift/issues/44784
+
 enum Foo {
   case bar
   case none
@@ -446,7 +448,7 @@ protocol P {}
 enum E : C & P {}
 // expected-error@-1 {{inheritance from class-constrained protocol composition type 'C & P'}}
 
-// SR-11522
+// https://github.com/apple/swift/issues/53923
 
 enum EnumWithStaticNone1 {
   case a
@@ -573,7 +575,7 @@ let _: EnumWithTypealiasNone? = .none // Okay
 let _: EnumWithBothStructAndComputedNone? = .none // Okay
 let _: EnumWithBothTypealiasAndComputedNone? = .none // Okay
 
-// SR-12063
+// https://github.com/apple/swift/issues/54499
 
 let foo1: Foo? = Foo.none
 let foo2: Foo?? = Foo.none

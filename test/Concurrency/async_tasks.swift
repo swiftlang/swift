@@ -89,7 +89,6 @@ func test_unsafeThrowingContinuations() async throws {
 
 // ==== Sendability ------------------------------------------------------------
 class NotSendable { }
-// expected-note@-1{{class 'NotSendable' does not conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 func test_nonsendableContinuation() async throws {
@@ -99,7 +98,7 @@ func test_nonsendableContinuation() async throws {
 
   let _: NotSendable = try await withUnsafeThrowingContinuation { continuation in
     Task {
-      continuation.resume(returning: NotSendable()) // expected-warning{{capture of 'continuation' with non-sendable type 'UnsafeContinuation<NotSendable, any Error>' in a `@Sendable` closure}}
+      continuation.resume(returning: NotSendable()) // okay
     }
   }
 }

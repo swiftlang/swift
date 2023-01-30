@@ -20,7 +20,9 @@ func givesPtr(_ str: String) {
   var d = 0.0
   var arr = [1, 2, 3]
 
-  // SR-9090: Allow double optional promotion for pointer conversions.
+  // https://github.com/apple/swift/issues/51587
+  // Allow double optional promotion for pointer conversions.
+
   takesDoubleOptionalPtr(&arr)
   takesDoubleOptionalPtr(arr)
   takesDoubleOptionalPtr(str)
@@ -35,12 +37,15 @@ func givesPtr(_ str: String) {
   // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'Double') are expected to be equal}}
 }
 
-// SR12382
-func SR12382(_ x: UnsafeMutablePointer<Double>??) {}
+// https://github.com/apple/swift/issues/54818
+do {
+  func f(_ x: UnsafeMutablePointer<Double>??) {}
 
-var i = 0
-SR12382(&i) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Double>'}}
-// expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'Double') are expected to be equal}}
+  var i = 0
+  f(&i)
+  // expected-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Double>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Pointee' ('Int' and 'Double') are expected to be equal}}
+}
 
 //problem/68254165 - Bad diagnostic when using String init(decodingCString:) with an incorrect pointer type
 func rdar68254165(ptr: UnsafeMutablePointer<Int8>) {

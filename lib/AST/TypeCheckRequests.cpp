@@ -49,6 +49,10 @@ void swift::simple_display(
   simple_display(out, ext);
 }
 
+void swift::simple_display(llvm::raw_ostream &out, ASTContext *ctx) {
+  out << "(AST Context)";
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
                            const TypeResolutionStage &value) {
   switch (value) {
@@ -946,8 +950,10 @@ Optional<Type> ResultTypeRequest::getCachedResult() const {
   auto *const decl = std::get<0>(getStorage());
   if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
     type = funcDecl->FnRetType.getType();
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    type = subscript->ElementTy.getType();
   } else {
-    type = cast<SubscriptDecl>(decl)->ElementTy.getType();
+    type = cast<MacroDecl>(decl)->resultType.getType();
   }
 
   if (type.isNull())
@@ -960,8 +966,10 @@ void ResultTypeRequest::cacheResult(Type type) const {
   auto *const decl = std::get<0>(getStorage());
   if (auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
     funcDecl->FnRetType.setType(type);
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    subscript->ElementTy.setType(type);
   } else {
-    cast<SubscriptDecl>(decl)->ElementTy.setType(type);
+    cast<MacroDecl>(decl)->resultType.setType(type);
   }
 }
 
@@ -1474,6 +1482,12 @@ void swift::simple_display(llvm::raw_ostream &out,
     out << ")";
   }
 
+  if (import.options.contains(ImportFlags::Preconcurrency))
+    out << " preconcurrency";
+
+  if (import.options.contains(ImportFlags::WeakLinked))
+    out << " weak-linked";
+
   out << " ]";
 }
 
@@ -1525,10 +1539,19 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
     out << "property-wrapper";
     return;
 
+  case CustomAttrTypeKind::TypeWrapper:
+    out << "type-wrapper";
+    return;
+
   case CustomAttrTypeKind::GlobalActor:
     out << "global-actor";
     return;
+
+  case CustomAttrTypeKind::RuntimeMetadata:
+    out << "runtime-metadata";
+    return;
   }
+
   llvm_unreachable("bad kind");
 }
 
@@ -1543,6 +1566,11 @@ Optional<Type> CustomAttrTypeRequest::getCachedResult() const {
 void CustomAttrTypeRequest::cacheResult(Type value) const {
   auto *attr = std::get<0>(getStorage());
   attr->setType(value);
+}
+
+SourceLoc MacroDefinitionRequest::getNearestLoc() const {
+  auto &desc = std::get<0>(getStorage());
+  return desc->getLoc();
 }
 
 bool ActorIsolation::requiresSubstitution() const {

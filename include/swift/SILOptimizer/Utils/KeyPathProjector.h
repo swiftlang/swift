@@ -62,7 +62,7 @@ public:
   /// Projects the key path to an address. Sets up the projection,
   /// invokes the callback, then tears down the projection.
   /// \param accessType The access type of the projected address.
-  /// \param callback A callback to invoke with the projected adddress.
+  /// \param callback A callback to invoke with the projected address.
   ///     The projected address is only valid from within \p callback.
   ///     If accessType is Get or Modify, the projected addres is an
   ///     initialized address type. If accessType is set, the projected

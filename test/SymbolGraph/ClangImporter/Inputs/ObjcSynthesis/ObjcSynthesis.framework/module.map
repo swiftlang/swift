@@ -1,0 +1,4 @@
+framework module ObjcSynthesis {
+  header "ObjcSynthesis.h"
+  export *
+}

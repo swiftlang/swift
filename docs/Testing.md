@@ -344,6 +344,12 @@ code for the target that is not the build machine:
   swiftinterface to the given path and passing additional default flags
   appropriate for resilient frameworks.
 
+* ``%target-swift-emit-module-interfaces(`` *swift interface path*,
+  *swift private interface path* ``)`` *other arguments*:
+  run ``swift-frontend`` for the target, emitting both swiftinterfaces
+  to the given paths and passing additional default flags appropriate for
+  resilient frameworks.
+
 * ``%target-swift-typecheck-module-from-interface(`` *swift interface path*
   ``)`` *other arguments*: run ``swift-frontend`` for the target, verifying
   the swiftinterface at the given path and passing additional default flags
@@ -595,3 +601,36 @@ actually unblocks PR testing by running the smoke test build preset locally.
 To enable the lldb test allowlist, add `-G swiftpr` to the
 `LLDB_TEST_CATEGORIES` variable in `utils/build-script-impl`. Disable it by
 removing that option.
+
+#### String constants in IR tests
+
+IRGen often needs to create private constants containing the NUL-terminated
+contents of strings, such as for string literals in user code or names in type
+metadata. When it does, IRGen names them in a specific format: they will
+have the prefix `.str.`, followed by the size in bytes (excluding terminator),
+followed by a `.`, followed by the contents of the string (excluding
+terminator). For example:
+
+```
+@.str.5.Hello             ; A constant containing "Hello\0"
+@".str.11.Hello World"    ; A constant containing "Hello World\0"
+@".str.7.Hello!\0A"       ; A constant containing "Hello!\n\0"
+@".str.4.\F0\9F\8F\8E"    ; A constant containing "🏎️\0"
+@.str.0.                  ; A constant containing "\0"
+```
+
+When writing IRGen tests, you can assume that names in this format have the
+expected contents, so you don't need to capture the constant's name and then
+check that it's referred to correctly at the use site.
+
+Note that this name format treats NUL characters (\00) specially. All string
+constants generated in this manner are NUL-terminated, so the terminator is not
+included in the count *or* the content. To work around LLVM IR limitations, NUL
+characters elsewhere in the content are replaced with `_` and a `.nul<index>`
+suffix is appended to the name, in order from lowest to highest index:
+
+```
+@.str.1._.nul0            ; A constant containing "\0\0"
+@.str.2.__.nul0.nul1      ; A constant containing "\0\0\0"
+@".str.6.nul: _.nul5"     ; A constant containing "nul: \0\0"
+```

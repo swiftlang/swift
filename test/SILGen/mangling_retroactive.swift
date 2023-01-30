@@ -93,7 +93,7 @@ extension ExternalGeneric: Error where Argument: Error { }
 func useRequiresError(_: RequiresError<ExternalGeneric<Error>>) {}
 // CHECK: sil hidden [ossa] @$s20mangling_retroactive16useRequiresErroryyAA0dE0Vy12RetroactiveB15ExternalGenericVys0E0_pGAIsAhAsAH_psAHHPyHC_HCg_GF
 
-// SR-10926
+// https://github.com/apple/swift/issues/53317
 protocol OurBaseProtocol: P {
   associatedtype Assoc: P
 }

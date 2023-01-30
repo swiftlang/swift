@@ -18,8 +18,9 @@ using namespace swift::ide;
 
 static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
     CodeCompletionResultSink &targetSink, CodeCompletionCache::Value &source,
-    bool onlyTypes, bool onlyPrecedenceGroups,
-    const ExpectedTypeContext *TypeContext, const DeclContext *DC) {
+    bool onlyTypes, bool onlyPrecedenceGroups, bool onlyMacros,
+    const ExpectedTypeContext *TypeContext, const DeclContext *DC,
+    bool CanCurrDeclContextHandleAsync) {
 
   // We will be adding foreign results (from another sink) into TargetSink.
   // TargetSink should have an owning pointer to the allocator that keeps the
@@ -59,6 +60,7 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
       case CodeCompletionDeclKind::InstanceVar:
       case CodeCompletionDeclKind::LocalVar:
       case CodeCompletionDeclKind::GlobalVar:
+      case CodeCompletionDeclKind::Macro:
         return false;
       }
 
@@ -67,7 +69,12 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
   } else if (onlyPrecedenceGroups) {
     shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
       return R->getAssociatedDeclKind() ==
-             CodeCompletionDeclKind::PrecedenceGroup;
+      CodeCompletionDeclKind::PrecedenceGroup;
+    };
+  } else if (onlyMacros) {
+    shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
+      return R->getAssociatedDeclKind() ==
+      CodeCompletionDeclKind::Macro;
     };
   } else {
     shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
@@ -87,8 +94,7 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
         *contextFreeResult, SemanticContextKind::OtherModule,
         CodeCompletionFlair(),
         /*numBytesToErase=*/0, TypeContext, DC, &USRTypeContext,
-        ContextualNotRecommendedReason::None,
-        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+        CanCurrDeclContextHandleAsync, ContextualNotRecommendedReason::None);
     targetSink.Results.push_back(contextualResult);
   }
 
@@ -99,7 +105,8 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
 void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     CodeCompletionContext &context,
     ArrayRef<RequestedCachedModule> requestedModules,
-    const ExpectedTypeContext *TypeContext, const DeclContext *DC) {
+    const ExpectedTypeContext *TypeContext, const DeclContext *DC,
+    bool CanCurrDeclContextHandleAsync) {
 
   // Use the current SourceFile as the DeclContext so that we can use it to
   // perform qualified lookup, and to get the correct visibility for
@@ -112,7 +119,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     // module.
     llvm::Optional<CodeCompletionCache::ValueRefCntPtr> V =
         context.Cache.get(R.Key);
-    if (!V.hasValue()) {
+    if (!V.has_value()) {
       // No cached results found. Fill the cache.
       V = context.Cache.createValue();
       // Temporary sink in which we gather the result. The cache value retains
@@ -143,10 +150,10 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       }
       context.Cache.set(R.Key, *V);
     }
-    assert(V.hasValue());
-    auto newItems =
-        copyCodeCompletionResults(context.getResultSink(), **V, R.OnlyTypes,
-                                  R.OnlyPrecedenceGroups, TypeContext, DC);
+    assert(V.has_value());
+    auto newItems = copyCodeCompletionResults(
+        context.getResultSink(), **V, R.OnlyTypes, R.OnlyPrecedenceGroups,
+        R.OnlyMacros, TypeContext, DC, CanCurrDeclContextHandleAsync);
     postProcessCompletionResults(newItems, context.CodeCompletionKind, DC,
                                  &context.getResultSink());
   }

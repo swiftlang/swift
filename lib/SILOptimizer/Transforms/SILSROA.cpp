@@ -213,9 +213,8 @@ createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
       Optional<SILDebugVariable> NewDebugVarInfo =
           SILDebugVariable::createFromAllocation(AI);
       if (NewDebugVarInfo)
-        // TODO: Handle DIExpr that is already attached
-        NewDebugVarInfo->DIExpr = SILDebugInfoExpression::createFragment(VD);
-
+        NewDebugVarInfo->DIExpr.append(
+            SILDebugInfoExpression::createFragment(VD));
       NewAllocations.push_back(B.createAllocStack(
           Loc, Type.getFieldType(VD, M, TypeExpansionContext(B.getFunction())),
           NewDebugVarInfo, AI->hasDynamicLifetime(), AI->isLexical()));

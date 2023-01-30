@@ -19,6 +19,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
@@ -50,11 +51,13 @@ struct Context final {
 
   InstructionDeleter &deleter;
 
+  BasicCalleeAnalysis *calleeAnalysis;
+
   Context(SILValue const &value, SILFunction &function,
-          InstructionDeleter &deleter)
+          InstructionDeleter &deleter, BasicCalleeAnalysis *calleeAnalysis)
       : value(value), definition(value->getDefiningInstruction()),
-        defBlock(value->getParentBlock()), function(function),
-        deleter(deleter) {
+        defBlock(value->getParentBlock()), function(function), deleter(deleter),
+        calleeAnalysis(calleeAnalysis) {
     assert(value->isLexical());
     assert(value->getOwnershipKind() == OwnershipKind::Owned);
   }
@@ -194,7 +197,7 @@ Dataflow::classifyInstruction(SILInstruction *instruction) {
                ? Classification::Barrier
                : Classification::Other;
   }
-  if (isDeinitBarrier(instruction)) {
+  if (isDeinitBarrier(instruction, context.calleeAnalysis)) {
     return Classification::Barrier;
   }
   return Classification::Other;
@@ -385,13 +388,14 @@ bool run(Context &context) {
 }
 } // end namespace LexicalDestroyHoisting
 
-bool swift::hoistDestroysOfOwnedLexicalValue(SILValue const value,
-                                             SILFunction &function,
-                                             InstructionDeleter &deleter) {
+bool swift::hoistDestroysOfOwnedLexicalValue(
+    SILValue const value, SILFunction &function, InstructionDeleter &deleter,
+    BasicCalleeAnalysis *calleeAnalysis) {
   if (!value->isLexical())
     return false;
   if (value->getOwnershipKind() != OwnershipKind::Owned)
     return false;
-  LexicalDestroyHoisting::Context context(value, function, deleter);
+  LexicalDestroyHoisting::Context context(value, function, deleter,
+                                          calleeAnalysis);
   return LexicalDestroyHoisting::run(context);
 }

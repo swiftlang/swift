@@ -20,7 +20,7 @@
 #include "swift/IDE/CompletionLookup.h"
 
 namespace swift {
-class CodeCompletionCallbacksFactory;
+class IDEInspectionCallbacksFactory;
 class Decl;
 class DeclContext;
 class FrontendOptions;
@@ -70,7 +70,7 @@ void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                               CodeCompletionConsumer &Consumer);
 
 /// Create a factory for code completion callbacks.
-CodeCompletionCallbacksFactory *
+IDEInspectionCallbacksFactory *
 makeCodeCompletionCallbacksFactory(CodeCompletionContext &CompletionContext,
                                    CodeCompletionConsumer &Consumer);
 

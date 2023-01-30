@@ -104,6 +104,9 @@ typedef struct {
 
   /// The path to the .swiftSourceInfo file.
   swiftscan_string_ref_t module_source_info_path;
+
+  /// A flag to indicate whether or not this module is a framework.
+  bool is_framework;
 } swiftscan_swift_binary_details_t;
 
 /// Swift placeholder modules carry additional details that specify their
@@ -158,6 +161,12 @@ struct swiftscan_import_set_s {
 struct swiftscan_scan_invocation_s {
   swiftscan_string_ref_t working_directory;
   swiftscan_string_set_t *argv;
+};
+
+struct swiftscan_diagnostic_info_s {
+  swiftscan_string_ref_t message;
+  swiftscan_diagnostic_severity_t severity;
+  // TODO: SourceLoc
 };
 
 #endif // SWIFT_C_DEPENDENCY_SCAN_IMPL_H

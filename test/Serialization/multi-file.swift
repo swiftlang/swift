@@ -42,7 +42,7 @@ struct StructWithInheritedConformances: Sequence {
   }
 }
 
-// https://bugs.swift.org/browse/SR-2576
+// https://github.com/apple/swift/issues/45181
 // An associated type inside a private protocol would cause crashes during
 // module merging.
 private protocol SomeProto {

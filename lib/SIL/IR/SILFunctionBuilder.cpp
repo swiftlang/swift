@@ -25,7 +25,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     SILLocation loc, StringRef name, SILLinkage linkage, CanSILFunctionType type, IsBare_t isBareSILFunction,
     IsTransparent_t isTransparent, IsSerialized_t isSerialized,
     IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
-    ProfileCounter entryCount,
+    IsRuntimeAccessible_t isRuntimeAccessible, ProfileCounter entryCount,
     IsThunk_t isThunk, SubclassScope subclassScope) {
   assert(!type->isNoEscape() && "Function decls always have escaping types.");
   if (auto fn = mod.lookUpFunction(name)) {
@@ -38,7 +38,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
                                 isBareSILFunction, isTransparent, isSerialized,
                                 entryCount, isDynamic, isDistributed,
-                                IsNotExactSelfClass, isThunk, subclassScope);
+                                isRuntimeAccessible, IsNotExactSelfClass,
+                                isThunk, subclassScope);
   fn->setDebugScope(new (mod) SILDebugScope(loc, fn));
   return fn;
 }
@@ -91,13 +92,14 @@ void SILFunctionBuilder::addFunctionAttributes(
       SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
       targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
       F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->isExported(), kind,
-          targetFunction, spiGroupIdent,
+          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
+          SA->isExported(), kind, targetFunction, spiGroupIdent,
           attributedFuncDecl->getModuleContext(), availability));
     } else {
       F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-          spiGroupIdent, attributedFuncDecl->getModuleContext(), availability));
+          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
+          SA->isExported(), kind, nullptr, spiGroupIdent,
+          attributedFuncDecl->getModuleContext(), availability));
     }
   }
 
@@ -139,8 +141,8 @@ void SILFunctionBuilder::addFunctionAttributes(
       }
     }
     for (const EffectsAttr *effectsAttr : llvm::reverse(customEffects)) {
-      auto error = F->parseEffects(effectsAttr->getCustomString(),
-                            /*fromSIL*/ false, /*isDerived*/ false, paramNames);
+      auto error = F->parseArgumentEffectsFromSource(
+                                effectsAttr->getCustomString(), paramNames);
       if (error.first) {
         SourceLoc loc = effectsAttr->getCustomStringLocation();
         if (loc.isValid())
@@ -295,11 +297,15 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     IsDistributed = IsDistributed_t::IsDistributed;
   }
 
+  IsRuntimeAccessible_t isRuntimeAccessible = IsNotRuntimeAccessible;
+  if (constant.isRuntimeAccessibleFunction())
+    isRuntimeAccessible = IsRuntimeAccessible;
+
   auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
                                 IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
-                                IsDistributed, IsNotExactSelfClass,
-                                IsNotThunk, constant.getSubclassScope(),
-                                inlineStrategy);
+                                IsDistributed, isRuntimeAccessible,
+                                IsNotExactSelfClass, IsNotThunk,
+                                constant.getSubclassScope(), inlineStrategy);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
   if (constant.isGlobal())
@@ -308,11 +314,14 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
 
-    if (constant.isForeign && decl->hasClangNode())
+    if (constant.isForeign && decl->hasClangNode() &&
+        !decl->getObjCImplementationDecl())
       F->setClangNodeOwner(decl);
 
-    F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
-    F->setAlwaysWeakImported(decl->isAlwaysWeakImported());
+    if (auto availability = constant.getAvailabilityForLinkage())
+      F->setAvailabilityForLinkage(*availability);
+
+    F->setIsAlwaysWeakImported(decl->isAlwaysWeakImported());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
@@ -346,11 +355,12 @@ SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
     SILLocation loc, StringRef name, CanSILFunctionType type,
     IsBare_t isBareSILFunction, IsTransparent_t isTransparent,
     IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
-    IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed) {
+    IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
+    IsRuntimeAccessible_t isRuntimeAccessible) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared, type,
                              isBareSILFunction, isTransparent, isSerialized,
-                             isDynamic, isDistributed, entryCount, isThunk,
-                             SubclassScope::NotApplicable);
+                             isDynamic, isDistributed, isRuntimeAccessible,
+                             entryCount, isThunk, SubclassScope::NotApplicable);
 }
 
 SILFunction *SILFunctionBuilder::createFunction(
@@ -358,13 +368,14 @@ SILFunction *SILFunctionBuilder::createFunction(
     GenericEnvironment *genericEnv, Optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
     IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
-    IsDistributed_t isDistributed, ProfileCounter entryCount,
-    IsThunk_t isThunk, SubclassScope subclassScope,
+    IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,
+    ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
     const SILDebugScope *DebugScope) {
   return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
                              isBareSILFunction, isTrans, isSerialized,
                              entryCount, isDynamic, isDistributed,
-                             IsNotExactSelfClass, isThunk, subclassScope,
-                             inlineStrategy, EK, InsertBefore, DebugScope);
+                             isRuntimeAccessible, IsNotExactSelfClass, isThunk,
+                             subclassScope, inlineStrategy, EK, InsertBefore,
+                             DebugScope);
 }

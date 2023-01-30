@@ -1,4 +1,4 @@
-//===--- AccessStorageAnalysisDumper.cpp - accessed storage anlaysis ----===//
+//===--- AccessStorageAnalysisDumper.cpp - accessed storage analysis ----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-accessed-storage-analysys-dumper"
+#define DEBUG_TYPE "sil-accessed-storage-analysis-dumper"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"

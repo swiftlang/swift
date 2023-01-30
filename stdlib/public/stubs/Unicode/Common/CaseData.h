@@ -16,7 +16,7 @@
 #ifndef CASE_DATA_H
 #define CASE_DATA_H
 
-#include "SwiftShims/SwiftStdint.h"
+#include "swift/shims/SwiftStdint.h"
 
 #define CASE_FOLD_LEVEL_COUNT 11
 

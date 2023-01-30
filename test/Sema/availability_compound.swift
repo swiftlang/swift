@@ -6,6 +6,7 @@ public struct PublicStruct {
   public struct Inner {}
   @available(*, unavailable)
   internal struct Obsolete {} // expected-note * {{marked unavailable here}}
+  // expected-note@-1 3{{type declared here}}
 }
 
 @available(*, unavailable, renamed: "PublicStruct")

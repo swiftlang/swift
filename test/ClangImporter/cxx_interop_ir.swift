@@ -1,6 +1,7 @@
 // RUN: %target-swiftxx-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | %FileCheck %s
-//
-// We can't yet call member functions correctly on Windows (SR-13129).
+
+// https://github.com/apple/swift/issues/55575
+// We can't yet call member functions correctly on Windows.
 // XFAIL: OS=windows-msvc
 
 import CXXInterop

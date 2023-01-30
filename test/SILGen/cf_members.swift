@@ -154,15 +154,11 @@ public func foo(_ x: Double) {
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1StaticMethod
   // CHECK: apply [[FN]]()
   var y = Struct1.staticMethod()
-  // CHECK: [[SELF:%.*]] = metatype
-  // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFs5Int32VycSo10IAMStruct1Vmcfu8_ : $@convention(thin) (@thin Struct1.Type) -> @owned @callee_guaranteed () -> Int32
-  // CHECK: [[I:%.*]] = apply [[THUNK]]([[SELF]])
-  // CHECK: [[BORROWED_I:%.*]] = begin_borrow [lexical] [[I]]
-  // CHECK: [[I_COPY:%.*]] = copy_value [[BORROWED_I]]
-  // CHECK: [[BORROWED_I2:%.*]] = begin_borrow [[I_COPY]]
+  // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32 
+  // CHECK: [[I2:%.*]] = thin_to_thick_function [[THUNK]]
   let i = Struct1.staticMethod
+  // CHECK: [[BORROWED_I2:%.*]] = begin_borrow [[I2]]
   // CHECK: apply [[BORROWED_I2]]()
-  // CHECK: destroy_value [[I_COPY]]
   y = i()
 
   // TODO: Support @convention(c) references that only capture thin metatype
@@ -238,31 +234,31 @@ public func foo(_ x: Double) {
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu0_ADSdcfu1_ : $@convention(thin) (Double, Struct1) -> Struct1 {
-// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         store [[SELF]] to [trivial] [[TMP:%.*]] :
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Rotate
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu4_ADSdcfu5_ : $@convention(thin) (Double, Struct1) -> Struct1 {
-// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Scale
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFs5Int32VycSo10IAMStruct1Vmcfu8_ADycfu9_ : $@convention(thin) (@thin Struct1.Type) -> Int32 {
-// CHECK:       bb0([[SELF:%.*]] : $@thin Struct1.Type):
+// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32 
+// CHECK:       bb0:
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1StaticMethod
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]()
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL:sil private [ossa] @$s10cf_members3fooyySdFySdcSo10IAMStruct1Vcfu10_ySdcfu11_ : $@convention(thin) (Double, Struct1) -> () {
-// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK-LABEL:sil private [ossa] @$s10cf_members3fooyySdFySdcSo10IAMStruct1Vcfu11_ySdcfu12_ : $@convention(thin) (Double, Struct1) -> () {
+// CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesLast
 // CHECK:         apply [[CFUNC]]([[X]], [[SELF]])
 
-// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFys5Int32V_SfSdtcSo10IAMStruct1Vcfu14_yAD_SfSdtcfu15_ : $@convention(thin) (Int32, Float, Double, Struct1) -> () {
-// CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
+// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFys5Int32V_SfSdtcSo10IAMStruct1Vcfu13_yAD_SfSdtcfu14_ : $@convention(thin) (Int32, Float, Double, Struct1) -> () {
+// CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesThird
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])
 

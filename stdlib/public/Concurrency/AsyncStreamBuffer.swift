@@ -12,6 +12,7 @@
 
 import Swift
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 #if ASYNC_STREAM_STANDALONE
 @_exported import _Concurrency
 import Darwin
@@ -592,3 +593,4 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     return storage
   }
 }
+#endif

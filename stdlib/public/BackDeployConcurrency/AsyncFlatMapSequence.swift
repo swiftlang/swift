@@ -31,14 +31,14 @@ extension AsyncSequence {
   ///     let stream = Counter(howHigh: 5)
   ///         .flatMap { Counter(howHigh: $0) }
   ///     for await number in stream {
-  ///         print("\(number)", terminator: " ")
+  ///         print(number, terminator: " ")
   ///     }
-  ///     // Prints: 1 1 2 1 2 3 1 2 3 4 1 2 3 4 5
+  ///     // Prints "1 1 2 1 2 3 1 2 3 4 1 2 3 4 5 "
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an element
   ///   of this sequence as its parameter and returns an `AsyncSequence`.
   /// - Returns: A single, flattened asynchronous sequence that contains all
-  ///   elements in all the asychronous sequences produced by `transform`.
+  ///   elements in all the asynchronous sequences produced by `transform`.
  @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
     _ transform: @escaping (Element) async -> SegmentOfResult

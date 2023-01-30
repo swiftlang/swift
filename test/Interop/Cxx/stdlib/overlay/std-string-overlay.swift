@@ -4,7 +4,7 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 
 import StdlibUnittest
-import std
+import CxxStdlib
 
 var StdStringOverlayTestSuite = TestSuite("std::string overlay")
 
@@ -19,23 +19,38 @@ StdStringOverlayTestSuite.test("std::string <=> Swift.String") {
 
   let cxx3: std.string = "literal"
   expectEqual(cxx3.size(), 7)
+
+  // Non-ASCII characters are represented by more than one CChar.
+  let cxx4: std.string = "тест"
+  expectEqual(cxx4.size(), 8)
+  let swift4 = String(cxxString: cxx4)
+  expectEqual(swift4, "тест")
+
+  let cxx5: std.string = "emoji_🤖"
+  expectEqual(cxx5.size(), 10)
+  let swift5 = String(cxxString: cxx5)
+  expectEqual(swift5, "emoji_🤖")
+
+  let cxx6 = std.string("xyz\0abc")
+  expectEqual(cxx6.size(), 7)
+  let swift6 = String(cxxString: cxx6)
+  expectEqual(swift6, "xyz\0abc")
 }
 
-extension std.string.const_iterator: UnsafeCxxInputIterator {
-  // This func should not be required.
-  public static func ==(lhs: std.string.const_iterator,
-                        rhs: std.string.const_iterator) -> Bool {
-#if os(Linux)
-    // In libstdc++, `base()` returns UnsafePointer<Optional<UnsafePointer<CChar>>>.
-    return lhs.__baseUnsafe().pointee == rhs.__baseUnsafe().pointee
-#else
-    // In libc++, `base()` returns UnsafePointer<CChar>.
-    return lhs.__baseUnsafe() == rhs.__baseUnsafe()
-#endif
+StdStringOverlayTestSuite.test("std::string as Swift.CustomDebugStringConvertible") {
+  let cxx1 = std.string()
+  expectEqual(cxx1.debugDescription, "std.string()")
+
+  let cxx2 = std.string("something123")
+  expectEqual(cxx2.debugDescription, "std.string(something123)")
+
+  let bytes: [UInt8] = [0xE1, 0xC1, 0xAC]
+  var cxx3 = std.string()
+  for byte in bytes {
+    cxx3.push_back(CChar(bitPattern: byte))
   }
+  expectEqual(cxx3.debugDescription, "std.string(���)")
 }
-
-extension std.string: CxxSequence {}
 
 StdStringOverlayTestSuite.test("std::string as Swift.Sequence") {
   let cxx1 = std.string()

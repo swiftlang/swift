@@ -343,7 +343,8 @@ BridgedProperty::outline(SILModule &M) {
 
   auto *Fun = FuncBuilder.getOrCreateFunction(
       ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
-      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed);
+      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
   bool NeedsDefinition = Fun->empty();
 
   if (Release) {
@@ -633,7 +634,8 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It,
         return false;
     }
     ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
-    assert(Release == &*It);
+    if (Release != &*It)
+      return false;
   }
 
   ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
@@ -1072,7 +1074,8 @@ ObjCMethodCall::outline(SILModule &M) {
 
   auto *Fun = FuncBuilder.getOrCreateFunction(
       ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
-      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed);
+      IsNotTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
   bool NeedsDefinition = Fun->empty();
 
   // Call the outlined function.
@@ -1407,7 +1410,7 @@ public:
     }
 
     if (Changed) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
 };

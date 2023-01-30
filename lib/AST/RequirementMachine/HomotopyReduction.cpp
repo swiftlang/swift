@@ -133,7 +133,7 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
     const auto &rule = Rules[ruleID];
 
     auto requirementID = rule.getRequirementID();
-    if (!requirementID.hasValue()) {
+    if (!requirementID.has_value()) {
       if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
         llvm::dbgs() << "\n- rule does not have a requirement ID: "
                      << rule;
@@ -157,7 +157,7 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
       // one, which makes it easier to suppress redundancy warnings for
       // inferred requirements later on.
       auto existingID = replacement.getRequirementID();
-      if (existingID.hasValue() && !WrittenRequirements[*existingID].inferred) {
+      if (existingID.has_value() && !WrittenRequirements[*existingID].inferred) {
         if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
           llvm::dbgs() << "\n- rule already has a requirement ID: "
                        << rule;
@@ -177,6 +177,41 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
 
   if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
     llvm::dbgs() << "\n}\n";
+  }
+}
+
+/// Find concrete type or superclass rules where the right hand side occurs as a
+/// proper prefix of one of its substitutions.
+///
+/// eg, (T.[concrete: G<T.[P:A]>] => T).
+void RewriteSystem::computeRecursiveRules() {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
+       ruleID < e; ++ruleID) {
+    auto &rule = getRule(ruleID);
+
+    if (rule.isPermanent() ||
+        rule.isRedundant())
+      continue;
+
+    auto optSymbol = rule.isPropertyRule();
+    if (!optSymbol)
+      continue;
+
+    auto kind = optSymbol->getKind();
+    if (kind != Symbol::Kind::ConcreteType &&
+        kind != Symbol::Kind::Superclass) {
+      continue;
+    }
+
+    auto rhs = rule.getRHS();
+    for (auto term : optSymbol->getSubstitutions()) {
+      if (term.size() > rhs.size() &&
+          std::equal(rhs.begin(), rhs.end(), term.begin())) {
+        RecursiveRules.push_back(ruleID);
+        rule.markRecursive();
+        break;
+      }
+    }
   }
 }
 
@@ -330,7 +365,7 @@ findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
       // Otherwise, perform a shortlex comparison on (LHS, RHS).
       Optional<int> comparison = rule.compare(otherRule, Context);
 
-      if (!comparison.hasValue()) {
+      if (!comparison.has_value()) {
         // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if
         // C and C' are superclass, concrete type or concrete conformance
         // symbols.
@@ -580,6 +615,7 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
   });
 
   propagateRedundantRequirementIDs();
+  computeRecursiveRules();
 
   // Check invariants after homotopy reduction.
   verifyRewriteLoops();
@@ -629,7 +665,7 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
         rule.containsUnresolvedSymbols())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
-    if (rule.isConflicting())
+    if (rule.isConflicting() || rule.isRecursive())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
     if (!rule.isRedundant())

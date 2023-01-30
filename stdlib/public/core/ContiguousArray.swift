@@ -409,8 +409,8 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
       _makeMutableAndUnique()
       _checkSubscript_mutating(index)
       let address = _buffer.mutableFirstElementAddress + index
+      defer { _endMutation() }
       yield &address.pointee
-      _endMutation();
     }
   }
 

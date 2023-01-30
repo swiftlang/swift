@@ -18,7 +18,7 @@
 #include "swift/Runtime/Heap.h"
 #include "Private.h"
 #include "swift/Runtime/Debug.h"
-#include "../SwiftShims/RuntimeShims.h"
+#include "swift/shims/RuntimeShims.h"
 #include <algorithm>
 #include <stdlib.h>
 #if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC

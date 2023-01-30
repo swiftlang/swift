@@ -164,6 +164,11 @@ namespace swift {
       constraints::SolutionApplicationTarget &target, bool needsPrecheck,
       llvm::function_ref<void(const constraints::Solution &)> callback);
 
+  /// Thunk around \c TypeChecker::resolveDeclRefExpr to make it available to
+  /// \c swift::ide
+  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
+                         bool replaceInvalidRefsWithErrors);
+
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
 
@@ -231,11 +236,10 @@ namespace swift {
 
   /// Collect type information for every expression in \c SF; all types will
   /// be printed to \c OS.
-  ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
-    ArrayRef<const char *> ExpectedProtocols,
-    std::vector<ExpressionTypeInfo> &scratch,
-    bool CanonicalType,
-    llvm::raw_ostream &OS);
+  ArrayRef<ExpressionTypeInfo> collectExpressionType(
+      SourceFile &SF, ArrayRef<const char *> ExpectedProtocols,
+      std::vector<ExpressionTypeInfo> &scratch, bool FullyQualified,
+      bool CanonicalType, llvm::raw_ostream &OS);
 
   /// Resolve a list of mangled names to accessible protocol decls from
   /// the decl context.
@@ -265,6 +269,7 @@ namespace swift {
   /// \c VariableTypeInfos will index into the string that backs this
   /// stream.
   void collectVariableType(SourceFile &SF, SourceRange Range,
+                           bool FullyQualified,
                            std::vector<VariableTypeInfo> &VariableTypeInfos,
                            llvm::raw_ostream &OS);
 
@@ -304,6 +309,8 @@ namespace swift {
     BuildArray,
     BuildLimitedAvailability,
     BuildFinalResult,
+    BuildPartialBlockFirst,
+    BuildPartialBlockAccumulated,
   };
 
   /// Try to infer the component type of a result builder from the type
@@ -325,18 +332,29 @@ namespace swift {
   /// Just a proxy to swift::contextUsesConcurrencyFeatures() from lib/IDE code.
   bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
 
+  /// Determine the isolation of a particular closure.
+  ClosureActorIsolation determineClosureActorIsolation(
+      AbstractClosureExpr *closure, llvm::function_ref<Type(Expr *)> getType,
+      llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+          getClosureActorIsolation);
+
   /// If the capture list shadows any declarations using shorthand syntax, i.e.
   /// syntax that names both the newly declared variable and the referenced
   /// variable by the same identifier in the source text, i.e. `[foo]`, return
   /// these shorthand shadows.
   /// The first element in the pair is the implicitly declared variable and the
   /// second variable is the shadowed one.
+  /// If a \c DeclContext is passed, it is used to resolve any
+  /// \c UnresolvedDeclRef that a shorthand shadow may refer to.
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
-  getShorthandShadows(CaptureListExpr *CaptureList);
+  getShorthandShadows(CaptureListExpr *CaptureList, DeclContext *DC = nullptr);
 
   /// Same as above but for shorthand `if let foo {` syntax.
+  /// If a \c DeclContext is passed, it is used to resolve any
+  /// \c UnresolvedDeclRef that a shorthand shadow may refer to.
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
-  getShorthandShadows(LabeledConditionalStmt *CondStmt);
+  getShorthandShadows(LabeledConditionalStmt *CondStmt,
+                      DeclContext *DC = nullptr);
 }
 
 #endif

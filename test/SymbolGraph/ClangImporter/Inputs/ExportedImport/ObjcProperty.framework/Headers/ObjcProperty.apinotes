@@ -1,0 +1,5 @@
+---
+Name: ObjcProperty
+Typedefs:
+- Name: ClangStruct
+  SwiftName: SwiftStruct

@@ -18,6 +18,7 @@
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ToolChain.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Host.h"
@@ -37,6 +38,23 @@ void swift::driver::ExpandResponseFilesWithRetry(llvm::StringSaver &Saver,
         Args)) {
       return;
     }
+  }
+}
+
+static void removeSupplementaryOutputs(llvm::opt::ArgList &ArgList) {
+  llvm::DenseSet<unsigned> OptSpecifiersToRemove;
+
+  for (llvm::opt::Arg *Arg : ArgList.getArgs()) {
+    if (!Arg)
+      continue;
+
+    const llvm::opt::Option &Opt = Arg->getOption();
+    if (Opt.hasFlag(options::SupplementaryOutput))
+      OptSpecifiersToRemove.insert(Opt.getID());
+  }
+
+  for (unsigned Specifier : OptSpecifiersToRemove) {
+    ArgList.eraseArg(Specifier);
   }
 }
 
@@ -85,9 +103,7 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   if (ForceNoOutputs) {
     // Clear existing output modes and supplementary outputs.
     ArgList->eraseArg(options::OPT_modes_Group);
-    ArgList->eraseArgIf([](const llvm::opt::Arg *A) {
-      return A && A->getOption().hasFlag(options::SupplementaryOutput);
-    });
+    removeSupplementaryOutputs(*ArgList);
 
     unsigned index = ArgList->MakeIndex("-typecheck");
     // Takes ownership of the Arg.

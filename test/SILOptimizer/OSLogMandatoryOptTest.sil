@@ -89,9 +89,10 @@ bb0:
   %9 = struct_extract %8 : $OSLogMessageStub, #OSLogMessageStub.interpolation
   %10 = struct_extract %9 : $OSLogInterpolationStub, #OSLogInterpolationStub.formatString
   %11 = alloc_stack $String
-  store_borrow %10 to %11 : $*String
+  %12 = store_borrow %10 to %11 : $*String
   %13 = function_ref @useFormatStringIndirect : $@convention(thin) (@in_guaranteed String) -> ()
-  %14 = apply %13(%11) : $@convention(thin) (@in_guaranteed String) -> ()
+  %14 = apply %13(%12) : $@convention(thin) (@in_guaranteed String) -> ()
+  end_borrow %12 : $*String
   end_borrow %8 : $OSLogMessageStub
   destroy_value %7 : $OSLogMessageStub
   dealloc_stack %11 : $*String
@@ -268,7 +269,7 @@ bb5:
   %17 = tuple ()
   return %17 : $()
     // We must have all string literals at the beginning of the borrowed scope,
-    // and destorys of the literals at the end of the borrow scope.
+    // and destroys of the literals at the end of the borrow scope.
 
     // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "test message: %lld"
     // CHECK: [[STRINGINIT:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
@@ -1057,7 +1058,7 @@ bb0:
 }
 
 // The following tests are for checking that constant folding doesn't
-// cause a crash when evaulating the instructions of an animation signpost.
+// cause a crash when evaluating the instructions of an animation signpost.
 
 // Protocol stub for CVarArgStub
 protocol CVarArgStub {}

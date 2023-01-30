@@ -15,7 +15,6 @@ target_sources(swiftSILOptimizer PRIVATE
   ConstantEvaluableSubsetChecker.cpp
   EpilogueARCMatcherDumper.cpp
   EpilogueRetainReleaseMatcherDumper.cpp
-  EscapeAnalysisDumper.cpp
   FunctionOrderPrinter.cpp
   IVInfoPrinter.cpp
   InstCount.cpp
@@ -30,8 +29,10 @@ target_sources(swiftSILOptimizer PRIVATE
   SerializeSILPass.cpp
   SILDebugInfoGenerator.cpp
   SILSkippingChecker.cpp
-  SideEffectsDumper.cpp
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
+  UnitTestRunner.cpp
   OwnershipDumper.cpp
-  OwnershipVerifierTextualErrorDumper.cpp)
+  OwnershipVerifierTextualErrorDumper.cpp
+  ParseTestSpecification.cpp)
+  

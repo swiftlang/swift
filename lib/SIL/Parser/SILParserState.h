@@ -47,6 +47,7 @@ public:
   bool parseDeclSIL(Parser &P) override;
   bool parseDeclSILStage(Parser &P) override;
   bool parseSILVTable(Parser &P) override;
+  bool parseSILMoveOnlyDeinit(Parser &P) override;
   bool parseSILGlobal(Parser &P) override;
   bool parseSILWitnessTable(Parser &P) override;
   bool parseSILDefaultWitnessTable(Parser &P) override;

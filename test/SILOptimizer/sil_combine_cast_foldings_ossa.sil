@@ -66,7 +66,8 @@ entry:
 // We will handle this in a future commit.
 //
 // CHECK-LABEL: sil [ossa] @function_cast_throw_to_nothrow :
-// CHECK:         builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 // CHECK: } // end sil function 'function_cast_throw_to_nothrow'
 sil [ossa] @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
 entry:

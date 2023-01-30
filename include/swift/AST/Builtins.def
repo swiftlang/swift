@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -339,10 +339,24 @@ BUILTIN_SIL_OPERATION(ReinterpretCast, "reinterpretCast", Special)
 /// only valid for the duration of the original binding.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
 
+/// unprotectedAddressOf (inout T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a physical lvalue. The returned pointer is
+/// only valid for the duration of the original binding.
+/// In contrast to `addressof`, this builtin doesn't trigger an insertion of
+/// stack protectors.
+BUILTIN_SIL_OPERATION(UnprotectedAddressOf, "unprotectedAddressOf", Special)
+
 /// addressOfBorrow (__shared T) -> Builtin.RawPointer
 /// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
 /// valid within the scope of the borrow.
 BUILTIN_SIL_OPERATION(AddressOfBorrow, "addressOfBorrow", Special)
+
+/// unprotectedAddressOfBorrow (__shared T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
+/// valid within the scope of the borrow.
+/// In contrast to `addressOfBorrow`, this builtin doesn't trigger an insertion of
+/// stack protectors.
+BUILTIN_SIL_OPERATION(UnprotectedAddressOfBorrow, "unprotectedAddressOfBorrow", Special)
 
 /// GepRaw(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
 ///
@@ -687,6 +701,18 @@ BUILTIN_MISC_OPERATION(UToUCheckedTrunc, "u_to_u_checked_trunc", "n", Special)
 /// IntToFPWithOverflow has type (Integer) -> Float
 BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
 
+/// Builtin.bitWidth_IntLiteral has type
+/// (_ value: Builtin.IntLiteral) -> Builtin.Word
+BUILTIN_MISC_OPERATION(BitWidth, "bitWidth", "n", Special)
+
+/// Builtin.isNegative_IntLiteral has type
+/// (_ value: Builtin.IntLiteral) -> Builtin.Int1
+BUILTIN_MISC_OPERATION(IsNegative, "isNegative", "n", Special)
+
+/// Builtin.wordAtIndex_IntLiteral has type
+/// (_ value: Builtin.IntLiteral, _ index: Builtin.Word) -> Builtin.Word
+BUILTIN_MISC_OPERATION(WordAtIndex, "wordAtIndex", "n", Special)
+
 /// zeroInitializer has type <T> () -> T
 BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
@@ -723,12 +749,6 @@ BUILTIN_MISC_OPERATION(AssignTakeArray, "assignTakeArray", "", Special)
 /// This builtin indicates to the optimizer that the buffer is not mutable.
 BUILTIN_MISC_OPERATION(COWBufferForReading, "COWBufferForReading", "n", Special)
 
-// unsafeGuaranteed has type <T: AnyObject> T -> (T, Builtin.Int8)
-BUILTIN_MISC_OPERATION(UnsafeGuaranteed, "unsafeGuaranteed", "", Special)
-
-// unsafeGuaranteedEnd has type (Builtin.Int8) -> ()
-BUILTIN_MISC_OPERATION(UnsafeGuaranteedEnd, "unsafeGuaranteedEnd", "", Special)
-
 // getObjCTypeEncoding has type <T> T.Type -> RawPointer
 BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
@@ -743,9 +763,6 @@ BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
 
 // TypePtrAuthDiscriminator has type <T> (T.Type) -> Int64
 BUILTIN_MISC_OPERATION(TypePtrAuthDiscriminator, "typePtrAuthDiscriminator", "n", Special)
-
-//  int_instrprof_increment has type (Builtin.RawPointer, Builtin.Int64, Builtin.Int32, Builtin.Int32) -> ().
-BUILTIN_MISC_OPERATION(IntInstrprofIncrement, "int_instrprof_increment", "", Special)
 
 /// Initialize the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Special)
@@ -776,22 +793,13 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
 BUILTIN_MISC_OPERATION(CreateTaskGroup,
                        "createTaskGroup", "", Special)
 
+/// Create a task group, with options.
+BUILTIN_MISC_OPERATION(CreateTaskGroupWithFlags,
+                       "createTaskGroupWithFlags", "", Special)
+
 /// Destroy a task group.
 BUILTIN_MISC_OPERATION(DestroyTaskGroup,
                        "destroyTaskGroup", "", Special)
-
-
-/// A builtin that can only be called from a transparent generic function. Takes
-/// two operands, the first operand the result address, the second operand the
-/// input address. Transforms into load [take] + move_value + store [init] when
-/// transparently inlined into a caller that has the generic of the callee
-/// specialized into a loadable type. If the transparent inlining does not
-/// specialize the type (due to being inlined into a non-generic context, the
-/// SILVerifier will abort).
-///
-/// Illegal to call except for in Swift._move in the stdlib. This is enforced by
-/// the SILVerifier.
-BUILTIN_MISC_OPERATION(Move, "move", "", Special)
 
 /// A builtin that can only be called from a transparent generic function. Takes
 /// two operands, the first operand the result address, the second operand the
@@ -922,6 +930,24 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
 /// ensure that optimizations keep the stack-allocated closure arguments alive
 /// until the endAsyncLet.
 BUILTIN_MISC_OPERATION(EndAsyncLetLifetime, "endAsyncLetLifetime", "", Special)
+
+/// addressOfBorrowOpaque (__shared T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a borrowed rvalue.  The returned pointer is
+/// only valid within the scope of the borrow.  
+///
+/// Differs from addressOfBorrow only in that it is not lowered until
+/// AddressLowering.
+BUILTIN_MISC_OPERATION(AddressOfBorrowOpaque, "addressOfBorrowOpaque", "", Special)
+
+/// unprotectedAddressOfBorrowOpaque (__shared T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
+/// valid within the scope of the borrow.
+/// In contrast to `addressOfBorrowOpaque`, this builtin doesn't trigger an
+/// insertion of stack protectors.
+///
+/// Differs from unprotectedAddressOfBorrow only in that it is not lowered until
+/// AddressLowering.
+BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBorrowOpaque", "", Special)
 
 /// createAsyncTask(): (
 ///     Int,                            // task-creation flags

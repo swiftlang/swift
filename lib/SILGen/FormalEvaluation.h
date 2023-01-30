@@ -207,12 +207,12 @@ class FormalEvaluationScope {
 public:
   FormalEvaluationScope(SILGenFunction &SGF);
   ~FormalEvaluationScope() {
-    if (!savedDepth.hasValue())
+    if (!savedDepth.has_value())
       return;
     popImpl();
   }
 
-  bool isPopped() const { return !savedDepth.hasValue(); }
+  bool isPopped() const { return !savedDepth.has_value(); }
 
   void pop() {
     if (wasInInOutConversionScope)

@@ -31,6 +31,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "access-enforcement-selection"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/ApplySite.h"
@@ -98,17 +99,23 @@ raw_ostream &operator<<(raw_ostream &os, const AddressCapture &capture) {
 
 // For each non-escaping closure, record the indices of arguments that
 // require dynamic enforcement.
+//
+// A note on closure cycles: local functions can be recursive, creating closure
+// cycles. DynamicCaptures ignores such cycles, simply processing the call graph
+// top-down. This relies on a simple rule: if a captured variable is passed as a
+// box a local function (presumably because the function escapes), then it must
+// also be passed as a box to any other local function called by the
+// first. Therefore, if any capture escapes in a closure cycle, then it must be
+// passed as a box in all closures within the cycle. DynamicCaptures does not
+// care about boxes, because they are always dynamically enforced.
 class DynamicCaptures {
-  const ClosureFunctionOrder &closureOrder;
-
   // This only maps functions that have at least one inout_aliasable argument.
   llvm::DenseMap<SILFunction *, SmallVector<unsigned, 4>> dynamicCaptureMap;
 
   DynamicCaptures(DynamicCaptures &) = delete;
 
 public:
-  DynamicCaptures(const ClosureFunctionOrder &closureOrder):
-    closureOrder(closureOrder) {}
+  DynamicCaptures() {}
 
   void recordCapture(AddressCapture capture) {
     LLVM_DEBUG(llvm::dbgs() << "Dynamic Capture: " << capture);
@@ -126,10 +133,10 @@ public:
   }
 
   bool isDynamic(SILFunctionArgument *arg) const {
-    // If the current function is a local function that directly or indirectly
-    // refers to itself, then conservatively assume dynamic enforcement.
-    if (closureOrder.isHeadOfClosureCycle(arg->getFunction()))
-      return true;
+    // This closure may be the head of a closure cycle. That's ok, because we
+    // only care about whether this argument escapes in the calling function
+    // this is *not* part of the cycle. If the capture escapes anywhere in the
+    // cycle, then it is passed as a box to all closures in that cycle.
 
     auto pos = dynamicCaptureMap.find(arg->getFunction());
     if (pos == dynamicCaptureMap.end())
@@ -194,7 +201,8 @@ public:
 
 private:
   void analyzeUsesOfBox(SingleValueInstruction *source);
-  void analyzeProjection(ProjectBoxInst *projection);
+  // Used for project_box and mark_must_initialize.
+  void analyzeProjection(SingleValueInstruction *project);
 
   /// Note that the given instruction is a use of the box (or a use of
   /// a projection from it) in which the address escapes.
@@ -237,13 +245,13 @@ void SelectEnforcement::analyzeUsesOfBox(SingleValueInstruction *source) {
   for (auto use : source->getUses()) {
     auto user = use->getUser();
 
-    if (auto BBI = dyn_cast<BeginBorrowInst>(user)) {
-      analyzeUsesOfBox(BBI);
+    if (auto bbi = dyn_cast<BeginBorrowInst>(user)) {
+      analyzeUsesOfBox(bbi);
       continue;
     }
 
-    if (auto MUI = dyn_cast<MarkUninitializedInst>(user)) {
-      analyzeUsesOfBox(MUI);
+    if (auto mui = dyn_cast<MarkUninitializedInst>(user)) {
+      analyzeUsesOfBox(mui);
       continue;
     }
 
@@ -281,9 +289,15 @@ static void checkUsesOfAccess(BeginAccessInst *access) {
 #endif
 }
 
-void SelectEnforcement::analyzeProjection(ProjectBoxInst *projection) {
+void SelectEnforcement::analyzeProjection(SingleValueInstruction *projection) {
   for (auto *use : projection->getUses()) {
     auto user = use->getUser();
+
+    // Look through mark must check.
+    if (auto *mmi = dyn_cast<MarkMustCheckInst>(user)) {
+      analyzeProjection(mmi);
+      continue;
+    }
 
     // Collect accesses.
     if (auto *access = dyn_cast<BeginAccessInst>(user)) {
@@ -613,7 +627,7 @@ void AccessEnforcementSelection::run() {
   ClosureFunctionOrder closureOrder(CSA);
   closureOrder.compute();
 
-  dynamicCaptures = std::make_unique<DynamicCaptures>(closureOrder);
+  dynamicCaptures = std::make_unique<DynamicCaptures>();
   SWIFT_DEFER { dynamicCaptures.reset(); };
 
   for (SILFunction *function : closureOrder.getTopDownFunctions()) {
@@ -687,8 +701,12 @@ AccessEnforcementSelection::getAccessKindForBox(ProjectBoxInst *projection) {
 
 SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
   // Recurse through MarkUninitializedInst.
-  if (auto *MUI = dyn_cast<MarkUninitializedInst>(address))
-    return getSourceAccess(MUI->getOperand());
+  if (auto *mui = dyn_cast<MarkUninitializedInst>(address))
+    return getSourceAccess(mui->getOperand());
+
+  // Recurse through mark must check.
+  if (auto *mmci = dyn_cast<MarkMustCheckInst>(address))
+    return getSourceAccess(mmci->getOperand());
 
   if (auto box = dyn_cast<ProjectBoxInst>(address))
     return getAccessKindForBox(box);

@@ -50,6 +50,9 @@ VARIABLE(SWIFT_DEBUG_ENABLE_COW_CHECKS, bool, false,
 VARIABLE(SWIFT_ENABLE_ASYNC_JOB_DISPATCH_INTEGRATION, bool, true,
          "Enable use of dispatch_async_swift_job when available.")
 
+VARIABLE(SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS, bool, false,
+         "Check for and error on double-calls of unchecked continuations.")
+
 #if defined(__APPLE__) && defined(__MACH__)
 
 VARIABLE(SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES, bool, false,
@@ -62,6 +65,9 @@ VARIABLE(SWIFT_DEBUG_ENABLE_SHARED_CACHE_PROTOCOL_CONFORMANCES, bool, true,
 
 #endif
 
+VARIABLE(SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES, bool, true,
+         "Enable dispatch cooperative queues in the global executor.")
+
 #ifndef NDEBUG
 
 VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, bool, false,
@@ -71,5 +77,8 @@ VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, bool, false,
 
 VARIABLE(SWIFT_BINARY_COMPATIBILITY_VERSION, uint32_t, 0,
         "Set the binary compatibility level of the Swift Standard Library")
+
+VARIABLE(SWIFT_DEBUG_FAILED_TYPE_LOOKUP, bool, false,
+         "Enable warnings when we fail to look up a type by name.")
 
 #undef VARIABLE

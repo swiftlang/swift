@@ -217,7 +217,9 @@ print(mbuilders.methodBuilder(13))
 // CHECK: ("propertyBuilder", 12)
 print(mbuilders.propertyBuilder)
 
-// SR-11439: Operator builders
+// https://github.com/apple/swift/issues/53840
+// Operator builders
+
 infix operator ^^^
 func ^^^ (lhs: Int, @TupleBuilder rhs: (Int) -> (String, Int)) -> (String, Int) {
   return rhs(lhs)
@@ -1198,3 +1200,186 @@ func test_callAsFunction_with_resultBuilder() {
 test_callAsFunction_with_resultBuilder()
 // CHECK: (0, "with parens", true)
 // CHECK: (1, "without parens", true)
+
+do {
+  struct S {
+    static func test<T>(@TupleBuilder _ body: (Bool) -> T) -> S {
+      print(body(true))
+      return .init()
+    }
+  }
+
+  let _: S? = .test {
+    42
+    ""
+    [$0]
+  }
+  // CHECK: (42, "", [true])
+}
+
+do {
+  @resultBuilder
+  struct MyBuilder {
+    static func buildBlock<T1: ExpressibleByStringLiteral>(_ t1: T1) -> (T1) {
+      return (t1)
+    }
+
+    static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
+      return (t1, t2)
+    }
+
+    static func buildOptional<T>(_ value: T?) -> T { return value! }
+
+    static func buildEither<T>(first value: T) -> T {
+      return value
+    }
+
+    static func buildEither<U>(second value: U) -> U {
+      return value
+    }
+  }
+
+  func test<T>(@MyBuilder _ builder: (Int) -> T) {
+    print(builder(42))
+  }
+
+  test {
+    if $0 < 0 {
+      "\($0)"
+    } else if $0 == 42 {
+      "the answer"
+    }
+  }
+  // CHECK: the answer
+}
+
+protocol TestIfSequences {
+}
+
+struct A: TestIfSequences {}
+struct B: TestIfSequences {}
+struct C: TestIfSequences {}
+struct D: TestIfSequences {}
+
+func testOptionalIfElseSequences() {
+  func check<T>(_ v: TestIfSequences,
+                @TupleBuilder body: (TestIfSequences) throws -> T) rethrows {
+    print(try body(v))
+  }
+
+  check(A()) { v in
+    if let a = v as? A {
+      a
+    } else if let b = v as? B {
+      b
+    } else if let c = v as? C {
+      c
+    }
+  }
+
+  check(B()) { v in
+    if let a = v as? A {
+      a
+    } else if let b = v as? B {
+      b
+    } else if let c = v as? C {
+      c
+    }
+  }
+
+  check(C()) { v in
+    if let a = v as? A {
+      a
+    } else if let b = v as? B {
+      b
+    } else if let c = v as? C {
+      c
+    }
+  }
+
+  check(D()) { v in
+    if let a = v as? A {
+      a
+    } else if let b = v as? B {
+      b
+    } else if let c = v as? C {
+      c
+    } else {
+      D()
+    }
+  }
+
+  check(A()) { v in
+    if let a = v as? A {
+      a
+    } else {
+      if let b = v as? B {
+        b
+      }
+
+      if let c = v as? C {
+        c
+      } else if let d = v as? D {
+        d
+      }
+    }
+  }
+
+  check(B()) { v in
+    if let a = v as? A {
+      a
+    } else {
+      if let b = v as? B {
+        b
+      }
+
+      if let c = v as? C {
+        c
+      } else if let d = v as? D {
+        d
+      }
+    }
+  }
+
+  check(C()) { v in
+    if let a = v as? A {
+      a
+    } else {
+      if let b = v as? B {
+        b
+      }
+
+      if let c = v as? C {
+        c
+      } else if let d = v as? D {
+        d
+      }
+    }
+  }
+
+  check(D()) { v in
+    if let a = v as? A {
+      a
+    } else {
+      if let b = v as? B {
+        b
+      }
+
+      if let c = v as? C {
+        c
+      } else if let d = v as? D {
+        d
+      }
+    }
+  }
+}
+
+testOptionalIfElseSequences()
+// CHECK: Optional(main.Either<main.Either<main.A, main.B>, main.C>.first(main.Either<main.A, main.B>.first(main.A())))
+// CHECK-NEXT: Optional(main.Either<main.Either<main.A, main.B>, main.C>.first(main.Either<main.A, main.B>.second(main.B())))
+// CHECK-NEXT: Optional(main.Either<main.Either<main.A, main.B>, main.C>.second(main.C()))
+// CHECK-NEXT: second(main.Either<main.C, main.D>.second(main.D()))
+// CHECK-NEXT: first(main.A())
+// CHECK-NEXT: second(Optional(main.B()), nil)
+// CHECK-NEXT: second(nil, Optional(main.Either<main.C, main.D>.first(main.C())))
+// CHECK-NEXT: second(nil, Optional(main.Either<main.C, main.D>.second(main.D())))

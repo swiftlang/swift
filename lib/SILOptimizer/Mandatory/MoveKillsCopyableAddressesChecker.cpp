@@ -141,6 +141,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/GraphNodeWorklist.h"
+#include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Consumption.h"
@@ -161,7 +162,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
@@ -182,15 +183,6 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
-
-namespace llvm {
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const SmallBitVector &bv) {
-  for (unsigned index : range(bv.size())) {
-    os << (bv[index] ? 1 : 0);
-  }
-  return os;
-}
-} // namespace llvm
 
 static SourceLoc getSourceLocFromValue(SILValue value) {
   if (auto *defInst = value->getDefiningInstruction())
@@ -264,6 +256,24 @@ struct ClosureOperandState {
 
 } // namespace
 
+/// Is this a reinit instruction that we know how to convert into its init form.
+static bool isReinitToInitConvertibleInst(Operand *memUse) {
+  auto *memInst = memUse->getUser();
+  switch (memInst->getKind()) {
+  default:
+    return false;
+
+  case SILInstructionKind::CopyAddrInst: {
+    auto *cai = cast<CopyAddrInst>(memInst);
+    return !cai->isInitializationOfDest();
+  }
+  case SILInstructionKind::StoreInst: {
+    auto *si = cast<StoreInst>(memInst);
+    return si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
+  }
+  }
+}
+
 static void convertMemoryReinitToInitForm(SILInstruction *memInst) {
   switch (memInst->getKind()) {
   default:
@@ -278,25 +288,6 @@ static void convertMemoryReinitToInitForm(SILInstruction *memInst) {
     auto *si = cast<StoreInst>(memInst);
     si->setOwnershipQualifier(StoreOwnershipQualifier::Init);
     return;
-  }
-  }
-}
-
-static bool memInstMustReinitialize(Operand *memOper) {
-  SILValue address = memOper->get();
-  auto *memInst = memOper->getUser();
-  switch (memInst->getKind()) {
-  default:
-    return false;
-
-  case SILInstructionKind::CopyAddrInst: {
-    auto *CAI = cast<CopyAddrInst>(memInst);
-    return CAI->getDest() == address && !CAI->isInitializationOfDest();
-  }
-  case SILInstructionKind::StoreInst: {
-    auto *si = cast<StoreInst>(memInst);
-    return si->getDest() == address &&
-           si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
   }
   }
 }
@@ -557,19 +548,16 @@ namespace {
 struct ClosureArgDataflowState {
   SmallVector<SILInstruction *, 32> livenessWorklist;
   SmallVector<SILInstruction *, 32> consumingWorklist;
-  PrunedLiveness livenessForConsumes;
+  MultiDefPrunedLiveness livenessForConsumes;
   UseState &useState;
 
 public:
-  ClosureArgDataflowState(UseState &useState) : useState(useState) {}
+  ClosureArgDataflowState(SILFunction *function, UseState &useState)
+      : livenessForConsumes(function), useState(useState) {}
 
   bool process(
       SILArgument *arg, ClosureOperandState &state,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
-
-  void clear() {
-    livenessForConsumes.clear();
-  }
 
 private:
   /// Perform our liveness dataflow. Returns true if we found any liveness uses
@@ -734,6 +722,7 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
   for (auto *user : useState.inits) {
     if (upwardScanForInit(user, useState)) {
       LLVM_DEBUG(llvm::dbgs() << "    Found init block at: " << *user);
+      livenessForConsumes.initializeDef(user);
       initBlocks.insert(user->getParent());
     }
   }
@@ -779,8 +768,6 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
 bool ClosureArgDataflowState::process(
     SILArgument *address, ClosureOperandState &state,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
-  clear();
-
   SILFunction *fn = address->getFunction();
   assert(fn);
 
@@ -847,9 +834,9 @@ bool ClosureArgDataflowState::process(
       return false;
     }
 
-    SWIFT_DEFER { livenessForConsumes.clear(); };
-    auto *frontBlock = &*fn->begin();
-    livenessForConsumes.initializeDefBlock(frontBlock);
+    //!!! FIXME: Why?
+    // auto *frontBlock = &*fn->begin();
+    // livenessForConsumes.initializeDefBlock(frontBlock);
 
     for (unsigned i : indices(livenessWorklist)) {
       if (auto *ptr = livenessWorklist[i]) {
@@ -914,7 +901,7 @@ bool GatherClosureUseVisitor::visitUse(Operand *op, AccessUseType useTy) {
   if (isa<DebugValueInst>(op->getUser()))
     return true;
 
-  // Ignore end_access. For our purposes, they are irrelevent and we do not want
+  // Ignore end_access. For our purposes, they are irrelevant and we do not want
   // to treat them like liveness uses.
   if (isa<EndAccessInst>(op->getUser()))
     return true;
@@ -932,7 +919,7 @@ bool GatherClosureUseVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return true;
   }
 
-  if (memInstMustReinitialize(op)) {
+  if (isReinitToInitConvertibleInst(op)) {
     if (stripAccessMarkers(op->get()) != useState.address) {
       LLVM_DEBUG(llvm::dbgs()
                  << "!!! Error! Found reinit use not on base address: "
@@ -1163,8 +1150,8 @@ SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
       swift::getSpecializedLinkage(orig, orig->getLinkage()), clonedName,
       clonedTy, orig->getGenericEnvironment(), orig->getLocation(),
       orig->isBare(), orig->isTransparent(), serialized, IsNotDynamic,
-      IsNotDistributed, orig->getEntryCount(), orig->isThunk(),
-      orig->getClassSubclassScope(), orig->getInlineStrategy(),
+      IsNotDistributed, IsNotRuntimeAccessible, orig->getEntryCount(),
+      orig->isThunk(), orig->getClassSubclassScope(), orig->getInlineStrategy(),
       orig->getEffectsKind(), orig, orig->getDebugScope());
   for (auto &Attr : orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
@@ -1308,7 +1295,7 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
     return true;
   }
 
-  if (memInstMustReinitialize(op)) {
+  if (isReinitToInitConvertibleInst(op)) {
     if (stripAccessMarkers(op->get()) != useState.address) {
       LLVM_DEBUG(llvm::dbgs()
                  << "!!! Error! Found reinit use not on base address: "
@@ -1932,7 +1919,6 @@ struct MoveKillsCopyableAddressesChecker {
   UseState useState;
   DataflowState dataflowState;
   UseState closureUseState;
-  ClosureArgDataflowState closureUseDataflowState;
   SILOptFunctionBuilder &funcBuilder;
   llvm::SmallMapVector<FullApplySite, SmallBitVector, 8>
       applySiteToPromotedArgIndices;
@@ -1943,8 +1929,7 @@ struct MoveKillsCopyableAddressesChecker {
       : fn(fn), useState(),
         dataflowState(funcBuilder, useState, applySiteToPromotedArgIndices,
                       closureConsumes),
-        closureUseState(), closureUseDataflowState(closureUseState),
-        funcBuilder(funcBuilder) {}
+        closureUseState(), funcBuilder(funcBuilder) {}
 
   void cloneDeferCalleeAndRewriteUses(
       SmallVectorImpl<SILValue> &temporaryStorage,
@@ -2067,7 +2052,7 @@ bool MoveKillsCopyableAddressesChecker::performClosureDataflow(
   if (!visitAccessPathUses(visitor, accessPath, fn))
     return false;
 
-  SWIFT_DEFER { closureUseDataflowState.clear(); };
+  ClosureArgDataflowState closureUseDataflowState(fn, closureUseState);
   return closureUseDataflowState.process(address, calleeOperandState,
                                          closureConsumes);
 }
@@ -2414,6 +2399,10 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
     auto &astContext = fn->getASTContext();
+
+    // Only run this pass if the move only language feature is enabled.
+    if (!astContext.LangOpts.Features.contains(Feature::MoveOnly))
+      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())

@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/modulecache)
 
+// rdar://88830153
+// https://github.com/apple/swift/issues/58134
+// This test is flaky on Windows.
 // UNSUPPORTED: OS=windows-msvc
-// This test is flaky on Windows. rdar://88830153 SR-15869
 
 // Setup builds a module TestModule that depends on OtherModule and LeafModule (built from other.swift and leaf.swift).
 // During setup, input and intermediate mtimes are all set to a constant 'old' time (long in the past).

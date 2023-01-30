@@ -21,6 +21,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Option/Options.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -147,9 +148,9 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     using version::Version;
     auto SwiftVersion = A->getValue();
     bool isValid = false;
-    if (auto Version =
-            Version::parseVersionString(SwiftVersion, SourceLoc(), nullptr)) {
-      if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
+    if (auto Version = VersionParser::parseVersionString(
+            SwiftVersion, SourceLoc(), nullptr)) {
+      if (auto Effective = Version.value().getEffectiveLanguageVersion()) {
         Invocation.getLangOptions().EffectiveLanguageVersion = *Effective;
         isValid = true;
       }
@@ -171,6 +172,8 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
       ParsedArgs.hasArg(OPT_skip_inherited_docs),
       ParsedArgs.hasArg(OPT_include_spi_symbols),
       /*IncludeClangDocs=*/false,
+      ParsedArgs.hasFlag(OPT_emit_extension_block_symbols,
+                         OPT_omit_extension_block_symbols, /*default=*/false),
   };
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {
@@ -241,7 +244,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   // don't need to print these errors.
   CI.removeDiagnosticConsumer(&DiagPrinter);
   
-  SmallVector<ModuleDecl *, 8> Overlays;
+  SmallVector<ModuleDecl *> Overlays;
   M->findDeclaredCrossImportOverlaysTransitive(Overlays);
   for (const auto *OM : Overlays) {
     auto CIM = CI.getASTContext().getModuleByName(OM->getNameStr());

@@ -1,0 +1,171 @@
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
+
+// TODO: Add FileCheck
+
+// This file contains specific SIL test cases that we expect to emit
+// diagnostics. These are cases where we want to make it easy to validate
+// independent of potential changes in the frontend's emission that this
+// behavior continues to be correct. If one wishes to add a test case here,
+// please be sure to also add the relevant test case also in its swift from to
+// moveonly_addresschecker_diagnostics.swift so we can also make sure we get the
+// correct diagnostics with the current compiler codegen.
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+public class CopyableKlass {}
+
+@_moveOnly
+public class Klass {
+    var intField: Int
+    var k: Klass?
+    init()
+}
+
+sil @get_klass : $@convention(thin) () -> @owned Klass
+
+@_moveOnly
+public struct NonTrivialStruct {
+    var k = Klass()
+    var copyableK = CopyableKlass()
+    var nonTrivialStruct2 = NonTrivialStruct2()
+}
+
+@_moveOnly
+public struct NonTrivialStructPair {
+    var lhs: NonTrivialStruct
+    var rhs: NonTrivialStruct
+}
+
+@_moveOnly
+public struct NonTrivialStruct2 {
+    var copyableKlass = CopyableKlass()
+}
+
+@_moveOnly
+public struct KlassPair {
+    var lhs: Klass = Klass()
+    var rhs: Klass = Klass()
+}
+
+@_moveOnly
+public struct AggStruct {
+    var lhs: Klass
+    var center: Int
+    var rhs: Klass
+    var pair: KlassPair
+}
+
+sil @get_aggstruct : $@convention(thin) () -> @owned AggStruct
+sil @nonConsumingUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
+sil @classConsume : $@convention(thin) (@owned Klass) -> () // user: %18
+sil @copyableClassConsume : $@convention(thin) (@owned CopyableKlass) -> () // user: %24
+sil @copyableClassUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed CopyableKlass) -> () // user: %16
+
+///////////
+// Tests //
+///////////
+
+sil hidden [ossa] @initWithSplitStores : $@convention(thin) (Int) -> @owned AggStruct {
+bb0(%0 : $Int):
+  %2 = alloc_stack [lexical] $AggStruct, var, name "self", implicit
+  %3 = mark_must_check [no_implicit_copy] %2 : $*AggStruct // expected-error {{'self' consumed more than once}}
+  debug_value %0 : $Int, let, name "myInit3", argno 1
+  %5 = function_ref @get_aggstruct : $@convention(thin) () -> @owned AggStruct
+  %6 = apply %5() : $@convention(thin) () -> @owned AggStruct
+  store %6 to [init] %3 : $*AggStruct
+  %8 = begin_access [modify] [static] %3 : $*AggStruct
+  %9 = struct_element_addr %8 : $*AggStruct, #AggStruct.center
+  store %0 to [trivial] %9 : $*Int
+  end_access %8 : $*AggStruct
+  %12 = begin_access [read] [static] %3 : $*AggStruct
+  %13 = struct_element_addr %12 : $*AggStruct, #AggStruct.lhs
+  %14 = load [copy] %13 : $*Klass // expected-note {{consuming use}}
+  end_access %12 : $*AggStruct
+  %16 = move_value [lexical] %14 : $Klass
+  %17 = mark_must_check [no_implicit_copy] %16 : $Klass
+  debug_value %17 : $Klass, let, name "x"
+  %19 = copy_value %17 : $Klass
+  %20 = move_value %19 : $Klass
+  destroy_value %20 : $Klass
+  destroy_value %17 : $Klass
+  %23 = load [copy] %3 : $*AggStruct // expected-note {{consuming use}}
+  destroy_addr %3 : $*AggStruct
+  dealloc_stack %2 : $*AggStruct
+  return %23 : $AggStruct
+}
+
+sil [ossa] @aggStructConsumeGrandField : $@convention(thin) (@owned AggStruct) -> () {
+bb0(%arg : @owned $AggStruct):
+  %0 = alloc_stack [lexical] $AggStruct, var, name "x2"
+  %1 = mark_must_check [no_implicit_copy] %0 : $*AggStruct
+  // expected-error @-1 {{'x2' consumed more than once}}
+  // expected-error @-2 {{'x2' consumed by a use in a loop}}
+  %9 = begin_access [modify] [static] %1 : $*AggStruct
+  store %arg to [assign] %9 : $*AggStruct
+  end_access %9 : $*AggStruct
+  %12 = begin_access [read] [static] %1 : $*AggStruct
+  %13 = struct_element_addr %12 : $*AggStruct, #AggStruct.pair
+  %14 = struct_element_addr %13 : $*KlassPair, #KlassPair.lhs
+  %15 = load [copy] %14 : $*Klass // expected-note {{consuming use}}
+  end_access %12 : $*AggStruct
+  %17 = function_ref @classConsume : $@convention(thin) (@owned Klass) -> ()
+  %18 = apply %17(%15) : $@convention(thin) (@owned Klass) -> ()
+  br bb1
+
+bb1:
+  switch_enum undef : $Optional<Int>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb3
+
+bb2(%55 : $Int):
+  %56 = begin_access [read] [static] %1 : $*AggStruct
+  %57 = struct_element_addr %56 : $*AggStruct, #AggStruct.pair
+  %58 = struct_element_addr %57 : $*KlassPair, #KlassPair.lhs
+  %59 = load [copy] %58 : $*Klass
+  // expected-note @-1 {{consuming use}}
+  // expected-note @-2 {{consuming use}}  
+  end_access %56 : $*AggStruct
+  %61 = function_ref @classConsume : $@convention(thin) (@owned Klass) -> ()
+  %62 = apply %61(%59) : $@convention(thin) (@owned Klass) -> ()
+  br bb1
+
+bb3:
+  destroy_addr %1 : $*AggStruct
+  dealloc_stack %0 : $*AggStruct
+  %67 = tuple ()
+  return %67 : $()
+}
+
+sil hidden [ossa] @copyableKlassInAMoveOnlyStruct2 : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> () {
+bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
+  %0 = alloc_stack [lexical] $NonTrivialStruct, var, name "a"
+  %1 = mark_must_check [no_implicit_copy] %0 : $*NonTrivialStruct // expected-error {{'a' consumed more than once}}
+  store %arg to [init] %1 : $*NonTrivialStruct
+  %9 = begin_access [modify] [static] %1 : $*NonTrivialStruct
+  store %arg1 to [assign] %9 : $*NonTrivialStruct
+  end_access %9 : $*NonTrivialStruct
+  %12 = begin_access [read] [static] %1 : $*NonTrivialStruct
+  %13 = struct_element_addr %12 : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+  %14 = load_borrow %13 : $*CopyableKlass
+  %15 = function_ref @copyableClassUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed CopyableKlass) -> ()
+  %16 = apply %15(%14) : $@convention(thin) (@guaranteed CopyableKlass) -> ()
+  end_borrow %14 : $CopyableKlass
+  end_access %12 : $*NonTrivialStruct
+  %19 = begin_access [read] [static] %1 : $*NonTrivialStruct
+  %20 = struct_element_addr %19 : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+  %21 = load [copy] %20 : $*CopyableKlass // expected-note {{consuming use}}
+  end_access %19 : $*NonTrivialStruct
+  %23 = function_ref @copyableClassConsume : $@convention(thin) (@owned CopyableKlass) -> ()
+  %24 = apply %23(%21) : $@convention(thin) (@owned CopyableKlass) -> ()
+  %25 = begin_access [read] [static] %1 : $*NonTrivialStruct
+  %26 = struct_element_addr %25 : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+  %27 = load [copy] %26 : $*CopyableKlass // expected-note {{consuming use}}
+  end_access %25 : $*NonTrivialStruct
+  %29 = function_ref @copyableClassConsume : $@convention(thin) (@owned CopyableKlass) -> ()
+  %30 = apply %29(%27) : $@convention(thin) (@owned CopyableKlass) -> ()
+  destroy_addr %1 : $*NonTrivialStruct
+  dealloc_stack %0 : $*NonTrivialStruct
+  %33 = tuple ()
+  return %33 : $()
+}

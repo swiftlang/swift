@@ -51,12 +51,14 @@ EXPECTED_DEFAULTS = {
     'build_backdeployconcurrency': False,
     'build_benchmarks': True,
     'build_clang_tools_extra': True,
+    'build_compiler_rt': True,
     'build_cygwin': True,
     'build_external_benchmarks': False,
     'build_foundation': False,
     'build_cmark': True,
     'build_swift': True,
     'build_llvm': True,
+    '_build_llvm': True,
     'build_freebsd': True,
     'build_ios': True,
     'build_ios_device': False,
@@ -90,8 +92,8 @@ EXPECTED_DEFAULTS = {
     'build_swiftpm': False,
     'build_swift_driver': False,
     'build_early_swift_driver': True,
+    'build_early_swiftsyntax': True,
     'build_swiftsyntax': False,
-    'build_libparser_only': False,
     'build_skstresstester': False,
     'build_swiftformat': False,
     'build_swiftevolve': False,
@@ -100,16 +102,20 @@ EXPECTED_DEFAULTS = {
     'test_indexstoredb_sanitize_all': False,
     'test_sourcekitlsp_sanitize_all': False,
     'build_sourcekitlsp': False,
+    'install_llvm': False,
     'install_swiftpm': False,
     'install_swiftsyntax': False,
     'install_swift_driver': False,
     'install_swiftdocc': False,
     'swiftsyntax_verify_generated_files': False,
+    'swiftsyntax_lint': False,
     'install_playgroundsupport': False,
     'install_sourcekitlsp': False,
+    'install_swiftformat': False,
     'install_skstresstester': False,
     'install_swiftevolve': False,
     'build_toolchainbenchmarks': False,
+    'build_toolchain_only': False,
     'build_tvos': True,
     'build_tvos_device': False,
     'build_tvos_simulator': False,
@@ -133,6 +139,7 @@ EXPECTED_DEFAULTS = {
     'cross_compile_append_host_target_to_destdir': True,
     'cross_compile_deps_path': None,
     'cross_compile_hosts': [],
+    'infer_cross_compile_hosts_on_darwin': False,
     'darwin_deployment_version_ios':
         defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
     'darwin_deployment_version_osx':
@@ -152,6 +159,7 @@ EXPECTED_DEFAULTS = {
     'enable_experimental_concurrency': True,
     'enable_experimental_distributed': True,
     'enable_experimental_string_processing': True,
+    'enable_experimental_reflection': True,
     'enable_lsan': False,
     'enable_sanitize_coverage': False,
     'disable_guaranteed_normal_arguments': False,
@@ -184,6 +192,7 @@ EXPECTED_DEFAULTS = {
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
     'libxml2_build_variant': 'Debug',
+    'lit_jobs': multiprocessing.cpu_count(),
     'zlib_build_variant': 'Debug',
     'curl_build_variant': 'Debug',
     'bootstrapping_mode': None,
@@ -194,6 +203,9 @@ EXPECTED_DEFAULTS = {
     'lldb_build_with_xcode': '0',
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
+    'llvm_cmake_options': [],
+    'llvm_enable_modules': False,
+    'llvm_include_tests': True,
     'llvm_ninja_targets': [],
     'llvm_ninja_targets_for_cross_compile_hosts': [],
     'llvm_max_parallel_lto_link_jobs':
@@ -223,6 +235,7 @@ EXPECTED_DEFAULTS = {
     'swift_darwin_module_archs': None,
     'swift_darwin_supported_archs': None,
     'swift_freestanding_is_darwin': False,
+    'swift_profile_instr_use': None,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_ld64_lto_codegen_only_for_supporting_targets': False,
@@ -244,7 +257,6 @@ EXPECTED_DEFAULTS = {
     'test_cygwin': False,
     'test_freebsd': False,
     'test_ios': False,
-    'test_ios_32bit_simulator': False,
     'test_watchos_32bit_simulator': False,
     'test_ios_host': False,
     'test_ios_simulator': False,
@@ -364,7 +376,7 @@ class DisableOption(_BaseOption):
 
 
 class ChoicesOption(_BaseOption):
-    """Option that accepts an argument from a predifined list of choices."""
+    """Option that accepts an argument from a predefined list of choices."""
 
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices', None)
@@ -494,6 +506,8 @@ EXPECTED_OPTIONS = [
     SetOption('--skip-test-early-swift-driver',
               dest='test_early_swift_driver', value=False),
 
+    SetFalseOption('--no-llvm-include-tests', dest='llvm_include_tests'),
+
     SetTrueOption('--back-deploy-concurrency', dest='build_backdeployconcurrency'),
     SetTrueOption('--install-back-deploy-concurrency',
                   dest='install_backdeployconcurrency'),
@@ -518,7 +532,6 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--swiftpm', dest='build_swiftpm'),
     SetTrueOption('--swift-driver', dest='build_swift_driver'),
     SetTrueOption('--swiftsyntax', dest='build_swiftsyntax'),
-    SetTrueOption('--build-libparser-only', dest='build_libparser_only'),
     SetTrueOption('--skstresstester', dest='build_skstresstester'),
     SetTrueOption('--swiftformat', dest='build_swiftformat'),
     SetTrueOption('--swiftevolve', dest='build_swiftevolve'),
@@ -547,6 +560,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--build-swift-static-stdlib'),
     EnableOption('--build-swift-stdlib-unittest-extra'),
     EnableOption('--build-swift-stdlib-static-print'),
+    EnableOption('--build-toolchain-only'),
     EnableOption('--build-swift-private-stdlib'),
     EnableOption('--build-swift-stdlib-unicode-data'),
     EnableOption('--cross-compile-append-host-target-to-destdir'),
@@ -557,6 +571,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--enable-experimental-concurrency'),
     EnableOption('--enable-experimental-distributed'),
     EnableOption('--enable-experimental-string-processing'),
+    EnableOption('--enable-experimental-reflection'),
     EnableOption('--enable-lsan'),
     EnableOption('--enable-sanitize-coverage'),
     EnableOption('--enable-tsan'),
@@ -578,12 +593,16 @@ EXPECTED_OPTIONS = [
     EnableOption('--sourcekit-lsp', dest='build_sourcekitlsp'),
     EnableOption('--test-sourcekit-lsp-sanitize-all',
                  dest='test_sourcekitlsp_sanitize_all'),
+    EnableOption('--install-llvm', dest='install_llvm'),
     EnableOption('--install-swiftsyntax', dest='install_swiftsyntax'),
     EnableOption('--swiftsyntax-verify-generated-files',
                  dest='swiftsyntax_verify_generated_files'),
+    EnableOption('--swiftsyntax-lint',
+                 dest='swiftsyntax_lint'),
     EnableOption('--install-swiftpm', dest='install_swiftpm'),
     EnableOption('--install-swift-driver', dest='install_swift_driver'),
     EnableOption('--install-sourcekit-lsp', dest='install_sourcekitlsp'),
+    EnableOption('--install-swiftformat', dest='install_swiftformat'),
     EnableOption('--install-skstresstester', dest='install_skstresstester'),
     EnableOption('--install-swiftevolve', dest='install_swiftevolve'),
     EnableOption('--install-swiftdocc', dest='install_swiftdocc'),
@@ -605,6 +624,8 @@ EXPECTED_OPTIONS = [
     EnableOption('--xctest', dest='build_xctest'),
     EnableOption('--swift-disable-dead-stripping'),
     EnableOption('--clean-early-swift-driver', dest='clean_early_swift_driver'),
+    EnableOption('--llvm-enable-modules'),
+    EnableOption('--build-llvm', dest='_build_llvm'),
 
     DisableOption('--skip-build-cmark', dest='build_cmark'),
     DisableOption('--skip-build-llvm', dest='build_llvm'),
@@ -634,6 +655,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-clean-xctest', dest='clean_xctest'),
     DisableOption('--skip-clean-llbuild', dest='clean_llbuild'),
     DisableOption('--skip-early-swift-driver', dest='build_early_swift_driver'),
+    DisableOption('--skip-early-swiftsyntax', dest='build_early_swiftsyntax'),
     DisableOption('--skip-clean-swiftpm', dest='clean_swiftpm'),
     DisableOption('--skip-clean-swift-driver', dest='clean_swift_driver'),
     DisableOption('--skip-test-android', dest='test_android'),
@@ -641,8 +663,6 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-cygwin', dest='test_cygwin'),
     DisableOption('--skip-test-freebsd', dest='test_freebsd'),
     DisableOption('--skip-test-ios', dest='test_ios'),
-    DisableOption('--skip-test-ios-32bit-simulator',
-                  dest='test_ios_32bit_simulator'),
     DisableOption('--skip-test-watchos-32bit-simulator',
                   dest='test_watchos_32bit_simulator'),
     DisableOption('--skip-test-ios-host', dest='test_ios_host'),
@@ -678,6 +698,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-build-libxml2', dest='build_libxml2'),
     DisableOption('--skip-build-zlib', dest='build_zlib'),
     DisableOption('--skip-build-curl', dest='build_curl'),
+    DisableOption('--skip-build-compiler-rt', dest='build_compiler_rt'),
 
     ChoicesOption('--compiler-vendor',
                   choices=['none', 'apple']),
@@ -724,6 +745,7 @@ EXPECTED_OPTIONS = [
     PathOption('--symbols-package'),
     PathOption('--cmake-c-launcher'),
     PathOption('--cmake-cxx-launcher'),
+    PathOption('--swift-profile-instr-use'),
 
     IntOption('--benchmark-num-o-iterations'),
     IntOption('--benchmark-num-onone-iterations'),
@@ -732,14 +754,17 @@ EXPECTED_OPTIONS = [
     IntOption('--swift-tools-max-parallel-lto-link-jobs'),
     EnableOption('--swift-tools-ld64-lto-codegen-only-for-supporting-targets'),
     IntOption('-j', dest='build_jobs'),
+    IntOption('--lit-jobs', dest='lit_jobs'),
     IntOption('--dsymutil-jobs', dest='dsymutil_jobs'),
 
     AppendOption('--cross-compile-hosts'),
+    SetTrueOption('--infer-cross-compile-hosts-on-darwin'),
     AppendOption('--extra-cmake-options'),
     AppendOption('--extra-swift-args'),
     AppendOption('--test-paths'),
     AppendOption('--llvm-ninja-targets'),
     AppendOption('--llvm-ninja-targets-for-cross-compile-hosts'),
+    AppendOption('--llvm-cmake-options'),
     AppendOption('--darwin-symroot-path-filters'),
 
     UnsupportedOption('--build-jobs'),
@@ -749,7 +774,7 @@ EXPECTED_OPTIONS = [
     UnsupportedOption('--skip-test-optimize-none-with-implicit-dynamic'),
     UnsupportedOption('--skip-test-optimized'),
 
-    # Options forwared to build-script-impl
+    # Options forwarded to build-script-impl
     BuildScriptImplOption('--skip-test-swift', dest='impl_skip_test_swift'),
     BuildScriptImplOption('--install-swift', dest='impl_install_swift'),
 

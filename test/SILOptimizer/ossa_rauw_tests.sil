@@ -593,34 +593,20 @@ bbExit:
   return %9999 : $()
 }
 
-// For the normal check, make sure we performed the optimization. In this case
-// it means eliminating the enum instruction in bb1.
-//
-// Then after cleaning up show that we do not have any copy_value or
-// begin_borrows left.
-//
-// CHECK-LABEL: sil [ossa] @guaranteed_to_guaranteed_consuming : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
-// CHECK-NOT: copy_value
-// CHECK: begin_borrow
-// CHECK-NOT: enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
-// CHECK: } // end sil function 'guaranteed_to_guaranteed_consuming'
-//
-// We eliminate all begin borrows from this example with semantic-arc.
+// MandatoryCombine does not handle this pattern
 sil [ossa] @guaranteed_to_guaranteed_consuming : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
 bb0(%0 : @guaranteed $FakeOptional<Klass>):
   switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some: bb1, case #FakeOptional.none: bb2
 
 bb1(%0a : @guaranteed $Klass):
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $Klass
-  %2 = begin_borrow %1 : $FakeOptional<Klass>
-  br bb3(%2 : $FakeOptional<Klass>)
+  br bb3(%1 : $FakeOptional<Klass>)
 
 bb2:
   %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
   br bb3(%3 : $FakeOptional<Klass>)
 
 bb3(%4 : @guaranteed $FakeOptional<Klass>):
-  end_borrow %4 : $FakeOptional<Klass>
   %9999 = tuple()
   return %9999 : $()
 }
@@ -629,7 +615,6 @@ bb3(%4 : @guaranteed $FakeOptional<Klass>):
 //
 // CHECK-LABEL: sil [ossa] @guaranteed_to_guaranteed_non_consuming_deadend : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
 // CHECK-NOT: copy_value
-// CHECK-NOT: begin_borrow
 // CHECK-NOT: enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
 // CHECK: } // end sil function 'guaranteed_to_guaranteed_non_consuming_deadend'
 sil [ossa] @guaranteed_to_guaranteed_non_consuming_deadend : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
@@ -687,8 +672,6 @@ bb3:
 // borrows.
 //
 // CHECK-LABEL: sil [ossa] @guaranteed_copy_rauw_owned : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
-// CHECK-NOT: copy_value
-// CHECK: begin_borrow
 // CHECK-NOT: copy_value
 // CHECK: } // end sil function 'guaranteed_copy_rauw_owned'
 sil [ossa] @guaranteed_copy_rauw_owned : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {

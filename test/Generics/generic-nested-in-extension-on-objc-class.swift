@@ -9,9 +9,10 @@
 
 import Foundation
 
+// https://github.com/apple/swift/issues/53775
+//
 // Test the fix for a crash when instantiating the metadata for a generic type
 // nested in an extension on an ObjC class in a different file.
-// https://bugs.swift.org/browse/SR-11374
 
 extension NSString {
   class _Inner2<T> where T: NSObject {}

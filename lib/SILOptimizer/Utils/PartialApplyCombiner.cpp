@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 
 using namespace swift;
@@ -59,34 +61,44 @@ public:
 /// apply instructions.
 bool PartialApplyCombiner::copyArgsToTemporaries(
     ArrayRef<FullApplySite> applies) {
+  SmallVector<Operand *, 8> argsToHandle;
+
+  // Find args that need extension for a non-stack partial_apply
   // A partial_apply [stack]'s argument are not owned by the partial_apply and
   // therefore their lifetime must outlive any uses.
-  if (pai->isOnStack())
-    return true;
-
-  SmallVector<Operand *, 8> argsToHandle;
-  getConsumedPartialApplyArgs(pai, argsToHandle,
-                              /*includeTrivialAddrArgs*/ true);
-  if (argsToHandle.empty())
-    return true;
+  if (!pai->isOnStack()) {
+    getConsumedPartialApplyArgs(pai, argsToHandle,
+                                /*includeTrivialAddrArgs*/ true);
+  }
 
   // Compute the set of endpoints, which will be used to insert destroys of
   // temporaries.
-  SmallVector<SILInstruction *, 16> paiUsers;
+  SmallVector<Operand *, 16> paiUses;
 
-  // Of course we must inlude all apply instructions which we want to optimize.
+  // Of course we must include all apply instructions which we want to optimize.
   for (FullApplySite ai : applies) {
-    paiUsers.push_back(ai.getInstruction());
+    paiUses.push_back(ai.getCalleeOperand());
   }
 
+  SmallVector<StoreBorrowInst *, 8> storeBorrowsToHandle;
+  for (auto arg : pai->getArguments()) {
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(arg)) {
+      storeBorrowsToHandle.push_back(sbi);
+    }
+  }
+
+  if (argsToHandle.empty() && storeBorrowsToHandle.empty()) {
+    return true;
+  }
   // Also include all destroys in the liferange for the arguments.
   // This is needed for later processing in tryDeleteDeadClosure: in case the
-  // pai gets dead after this optimization, tryDeleteDeadClosure relies on that
-  // we already copied the pai arguments to extend their lifetimes until the pai
-  // is finally destroyed.
-  collectDestroys(pai, paiUsers);
+  // pai gets dead after this optimization, tryDeleteDeadClosure relies on
+  // that we already copied the pai arguments to extend their lifetimes until
+  // the pai is finally destroyed.
+  collectDestroys(pai, paiUses);
 
-  ValueLifetimeAnalysis vla(pai, paiUsers);
+  ValueLifetimeAnalysis vla(pai,
+                            llvm::makeArrayRef(paiUses.begin(), paiUses.end()));
   ValueLifetimeAnalysis::Frontier partialApplyFrontier;
 
   // Computing the frontier may fail if the frontier is located on a critical
@@ -113,6 +125,23 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
     // Destroy the argument value (either as SSA value or in the stack-
     // allocated temporary) at the end of the partial_apply's lifetime.
     endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt, callbacks);
+  }
+
+  DeadEndBlocks deBlocks(pai->getFunction());
+  for (auto *storeBorrow : storeBorrowsToHandle) {
+    if (extendStoreBorrow(storeBorrow, paiUses, &deBlocks, callbacks)) {
+      continue;
+    }
+    SILBuilderWithScope builder(pai, builderCtxt);
+    // Copy address-arguments into a stack-allocated temporary.
+    auto *asi = builder.createAllocStack(pai->getLoc(), storeBorrow->getType());
+    builder.createCopyAddr(pai->getLoc(), storeBorrow, asi, IsTake_t::IsNotTake,
+                           IsInitialization_t::IsInitialization);
+    argToTmpCopy.insert(std::make_pair(storeBorrow, asi));
+
+    // Destroy the argument value (either as SSA value or in the stack-
+    // allocated temporary) at the end of the partial_apply's lifetime.
+    endLifetimeAtFrontier(asi, partialApplyFrontier, builderCtxt, callbacks);
   }
   return true;
 }
@@ -150,7 +179,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
         auto *ASI = builder.createAllocStack(pai->getLoc(), arg->getType());
         builder.createCopyAddr(pai->getLoc(), arg, ASI, IsTake_t::IsNotTake,
                                IsInitialization_t::IsInitialization);
-        paiAI.insertAfterFullEvaluation([&](SILBuilder &builder) {
+        paiAI.insertAfterApplication([&](SILBuilder &builder) {
           builder.createDeallocStack(destroyloc, ASI);
         });
         arg = ASI;
@@ -178,7 +207,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   // We also need to destroy the partial_apply instruction itself because it is
   // consumed by the apply_instruction.
   if (!pai->hasCalleeGuaranteedContext()) {
-    paiAI.insertAfterFullEvaluation([&](SILBuilder &builder) {
+    paiAI.insertAfterApplication([&](SILBuilder &builder) {
       builder.emitDestroyValueOperation(destroyloc, pai);
     });
   }
@@ -211,8 +240,8 @@ bool PartialApplyCombiner::combine() {
     auto *user = use->getUser();
 
     // Recurse through copy_value
-    if (auto *cvi = dyn_cast<CopyValueInst>(user)) {
-      for (auto *copyUse : cvi->getUses())
+    if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user)) {
+      for (auto *copyUse : cast<SingleValueInstruction>(user)->getUses())
         worklist.push_back(copyUse);
       continue;
     }

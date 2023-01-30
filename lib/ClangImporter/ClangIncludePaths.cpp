@@ -162,20 +162,20 @@ createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
   // If an SDK path was explicitly passed to Swift, make sure to pass it to
   // Clang driver as well. It affects the resulting include paths.
   auto sdkPath = ctx.SearchPathOpts.getSDKPath();
-  if (!sdkPath.empty()) {
-    unsigned argIndex = clangDriverArgs.MakeIndex("--sysroot", sdkPath);
-    clangDriverArgs.append(new llvm::opt::Arg(
-        clangDriver.getOpts().getOption(clang::driver::options::OPT__sysroot),
-        sdkPath, argIndex));
-  }
+  if (!sdkPath.empty())
+    clangDriver.SysRoot = sdkPath.str();
   return clangDriverArgs;
+}
+
+static bool shouldInjectGlibcModulemap(const llvm::Triple &triple) {
+  return triple.isOSGlibc() || triple.isOSOpenBSD() || triple.isOSFreeBSD() ||
+         triple.isAndroid();
 }
 
 static SmallVector<std::pair<std::string, std::string>, 2>
 getGlibcFileMapping(ASTContext &ctx) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
-  // We currently only need this when building for Linux.
-  if (!triple.isOSLinux())
+  if (!shouldInjectGlibcModulemap(triple))
     return {};
 
   // Extract the Glibc path from Clang driver.
@@ -195,7 +195,7 @@ getGlibcFileMapping(ASTContext &ctx) {
   Path glibcDir;
   if (auto dir = findFirstIncludeDir(parsedIncludeArgs,
                                      {"inttypes.h", "unistd.h", "stdint.h"})) {
-    glibcDir = dir.getValue();
+    glibcDir = dir.value();
   } else {
     ctx.Diags.diagnose(SourceLoc(), diag::glibc_not_found, triple.str());
     return {};
@@ -203,16 +203,9 @@ getGlibcFileMapping(ASTContext &ctx) {
 
   Path actualModuleMapPath;
   if (auto path = getGlibcModuleMapPath(ctx.SearchPathOpts, triple))
-    actualModuleMapPath = path.getValue();
+    actualModuleMapPath = path.value();
   else
     // FIXME: Emit a warning of some kind.
-    return {};
-
-  // Only inject the module map if it actually exists. It may not, for example
-  // if `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
-  // a Swift compiler not built for Linux targets.
-  if (!llvm::sys::fs::exists(actualModuleMapPath))
-    // FIXME: emit a warning of some kind.
     return {};
 
   // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
@@ -260,7 +253,7 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
   Path cxxStdlibDir;
   if (auto dir = findFirstIncludeDir(parsedStdlibArgs,
                                      {"cstdlib", "string", "vector"})) {
-    cxxStdlibDir = dir.getValue();
+    cxxStdlibDir = dir.value();
   } else {
     ctx.Diags.diagnose(SourceLoc(), diag::libstdcxx_not_found, triple.str());
     return {};
@@ -268,7 +261,7 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
 
   Path actualModuleMapPath;
   if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, triple))
-    actualModuleMapPath = path.getValue();
+    actualModuleMapPath = path.value();
   else
     return {};
 
@@ -290,7 +283,7 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
   // {sysroot}/usr/include/module.{map,modulemap}.
   Path injectedModuleMapPath;
   if (auto path = getInjectedModuleMapPath(cxxStdlibDir))
-    injectedModuleMapPath = path.getValue();
+    injectedModuleMapPath = path.value();
   else
     return {};
 

@@ -96,8 +96,8 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
 
     Optional<unsigned> bufferID =
         SM.getIDForBufferIdentifier(subconsumer.getInputFileName());
-    assert(bufferID.hasValue() && "consumer registered for unknown file");
-    CharSourceRange range = SM.getRangeForBuffer(bufferID.getValue());
+    assert(bufferID.has_value() && "consumer registered for unknown file");
+    CharSourceRange range = SM.getRangeForBuffer(bufferID.value());
     ConsumersOrderedByRange.emplace_back(
         ConsumerAndRange(range, subconsumerIndex));
   }
@@ -147,10 +147,10 @@ FileSpecificDiagnosticConsumer::subconsumerForLocation(SourceManager &SM,
     // can't find buffers for the inputs).
     assert(!Subconsumers.empty());
     if (!SM.getIDForBufferIdentifier(Subconsumers.begin()->getInputFileName())
-             .hasValue()) {
+             .has_value()) {
       assert(llvm::none_of(Subconsumers, [&](const Subconsumer &subconsumer) {
         return SM.getIDForBufferIdentifier(subconsumer.getInputFileName())
-            .hasValue();
+            .has_value();
       }));
       return None;
     }
@@ -185,7 +185,7 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
 
   auto subconsumer = findSubconsumer(SM, Info);
   if (subconsumer) {
-    subconsumer.getValue()->handleDiagnostic(SM, Info);
+    subconsumer.value()->handleDiagnostic(SM, Info);
     return;
   }
   // Last resort: spray it everywhere

@@ -630,7 +630,7 @@ public:
 
       // The relationship expressed in the builtin.
       Optional<ValueRelation> Rel = getArithOpRelation(BI);
-      if (!Rel.hasValue())
+      if (!Rel.has_value())
         return;
 
       // Construct and register the constraint.

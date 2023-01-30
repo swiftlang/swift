@@ -56,7 +56,8 @@ entry:
 }
 
 // CHECK-LABEL: sil @function_cast_throw_to_nothrow
-// CHECK:         builtin "int_trap"
+// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
 sil @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
 entry:
   unconditional_checked_cast_addr () throws -> () in undef : $*(@in ()) -> (@out (), @error Error) to () -> ()        in undef : $*(@in ()) -> @out ()

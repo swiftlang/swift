@@ -24,12 +24,16 @@ constexpr static const StringLiteral STDLIB_NAME = "Swift";
 constexpr static const StringLiteral SWIFT_ONONE_SUPPORT = "SwiftOnoneSupport";
 /// The name of the Concurrency module, which supports that extension.
 constexpr static const StringLiteral SWIFT_CONCURRENCY_NAME = "_Concurrency";
+/// The name of the Concurrency Shims Clang module
+constexpr static const StringLiteral SWIFT_CONCURRENCY_SHIMS_NAME = "_SwiftConcurrencyShims";
 /// The name of the Distributed module, which supports that extension.
 constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "Distributed";
 /// The name of the StringProcessing module, which supports that extension.
 constexpr static const StringLiteral SWIFT_STRING_PROCESSING_NAME = "_StringProcessing";
 /// The name of the SwiftShims module, which contains private stdlib decls.
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
+/// The name of the CxxShim module, which contains a cxx casting utility.
+constexpr static const StringLiteral CXX_SHIM_NAME = "CxxShim";
 /// The name of the Builtin module, which contains Builtin functions.
 constexpr static const StringLiteral BUILTIN_NAME = "Builtin";
 /// The name of the clang imported header module.
@@ -158,6 +162,9 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_SILTOKEN = {
 /// The name of the Builtin type for Word
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_WORD = {
     "Builtin.Word"};
+/// The name of the Builtin type for PackIndex
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_PACKINDEX = {
+    "Builtin.PackIndex"};
 
 } // end namespace swift
 

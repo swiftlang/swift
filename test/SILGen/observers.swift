@@ -18,8 +18,7 @@ public struct DidSetWillSetTests {
 
     // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
     // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
-    // CHECK:        [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[SELF]]
-    // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF_LIFETIME]]
+    // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF]]
     // CHECK:        [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_SELF]]
     // CHECK:        [[P1:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
     // CHECK-NEXT:   assign %0 to [[P1]]
@@ -318,8 +317,7 @@ func local_observing_property(_ arg: Int) {
   // Alloc and initialize the property to the argument value.
   // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
   // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
-  // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
+  // CHECK: [[PB:%.*]] = project_box [[BOX]]
   // CHECK: store [[ARG]] to [trivial] [[PB]]
 }
 
@@ -327,7 +325,7 @@ func local_observing_property(_ arg: Int) {
 // Ensure that setting the variable from within its own didSet doesn't recursively call didSet.
 
 // CHECK-LABEL: sil private [ossa] @$s9observers24local_observing_property{{[_0-9a-zA-Z]*}}SiF13localproperty{{[_0-9a-zA-Z]*}}SivW
-// CHECK: bb0(%0 : @guaranteed ${ var Int })
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var Int })
 // CHECK: [[POINTER:%.*]] = project_box %0 : ${ var Int }, 0
 // CHECK: // function_ref observers.zero.unsafeMutableAddressor : Swift.Int
 // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$s9observers4zero{{[_0-9a-zA-Z]*}}vau
@@ -391,7 +389,7 @@ func propertyWithDidSetTakingOldValue() {
 }
 
 // CHECK-LABEL: sil private [ossa] @$s9observers32propertyWithDidSetTakingOldValueyyF1pL_Sivs
-// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @guaranteed ${ var Int }):
+// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @closureCapture @guaranteed ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "value", argno 1
 // CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]
 // CHECK-NEXT:  debug_value [[ARG2_PB]] : $*Int, var, name "p", argno 2, expr op_deref

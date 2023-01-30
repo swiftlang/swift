@@ -68,6 +68,7 @@ set(LLDB_ALLOW_STATIC_BINDINGS YES CACHE BOOL "")
 set(LLDB_USE_STATIC_BINDINGS YES CACHE BOOL "")
 set(LLDB_ENABLE_PYTHON YES CACHE BOOL "")
 set(LLDB_EMBED_PYTHON_HOME NO CACHE BOOL "")
+set(LLDB_ENABLE_LIBXML2 NO CACHE BOOL "")
 
 # This requires perl which may not be available on Windows
 set(SWIFT_INCLUDE_DOCS NO CACHE BOOL "")
@@ -149,7 +150,6 @@ set(SWIFT_INSTALL_COMPONENTS
       sourcekit-inproc
       swift-remote-mirror
       swift-remote-mirror-headers
-      parser-lib
     CACHE STRING "")
 
 set(LLVM_DISTRIBUTION_COMPONENTS

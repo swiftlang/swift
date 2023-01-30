@@ -24,9 +24,11 @@ target_sources(swiftSIL PRIVATE
   SILInstructions.cpp
   SILLocation.cpp
   SILModule.cpp
+  SILMoveOnlyDeinit.cpp
   SILPrinter.cpp
   SILProfiler.cpp
   SILSuccessor.cpp
+  SILSymbolVisitor.cpp
   SILType.cpp
   SILUndef.cpp
   SILVTable.cpp

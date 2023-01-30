@@ -10,6 +10,9 @@
 // UNSUPPORTED: back_deploy_concurrency
 // UNSUPPORTED: threading_none
 
+// rdar://101077408 – Temporarily disable on watchOS simulator
+// UNSUPPORTED: DARWIN_SIMULATOR=watchos
+
 import StdlibUnittest
 import Dispatch
 #if canImport(Darwin)

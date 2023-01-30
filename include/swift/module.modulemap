@@ -1,19 +1,34 @@
 module BasicBridging {
   header "Basic/BridgedSwiftObject.h"
   header "Basic/BasicBridging.h"
-  export *
-}
-
-module ASTBridging {
-  header "AST/ASTBridging.h"
-  header "AST/DiagnosticEngine.h"
-  header "AST/DiagnosticConsumer.h"
+  header "Basic/SourceLoc.h"
   requires cplusplus
   export *
 }
 
+module ASTBridging {
+  header "AST/AnyFunctionRef.h"
+  header "AST/ASTBridging.h"
+  header "AST/Builtins.h"
+  header "AST/DiagnosticEngine.h"
+  header "AST/DiagnosticConsumer.h"
+  header "AST/ForeignAsyncConvention.h"
+  header "AST/ForeignErrorConvention.h"
+  header "AST/SubstitutionMap.h"
+
+  textual header "AST/Builtins.def"
+
+  requires cplusplus
+  export *
+}
+
+module CASTBridging {
+  header "AST/CASTBridging.h"
+}
+
 module SILBridging {
   header "SIL/SILBridging.h"
+  header "SIL/SILLocation.h"
   requires cplusplus
   export *
 }

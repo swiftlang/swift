@@ -10,7 +10,7 @@ static func foo() {} // expected-error{{static methods may only be declared on a
 // Below this line are such octets that should be skipped by the lexer.
 // They may not be rendered correctly by your text editor, if at all.
 
-// Begin magic UTF-8 garbage
+// Begin magic UTF-8 values
 // 0xC0
 À // expected-error {{invalid UTF-8 found in source file}}
 // 0xC1
@@ -31,7 +31,7 @@ static func foo() {} // expected-error{{static methods may only be declared on a
 ü // expected-error {{invalid UTF-8 found in source file}}
 // 0xFD
 ý // expected-error {{invalid UTF-8 found in source file}}
-// End magic UTF-8 garbage
+// End magic UTF-8 values
 
 // Make sure we don't stop processing the whole file.
 static func bar() {} // expected-error{{static methods may only be declared on a type}} {{1-8=}}

@@ -405,7 +405,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       tokenI[2].is(clang::tok::r_paren)) {
     if (!castType.isNull()) {
       // this is a nested cast
-      // TODO(SR-15429): Diagnose nested cast
+      // TODO(https://github.com/apple/swift/issues/57735): Diagnose nested cast.
       return nullptr;
     }
 
@@ -428,20 +428,20 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       if (parsedType && diagPool.empty()) {
         castType = parsedType.get();
       } else {
-        // TODO(SR-15429): Add diagnosis
+        // TODO(https://github.com/apple/swift/issues/57735): Add diagnosis.
         return nullptr;
       }
       if (!castType->isBuiltinType() && !castTypeIsId) {
-        // TODO(SR-15429): Add diagnosis
+        // TODO(https://github.com/apple/swift/issues/57735): Add diagnosis.
         return nullptr;
       }
     } else {
       auto builtinType = builtinTypeForToken(tokenI[1],
                                              impl.getClangASTContext());
       if (builtinType) {
-        castType = builtinType.getValue();
+        castType = builtinType.value();
       } else {
-        // TODO(SR-15429): Add diagnosis
+        // TODO(https://github.com/apple/swift/issues/57735): Add diagnosis.
         return nullptr;
       }
     }
@@ -499,8 +499,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       // FIXME: If the identifier refers to a declaration, alias it?
     }
 
-    // TODO(SR-15429): Seems rare to have a single token that is neither a
-    // literal nor an identifier, but add diagnosis
+    // TODO(https://github.com/apple/swift/issues/57735): Seems rare to have a single token that is neither a literal nor an identifier, but add diagnosis.
     return nullptr;
   }
   case 2: {

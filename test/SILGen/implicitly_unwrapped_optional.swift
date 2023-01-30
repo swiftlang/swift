@@ -66,25 +66,29 @@ func bind_any() {
   let object : AnyObject? = return_any()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s29implicitly_unwrapped_optional6sr3758yyF
-func sr3758() {
+// https://github.com/apple/swift/issues/46343
+//
+// CHECK-LABEL: sil hidden [ossa] @$s29implicitly_unwrapped_optional7f_46343yyF
+func f_46343() {
   // Verify that there are no additional reabstractions introduced.
-  // CHECK: [[CLOSURE:%.+]] = function_ref @$s29implicitly_unwrapped_optional6sr3758yyFyypSgcfU_ : $@convention(thin) (@in_guaranteed Optional<Any>) -> ()
+  // CHECK: [[CLOSURE:%.+]] = function_ref @$s29implicitly_unwrapped_optional7f_46343yyFyypSgcfU_ : $@convention(thin) (@in_guaranteed Optional<Any>) -> ()
   // CHECK: [[F:%.+]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (@in_guaranteed Optional<Any>) -> () to $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
   // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
   // CHECK: = apply [[BORROWED_F]]({{%.+}}) : $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
   // CHECK: end_borrow [[BORROWED_F]]
   let f: ((Any?) -> Void) = { (arg: Any!) in }
   f(nil)
-} // CHECK: end sil function '$s29implicitly_unwrapped_optional6sr3758yyF'
+} // CHECK: end sil function '$s29implicitly_unwrapped_optional7f_46343yyF'
 
-// SR-10492: Make sure we can SILGen all of the below without crashing:
-class SR_10492_C1 {
+// https://github.com/apple/swift/issues/52892
+// Make sure we can SILGen all of the below without crashing:
+
+class C1_52892 {
   init!() {}
 }
 
-class SR_10492_C2 {
-  init(_ foo: SR_10492_C1) {}
+class C2_52892 {
+  init(_ foo: C1_52892) {}
 }
 
 @objc class C {
@@ -106,7 +110,7 @@ struct S {
 
     // Not really paren'd, but a previous version of the compiler modeled it
     // that way.
-    let _ = SR_10492_C2(SR_10492_C1())
+    let _ = C2_52892(C1_52892())
 
     let _: C = (anyObj.foo)!()
   }

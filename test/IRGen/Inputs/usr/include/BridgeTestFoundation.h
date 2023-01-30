@@ -53,10 +53,13 @@ __attribute__((availability(macosx,introduced=10.51)))
 @interface NSUserNotificationAction : NSObject
 @end
 
+void always_available_function();
+
 __attribute__((availability(macosx,introduced=10.51)))
 void future_function_should_be_weak();
 
 extern int weak_variable __attribute__((weak_import));
+extern int strong_variable;
 
 @interface NSError : NSObject
 

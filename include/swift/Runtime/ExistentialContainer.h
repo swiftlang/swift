@@ -68,8 +68,7 @@ struct TargetOpaqueExistentialContainer {
 
   /// Dump information about this specific box and its contents. Only intended
   /// for use in the debugger.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "Only meant for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 };
 using OpaqueExistentialContainer = TargetOpaqueExistentialContainer<InProcess>;

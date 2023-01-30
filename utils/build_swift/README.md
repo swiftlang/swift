@@ -8,5 +8,5 @@ the Swift build-script.
 You may run the unit test suite using the command:
 
 ```sh
-$ python utils/build_swift/run_tests.py
+$ python3 utils/build_swift/run_tests.py
 ```

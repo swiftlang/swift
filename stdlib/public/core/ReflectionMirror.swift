@@ -14,8 +14,11 @@
 
 import SwiftShims
 
-@_silgen_name("swift_isClassType")
-internal func _isClassType(_: Any.Type) -> Bool
+internal func _isClassType(_ type: Any.Type) -> Bool {
+  // a thick metatype is represented with a pointer metadata structure,
+  // so this unsafeBitCast is a safe operation here.
+  return swift_isClassType(unsafeBitCast(type, to: UnsafeRawPointer.self))
+}
 
 @_silgen_name("swift_getMetadataKind")
 internal func _metadataKind(_: Any.Type) -> UInt

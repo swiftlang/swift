@@ -100,7 +100,7 @@ def function_bug_reducer(input_file, nm, sil_opt_invoker, sil_extract_invoker,
 
     print("Base case crashes! Trying to reduce *.sib file")
 
-    # Otherwise, reduce the list of pases that cause the optimzier to crash.
+    # Otherwise, reduce the list of pases that cause the optimizer to crash.
     tester = OptimizerTester(sil_opt_invoker, pass_list)
     r = ReduceMiscompilingFunctions(functions, sil_extract_invoker,
                                     tester)

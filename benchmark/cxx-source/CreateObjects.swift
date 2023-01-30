@@ -20,7 +20,7 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "CreateObjects",
     runFunction: run_CreateObjects,
-    tags: [.validation, .bridging])
+    tags: [.validation, .bridging, .cxxInterop])
 ]
 
 @inline(never)

@@ -64,9 +64,9 @@ public:
     InitialDC->walkContext(*this);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
 
-  Expr *walkToExprPost(Expr *E) override;
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
 
   /// Check whether code completion expression is located inside of a
   /// multi-statement closure.
@@ -89,6 +89,10 @@ public:
 
   bool hasCompletionKeyPathComponent() const {
     return CompletionNode.dyn_cast<const KeyPathExpr *>() != nullptr;
+  }
+
+  bool hasCompletion() const {
+    return !CompletionNode.isNull();
   }
 
   /// If we are completing in a key path, returns the \c KeyPath that contains

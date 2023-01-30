@@ -26,7 +26,7 @@ bb0(%0 : @owned $Klass):
 // CHECK-LABEL: sil [ossa] @lexical_lifetime_address : $@convention(thin) (@in Klass) -> () {
 // CHECK: bb0(%0 : $*Klass):
 // CHECK-NEXT:   %1 = alloc_stack $Klass
-// CHECK-NEXT:   copy_addr [take] %0 to [initialization] %1 : $*Klass
+// CHECK-NEXT:   copy_addr [take] %0 to [init] %1 : $*Klass
 // CHECK-NEXT:   destroy_addr %1 : $*Klass
 // CHECK-NEXT:   dealloc_stack %1 : $*Klass
 // CHECK-NEXT:   tuple ()
@@ -35,7 +35,7 @@ bb0(%0 : @owned $Klass):
 sil [ossa] @lexical_lifetime_address : $@convention(thin) (@in Klass) -> () {
 bb0(%0 : $*Klass):
   %1 = alloc_stack [lexical] $Klass
-  copy_addr [take] %0 to [initialization] %1 : $*Klass
+  copy_addr [take] %0 to [init] %1 : $*Klass
   destroy_addr %1 : $*Klass
   dealloc_stack %1 : $*Klass
   %9999 = tuple()

@@ -107,7 +107,8 @@ WARNING(import_multiple_mainactor_attr,none,
       (StringRef, StringRef))
 
 WARNING(contradicting_mutation_attrs,none,
-        "attribute 'nonmutating' is ignored when combined with attribute 'mutating'", ())
+        "attribute '%0' is ignored when combined with attribute '%1'",
+        (StringRef, StringRef))
 
 WARNING(nonmutating_without_const,none,
         "attribute 'nonmutating' has no effect on non-const method", ())
@@ -131,6 +132,13 @@ WARNING(too_many_class_template_instantiations, none,
 WARNING(api_pattern_attr_ignored, none,
         "'%0' swift attribute ignored on type '%1': type is not copyable or destructible",
         (StringRef, StringRef))
+
+ERROR(objc_implementation_two_impls, none,
+      "duplicate implementation of Objective-C %select{|category %0 on }0"
+      "class %1",
+      (Identifier, ValueDecl *))
+NOTE(previous_objc_implementation, none,
+     "previously implemented by extension here", ())
 
 NOTE(macro_not_imported_unsupported_operator, none, "operator not supported in macro arithmetic", ())
 NOTE(macro_not_imported_unsupported_named_operator, none, "operator '%0' not supported in macro arithmetic", (StringRef))
@@ -190,6 +198,16 @@ ERROR(foreign_reference_types_invalid_retain,none,
 ERROR(foreign_reference_types_invalid_release,none,
       "specified release function '%0' is invalid. Release must have exactly "
       "one argument of type '%1'", (StringRef, StringRef))
+
+ERROR(cannot_find_conforms_to,none,
+      "specified protocol conformance could not be found '%0'.", (StringRef))
+
+ERROR(conforms_to_ambiguous,none,
+      "specified protocol conformance is ambiguous. "
+      "Found multiple protocols named '%0'.", (StringRef))
+
+ERROR(conforms_to_not_protocol,none,
+      "specified protocol conformance '%0' is not a protocol.", (StringRef))
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
 NOTE(record_field_not_imported, none, "field %0 not imported", (const clang::NamedDecl*))

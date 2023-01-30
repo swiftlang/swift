@@ -163,36 +163,36 @@ enum BoolLike { case true_, false_ }
 sil @testThread : $@convention(thin) (@in BoolLike) -> Int64 {
 bb0(%0 : $*BoolLike):
   // CHECK: switch_enum_addr %0 : $*BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
-  switch_enum_addr %0 : $*BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb3 // id: %3
+  switch_enum_addr %0 : $*BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb3
 
-bb1:                                              // Preds: bb0
-  %4 = integer_literal $Builtin.Int1, -1          // user: %5
-  br bb2(%4 : $Builtin.Int1)                      // id: %5
+bb1:
+  %4 = integer_literal $Builtin.Int1, -1
+  br bb2(%4 : $Builtin.Int1)
 
-bb2(%6 : $Builtin.Int1):                          // Preds: bb3 bb1
-  br bb4                                          // id: %7
+bb2(%6 : $Builtin.Int1):
+  br bb4
 
-bb3:                                              // Preds: bb0
-  %8 = integer_literal $Builtin.Int1, 0           // user: %9
-  br bb2(%8 : $Builtin.Int1)                      // id: %9
+bb3:
+  %8 = integer_literal $Builtin.Int1, 0
+  br bb2(%8 : $Builtin.Int1)
 
-bb4:                                              // Preds: bb2
-  cond_br %6, bb5, bb6                            // id: %10
+bb4:
+  cond_br %6, bb5, bb6
 
-bb5:                                              // Preds: bb4
+bb5:
   %11 = metatype $@thin Int64.Type
-  %12 = integer_literal $Builtin.Int64, 42        // user: %13
-  %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
-  br bb7(%13 : $Int64)                            // id: %14
+  %12 = integer_literal $Builtin.Int64, 42
+  %13 = struct $Int64 (%12 : $Builtin.Int64)
+  br bb7(%13 : $Int64)
 
-bb6:                                              // Preds: bb4
+bb6:
   %15 = metatype $@thin Int64.Type
-  %16 = integer_literal $Builtin.Int64, 17        // user: %17
-  %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %18
-  br bb7(%17 : $Int64)                            // id: %18
+  %16 = integer_literal $Builtin.Int64, 17
+  %17 = struct $Int64 (%16 : $Builtin.Int64)
+  br bb7(%17 : $Int64)
 
-bb7(%19 : $Int64):                                // Preds: bb6 bb5
-  return %19 : $Int64                             // id: %21
+bb7(%19 : $Int64):
+  return %19 : $Int64
 }
 
 // func testThread2(a : Int32) -> Int32 {
@@ -218,35 +218,35 @@ bb0(%0 : $Builtin.Int1):
   %f = integer_literal $Builtin.Int1, 0
   cond_br %0, bb1, bb2
 
-bb1:                                              // Preds: bb0
-  %4 = enum $BoolLike, #BoolLike.true_!enumelt    // user: %5
-  br bb3(%4 : $BoolLike)                          // id: %5
+bb1:
+  %4 = enum $BoolLike, #BoolLike.true_!enumelt
+  br bb3(%4 : $BoolLike)
 
-bb2:                                              // Preds: bb0
-  %8 = enum $BoolLike, #BoolLike.false_!enumelt   // user: %9
-  br bb3(%8 : $BoolLike)                          // id: %9
+bb2:
+  %8 = enum $BoolLike, #BoolLike.false_!enumelt
+  br bb3(%8 : $BoolLike)
 
-bb3(%6 : $BoolLike):                              // Preds: bb3 bb1
+bb3(%6 : $BoolLike):
   %100 = select_enum %6 : $BoolLike, case #BoolLike.true_!enumelt: %t, case #BoolLike.false_!enumelt: %f : $Builtin.Int1
-  br bb4                                          // id: %7
+  br bb4
 
-bb4:                                              // Preds: bb2
-  cond_br %100, bb5, bb6                          // id: %10
+bb4:
+  cond_br %100, bb5, bb6
 
-bb5:                                              // Preds: bb4
+bb5:
   %11 = metatype $@thin Int64.Type
-  %12 = integer_literal $Builtin.Int64, 42        // user: %13
-  %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
-  br bb7(%13 : $Int64)                            // id: %14
+  %12 = integer_literal $Builtin.Int64, 42
+  %13 = struct $Int64 (%12 : $Builtin.Int64)
+  br bb7(%13 : $Int64)
 
-bb6:                                              // Preds: bb4
+bb6:
   %15 = metatype $@thin Int64.Type
-  %16 = integer_literal $Builtin.Int64, 17        // user: %17
-  %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %18
-  br bb7(%17 : $Int64)                            // id: %18
+  %16 = integer_literal $Builtin.Int64, 17
+  %17 = struct $Int64 (%16 : $Builtin.Int64)
+  br bb7(%17 : $Int64)
 
-bb7(%19 : $Int64):                                // Preds: bb6 bb5
-  return %19 : $Int64                             // id: %21
+bb7(%19 : $Int64):
+  return %19 : $Int64
 }
 
 // func testThread3(a : Int32) -> Int32 {
@@ -273,36 +273,36 @@ bb0(%0 : $Builtin.Int1):
   %f = integer_literal $Builtin.Int1, 0
   cond_br %0, bb1, bb2
 
-bb1:                                              // Preds: bb0
-  %4 = enum $BoolLike, #BoolLike.true_!enumelt          // user: %5
+bb1:
+  %4 = enum $BoolLike, #BoolLike.true_!enumelt
   %40 = integer_literal $Builtin.Int64, 16
-  br bb3(%4 : $BoolLike, %40 : $Builtin.Int64)                      // id: %5
+  br bb3(%4 : $BoolLike, %40 : $Builtin.Int64)
 
-bb2:                                              // Preds: bb0
-  %8 = enum $BoolLike, #BoolLike.false_!enumelt           // user: %9
+bb2:
+  %8 = enum $BoolLike, #BoolLike.false_!enumelt
   %80 = integer_literal $Builtin.Int64, 17
-  br bb3(%8 : $BoolLike, %80 : $Builtin.Int64)                      // id: %9
+  br bb3(%8 : $BoolLike, %80 : $Builtin.Int64)
 
-bb3(%6 : $BoolLike, %60 : $Builtin.Int64):                          // Preds: bb3 bb1
+bb3(%6 : $BoolLike, %60 : $Builtin.Int64):
   %100 = select_enum %6 : $BoolLike, case #BoolLike.true_!enumelt: %t, case #BoolLike.false_!enumelt: %f : $Builtin.Int1
-  br bb4                                          // id: %7
+  br bb4
 
-bb4:                                              // Preds: bb2
-  cond_br %100, bb5, bb6                            // id: %10
+bb4:
+  cond_br %100, bb5, bb6
 
-bb5:                                              // Preds: bb4
+bb5:
   %11 = metatype $@thin Int64.Type
-  %12 = integer_literal $Builtin.Int64, 42        // user: %13
-  %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
-  br bb7(%13 : $Int64)                            // id: %14
+  %12 = integer_literal $Builtin.Int64, 42
+  %13 = struct $Int64 (%12 : $Builtin.Int64)
+  br bb7(%13 : $Int64)
 
-bb6:                                              // Preds: bb4
+bb6:
   %15 = metatype $@thin Int64.Type
-  %17 = struct $Int64 (%60 : $Builtin.Int64)      // user: %18
-  br bb7(%17 : $Int64)                            // id: %18
+  %17 = struct $Int64 (%60 : $Builtin.Int64)
+  br bb7(%17 : $Int64)
 
-bb7(%19 : $Int64):                                // Preds: bb6 bb5
-  return %19 : $Int64                             // id: %21
+bb7(%19 : $Int64):
+  return %19 : $Int64
 }
 
 
@@ -452,7 +452,7 @@ bb5(%6 : $Int64):
   return %6 : $Int64
 }
 
-// Eliminate the trampoline from from a cond_br at bb5->bb3->bb4/
+// Eliminate the trampoline from a cond_br at bb5->bb3->bb4/
 // This becomes a cond_br at bb8->bb5
 // CHECK-LABEL: @elim_trampoline5
 // CHECK: cond_br
@@ -579,27 +579,27 @@ import Swift
 // CHECK-NOT: br bb
 sil @dead_loop : $@convention(thin) () -> () {
 bb0:
-  %0 = integer_literal $Builtin.Int1, 0           // users: %1, %4
-  %2 = integer_literal $Builtin.Int1, -1          // user: %11
-  cond_br %0, bb1, bb3                            // id: %4
+  %0 = integer_literal $Builtin.Int1, 0
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_br %0, bb1, bb3
 
-bb1:                                              // Preds: bb0
-  %5 = integer_literal $Builtin.Int32, 0           // users: %6, %7
+bb1:
+  %5 = integer_literal $Builtin.Int32, 0
   %6 = struct $Int32 (%5 : $Builtin.Int32)
-  br bb2(%5 : $Builtin.Int32)                      // id: %7
+  br bb2(%5 : $Builtin.Int32)
 
-bb2(%8 : $Builtin.Int32):                          // Preds: bb1 bb2
-  %9 = integer_literal $Builtin.Int32, 1           // user: %11
-  %11 = builtin "sadd_with_overflow_Int32"(%8 : $Builtin.Int32, %9 : $Builtin.Int32, %2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %12, %13
-  %12 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 0 // users: %15, %16
-  %13 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 1 // user: %14
-  cond_fail %13 : $Builtin.Int1                   // id: %14
+bb2(%8 : $Builtin.Int32):
+  %9 = integer_literal $Builtin.Int32, 1
+  %11 = builtin "sadd_with_overflow_Int32"(%8 : $Builtin.Int32, %9 : $Builtin.Int32, %2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 0
+  %13 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %13 : $Builtin.Int1
   %15 = struct $Int32 (%12 : $Builtin.Int32)
-  br bb2(%12 : $Builtin.Int32)                     // id: %16
+  br bb2(%12 : $Builtin.Int32)
 
-bb3:                                              // Preds: bb0
-  %17 = tuple ()                                  // user: %18
-  return %17 : $()                                // id: %18
+bb3:
+  %17 = tuple ()
+  return %17 : $()
 }
 
 // We should be able to compile this down to returning the parameter
@@ -621,31 +621,31 @@ bb1:
   br bb3(%4 : $Bool)
 
 bb2:
-  %6 = integer_literal $Builtin.Int1, -1          // user: %7
-  %7 = struct $Bool (%6 : $Builtin.Int1)          // user: %8
-  br bb3(%7 : $Bool)                              // id: %8
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = struct $Bool (%6 : $Builtin.Int1)
+  br bb3(%7 : $Bool)
 
 // CHECK: bb3
-bb3(%9 : $Bool):                                  // Preds: bb1 bb2
+bb3(%9 : $Bool):
 // CHECK-NOT: struct_extract
-  %10 = struct_extract %9 : $Bool, #Bool._value    // user: %11
+  %10 = struct_extract %9 : $Bool, #Bool._value
 // CHECK: return
-  cond_br %10, bb4, bb5                           // id: %11
+  cond_br %10, bb4, bb5
 
 // CHECK-NOT: bb4
-bb4:                                              // Preds: bb3
-  %12 = integer_literal $Builtin.Int1, 0          // user: %13
-  %13 = struct $Bool (%12 : $Builtin.Int1)        // user: %14
-  br bb6(%13 : $Bool)                             // id: %14
+bb4:
+  %12 = integer_literal $Builtin.Int1, 0
+  %13 = struct $Bool (%12 : $Builtin.Int1)
+  br bb6(%13 : $Bool)
 
 // CHECK-NOT: bb5
-bb5:                                              // Preds: bb3
-  %15 = integer_literal $Builtin.Int1, -1         // user: %16
-  %16 = struct $Bool (%15 : $Builtin.Int1)        // user: %17
-  br bb6(%16 : $Bool)                             // id: %17
+bb5:
+  %15 = integer_literal $Builtin.Int1, -1
+  %16 = struct $Bool (%15 : $Builtin.Int1)
+  br bb6(%16 : $Bool)
 
-bb6(%18 : $Bool):                                 // Preds: bb4 bb5
-  return %18 : $Bool                              // id: %19
+bb6(%18 : $Bool):
+  return %18 : $Bool
 }
 
 class C {
@@ -1049,7 +1049,6 @@ bb5(%r : $Builtin.Int32):
 // CHECK: bb1(
 // CHECK:  cond_br {{.*}}, bb3, bb2
 // CHECK: bb2:
-// CHECK:  enum $Optional<Int32>, #Optional.some
 // CHECK:  br bb1(
 // CHECK: bb3:
 // CHECK:  return
@@ -2481,7 +2480,7 @@ sil @rethrow_function : $@convention(thin) (@owned @callee_owned (Int) -> (Int, 
 sil @non_throwing_closure : $@convention(thin) (Int) -> Int
 
 // CHECK-LABEL: sil @replace_try_apply_with_apply
-// CHECK: [[R:%[0-9]+]] = apply [nothrow] %1(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
+// CHECK: [[R:%[0-9]+]] = apply [nothrow] %1(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error any Error)) -> (Int, @error any Error)
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return [[R]] : $Int
 sil @replace_try_apply_with_apply : $@convention(thin) () -> Int {
@@ -2747,29 +2746,6 @@ bb2(%16 : $Error):
   unreachable
 }
 
-
-// Check that we don't crash on this.
-
-// CHECK-LABEL: @simplified_branch_arg_has_result_value_1
-// CHECK: [[B:%[0-9]+]] = alloc_box
-// CHECK: [[PB:%[0-9]+]] = project_box [[B]]
-// CHECK: br bb1([[PB]] : $*Builtin.Int32)
-sil @simplified_branch_arg_has_result_value_1 : $@convention(thin) (@in Builtin.Int32) -> Builtin.Int32 {
-entry(%0 : $*Builtin.Int32):
-  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
-  %p = project_box %b : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-  %i = integer_literal $Builtin.Int32, 0
-  store %i to %p : $*Builtin.Int32
-  br bb1(%p : $*Builtin.Int32)
-
-bb1(%a : $*Builtin.Int32):
-  %r = load %a : $*Builtin.Int32
-  cond_br undef, bb1(%0 : $*Builtin.Int32), bb2
-
-bb2:
-  return %r : $Builtin.Int32
-}
-
 // CHECK-LABEL: sil @unpack_enum_arg
 // CHECK: bb1:
 // CHECK:   br bb3(%0 : $Int)
@@ -2948,10 +2924,10 @@ class IsQ : Q {}
 // ---
 // CHECK-LABEL: sil @test_dead_checked_cast_br : $@convention(thin) (@in IsQ) -> () {
 // CHECK: bb0(%0 : $*IsQ):
-// CHECK:   [[Q:%.*]] = alloc_stack $Q
+// CHECK:   [[Q:%.*]] = alloc_stack $any Q
 // CHECK:   [[LD:%.*]] = load %0 : $*IsQ
 // CHECK:   strong_release [[LD]] : $IsQ
-// CHECK:   dealloc_stack [[Q]] : $*Q
+// CHECK:   dealloc_stack [[Q]] : $*any Q
 // CHECK:   [[R:%.*]] = tuple ()
 // CHECK:   return [[R]] : $()
 // CHECK-LABEL: } // end sil function 'test_dead_checked_cast_br'
@@ -2967,7 +2943,7 @@ bb1:
 bb2(%5 : $Builtin.Int1):
   // To avoid violating ownership, Q needs to be destroyed here. However, that
   // would create a use of the checked_cast, defeating the test. In theory, Q
-  // could be some unmananged type with no destroy, but we don't have a way to
+  // could be some unmanaged type with no destroy, but we don't have a way to
   // express that in the type system, and bridged casts don't yet go through
   // this optimization path.
   dealloc_stack %p : $*Q
@@ -3015,7 +2991,7 @@ bb3(%11 : $Int):
 // CHECK:   store %0 to [[SRC]]
 // CHECK:   [[DST:%.*]] = alloc_stack $String
 // CHECK:   [[TEMP:%.*]] = alloc_stack $String
-// CHECK:   copy_addr [[SRC]] to [initialization] [[TEMP]]
+// CHECK:   copy_addr [[SRC]] to [init] [[TEMP]]
 // CHECK:   [[LD1:%.*]] = load [[TEMP]]
 // CHECK:   store [[LD1]] to [[DST]]
 // CHECK:   [[LD2:%.*]] = load [[DST]]
@@ -3255,4 +3231,90 @@ bb5:
 bb6:
   %r = tuple()
   return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_crash_in_cast_jump_threading
+// CHECK:         checked_cast_br
+// CHECK:       } // end sil function 'dont_crash_in_cast_jump_threading'
+sil @dont_crash_in_cast_jump_threading : $@convention(thin) (Optional<Base>) -> () {
+bb0(%0 : $Optional<Base>):
+  br bb1
+
+bb1:
+  switch_enum %0 : $Optional<Base>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb21
+
+
+bb2(%18 : $Base):
+  checked_cast_br %18 : $Base to Derived, bb3, bb4
+
+bb3(%21 : $Derived):
+  %22 = integer_literal $Builtin.Int1, -1
+  br bb5(%22 : $Builtin.Int1)
+
+bb4:
+  %24 = integer_literal $Builtin.Int1, 0
+  br bb5(%24 : $Builtin.Int1)
+
+
+bb5(%26 : $Builtin.Int1):
+  cond_br %26, bb6, bb19
+
+bb6:
+  checked_cast_br %18 : $Base to Derived, bb7, bb8
+
+
+bb7(%29 : $Derived):
+  %30 = enum $Optional<Derived>, #Optional.some!enumelt, %29 : $Derived
+  br bb9(%30 : $Optional<Derived>)
+
+bb8:
+  %32 = enum $Optional<Derived>, #Optional.none!enumelt
+  br bb9(%32 : $Optional<Derived>)
+
+
+bb9(%34 : $Optional<Derived>):
+  switch_enum %34 : $Optional<Derived>, case #Optional.some!enumelt: bb10, case #Optional.none!enumelt: bb18
+
+
+bb10(%36 : $Derived):
+  br bb11
+
+bb11:
+  checked_cast_br %18 : $Base to Derived, bb12, bb13
+
+
+bb12(%43 : $Derived):
+  %44 = enum $Optional<Derived>, #Optional.some!enumelt, %43 : $Derived
+  br bb14(%44 : $Optional<Derived>)
+
+bb13:
+  %46 = enum $Optional<Derived>, #Optional.none!enumelt
+  br bb14(%46 : $Optional<Derived>)
+
+
+bb14(%48 : $Optional<Derived>):
+  switch_enum %48 : $Optional<Derived>, case #Optional.some!enumelt: bb15, case #Optional.none!enumelt: bb17
+
+
+bb15(%50 : $Derived):
+  br bb16
+
+bb16:
+  br bb20
+
+bb17:
+  br bb16
+
+bb18:
+  br bb11
+
+bb19:
+  br bb20
+
+bb20:
+  br bb1
+
+bb21:
+  %75 = tuple ()
+  return %75 : $()
 }

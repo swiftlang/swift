@@ -193,7 +193,7 @@ actor MultiVarActor {
     var firstVar: Int
     var secondVar: Float
 
-    // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC10doNotThrowACSb_tYaKcfc : $@convention(method) @async (Bool, @owned MultiVarActor) -> (@owned MultiVarActor, @error Error) {
+    // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC10doNotThrowACSb_tYaKcfc : $@convention(method) @async (Bool, @owned MultiVarActor) -> (@owned MultiVarActor, @error any Error) {
     // CHECK:   bb0({{%[0-9]+}} : $Bool, [[SELF:%[0-9]+]] : $MultiVarActor):
     // CHECK:       [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MultiVarActor, #MultiVarActor.firstVar
     // CHECK:       [[VAR:%[0-9]+]] = begin_access [modify] [dynamic] [[REF]] : $*Int

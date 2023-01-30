@@ -1,17 +1,14 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
 //
 // REQUIRES: executable_test
-//
-// Enable this everywhere once we have a solution for modularizing other C++ stdlibs: rdar://87654514
-// REQUIRES: OS=macosx || OS=linux-gnu
 
 import StdlibUnittest
 import StdString
 #if os(Linux)
-import std
-// FIXME: import std.string once libstdc++ is split into submodules.
+import CxxStdlib
+// FIXME: import CxxStdlib.string once libstdc++ is split into submodules.
 #else
-import std.string
+import CxxStdlib.string
 #endif
 
 var StdStringTestSuite = TestSuite("StdString")

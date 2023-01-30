@@ -17,8 +17,8 @@ internal class SCC: SPP {
  return opt2(b:b)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @$s30existential_transform_soletype4opt11bs5Int32VAA3SPP_p_tF : $@convention(thin) (@in_guaranteed SPP) -> Int32 {
-// CHECK: bb0(%0 : $*SPP):
+// CHECK-LABEL: sil hidden [noinline] @$s30existential_transform_soletype4opt11bs5Int32VAA3SPP_p_tF : $@convention(thin) (@in_guaranteed any SPP) -> Int32 {
+// CHECK: bb0(%0 : $*any SPP):
 // CHECK:   debug_value {{.*}} expr op_deref
 // CHECK:   function_ref @$s30existential_transform_soletype4opt21bs5Int32VAA3SPP_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SPP> (@in_guaranteed τ_0_0) -> Int32 // user: %4
 // CHECK:   open_existential_addr

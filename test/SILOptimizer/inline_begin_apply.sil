@@ -44,6 +44,23 @@ unwind:
   unwind
 }
 
+sil [ossa] @getSomeClass : $@convention(thin) () -> @owned SomeClass
+
+sil [transparent] [ossa] @yield_owned_as_guaranteed : $@yield_once @convention(thin) () -> @yields @guaranteed SomeClass {
+  %getSomeClass = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  %SomeClass = apply %getSomeClass() : $@convention(thin) () -> @owned SomeClass
+  yield %SomeClass : $SomeClass, resume bb1, unwind bb2
+
+bb1:
+  destroy_value %SomeClass : $SomeClass
+  %retval = tuple ()
+  return %retval : $()
+
+bb2:
+  destroy_value %SomeClass : $SomeClass
+  unwind
+}
+
 sil [transparent] [ossa] @test_unreachable : $@yield_once <C: SomeClass> () -> (@yields @in Indirect<C>) {
 entry:
   unreachable 
@@ -555,3 +572,48 @@ bb2:
   return %ret : $()
 }
 
+
+// CHECK-LABEL: sil [ossa] @test_store_borrow_owned_as_guaranteed_yield : {{.*}} {
+// CHECK:       {{bb[0-9]+}}:
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $SomeClass
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[BORROW:%[^,]+]] = store_borrow [[LIFETIME]] to [[ADDR]]
+// CHECK:         yield [[BORROW]] {{.*}}, resume [[BB_RESUME:bb[0-9]+]], unwind [[BB_UNWIND:bb[0-9]+]]
+// CHECK:       [[BB_RESUME]]:
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         tuple ()
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK:       [[BB_UNWIND]]:
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         unwind
+// CHECK-LABEL: } // end sil function 'test_store_borrow_owned_as_guaranteed_yield'
+sil [ossa] @test_store_borrow_owned_as_guaranteed_yield : $@yield_once @convention(thin) @substituted <T> () -> @yields @in_guaranteed T for <SomeClass> {
+entry:
+  %addr = alloc_stack $SomeClass
+  %callee = function_ref @yield_owned_as_guaranteed : $@yield_once @convention(thin) () -> @yields @guaranteed SomeClass
+  (%instance, %token) = begin_apply %callee() : $@yield_once @convention(thin) () -> @yields @guaranteed SomeClass
+  %borrow = store_borrow %instance to %addr : $*SomeClass
+  yield %borrow : $*SomeClass, resume bb_resume, unwind bb_unwind
+
+bb_resume:
+  end_borrow %borrow : $*SomeClass
+  dealloc_stack %addr : $*SomeClass
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+
+bb_unwind:
+  end_borrow %borrow : $*SomeClass
+  dealloc_stack %addr : $*SomeClass
+  abort_apply %token
+  unwind
+
+}

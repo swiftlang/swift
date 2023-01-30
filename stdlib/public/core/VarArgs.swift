@@ -215,9 +215,11 @@ public func _encodeBitsAsWords<T>(_ x: T) -> [Int] {
   _internalInvariant(!result.isEmpty)
   var tmp = x
   // FIXME: use UnsafeMutablePointer.assign(from:) instead of memcpy.
-  _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
-          src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
-          size: UInt(MemoryLayout<T>.size))
+  _withUnprotectedUnsafeMutablePointer(to: &tmp) {
+    _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
+            src: $0,
+            size: UInt(MemoryLayout<T>.size))
+  }
   return result
 }
 

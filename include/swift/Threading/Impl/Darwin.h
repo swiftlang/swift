@@ -21,12 +21,34 @@
 #include <os/lock.h>
 #include <pthread.h>
 
+#include "chrono_utils.h"
+
 #include "llvm/ADT/Optional.h"
 
 #include "swift/Threading/Errors.h"
 
 namespace swift {
 namespace threading_impl {
+
+#define SWIFT_PTHREADS_CHECK(expr)                                             \
+  do {                                                                         \
+    int res_ = (expr);                                                         \
+    if (res_ != 0)                                                             \
+      swift::threading::fatal(#expr " failed with error %d\n", res_);          \
+  } while (0)
+
+#define SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(falseerr, expr)                    \
+  do {                                                                         \
+    int res_ = (expr);                                                         \
+    switch (res_) {                                                            \
+    case 0:                                                                    \
+      return true;                                                             \
+    case falseerr:                                                             \
+      return false;                                                            \
+    default:                                                                   \
+      swift::threading::fatal(#expr " failed with error (%d)\n", res_);        \
+    }                                                                          \
+  } while (0)
 
 // .. Thread related things ..................................................
 
@@ -102,6 +124,55 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   ::os_unfair_lock_unlock(&handle);
 }
 
+// .. ConditionVariable support ..............................................
+
+struct cond_handle {
+  ::pthread_cond_t  condition;
+  ::pthread_mutex_t mutex;
+};
+
+inline void cond_init(cond_handle &handle) {
+  handle.condition = PTHREAD_COND_INITIALIZER;
+  handle.mutex = PTHREAD_MUTEX_INITIALIZER;
+}
+inline void cond_destroy(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_cond_destroy(&handle.condition));
+  SWIFT_PTHREADS_CHECK(::pthread_mutex_destroy(&handle.mutex));
+}
+inline void cond_lock(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_mutex_lock(&handle.mutex));
+}
+inline void cond_unlock(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_mutex_unlock(&handle.mutex));
+}
+inline void cond_signal(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_cond_signal(&handle.condition));
+}
+inline void cond_broadcast(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_cond_broadcast(&handle.condition));
+}
+inline void cond_wait(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_cond_wait(&handle.condition, &handle.mutex));
+}
+template <class Rep, class Period>
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::duration<Rep, Period> duration) {
+  auto to_wait = chrono_utils::ceil<
+    std::chrono::system_clock::duration>(duration);
+  auto deadline = std::chrono::system_clock::now() + to_wait;
+  return cond_wait(handle, deadline);
+}
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::system_clock::time_point deadline) {
+  auto ns = chrono_utils::ceil<std::chrono::nanoseconds>(
+    deadline.time_since_epoch()).count();
+  struct ::timespec ts = { ::time_t(ns / 1000000000), long(ns % 1000000000) };
+  SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(
+    ETIMEDOUT,
+    ::pthread_cond_timedwait(&handle.condition, &handle.mutex, &ts)
+  );
+}
+
 // .. Once ...................................................................
 
 using once_t = ::dispatch_once_t;
@@ -115,13 +186,15 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 // On Darwin, we want to use the reserved keys
 #define SWIFT_THREADING_USE_RESERVED_TLS_KEYS 1
 
-#if __has_include(<pthread/tsd_private.h>)
+#if !(SWIFT_THREADING_IS_COMPATIBILITY_LIBRARY && __ARM_ARCH_7K__) && __has_include(<pthread/tsd_private.h>)
 } // namespace threading_impl
 } // namespace swift
 
 extern "C" {
 #include <pthread/tsd_private.h>
 }
+
+#define SWIFT_THREADING_USE_DIRECT_TSD 1
 
 namespace swift {
 namespace threading_impl {
@@ -137,17 +210,12 @@ namespace threading_impl {
 #define __PTK_FRAMEWORK_SWIFT_KEY8 108
 #define __PTK_FRAMEWORK_SWIFT_KEY9 109
 
+#define SWIFT_THREADING_USE_DIRECT_TSD 0
+
 extern "C" {
 
 extern int pthread_key_init_np(int, void (*)(void *));
 
-inline bool _pthread_has_direct_tsd() { return false; }
-inline void *_pthread_getspecific_direct(pthread_key_t k) {
-  return pthread_getspecific(k);
-}
-inline void _pthread_setspecific_direct(pthread_key_t k, void *v) {
-  pthread_setspecific(k, v);
-}
 }
 #endif
 
@@ -186,18 +254,22 @@ inline bool tls_alloc(tls_key_t &key, tls_dtor_t dtor) {
 }
 
 inline void *tls_get(tls_key_t key) {
+#if SWIFT_THREADING_USE_DIRECT_TSD
   if (_pthread_has_direct_tsd())
     return _pthread_getspecific_direct(key);
   else
+#endif
     return pthread_getspecific(key);
 }
 
 inline void *tls_get(tls_key key) { return tls_get(tls_get_key(key)); }
 
 inline void tls_set(tls_key_t key, void *value) {
+#if SWIFT_THREADING_USE_DIRECT_TSD
   if (_pthread_has_direct_tsd())
     _pthread_setspecific_direct(key, value);
   else
+#endif
     pthread_setspecific(key, value);
 }
 

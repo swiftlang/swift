@@ -98,7 +98,9 @@ class GenericWrapperNode<T : HasValue> : GenericSubNode<T.Value> {
   }
 }
 
-// https://bugs.swift.org/browse/SR-3848 - Initializer with generic parameter
+// Initializer with generic parameter
+// https://github.com/apple/swift/issues/46433
+
 protocol P {
   associatedtype T
 }

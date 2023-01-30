@@ -57,6 +57,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
@@ -172,7 +173,7 @@ public:
       for (auto &Inst : *BB) {
         // Can't clone alloc_stack instructions whose dealloc_stack is outside
         // the loop.
-        if (!Loop->canDuplicate(&Inst))
+        if (!canDuplicateLoopInstruction(Loop, &Inst))
           return false;
 
         ArraySemanticsCall ArrayPropsInst(&Inst, "array.props", true);

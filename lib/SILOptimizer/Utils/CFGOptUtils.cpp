@@ -88,7 +88,7 @@ deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> termOperands,
 // Our implementation assumes that our caller is attempting to remove a dead
 // SILPhiArgument from a SILBasicBlock and has already RAUWed the argument.
 TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
-                                 size_t argIndex) {
+                                 size_t argIndex, bool cleanupDeadPhiOps) {
   if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
     SmallVector<SILValue, 8> trueArgs;
     SmallVector<SILValue, 8> falseArgs;
@@ -97,14 +97,18 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
     llvm::copy(cbi->getFalseArgs(), std::back_inserter(falseArgs));
 
     if (destBlock == cbi->getTrueBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(),
-                                                argIndex);
+      if (cleanupDeadPhiOps) {
+        deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(),
+                                                  argIndex);
+      }
       trueArgs.erase(trueArgs.begin() + argIndex);
     }
 
     if (destBlock == cbi->getFalseBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(cbi->getFalseOperands(),
-                                                argIndex);
+      if (cleanupDeadPhiOps) {
+        deleteTriviallyDeadOperandsOfDeadArgument(cbi->getFalseOperands(),
+                                                  argIndex);
+      }
       falseArgs.erase(falseArgs.begin() + argIndex);
     }
 
@@ -120,8 +124,9 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
   if (auto *bi = dyn_cast<BranchInst>(branch)) {
     SmallVector<SILValue, 8> args;
     llvm::copy(bi->getArgs(), std::back_inserter(args));
-
-    deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex);
+    if (cleanupDeadPhiOps) {
+      deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex);
+    }
     args.erase(args.begin() + argIndex);
     auto *result = SILBuilderWithScope(bi).createBranch(bi->getLoc(),
                                                         bi->getDestBB(), args);
@@ -132,7 +137,8 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
   llvm_unreachable("unsupported terminator");
 }
 
-void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex) {
+void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
+                             bool cleanupDeadPhiOps) {
   assert(block->getArgument(argIndex)->isPhi()
          && "Only should be used on phi arguments");
   block->eraseArgument(argIndex);
@@ -149,7 +155,7 @@ void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex) {
     predBlocks.insert(pred);
 
   for (auto *pred : predBlocks)
-    deleteEdgeValue(pred->getTerminator(), block, argIndex);
+    deleteEdgeValue(pred->getTerminator(), block, argIndex, cleanupDeadPhiOps);
 }
 
 /// Changes the edge value between a branch and destination basic block
@@ -230,229 +236,6 @@ TermInst *swift::changeEdgeValue(TermInst *branch, SILBasicBlock *dest,
   }
 
   llvm_unreachable("Unhandled terminator leading to merge block");
-}
-
-template <class SwitchEnumTy, class SwitchEnumCaseTy>
-SILBasicBlock *replaceSwitchDest(SwitchEnumTy *sTy,
-                                 SmallVectorImpl<SwitchEnumCaseTy> &cases,
-                                 unsigned edgeIdx, SILBasicBlock *newDest) {
-  auto *defaultBB = sTy->hasDefault() ? sTy->getDefaultBB() : nullptr;
-  for (unsigned i = 0, e = sTy->getNumCases(); i != e; ++i)
-    if (edgeIdx != i)
-      cases.push_back(sTy->getCase(i));
-    else
-      cases.push_back(std::make_pair(sTy->getCase(i).first, newDest));
-  if (edgeIdx == sTy->getNumCases())
-    defaultBB = newDest;
-  return defaultBB;
-}
-
-template <class SwitchEnumTy, class SwitchEnumCaseTy>
-SILBasicBlock *
-replaceSwitchDest(SwitchEnumTy *sTy, SmallVectorImpl<SwitchEnumCaseTy> &cases,
-                  SILBasicBlock *oldDest, SILBasicBlock *newDest) {
-  auto *defaultBB = sTy->hasDefault() ? sTy->getDefaultBB() : nullptr;
-  for (unsigned i = 0, e = sTy->getNumCases(); i != e; ++i)
-    if (sTy->getCase(i).second != oldDest)
-      cases.push_back(sTy->getCase(i));
-    else
-      cases.push_back(std::make_pair(sTy->getCase(i).first, newDest));
-  if (oldDest == defaultBB)
-    defaultBB = newDest;
-  return defaultBB;
-}
-
-/// Replace a branch target.
-///
-/// \param t The terminating instruction to modify.
-/// \param oldDest The successor block that will be replaced.
-/// \param newDest The new target block.
-/// \param preserveArgs If set, preserve arguments on the replaced edge.
-void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
-                                SILBasicBlock *newDest, bool preserveArgs) {
-  SILBuilderWithScope builder(t);
-
-  switch (t->getTermKind()) {
-  // Only Branch and CondBranch may have arguments.
-  case TermKind::BranchInst: {
-    auto br = cast<BranchInst>(t);
-    assert(oldDest == br->getDestBB() && "wrong branch target");
-    SmallVector<SILValue, 8> args;
-    if (preserveArgs) {
-      for (auto arg : br->getArgs())
-        args.push_back(arg);
-    }
-    builder.createBranch(t->getLoc(), newDest, args);
-    br->dropAllReferences();
-    br->eraseFromParent();
-    return;
-  }
-
-  case TermKind::CondBranchInst: {
-    auto condBr = cast<CondBranchInst>(t);
-    SmallVector<SILValue, 8> trueArgs;
-    if (oldDest == condBr->getFalseBB() || preserveArgs) {
-      for (auto Arg : condBr->getTrueArgs())
-        trueArgs.push_back(Arg);
-    }
-    SmallVector<SILValue, 8> falseArgs;
-    if (oldDest == condBr->getTrueBB() || preserveArgs) {
-      for (auto arg : condBr->getFalseArgs())
-        falseArgs.push_back(arg);
-    }
-    SILBasicBlock *trueDest = condBr->getTrueBB();
-    SILBasicBlock *falseDest = condBr->getFalseBB();
-    if (oldDest == condBr->getTrueBB()) {
-      trueDest = newDest;
-    } else {
-      assert(oldDest == condBr->getFalseBB() && "wrong cond_br target");
-      falseDest = newDest;
-    }
-
-    builder.createCondBranch(
-        condBr->getLoc(), condBr->getCondition(), trueDest, trueArgs, falseDest,
-        falseArgs, condBr->getTrueBBCount(), condBr->getFalseBBCount());
-    condBr->dropAllReferences();
-    condBr->eraseFromParent();
-    return;
-  }
-
-  case TermKind::SwitchValueInst: {
-    auto sii = cast<SwitchValueInst>(t);
-    SmallVector<std::pair<SILValue, SILBasicBlock *>, 8> cases;
-    auto *defaultBB = replaceSwitchDest(sii, cases, oldDest, newDest);
-    builder.createSwitchValue(sii->getLoc(), sii->getOperand(), defaultBB,
-                              cases);
-    sii->eraseFromParent();
-    return;
-  }
-
-  case TermKind::SwitchEnumInst: {
-    auto sei = cast<SwitchEnumInst>(t);
-    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> cases;
-    auto *defaultBB = replaceSwitchDest(sei, cases, oldDest, newDest);
-    builder.createSwitchEnum(sei->getLoc(), sei->getOperand(), defaultBB,
-                             cases, None, ProfileCounter(),
-                             sei->getForwardingOwnershipKind());
-    sei->eraseFromParent();
-    return;
-  }
-
-  case TermKind::SwitchEnumAddrInst: {
-    auto sei = cast<SwitchEnumAddrInst>(t);
-    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> cases;
-    auto *defaultBB = replaceSwitchDest(sei, cases, oldDest, newDest);
-    builder.createSwitchEnumAddr(sei->getLoc(), sei->getOperand(), defaultBB,
-                                 cases);
-    sei->eraseFromParent();
-    return;
-  }
-
-  case TermKind::DynamicMethodBranchInst: {
-    auto dmbi = cast<DynamicMethodBranchInst>(t);
-    assert(oldDest == dmbi->getHasMethodBB()
-           || oldDest == dmbi->getNoMethodBB() && "Invalid edge index");
-    auto hasMethodBB =
-        oldDest == dmbi->getHasMethodBB() ? newDest : dmbi->getHasMethodBB();
-    auto noMethodBB =
-        oldDest == dmbi->getNoMethodBB() ? newDest : dmbi->getNoMethodBB();
-    builder.createDynamicMethodBranch(dmbi->getLoc(), dmbi->getOperand(),
-                                      dmbi->getMember(), hasMethodBB,
-                                      noMethodBB);
-    dmbi->eraseFromParent();
-    return;
-  }
-
-  case TermKind::CheckedCastBranchInst: {
-    auto cbi = cast<CheckedCastBranchInst>(t);
-    assert(oldDest == cbi->getSuccessBB()
-           || oldDest == cbi->getFailureBB() && "Invalid edge index");
-    auto successBB =
-        oldDest == cbi->getSuccessBB() ? newDest : cbi->getSuccessBB();
-    auto failureBB =
-        oldDest == cbi->getFailureBB() ? newDest : cbi->getFailureBB();
-    builder.createCheckedCastBranch(
-        cbi->getLoc(), cbi->isExact(), cbi->getOperand(),
-        cbi->getTargetLoweredType(), cbi->getTargetFormalType(),
-        successBB, failureBB, cbi->getForwardingOwnershipKind(),
-        cbi->getTrueBBCount(), cbi->getFalseBBCount());
-    cbi->eraseFromParent();
-    return;
-  }
-
-  case TermKind::CheckedCastAddrBranchInst: {
-    auto cbi = cast<CheckedCastAddrBranchInst>(t);
-    assert(oldDest == cbi->getSuccessBB()
-           || oldDest == cbi->getFailureBB() && "Invalid edge index");
-    auto successBB =
-        oldDest == cbi->getSuccessBB() ? newDest : cbi->getSuccessBB();
-    auto failureBB =
-        oldDest == cbi->getFailureBB() ? newDest : cbi->getFailureBB();
-    auto trueCount = cbi->getTrueBBCount();
-    auto falseCount = cbi->getFalseBBCount();
-    builder.createCheckedCastAddrBranch(
-        cbi->getLoc(), cbi->getConsumptionKind(),
-        cbi->getSrc(), cbi->getSourceFormalType(),
-        cbi->getDest(), cbi->getTargetFormalType(),
-        successBB, failureBB, trueCount, falseCount);
-    cbi->eraseFromParent();
-    return;
-  }
-
-  case TermKind::TryApplyInst: {
-    auto *tai = cast<TryApplyInst>(t);
-    SILBasicBlock *normalBB =
-        (oldDest == tai->getNormalBB() ? newDest : tai->getNormalBB());
-    SILBasicBlock *errorBB =
-        (oldDest == tai->getErrorBB() ? newDest : tai->getErrorBB());
-    SmallVector<SILValue, 8> args;
-    for (SILValue arg : tai->getArguments()) {
-      args.push_back(arg);
-    }
-    builder.createTryApply( tai->getLoc(), tai->getCallee(),
-                tai->getSubstitutionMap(), args, normalBB, errorBB,
-                tai->getApplyOptions(), tai->getSpecializationInfo());
-    tai->eraseFromParent();
-    return;
-  }
-  
-  case TermKind::YieldInst: {
-    auto *yi = cast<YieldInst>(t);
-    SILBasicBlock *resumeBB =
-        (oldDest == yi->getResumeBB() ? newDest : yi->getResumeBB());
-    SILBasicBlock *unwindBB =
-        (oldDest == yi->getUnwindBB() ? newDest : yi->getUnwindBB());
-    SmallVector<SILValue, 8> args;
-    for (SILValue arg : yi->getYieldedValues()) {
-      args.push_back(arg);
-    }
-    builder.createYield(yi->getLoc(), args,resumeBB, unwindBB);
-    yi->eraseFromParent();
-    return;
-  }
-      
-  case TermKind::AwaitAsyncContinuationInst: {
-    auto ai = cast<AwaitAsyncContinuationInst>(t);
-    SILBasicBlock *resumeBB =
-      (oldDest == ai->getResumeBB() ? newDest : ai->getResumeBB());
-    SILBasicBlock *errorBB =
-      (oldDest == ai->getErrorBB() ? newDest : ai->getErrorBB());
-    
-    builder.createAwaitAsyncContinuation(ai->getLoc(),
-                                         ai->getOperand(),
-                                         resumeBB, errorBB);
-    ai->eraseFromParent();
-    return;
-  }
-
-  case TermKind::ReturnInst:
-  case TermKind::ThrowInst:
-  case TermKind::UnreachableInst:
-  case TermKind::UnwindInst:
-    llvm_unreachable(
-        "Branch target cannot be replaced for this terminator instruction!");
-  }
-  llvm_unreachable("Not yet implemented!");
 }
 
 /// Check if the edge from the terminator is critical.

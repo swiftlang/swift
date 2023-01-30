@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImageInspectionCommon.h"
-#include "../SwiftShims/MetadataSections.h"
+#include "swift/shims/MetadataSections.h"
 
 #include <cstddef>
 #include <new>
@@ -42,6 +42,7 @@ DECLARE_SWIFT_SECTION(swift5_builtin)
 DECLARE_SWIFT_SECTION(swift5_capture)
 DECLARE_SWIFT_SECTION(swift5_mpenum)
 DECLARE_SWIFT_SECTION(swift5_accessible_functions)
+DECLARE_SWIFT_SECTION(swift5_runtime_attributes)
 }
 
 #undef DECLARE_SWIFT_SECTION
@@ -77,20 +78,10 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_capture),
       SWIFT_SECTION_RANGE(swift5_mpenum),
       SWIFT_SECTION_RANGE(swift5_accessible_functions),
+      SWIFT_SECTION_RANGE(swift5_runtime_attributes),
   };
 
 #undef SWIFT_SECTION_RANGE
 
   swift_addNewDSOImage(&sections);
 }
-
-__asm__(".section \".note.swift_reflection_metadata\", \"aw\"");
-
-static __attribute__((__used__))
-__attribute__((__section__(".note.swift_reflection_metadata")))
-__attribute__((__aligned__(1)))
-struct {
-  const char MagicString[sizeof(SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING)];
-  const swift::MetadataSections *Sections;
-} __attribute__((__packed__))
-Note = {SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING, &sections};

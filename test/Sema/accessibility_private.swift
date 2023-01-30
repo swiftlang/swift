@@ -207,13 +207,14 @@ extension Container {
   fileprivate class PrivateGenericUser<T> where T: PrivateInnerClass {} // expected-error {{generic class cannot be declared fileprivate because its generic requirement uses a private type}} {{none}}
 }
 
-fileprivate struct SR2579 {
+// https://github.com/apple/swift/issues/45184
+fileprivate struct C_45184 {
   private struct Inner {
     private struct InnerPrivateType {}
-    var innerProperty = InnerPrivateType() // expected-error {{property must be declared private because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
+    var innerProperty = InnerPrivateType() // expected-error {{property must be declared private because its type 'C_45184.Inner.InnerPrivateType' uses a private type}}
   }
   // FIXME: We need better errors when one access violation results in more
   // downstream.
-  private var outerProperty = Inner().innerProperty // expected-error {{property cannot be declared in this context because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
-  var outerProperty2 = Inner().innerProperty // expected-error {{property must be declared private because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
+  private var outerProperty = Inner().innerProperty // expected-error {{property cannot be declared in this context because its type 'C_45184.Inner.InnerPrivateType' uses a private type}}
+  var outerProperty2 = Inner().innerProperty // expected-error {{property must be declared private because its type 'C_45184.Inner.InnerPrivateType' uses a private type}}
 }

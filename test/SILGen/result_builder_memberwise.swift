@@ -42,7 +42,7 @@ struct MyTupleStruct<T, U> {
 // CHECK-NEXT:   [[SECOND_ADDR:%.*]] = struct_element_addr [[SELF]] : $*MyTupleStruct<T, U>, #MyTupleStruct.second
 // CHECK-NEXT:   [[CALL_RESULT:%.*]] = alloc_stack $U
 // CHECK-NEXT:   apply [[SECOND]]([[CALL_RESULT]]) : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <U>
-// CHECK-NEXT:   copy_addr [take] [[CALL_RESULT]] to [initialization] [[SECOND_ADDR]] : $*U
+// CHECK-NEXT:   copy_addr [take] [[CALL_RESULT]] to [init] [[SECOND_ADDR]] : $*U
 func trigger(cond: Bool) {
   _ = MyTupleStruct {
     1

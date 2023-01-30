@@ -51,6 +51,7 @@ namespace swift {
   enum class StaticSpellingKind : uint8_t;
   enum class DescriptiveDeclKind : uint8_t;
   enum DeclAttrKind : unsigned;
+  enum class StmtKind;
 
   /// Enumeration describing all of possible diagnostics.
   ///
@@ -116,6 +117,7 @@ namespace swift {
     ReferenceOwnership,
     StaticSpellingKind,
     DescriptiveDeclKind,
+    DescriptiveStmtKind,
     DeclAttribute,
     VersionTuple,
     LayoutConstraint,
@@ -149,6 +151,7 @@ namespace swift {
       ReferenceOwnership ReferenceOwnershipVal;
       StaticSpellingKind StaticSpellingKindVal;
       DescriptiveDeclKind DescriptiveDeclKindVal;
+      StmtKind DescriptiveStmtKindVal;
       const DeclAttribute *DeclAttributeVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
@@ -234,6 +237,10 @@ namespace swift {
     DiagnosticArgument(DescriptiveDeclKind DDK)
         : Kind(DiagnosticArgumentKind::DescriptiveDeclKind),
           DescriptiveDeclKindVal(DDK) {}
+
+    DiagnosticArgument(StmtKind SK)
+        : Kind(DiagnosticArgumentKind::DescriptiveStmtKind),
+          DescriptiveStmtKindVal(SK) {}
 
     DiagnosticArgument(const DeclAttribute *attr)
         : Kind(DiagnosticArgumentKind::DeclAttribute),
@@ -339,6 +346,11 @@ namespace swift {
     DescriptiveDeclKind getAsDescriptiveDeclKind() const {
       assert(Kind == DiagnosticArgumentKind::DescriptiveDeclKind);
       return DescriptiveDeclKindVal;
+    }
+
+    StmtKind getAsDescriptiveStmtKind() const {
+      assert(Kind == DiagnosticArgumentKind::DescriptiveStmtKind);
+      return DescriptiveStmtKindVal;
     }
 
     const DeclAttribute *getAsDeclAttribute() const {
@@ -490,6 +502,7 @@ namespace swift {
     }
 
     void addChildNote(Diagnostic &&D);
+    void insertChildNote(unsigned beforeIndex, Diagnostic &&D);
   };
   
   /// Describes an in-flight diagnostic, which is currently active
@@ -707,6 +720,9 @@ namespace swift {
 
     /// Don't emit any warnings
     bool suppressWarnings = false;
+    
+    /// Don't emit any remarks
+    bool suppressRemarks = false;
 
     /// Emit all warnings as errors
     bool warningsAsErrors = false;
@@ -745,6 +761,10 @@ namespace swift {
     /// Whether to skip emitting warnings
     void setSuppressWarnings(bool val) { suppressWarnings = val; }
     bool getSuppressWarnings() const { return suppressWarnings; }
+    
+    /// Whether to skip emitting remarks
+    void setSuppressRemarks(bool val) { suppressRemarks = val; }
+    bool getSuppressRemarks() const { return suppressRemarks; }
 
     /// Whether to treat warnings as errors
     void setWarningsAsErrors(bool val) { warningsAsErrors = val; }
@@ -763,6 +783,7 @@ namespace swift {
     void swap(DiagnosticState &other) {
       std::swap(showDiagnosticsAfterFatalError, other.showDiagnosticsAfterFatalError);
       std::swap(suppressWarnings, other.suppressWarnings);
+      std::swap(suppressRemarks, other.suppressRemarks);
       std::swap(warningsAsErrors, other.warningsAsErrors);
       std::swap(fatalErrorOccurred, other.fatalErrorOccurred);
       std::swap(anyErrorOccurred, other.anyErrorOccurred);
@@ -878,6 +899,12 @@ namespace swift {
     void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
     bool getSuppressWarnings() const {
       return state.getSuppressWarnings();
+    }
+
+    /// Whether to skip emitting remarks
+    void setSuppressRemarks(bool val) { state.setSuppressRemarks(val); }
+    bool getSuppressRemarks() const {
+      return state.getSuppressRemarks();
     }
 
     /// Whether to treat warnings as errors
@@ -1137,6 +1164,11 @@ namespace swift {
 
     /// Send \c diag to all diagnostic consumers.
     void emitDiagnostic(const Diagnostic &diag);
+
+    /// Retrieve the set of child notes that describe how the generated
+    /// source buffer was derived, e.g., a macro expansion backtrace.
+    std::vector<Diagnostic> getGeneratedSourceBufferNotes(
+        SourceLoc loc, Optional<unsigned> &lastBufferID);
 
     /// Handle a new diagnostic, which will either be emitted, or added to an
     /// active transaction.

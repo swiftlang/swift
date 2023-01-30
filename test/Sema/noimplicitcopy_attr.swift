@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -parse-stdlib -disable-availability-checking -verify-syntax-tree
+// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -parse-stdlib -disable-availability-checking
 
 import Swift
 
@@ -20,8 +20,7 @@ func varDecls(_ x: Klass, _ x2: Klass) -> () {
 
 func getKlass() -> Builtin.NativeObject {
     let k = Klass()
-    let b = Builtin.unsafeCastToNativeObject(k)
-    return Builtin.move(b)
+    return Builtin.unsafeCastToNativeObject(k)
 }
 
 @_noImplicitCopy var g: Builtin.NativeObject = getKlass() // expected-error {{'@_noImplicitCopy' attribute can only be applied to local lets}}

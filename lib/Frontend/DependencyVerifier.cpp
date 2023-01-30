@@ -326,7 +326,7 @@ bool DependencyVerifier::parseExpectations(
     return true;
   }
 
-  const auto BufferID = MaybeBufferID.getValue();
+  const auto BufferID = MaybeBufferID.value();
   const CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
   const StringRef InputFile = SM.extractText(EntireRange);
 

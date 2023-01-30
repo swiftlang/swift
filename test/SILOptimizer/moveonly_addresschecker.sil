@@ -1,0 +1,344 @@
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+
+public class CopyableKlass {}
+
+@_moveOnly
+public class Klass {
+    var intField: Int
+    var k: Klass?
+    init()
+}
+
+sil @get_klass : $@convention(thin) () -> @owned Klass
+sil @nonConsumingUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil @copyableClassConsume : $@convention(thin) (@owned CopyableKlass) -> () // user: %24
+sil @copyableClassUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed CopyableKlass) -> () // user: %16
+
+@_moveOnly
+public struct NonTrivialStruct {
+    var k = Klass()
+    var copyableK = CopyableKlass()
+    var nonTrivialStruct2 = NonTrivialStruct2()
+}
+
+@_moveOnly
+public struct NonTrivialStructPair {
+    var lhs: NonTrivialStruct
+    var rhs: NonTrivialStruct
+}
+
+@_moveOnly
+public struct NonTrivialStruct2 {
+    var copyableKlass = CopyableKlass()
+}
+
+@_moveOnly struct MyBufferView<T> {
+  var ptr: UnsafeBufferPointer<T>
+}
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil [ossa] @simpleInitReturn : $@convention(thin) (@owned NonTrivialStruct) -> @owned NonTrivialStruct {
+// CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
+// CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
+// CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
+// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[ALLOC_STACK]]
+// CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
+// CHECK-NEXT:   return [[RESULT]]
+// CHECK: } // end sil function 'simpleInitReturn'
+sil [ossa] @simpleInitReturn : $@convention(thin) (@owned NonTrivialStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack [lexical] $NonTrivialStruct
+  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  store %0 to [init] %2 : $*NonTrivialStruct
+  %3 = load [copy] %2 : $*NonTrivialStruct
+  destroy_addr %2 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %3 : $NonTrivialStruct
+}
+
+sil [ossa] @simpleInitReturn2 : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> @owned NonTrivialStructPair {
+bb0(%arg1 : @owned $NonTrivialStruct, %arg2 : @owned $NonTrivialStruct):
+  %1 = alloc_stack [lexical] $NonTrivialStruct
+  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  store %arg1 to [init] %2 : $*NonTrivialStruct
+  %3 = load [copy] %2 : $*NonTrivialStruct
+  destroy_addr %2 : $*NonTrivialStruct
+
+  store %arg2 to [init] %2 : $*NonTrivialStruct
+  %3a = load [copy] %2 : $*NonTrivialStruct
+  destroy_addr %2 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  %result = struct $NonTrivialStructPair(%3 : $NonTrivialStruct, %3a : $NonTrivialStruct)
+  return %result : $NonTrivialStructPair
+}
+
+// CHECK-LABEL: sil [ossa] @simpleInitReturnMoveOnlyField : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
+// CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
+// CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
+// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK-NEXT:   destroy_addr [[GEP_1]]
+// CHECK-NEXT:   destroy_addr [[GEP_2]]
+// CHECK-NEXT:   [[GEP_3:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.k
+// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP_3]]
+// CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
+// CHECK-NEXT:   return [[RESULT]]
+// CHECK: } // end sil function 'simpleInitReturnMoveOnlyField'
+sil [ossa] @simpleInitReturnMoveOnlyField : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack [lexical] $NonTrivialStruct
+  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  store %0 to [init] %2 : $*NonTrivialStruct
+  %3a = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.k
+  %3 = load [copy] %3a : $*Klass
+  destroy_addr %2 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %3 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
+// CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
+// CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
+// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK-NEXT:   destroy_addr [[GEP_1]]
+// CHECK-NEXT:   destroy_addr [[GEP_2]]
+// CHECK-NEXT:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP]]
+// CHECK-NEXT:   br bb3([[RESULT]] :
+//
+// CHECK: bb2:
+// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP]]
+// CHECK-NEXT:   br bb3([[RESULT]] :
+
+// CHECK: bb3([[RESULT:%.*]] :
+// CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
+// CHECK-NEXT:   return [[RESULT]]
+// CHECK: } // end sil function 'simpleInitReturnMoveOnlyFieldMultiBlock'
+sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack [lexical] $NonTrivialStruct
+  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  store %0 to [init] %2 : $*NonTrivialStruct
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3a = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.k
+  %3 = load [copy] %3a : $*Klass
+  br bb3(%3 : $Klass)
+
+bb2:
+  %4a = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.k
+  %4 = load [copy] %4a : $*Klass
+  br bb3(%4 : $Klass)
+
+bb3(%5 : @owned $Klass):
+  destroy_addr %2 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %5 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock2 : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
+// CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
+// CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
+// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK-NEXT:   destroy_addr [[GEP_1]]
+// CHECK-NEXT:   destroy_addr [[GEP_2]]
+// CHECK-NEXT:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   destroy_addr [[GEP]]
+// CHECK-NEXT:   function_ref get_klass
+// CHECK-NEXT:   [[FUNC:%.*]] = function_ref @get_klass :
+// CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUNC]]()
+// CHECK-NEXT:   br bb3([[RESULT]] :
+//
+// CHECK: bb2:
+// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP]]
+// CHECK-NEXT:   br bb3([[RESULT]] :
+
+// CHECK: bb3([[RESULT:%.*]] :
+// CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
+// CHECK-NEXT:   return [[RESULT]]
+// CHECK: } // end sil function 'simpleInitReturnMoveOnlyFieldMultiBlock2'
+sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock2 : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack [lexical] $NonTrivialStruct
+  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  store %0 to [init] %2 : $*NonTrivialStruct
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %3 = apply %f() : $@convention(thin) () -> @owned Klass
+  br bb3(%3 : $Klass)
+
+bb2:
+  %4a = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.k
+  %4 = load [copy] %4a : $*Klass
+  br bb3(%4 : $Klass)
+
+bb3(%5 : @owned $Klass):
+  destroy_addr %2 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %5 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock3 : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
+// CHECK-NEXT:   [[ALLOC_STACK:%.*]] = alloc_stack [lexical]
+// CHECK-NEXT:   store [[ARG]] to [init] [[ALLOC_STACK]]
+// CHECK-NEXT:   [[GEP_1:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.copyableK
+// CHECK-NEXT:   [[GEP_2:%.*]] = struct_element_addr [[ALLOC_STACK]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
+// CHECK-NEXT:   destroy_addr [[GEP_1]]
+// CHECK-NEXT:   destroy_addr [[GEP_2]]
+// CHECK-NEXT:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   destroy_addr [[GEP]]
+// CHECK-NEXT:   function_ref get_klass
+// CHECK-NEXT:   [[FUNC:%.*]] = function_ref @get_klass :
+// CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUNC]]()
+// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   store [[RESULT]] to [init] [[GEP]]
+// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP]]
+// CHECK-NEXT:   br bb3([[RESULT]] :
+//
+// CHECK: bb2:
+// CHECK-NEXT:   [[GEP:%.*]] = struct_element_addr [[ALLOC_STACK]]
+// CHECK-NEXT:   [[RESULT:%.*]] = load [take] [[GEP]]
+// CHECK-NEXT:   br bb3([[RESULT]] :
+//
+// CHECK: bb3([[RESULT:%.*]] :
+// CHECK-NEXT:   dealloc_stack [[ALLOC_STACK]]
+// CHECK-NEXT:   return [[RESULT]]
+// CHECK: } // end sil function 'simpleInitReturnMoveOnlyFieldMultiBlock3'
+sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock3 : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack [lexical] $NonTrivialStruct
+  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  store %0 to [init] %2 : $*NonTrivialStruct
+  cond_br undef, bb1, bb2
+
+bb1:
+  %f = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %3 = apply %f() : $@convention(thin) () -> @owned Klass
+  %3a = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.k
+  store %3 to [assign] %3a : $*Klass
+  %3b = load [copy] %3a : $*Klass
+  br bb3(%3b : $Klass)
+
+bb2:
+  %4a = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.k
+  %4 = load [copy] %4a : $*Klass
+  br bb3(%4 : $Klass)
+
+bb3(%5 : @owned $Klass):
+  destroy_addr %2 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %5 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @useVarKlassNoErrorSimple : $@convention(thin) (@owned Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] : @owned $Klass):
+// CHECK: [[PTR:%.*]] = alloc_stack [lexical] $Klass, var, name "k"
+// CHECK: store [[ARG]] to [init] [[PTR]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] [[PTR]]
+// CHECK: [[LOAD:%.*]] = load [take] [[ACCESS]]
+// CHECK: end_access [[ACCESS]]
+// CHECK: } // end sil function 'useVarKlassNoErrorSimple'
+sil [ossa] @useVarKlassNoErrorSimple : $@convention(thin) (@owned Klass) -> () {
+bb0(%arg : @owned $Klass):
+  %0 = alloc_stack [lexical] $Klass, var, name "k"
+  %1 = mark_must_check [no_implicit_copy] %0 : $*Klass
+  store %arg to [init] %1 : $*Klass
+  %12 = begin_access [read] [static] %1 : $*Klass
+  %13 = load_borrow %12 : $*Klass
+  %14 = function_ref @nonConsumingUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %13 : $Klass
+  end_access %12 : $*Klass
+  %18 = begin_access [read] [static] %1 : $*Klass
+  %19 = load [copy] %18 : $*Klass
+  end_access %18 : $*Klass
+  %21 = move_value [lexical] %19 : $Klass
+  %22 = mark_must_check [no_implicit_copy] %21 : $Klass
+  debug_value %22 : $Klass, let, name "k2"
+  %24 = copy_value %22 : $Klass
+  %25 = move_value %24 : $Klass
+  destroy_value %25 : $Klass
+  destroy_value %22 : $Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %0 : $*Klass
+  %30 = tuple ()
+  return %30 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @classSimpleNonConsumingUseTest : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+// CHECK: [[STACK:%.*]] = alloc_stack [lexical] $Klass, var, name "x2"
+// CHECK: store {{%.*}} to [init] [[STACK]]
+// CHECK: destroy_addr [[STACK]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] [[STACK]]
+// CHECK: store {{%.*}} to [init] [[ACCESS]]
+// CHECK: end_access [[ACCESS]]
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [static] [[STACK]]
+// CHECK: [[BORROW:%.*]] = load_borrow [[ACCESS]]
+// CHECK: apply {{%.*}}([[BORROW]]) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: end_borrow [[BORROW]]
+// CHECK: end_access [[ACCESS]]
+// CHECK: destroy_addr [[STACK]]
+// CHECK: } // end sil function 'classSimpleNonConsumingUseTest'
+sil [ossa] @classSimpleNonConsumingUseTest : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %4 = alloc_stack [lexical] $Klass, var, name "x2"
+  %5 = mark_must_check [no_implicit_copy] %4 : $*Klass
+  store %0 to [init] %5 : $*Klass
+  %9 = begin_access [modify] [static] %5 : $*Klass
+  store %1 to [assign] %9 : $*Klass
+  end_access %9 : $*Klass
+  %12 = begin_access [read] [static] %5 : $*Klass
+  %13 = load_borrow %12 : $*Klass
+  %14 = function_ref @nonConsumingUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %13 : $Klass
+  end_access %12 : $*Klass
+  destroy_addr %5 : $*Klass
+  dealloc_stack %4 : $*Klass
+  %21 = tuple ()
+  return %21 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @myBufferViewSetter : $@convention(method) <T> (UnsafeBufferPointer<T>, @inout MyBufferView<T>) -> () {
+// CHECK-NOT: destroy_addr
+// CHECK: } // end sil function 'myBufferViewSetter'
+sil [ossa] @myBufferViewSetter : $@convention(method) <T> (UnsafeBufferPointer<T>, @inout MyBufferView<T>) -> () {
+bb0(%0 : $UnsafeBufferPointer<T>, %1 : $*MyBufferView<T>):
+  debug_value %0 : $UnsafeBufferPointer<T>, let, name "value", argno 1, implicit
+  %3 = mark_must_check [no_implicit_copy] %1 : $*MyBufferView<T>
+  debug_value %3 : $*MyBufferView<T>, var, name "self", argno 2, implicit, expr op_deref
+  %5 = begin_access [modify] [static] %3 : $*MyBufferView<T>
+  %6 = struct_element_addr %5 : $*MyBufferView<T>, #MyBufferView.ptr
+  store %0 to [trivial] %6 : $*UnsafeBufferPointer<T>
+  end_access %5 : $*MyBufferView<T>
+  %9 = tuple ()
+  return %9 : $()
+}

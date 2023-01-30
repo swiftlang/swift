@@ -30,7 +30,7 @@ template <class Impl, class T> class SILBitfield {
   /// that the bits of that block are not initialized yet.
   /// See also: SILBasicBlock::lastInitializedBitfieldID,
   ///           SILFunction::currentBitfieldID
-  uint64_t bitfieldID;
+  int64_t bitfieldID;
 
   short startBit;
   short endBit;
@@ -84,6 +84,9 @@ public:
            "value too large for BasicBlockBitfield");
     unsigned clearMask = mask;
     if (bitfieldID > entity->lastInitializedBitfieldID) {
+
+      if (entity->isMarkedAsDeleted())
+        return;
 
       // The bitfield is not initialized yet in this block.
       // Initialize the bitfield, and also initialize all parent bitfields,

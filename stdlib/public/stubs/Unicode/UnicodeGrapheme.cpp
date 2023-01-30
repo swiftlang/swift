@@ -15,7 +15,7 @@
 #else
 #include "swift/Runtime/Debug.h"
 #endif
-#include "SwiftShims/UnicodeData.h"
+#include "swift/shims/UnicodeData.h"
 #include <limits>
 
 SWIFT_RUNTIME_STDLIB_INTERNAL

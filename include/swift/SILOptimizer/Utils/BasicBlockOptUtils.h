@@ -56,7 +56,7 @@ public:
 };
 
 /// Computes the set of blocks from which a path to the return-block exists.
-/// This does not include pathes to a throw-block.
+/// This does not include paths to a throw-block.
 class ReachingReturnBlocks {
     BasicBlockWorklist worklist;
 
@@ -182,7 +182,7 @@ public:
 /// instead.
 ///
 /// After cloning, call updateSSAAfterCloning. This is decoupled from cloning
-/// becaused some clients perform CFG edges updates after cloning but before
+/// because some clients perform CFG edges updates after cloning but before
 /// splitting CFG edges.
 class BasicBlockCloner : public SILCloner<BasicBlockCloner> {
   using SuperTy = SILCloner<BasicBlockCloner>;
@@ -195,7 +195,7 @@ protected:
   /// Will cloning require an SSA update?
   bool needsSSAUpdate = false;
 
-  /// Transient object for analyzing a single address projction chain. It's
+  /// Transient object for analyzing a single address projection chain. It's
   /// state is reset each time analyzeAddressProjections is called.
   SinkAddressProjections sinkProj;
 
@@ -273,18 +273,8 @@ public:
     bi->eraseFromParent();
   }
 
-  /// Create phis and maintain OSSA invariants.
-  ///
-  /// Note: This must be called after calling cloneBlock or cloneBranchTarget,
-  /// before using any OSSA utilities.
-  ///
-  /// The client may perform arbitrary branch fixups and dead block removal
-  /// after cloning and before calling this.
-  ///
-  /// WARNING: If client converts terminator results to phis (e.g. replaces a
-  /// switch_enum with a branch), then it must call this before performing that
-  /// transformation, or fix the OSSA representation of that value itself.
-  void updateOSSAAfterCloning();
+  /// Helper function to perform SSA updates
+  void updateSSAAfterCloning();
 
   /// Get the newly cloned block corresponding to `origBB`.
   SILBasicBlock *getNewBB() {
@@ -294,13 +284,6 @@ public:
   bool wasCloned() { return isBlockCloned(origBB); }
 
 protected:
-  /// Helper function to perform SSA updates used by updateOSSAAfterCloning.
-  void updateSSAAfterCloning(SmallVectorImpl<SILPhiArgument *> &newPhis);
-
-  /// Given a terminator result, either from the original or the cloned block,
-  /// update OSSA for any phis created for the result during edge splitting.
-  void updateOSSATerminatorResult(SILPhiArgument *termResult);
-
   // MARK: CRTP overrides.
 
   /// Override getMappedValue to allow values defined outside the block to be

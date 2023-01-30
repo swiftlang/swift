@@ -16,5 +16,5 @@
 #ifndef NORMALIZATION_DATA_H
 #define NORMALIZATION_DATA_H
 
-#include "../SwiftShims/SwiftStdint.h"
+#include "swift/shims/SwiftStdint.h"
 

@@ -214,7 +214,7 @@ bool StackNesting::insertDeallocs(const BitVector &AliveBefore,
     if (!AliveAfter.test(LocNr)) {
       auto *Alloc = StackLocs[LocNr].Alloc;
       InsertionPoint = createDealloc(Alloc, InsertionPoint,
-                   Location.hasValue() ? Location.getValue() : Alloc->getLoc());
+                   Location.has_value() ? Location.value() : Alloc->getLoc());
       changesMade = true;
     }
   }

@@ -13,9 +13,9 @@
 #include "swift/StaticMirror/BinaryScanningTool.h"
 #include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Reflection/ReflectionContext.h"
-#include "swift/Reflection/TypeRefBuilder.h"
-#include "swift/Reflection/TypeLowering.h"
+#include "swift/RemoteInspection/ReflectionContext.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/StaticMirror/ObjectFileContext.h"
 
@@ -52,7 +52,13 @@ BinaryScanningTool::BinaryScanningTool(
     ObjectOwners.push_back(std::move(ObjectOwner));
     ObjectFiles.push_back(O);
   }
-  Context = makeReflectionContextForObjectFiles(ObjectFiles);
+  // FIXME: This could/should be configurable.
+#if SWIFT_OBJC_INTEROP
+  bool ObjCInterop = true;
+#else
+  bool ObjCInterop = false;
+#endif
+  Context = makeReflectionContextForObjectFiles(ObjectFiles, ObjCInterop);
   PointerSize = Context->PointerSize;
 }
 

@@ -6,8 +6,8 @@ func dup<T>(_ x: T) -> (T, T) { return (x,x) }
 // CHECK-LABEL:      sil hidden [ossa] @$s14generic_tuples3dup{{[_0-9a-zA-Z]*}}F
 // CHECK:      ([[RESULT_0:%.*]] : $*T, [[RESULT_1:%.*]] : $*T, [[XVAR:%.*]] : $*T):
 // CHECK-NEXT: debug_value [[XVAR]] : $*T, let, name "x", {{.*}} expr op_deref
-// CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[RESULT_0]]
-// CHECK-NEXT: copy_addr [[XVAR]] to [initialization] [[RESULT_1]]
+// CHECK-NEXT: copy_addr [[XVAR]] to [init] [[RESULT_0]]
+// CHECK-NEXT: copy_addr [[XVAR]] to [init] [[RESULT_1]]
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]]
 

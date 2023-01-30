@@ -1,4 +1,3 @@
-
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-static-assert
 
 func isInt<T>(_ value: T) -> Bool {
@@ -544,5 +543,110 @@ func test_conflicting_pattern_vars() {
         _ = y
       }
     }
+  }
+}
+
+// rdar://91452726 - crash in MissingMemberFailure::diagnoseInLiteralCollectionContext
+struct Test {
+  struct ID {
+  }
+
+  enum E : Hashable, Equatable {
+  case id
+  }
+
+  var arr: [(ID, E)]
+
+  func test() {
+    _ = arr.map { v in
+      switch v {
+      case .id: return true // expected-error {{value of tuple type '(Test.ID, Test.E)' has no member 'id'}}
+      }
+    }
+  }
+}
+
+https://github.com/apple/swift/issues/61017
+do {
+  @propertyWrapper
+  struct Wrapper {
+    var wrappedValue: Int
+
+    init(wrappedValue: Int) {
+      self.wrappedValue = wrappedValue
+    }
+  }
+
+  class Test {
+    let bar: () -> Void = {
+      @Wrapper var wrapped = 1
+      let wrapper: Wrapper = _wrapped // Ok
+    }
+  }
+}
+
+https://github.com/apple/swift/issues/61024
+do {
+  enum Baz: String {
+  case someCase
+  }
+
+  @propertyWrapper
+  struct Wrapper {
+    var wrappedValue: Int
+    let argument: String
+
+    init(wrappedValue: Int, argument: String) { // expected-note 2 {{'init(wrappedValue:argument:)' declared here}}
+      self.wrappedValue = wrappedValue
+      self.argument = argument
+    }
+  }
+
+  class Foo {
+    let ok: () -> Void = {
+      @Wrapper(argument: Baz.someCase.rawValue) var wrapped1 = 1 // Ok
+      @Wrapper(wrappedValue: 42, argument: Baz.someCase.rawValue) var wrapped2 // Ok
+      @Wrapper(wrappedValue: 42, argument: Baz.someCase.rawValue) var wrapped3: Int // Ok
+    }
+
+    let bad0: () -> Void = {
+      @Wrapper var wrapped: Int
+      // expected-error@-1 {{missing arguments for parameters 'wrappedValue', 'argument' in call}}
+    }
+
+    let bad1: () -> Void = {
+      @Wrapper var wrapped = 0
+      // expected-error@-1 {{missing argument for parameter 'argument' in property wrapper initializer; add 'wrappedValue' and 'argument' arguments in '@Wrapper(...)'}}
+    }
+
+    let bad2: () -> Void = {
+      @Wrapper(wrappedValue: 42, argument: Baz.someCase.rawValue) var wrapped = 0
+      // expected-error@-1 {{extra argument 'wrappedValue' in call}}
+    }
+  }
+}
+
+// Test to make sure that type-checker doesn't attempt the closure passed to
+// `.filter` before the one from `.init`, otherwise it would mean that generic
+// parameter of `.filter` wouldn't be inferred since it depends on result of
+// `.init` closure.
+func test_that_closures_are_attempted_in_order() {
+  struct Test<T> {
+    init(_: ([Int]) -> T) {}
+    init(_: String) {}
+    init(_: Int, _: String = "") {}
+
+    func filter(_: (T) -> Bool) {}
+  }
+
+  Test {
+    _ = 42
+    return $0.map { Optional(Float($0)) }
+  }
+  .filter {
+    if $0.isEmpty { // Ok
+      return true
+    }
+    return false
   }
 }

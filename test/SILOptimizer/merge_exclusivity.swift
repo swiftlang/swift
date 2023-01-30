@@ -359,10 +359,10 @@ private struct EscapedString: WriteProt {
 }
 
 public func asWriteProt<T>(_ items: [T], transform: @escaping (T) -> String) -> WriteProt {
-    return EscapedTransforme(items: items, transform: transform)
+    return EscapedTransform(items: items, transform: transform)
 }
 
-private struct EscapedTransforme<T>: WriteProt {
+private struct EscapedTransform<T>: WriteProt {
     let items: [T]
     let transform: (T) -> String
 

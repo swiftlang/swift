@@ -93,6 +93,7 @@ struct ValidationInfo {
   StringRef sdkName = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
+  std::vector<StringRef> allowableClients;
 };
 
 /// A collection of options that can be used to set up a new AST context
@@ -106,6 +107,7 @@ class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
   std::string SDKPath;
   StringRef ModuleABIName;
+  StringRef ModulePackageName;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -114,6 +116,7 @@ class ExtendedValidationInfo {
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
     unsigned IsImplicitDynamicEnabled : 1;
+    unsigned IsBuiltFromInterface : 1;
     unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
     unsigned IsConcurrencyChecked : 1;
   } Bits;
@@ -163,6 +166,10 @@ public:
   void setResilienceStrategy(ResilienceStrategy resilience) {
     Bits.ResilienceStrategy = unsigned(resilience);
   }
+  bool isBuiltFromInterface() const { return Bits.IsBuiltFromInterface; }
+  void setIsBuiltFromInterface(bool val) {
+    Bits.IsBuiltFromInterface = val;
+  }
   bool isAllowModuleWithCompilerErrorsEnabled() {
     return Bits.IsAllowModuleWithCompilerErrorsEnabled;
   }
@@ -173,12 +180,21 @@ public:
   StringRef getModuleABIName() const { return ModuleABIName; }
   void setModuleABIName(StringRef name) { ModuleABIName = name; }
 
+  StringRef getModulePackageName() const { return ModulePackageName; }
+  void setModulePackageName(StringRef name) { ModulePackageName = name; }
+
   bool isConcurrencyChecked() const {
     return Bits.IsConcurrencyChecked;
   }
   void setIsConcurrencyChecked(bool val = true) {
     Bits.IsConcurrencyChecked = val;
   }
+};
+
+struct SearchPath {
+  std::string Path;
+  bool IsFramework;
+  bool IsSystem;
 };
 
 /// Returns info about the serialized AST in the given data.
@@ -198,6 +214,8 @@ public:
 /// compiled with -enable-ossa-modules.
 /// \param requiredSDK If not empty, only accept modules built with
 /// a compatible SDK. The StringRef represents the canonical SDK name.
+/// \param requiresRevisionMatch if true, expects the swift tag to match in
+/// addition to the module format version number.
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
@@ -205,9 +223,11 @@ public:
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
     StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
+    bool requiresRevisionMatch = true,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
-        nullptr);
+        nullptr,
+    SmallVectorImpl<SearchPath> *searchPaths = nullptr);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.
 ///

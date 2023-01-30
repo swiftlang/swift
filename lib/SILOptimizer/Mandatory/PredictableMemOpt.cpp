@@ -702,7 +702,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
       eltVal = builder.emitCopyValueOperation(loc, eltVal);
     }
 
-    if (!singularValue.hasValue()) {
+    if (!singularValue.has_value()) {
       singularValue = eltVal;
     } else if (*singularValue != eltVal) {
       singularValue = SILValue();
@@ -714,7 +714,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
 
   // If we only are tracking a singular value, we do not need to construct
   // SSA. Just return that value.
-  if (auto val = singularValue.getValueOr(SILValue())) {
+  if (auto val = singularValue.value_or(SILValue())) {
     // This assert documents that we are expecting that if we are in ossa, have
     // a non-trivial value, and are not taking, we should never go down this
     // code path. If we did, we would need to insert a copy here. The reason why
@@ -876,7 +876,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
     assert(!builder.hasOwnership() ||
            eltVal->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
 
-    if (!singularValue.hasValue()) {
+    if (!singularValue.has_value()) {
       singularValue = eltVal;
     } else if (*singularValue != eltVal) {
       singularValue = SILValue();
@@ -894,7 +894,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   // visit this code path if we have a take implying that non-trivial values
   // /will/ have a copy and thus are guaranteed (since each copy yields a
   // different value) to not be singular values.
-  if (auto val = singularValue.getValueOr(SILValue())) {
+  if (auto val = singularValue.value_or(SILValue())) {
     assert((!B.hasOwnership() ||
             val->getType().isTrivial(*insertBlock->getParent())) &&
            "Should have inserted copies for each insertion point, so shouldn't "
@@ -1168,7 +1168,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
       termInst->setOperand(phiIndex, phiCopy);
 
       // Now that we know our base, phi, phiCopy for this specific incoming
-      // value, append it to the phiNodeClenaupState so we can insert
+      // value, append it to the phiNodeCleanupState so we can insert
       // destroy_values late after we visit all insertedPhiNodes.
       cleanupInserter.trackNewCleanup(value, phiCopy);
     }
@@ -1242,7 +1242,7 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(
 
   for (auto *inst : insertedInsts) {
     // Otherwise, see if this is a load [copy]. It if it a load [copy], then we
-    // know that the load [copy] must be in the load block meaing we can just
+    // know that the load [copy] must be in the load block meaning we can just
     // put a destroy_value /after/ the load_borrow to ensure that the value
     // lives long enough for us to copy_value it or a derived value for the
     // begin_borrow.
@@ -1504,7 +1504,7 @@ static inline void updateAvailableValuesHelper(
     if (!entry) {
       // and we are told to initialize it, do so.
       if (auto defaultValue = defaultFunc(i)) {
-        entry = std::move(defaultValue.getValue());
+        entry = std::move(defaultValue.value());
       } else {
         // Otherwise, mark this as a conflicting value. There is some available
         // value here, we just do not know what it is at this point. This
@@ -1971,7 +1971,7 @@ private:
 
   /// Promote a load take cleaning up everything except for RAUWing the
   /// instruction with the aggregated result. The routine returns the new
-  /// aggreaged result to the caller and expects the caller to eventually RAUW
+  /// aggregated result to the caller and expects the caller to eventually RAUW
   /// \p inst with the return value. The reason why we do this is to allow for
   /// the caller to work around invalidation issues by not deleting the load
   /// [take] until after all load [take] have been cleaned up.
@@ -2069,7 +2069,7 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
 
   SmallVector<AvailableValue, 8> availableValues;
   auto result = computeAvailableValues(srcAddr, li, availableValues);
-  if (!result.hasValue())
+  if (!result.has_value())
     return false;
 
   SILType loadTy = result->first;
@@ -2134,7 +2134,7 @@ bool AllocOptimize::promoteCopyAddr(CopyAddrInst *cai) {
 
   SmallVector<AvailableValue, 8> availableValues;
   auto result = computeAvailableValues(srcAddr, cai, availableValues);
-  if (!result.hasValue())
+  if (!result.has_value())
     return false;
 
   // Ok, we have some available values.  If we have a copy_addr, explode it now,
@@ -2168,7 +2168,7 @@ bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *lbi) {
 
   SmallVector<AvailableValue, 8> availableValues;
   auto result = computeAvailableValues(srcAddr, lbi, availableValues);
-  if (!result.hasValue())
+  if (!result.has_value())
     return false;
 
   ++NumLoadPromoted;
@@ -2841,6 +2841,11 @@ static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
   if (getMemoryType(alloc).aggregateHasUnreferenceableStorage())
     return nullptr;
 
+  // Do not perform this on move only values since we introduce copies to
+  // promote things.
+  if (getMemoryType(alloc).isMoveOnly())
+    return nullptr;
+
   // Otherwise we are good to go. Lets try to optimize this memory!
   return alloc;
 }
@@ -2851,9 +2856,9 @@ bool swift::optimizeMemoryAccesses(SILFunction &fn) {
 
   InstructionDeleter deleter;
   for (auto &bb : fn) {
-    for (SILInstruction *inst : deleter.updatingRange(&bb)) {
+    for (SILInstruction &inst : bb.deletableInstructions()) {
       // First see if i is an allocation that we can optimize. If not, skip it.
-      AllocationInst *alloc = getOptimizableAllocation(inst);
+      AllocationInst *alloc = getOptimizableAllocation(&inst);
       if (!alloc) {
         continue;
       }
@@ -2895,9 +2900,9 @@ bool swift::eliminateDeadAllocations(SILFunction &fn) {
 
   for (auto &bb : fn) {
     InstructionDeleter deleter;
-    for (SILInstruction *inst : deleter.updatingRange(&bb)) {
+    for (SILInstruction &inst : bb.deletableInstructions()) {
       // First see if i is an allocation that we can optimize. If not, skip it.
-      AllocationInst *alloc = getOptimizableAllocation(inst);
+      AllocationInst *alloc = getOptimizableAllocation(&inst);
       if (!alloc) {
         continue;
       }

@@ -41,18 +41,17 @@ namespace irgen {
                                   llvm::GlobalValue *global,
                                   const LinkEntity &entity);
 
-  llvm::Function *createFunction(IRGenModule &IGM,
-                                 LinkInfo &linkInfo,
-                                 const Signature &signature,
-                                 llvm::Function *insertBefore = nullptr,
-                                 OptimizationMode FuncOptMode =
-                                   OptimizationMode::NotSet);
+  llvm::Function *createFunction(
+      IRGenModule &IGM, LinkInfo &linkInfo, const Signature &signature,
+      llvm::Function *insertBefore = nullptr,
+      OptimizationMode FuncOptMode = OptimizationMode::NotSet,
+      StackProtectorMode stackProtect = StackProtectorMode::NoStackProtector);
 
   llvm::GlobalVariable *
   createVariable(IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *objectType,
                  Alignment alignment, DebugTypeInfo DebugType = DebugTypeInfo(),
                  Optional<SILLocation> DebugLoc = None,
-                 StringRef DebugName = StringRef(), bool heapAllocated = false);
+                 StringRef DebugName = StringRef());
 
   llvm::GlobalVariable *
   createLinkerDirectiveVariable(IRGenModule &IGM, StringRef Name);

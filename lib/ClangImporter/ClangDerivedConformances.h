@@ -21,8 +21,14 @@ namespace swift {
 bool isIterator(const clang::CXXRecordDecl *clangDecl);
 
 /// If the decl is a C++ input iterator, synthesize a conformance to the
-/// UnsafeCxxInputIterator protocol, which is defined in the std overlay.
+/// UnsafeCxxInputIterator protocol, which is defined in the Cxx module.
 void conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
+                                  NominalTypeDecl *decl,
+                                  const clang::CXXRecordDecl *clangDecl);
+
+/// If the decl is a C++ sequence, synthesize a conformance to the CxxSequence
+/// protocol, which is defined in the Cxx module.
+void conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
                                   NominalTypeDecl *decl,
                                   const clang::CXXRecordDecl *clangDecl);
 

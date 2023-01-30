@@ -169,7 +169,7 @@ extension ${Self}: LosslessStringConvertible {
       self.init(Substring(text))
     } else {
       self = 0.0
-      let success = withUnsafeMutablePointer(to: &self) { p -> Bool in
+      let success = _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
         text.withCString { chars -> Bool in
           switch chars[0] {
           case 9, 10, 11, 12, 13, 32:
@@ -198,7 +198,7 @@ extension ${Self}: LosslessStringConvertible {
   @available(SwiftStdlib 5.3, *)
   public init?(_ text: Substring) {
     self = 0.0
-    let success = withUnsafeMutablePointer(to: &self) { p -> Bool in
+    let success = _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
       text.withCString { chars -> Bool in
         switch chars[0] {
         case 9, 10, 11, 12, 13, 32:

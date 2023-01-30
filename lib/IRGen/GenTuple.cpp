@@ -83,13 +83,12 @@ namespace {
       IGF.IGM.getSize(Size(index)),               //     [index]
       llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)  //       .Offset
     };
-    auto slot = IGF.Builder.CreateInBoundsGEP(
-        asTuple->getType()->getScalarType()->getPointerElementType(), asTuple,
-        indices);
+    auto slot = IGF.Builder.CreateInBoundsGEP(IGF.IGM.TupleTypeMetadataTy,
+                                              asTuple, indices);
 
-    return IGF.Builder.CreateLoad(slot, IGF.IGM.getPointerAlignment(),
-                                  metadata->getName()
-                                    + "." + Twine(index) + ".offset");
+    return IGF.Builder.CreateLoad(
+        slot, IGF.IGM.Int32Ty, IGF.IGM.getPointerAlignment(),
+        metadata->getName() + "." + Twine(index) + ".offset");
   }
 
   /// Adapter for tuple types.
@@ -235,7 +234,7 @@ namespace {
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (getFields().empty()) {
         return IGM.typeLayoutCache.getEmptyEntry();
@@ -280,7 +279,7 @@ namespace {
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (getFields().empty()) {
         return IGM.typeLayoutCache.getEmptyEntry();

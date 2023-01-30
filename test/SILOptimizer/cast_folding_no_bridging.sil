@@ -23,7 +23,7 @@ import Foundation
 sil @testSwiftToSwift : $@convention(thin) (@in Set<Int>, @guaranteed Set<Int>) -> @owned Set<Int> {
 bb0(%0 : $*Set<Int>, %1 : $Set<Int>):
   %3 = alloc_stack $Set<Int>
-  copy_addr %0 to [initialization] %3 : $*Set<Int>
+  copy_addr %0 to [init] %3 : $*Set<Int>
   %5 = alloc_stack $Set<Int>
   checked_cast_addr_br take_always Set<Int> in %3 : $*Set<Int> to Set<Int> in %5 : $*Set<Int>, bb1, bb3
 

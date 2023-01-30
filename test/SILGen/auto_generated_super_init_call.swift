@@ -134,8 +134,9 @@ class ChildOfParentWithNoDefaultInit : ParentWithNoDefaultInit {
   }
 }
 
-// <https://bugs.swift.org/browse/SR-5974> - auto-generated super.init()
-// delegation to a throwing or failing initializer
+// https://github.com/apple/swift/issues/48533
+// Auto-generated 'super.init()' delegation to a throwing or failing initializer
+
 class FailingParent {
   init?() {}
 }

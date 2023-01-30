@@ -7,7 +7,11 @@
 func syncContext() {
   let r = Request()
   let d = Delegate()
-  d.makeRequest1(r) // NOTE: this use to trigger an overload resolution error, see SR-13760
+
+  // https://github.com/apple/swift/issues/56157
+  // This use to trigger an overload resolution error.
+  d.makeRequest1(r)
+
   d.makeRequest2(r)
   d.makeRequest3(r)
 }

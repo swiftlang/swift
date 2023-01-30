@@ -14,6 +14,7 @@ class ItemList: ObservableObject {
   @Published var items = [Item]()
 }
 
+@available(SwiftStdlib 5.3, *)
 struct ContentView: View {
   @StateObject var list = ItemList()
 

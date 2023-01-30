@@ -171,7 +171,8 @@ extension SubSub {
   }
 }
 
-// SR-1025
+// https://github.com/apple/swift/issues/43637
+
 extension Base {
   fileprivate static var x = 1
 }

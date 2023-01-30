@@ -25,7 +25,8 @@ class NamedDecl;
 namespace swift {
 
 class AbstractClosureExpr;
-class ConformanceAccessPath;
+class ConformancePath;
+class MacroExpansionExpr;
 class RootProtocolConformance;
 
 namespace Mangle {
@@ -157,6 +158,8 @@ public:
     AccessibleFunctionRecord,
     BackDeploymentThunk,
     BackDeploymentFallback,
+    HasSymbolQuery,
+    RuntimeDiscoverableAttributeRecord,
   };
 
   /// lldb overrides the defaulted argument to 'true'.
@@ -356,6 +359,18 @@ public:
   std::string mangleOpaqueTypeDecl(const ValueDecl *decl);
 
   std::string mangleGenericSignature(const GenericSignature sig);
+
+  std::string mangleHasSymbolQuery(const ValueDecl *decl);
+
+  std::string
+  mangleRuntimeAttributeGeneratorEntity(const ValueDecl *decl, CustomAttr *attr,
+                                        SymbolKind SKind = SymbolKind::Default);
+
+  std::string mangleMacroExpansion(const MacroExpansionExpr *expansion);
+  std::string mangleMacroExpansion(const MacroExpansionDecl *expansion);
+  void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC);
+  void appendMacroExpansionOperator(
+      StringRef macroName, unsigned discriminator);
 
   enum SpecialContext {
     ObjCContext,
@@ -560,7 +575,7 @@ protected:
   void appendConcreteProtocolConformance(
                                         const ProtocolConformance *conformance,
                                         GenericSignature sig);
-  void appendDependentProtocolConformance(const ConformanceAccessPath &path,
+  void appendDependentProtocolConformance(const ConformancePath &path,
                                           GenericSignature sig);
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
@@ -581,6 +596,9 @@ protected:
 
   void appendConstrainedExistential(Type base, GenericSignature sig,
                                     const ValueDecl *forDecl);
+
+  void appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
+                                             CustomAttr *attr);
 };
 
 } // end namespace Mangle

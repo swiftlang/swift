@@ -69,7 +69,7 @@ let _: ((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> () = withoutActuallyEsc
 // Failing to propagate @noescape into non-single-expression
 // closure passed to withoutActuallyEscaping
 
-// https://bugs.swift.org/browse/SR-7886
+// https://github.com/apple/swift/issues/50421
 
 class Box<T> {
   let value: T

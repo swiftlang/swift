@@ -36,7 +36,7 @@ bb0:
 
 // (thick_to_objc_metatype (existential_metatype @thick)) -> (existential_metatype @objc_metatype)
 //
-// CHECK-LABEL: sil @_TF31peephole_thick_to_objc_metatype48test_thick_to_objc_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @owned AnyObject
+// CHECK-LABEL: sil @_TF31peephole_thick_to_objc_metatype48test_thick_to_objc_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned any X) -> @owned AnyObject
 // CHECK-NOT: existential_metatype $@thick
 // CHECK-NOT: {{thick_to_objc_metatype }}
 // CHECK: existential_metatype $@objc_metatype
@@ -88,7 +88,7 @@ bb0:
 
 // (objc_to_objc_metatype (existential_metatype @objc_metatype)) -> (existential_metatype @thick)
 //
-// CHECK-LABEL: sil @_TF31peephole_thick_to_objc_metatype48test_objc_to_thick_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned X) -> @thick X.Type
+// CHECK-LABEL: sil @_TF31peephole_thick_to_objc_metatype48test_objc_to_thick_metatype_existential_metatypeFPS_1X_Ps9AnyObject_ : $@convention(thin) (@owned any X) -> @thick any X.Type
 // CHECK-NOT: existential_metatype $@objc_metatype
 // CHECK-NOT: {{objc_to_thick_metatype }}
 // CHECK: existential_metatype $@thick
@@ -122,7 +122,7 @@ bb0(%0 : $T):
 // CHECK: [[T:%.*]] = apply
 // CHECK-NOT: objc_to_thick_metatype
 // CHECK-NOT: thick_to_objc_metatype
-// CHECK: enum $Optional<@objc_metatype AnyObject.Type>, #Optional.some!enumelt, [[T]] : $@objc_metatype AnyObject.Type
+// CHECK: enum $Optional<@objc_metatype any AnyObject.Type>, #Optional.some!enumelt, [[T]] : $@objc_metatype any AnyObject.Type
 // CHECK: } // end sil function '$test_peephole_objc_to_thick_to_objc'
 
 sil @$test_peephole_objc_to_thick_to_objc : $@convention(thin) (@guaranteed NSObject) -> Optional<UnsafeMutablePointer<OpaquePointer>> {

@@ -117,7 +117,7 @@ all_boxes = [
 ]
 protocol_boxes = [
     Box(name="PublicProtocol"),
-#    Box(name="FilePrivateProtocol"), # Blocked by SR-2620 aka rdar://28281488
+#    Box(name="FilePrivateProtocol"), # FIXME: Blocked by https://github.com/apple/swift/issues/45225 (rdar://28281488)
     Box(name="InternalProtocol"),
 ]
 
@@ -125,7 +125,7 @@ protocol_boxes = [
 default_protocols = [
   "PublicProtocol",
   "InternalProtocol",
-  # "FilePrivateProtocol" # Blocked by SR-2620 aka rdar://28281488
+  # "FilePrivateProtocol" # FIXME: Blocked by https://github.com/apple/swift/issues/45225 (rdar://28281488)
 ]
 
 class Contents:

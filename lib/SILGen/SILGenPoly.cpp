@@ -82,6 +82,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "silgen-poly"
 #include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -520,7 +521,7 @@ ManagedValue Transform::transform(ManagedValue v,
       } else if (inputSubstType->isSet()) {
         fn = SGF.SGM.getSetUpCast(Loc);
       } else {
-        llvm_unreachable("unsupported collection upcast kind");
+        llvm::report_fatal_error("unsupported collection upcast kind");
       }
 
       return SGF.emitCollectionConversion(Loc, fn, inputSubstType,
@@ -756,7 +757,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     }
 
     SGFContext eltCtxt =
-      (outputEltTemp ? SGFContext(&outputEltTemp.getValue()) : SGFContext());
+      (outputEltTemp ? SGFContext(&outputEltTemp.value()) : SGFContext());
     auto outputElt = transform(inputElt,
                                inputEltOrigType, inputEltSubstType,
                                outputEltOrigType, outputEltSubstType,
@@ -772,7 +773,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     }
 
     // Otherwise, make sure we emit into the slot.
-    auto &temp = outputEltTemp.getValue();
+    auto &temp = outputEltTemp.value();
     auto outputEltAddr = temp.getManagedAddress();
 
     // That might involve storing directly.
@@ -934,9 +935,8 @@ namespace {
           assert(!param.isInOut());
           elts.emplace_back(param.getParameterType());
         }
-        auto outputSubstType = cast<TupleType>(
-          TupleType::get(elts, SGF.getASTContext())
-            ->getCanonicalType());
+        auto outputSubstType = CanTupleType(
+          TupleType::get(elts, SGF.getASTContext()));
 
         // Translate the input tuple value into the output tuple value. Note
         // that the output abstraction pattern is a tuple, and we explode tuples
@@ -1192,8 +1192,6 @@ namespace {
                                     CanTupleType inputTupleType,
                                     AbstractionPattern outputOrigType,
                                     CanTupleType outputTupleType) {
-      assert(!inputTupleType->hasElementWithOwnership() &&
-             !outputTupleType->hasElementWithOwnership());
       assert(inputTupleType->getNumElements() ==
              outputTupleType->getNumElements());
 
@@ -1282,8 +1280,6 @@ namespace {
                                    CanTupleType outputSubstType) {
       assert(inputOrigType.matchesTuple(inputSubstType));
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasElementWithOwnership() &&
-             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -1304,8 +1300,6 @@ namespace {
                                   ManagedValue inputTupleAddr) {
       assert(inputOrigType.isTypeParameter());
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasElementWithOwnership() &&
-             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -1351,8 +1345,6 @@ namespace {
                                  TemporaryInitialization &tupleInit) {
       assert(inputOrigType.matchesTuple(inputSubstType));
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasElementWithOwnership() &&
-             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -1522,8 +1514,6 @@ namespace {
       case ParameterConvention::Indirect_InoutAliasable:
         llvm_unreachable("abstraction difference in aliasable argument not "
                          "allowed");
-      case ParameterConvention::Indirect_In_Constant:
-        llvm_unreachable("in_constant convention not allowed in SILGen");
       }
 
       llvm_unreachable("Covered switch isn't covered?!");
@@ -1739,7 +1729,6 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
     return ManagedValue::forLValue(value);
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
     return SGF.emitManagedRValueWithCleanup(value);
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned:
@@ -1747,10 +1736,13 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
       return ManagedValue::forUnmanaged(value);
     return ManagedValue::forBorrowedObjectRValue(value);
   case ParameterConvention::Indirect_In_Guaranteed: {
-    bool isOpaque = SGF.getTypeLowering(value->getType()).isAddressOnly() &&
-                    !SGF.silConv.useLoweredAddresses();
-    return isOpaque ? ManagedValue::forBorrowedObjectRValue(value)
-                    : ManagedValue::forBorrowedAddressRValue(value);
+    if (SGF.silConv.useLoweredAddresses()) {
+      return ManagedValue::forBorrowedAddressRValue(value);
+    }
+    if (value->getType().isTrivial(SGF.F)) {
+      return ManagedValue::forTrivialObjectRValue(value);
+    }
+    return ManagedValue::forBorrowedObjectRValue(value);
   }
   }
   llvm_unreachable("bad kind");
@@ -3064,6 +3056,24 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   auto substSourceType = fn.getType().castTo<SILFunctionType>();
   auto substExpectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
   
+  LLVM_DEBUG(llvm::dbgs() << "=== Generating reabstraction thunk from:\n";
+             substSourceType.dump(llvm::dbgs());
+             llvm::dbgs() << "\n    to:\n";
+             substExpectedType.dump(llvm::dbgs());
+             llvm::dbgs() << "\n    for source location:\n";
+             if (auto d = loc.getAsASTNode<Decl>()) {
+               d->dump(llvm::dbgs());
+             } else if (auto e = loc.getAsASTNode<Expr>()) {
+               e->dump(llvm::dbgs());
+             } else if (auto s = loc.getAsASTNode<Stmt>()) {
+               s->dump(llvm::dbgs());
+             } else if (auto p = loc.getAsASTNode<Pattern>()) {
+               p->dump(llvm::dbgs());
+             } else {
+               loc.dump();
+             }
+             llvm::dbgs() << "\n");
+  
   // Apply substitutions in the source and destination types, since the thunk
   // doesn't change because of different function representations.
   CanSILFunctionType sourceType;
@@ -3274,7 +3284,7 @@ static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
 static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
                                                   CanType dynamicSelfType) {
   PrettyStackTraceSILFunction stackTrace(
-      "emitting withoutAcutallyEscaping thunk in", &SGF.F);
+      "emitting withoutActuallyEscaping thunk in", &SGF.F);
 
   auto loc = RegularLocation::getAutoGeneratedLocation();
 
@@ -3453,7 +3463,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   SILGenFunctionBuilder fb(SGM);
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
-      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed);
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible);
 
   // Partially-apply the thunk to `linearMap` and return the thunked value.
   auto getThunkedResult = [&]() {
@@ -3723,6 +3734,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       customDerivativeFn->isSerialized(),
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
+      customDerivativeFn->isRuntimeAccessible(),
       customDerivativeFn->getEntryCount(), IsThunk,
       customDerivativeFn->getClassSubclassScope());
   // This thunk may be publicly exposed and cannot be transparent.
@@ -4224,7 +4236,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
                                   SILType::getPrimitiveObjectType(derivedFTy),
                                   subs, args, derivedYields);
     auto overrideSubs = SubstitutionMap::getOverrideSubstitutions(
-        base.getDecl(), derived.getDecl(), /*derivedSubs=*/subs);
+        base.getDecl(), derived.getDecl()).subst(subs);
 
     YieldInfo derivedYieldInfo(SGM, derived, derivedFTy, subs);
     YieldInfo baseYieldInfo(SGM, base, thunkTy, overrideSubs);
@@ -4446,6 +4458,7 @@ void SILGenFunction::emitProtocolWitness(
 
     // For an instance actor, get the actor 'self'.
     if (*enterIsolation == ActorIsolation::ActorInstance) {
+      assert(enterIsolation->getActorInstanceParameter() == 0 && "Not self?");
       auto actorSelfVal = origParams.back();
 
       if (actorSelfVal.getType().isAddress()) {
@@ -4472,6 +4485,8 @@ void SILGenFunction::emitProtocolWitness(
                                           ->getCanonicalType());
   }
 
+  assert(!witnessSubstTy->hasError());
+
   if (auto genericFnType = dyn_cast<GenericFunctionType>(reqtSubstTy)) {
     auto forwardingSubs = F.getForwardingSubstitutionMap();
     reqtSubstTy = cast<FunctionType>(genericFnType
@@ -4481,6 +4496,8 @@ void SILGenFunction::emitProtocolWitness(
     reqtSubstTy = cast<FunctionType>(F.mapTypeIntoContext(reqtSubstTy)
                                           ->getCanonicalType());
   }
+
+  assert(!reqtSubstTy->hasError());
 
   // Get the lowered type of the witness.
   auto origWitnessFTy = getWitnessFunctionType(getTypeExpansionContext(), SGM,
@@ -4509,7 +4526,7 @@ void SILGenFunction::emitProtocolWitness(
   //    @convention(method) (@thin Foo.Type) -> () but the "actual" SIL function
   // looks like this:
   //    @convention(c) () -> ()
-  // . We do this by simply omiting the last params.
+  // . We do this by simply omitting the last params.
   // TODO: fix this for static C++ methods.
   if (witness.getDecl()->getClangDecl() &&
       isa<clang::CXXConstructorDecl>(witness.getDecl()->getClangDecl()))
@@ -4606,4 +4623,7 @@ void SILGenFunction::emitProtocolWitness(
   formalEvalScope.pop();
   scope.pop();
   B.createReturn(loc, reqtResultValue);
+
+  // Now that we have finished emitting the function, verify it!
+  F.verify();
 }

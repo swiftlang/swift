@@ -151,6 +151,41 @@ isVisibleToObjC(const ValueDecl *VD, AccessLevel minRequiredAccess,
   return false;
 }
 
+StringRef
+swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
+                                      CustomNamesOnly_t customNamesOnly) {
+  if (const auto *Expose = VD->getAttrs().getAttribute<ExposeAttr>()) {
+    if (!Expose->Name.empty())
+      return Expose->Name;
+  }
+
+  if (customNamesOnly)
+    return StringRef();
+
+  // FIXME: String.Index should be exposed as String::Index, not _String_Index.
+  if (VD->getModuleContext()->isStdlibModule() &&
+      VD->getBaseIdentifier().str() == "Index") {
+    return "String_Index";
+  }
+
+  return VD->getBaseIdentifier().str();
+}
+
+swift::cxx_translation::DeclRepresentation
+swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
+  if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
+    return {Unsupported, UnrepresentableIsolatedInActor};
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    if (AFD->hasAsync())
+      return {Unsupported, UnrepresentableAsync};
+    // Don't expose @_alwaysEmitIntoClient functions as they require their
+    // bodies to be emitted into client.
+    if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      return {Unsupported, UnrepresentableRequiresClientEmission};
+  }
+  return {Representable, llvm::None};
+}
+
 bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
                                             AccessLevel minRequiredAccess,
                                             bool checkParent) {

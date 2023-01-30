@@ -398,7 +398,7 @@ extension StrideTo: CustomReflectable {
 }
 #endif
 
-// FIXME(conditional-conformances): This does not yet compile (SR-6474).
+// FIXME(conditional-conformances): This does not yet compile (https://github.com/apple/swift/issues/49024).
 #if false
 extension StrideTo: RandomAccessCollection
 where Element.Stride: BinaryInteger {
@@ -616,7 +616,7 @@ extension StrideThrough: CustomReflectable {
 }
 #endif
 
-// FIXME(conditional-conformances): This does not yet compile (SR-6474).
+// FIXME(conditional-conformances): This does not yet compile (https://github.com/apple/swift/issues/49024).
 #if false
 extension StrideThrough: RandomAccessCollection
 where Element.Stride: BinaryInteger {

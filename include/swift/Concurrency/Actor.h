@@ -52,8 +52,8 @@ enum : uint32_t {
   /// The actor is ready for deallocation once it stops running
   Zombie_ReadyForDeallocation = 0x3,
 
-  // Bit 3
-  DistributedRemote = 0x8,
+  // Bit 3 is free
+
   // Bit 4
   IsPriorityEscalated = 0x10,
 

@@ -48,6 +48,11 @@ struct SymbolGraphOptions {
 
   /// Whether to include documentation for clang nodes or not.
   bool IncludeClangDocs = false;
+
+  /// Whether to emit "swift.extension" symbols for extensions to external types
+  /// along with "extensionTo" relationships instead of directly associating
+  /// members and conformances with the extended nominal.
+  bool EmitExtensionBlockSymbols = false;
 };
 
 } // end namespace symbolgraphgen

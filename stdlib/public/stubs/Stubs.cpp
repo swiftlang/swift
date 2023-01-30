@@ -70,9 +70,9 @@
 
 #include "swift/Threading/Thread.h"
 
-#include "SwiftShims/LibcShims.h"
-#include "SwiftShims/RuntimeShims.h"
-#include "SwiftShims/RuntimeStubs.h"
+#include "swift/shims/LibcShims.h"
+#include "swift/shims/RuntimeShims.h"
+#include "swift/shims/RuntimeStubs.h"
 
 #include "llvm/ADT/StringExtras.h"
 
@@ -461,7 +461,7 @@ void _swift_stdlib_flockfile_stdout() {
 #if defined(_WIN32)
   _lock_file(stdout);
 #elif defined(__wasi__)
-  // WebAssembly/WASI doesn't support file locking yet https://bugs.swift.org/browse/SR-12097
+  // FIXME: WebAssembly/WASI doesn't support file locking yet (https://github.com/apple/swift/issues/54533).
 #else
   flockfile(stdout);
 #endif
@@ -471,7 +471,7 @@ void _swift_stdlib_funlockfile_stdout() {
 #if defined(_WIN32)
   _unlock_file(stdout);
 #elif defined(__wasi__)
-  // WebAssembly/WASI doesn't support file locking yet https://bugs.swift.org/browse/SR-12097
+  // FIXME: WebAssembly/WASI doesn't support file locking yet (https://github.com/apple/swift/issues/54533).
 #else
   funlockfile(stdout);
 #endif

@@ -185,7 +185,7 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
         if (potentialEscapePoints.contains(inst)) {
           if (auto *store = dyn_cast<StoreInst>(inst)) {
             // Don't immediately bail on a store instruction. Instead, remember
-            // it and check if it interfers with any (potential) load.
+            // it and check if it interferes with any (potential) load.
             if (storeAddrsFound.insert(store->getDest())) {
               storeAddrs.push_back(store->getDest());
               numStoresFound += 1;
@@ -267,8 +267,10 @@ void COWOptsPass::collectEscapePoints(SILValue v,
                             escapePoints, handled);
         break;
       case SILInstructionKind::CondBranchInst:
-        collectEscapePoints(cast<CondBranchInst>(user)->getArgForOperand(use),
-                            escapePoints, handled);
+        if (use->getOperandNumber() != CondBranchInst::ConditionIdx) {
+          collectEscapePoints(cast<CondBranchInst>(user)->getArgForOperand(use),
+                              escapePoints, handled);
+        }
         break;
       case SILInstructionKind::StructInst:
       case SILInstructionKind::StructExtractInst:

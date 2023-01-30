@@ -32,36 +32,31 @@
 
 using namespace swift;
 
+ASTWalker::PostWalkResult<Expr *>
+DiscriminatorFinder::walkToExprPost(Expr *E)  {
+  auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+  if (!ACE)
+    return Action::Continue(E);
+
+  unsigned Discriminator = ACE->getDiscriminator();
+  assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
+         "Existing closures should have valid discriminators");
+  if (Discriminator >= NextDiscriminator)
+    NextDiscriminator = Discriminator + 1;
+  if (FirstDiscriminator == AbstractClosureExpr::InvalidDiscriminator ||
+      Discriminator < FirstDiscriminator)
+    FirstDiscriminator = Discriminator;
+
+  return Action::Continue(E);
+}
+
+unsigned DiscriminatorFinder::getNextDiscriminator() {
+  if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
+    llvm::report_fatal_error("Out of valid closure discriminators");
+  return NextDiscriminator++;
+}
+
 namespace {
-
-/// Find available closure discriminators.
-///
-/// The parser typically takes care of assigning unique discriminators to
-/// closures, but the parser is unavailable during semantic analysis.
-class DiscriminatorFinder : public ASTWalker {
-  unsigned NextDiscriminator = 0;
-
-public:
-  Expr *walkToExprPost(Expr *E) override {
-    auto *ACE = dyn_cast<AbstractClosureExpr>(E);
-    if (!ACE)
-      return E;
-
-    unsigned Discriminator = ACE->getDiscriminator();
-    assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
-           "Existing closures should have valid discriminators");
-    if (Discriminator >= NextDiscriminator)
-      NextDiscriminator = Discriminator + 1;
-    return E;
-  }
-
-  // Get the next available closure discriminator.
-  unsigned getNextDiscriminator() {
-    if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
-      llvm::report_fatal_error("Out of valid closure discriminators");
-    return NextDiscriminator++;
-  }
-};
 
 /// Instrument decls with sanity-checks which the debugger can evaluate.
 class DebuggerTestingTransform : public ASTWalker {
@@ -78,31 +73,32 @@ public:
         DebuggerTestingCheckExpectName(
             Ctx.getIdentifier("_debuggerTestingCheckExpect")) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     pushLocalDeclContext(D);
 
     // Skip implicit decls, because the debugger isn't used to step through
     // these.
     if (D->isImplicit())
-      return false;
+      return Action::SkipChildren();
 
     // Whitelist the kinds of decls to transform.
     // TODO: Expand the set of decls visited here.
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(D))
-      return FD->getBody();
+      return Action::VisitChildrenIf(FD->getBody());
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-      return TLCD->getBody();
+      return Action::VisitChildrenIf(TLCD->getBody());
     if (isa<NominalTypeDecl>(D))
-      return true;
-    return false;
+      return Action::Continue();
+
+    return Action::SkipChildren();
   }
 
-  bool walkToDeclPost(Decl *D) override {
+  PostWalkAction walkToDeclPost(Decl *D) override {
     popLocalDeclContext(D);
-    return true;
+    return Action::Continue();
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     pushLocalDeclContext(E);
 
     // Whitelist the kinds of exprs to transform.
@@ -110,12 +106,12 @@ public:
     if (auto *AE = dyn_cast<AssignExpr>(E))
       return insertCheckExpect(AE, AE->getDest());
 
-    return {true, E};
+    return Action::Continue(E);
   }
 
-  Expr *walkToExprPost(Expr *E) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     popLocalDeclContext(E);
-    return E;
+    return Action::Continue(E);
   }
 
 private:
@@ -167,10 +163,10 @@ private:
   /// The return value contains 1) a flag indicating whether or not to
   /// recursively transform the children of the transformed expression, and 2)
   /// the transformed expression itself.
-  std::pair<bool, Expr *> insertCheckExpect(Expr *OriginalExpr, Expr *DstExpr) {
+  PreWalkResult<Expr *> insertCheckExpect(Expr *OriginalExpr, Expr *DstExpr) {
     auto *DstRef = extractDeclOrMemberRef(DstExpr);
     if (!DstRef)
-      return {true, OriginalExpr};
+      return Action::Continue(OriginalExpr);
 
     ValueDecl *DstDecl;
     if (auto *DRE = dyn_cast<DeclRefExpr>(DstRef))
@@ -180,14 +176,14 @@ private:
       DstDecl = MRE->getMember().getDecl();
     }
     if (!DstDecl->hasName())
-      return {true, OriginalExpr};
+      return Action::Continue(OriginalExpr);
 
     // Don't capture variables which aren't default-initialized.
     if (auto *VD = dyn_cast<VarDecl>(DstDecl))
       if (!VD->isParentInitialized() &&
           !(isa<ParamDecl>(VD) &&
             cast<ParamDecl>(VD)->isInOut()))
-        return {true, OriginalExpr};
+        return Action::Continue(OriginalExpr);
 
     // Rewrite the original expression into this:
     // call
@@ -271,8 +267,9 @@ private:
         ClosureExpr(DeclAttributes(), SourceRange(), nullptr, Params,
                     SourceLoc(), SourceLoc(),
                     SourceLoc(), SourceLoc(), nullptr,
-                    DF.getNextDiscriminator(), getCurrentDeclContext());
+                    getCurrentDeclContext());
     Closure->setImplicit(true);
+    Closure->setDiscriminator(DF.getNextDiscriminator());
 
     // TODO: Save and return the value of $OriginalExpr.
     ASTNode ClosureElements[] = {OriginalExpr, CheckExpectExpr};
@@ -295,7 +292,7 @@ private:
     // ensures that the type checker can infer <noescape> for captured values.
     TypeChecker::computeCaptures(Closure);
 
-    return {false, FinalExpr};
+    return Action::SkipChildren(FinalExpr);
   }
 };
 

@@ -7,6 +7,8 @@
 // RUN:      %s -g -O -o - -emit-ir \
 // RUN:      | %FileCheck %s --check-prefix=IR
 
+// REQUIRES: swift_in_compiler
+
 import StdlibUnittest
 
 @inline(never)

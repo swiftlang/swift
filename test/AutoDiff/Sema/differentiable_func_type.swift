@@ -41,6 +41,10 @@ let _: @differentiable(_linear) (Float) -> NonDiffType
 
 let _: @differentiable(_linear) (Float) -> Float
 
+// expected-error @+1 {{'@differentiable' function returning Void must have at least one differentiable inout parameter, i.e. a non-'@noDerivative' parameter whose type conforms to 'Differentiable'}}
+let _: @differentiable(reverse) (Float) -> Void
+let _: @differentiable(reverse) (inout Float) -> Void // okay
+
 // expected-error @+1 {{result type '@differentiable(reverse) (U) -> Float' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 func test1<T: Differentiable, U: Differentiable>(_: @differentiable(reverse) (T) -> @differentiable(reverse) (U) -> Float) {}
 // expected-error @+1 {{result type '(U) -> Float' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
@@ -135,7 +139,6 @@ let _: (Float) -> @noDerivative Float
 // expected-error @+1 {{'@noDerivative' may only be used on parameters of '@differentiable' function types}}
 let _: @differentiable(reverse) (Float) -> @noDerivative Float
 
-// expected-error @+2 {{'@noDerivative' may only be used on parameters of '@differentiable' function types}}
 // expected-error @+1 {{'@noDerivative' must not be used on variadic parameters}}
 let _: (Float, @noDerivative Float...) -> Float
 

@@ -4,9 +4,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: PTRSIZE=64
 
-// Currently failing on arm: rdar://92963081
-// REQUIRES: CPU=x86_64
-
 sil_stage canonical
 
 import Builtin
@@ -15,11 +12,18 @@ import SwiftShims
 
 class X {}
 
-sil [escapes !%0, !%0.c*.v**] @$ss23_ContiguousArrayStorageCfD : $@convention(method) <Element> (@owned _ContiguousArrayStorage<Element>) -> ()
+sil @$ss23_ContiguousArrayStorageCfD : $@convention(method) <Element> (@owned _ContiguousArrayStorage<Element>) -> () {
+[%0: noescape, noescape c*.v**] 
+}
 
-sil [defined_escapes %0 => %r.0.v**, %0.c*.v** => %r.0.v**.c*.v**, %0.c*.v** => %r.1.v**] @array_adopt_storage_class : $@convention(method) (@owned _ContiguousArrayStorage<X>, Int, @thin Array<X>.Type) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+sil @array_adopt_storage_class : $@convention(method) (@owned _ContiguousArrayStorage<X>, Int, @thin Array<X>.Type) -> (@owned Array<X>, UnsafeMutablePointer<X>) {
+[%0: escape! => %r.0.v**, escape c*.v** => %r.0.v**.c*.v**, escape c*.v** => %r.1.v**] 
+}
 
-sil [escapes %0 => %r.0.s0.**] @array_adopt_storage : $@convention(thin) (@owned _ContiguousArrayStorage<Int>) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+sil @array_adopt_storage : $@convention(thin) (@owned _ContiguousArrayStorage<Int>) -> (@owned Array<Int>, UnsafeMutablePointer<Int>) {
+[%0: escape => %r.0.s0.**] 
+}
+
 sil @take_ptr : $@convention(thin) (UnsafeMutablePointer<Int>) -> ()
 
 // CHECK-LABEL: Escape information for call_array_adopt_storage:

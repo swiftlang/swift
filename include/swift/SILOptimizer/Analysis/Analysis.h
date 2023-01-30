@@ -27,7 +27,7 @@ class SILPassManager;
 /// A list of the known analysis.
 struct SILAnalysisKind {
   enum InnerTy {
-#define ANALYSIS(NAME) NAME,
+#define SIL_ANALYSIS(NAME) NAME,
 #include "Analysis.def"
   } value;
 
@@ -64,6 +64,11 @@ public:
     /// has been modified.
     Branches = 0x4,
 
+    /// The function effects.
+    ///
+    /// The computed effects of the function are invalidated.
+    Effects = 0x8,
+
     /// Convenience states:
     FunctionBody = Calls | Branches | Instructions,
 
@@ -71,7 +76,7 @@ public:
 
     BranchesAndInstructions = Branches | Instructions,
 
-    Everything = Calls | Branches | Instructions,
+    Everything = FunctionBody | Effects,
   };
 
 private:
@@ -329,7 +334,7 @@ public:
   FunctionInfoTy *operator->() { return *this; }
 };
 
-#define ANALYSIS(NAME) SILAnalysis *create##NAME##Analysis(SILModule *);
+#define SIL_ANALYSIS(NAME) SILAnalysis *create##NAME##Analysis(SILModule *);
 #include "Analysis.def"
 
 } // end namespace swift

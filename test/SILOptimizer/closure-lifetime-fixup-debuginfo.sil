@@ -1,0 +1,43 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-lifetime-fixup -emit-verbose-sil %s | %FileCheck %s
+
+import Builtin
+import Swift
+import SwiftShims
+
+
+sil_scope 1 { loc "closure-lifetime-fixup-debuginfo.sil":12:34 parent @destroy_and_dealloc_of_capture_are_cleanups : $@convention(method) <Self where Self : Indexable> (@in Self) -> () }
+sil_scope 2 { loc "closure-lifetime-fixup-debuginfo.sil":12:34 parent 1 }
+
+protocol Indexable {
+associatedtype Index
+}
+
+// Verify that the destroy_addr and dealloc_stack that are created for captured
+// closure arguments are marked as cleanups.
+// CHECK-LABEL: sil [ossa] @destroy_and_dealloc_of_capture_are_cleanups : {{.*}} {
+// CHECK:         [[CAPTURED_ADDR:%[^,]+]] = alloc_stack $Self
+// CHECK:         try_apply {{.*}}, normal [[SUCCESS:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]
+// CHECK:         destroy_addr [[CAPTURED_ADDR]]{{.*}}:cleanup:
+//                                                     ^^^^^^^
+// CHECK:         dealloc_stack [[CAPTURED_ADDR]]{{.*}}:cleanup:
+//                                                      ^^^^^^^
+// CHECK-LABEL: } // end sil function 'destroy_and_dealloc_of_capture_are_cleanups'
+sil [ossa] @destroy_and_dealloc_of_capture_are_cleanups : $@convention(method) <Self where Self : Indexable> (@in Self) -> () {
+bb0(%self : $*Self):
+  %copy = alloc_stack $Self, scope 1
+  copy_addr %self to [init] %copy : $*Self, scope 2
+  %closure = partial_apply [callee_guaranteed] undef<Self>(%copy) : $@convention(thin) <Tee where Tee : Indexable> (@in_guaranteed Tee) -> (@out Tee.Index, @error any Error), scope 2
+  %converted = convert_function %closure : $@callee_guaranteed () -> (@out Self.Index, @error any Error) to $@callee_guaranteed @substituted <Tee> () -> (@out Tee, @error any Error) for <Self.Index>, scope 2
+  %noescape = convert_escape_to_noescape [not_guaranteed] %converted : $@callee_guaranteed @substituted <Tee> () -> (@out Tee, @error any Error) for <Self.Index> to $@noescape @callee_guaranteed @substituted <Tee> () -> (@out Tee, @error any Error) for <Self.Index>, scope 2
+  try_apply undef<Self.Index>(%noescape) : $@convention(thin) <Tee> (@noescape @callee_guaranteed @substituted <Tee> () -> (@out Tee, @error any Error) for <Tee>) -> (@error any Error), normal bb1, error bb2, scope 2
+bb1(%result : $()):
+  destroy_value %converted : $@callee_guaranteed @substituted <Tee> () -> (@out Tee, @error any Error) for <Self.Index>, scope 2
+  destroy_addr %self : $*Self, scope 2
+  %retval = tuple (), scope 2
+  dealloc_stack %copy : $*Self, scope 2
+  return %retval : $(), scope 2
+
+bb2(%83 : @owned $any Error):
+  unreachable , scope 2
+}

@@ -17,7 +17,12 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
 
+namespace clang {
+class HeaderSearch;
+}
+
 namespace swift {
+class FrontendOptions;
 class IRGenOptions;
 class ModuleDecl;
 class ValueDecl;
@@ -34,8 +39,9 @@ class ValueDecl;
 /// Returns true on error.
 bool printAsClangHeader(raw_ostream &out, ModuleDecl *M,
                         StringRef bridgingHeader,
-                        bool ExposePublicDeclsInClangHeader,
-                        const IRGenOptions &irGenOpts);
+                        const FrontendOptions &frontendOpts,
+                        const IRGenOptions &irGenOpts,
+                        clang::HeaderSearch &headerSearchInfo);
 }
 
 #endif

@@ -50,6 +50,11 @@ class ConstraintGraphScope {
 public:
   explicit ConstraintGraphScope(ConstraintGraph &CG);
   ~ConstraintGraphScope();
+  
+  /// Get number of changes recorded at the start of the current active scope.
+  unsigned getStartIdx() {
+    return NumChanges;
+  }
 };
 
 } // end namespace constraints

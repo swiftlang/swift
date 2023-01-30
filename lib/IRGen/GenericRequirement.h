@@ -19,8 +19,8 @@
 #ifndef SWIFT_IRGEN_GENERICREQUIREMENT_H
 #define SWIFT_IRGEN_GENERICREQUIREMENT_H
 
-#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -41,6 +41,7 @@ namespace irgen {
 class Address;
 class IRGenFunction;
 class IRGenModule;
+class DynamicMetadataRequest;
 
 using RequirementCallback =
   llvm::function_ref<void(GenericRequirement requirement)>;
@@ -54,9 +55,9 @@ void enumerateGenericSignatureRequirements(CanGenericSignature signature,
 /// value.
 llvm::Value *
 emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
-                                        CanGenericSignature signature,
                                         GenericRequirement requirement,
-                                        SubstitutionMap subs);
+                                        SubstitutionMap subs,
+                                        DynamicMetadataRequest request);
 
 using EmitGenericRequirementFn =
   llvm::function_ref<llvm::Value*(GenericRequirement reqt)>;
@@ -86,15 +87,10 @@ void bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
 /// A class describing the layout of the generic requirements of a
 /// nominal type metadata.
 ///
-/// The generic requirements are always laid out as a sequence of type
-/// metadata (corresponding to the type parameters of the context established
-/// by the type, minus anything fulfillable from its parent type metadata)
-/// followed by a sequence of protocol witness tables (corresponding to the
-/// root conformances of the context established by the type, again minus
-/// anything fulfillable from its parent type metadata).
+/// The generic requirements are always laid out as a sequence of shape
+/// parameters, followed by type metadata and witness tables.
 class GenericTypeRequirements {
   llvm::SmallVector<GenericRequirement, 4> Requirements;
-  CanGenericSignature Generics;
 
 public:
   GenericTypeRequirements(IRGenModule &IGM, NominalTypeDecl *decl);
@@ -105,37 +101,7 @@ public:
     return Requirements;
   }
 
-  /// Return the number of entries required in order to store this data.
-  unsigned getStorageSizeInWords() const {
-    return Requirements.size();
-  }
-
-  /// Return the number of type metadata requirements.
-  unsigned getNumTypeRequirements() const {
-    unsigned count = 0;
-    for (auto i = Requirements.begin(), e = Requirements.end(); i != e; ++i) {
-      if (!i->Protocol) {
-        count++;
-      } else {
-#ifndef NDEBUG
-        // Assert that the rest of the requirements are conformance
-        // requirements.
-        for (++i; i != e; ++i) {
-          assert(i->Protocol && "type requirement followed conformance!");
-        }
-#endif
-        break;
-      }
-    }
-    return count;
-  }
-
   bool empty() const { return Requirements.empty(); }
-
-  using FulfillmentCallback = llvm::function_ref<void(
-      unsigned requirementIndex, CanType type, ProtocolConformanceRef conf)>;
-  void enumerateFulfillments(IRGenModule &IGM, SubstitutionMap subs,
-                             FulfillmentCallback callback);
 
   void emitInitOfBuffer(IRGenFunction &IGF, SubstitutionMap subs,
                         Address buffer);

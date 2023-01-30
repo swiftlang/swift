@@ -174,7 +174,7 @@ void PropertyMap::addLayoutProperty(
   }
 
   // Otherwise, compute the intersection.
-  assert(props->LayoutRule.hasValue());
+  assert(props->LayoutRule.has_value());
   auto mergedLayout = props->Layout.merge(property.getLayoutConstraint());
 
   // If the intersection is invalid, we have a conflict.
@@ -292,7 +292,7 @@ void PropertyMap::addSuperclassProperty(
     assert(props->Superclasses.empty());
     auto &req = props->Superclasses[superclassDecl];
 
-    assert(!req.SuperclassType.hasValue());
+    assert(!req.SuperclassType.has_value());
     assert(req.SuperclassRules.empty());
 
     req.SuperclassType = property;
@@ -316,7 +316,7 @@ void PropertyMap::addSuperclassProperty(
     // Perform concrete type unification at this level of the class
     // hierarchy.
     auto &req = props->Superclasses[superclassDecl];
-    assert(req.SuperclassType.hasValue());
+    assert(req.SuperclassType.has_value());
     assert(!req.SuperclassRules.empty());
 
     unifyConcreteTypes(key, req.SuperclassType, req.SuperclassRules,
@@ -363,7 +363,7 @@ void PropertyMap::addSuperclassProperty(
     // Record the new rule at the more specific level of the class
     // hierarchy.
     auto &req = props->Superclasses[superclassDecl];
-    assert(!req.SuperclassType.hasValue());
+    assert(!req.SuperclassType.has_value());
     assert(req.SuperclassRules.empty());
 
     req.SuperclassType = property;
@@ -647,6 +647,7 @@ void PropertyMap::addProperty(
   case Symbol::Kind::Name:
   case Symbol::Kind::GenericParam:
   case Symbol::Kind::AssociatedType:
+  case Symbol::Kind::Shape:
     break;
   }
 

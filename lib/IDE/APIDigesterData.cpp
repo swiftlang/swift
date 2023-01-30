@@ -199,8 +199,8 @@ void swift::ide::api::TypeMemberDiffItem::undef(llvm::raw_ostream &os) {
 }
 
 void swift::ide::api::TypeMemberDiffItem::streamDef(llvm::raw_ostream &os) const {
-  std::string IndexContent = selfIndex.hasValue() ?
-    std::to_string(selfIndex.getValue()) : "";
+  std::string IndexContent = selfIndex.has_value() ?
+    std::to_string(selfIndex.value()) : "";
   os << head() << "("
      << "\"" << usr << "\"" << ", "
      << "\"" << newTypeName << "\"" << ", "
@@ -363,16 +363,16 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
     Optional<uint8_t> SelfIndexShort;
     Optional<uint8_t> RemovedIndexShort;
     if (SelfIndex)
-      SelfIndexShort = SelfIndex.getValue();
+      SelfIndexShort = SelfIndex.value();
     if (RemovedIndex)
-      RemovedIndexShort = RemovedIndex.getValue();
+      RemovedIndexShort = RemovedIndex.value();
     return new (Alloc.Allocate<TypeMemberDiffItem>())
       TypeMemberDiffItem(Usr, NewTypeName, NewPrintedName, SelfIndexShort,
                          RemovedIndexShort, OldTypeName, OldPrintedName);
   }
   case APIDiffItemKind::ADK_NoEscapeFuncParam: {
     return new (Alloc.Allocate<NoEscapeFuncParam>())
-      NoEscapeFuncParam(Usr, Index.getValue());
+      NoEscapeFuncParam(Usr, Index.value());
   }
   case APIDiffItemKind::ADK_OverloadedFuncInfo: {
     return new (Alloc.Allocate<OverloadedFuncInfo>()) OverloadedFuncInfo(Usr);

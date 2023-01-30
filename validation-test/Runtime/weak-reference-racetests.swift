@@ -54,8 +54,8 @@ let WeakReferenceRaceTests = TestSuite("WeakReferenceRaceTests")
 
 struct RaceTest_instancePropertyCopy: WeakReferenceRaceTest {
   func makeRaceData() -> WeakReferenceRaceData {
-    // Capture a weak reference via its container object
-    // "https://bugs.swift.org/browse/SR-192"
+    // Capture a weak reference via its container object.
+    // https://github.com/apple/swift/issues/42814
     let box = WBox(Thing())
     return WeakReferenceRaceData {
       let nbox = WBox<Thing>()
@@ -65,14 +65,14 @@ struct RaceTest_instancePropertyCopy: WeakReferenceRaceTest {
   }
 }
 
-WeakReferenceRaceTests.test("class instance property [SR-192] (copy)") {
+WeakReferenceRaceTests.test("class instance property (copy)") {
   runRaceTest(RaceTest_instancePropertyCopy.self, trials: iterations)
 }
 
 struct RaceTest_instancePropertyLoad: WeakReferenceRaceTest {
   func makeRaceData() -> WeakReferenceRaceData {
-    // Capture a weak reference via its container object
-    // "https://bugs.swift.org/browse/SR-192"
+    // Capture a weak reference via its container object.
+    // https://github.com/apple/swift/issues/42814
     let box = WBox(Thing())
     return WeakReferenceRaceData {
       if let ref = box.wref {
@@ -82,7 +82,7 @@ struct RaceTest_instancePropertyLoad: WeakReferenceRaceTest {
   }
 }
 
-WeakReferenceRaceTests.test("class instance property [SR-192] (load)") {
+WeakReferenceRaceTests.test("class instance property (load)") {
   runRaceTest(RaceTest_instancePropertyLoad.self, trials: iterations)
 }
 

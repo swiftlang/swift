@@ -73,7 +73,9 @@ func testAnyObjectOptional() -> AnyObject? {
   return x
 }
 
-// SR-11511 Warning for inferring an array of empty tuples
+// https://github.com/apple/swift/issues/53912
+// Warning for inferring an array of empty tuples
+
 var arrayOfEmptyTuples = [""].map { print($0) } // expected-warning {{variable 'arrayOfEmptyTuples' inferred to have type '[()]'}} \
                                                 // expected-note {{add an explicit type annotation to silence this warning}} {{23-23=: [()]}}
 

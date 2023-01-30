@@ -15,56 +15,47 @@
 #if _runtime(_ObjC)
 import Foundation
 
-func parseGraphemeBreakTests(
-  _ data: String,
-  into result: inout [(String, Int)]
-) {
-  for line in data.split(separator: "\n") {
+public struct GraphemeBreakTest {
+  public let string: String
+  public let pieces: [[Unicode.Scalar]]
+
+  init?(line: some StringProtocol) {
     // Only look at actual tests
-    guard line.hasPrefix("÷") else {
-      continue
-    }
+    guard line.hasPrefix("÷") else { return nil }
 
     let info = line.split(separator: "#")
     let components = info[0].split(separator: " ")
 
     var string = ""
-    var count = 0
+    var pieces: [[Unicode.Scalar]] = []
 
-    for i in components.indices {
-      guard i != 0 else {
-        continue
-      }
-
-      let scalar: Unicode.Scalar
-
-      // If we're an odd index, this is a scalar.
-      if i & 0x1 == 1 {
-        scalar = Unicode.Scalar(UInt32(components[i], radix: 16)!)!
-
+    var piece: [Unicode.Scalar] = []
+    for component in components {
+      switch component {
+      case "":
+        break
+      case "×": // no grapheme break opportunity
+        break
+      case "÷": // grapheme break opportunity
+        guard !piece.isEmpty else { break }
+        pieces.append(piece)
+        piece = []
+      case _: // hexadecimal scalar value
+        guard let value = UInt32(component, radix: 16) else { return nil }
+        guard let scalar = Unicode.Scalar(value) else { return nil }
         string.unicodeScalars.append(scalar)
-      } else {
-        // Otherwise, it is a grapheme breaking operator.
-
-        // If this is a break, record the +1 count. Otherwise it is × which is
-        // not a break.
-        if components[i] == "÷" {
-          count += 1
-        }
+        piece.append(scalar)
       }
     }
-
-    result.append((string, count))
+    if !piece.isEmpty { pieces.append(piece) }
+    self.string = string
+    self.pieces = pieces
   }
 }
 
-public let graphemeBreakTests: [(String, Int)] = {
-  var result: [(String, Int)] = []
-
+public let graphemeBreakTests: [GraphemeBreakTest] = {
   let testFile = readInputFile("GraphemeBreakTest.txt")
-
-  parseGraphemeBreakTests(testFile, into: &result)
-
-  return result
+  return testFile.split(separator: "\n")
+    .compactMap { GraphemeBreakTest(line: $0) }
 }()
 #endif

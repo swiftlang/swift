@@ -21,7 +21,7 @@
 
 @available(macOS 10.12, *)
 public func foo() { }
-// TRC-API: (root versions=[10.10.0,+Inf)
+// TRC-API: (root versions=[10.10,+Inf)
 // TRC-API:   (decl versions=[10.12,+Inf) decl=foo()
 
 #if canImport(Swift)

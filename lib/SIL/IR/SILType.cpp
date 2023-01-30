@@ -22,11 +22,12 @@
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
+#include <tuple>
 
 using namespace swift;
 using namespace swift::Lowering;
 
-/// Find an opened archetype represented by this type.
+/// Find a local archetype represented by this type.
 /// It is assumed by this method that the type contains
 /// at most one opened archetype.
 /// Typically, it would be called from a type visitor.
@@ -35,13 +36,14 @@ using namespace swift::Lowering;
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
 CanOpenedArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
+  return dyn_cast_or_null<OpenedArchetypeType>(getLocalArchetypeOf(Ty));
+}
+CanLocalArchetypeType swift::getLocalArchetypeOf(CanType Ty) {
   if (!Ty)
-    return CanOpenedArchetypeType();
+    return CanLocalArchetypeType();
   while (auto MetaTy = dyn_cast<AnyMetatypeType>(Ty))
     Ty = MetaTy.getInstanceType();
-  if (Ty->isOpenedExistential())
-    return cast<OpenedArchetypeType>(Ty);
-  return CanOpenedArchetypeType();
+  return dyn_cast<LocalArchetypeType>(Ty);
 }
 
 SILType SILType::getExceptionType(const ASTContext &C) {
@@ -99,6 +101,10 @@ SILType SILType::getEmptyTupleType(const ASTContext &C) {
 
 SILType SILType::getSILTokenType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheSILTokenType);
+}
+
+SILType SILType::getPackIndexType(const ASTContext &C) {
+  return getPrimitiveObjectType(C.ThePackIndexType);
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {
@@ -159,6 +165,15 @@ bool SILType::isNoReturnFunction(SILModule &M,
     return funcTy->isNoReturnFunction(M, context);
 
   return false;
+}
+
+Lifetime SILType::getLifetime(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  const auto &lowering = F.getTypeLowering(contextType);
+  auto properties = lowering.getRecursiveProperties();
+  if (properties.isTrivial())
+    return Lifetime::None;
+  return properties.isLexical() ? Lifetime::Lexical : Lifetime::EagerMove;
 }
 
 std::string SILType::getMangledName() const {
@@ -307,6 +322,10 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
 SILType SILType::getFieldType(VarDecl *field, SILModule &M,
                               TypeExpansionContext context) const {
   return getFieldType(field, M.Types, context);
+}
+
+SILType SILType::getFieldType(VarDecl *field, SILFunction *fn) const {
+  return getFieldType(field, fn->getModule(), fn->getTypeExpansionContext());
 }
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
@@ -773,7 +792,7 @@ bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
 bool SILType::isDifferentiable(SILModule &M) const {
   return getASTType()
       ->getAutoDiffTangentSpace(LookUpConformanceInModule(M.getSwiftModule()))
-      .hasValue();
+      .has_value();
 }
 
 Type
@@ -925,10 +944,23 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
   return SILType();
 }
 
-// TODO: Create isPureMoveOnly.
 bool SILType::isMoveOnly() const {
   if (auto *nom = getNominalOrBoundGenericNominal())
     if (nom->isMoveOnly())
       return true;
   return isMoveOnlyWrapped();
+}
+
+bool SILType::isMoveOnlyType() const {
+  if (auto *nom = getNominalOrBoundGenericNominal())
+    if (nom->isMoveOnly())
+      return true;
+  return false;
+}
+
+bool SILType::isPureMoveOnly() const {
+  if (auto *nom = getNominalOrBoundGenericNominal())
+    if (nom->isMoveOnly())
+      return true;
+  return false;
 }

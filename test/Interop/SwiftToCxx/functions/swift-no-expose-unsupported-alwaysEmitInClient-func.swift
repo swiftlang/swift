@@ -1,14 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-public-decls -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
 // CHECK-NOT: SWIFT_EXTERN bool $s9Functions24alwaysEmitIntoClientFuncyS2bF(bool x) SWIFT_NOEXCEPT SWIFT_CALL; // alwaysEmitIntoClientFunc(_:)
 
-// CHECK:       namespace Functions {
-// CHECK-EMPTY:
-// CHECK-EMPTY:
+// CHECK:       namespace Functions __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Functions") {
 // CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT:  } // namespace Functions

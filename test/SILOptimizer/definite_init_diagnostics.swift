@@ -1098,7 +1098,7 @@ func test22436880() {
   bug22436880(&x) // expected-error {{immutable value 'x' must not be passed inout}}
 }
 
-// sr-184
+// https://github.com/apple/swift/issues/42806
 let x: String? // expected-note 2 {{constant defined here}}
 print(x?.count as Any) // expected-error {{constant 'x' used before being initialized}}
 print(x!) // expected-error {{constant 'x' used before being initialized}}
@@ -1157,8 +1157,9 @@ class r23013334Derived : rdar16119509_Base {
 
 }
 
-// sr-1469
-struct SR1469_Struct1 {
+// https://github.com/apple/swift/issues/44078
+
+struct S1_44078 {
   let a: Int
   let b: Int // expected-note {{'self.b' not initialized}}
   
@@ -1172,7 +1173,7 @@ struct SR1469_Struct1 {
   }
 }
 
-struct SR1469_Struct2 {
+struct S2_44078 {
   let a: Int
   let b: Int // expected-note {{'self.b' not initialized}}
   
@@ -1182,7 +1183,7 @@ struct SR1469_Struct2 {
   }
 }
 
-struct SR1469_Struct3 {
+struct S3_44078 {
   let a: Int
   let b: Int // expected-note {{'self.b' not initialized}}
   
@@ -1195,7 +1196,7 @@ struct SR1469_Struct3 {
   } // expected-error {{return from initializer without initializing all stored properties}}
 }
 
-enum SR1469_Enum1 {
+enum E1_44078 {
   case A, B
   
   init?(x: Int) {
@@ -1207,14 +1208,14 @@ enum SR1469_Enum1 {
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
-enum SR1469_Enum2 {
+enum E2_44078 {
   case A, B
   
   init?() {
     return
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
-enum SR1469_Enum3 {
+enum E3_44078 {
   case A, B
   
   init?(x: Int) {
@@ -1553,7 +1554,8 @@ func testOptionalUnwrapNoError() -> Int? {
   return x!
 }
 
-// <https://bugs.swift.org/browse/SR-9451>
+// https://github.com/apple/swift/issues/51914
+
 class StrongCycle {
   var c: StrongCycle
   var d: Int

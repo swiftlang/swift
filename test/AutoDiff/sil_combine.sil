@@ -1,0 +1,61 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+// SILCombine tests for differentiation-related instructions.
+
+sil_stage canonical
+
+import Swift
+import _Differentiation
+
+// MARK: `differentiable_function_extract` folding
+
+sil @differentiable_function_extract_orig : $@convention(thin) (@callee_guaranteed (Float) -> Float) -> (@callee_guaranteed (Float) -> Float) {
+bb0(%orig : $@callee_guaranteed (Float) -> Float):
+  %diff_fn = differentiable_function [parameters 0] [results 0] %orig : $@callee_guaranteed (Float) -> Float
+  %extracted_orig = differentiable_function_extract [original] %diff_fn : $@callee_guaranteed @differentiable(reverse) (Float) -> Float
+  return %extracted_orig : $@callee_guaranteed (Float) -> Float
+}
+
+// CHECK-LABEL: sil @differentiable_function_extract_orig : $@convention(thin) (@callee_guaranteed (Float) -> Float) -> @callee_guaranteed (Float) -> Float {
+// CHECK: bb0([[ORIG_FN:%.*]] : $@callee_guaranteed (Float) -> Float):
+// CHECK:   return [[ORIG_FN]] : $@callee_guaranteed (Float) -> Float
+// CHECK-LABEL: } // end sil function 'differentiable_function_extract_orig'
+
+sil @differentiable_function_extract_jvp : $@convention(thin) (@callee_guaranteed (Float) -> Float, @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) -> (@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) {
+bb0(%orig : $@callee_guaranteed (Float) -> Float, %jvp : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)):
+  %diff_fn = differentiable_function [parameters 0] [results 0] %orig : $@callee_guaranteed (Float) -> Float with_derivative {%jvp : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), undef : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
+  %extracted_jvp = differentiable_function_extract [jvp] %diff_fn : $@callee_guaranteed @differentiable(reverse) (Float) -> Float
+  return %extracted_jvp : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// CHECK-LABEL: sil @differentiable_function_extract_jvp : $@convention(thin) (@callee_guaranteed (Float) -> Float, @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) -> @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK: bb0([[ORIG_FN:%.*]] : $@callee_guaranteed (Float) -> Float, [[JVP_FN:%.*]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)):
+// CHECK:   return [[JVP_FN]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-LABEL: } // end sil function 'differentiable_function_extract_jvp'
+
+sil @differentiable_function_extract_vjp : $@convention(thin) (@callee_guaranteed (Float) -> Float, @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) -> (@callee_guaranteed  (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) {
+bb0(%orig : $@callee_guaranteed (Float) -> Float, %vjp : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)):
+  %diff_fn = differentiable_function [parameters 0] [results 0] %orig : $@callee_guaranteed (Float) -> Float with_derivative {undef : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), %vjp : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
+  %extracted_vjp = differentiable_function_extract [vjp] %diff_fn : $@callee_guaranteed @differentiable(reverse) (Float) -> Float
+  return %extracted_vjp : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// CHECK-LABEL: sil @differentiable_function_extract_vjp : $@convention(thin) (@callee_guaranteed (Float) -> Float, @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) -> @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK: bb0([[ORIG_FN:%.*]] : $@callee_guaranteed (Float) -> Float, [[VJP_FN:%.*]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)):
+// CHECK:   return [[VJP_FN]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-LABEL: } // end sil function 'differentiable_function_extract_vjp'
+
+// Test `differentiatiable_function_extract [vjp] %diff_fn` where `%diff_fn` does not have a VJP function operand.
+sil @differentiable_function_extract_vjp_undefined : $@convention(thin) (@callee_guaranteed (Float) -> Float) -> (@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) {
+bb0(%orig : $@callee_guaranteed (Float) -> Float):
+  %diff_fn = differentiable_function [parameters 0] [results 0] %orig : $@callee_guaranteed (Float) -> Float
+  %extracted_vjp = differentiable_function_extract [vjp] %diff_fn : $@callee_guaranteed @differentiable(reverse) (Float) -> Float
+  return %extracted_vjp : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// CHECK-LABEL: sil @differentiable_function_extract_vjp_undefined : $@convention(thin) (@callee_guaranteed (Float) -> Float) -> @callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK: bb0([[ORIG_FN:%.*]] : $@callee_guaranteed (Float) -> Float):
+// CHECK:   [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_FN]] : $@callee_guaranteed (Float) -> Float
+// CHECK:   [[EXTRACTED_VJP:%.*]] = differentiable_function_extract [vjp] [[DIFF_FN]] : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
+// CHECK:   return [[EXTRACTED_VJP]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-LABEL: } // end sil function 'differentiable_function_extract_vjp_undefined' 

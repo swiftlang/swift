@@ -23,7 +23,7 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
 // CHECK:         [[HEADER:%.*]] = getelementptr inbounds { %objc_block, i8* }, { %objc_block, i8* }* %0, i32 0, i32 0
 // CHECK:         [[SLOT:%.*]] = getelementptr inbounds %objc_block, %objc_block* [[HEADER]], i32 0, i32 3
 // CHECK:         [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK:         [[SIGNED:%.*]] = call i64 @llvm.ptrauth.sign.i64(i64 ptrtoint (void (void (...)*)* @invoke_trivial to i64), i32 0, i64 [[T0]])
+// CHECK:         [[SIGNED:%.*]] = call i64 @llvm.ptrauth.sign(i64 ptrtoint (void (void (...)*)* @invoke_trivial to i64), i32 0, i64 [[T0]])
 // CHECK:         [[T0:%.*]] = inttoptr i64 [[SIGNED]] to i8*
 // CHECK:         store i8* [[T0]], i8** [[SLOT]],
 // CHECK:         [[SLOT:%.*]] = getelementptr inbounds %objc_block, %objc_block* [[HEADER]], i32 0, i32 4
@@ -45,7 +45,7 @@ entry(%0 : $*@block_storage Builtin.NativeObject):
 // CHECK:         [[HEADER:%.*]] = getelementptr inbounds { %objc_block, %swift.refcounted* }, { %objc_block, %swift.refcounted* }* %0, i32 0, i32 0
 // CHECK:         [[SLOT:%.*]] = getelementptr inbounds %objc_block, %objc_block* [[HEADER]], i32 0, i32 3
 // CHECK:         [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK:         [[SIGNED:%.*]] = call i64 @llvm.ptrauth.sign.i64(i64 ptrtoint (void (void (...)*)* @invoke_nontrivial to i64), i32 0, i64 [[T0]])
+// CHECK:         [[SIGNED:%.*]] = call i64 @llvm.ptrauth.sign(i64 ptrtoint (void (void (...)*)* @invoke_nontrivial to i64), i32 0, i64 [[T0]])
 // CHECK:         [[T0:%.*]] = inttoptr i64 [[SIGNED]] to i8*
 // CHECK:         store i8* [[T0]], i8** [[SLOT]],
 // CHECK:         [[SLOT:%.*]] = getelementptr inbounds %objc_block, %objc_block* [[HEADER]], i32 0, i32 4

@@ -1,0 +1,22 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -address-lowering -diagnostic-constant-propagation -type-lowering-force-opaque-value-lowering | %FileCheck %s
+sil_stage canonical
+
+struct G<T> {
+    var t: T
+}
+
+// CHECK-LABEL: sil [ossa] @checked_cast_same_type : {{.*}} {
+// CHECK:         copy_addr [take]
+// CHECK-LABEL: } // end sil function 'checked_cast_same_type'
+sil [ossa] @checked_cast_same_type : $@convention(thin) <T> () -> () {
+  %addr_src = alloc_stack $G<T>
+  %addr_dest = alloc_stack $G<T>
+  apply undef<T>(%addr_src) : $@convention(thin) <U> () -> @out G<U>
+  unconditional_checked_cast_addr G<T> in %addr_src : $*G<T> to G<T> in %addr_dest : $*G<T>
+  apply undef<T>(%addr_dest) : $@convention(thin) <U> (@in_guaranteed G<U>) -> ()
+  destroy_addr %addr_dest : $*G<T>
+  dealloc_stack %addr_dest : $*G<T>
+  dealloc_stack %addr_src : $*G<T>
+  %retval = tuple ()
+  return %retval : $()
+}

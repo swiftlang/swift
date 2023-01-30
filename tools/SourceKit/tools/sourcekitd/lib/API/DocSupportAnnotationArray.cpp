@@ -11,11 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "sourcekitd/DocSupportAnnotationArray.h"
+#include "sourcekitd/DictionaryKeys.h"
 #include "sourcekitd/CompactArray.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "llvm/Support/MemoryBuffer.h"
 
-#include "DictionaryKeys.h"
 
 using namespace SourceKit;
 using namespace sourcekitd;

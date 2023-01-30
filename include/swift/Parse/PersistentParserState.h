@@ -18,7 +18,6 @@
 #define SWIFT_PARSE_PERSISTENTPARSERSTATE_H
 
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Parse/LocalContext.h"
 
 namespace swift {
 
@@ -26,71 +25,64 @@ class SourceFile;
 class DeclContext;
 class IterableDeclContext;
 
-enum class CodeCompletionDelayedDeclKind {
+enum class IDEInspectionDelayedDeclKind {
   TopLevelCodeDecl,
   Decl,
   FunctionBody,
 };
 
-class CodeCompletionDelayedDeclState {
+class IDEInspectionDelayedDeclState {
 public:
-  CodeCompletionDelayedDeclKind Kind;
+  IDEInspectionDelayedDeclKind Kind;
   unsigned Flags;
   DeclContext *ParentContext;
   unsigned StartOffset;
   unsigned EndOffset;
   unsigned PrevOffset;
 
-  CodeCompletionDelayedDeclState(CodeCompletionDelayedDeclKind Kind,
-                                 unsigned Flags, DeclContext *ParentContext,
-                                 unsigned StartOffset, unsigned EndOffset,
-                                 unsigned PrevOffset)
+  IDEInspectionDelayedDeclState(IDEInspectionDelayedDeclKind Kind,
+                                unsigned Flags, DeclContext *ParentContext,
+                                unsigned StartOffset, unsigned EndOffset,
+                                unsigned PrevOffset)
       : Kind(Kind), Flags(Flags), ParentContext(ParentContext),
-        StartOffset(StartOffset), EndOffset(EndOffset),
-        PrevOffset(PrevOffset) {}
+        StartOffset(StartOffset), EndOffset(EndOffset), PrevOffset(PrevOffset) {
+  }
 };
 
 /// Parser state persistent across multiple parses.
 class PersistentParserState {
-  std::unique_ptr<CodeCompletionDelayedDeclState> CodeCompletionDelayedDeclStat;
-
-  /// The local context for all top-level code.
-  TopLevelContext TopLevelCode;
+  std::unique_ptr<IDEInspectionDelayedDeclState> IDEInspectionDelayedDeclStat;
 
 public:
   PersistentParserState();
   PersistentParserState(ASTContext &ctx) : PersistentParserState() { }
   ~PersistentParserState();
 
-  void setCodeCompletionDelayedDeclState(SourceManager &SM, unsigned BufferID,
-                                         CodeCompletionDelayedDeclKind Kind,
-                                         unsigned Flags,
-                                         DeclContext *ParentContext,
-                                         SourceRange BodyRange,
-                                         SourceLoc PreviousLoc);
-  void restoreCodeCompletionDelayedDeclState(
-      const CodeCompletionDelayedDeclState &other);
+  void setIDEInspectionDelayedDeclState(SourceManager &SM, unsigned BufferID,
+                                        IDEInspectionDelayedDeclKind Kind,
+                                        unsigned Flags,
+                                        DeclContext *ParentContext,
+                                        SourceRange BodyRange,
+                                        SourceLoc PreviousLoc);
+  void restoreIDEInspectionDelayedDeclState(
+      const IDEInspectionDelayedDeclState &other);
 
-  bool hasCodeCompletionDelayedDeclState() const {
-    return CodeCompletionDelayedDeclStat.get() != nullptr;
+  bool hasIDEInspectionDelayedDeclState() const {
+    return IDEInspectionDelayedDeclStat.get() != nullptr;
   }
 
-  CodeCompletionDelayedDeclState &getCodeCompletionDelayedDeclState() {
-    return *CodeCompletionDelayedDeclStat.get();
+  IDEInspectionDelayedDeclState &getIDEInspectionDelayedDeclState() {
+    return *IDEInspectionDelayedDeclStat.get();
   }
-  const CodeCompletionDelayedDeclState &
-  getCodeCompletionDelayedDeclState() const {
-    return *CodeCompletionDelayedDeclStat.get();
-  }
-
-  std::unique_ptr<CodeCompletionDelayedDeclState>
-  takeCodeCompletionDelayedDeclState() {
-    assert(hasCodeCompletionDelayedDeclState());
-    return std::move(CodeCompletionDelayedDeclStat);
+  const IDEInspectionDelayedDeclState &
+  getIDEInspectionDelayedDeclState() const {
+    return *IDEInspectionDelayedDeclStat.get();
   }
 
-  TopLevelContext &getTopLevelContext() {
-    return TopLevelCode;
+  std::unique_ptr<IDEInspectionDelayedDeclState>
+  takeIDEInspectionDelayedDeclState() {
+    assert(hasIDEInspectionDelayedDeclState());
+    return std::move(IDEInspectionDelayedDeclStat);
   }
 };
 

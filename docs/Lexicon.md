@@ -49,7 +49,7 @@ thunk helpers" sometimes seen in Swift backtraces come from.)
 
 Broadly, an "access path" is a list of "accesses" which must be chained together
 to compute some output from an input. For instance, the generics system has a
-type called a `ConformanceAccessPath` which explains how to, for example,
+type called a `ConformancePath` which explains how to, for example,
 walk from `T: Collection` to `T: Sequence` to `T.Iterator: IteratorProtocol`.
 There are several different kinds of "access path" in different parts of the compiler,
 but they all follow this basic theme.
@@ -100,7 +100,7 @@ Apple term for "the person assigned to watch CI this week".
 
 ## canonical SIL
 
-SIL after the
+[SIL](#sil) after the
 [mandatory passes](#mandatory-passes--mandatory-optimizations) have run.
 This can be used as input to IRGen to generate LLVM IR or object files.
 
@@ -179,7 +179,7 @@ The other half is provided by corresponding
 ## DI (definite initialization / definitive initialization)
 
 The feature that no uninitialized variables, constants, or properties will
-be read by a program, or the analysis pass that operates on SIL to
+be read by a program, or the analysis pass that operates on [SIL](#sil) to
 guarantee this. This was 
 [discussed on Apple's Swift blog](https://developer.apple.com/swift/blog/?id=28).
 
@@ -284,6 +284,8 @@ perform structural modification, e.x.:
 2. `case let x:`.
 3. `case (_, _):`.
 
+Contrast with [refutable pattern](#refutable-pattern)
+
 ## IR
 
 1. "intermediate representation": a generic term for a format representing
@@ -327,7 +329,7 @@ The module for the file or files currently being compiled.
 
 ## mandatory passes / mandatory optimizations
 
-Transformations over SIL that run immediately after SIL generation. Once
+Transformations over [SIL](#sil) that run immediately after SIL generation. Once
 all mandatory passes have run (and if no errors are found), the SIL is
 considered [canonical](#canonical-SIL).
 
@@ -359,7 +361,7 @@ Has *many* uses in the Swift world. We may want to rename some of them.
 2. A compilation unit; that is, source files that are compiled together.
    These files may contain cross-references. Represented as "the main
    module" (a specific ModuleDecl).
-3. (as "SIL module") A container for SIL to be compiled together, along
+3. (as "[SIL](#sil) module") A container for SIL to be compiled together, along
    with various context for the compilation.
 4. (as "LLVM module") A collection of LLVM IR to be compiled together.
    Always created in an LLVMContext.
@@ -491,7 +493,7 @@ on that system.
 
 ## raw SIL
 
-SIL just after being generated, not yet in a form that can be used for
+[SIL](#sil) just after being generated, not yet in a form that can be used for
 IR generation.
 See [mandatory passes](#mandatory-passes--mandatory-optimizations).
 
@@ -539,6 +541,8 @@ A pattern that may not always match. These include patterns such as:
 1. Isa check, e.g. `case let x as String:`.
 2. Enum case check: e.g. `case .none:`.
 3. Expr pattern: e.g. `case foo():`.
+
+Contrast with [irrefutable pattern](#irrefutable-pattern)
 
 ## resilient
 
@@ -656,7 +660,7 @@ The value or type that satisfies a protocol requirement.
 
 ## witness table
 
-The SIL (and runtime) representation of a [conformance](#conformance); essentially a
+The [SIL](#sil) (and runtime) representation of a [conformance](#conformance); essentially a
 [vtable](#vtable-virtual-dispatch-table) but for a protocol instead of
 a class.
 

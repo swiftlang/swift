@@ -156,6 +156,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 4
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 217,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 221,
     key.length: 1

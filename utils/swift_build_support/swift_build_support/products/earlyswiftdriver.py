@@ -12,6 +12,7 @@
 
 import os
 
+from . import earlyswiftsyntax
 from . import product
 from .. import shell
 from .. import toolchain
@@ -57,7 +58,11 @@ class EarlySwiftDriver(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return []
+        # FIXME: This isn't a real dependency, but is necessary to linearize the
+        # dependency graph from Swift to EarlySwiftSyntax. If we properly
+        # express the dependency from Swift -> EarlySwiftSyntax, build_graph.py
+        # asserts that there are multiple roots to the graph.
+        return [earlyswiftsyntax.EarlySwiftSyntax]
 
     def should_clean(self, host_target):
         return self.args.clean_early_swift_driver

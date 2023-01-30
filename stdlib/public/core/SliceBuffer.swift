@@ -211,7 +211,7 @@ internal struct _SliceBuffer<Element>
     //
     //   return _hasNativeBuffer && isUniquelyReferenced()
     //
-    // SR-6437
+    // https://github.com/apple/swift/issues/48987
     if !_hasNativeBuffer {
       return false
     }

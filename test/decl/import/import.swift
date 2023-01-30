@@ -34,7 +34,7 @@ func f1(_ a: Swift.Int) -> Swift.Void { print(a) }
 import func Swift.print
 
 // rdar://14418336
-#import something_nonexistent // expected-error {{expected expression}} expected-error {{no such module 'something_nonexistent'}}
+#import something_nonexistent // expected-error {{expected a macro identifier}} expected-error {{no such module 'something_nonexistent'}}
 
 // Import specific decls
 import typealias Swift.Int

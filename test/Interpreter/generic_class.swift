@@ -184,8 +184,9 @@ class MoreConcreteQuadruple : SemiConcreteTriple<State> {
   }
 }
 
-// This check triggers SR-815 (rdar://problem/25318716) on macOS 10.9 and iOS 7.
-// Disable it for now when testing on those versions.
+// This check triggers https://github.com/apple/swift/issues/43427
+// (rdar://problem/25318716) on macOS 10.9 and iOS 7. Disable it for now when
+// testing on those versions.
 if #available(macOS 10.10, iOS 8, *) {
   var u = MoreConcreteQuadruple(10, 17, State.CA, "Hella")
 

@@ -70,7 +70,7 @@ namespace rewriting {
 /// \c Sequence conformance of \c C (because \c Collection inherits
 /// \c Sequence). Finally, it extracts the conformance of the associated type
 /// \c Iterator to \c IteratorProtocol from the \c Sequence protocol.
-class ConformanceAccessPath {
+class ConformancePath {
 public:
   /// An entry in the conformance access path, which is described by the
   /// dependent type on which the conformance is stated as the protocol to
@@ -80,7 +80,7 @@ public:
 private:
   ArrayRef<Entry> path;
 
-  ConformanceAccessPath(ArrayRef<Entry> path) : path(path) {}
+  ConformancePath(ArrayRef<Entry> path) : path(path) {}
 
   friend class GenericSignatureImpl;
   friend class rewriting::RequirementMachine;
@@ -179,6 +179,8 @@ public:
 
     RequiredProtocols protos;
     LayoutConstraint layout;
+
+    Type packShape;
   };
 
 private:
@@ -213,9 +215,9 @@ public:
   SmallVector<Requirement, 4>
   requirementsNotSatisfiedBy(GenericSignature otherSig) const;
 
-  /// Return the canonical version of the given type under this generic
+  /// Return the reduced version of the given type under this generic
   /// signature.
-  CanType getCanonicalTypeInContext(Type type) const;
+  CanType getReducedType(Type type) const;
 
   /// Check invariants.
   void verify() const;
@@ -225,6 +227,9 @@ public:
   /// requirement signature against the protocol generic signature
   /// <Self where Self : P>.
   void verify(ArrayRef<Requirement> reqts) const;
+
+  /// Returns a new signature with the given parameters erased
+  GenericSignature typeErased(ArrayRef<Type> typeErasedParams) const;
 };
 
 /// A reference to a canonical generic signature.
@@ -383,7 +388,7 @@ public:
   /// generic signature.
   ///
   /// The type parameters must be known to not be concrete within the context.
-  bool areSameTypeParameterInContext(Type type1, Type type2) const;
+  bool areReducedTypeParametersEqual(Type type1, Type type2) const;
 
   /// Determine if \c sig can prove \c requirement, meaning that it can deduce
   /// T: Foo or T == U (etc.) with the information it knows. This includes
@@ -392,29 +397,40 @@ public:
   bool isRequirementSatisfied(
       Requirement requirement, bool allowMissing = false) const;
 
-  bool isCanonicalTypeInContext(Type type) const;
+  bool isReducedType(Type type) const;
 
   /// Determine whether the given type parameter is defined under this generic
   /// signature.
-  bool isValidTypeInContext(Type type) const;
+  bool isValidTypeParameter(Type type) const;
 
-  /// Retrieve the conformance access path used to extract the conformance of
+  /// Retrieve the conformance path used to extract the conformance of
   /// interface \c type to the given \c protocol.
   ///
-  /// \param type The interface type whose conformance access path is to be
+  /// \param type The type parameter whose conformance path is to be
   /// queried.
   /// \param protocol A protocol to which \c type conforms.
   ///
-  /// \returns the conformance access path that starts at a requirement of
+  /// \returns the conformance path that starts at a requirement of
   /// this generic signature and ends at the conformance that makes \c type
   /// conform to \c protocol.
   ///
-  /// \seealso ConformanceAccessPath
-  ConformanceAccessPath getConformanceAccessPath(Type type,
-                                                 ProtocolDecl *protocol) const;
+  /// \seealso ConformancePath
+  ConformancePath getConformancePath(Type type,
+                                     ProtocolDecl *protocol) const;
 
   /// Lookup a nested type with the given name within this type parameter.
   TypeDecl *lookupNestedType(Type type, Identifier name) const;
+
+  /// Returns the shape equivalence class of the given type parameter.
+  ///
+  /// \param type The type parameter to compute the reduced shape for.
+  /// Only type parameter packs have a shape, including dependent members
+  /// whose root generic parameter is a pack.
+  Type getReducedShape(Type type) const;
+
+  /// Returns \c true if the given type parameter packs are in
+  /// the same shape equivalence class.
+  bool haveSameShape(Type type1, Type type2) const;
 
   /// Get the ordinal of a generic parameter in this generic signature.
   ///
@@ -440,6 +456,13 @@ public:
   /// \note If the upper bound is a protocol or protocol composition,
   /// will return an instance of \c ExistentialType.
   Type getNonDependentUpperBounds(Type type) const;
+
+  /// Given a type parameter, compute the most specific supertype (upper bound)
+  /// that is possibly dependent on other type parameters.
+  ///
+  /// \note If the upper bound is a protocol or protocol composition,
+  /// will return an instance of \c ExistentialType.
+  Type getDependentUpperBounds(Type type) const;
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       TypeArrayView<GenericTypeParamType> genericParams,
@@ -487,9 +510,9 @@ private:
   SmallVector<Requirement, 4>
   requirementsNotSatisfiedBy(GenericSignature otherSig) const;
 
-  /// Return the canonical version of the given type under this generic
+  /// Return the reduced version of the given type under this generic
   /// signature.
-  CanType getCanonicalTypeInContext(Type type) const;
+  CanType getReducedType(Type type) const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);

@@ -4,6 +4,7 @@
 // RUN: %target-swiftc_driver -wmo -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil -save-optimization-record=yaml  -save-optimization-record-path %t/note.yaml -Xfrontend -enable-lexical-borrow-scopes=false %s -o /dev/null && %FileCheck --input-file=%t/note.yaml %s
 
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
+// REQUIRES: swift_in_compiler
 
 // This file is testing out the basic YAML functionality to make sure that it
 // works without burdening basic_yaml.swift with having to update all

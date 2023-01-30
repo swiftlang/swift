@@ -61,7 +61,7 @@ public:
   }
 
   const_reverse_range getReversePostOrder(SILBasicBlock *StartBlock) const {
-    unsigned RPONumber = getRPONumber(StartBlock).getValue();
+    unsigned RPONumber = getRPONumber(StartBlock).value();
     return getReversePostOrder(RPONumber);
   }
 

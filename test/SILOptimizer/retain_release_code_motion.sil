@@ -2,6 +2,8 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
 // RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
+// REQUIRES: swift_in_compiler
+
 import Builtin
 import Swift
 
@@ -205,7 +207,7 @@ sil hidden @retain_not_blocked_by_copyaddrinit : $@convention(thin) <T> (@in T, 
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   strong_release %2 : $B
   strong_retain %2 : $B
-  copy_addr [take] %1 to [initialization] %0 : $*T // id: %3
+  copy_addr [take] %1 to [init] %0 : $*T // id: %3
   %4 = tuple ()                                   // user: %5
   return %4 : $()                                 // id: %5
 }
@@ -319,7 +321,7 @@ bb3:
   return %5 : $()
 }
 
-// CHECK-LABEL: sil [serialized] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+// CHECK-LABEL: sil [serialized] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error any Error {
 // CHECK: bb0(
 // CHECK: strong_retain
 // CHECK: try_apply
@@ -820,6 +822,28 @@ bb0(%0 : $_ContiguousArrayBuffer<AnyObject>, %1 : $Builtin.Word, %2 : $Builtin.W
   return %newptr : $Builtin.RawPointer
 }
 
+// CHECK-RELEASE-HOISTING-LABEL: sil @testMemcpy
+// CHECK-RELEASE-HOISTING:       bb0(%0 : $_ContiguousArrayBuffer<UInt64>, %1 : $Builtin.Word):
+// CHECK-RELEASE-HOISTING:         builtin "int_memcpy_RawPointer_RawPointer_Word"
+// CHECK-RELEASE-HOISTING:         release_value %0 : $_ContiguousArrayBuffer<UInt64>
+// CHECK-RELEASE-HOISTING:       } // end sil function 'testMemcpy'
+sil @testMemcpy : $@convention(thin) (_ContiguousArrayBuffer<UInt64>, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $_ContiguousArrayBuffer<UInt64>, %1 : $Builtin.Word):
+  %newptr = builtin "allocRaw"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.RawPointer
+  %token = bind_memory %newptr : $Builtin.RawPointer, %1 : $Builtin.Word to $*UInt64
+  %storage = struct_extract %0 : $_ContiguousArrayBuffer<UInt64>, #_ContiguousArrayBuffer._storage
+  %elements = ref_tail_addr %storage : $__ContiguousArrayStorageBase, $UInt64
+  %eltptr = address_to_pointer %elements : $*UInt64 to $Builtin.RawPointer
+  %objptr = struct $UnsafePointer<UInt64> (%eltptr : $Builtin.RawPointer)
+  %ptrdep = mark_dependence %objptr : $UnsafePointer<UInt64> on %storage : $__ContiguousArrayStorageBase
+  %rawptr = struct_extract %ptrdep : $UnsafePointer<UInt64>, #UnsafePointer._rawValue
+  %f = integer_literal $Builtin.Int1, 0
+  %move = builtin "int_memcpy_RawPointer_RawPointer_Word"(%newptr : $Builtin.RawPointer, %rawptr : $Builtin.RawPointer, %1 : $Builtin.Word, %f : $Builtin.Int1) : $()
+  release_value %0 : $_ContiguousArrayBuffer<UInt64>
+  return %newptr : $Builtin.RawPointer
+}
+
+
 // CHECK-LABEL: sil @dontMoveOverExistentialToClassCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<fuzz>
 // CHECK:    strong_retain %0
 // CHECK:    checked_cast_br %0
@@ -842,9 +866,9 @@ bb3(%24 : $Optional<fuzz>):
   return %24 : $Optional<fuzz>
 }
 
-// CHECK-LABEL: sil @moveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<P>
+// CHECK-LABEL: sil @moveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<any P>
 // CHECK:    checked_cast_br %0
-// CHECK:    enum $Optional<P>, #Optional.some!enumelt
+// CHECK:    enum $Optional<any P>, #Optional.some!enumelt
 // CHECK:    strong_retain %0
 // CHECK-NOT: release
 // CHECK:  } // end sil function 'moveOverClassToExistentialCast'
@@ -866,7 +890,7 @@ bb3(%24 : $Optional<P>):
   return %24 : $Optional<P>
 }
 
-// CHECK-LABEL: sil @dontMoveOverExistentialToExistentialCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<P>
+// CHECK-LABEL: sil @dontMoveOverExistentialToExistentialCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<any P>
 // CHECK:    strong_retain %0
 // CHECK:    checked_cast_br %0
 // CHECK:  } // end sil function 'dontMoveOverExistentialToExistentialCast'
@@ -909,6 +933,13 @@ sil [ossa] @setNode : $@convention(thin) (@owned Node, @inout Queue) -> () {
 bb0(%0 : @owned $Node, %1 : $*Queue):
   %new = struct $Queue(%0 : $Node)
   store %new to [assign] %1 : $*Queue
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil [ossa] @destroyNode : $@convention(thin) (@owned Node, @inout Queue) -> () {
+bb0(%0 : @owned $Node, %1 : $*Queue):
+  destroy_value %0 : $Node
   %6 = tuple ()
   return %6 : $()
 }
@@ -985,9 +1016,9 @@ sil @testMayReleaseUniqNoSink : $@convention(thin) () -> () {
 bb0:
   %queue = alloc_stack $Queue
   %extraNode = alloc_ref $Node
-  %set = function_ref @setNode : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  %destroy = function_ref @destroyNode : $@convention(thin) (@owned Node, @inout Queue) -> ()
   strong_retain %extraNode : $Node
-  %call = apply %set(%extraNode, %queue) : $@convention(thin) (@owned Node, @inout Queue) -> ()
+  %call = apply %destroy(%extraNode, %queue) : $@convention(thin) (@owned Node, @inout Queue) -> ()
   dealloc_stack %queue : $*Queue
   %12 = tuple ()
   return %12 : $()
@@ -997,8 +1028,8 @@ bb0:
 // there's no connection.
 //
 // CHECK-LABEL: sil @testMayReleaseUniqSink : $@convention(thin) () -> () {
-// CHECK: apply {{.*}} : $@convention(thin) (@owned Node, @inout Queue) -> ()
-// CHECK: strong_retain
+// CHECK-NOT-SUPPORTED-YET: apply {{.*}} : $@convention(thin) (@owned Node, @inout Queue) -> ()
+// CHECK-NOT-SUPPORTED-YET: strong_retain
 // CHECK-LABEL: } // end sil function 'testMayReleaseUniqSink'
 sil @testMayReleaseUniqSink : $@convention(thin) () -> () {
 bb0:

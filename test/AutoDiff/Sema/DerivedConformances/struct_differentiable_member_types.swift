@@ -12,4 +12,9 @@ protocol Protocol {
 struct Struct: Differentiable {
   var weight: Float
 }
+
+// Extending a synthesized type doesn't actually work because of circularity issues.
+// It just wasn't diagnosed before.
+
 extension Struct.TangentVector: Protocol {}
+// expected-error@-1 {{non-nominal type 'Struct.TangentVector' cannot be extended}}

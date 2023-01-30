@@ -167,7 +167,8 @@
     "Integers": [
       "Integers.swift",
       "IntegerTypes.swift",
-      "IntegerParsing.swift"],
+      "IntegerParsing.swift",
+      "StaticBigInt.swift"],
     "Floating": [
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",
@@ -187,6 +188,7 @@
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift",
+    "UnsafeBufferPointerSlice.swift",
     "UnsafeRawBufferPointer.swift"
   ],
   "Protocols": [
@@ -211,6 +213,7 @@
     "Identifiable.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
+    "Macros.swift",
     "ManagedBuffer.swift",
     "Misc.swift",
     "OptionSet.swift",

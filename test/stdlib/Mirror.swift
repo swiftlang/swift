@@ -589,8 +589,9 @@ func verifyWeakUnownedReflection
   verifyExistentialField(child: i.next()!, name: "unowned_unsafe_existential")
   expectNil(i.next())
 
-  // The original bug report from SR-5289 crashed when the print() code
-  // attempted to reflect the contents of an unowned field.
+  // The original bug report from https://github.com/apple/swift/issues/47864
+  // crashed when the print() code attempted to reflect the contents of an
+  // unowned field.
   // The tests above _should_ suffice to check this, but let's print everything
   // anyway just to be sure.
   for c in m.children {
@@ -599,9 +600,10 @@ func verifyWeakUnownedReflection
 }
 
 #if _runtime(_ObjC)
-// Related: SR-5289 reported a crash when using Mirror to inspect Swift
-// class objects containing unowned pointers to Obj-C class objects.
-mirrors.test("Weak and Unowned Obj-C refs in class (SR-5289)") {
+// Related: https://github.com/apple/swift/issues/47864 reported a crash when
+// using 'Mirror' to inspect Swift class objects containing unowned pointers
+// to Obj-C class objects.
+mirrors.test("Weak and Unowned Obj-C refs in class") {
   class SwiftClassWithWeakAndUnowned {
     var strong_class: WeakUnownedObjCClass
     var strong_existential: WeakUnownedTestsP1 & WeakUnownedTestsP2

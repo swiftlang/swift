@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "flow-isolation"
 
+#include "llvm/Support/WithColor.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -422,6 +423,15 @@ void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
   if (propertyUses.empty())
     return;
 
+  auto *fn = info.getFunction();
+  auto &ctx = fn->getASTContext();
+
+  // Disable these diagnostics in deinitializers unless complete checking is
+  // enabled.
+  if (forDeinit && ctx.LangOpts.StrictConcurrencyLevel
+        != StrictConcurrency::Complete)
+    return;
+
   // Blame that is valid for the first property use is valid for all uses
   // in this block.
   if (!blame)
@@ -438,7 +448,6 @@ void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
     }
   }
 
-  auto *fn = info.getFunction();
   auto &diag = fn->getASTContext().Diags;
 
   SILLocation blameLoc = blame->getDebugLocation().getLocation();

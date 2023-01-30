@@ -2,7 +2,6 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/SIL/SILDeclRef.h"
 #include <swift/APIDigester/ModuleAnalyzerNodes.h>
 #include <algorithm>
 
@@ -50,7 +49,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
   SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *D);
   SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID);
-  SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform);
+  SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform);
   SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info = TypeInitInfo());
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
@@ -108,7 +107,7 @@ SDKNode::SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind): Ctx(Info.Ctx),
 
 SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root),
   ToolArgs(Info.ToolArgs),
-  JsonFormatVer(Info.JsonFormatVer.hasValue() ? *Info.JsonFormatVer : DIGESTER_JSON_DEFAULT_VERSION) {}
+  JsonFormatVer(Info.JsonFormatVer.has_value() ? *Info.JsonFormatVer : DIGESTER_JSON_DEFAULT_VERSION) {}
 
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
       : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
@@ -173,6 +172,9 @@ SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclVar), IsLet(Info.IsLet),
   HasStorage(Info.HasStorage) {}
 
+SDKNodeDeclMacro::SDKNodeDeclMacro(SDKNodeInitInfo Info):
+  SDKNodeDecl(Info, SDKNodeKind::DeclMacro) {}
+
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
                      ReqNewWitnessTableEntry(Info.ReqNewWitnessTableEntry),
@@ -224,6 +226,10 @@ SDKNodeDeclAccessor *SDKNodeDeclSubscript::getAccessor(AccessorKind Kind) const 
 }
 
 SDKNodeType *SDKNodeDeclVar::getType() const {
+  return cast<SDKNodeType>(childAt(0));
+}
+
+SDKNodeType *SDKNodeDeclMacro::getType() const {
   return cast<SDKNodeType>(childAt(0));
 }
 
@@ -410,6 +416,7 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
     return SDKNodeDeclAbstractFunc::getTypeRoleDescription(Ctx,
       P->getChildIndex(this));
   case SDKNodeKind::DeclVar:
+  case SDKNodeKind::DeclMacro:
     return "declared";
   case SDKNodeKind::DeclTypeAlias:
     return "underlying";
@@ -994,6 +1001,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       LLVM_FALLTHROUGH;
     }
+    case SDKNodeKind::DeclMacro:
     case SDKNodeKind::Conformance:
     case SDKNodeKind::TypeWitness:
     case SDKNodeKind::DeclImport:
@@ -1348,7 +1356,7 @@ StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
 
 StringRef SDKContext::getObjcName(Decl *D) {
   if (auto *OC = D->getAttrs().getAttribute<ObjCAttr>()) {
-    if (OC->getName().hasValue()) {
+    if (OC->getName().has_value()) {
       SmallString<32> Buffer;
       return buffer(OC->getName()->getString(Buffer));
     }
@@ -1459,17 +1467,21 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID):
   Name = PrintedName = Ctx.buffer(content);
 }
 
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform):
-    SDKNodeInitInfo(Ctx, Conform->getProtocol()) {
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform):
+    SDKNodeInitInfo(Ctx, Conform.getRequirement()) {
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
-  GenericSig = printGenericSignature(Ctx, Conform, Ctx.checkingABI());
-  SugaredGenericSig = Ctx.checkingABI() ?
-    printGenericSignature(Ctx, Conform, false): StringRef();
-  // Whether this conformance is ABI placeholder depends on the decl context
-  // of this conformance.
-  IsABIPlaceholder = isABIPlaceholderRecursive(Conform->getDeclContext()->
-                                               getAsDecl());
+  if (Conform.isConcrete()) {
+    auto *Concrete = Conform.getConcrete();
+
+    GenericSig = printGenericSignature(Ctx, Concrete, Ctx.checkingABI());
+    SugaredGenericSig = Ctx.checkingABI() ?
+      printGenericSignature(Ctx, Concrete, false): StringRef();
+    // Whether this conformance is ABI placeholder depends on the decl context
+    // of this conformance.
+    IsABIPlaceholder = isABIPlaceholderRecursive(Concrete->getDeclContext()->
+                                                 getAsDecl());
+  }
 }
 
 static bool isProtocolRequirement(ValueDecl *VD) {
@@ -1487,7 +1499,7 @@ static bool isProtocolRequirement(ValueDecl *VD) {
 
 static bool requireWitnessTableEntry(ValueDecl *VD) {
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return SILDeclRef::requiresNewWitnessTableEntry(FD);
+    return FD->requiresNewWitnessTableEntry();
   }
   return false;
 }
@@ -1601,8 +1613,9 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
     // Still, return type first
     Root->addChild(constructTypeNode(Fun->getResult()));
 
-    auto Input = AnyFunctionType::composeTuple(Fun->getASTContext(),
-                                               Fun->getParams());
+    auto Input =
+        AnyFunctionType::composeTuple(Fun->getASTContext(), Fun->getParams(),
+                                      ParameterFlagHandling::IgnoreNonEmpty);
     Root->addChild(constructTypeNode(Input));
     return Root;
   }
@@ -1706,7 +1719,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       // Private vars with fixed binary orders can have ABI-impact, so we should
       // allowlist them if we're checking ABI.
-      if (getFixedBinaryOrder(VD).hasValue())
+      if (getFixedBinaryOrder(VD).has_value())
         return false;
       // Typealias should have no impact on ABI.
       if (isa<TypeAliasDecl>(VD))
@@ -1729,6 +1742,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
       return true;
+    case AccessLevel::Package:
     case AccessLevel::Public:
     case AccessLevel::Open:
       break;
@@ -1830,6 +1844,13 @@ SwiftDeclCollector::constructTypeAliasNode(TypeAliasDecl *TAD) {
 }
 
 SDKNode *swift::ide::api::
+SwiftDeclCollector::constructMacroNode(MacroDecl *MD) {
+  auto Macro = SDKNodeInitInfo(Ctx, MD).createSDKNode(SDKNodeKind::DeclMacro);
+  Macro->addChild(constructTypeNode(MD->getInterfaceType(), TypeInitInfo()));
+  return Macro;
+}
+
+SDKNode *swift::ide::api::
 SwiftDeclCollector::constructAssociatedTypeNode(AssociatedTypeDecl *ATD) {
   auto Asso = SDKNodeInitInfo(Ctx, ATD).
     createSDKNode(SDKNodeKind::DeclAssociatedType);
@@ -1909,7 +1930,7 @@ SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
   if (Ctx.checkingABI())
     Conform = Conform->getCanonicalConformance();
   auto ConfNode = cast<SDKNodeConformance>(SDKNodeInitInfo(Ctx,
-    Conform).createSDKNode(SDKNodeKind::Conformance));
+    ProtocolConformanceRef(Conform)).createSDKNode(SDKNodeKind::Conformance));
   Conform->forEachTypeWitness(
     [&](AssociatedTypeDecl *assoc, Type ty, TypeDecl *typeDecl) -> bool {
       ConfNode->addChild(constructTypeWitnessNode(assoc, ty));
@@ -1921,12 +1942,25 @@ SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
 void swift::ide::api::
 SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
                                               NominalTypeDecl *NTD) {
-  // Avoid adding the same conformance twice.
-  SmallPtrSet<ProtocolConformance*, 4> Seen;
-  for (auto &Conf: NTD->getAllConformances()) {
-    if (!Ctx.shouldIgnore(Conf->getProtocol()) && !Seen.count(Conf))
-      Root->addConformance(constructConformanceNode(Conf));
-    Seen.insert(Conf);
+  if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
+    PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
+      if (PD != inherited && !Ctx.shouldIgnore(inherited)) {
+        ProtocolConformanceRef Conf(inherited);
+        auto ConfNode = SDKNodeInitInfo(Ctx, Conf)
+            .createSDKNode(SDKNodeKind::Conformance);
+        Root->addConformance(ConfNode);
+      }
+
+      return TypeWalker::Action::Continue;
+    });
+  } else {
+    // Avoid adding the same conformance twice.
+    SmallPtrSet<ProtocolConformance*, 4> Seen;
+    for (auto &Conf: NTD->getAllConformances()) {
+      if (!Ctx.shouldIgnore(Conf->getProtocol()) && !Seen.count(Conf))
+        Root->addConformance(constructConformanceNode(Conf));
+      Seen.insert(Conf);
+    }
   }
 }
 
@@ -2011,6 +2045,8 @@ void SwiftDeclCollector::processValueDecl(ValueDecl *VD) {
     RootNode->addChild(constructVarNode(VAD));
   } else if (auto TAD = dyn_cast<TypeAliasDecl>(VD)) {
     RootNode->addChild(constructTypeAliasNode(TAD));
+  } else if (auto MD = dyn_cast<MacroDecl>(VD)) {
+    RootNode->addChild(constructMacroNode(MD));
   } else {
     llvm_unreachable("unhandled value decl");
   }
@@ -2369,16 +2405,17 @@ class ConstExtractor: public ASTWalker {
     }
     return false;
   }
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (E->isSemanticallyConstExpr()) {
       record(E, E);
-      return { false, E };
+      return Action::SkipChildren(E);
     }
     if (handleSimpleReference(E)) {
-      return { false, E };
+      return Action::SkipChildren(E);
     }
-    return { true, E };
+    return Action::Continue(E);
   }
+
 public:
   ConstExtractor(SDKContext &SCtx, ASTContext &Ctx): SCtx(SCtx),
     SM(Ctx.SourceMgr) {}
@@ -2674,7 +2711,7 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
           break;
         }
         auto result = isFromExtensionChanged(*this, *Right);
-        if (result.hasValue() && *result) {
+        if (result.has_value() && *result) {
           emitDiag(Loc, diag::class_member_moved_to_extension);
         }
         break;

@@ -10,7 +10,8 @@
 
 // REQUIRES: objc_interop
 
-// SR-3917
+// https://github.com/apple/swift/issues/46502
+
 import def_objc_conforming
 
 func test(x: Foo) { _ = x.badness }

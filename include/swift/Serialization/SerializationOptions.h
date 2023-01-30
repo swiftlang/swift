@@ -29,12 +29,13 @@ namespace swift {
     SerializationOptions &operator=(SerializationOptions &&) = default;
     ~SerializationOptions() = default;
 
-    const char *OutputPath = nullptr;
-    const char *DocOutputPath = nullptr;
-    const char *SourceInfoOutputPath = nullptr;
+    StringRef OutputPath;
+    StringRef DocOutputPath;
+    StringRef SourceInfoOutputPath;
     std::string ABIDescriptorPath;
     bool emptyABIDescriptor = false;
     llvm::VersionTuple UserModuleVersion;
+    std::set<std::string> AllowableClients;
     std::string SDKName;
 
     StringRef GroupInfoPath;

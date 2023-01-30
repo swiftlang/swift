@@ -65,8 +65,8 @@ bb2(%result_error : $Error):
 // CHECK: SIL verification failed: cannot call an async function from a non async function: !calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync()
 // CHECK: Verifying instruction:
 // CHECK:      // function_ref asynccallee2
-// CHECK:   %0 = function_ref @asynccallee2 : $@convention(thin) @async () -> ((), @error Error) // user: %1
-// CHECK: ->  try_apply %0() : $@convention(thin) @async () -> ((), @error Error), normal bb1, error bb2 // id: %1
+// CHECK:   %0 = function_ref @asynccallee2 : $@convention(thin) @async () -> ((), @error any Error) // user: %1
+// CHECK: ->  try_apply %0() : $@convention(thin) @async () -> ((), @error any Error), normal bb1, error bb2 // id: %1
 // CHECK-LABEL: End Error in function nonasync_try_apply_caller
 sil [ossa] @nonasync_try_apply_caller : $@convention(thin) () -> () {
 bb0:

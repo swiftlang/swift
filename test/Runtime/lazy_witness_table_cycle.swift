@@ -2,7 +2,8 @@
 // REQUIRES: executable_test
 // REQUIRES: foundation
 
-// SR-5958
+// https://github.com/apple/swift/issues/48517
+
 import Foundation
 
 public struct Property: Equatable, Hashable, Codable {

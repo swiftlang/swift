@@ -206,8 +206,11 @@ template <class Fn>
 static bool withStatusRecordLock(AsyncTask *task,
                                  LockContext lockContext,
                                  Fn &&fn) {
+  auto loadOrdering = getLoadOrdering(lockContext);
   ActiveTaskStatus status =
-    task->_private()._status().load(getLoadOrdering(lockContext));
+    task->_private()._status().load(loadOrdering);
+  if (loadOrdering == std::memory_order_acquire)
+    _swift_tsan_acquire(task);
   return withStatusRecordLock(task, lockContext, status, [&] {
     fn(status);
   });
@@ -242,6 +245,7 @@ bool swift::addStatusRecord(
       // We have to use a release on success to make the initialization of
       // the new record visible to an asynchronous thread trying to modify the
       // status records
+      _swift_tsan_release(task);
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
@@ -383,7 +387,9 @@ static void swift_taskGroup_attachChildImpl(TaskGroup *group,
   // Acquire the status record lock of parent - we want to synchronize with
   // concurrent cancellation or escalation as we're adding new tasks to the
   // group.
-  auto parent = swift_task_getCurrent();
+  auto parent = child->childFragment()->getParent();
+  assert(parent == swift_task_getCurrent());
+
   withStatusRecordLock(parent, LockContext::OnTask, [&](ActiveTaskStatus &parentStatus) {
     group->addChildTask(child);
 
@@ -396,6 +402,18 @@ static void swift_taskGroup_attachChildImpl(TaskGroup *group,
     // child task to a TaskGroupRecord instead, we synchronize on the
     // parent's task status and then update the child.
     updateNewChildWithParentAndGroupState(child, parentStatus, group);
+  });
+}
+
+void swift::_swift_taskGroup_detachChild(TaskGroup *group,
+                                         AsyncTask *child) {
+  // We are called synchronously from the perspective of the owning task.
+  // That doesn't necessarily mean the owning task *is* the current task,
+  // though, just that it's not concurrently running.
+  auto parent = child->childFragment()->getParent();
+
+  withStatusRecordLock(parent, LockContext::OnTask, [&](ActiveTaskStatus &parentStatus) {
+    group->removeChildTask(child);
   });
 }
 
@@ -417,10 +435,12 @@ static void performCancellationAction(TaskStatusRecord *record) {
     return;
   }
 
+  // Task groups need their children to be cancelled.  Note that we do
+  // not want to formally cancel the task group itself; that property is
+  // under the synchronous control of the task that owns the group.
   case TaskStatusRecordKind::TaskGroup: {
-    auto childRecord = cast<TaskGroupTaskStatusRecord>(record);
-    for (AsyncTask *child: childRecord->children())
-      swift_task_cancel(child);
+    auto groupRecord = cast<TaskGroupTaskStatusRecord>(record);
+    _swift_taskGroup_cancelAllChildren(groupRecord->getGroup());
     return;
   }
 
@@ -460,9 +480,19 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     // Set cancelled bit even if oldStatus.isStatusRecordLocked()
     newStatus = oldStatus.withCancelled();
 
+    // Perform an acquire operation on success, which pairs with the release
+    // operation in addStatusRecord. This ensures that the contents of the
+    // status records are visible to this thread, as well as the contents of any
+    // cancellation handlers and the data they access. We place this acquire
+    // barrier here, because the subsequent call to `withStatusRecordLock` might
+    // not have its own acquire barrier. We're calling the four-argument version
+    // which relies on the caller to have performed the first load, and if the
+    // compare_exchange operation in withStatusRecordLock succeeds the first
+    // time, then it won't perform an acquire.
     if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
-            /*success*/ std::memory_order_relaxed,
+            /*success*/ std::memory_order_acquire,
             /*failure*/ std::memory_order_relaxed)) {
+      _swift_tsan_acquire(task);
       break;
     }
   }
@@ -477,22 +507,6 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     for (auto cur : newStatus.records()) {
       performCancellationAction(cur);
     }
-  });
-}
-
-SWIFT_CC(swift)
-static void swift_task_cancel_group_child_tasksImpl(TaskGroup *group) {
-  // Acquire the status record lock.
-  //
-  // Guaranteed to be called from the context of the parent task that created
-  // the task group once we have #40616
-  auto task = swift_task_getCurrent();
-  withStatusRecordLock(task, LockContext::OnTask,
-                       [&](ActiveTaskStatus &status) {
-    // We purposefully DO NOT make this a cancellation by itself.
-    // We are cancelling the task group, and all tasks it contains.
-    // We are NOT cancelling the entire parent task though.
-    performCancellationAction(group->getTaskRecord());
   });
 }
 

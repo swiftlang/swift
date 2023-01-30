@@ -169,6 +169,12 @@ enum IsInfiniteType_t : bool {
   IsInfiniteType = true,
 };
 
+/// Does this type contain at least one non-trivial, non-eager-move type?
+enum IsLexical_t : bool {
+  IsNotLexical = false,
+  IsLexical = true,
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -184,6 +190,7 @@ public:
       TypeExpansionSensitiveFlag = 1 << 4,
       InfiniteFlag               = 1 << 5,
       HasRawPointerFlag          = 1 << 6,
+      LexicalFlag                = 1 << 7,
     };
     // clang-format on
 
@@ -198,13 +205,15 @@ public:
         IsAddressOnly_t isAddressOnly, IsResilient_t isResilient,
         IsTypeExpansionSensitive_t isTypeExpansionSensitive =
             IsNotTypeExpansionSensitive,
-        HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer)
+        HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
+        IsLexical_t isLexical = IsNotLexical)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
                 (isResilient ? ResilientFlag : 0U) |
                 (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
-                (hasRawPointer ? HasRawPointerFlag : 0U)) {}
+                (hasRawPointer ? HasRawPointerFlag : 0U) |
+                (isLexical ? LexicalFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -220,11 +229,13 @@ public:
     }
 
     static constexpr RecursiveProperties forReference() {
-      return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient};
+      return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
+              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical};
     }
 
     static constexpr RecursiveProperties forOpaque() {
-      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient};
+      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
+              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical};
     }
 
     static constexpr RecursiveProperties forResilient() {
@@ -257,6 +268,9 @@ public:
     IsInfiniteType_t isInfinite() const {
       return IsInfiniteType_t((Flags & InfiniteFlag) != 0);
     }
+    IsLexical_t isLexical() const {
+      return IsLexical_t((Flags & LexicalFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
@@ -267,14 +281,21 @@ public:
               (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0);
     }
     void setInfinite() { Flags |= InfiniteFlag; }
+    void setLexical(IsLexical_t isLexical) {
+      Flags = (Flags & ~LexicalFlag) | (isLexical ? LexicalFlag : 0);
+    }
   };
 
 private:
   friend class TypeConverter;
 
-  /// The SIL type of values with this Swift type.
-  SILType LoweredType;
+  virtual void setLoweredAddresses() const {}
 
+protected:
+  /// The SIL type of values with this Swift type.
+  mutable SILType LoweredType;
+
+private:
   RecursiveProperties Properties;
 
   /// The resilience expansion for this type lowering.
@@ -366,6 +387,11 @@ public:
   /// type is lowered if we could look through to the underlying type.
   bool isTypeExpansionSensitive() const {
     return Properties.isTypeExpansionSensitive();
+  }
+
+  /// Should a value of this type have its lifetime tied to its lexical scope?
+  bool isLexical() const {
+    return Properties.isLexical();
   }
 
   ResilienceExpansion getResilienceExpansion() const {
@@ -756,6 +782,9 @@ class TypeConverter {
   void removeNullEntry(const TypeKey &k);
 #endif
 
+  /// True if SIL conventions force address-only to be passed by address.
+  bool LoweredAddresses;
+
   CanGenericSignature CurGenericSignature;
 
   /// Stack of types currently being lowered as part of an aggregate.
@@ -802,7 +831,7 @@ public:
   ModuleDecl &M;
   ASTContext &Context;
 
-  TypeConverter(ModuleDecl &m);
+  TypeConverter(ModuleDecl &m, bool loweredAddresses = true);
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
@@ -1196,6 +1225,9 @@ public:
   
   void setCaptureTypeExpansionContext(SILDeclRef constant,
                                       SILModule &M);
+
+  void setLoweredAddresses();
+
 private:
   CanType computeLoweredRValueType(TypeExpansionContext context,
                                    AbstractionPattern origType,
@@ -1223,6 +1255,21 @@ private:
                                CanType result,
                                Bridgeability bridging,
                                bool suppressOptional);
+#ifndef NDEBUG
+  /// Check the result of
+  /// getTypeLowering(AbstractionPattern,Type,TypeExpansionContext).
+  void verifyLowering(const TypeLowering &, AbstractionPattern origType,
+                      Type origSubstType, TypeExpansionContext forExpansion);
+  bool
+  visitAggregateLeaves(Lowering::AbstractionPattern origType, Type substType,
+                       TypeExpansionContext context,
+                       std::function<bool(Type, Lowering::AbstractionPattern,
+                                          ValueDecl *, Optional<unsigned>)>
+                           isLeafAggregate,
+                       std::function<bool(Type, Lowering::AbstractionPattern,
+                                          ValueDecl *, Optional<unsigned>)>
+                           visit);
+#endif
 };
 
 } // namespace Lowering

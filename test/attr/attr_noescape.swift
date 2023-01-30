@@ -255,7 +255,9 @@ public func XCTAssert(_ expression: @autoclosure () -> Bool, _ message: String =
 
 
 
-/// SR-770 - Currying and `noescape`/`rethrows` don't work together anymore
+/// https://github.com/apple/swift/issues/43382
+/// Currying and `noescape`/`rethrows` don't work together anymore
+
 func curriedFlatMap<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-error 1{{unknown attribute 'noescape'}}
   return { f in
     x.flatMap(f)
@@ -276,8 +278,8 @@ func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int { // ex
 }
 
 
-// SR-824 - @noescape for Type Aliased Closures
-//
+/// https://github.com/apple/swift/issues/43436
+/// `@noescape` for type-aliased closures
 
 // Old syntax -- @noescape is the default, and is redundant
 typealias CompletionHandlerNE = @noescape (_ success: Bool) -> () // expected-error{{unknown attribute 'noescape'}}

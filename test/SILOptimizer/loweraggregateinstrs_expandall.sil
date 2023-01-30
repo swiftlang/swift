@@ -164,7 +164,7 @@ bb0(%0 : $*E):
 // CHECK: return
 sil @expand_copy_addr_takeinit : $@convention(thin) (@inout S, @inout S) -> () {
 bb0(%0 : $*S, %1 : $*S):
-  copy_addr [take] %0 to [initialization] %1 : $*S
+  copy_addr [take] %0 to [init] %1 : $*S
   %2 = tuple()
   return %2 : $()
 }
@@ -185,7 +185,7 @@ bb0(%0 : $*S, %1 : $*S):
 // CHECK: } // end sil function 'expand_copy_addr_init'
 sil @expand_copy_addr_init : $@convention(thin) (@inout S, @inout S) -> () {
 bb0(%0 : $*S, %1 : $*S):
-  copy_addr %0 to [initialization] %1 : $*S
+  copy_addr %0 to [init] %1 : $*S
   %2 = tuple()
   return %2 : $()
 }
@@ -330,7 +330,7 @@ bb0(%0 : $*(S, S2, C1, E), %1 : $*(S, S2, C1, E)):
 // CHECK: } // end sil function 'expand_copy_addr_addressonly'
 sil @expand_copy_addr_addressonly : $@convention(thin) <T> (@inout T) -> () {
 bb0(%0 : $*T):
-  copy_addr [take] %0 to [initialization] %0 : $*T
+  copy_addr [take] %0 to [init] %0 : $*T
   %1 = tuple()
   return %1 : $()
 }

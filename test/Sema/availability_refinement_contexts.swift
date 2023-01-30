@@ -3,7 +3,7 @@
 
 // REQUIRES: OS=macosx
 
-// CHECK: {{^}}(root versions=[10.{{[0-9]+}}.0,+Inf)
+// CHECK: {{^}}(root versions=[10.{{[0-9]+}},+Inf)
 
 // CHECK-NEXT: {{^}}  (decl versions=[10.51,+Inf) decl=SomeClass
 // CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=someMethod()

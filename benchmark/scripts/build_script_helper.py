@@ -16,7 +16,7 @@ def perform_build(args, swiftbuild_path, config, binary_name, opt_flag):
         swiftbuild_path,
         "--package-path",
         args.package_path,
-        "--build-path",
+        "--scratch-path",
         inner_build_dir,
         "--configuration",
         config,

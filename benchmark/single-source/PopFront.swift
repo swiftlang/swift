@@ -52,7 +52,7 @@ public func run_PopFrontUnsafePointer(_ n: Int) {
       var count = arrayCount
       while count != 0 {
         result += a[0]
-        a.assign(from: a + 1, count: count - 1)
+        a.update(from: a + 1, count: count - 1)
         count -= 1
       }
       check(result == arrayCount)

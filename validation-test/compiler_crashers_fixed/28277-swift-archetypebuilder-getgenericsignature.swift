@@ -1,5 +1,5 @@
 // NOTE: This test does NOT run under Address Sanitizer because it triggers
-// a heap use-after-free (SR-1070).
+// a heap use-after-free (https://github.com/apple/swift/issues/43682).
 
 // This source file is part of the Swift.org open source project
 // Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors

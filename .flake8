@@ -16,7 +16,6 @@ filename =
 
     ./utils/80+-check,
     ./utils/backtrace-check,
-    ./utils/build-parser-lib,
     ./utils/build-script,
     ./utils/check-incremental,
     ./utils/coverage/coverage-build-db,
@@ -50,9 +49,6 @@ ignore =
     # The black tool treats slices consistently, the E203 warning is not PEP8
     # compliant (https://github.com/psf/black#slices).
     E203,
-
-    # FIXME: We should not have trailing whitespace.
-    W291,
 
     # Line breaks before binary operators are not explicitly disallowed in
     # PEP8, rather it should be consistent throughout the project. The black

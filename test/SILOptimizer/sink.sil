@@ -226,13 +226,13 @@ public protocol P : class {
 // CHECK: metatype
 sil @dont_sink_open_existential : $@convention(thin) (@owned P) -> () {
 bb0(%0 : $P):
-  %1 = open_existential_ref %0 : $P to $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P
-  %2 = metatype $@thick (@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P).Type
-  %3 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P, #P.foo, %1 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %1 = open_existential_ref %0 : $P to $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self
+  %2 = metatype $@thick (@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self).Type
+  %3 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self, #P.foo, %1 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
   br bb1
 
 bb1:
-  %4 = apply %3<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P>(%1) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  %4 = apply %3<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self>(%1) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
   strong_release %0 : $P
   %5 = tuple ()
   return %5 : $()

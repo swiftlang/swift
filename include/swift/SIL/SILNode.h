@@ -122,7 +122,7 @@ public:
   enum { NumAssignOwnershipQualifierBits = 2 };
   enum { NumAssignByWrapperModeBits = 2 };
   enum { NumSILAccessKindBits = 2 };
-  enum { NumSILAccessEnforcementBits = 2 };
+  enum { NumSILAccessEnforcementBits = 3 };
   enum { NumAllocRefTailTypesBits = 4 };
 
 protected:
@@ -194,6 +194,8 @@ protected:
     SHARED_FIELD(EndAccessInst, bool aborting);
     SHARED_FIELD(RefElementAddrInst, bool immutable);
     SHARED_FIELD(RefTailAddrInst, bool immutable);
+    SHARED_FIELD(AddressToPointerInst, bool needsStackProtection);
+    SHARED_FIELD(IndexAddrInst, bool needsStackProtection);
     SHARED_FIELD(HopToExecutorInst, bool mandatory);
     SHARED_FIELD(DestroyValueInst, bool poisonRefs);
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
@@ -202,7 +204,8 @@ protected:
 
     SHARED_FIELD(DebugValueInst, uint8_t
       poisonRefs : 1,
-      operandWasMoved : 1);
+      operandWasMoved : 1,
+      trace : 1);
 
     SHARED_FIELD(AllocStackInst, uint8_t
       dynamicLifetime : 1,
@@ -216,6 +219,10 @@ protected:
       numTailTypes: NumAllocRefTailTypesBits);
 
     SHARED_FIELD(CopyAddrInst, uint8_t
+      isTakeOfSrc : 1,
+      isInitializationOfDest : 1);
+
+    SHARED_FIELD(ExplicitCopyAddrInst, uint8_t
       isTakeOfSrc : 1,
       isInitializationOfDest : 1);
 
@@ -260,8 +267,10 @@ protected:
     SHARED_FIELD(FloatLiteralInst, uint32_t numBits);
     SHARED_FIELD(StringLiteralInst, uint32_t length);
     SHARED_FIELD(PointerToAddressInst, uint32_t alignment);
+    SHARED_FIELD(SILFunctionArgument, uint32_t noImplicitCopy : 1,
+                 lifetimeAnnotation : 2, closureCapture : 1);
 
-  // Do not use `_sharedUInt32_private` outside of SILNode.
+    // Do not use `_sharedUInt32_private` outside of SILNode.
   } _sharedUInt32_private;
 
   static_assert(sizeof(SharedUInt32Fields) == sizeof(uint32_t),
@@ -323,8 +332,13 @@ protected:
   /// -> AAA, BB and C are initialized,
   ///    DD and EEE are uninitialized
   ///
+  /// If the ID is negative, it means that the node (in case it's an instruction)
+  /// is deleted, i.e. it does not belong to the function anymore. Conceptually
+  /// this results in setting all bitfields to zero, which e.g. "removes" the
+  /// node from all NodeSets.
+  ///
   /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
-  uint64_t lastInitializedBitfieldID = 0;
+  int64_t lastInitializedBitfieldID = 0;
 
 private:
   SwiftMetatype getSILNodeMetatype(SILNodeKind kind);
@@ -382,13 +396,19 @@ public:
     lastInitializedBitfieldID = 0;
   }
 
+  void markAsDeleted() {
+    lastInitializedBitfieldID = -1;
+  }
+
+  bool isMarkedAsDeleted() const { return lastInitializedBitfieldID < 0; }
+
   static SILNode *instAsNode(SILInstruction *inst);
   static const SILNode *instAsNode(const SILInstruction *inst);
 
   static bool classof(SILNodePointer node) { return true; }
 };
 
-static_assert(sizeof(SILNode) <= 4 * sizeof(void *),
+static_assert(sizeof(SILNode) <= 4 * sizeof(uint64_t),
               "SILNode must stay small");
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

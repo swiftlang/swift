@@ -22,3 +22,13 @@ module CenumsNSOptions {
   header "c-enums-NS_OPTIONS.h"
   requires cplusplus
 }
+
+module TypedUntypedEnums {
+  header "typed-untyped-enums.h"
+  requires cplusplus
+}
+
+module CenumsNSOptionsExternC [extern_c] {
+  header "c-enums-NS_OPTIONS_without_extern_C.h"
+  requires cplusplus
+}

@@ -155,7 +155,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // TODO: There may be some way of sinking this into the loop below.
   //
   // FIXME: The haveAnyLocalScopes and destroy.empty() checks are relics of
-  // attempts to handle dead end blocks during areUsesWithinTransitiveScope. If
+  // attempts to handle dead end blocks during areUsesWithinExtendedScope. If
   // we don't use dead end blocks at all, they should not be relevant.
   bool haveAnyLocalScopes =
       llvm::any_of(borrowScopeIntroducers, [](BorrowedValue borrowScope) {
@@ -172,7 +172,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   // destroy_values. Check if:
   //
   // 1. All of our destroys are joint post-dominated by our end borrow scope
-  //    set. If they do not, then the copy_value is lifetime extending the
+  //    set. If they are not, then the copy_value is lifetime extending the
   //    guaranteed value, we can not eliminate it.
   //
   // 2. If all of our destroy_values are dead end. In such a case, the linear
@@ -182,14 +182,13 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   //    need to insert an end_borrow since all of our borrow introducers are
   //    non-local scopes.
   //
-  // The call to areUsesWithinTransitiveScope cannot consider dead-end blocks. A
+  // The call to areUsesWithinExtendedScope cannot consider dead-end blocks. A
   // local borrow scope requires all its inner uses to be inside the borrow
   // scope, regardless of whether the end of the scope is inside a dead-end
   // block.
   {
-    SmallVector<Operand *, 8> scratchSpace;
     if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-          return !borrowScope.areUsesWithinTransitiveScope(
+          return !borrowScope.areUsesWithinExtendedScope(
               lr.getAllConsumingUses(), nullptr);
         })) {
       return false;
@@ -218,7 +217,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
       }
 
       if (llvm::any_of(borrowScopeIntroducers, [&](BorrowedValue borrowScope) {
-            return !borrowScope.areUsesWithinTransitiveScope(
+            return !borrowScope.areUsesWithinExtendedScope(
                 phiArgLR.getAllConsumingUses(), nullptr);
           })) {
         return false;

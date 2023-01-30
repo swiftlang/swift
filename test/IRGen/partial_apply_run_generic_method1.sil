@@ -63,7 +63,7 @@ sil hidden [ossa] @generic_function : $@convention(method) <T> (@in_guaranteed T
 bb0(%0 : $*T, %1 : $*T, %2 : @guaranteed $C):
   debug_value %1 : $*T, let, name "t", argno 1 , expr op_deref
   debug_value %2 : $C, let, name "self", argno 2  
-  copy_addr %1 to [initialization] %0 : $*T       
+  copy_addr %1 to [init] %0 : $*T       
   %6 = tuple ()                                   
   return %6 : $()                                 
 } 

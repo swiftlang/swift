@@ -14,13 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Availability.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Types.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include <map>
 
 using namespace swift;
@@ -61,9 +62,9 @@ static bool
 mergeIntoInferredVersion(const Optional<llvm::VersionTuple> &Version,
                          Optional<llvm::VersionTuple> &Inferred,
                          MergeFunction Merge) {
-  if (Version.hasValue()) {
-    if (Inferred.hasValue()) {
-      Inferred = Merge(Inferred.getValue(), Version.getValue());
+  if (Version.has_value()) {
+    if (Inferred.has_value()) {
+      Inferred = Merge(Inferred.value(), Version.value());
       return *Inferred == *Version;
     } else {
       Inferred = Version;
@@ -95,32 +96,40 @@ static void mergeWithInferredAvailability(const AvailableAttr *Attr,
 
 /// Create an implicit availability attribute for the given platform
 /// and with the inferred availability.
-static AvailableAttr *
-createAvailableAttr(PlatformKind Platform,
-                       const InferredAvailability &Inferred,
-                       ASTContext &Context) {
+static AvailableAttr *createAvailableAttr(PlatformKind Platform,
+                                          const InferredAvailability &Inferred,
+                                          StringRef Message, 
+                                          StringRef Rename,
+                                          ValueDecl *RenameDecl,
+                                          ASTContext &Context) {
 
   llvm::VersionTuple Introduced =
-      Inferred.Introduced.getValueOr(llvm::VersionTuple());
+      Inferred.Introduced.value_or(llvm::VersionTuple());
   llvm::VersionTuple Deprecated =
-      Inferred.Deprecated.getValueOr(llvm::VersionTuple());
+      Inferred.Deprecated.value_or(llvm::VersionTuple());
   llvm::VersionTuple Obsoleted =
-      Inferred.Obsoleted.getValueOr(llvm::VersionTuple());
+      Inferred.Obsoleted.value_or(llvm::VersionTuple());
 
-  return new (Context) AvailableAttr(
-      SourceLoc(), SourceRange(), Platform,
-      /*Message=*/StringRef(),
-      /*Rename=*/StringRef(), /*RenameDecl=*/nullptr,
-        Introduced, /*IntroducedRange=*/SourceRange(),
-        Deprecated, /*DeprecatedRange=*/SourceRange(),
-        Obsoleted, /*ObsoletedRange=*/SourceRange(),
-      Inferred.PlatformAgnostic, /*Implicit=*/true,
-      Inferred.IsSPI);
+  return new (Context)
+      AvailableAttr(SourceLoc(), SourceRange(), Platform,
+                    Message, Rename, RenameDecl,
+                    Introduced, /*IntroducedRange=*/SourceRange(),
+                    Deprecated, /*DeprecatedRange=*/SourceRange(),
+                    Obsoleted, /*ObsoletedRange=*/SourceRange(),
+                    Inferred.PlatformAgnostic, /*Implicit=*/true,
+                    Inferred.IsSPI);
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(
     Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls,
     ASTContext &Context) {
+
+  // Let the new AvailabilityAttr inherit the message and rename.
+  // The first encountered message / rename will win; this matches the 
+  // behaviour of diagnostics for 'non-inherited' AvailabilityAttrs.
+  StringRef Message;
+  StringRef Rename;
+  ValueDecl *RenameDecl = nullptr;
 
   // Iterate over the declarations and infer required availability on
   // a per-platform basis.
@@ -132,6 +141,14 @@ void AvailabilityInference::applyInferredAvailableAttrs(
         continue;
 
       mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->Platform]);
+
+      if (Message.empty() && !AvAttr->Message.empty())
+        Message = AvAttr->Message;
+
+      if (Rename.empty() && !AvAttr->Rename.empty()) {
+        Rename = AvAttr->Rename;
+        RenameDecl = AvAttr->RenameDecl;
+      }
     }
   }
 
@@ -139,9 +156,30 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   // to ToDecl.
   DeclAttributes &Attrs = ToDecl->getAttrs();
   for (auto &Pair : Inferred) {
-    auto *Attr = createAvailableAttr(Pair.first, Pair.second, Context);
+    auto *Attr = createAvailableAttr(Pair.first, Pair.second, Message,
+                                     Rename, RenameDecl, Context);
+
     Attrs.add(Attr);
   }
+}
+
+/// Returns the decl that should be considered the parent decl of the given decl
+/// when looking for inherited availability annotations.
+static Decl *parentDeclForAvailability(const Decl *D) {
+  if (auto *AD = dyn_cast<AccessorDecl>(D))
+    return AD->getStorage();
+
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    if (auto *NTD = ED->getExtendedNominal())
+      return NTD;
+  }
+
+  // Clang decls may be inaccurately parented rdar://53956555
+  if (D->hasClangNode())
+    return nullptr;
+
+  // Availability is inherited from the enclosing context.
+  return D->getDeclContext()->getInnermostDeclarationDeclContext();
 }
 
 /// Returns true if the introduced version in \p newAttr should be used instead
@@ -157,20 +195,21 @@ static bool isBetterThan(const AvailableAttr *newAttr,
 
   // If they belong to the same platform, the one that introduces later wins.
   if (prevAttr->Platform == newAttr->Platform)
-    return prevAttr->Introduced.getValue() < newAttr->Introduced.getValue();
+    return prevAttr->Introduced.value() < newAttr->Introduced.value();
 
   // If the new attribute's platform inherits from the old one, it wins.
   return inheritsAvailabilityFromPlatform(newAttr->Platform,
                                           prevAttr->Platform);
 }
 
-Optional<AvailabilityContext>
-AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
+const AvailableAttr *
+AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D,
+                                                      ASTContext &Ctx) {
   const AvailableAttr *bestAvailAttr = nullptr;
 
   for (auto Attr : D->getAttrs()) {
     auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
-    if (AvailAttr == nullptr || !AvailAttr->Introduced.hasValue() ||
+    if (AvailAttr == nullptr || !AvailAttr->Introduced.has_value() ||
         !AvailAttr->isActivePlatform(Ctx) ||
         AvailAttr->isLanguageVersionSpecific() ||
         AvailAttr->isPackageDescriptionVersionSpecific()) {
@@ -181,17 +220,65 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
       bestAvailAttr = AvailAttr;
   }
 
+  return bestAvailAttr;
+}
+
+Optional<AvailableAttrDeclPair>
+SemanticAvailableRangeAttrRequest::evaluate(Evaluator &evaluator,
+                                            const Decl *decl) const {
+  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(
+          decl, decl->getASTContext()))
+    return std::make_pair(attr, decl);
+
+  if (auto *parent = parentDeclForAvailability(decl))
+    return parent->getSemanticAvailableRangeAttr();
+
+  return None;
+}
+
+Optional<AvailableAttrDeclPair> Decl::getSemanticAvailableRangeAttr() const {
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, SemanticAvailableRangeAttrRequest{this}, None);
+}
+
+Optional<AvailabilityContext>
+AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
+  auto bestAvailAttr = attrForAnnotatedAvailableRange(D, Ctx);
   if (!bestAvailAttr)
     return None;
 
-  return AvailabilityContext{
-    VersionRange::allGTE(bestAvailAttr->Introduced.getValue()),
-    bestAvailAttr->IsSPI};
+  return availableRange(bestAvailAttr, Ctx);
 }
 
 bool Decl::isAvailableAsSPI() const {
   return AvailabilityInference::availableRange(this, getASTContext())
     .isAvailableAsSPI();
+}
+
+Optional<AvailableAttrDeclPair>
+SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator,
+                                         const Decl *decl) const {
+  // Directly marked unavailable.
+  if (auto attr = decl->getAttrs().getUnavailable(decl->getASTContext()))
+    return std::make_pair(attr, decl);
+
+  if (auto *parent = parentDeclForAvailability(decl))
+    return parent->getSemanticUnavailableAttr();
+
+  return None;
+}
+
+Optional<AvailableAttrDeclPair> Decl::getSemanticUnavailableAttr() const {
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, SemanticUnavailableAttrRequest{this}, None);
+}
+
+bool UnavailabilityReason::requiresDeploymentTargetOrEarlier(
+    ASTContext &Ctx) const {
+  return RequiredDeploymentRange.getLowerEndpoint() <=
+         AvailabilityContext::forDeploymentTarget(Ctx)
+             .getOSVersion()
+             .getLowerEndpoint();
 }
 
 AvailabilityContext
@@ -201,7 +288,7 @@ AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr
   const AvailableAttr *bestAvailAttr = nullptr;
 
   for (auto *availAttr : attr->getAvailableAttrs()) {
-    if (availAttr == nullptr || !availAttr->Introduced.hasValue() ||
+    if (availAttr == nullptr || !availAttr->Introduced.has_value() ||
         !availAttr->isActivePlatform(ctx) ||
         availAttr->isLanguageVersionSpecific() ||
         availAttr->isPackageDescriptionVersionSpecific()) {
@@ -212,11 +299,8 @@ AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr
       bestAvailAttr = availAttr;
   }
 
-  if (bestAvailAttr) {
-    return AvailabilityContext{
-      VersionRange::allGTE(bestAvailAttr->Introduced.getValue())
-    };
-  }
+  if (bestAvailAttr)
+    return availableRange(bestAvailAttr, ctx);
 
   return AvailabilityContext::alwaysAvailable();
 }
@@ -225,8 +309,8 @@ AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
                                                           ASTContext &Ctx) {
   Optional<AvailabilityContext> AnnotatedRange =
       annotatedAvailableRange(D, Ctx);
-  if (AnnotatedRange.hasValue()) {
-    return AnnotatedRange.getValue();
+  if (AnnotatedRange.has_value()) {
+    return AnnotatedRange.value();
   }
 
   // Unlike other declarations, extensions can be used without referring to them
@@ -240,13 +324,21 @@ AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
   DeclContext *DC = D->getDeclContext();
   if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
     AnnotatedRange = annotatedAvailableRange(ED, Ctx);
-    if (AnnotatedRange.hasValue()) {
-      return AnnotatedRange.getValue();
+    if (AnnotatedRange.has_value()) {
+      return AnnotatedRange.value();
     }
   }
 
   // Treat unannotated declarations as always available.
   return AvailabilityContext::alwaysAvailable();
+}
+
+AvailabilityContext
+AvailabilityInference::availableRange(const AvailableAttr *attr,
+                                      ASTContext &Ctx) {
+  assert(attr->isActivePlatform(Ctx));
+  return AvailabilityContext{VersionRange::allGTE(attr->Introduced.value()),
+                             attr->IsSPI};
 }
 
 namespace {

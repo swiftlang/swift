@@ -75,7 +75,8 @@ extension _SmallString {
     return nil
 #else
     guard _isObjCTaggedPointer(ns) else { return nil }
-    self.init(taggedCocoa: ns)
+    self = (ns as String)._guts.asSmall //regular tagged NSStrings are guaranteed to bridge to SmallStrings
+    assert(_StringGuts(self).isSmall)
 #endif
   }
 #endif

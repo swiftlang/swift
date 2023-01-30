@@ -776,7 +776,7 @@ tests.test("Remainder/DividingBy0") {
 }
 
 tests.test("RemainderReportingOverflow/DividingByMinusOne") {
-  // Work around SR-5964.
+  // Work around https://github.com/apple/swift/issues/48523.
   func minusOne<T : SignedInteger>() -> T {
     return -1 as T
   }
@@ -844,7 +844,7 @@ tests.test("Strideable") {
   expectEqual(dist(${u}Int.max, ${u}x), -10)
 
   // FIXME: The compiler spuriously flags these as overflowing:
-  // https://bugs.swift.org/browse/SR-5882
+  // https://github.com/apple/swift/issues/48452
   // expectEqual(${u}x.distance(to: ${u}Int.max), 10)
 % end
 

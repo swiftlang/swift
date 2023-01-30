@@ -228,7 +228,7 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
 }
 
 // FIXME: This stuff should be merged with the existing logic in
-// include/swift/Reflection/TypeRefBuilder.h as part of the rewrite
+// include/swift/RemoteInspection/TypeRefBuilder.h as part of the rewrite
 // to change stdlib reflection over to using remote mirrors.
 
 Demangle::NodePointer

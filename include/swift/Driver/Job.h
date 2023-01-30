@@ -417,7 +417,7 @@ public:
   static void printArguments(raw_ostream &Stream,
                              const llvm::opt::ArgStringList &Args);
 
-  bool hasResponseFile() const { return ResponseFile.hasValue(); }
+  bool hasResponseFile() const { return ResponseFile.has_value(); }
 
   bool writeArgsToResponseFile() const;
 

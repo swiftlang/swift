@@ -17,11 +17,7 @@ if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(Sema)
   add_subdirectory(SIL)
   add_subdirectory(SwiftDemangle)
-  add_subdirectory(Syntax)
 
-  if(SWIFT_BUILD_SYNTAXPARSERLIB)
-    add_subdirectory(SyntaxParser)
-  endif()
   add_subdirectory(Threading)
 
   if(SWIFT_BUILD_SDK_OVERLAY)

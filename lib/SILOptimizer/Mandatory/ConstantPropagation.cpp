@@ -48,7 +48,7 @@ private:
 } // end anonymous namespace
 
 SILTransform *swift::createDiagnosticConstantPropagation() {
-  // Diagostic propagation is rerun on deserialized SIL because it is sensitive
+  // Diagnostic propagation is rerun on deserialized SIL because it is sensitive
   // to assert configuration.
   return new ConstantPropagation(true /*enable diagnostics*/);
 }

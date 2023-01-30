@@ -752,9 +752,9 @@ bb0(%0 : @guaranteed $Klass):
   %0a = copy_value %0 : $Klass
   %1 = init_existential_ref %0a : $Klass : $Klass, $MyFakeAnyObject
   %1a = begin_borrow %1 : $MyFakeAnyObject
-  %2 = open_existential_ref %1a : $MyFakeAnyObject to $@opened("A2E21C52-6089-11E4-9866-3C0754723233") MyFakeAnyObject
-  %3 = witness_method $@opened("A2E21C52-6089-11E4-9866-3C0754723233") MyFakeAnyObject, #MyFakeAnyObject.myFakeMethod, %2 : $@opened("A2E21C52-6089-11E4-9866-3C0754723233") MyFakeAnyObject : $@convention(witness_method: MyFakeAnyObject) <τ_0_0 where τ_0_0 : MyFakeAnyObject> (@guaranteed τ_0_0) -> ()
-  apply %3<@opened("A2E21C52-6089-11E4-9866-3C0754723233") MyFakeAnyObject>(%2) : $@convention(witness_method: MyFakeAnyObject)  <τ_0_0 where τ_0_0 : MyFakeAnyObject> (@guaranteed τ_0_0) -> ()
+  %2 = open_existential_ref %1a : $MyFakeAnyObject to $@opened("A2E21C52-6089-11E4-9866-3C0754723233", MyFakeAnyObject) Self
+  %3 = witness_method $@opened("A2E21C52-6089-11E4-9866-3C0754723233", MyFakeAnyObject) Self, #MyFakeAnyObject.myFakeMethod, %2 : $@opened("A2E21C52-6089-11E4-9866-3C0754723233", MyFakeAnyObject) Self : $@convention(witness_method: MyFakeAnyObject) <τ_0_0 where τ_0_0 : MyFakeAnyObject> (@guaranteed τ_0_0) -> ()
+  apply %3<@opened("A2E21C52-6089-11E4-9866-3C0754723233", MyFakeAnyObject) Self>(%2) : $@convention(witness_method: MyFakeAnyObject)  <τ_0_0 where τ_0_0 : MyFakeAnyObject> (@guaranteed τ_0_0) -> ()
   end_borrow %1a : $MyFakeAnyObject
   destroy_value %1 : $MyFakeAnyObject
   %9999 = tuple()
@@ -1210,7 +1210,7 @@ bb3(%14 : @owned $FakeOptional<Klass>):
 bb4(%16 : @owned $Klass):
   %17 = begin_borrow %16 : $Klass
   %18 = ref_element_addr %17 : $Klass, #Klass.base
-  copy_addr %18 to [initialization] %3 : $*Klass
+  copy_addr %18 to [init] %3 : $*Klass
   end_borrow %17 : $Klass
   destroy_value %16 : $Klass
   inject_enum_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
@@ -1630,3 +1630,30 @@ exit:
     %res = tuple ()
     return %res : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_owned_to_guaranteed_phi : 
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'test_owned_to_guaranteed_phi'
+sil [ossa] @test_owned_to_guaranteed_phi : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %some = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  %copysome = copy_value %some : $FakeOptional<Klass>
+  switch_enum %copysome : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb2, case #FakeOptional.none!enumelt: bb3
+
+bb2(%2 : @owned $Klass):
+  br bb4(%2 : $Klass)
+
+bb3:
+  %3 = copy_value %1 : $Klass
+  br bb4(%3 : $Klass)
+
+bb4(%4 : @owned $Klass):
+  %b = begin_borrow %4 : $Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %4 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
+

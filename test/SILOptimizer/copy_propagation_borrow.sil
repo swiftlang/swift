@@ -243,13 +243,12 @@ bb3:
 // CHECK:      bb1:
 // CHECK-NEXT:   [[COPY:%.*]] = copy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:   apply %{{.*}}([[COPY]]) : $@convention(thin) (@owned C) -> ()
-// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
-// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   destroy_value [[OUTERCOPY]] : $C
+// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-LABEL: } // end sil function 'testLocalBorrowPostDomDestroy'
 sil [ossa] @testLocalBorrowPostDomDestroy : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
@@ -285,11 +284,9 @@ bb3:
 // CHECK:      bb1:
 // CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@owned C) -> ()
-// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
 // CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
-// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-NEXT:   destroy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
@@ -328,13 +325,11 @@ bb3:
 // CHECK-NEXT:  apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:  [[ARGCOPY:%.*]] = copy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:  apply %2([[OUTERCOPY]], [[ARGCOPY:%.*]]) : $@convention(thin) (@owned C, @owned C) -> ()
-// CHECK-NEXT:  destroy_value %0 : $C
 // CHECK-NEXT:  br bb3
 // CHECK:     bb2:
 // CHECK-NEXT:  apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
 //
 // This copy would be eliminated if the outer lifetime were also canonicalized (no unchecked_ownership_conversion)
-// CHECK-NEXT:  destroy_value %0 : $C
 // CHECK-NEXT:  [[COPY2:%.*]] = copy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:  destroy_value [[COPY2]] : $C
 // CHECK-NEXT:  destroy_value %4 : $C
@@ -1221,19 +1216,19 @@ bb0(%0 : @guaranteed $C):
 //
 // CHECK-NOSCOPES-LABEL: sil [ossa] @testEscapingEscapingCast : $@convention(method) (@guaranteed @callee_guaranteed (Int64) -> Int64) -> () {
 // CHECK-NOSCOPES:      bb0(%0 : @guaranteed $@callee_guaranteed (Int64) -> Int64):
-// CHECK-NOSCOPES-NEXT: %1 = convert_function %0 : $@callee_guaranteed (Int64) -> Int64 to $@callee_guaranteed (Int64) -> (Int64, @error Error) // user: %2
-// CHECK-NOSCOPES-NEXT: %2 = convert_escape_to_noescape %1 : $@callee_guaranteed (Int64) -> (Int64, @error Error) to $@noescape @callee_guaranteed (Int64) -> (Int64, @error Error)
+// CHECK-NOSCOPES-NEXT: %1 = convert_function %0 : $@callee_guaranteed (Int64) -> Int64 to $@callee_guaranteed (Int64) -> (Int64, @error any Error) // user: %2
+// CHECK-NOSCOPES-NEXT: %2 = convert_escape_to_noescape %1 : $@callee_guaranteed (Int64) -> (Int64, @error any Error) to $@noescape @callee_guaranteed (Int64) -> (Int64, @error any Error)
 // CHECK-NOSCOPES-NEXT: = tuple ()
 // CHECK-NOSCOPES-NEXT: return
 // CHECK-NOSCOPES-LABEL: } // end sil function 'testEscapingEscapingCast'
 sil [ossa] @testEscapingEscapingCast : $@convention(method) (@guaranteed @callee_guaranteed (Int64) -> Int64) -> () {
 bb0(%0 : @guaranteed $@callee_guaranteed (Int64) -> Int64):
   %1 = copy_value %0 : $@callee_guaranteed (Int64) -> Int64
-  %2 = convert_function %1 : $@callee_guaranteed (Int64) -> Int64 to $@callee_guaranteed (Int64) -> (Int64, @error Error)
-  %3 = copy_value %2 : $@callee_guaranteed (Int64) -> (Int64, @error Error)
-  %4 = convert_escape_to_noescape %3 : $@callee_guaranteed (Int64) -> (Int64, @error Error) to $@noescape @callee_guaranteed (Int64) -> (Int64, @error Error) // user: %29
-  destroy_value %3 : $@callee_guaranteed (Int64) -> (Int64, @error Error)
-  destroy_value %2 : $@callee_guaranteed (Int64) -> (Int64, @error Error)
+  %2 = convert_function %1 : $@callee_guaranteed (Int64) -> Int64 to $@callee_guaranteed (Int64) -> (Int64, @error any Error)
+  %3 = copy_value %2 : $@callee_guaranteed (Int64) -> (Int64, @error any Error)
+  %4 = convert_escape_to_noescape %3 : $@callee_guaranteed (Int64) -> (Int64, @error any Error) to $@noescape @callee_guaranteed (Int64) -> (Int64, @error any Error) // user: %29
+  destroy_value %3 : $@callee_guaranteed (Int64) -> (Int64, @error any Error)
+  destroy_value %2 : $@callee_guaranteed (Int64) -> (Int64, @error any Error)
   %7 = tuple ()
   return %7 : $()
 }

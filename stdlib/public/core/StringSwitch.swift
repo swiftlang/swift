@@ -68,23 +68,24 @@ func _findStringSwitchCaseWithCache(
   string: String,
   cache: inout _OpaqueStringSwitchCache) -> Int {
 
-  return withUnsafeMutableBytes(of: &cache) {
-    (bufPtr: UnsafeMutableRawBufferPointer) -> Int in
-
-    let oncePtr = bufPtr.baseAddress!
-    let cacheRawPtr = oncePtr + MemoryLayout<Builtin.Word>.stride
-    let cachePtr = cacheRawPtr.bindMemory(to: _StringSwitchCache.self, capacity: 1)
-    var context = _StringSwitchContext(cases: cases, cachePtr: cachePtr)
-    withUnsafeMutablePointer(to: &context) { (context) -> () in
-      Builtin.onceWithContext(oncePtr._rawValue, _createStringTableCache,
-                              context._rawValue)
-    }
-    let cache = cachePtr.pointee;
-    if let idx = cache[string] {
-      return idx
-    }
-    return -1
+#if $BuiltinUnprotectedAddressOf
+  let ptr = UnsafeMutableRawPointer(Builtin.unprotectedAddressOf(&cache))
+#else
+  let ptr = UnsafeMutableRawPointer(Builtin.addressof(&cache))
+#endif
+  let oncePtr = ptr
+  let cacheRawPtr = oncePtr + MemoryLayout<Builtin.Word>.stride
+  let cachePtr = cacheRawPtr.bindMemory(to: _StringSwitchCache.self, capacity: 1)
+  var context = _StringSwitchContext(cases: cases, cachePtr: cachePtr)
+  withUnsafeMutablePointer(to: &context) { (context) -> () in
+    Builtin.onceWithContext(oncePtr._rawValue, _createStringTableCache,
+                            context._rawValue)
   }
+  let cache = cachePtr.pointee;
+  if let idx = cache[string] {
+    return idx
+  }
+  return -1
 }
 
 /// Builds the string switch case.

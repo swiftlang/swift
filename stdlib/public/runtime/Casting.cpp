@@ -17,8 +17,6 @@
 
 #include "swift/Runtime/Casting.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "../SwiftShims/GlobalObjects.h"
-#include "../SwiftShims/RuntimeShims.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
@@ -32,6 +30,8 @@
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/shims/GlobalObjects.h"
+#include "swift/shims/RuntimeShims.h"
 #include "swift/Threading/Mutex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"

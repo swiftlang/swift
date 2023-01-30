@@ -1,6 +1,6 @@
 /// Check that serialized non user accessible functions are not autocompleted.
 /// rdar://problem/53891642
-/// SR-7460
+/// https://github.com/apple/swift/issues/50003
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/complete_user_accessibility_helper.swift -module-name helper -emit-module-path %t/helper.swiftmodule

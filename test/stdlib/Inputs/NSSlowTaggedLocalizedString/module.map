@@ -1,0 +1,3 @@
+module NSSlowTaggedLocalizedString {
+  header "NSSlowTaggedLocalizedString.h"
+}

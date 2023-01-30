@@ -13,7 +13,7 @@ struct Teststruct {
     let set = Set<String>()
     for _ in set {
       // Check that the global initializer is not hoisted out of this loop,
-      // resulting in a dispatch_once re-retrance crash.
+      // resulting in a dispatch_once reentrancy crash.
       _ = Teststruct.s
     }
   }

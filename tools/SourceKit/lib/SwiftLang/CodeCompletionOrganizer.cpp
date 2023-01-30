@@ -76,10 +76,11 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
     const Options &options, Completion *prefix, bool clearFlair) {
 
   ImportDepth depth;
-  if (info.swiftASTContext) {
+  if (info.compilerInstance) {
     // Build import depth map.
-    depth = ImportDepth(*info.swiftASTContext,
-                        info.invocation->getFrontendOptions());
+    depth = ImportDepth(
+        info.compilerInstance->getASTContext(),
+        info.compilerInstance->getInvocation().getFrontendOptions());
   }
 
   if (info.completionContext)
@@ -134,16 +135,16 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     auto *contextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             sink.swiftSink, CodeCompletionResultKind::Pattern, completionString,
-            CodeCompletionOperatorKind::None, /*BriefDocComment=*/"",
-            CodeCompletionResultType::unknown(),
+            CodeCompletionOperatorKind::None, /*IsAsync=*/false,
+            /*BriefDocComment=*/"", CodeCompletionResultType::unknown(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     auto *swiftResult = new (sink.allocator) CodeCompletion::SwiftResult(
         *contextFreeResult, SemanticContextKind::Local,
         CodeCompletionFlairBit::ExpressionSpecific,
         /*NumBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
-        /*USRTypeContext=*/nullptr, ContextualNotRecommendedReason::None,
-        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+        /*USRTypeContext=*/nullptr, /*CanCurrDeclContextHandleAsync=*/false,
+        ContextualNotRecommendedReason::None);
 
     CompletionBuilder builder(sink, *swiftResult);
     builder.setCustomKind(customCompletion.Kind);
@@ -1166,15 +1167,16 @@ Completion *CompletionBuilder::finish() {
         new (sink.allocator) ContextFreeCodeCompletionResult(
             contextFreeBase.getKind(),
             contextFreeBase.getOpaqueAssociatedKind(), opKind,
-            contextFreeBase.isSystem(), newCompletionString,
+            contextFreeBase.isSystem(), contextFreeBase.isAsync(),
+            contextFreeBase.hasAsyncAlternative(), newCompletionString,
             contextFreeBase.getModuleName(),
             contextFreeBase.getBriefDocComment(),
             contextFreeBase.getAssociatedUSRs(),
             contextFreeBase.getResultType(),
             contextFreeBase.getNotRecommendedReason(),
             contextFreeBase.getDiagnosticSeverity(),
-            contextFreeBase.getDiagnosticMessage(),
-            newFilterName);
+            contextFreeBase.getDiagnosticMessage(), newFilterName,
+            contextFreeBase.getNameForDiagnostics());
     newBase = base.withContextFreeResultSemanticContextAndFlair(
         *contextFreeResult, semanticContext, flair, sink.swiftSink);
   }

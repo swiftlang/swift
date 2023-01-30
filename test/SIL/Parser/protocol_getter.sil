@@ -11,9 +11,9 @@ protocol TestP : class {
 // CHECK-LABEL: sil @test
 sil @test : $@convention(method) (TestP) -> () {
 bb0(%0 : $TestP):
-  %1 = open_existential_ref %0 : $TestP to $@opened("01234567-89ab-cdef-0123-000000000000") TestP
-  // CHECK: witness_method $@opened({{.*}}) TestP, #TestP.count!getter : {{.*}}, %{{.*}} : $@opened({{.*}} : $@convention(witness_method: TestP) <τ_0_0 where τ_0_0 : TestP> (τ_0_0) -> Int
-  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") TestP, #TestP.count!getter, %1 : $@opened("01234567-89ab-cdef-0123-000000000000") TestP : $@convention(witness_method: TestP) <T: TestP> (T) -> Int
+  %1 = open_existential_ref %0 : $TestP to $@opened("01234567-89ab-cdef-0123-000000000000", TestP) Self
+  // CHECK: witness_method $@opened({{.*}}, any TestP) Self, #TestP.count!getter : {{.*}}, %{{.*}} : $@opened({{.*}} : $@convention(witness_method: TestP) <τ_0_0 where τ_0_0 : TestP> (τ_0_0) -> Int
+  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000", TestP) Self, #TestP.count!getter, %1 : $@opened("01234567-89ab-cdef-0123-000000000000", TestP) Self : $@convention(witness_method: TestP) <T: TestP> (T) -> Int
   %3 = tuple ()
   return %3 : $()
 }
@@ -23,10 +23,10 @@ bb0(%0 : $TestP):
 sil @top : $@convention(thin) (@owned TestP) -> @owned Optional<String> {
 bb0(%0 : $TestP):
   strong_retain %0 : $TestP
-  %3 = open_existential_ref %0 : $TestP to $@opened("01234567-89ab-cdef-0123-111111111111") TestP
-  // CHECK: witness_method $@opened({{.*}}) TestP, #TestP.test
-  %4 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") TestP, #TestP.test, %3 : $@opened("01234567-89ab-cdef-0123-111111111111") TestP : $@convention(witness_method: TestP) @callee_owned <T: TestP> (@owned T) -> @owned Optional<String>
-  %5 = apply %4<@opened("01234567-89ab-cdef-0123-111111111111") TestP>(%3) : $@convention(witness_method: TestP) @callee_owned <T: TestP> (@owned T) -> @owned Optional<String>
+  %3 = open_existential_ref %0 : $TestP to $@opened("01234567-89ab-cdef-0123-111111111111", TestP) Self
+  // CHECK: witness_method $@opened({{.*}}, any TestP) Self, #TestP.test
+  %4 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111", TestP) Self, #TestP.test, %3 : $@opened("01234567-89ab-cdef-0123-111111111111", TestP) Self : $@convention(witness_method: TestP) @callee_owned <T: TestP> (@owned T) -> @owned Optional<String>
+  %5 = apply %4<@opened("01234567-89ab-cdef-0123-111111111111", TestP) Self>(%3) : $@convention(witness_method: TestP) @callee_owned <T: TestP> (@owned T) -> @owned Optional<String>
   strong_release %0 : $TestP
   return %5 : $Optional<String>
 }

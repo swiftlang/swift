@@ -341,7 +341,7 @@ struct BlockInfo {
       if (invariants.isMemoryInvariant() && mayWriteToMemory(&inst)) {
         // If we are assuming that all memory is invariant, a memory-writing
         // instruction potentially breaks the infinite recursion loop. For the
-        // sake of the anlaysis, it's like a function exit.
+        // sake of the analysis, it's like a function exit.
         reachesFunctionExit = true;
         return;
       }

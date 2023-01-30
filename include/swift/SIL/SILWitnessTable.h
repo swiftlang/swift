@@ -90,7 +90,7 @@ public:
     AssociatedType,
     AssociatedTypeProtocol,
     BaseProtocol
-  };
+  } ENUM_EXTENSIBILITY_ATTR(open);
   
   /// A witness table entry.
   class Entry {
@@ -223,6 +223,8 @@ public:
                                  RootProtocolConformance *conformance);
 
   ~SILWitnessTable();
+  
+  SILModule &getModule() const { return Mod; }
 
   /// Return the AST ProtocolConformance this witness table represents.
   RootProtocolConformance *getConformance() const {

@@ -47,7 +47,9 @@ struct Struct: Differentiable {
   @Wrapper @SimpleWrapper var trivial: Float = 10
   @Wrapper @SimpleWrapper var tracked: Tracked<Float> = 20
   @Wrapper @SimpleWrapper var nontrivial: NontrivialLoadable<Float> = 30
-  // Tests SR-12800: semantic member accessors should have empty linear map structs.
+
+  // https://github.com/apple/swift/issues/55245
+  // Semantic member accessors should have empty linear map structs.
   @DifferentiableWrapper var differentiableWrapped: Float = 40
 
   static func testGetters() {
@@ -75,7 +77,8 @@ struct GenericStruct<T: Differentiable>: Differentiable {
   @Wrapper @SimpleWrapper var nontrivial: NontrivialLoadable<Float> = 30
   @Wrapper @SimpleWrapper var addressOnly: T
 
-  // SR-12778: Test getter pullback for non-trivial loadable property.
+  // https://github.com/apple/swift/issues/55223
+  // Test getter pullback for non-trivial loadable property.
   static func testGetters() {
     let _: @differentiable(reverse) (Self) -> Float = { $0.trivial }
     let _: @differentiable(reverse) (Self) -> Tracked<Float> = { $0.tracked }
@@ -83,7 +86,8 @@ struct GenericStruct<T: Differentiable>: Differentiable {
     let _: @differentiable(reverse) (Self) -> T = { $0.addressOnly }
   }
 
-  // SR-12779: Test setter pullback for non-trivial loadable property.
+  // https://github.com/apple/swift/issues/55224
+  // Test setter pullback for non-trivial loadable property.
   static func testSetters() {
     let _: @differentiable(reverse) (inout Self, Float) -> Void =
       { $0.trivial = $1 }

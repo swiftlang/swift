@@ -78,6 +78,7 @@ public:
     clear();
     Root = other.Root;
     other.Root = nullptr;
+    return *this;
   }
 
   SuccessorMap(const SuccessorMap &other) : Root(copyTree(other.Root)) {}
@@ -85,6 +86,7 @@ public:
     // TODO: this is clearly optimizable to re-use nodes.
     deleteTree(Root);
     Root = copyTree(other.Root);
+    return *this;
   }
 
   ~SuccessorMap() {
@@ -373,13 +375,13 @@ private:
     assert(Traits::precedes(node->Begin, node->End));
 
     // The first key must be strictly higher than the lower bound.
-    if (lowerBound.hasValue())
-      assert(Traits::precedes(lowerBound.getValue(), node->Begin));
+    if (lowerBound.has_value())
+      assert(Traits::precedes(lowerBound.value(), node->Begin));
 
     // The last key (i.e. End-1) must be strictly lower than
     // upperBound-1, or in other words, End must precede upperBound.
-    if (upperBound.hasValue()) 
-      assert(Traits::precedes(node->End, upperBound.getValue()));
+    if (upperBound.has_value())
+      assert(Traits::precedes(node->End, upperBound.value()));
 
     // The keys in the left sub-tree must all be strictly less than
     // Begin-1, because if any key equals Begin-1, that node should

@@ -19,7 +19,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Threading/Once.h"
-#include "../SwiftShims/RuntimeShims.h"
+#include "swift/shims/RuntimeShims.h"
 #include <stdint.h>
 
 // If this is an Apple OS, use the Apple binary compatibility rules

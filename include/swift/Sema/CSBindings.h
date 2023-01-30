@@ -480,6 +480,9 @@ public:
   /// if it has only concrete types or would resolve a closure.
   bool favoredOverDisjunction(Constraint *disjunction) const;
 
+  /// Check if this binding is favored over a conjunction.
+  bool favoredOverConjunction(Constraint *conjunction) const;
+
   /// Detect `subtype` relationship between two type variables and
   /// attempt to infer supertype bindings transitively e.g.
   ///
@@ -546,8 +549,6 @@ public:
   }
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
-  void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
-            unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
 
 private:
   void addBinding(PotentialBinding binding);

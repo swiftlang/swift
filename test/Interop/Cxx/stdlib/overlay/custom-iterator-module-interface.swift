@@ -1,12 +1,30 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s
-
-// CHECK: import Cxx
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK: struct ConstIterator : UnsafeCxxInputIterator {
 // CHECK:   var pointee: Int32 { get }
 // CHECK:   func successor() -> ConstIterator
 // CHECK:   typealias Pointee = Int32
 // CHECK:   static func == (lhs: ConstIterator, other: ConstIterator) -> Bool
+// CHECK: }
+
+// CHECK: struct ConstRACIterator : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   func successor() -> ConstRACIterator
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias Distance = Int32
+// CHECK:   static func += (lhs: inout ConstRACIterator, v: ConstRACIterator.difference_type)
+// CHECK:   static func - (lhs: ConstRACIterator, other: ConstRACIterator) -> Int32
+// CHECK:   static func == (lhs: ConstRACIterator, other: ConstRACIterator) -> Bool
+// CHECK: }
+
+// CHECK: struct ConstRACIteratorRefPlusEq : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   func successor() -> ConstRACIterator
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias Distance = Int32
+// CHECK:   static func += (lhs: inout ConstRACIteratorRefPlusEq, v: ConstRACIteratorRefPlusEq.difference_type)
+// CHECK:   static func - (lhs: ConstRACIteratorRefPlusEq, other: ConstRACIteratorRefPlusEq) -> Int32
+// CHECK:   static func == (lhs: ConstRACIteratorRefPlusEq, other: ConstRACIteratorRefPlusEq) -> Bool
 // CHECK: }
 
 // CHECK: struct ConstIteratorOutOfLineEq : UnsafeCxxInputIterator {
@@ -36,6 +54,16 @@
 // CHECK:   static func == (lhs: HasCustomIteratorTag, other: HasCustomIteratorTag) -> Bool
 // CHECK: }
 
+// CHECK: struct HasCustomRACIteratorTag : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   func successor() -> HasCustomRACIteratorTag
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias Distance = Int32
+// CHECK:   static func += (lhs: inout HasCustomRACIteratorTag, x: Int32)
+// CHECK:   static func - (lhs: HasCustomRACIteratorTag, x: HasCustomRACIteratorTag) -> Int32
+// CHECK:   static func == (lhs: HasCustomRACIteratorTag, other: HasCustomRACIteratorTag) -> Bool
+// CHECK: }
+
 // CHECK: struct HasCustomIteratorTagInline : UnsafeCxxInputIterator {
 // CHECK:   var pointee: Int32 { get }
 // CHECK:   func successor() -> HasCustomIteratorTagInline
@@ -57,3 +85,23 @@
 // CHECK-NOT: struct HasNoIncrementOperator : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasNoPreIncrementOperator : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasNoDereferenceOperator : UnsafeCxxInputIterator
+
+// CHECK: struct __CxxTemplateInst17TemplatedIteratorIiE : UnsafeCxxInputIterator {
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   func successor() -> __CxxTemplateInst17TemplatedIteratorIiE
+// CHECK:   typealias Pointee = Int32
+// CHECK:   static func == (lhs: __CxxTemplateInst17TemplatedIteratorIiE, other: __CxxTemplateInst17TemplatedIteratorIiE) -> Bool
+// CHECK: }
+
+// CHECK: struct __CxxTemplateInst28TemplatedIteratorOutOfLineEqIiE : UnsafeCxxInputIterator {
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   func successor() -> __CxxTemplateInst28TemplatedIteratorOutOfLineEqIiE
+// CHECK:   typealias Pointee = Int32
+// CHECK: }
+
+// CHECK: struct __CxxTemplateInst31TemplatedRACIteratorOutOfLineEqIiE : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   func successor() -> __CxxTemplateInst31TemplatedRACIteratorOutOfLineEqIiE
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias Distance = __CxxTemplateInst31TemplatedRACIteratorOutOfLineEqIiE.difference_type
+// CHECK: }

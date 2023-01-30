@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(Parse, CodeCompletionSecondPassRequest,
-              bool (SourceFile *, CodeCompletionCallbacksFactory *),
+SWIFT_REQUEST(Parse, IDEInspectionSecondPassRequest,
+              bool (SourceFile *, IDEInspectionCallbacksFactory *),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(Parse, ParseMembersRequest,
               FingerprintAndMembers(IterableDeclContext *), Cached, NoLocationInfo)
@@ -24,4 +24,7 @@ SWIFT_REQUEST(Parse, ParseAbstractFunctionBodyRequest,
               NoLocationInfo)
 SWIFT_REQUEST(Parse, ParseSourceFileRequest,
               SourceFileParsingResult(SourceFile *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(Parse, ParseTopLevelDeclsRequest,
+              ArrayRef<Decl *>(SourceFile *), Cached,
               NoLocationInfo)

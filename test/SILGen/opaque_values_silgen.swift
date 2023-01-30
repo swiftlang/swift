@@ -60,15 +60,15 @@ func forEachStmt() {
 
 // Tests that existential boxes can contain opaque types
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12openExistBoxySSs5Error_pF : $@convention(thin) (@guaranteed Error) -> @owned String {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
-// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}) Error
-// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12openExistBoxySSs5Error_pF : $@convention(thin) (@guaranteed any Error) -> @owned String {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error):
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box_value [[ARG]] : $any Error to $@opened({{.*}}, any Error) Self
+// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}, any Error) Self
 // CHECK:   [[COPY:%.*]] = copy_value [[OPAQUE_ARG]]
 // CHECK:   store [[COPY]] to [init] [[ALLOC_OPEN]]
 // CHECK:   destroy_addr [[ALLOC_OPEN]]
 // CHECK:   dealloc_stack [[ALLOC_OPEN]]
-// CHECK-NOT:   destroy_value [[ARG]] : $Error
+// CHECK-NOT:   destroy_value [[ARG]] : $any Error
 // CHECK:   return {{.*}} : $String
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen12openExistBoxySSs5Error_pF'
 func openExistBox(_ x: Error) -> String {
@@ -99,13 +99,13 @@ protocol EmptyP {}
 
 struct AddressOnlyStruct : EmptyP {}
 
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen10addrOnlyIf1xAA6EmptyP_pSb_tF : $@convention(thin) (Bool) -> @out EmptyP {
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen10addrOnlyIf1xAA6EmptyP_pSb_tF : $@convention(thin) (Bool) -> @out any EmptyP {
 // HECK: bb0([[ARG:%.*]] : $Bool):
-// HECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var EmptyP }, var
+// HECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var any EmptyP }, var
 // HECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
 // HECK:   [[APPLY_FOR_BOX:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(method) (@thin AddressOnlyStruct.Type) -> AddressOnlyStruct
-// HECK:   [[INIT_OPAQUE:%.*]] = init_existential_value [[APPLY_FOR_BOX]] : $AddressOnlyStruct, $AddressOnlyStruct, $EmptyP
-// HECK:   store [[INIT_OPAQUE]] to [init] [[PROJ_BOX]] : $*EmptyP
+// HECK:   [[INIT_OPAQUE:%.*]] = init_existential_value [[APPLY_FOR_BOX]] : $AddressOnlyStruct, $AddressOnlyStruct, $any EmptyP
+// HECK:   store [[INIT_OPAQUE]] to [init] [[PROJ_BOX]] : $*any EmptyP
 // HECK:   [[APPLY_FOR_BRANCH:%.*]] = apply %{{.*}}([[ARG]]) : $@convention(method) (Bool) -> Builtin.Int1
 // HECK:   cond_br [[APPLY_FOR_BRANCH]], bb2, bb1
 // HECK: bb1:
@@ -128,19 +128,19 @@ func addrOnlyIf(x: Bool) -> EmptyP {
 
 // Tests LValue of error types / existential boxes
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12propOfLValueySSs5Error_pF : $@convention(thin) (@guaranteed Error) -> @owned String {
-// HECK: bb0([[ARG:%.*]] : $Error):
-// HECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var Error }
+// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen12propOfLValueySSs5Error_pF : $@convention(thin) (@guaranteed any Error) -> @owned String {
+// HECK: bb0([[ARG:%.*]] : $any Error):
+// HECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var any Error }
 // HECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
 // HECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // HECK:   store [[COPY_ARG]] to [init] [[PROJ_BOX]]
-// HECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*Error
+// HECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*any Error
 // HECK:   [[LOAD_BOX:%.*]] = load [copy] [[READ]]
-// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[LOAD_BOX]] : $Error to $*@opened({{.*}}) Error
+// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[LOAD_BOX]] : $any Error to $*@opened({{.*}}, any Error) Self
 // HECK:   [[LOAD_OPAQUE:%.*]] = load [copy] [[OPAQUE_ARG]]
-// HECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
+// HECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}, any Error) Self
 // HECK:   store [[LOAD_OPAQUE]] to [init] [[ALLOC_OPEN]]
-// HECK:   [[RET_VAL:%.*]] = apply {{.*}}<@opened({{.*}}) Error>([[ALLOC_OPEN]])
+// HECK:   [[RET_VAL:%.*]] = apply {{.*}}<@opened({{.*}}, any Error) Self>([[ALLOC_OPEN]])
 // HECK:   return [[RET_VAL]] : $String
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen12propOfLValueySSs5Error_pF'
 func propOfLValue(_ x: Error) -> String {
@@ -282,7 +282,7 @@ public enum FloatingPointSign {
 // CHECK-OSX:   [[VAL:%.*]] = open_existential_value [[BORROW2]] : $Any to $@opened
 // CHECK-OSX:   [[COPY2:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX:   end_borrow [[BORROW2]] : $Any
-// CHECK-OSX:   [[RESULT:%.*]] = apply %{{.*}}<@opened("{{.*}}") Any>([[COPY2]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+// CHECK-OSX:   [[RESULT:%.*]] = apply %{{.*}}<@opened("{{.*}}", Any) Self>([[COPY2]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
 // CHECK-OSX:   destroy_value [[COPY2]] : $@opened
 // CHECK-OSX:   destroy_value [[COPY]] : $Any
 // CHECK-OSX-NOT:   destroy_value %0 : $Any
@@ -297,11 +297,11 @@ public func unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
 // Test open_existential_box_value in a conversion context.
 // ---
 // CHECK-OSX-LABEL: sil [ossa] @$s20opaque_values_silgen22testOpenExistentialBox1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
-// CHECK-OSX: [[BORROW:%.*]] = begin_borrow [lexical] %{{.*}} : $Error
-// CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened
+// CHECK-OSX: [[BORROW:%.*]] = begin_borrow [lexical] %{{.*}} : $any Error
+// CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $any Error to $@opened
 // CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened
-// CHECK-OSX: end_borrow [[BORROW]] : $Error
+// CHECK-OSX: end_borrow [[BORROW]] : $any Error
 // CHECK-OSX-LABEL: } // end sil function '$s20opaque_values_silgen22testOpenExistentialBox1eys5Error_pSg_tF'
 public func testOpenExistentialBox(e: Error?) {
   if let u = e {
@@ -478,3 +478,170 @@ enum TestEnum<T> {
   }
 }
 
+public enum EnumWithTwoSameAddressOnlyPayloads<T> {
+  case nope
+  case yes(T)
+  case and(T)
+
+// CHECK-LABEL: sil [ossa] @EnumWithTwoSameAddressOnlyPayloads_getPayload : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[RESULT_STORAGE:%[^,]+]] = alloc_stack $T
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         switch_enum [[COPY]] : $EnumWithTwoSameAddressOnlyPayloads<T>, 
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.nope!enumelt: {{bb[0-9]+}}, 
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.yes!enumelt: [[YES_BLOCK:bb[0-9]+]], 
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.and!enumelt: [[AND_BLOCK:bb[0-9]+]]
+// CHECK:       [[YES_BLOCK]]([[YES_VALUE:%[^,]+]] :
+// CHECK:         [[YES_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[YES_VALUE]]
+// CHECK:         [[YES_COPY:%[^,]+]] = copy_value [[YES_LIFETIME]]
+// CHECK:         store [[YES_COPY]] to [init] [[RESULT_STORAGE]]
+// CHECK:       [[AND_BLOCK]]([[AND_VALUE:%[^,]+]] :
+// CHECK:         [[AND_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[AND_VALUE]]
+// CHECK:         [[AND_COPY:%[^,]+]] = copy_value [[AND_LIFETIME]]
+// CHECK:         store [[AND_COPY]] to [init] [[RESULT_STORAGE]]
+// CHECK-LABEL: } // end sil function 'EnumWithTwoSameAddressOnlyPayloads_getPayload'
+  public var getPayload: T? {
+    @_silgen_name("EnumWithTwoSameAddressOnlyPayloads_getPayload")
+    get {
+    switch self {
+      case .nope:
+        return nil
+      case .yes(let t), .and(let t):
+        return t
+    }
+    }
+  }
+}
+
+
+// Verify exit block arguments are ordered correctly.
+// 
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_ : {{.*}} {
+// CHECK:         br [[EPILOG:bb[0-9]+]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
+// CHECK:         br [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
+// CHECK:       [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : @owned $Value, {{%[^,]+}} : @owned $Value):
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_'
+func doit<T>(_ f: () -> T) -> T {
+  f()
+}
+@_silgen_name("duplicate_with_int4")
+func duplicate_with_int4<Value>(condition: Bool, value: Value) -> (Int, Int, Int, (Value, Value)) {
+  doit {
+    if condition {
+      return (Int(), Int(), Int(), (value, value))
+    } else {
+      return (Int(), Int(), Int(), (value, value))
+    }
+  }
+}
+
+// Verify tuple rebuilding.
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_ : {{.*}} {
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
+// CHECK:         return [[RETVAL]] : $(Value, Value)
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_'
+@_silgen_name("duplicate1")
+func duplicate1<Value>(value: Value) -> (Value, Value) {
+  doit { 
+      (value, value)
+  }
+}
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_ : {{.*}} {
+// CHECK:         [[RETVAL:%[^,]+]] = tuple $(one: Value, two: Value) ({{%[^,]+}}, {{%[^,]+}})   
+// CHECK:         return [[RETVAL]] : $(one: Value, two: Value)           
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_'
+@_silgen_name("duplicate2")
+func duplicate2<Value>(value: Value) -> (one: Value, two: Value) {
+  doit { 
+      (one: value, two: value)
+  }
+}
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int15valuex_xSitx_tlFx_xSityXEfU_ : {{.*}} {
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value, {{%[^,]+}} : $Int)
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int15valuex_xSitx_tlFx_xSityXEfU_'
+@_silgen_name("duplicate_with_int1")
+func duplicate_with_int1<Value>(value: Value) -> (Value, Value, Int) {
+  doit {
+    (value, value, 42)
+  }
+}
+
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int25valuex_xt_Sitx_tlFx_xt_SityXEfU_ : {{.*}} {
+// CHECK:         [[INNER:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value)           
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ([[INNER]] : $(Value, Value), {{%[^,]+}} : $Int)    
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int25valuex_xt_Sitx_tlFx_xt_SityXEfU_'
+@_silgen_name("duplicate_with_int2")
+func duplicate_with_int2<Value>(value: Value) -> ((Value, Value), Int) {
+  doit {
+    ((value, value), 42)
+  }
+}
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ : {{.*}} {
+// CHECK:         [[INNERMOST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Int)           
+// CHECK:         [[INNERMIDDLE:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMOST]] : $(Value, Int), {{%[^,]+}} : $Value) 
+// CHECK:         [[INNERLEAST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMIDDLE]] : $(Value, (Value, Int), Value)) 
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Int, [[INNERLEAST]] : $(Value, (Value, (Value, Int), Value)), {{%[^,]+}} : $Int) 
+// CHECK:         return [[RETVAL]] : $(Int, (Value, (Value, (Value, Int), Value)), Int) 
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_'
+@_silgen_name("duplicate_with_int3")
+func duplicate_with_int3<Value>(value: Value) -> (Int, (Value, (Value, (Value, Int), Value)), Int) {
+  doit {
+    (42, (value, (value, (value, 43), value)), 44)
+  }
+}
+
+// Keypaths
+
+indirect enum IndirectEnumWithAReadableIntProperty {
+// CHECK-LABEL: sil {{.*}}@$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivpACTK : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// TODO: Eliminate this copy.
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[COPY]]
+// CHECK:         [[FN:%[^,]+]] = function_ref @$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivg : $@convention(method) (@guaranteed IndirectEnumWithAReadableIntProperty) -> Int
+// CHECK:         [[RESULT:%[^,]+]] = apply [[FN]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen36IndirectEnumWithAReadableIntPropertyO1iSivpACTK'
+  var i: Int { 0 }
+}
+
+func takeReadableIntKeyPath<T>(_ kp: KeyPath<T, Int>) {
+}
+
+func giveReadableIntKeyPathInt() {
+  takeReadableIntKeyPath(\IndirectEnumWithAReadableIntProperty.i)
+}
+
+indirect enum StructWithAReadableStringProperty {
+// CHECK-LABEL: sil {{.*}}@$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvpACTK : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[COPY]]
+// CHECK:         [[FN:%[^,]+]] = function_ref @$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvg : $@convention(method) (@guaranteed StructWithAReadableStringProperty) -> @owned String 
+// CHECK:         [[RESULT:%[^,]+]] = apply [[FN]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvpACTK'
+  var s: String { "howdy" }
+}
+
+func takeKeyPathString<T>(_ kp: KeyPath<T, String>) {
+}
+
+func giveKeyPathString() {
+  takeKeyPathString(\StructWithAReadableStringProperty.s)
+}
+
+// CHECK-LABEL: sil {{.*}}@$s20opaque_values_silgen29backDeployingReturningGenericyxxKlFTwb : {{.*}} <T> {{.*}} {
+// Ensure that there aren't any "normal" (in the sense of try_apply) blocks that
+// take unbound generic parameters (τ_0_0).
+// CHECK-NOT: {{bb[0-9]+}}({{%[^,]+}} : @owned $τ_0_0):
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen29backDeployingReturningGenericyxxKlFTwb'
+@available(SwiftStdlib 5.1, *)
+@_backDeploy(before: SwiftStdlib 5.8)
+public func backDeployingReturningGeneric<T>(_ t: T) throws -> T { t }

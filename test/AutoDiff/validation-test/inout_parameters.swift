@@ -191,10 +191,11 @@ InoutParameterAutoDiffTests.test("InoutClassParameter") {
   }
 }
 
-// SR-13305: Test function with non-wrt `inout` parameter, which should be
+// https://github.com/apple/swift/issues/55745
+// Test function with non-wrt `inout` parameter, which should be
 // treated as a differentiability result.
 
-protocol SR_13305_Protocol {
+protocol P_55745 {
   @differentiable(reverse, wrt: x)
   func method(_ x: Float, _ y: inout Float)
 
@@ -203,7 +204,7 @@ protocol SR_13305_Protocol {
 }
 
 InoutParameterAutoDiffTests.test("non-wrt inout parameter") {
-  struct SR_13305_Struct: SR_13305_Protocol {
+  struct Struct: P_55745 {
     @differentiable(reverse, wrt: x)
     func method(_ x: Float, _ y: inout Float) {
       y = y * x
@@ -216,20 +217,20 @@ InoutParameterAutoDiffTests.test("non-wrt inout parameter") {
   }
 
   @differentiable(reverse, wrt: x)
-  func foo(_ s: SR_13305_Struct, _ x: Float, _ y: Float) -> Float {
+  func foo(_ s: Struct, _ x: Float, _ y: Float) -> Float {
     var y = y
     s.method(x, &y)
     return y
   }
 
   @differentiable(reverse, wrt: x)
-  func fooGeneric<T: SR_13305_Protocol>(_ s: T, _ x: Float, _ y: Float) -> Float {
+  func fooGeneric<T: P_55745>(_ s: T, _ x: Float, _ y: Float) -> Float {
     var y = y
     s.method(x, &y)
     return x
   }
 
-  let s = SR_13305_Struct()
+  let s = Struct()
 
   do {
     let (value, (dx, dy)) = valueWithGradient(at: 2, 3, of: { foo(s, $0, $1) })

@@ -27,3 +27,8 @@ module ReferenceCounted {
   header "reference-counted.h"
   requires cplusplus
 }
+
+module MemberLayout {
+  header "member-layout.h"
+  requires cplusplus
+}

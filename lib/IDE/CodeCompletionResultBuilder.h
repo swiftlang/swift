@@ -43,6 +43,8 @@ class CodeCompletionResultBuilder {
   CodeCompletionFlair Flair;
   unsigned NumBytesToErase = 0;
   const Decl *AssociatedDecl = nullptr;
+  bool IsAsync = false;
+  bool HasAsyncAlternative = false;
   Optional<CodeCompletionLiteralKind> LiteralKind;
   CodeCompletionKeywordKind KeywordKind = CodeCompletionKeywordKind::None;
   unsigned CurrentNestingLevel = 0;
@@ -63,6 +65,7 @@ class CodeCompletionResultBuilder {
   /// type relation to \c ResultType.
   const ExpectedTypeContext *TypeContext = nullptr;
   const DeclContext *DC = nullptr;
+  bool CanCurrDeclContextHandleAsync = false;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -113,6 +116,11 @@ public:
 
   void setAssociatedDecl(const Decl *D);
 
+  void setIsAsync(bool IsAsync) { this->IsAsync = IsAsync; }
+  void setHasAsyncAlternative(bool HasAsyncAlternative) {
+    this->HasAsyncAlternative = HasAsyncAlternative;
+  }
+
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
   void setContextFreeNotRecommended(ContextFreeNotRecommendedReason Reason) {
@@ -149,6 +157,10 @@ public:
     this->DC = DC;
   }
 
+  void setCanCurrDeclContextHandleAsync(bool CanCurrDeclContextHandleAsync) {
+    this->CanCurrDeclContextHandleAsync = CanCurrDeclContextHandleAsync;
+  }
+
   void withNestedGroup(CodeCompletionString::Chunk::ChunkKind Kind,
                   llvm::function_ref<void()> body);
 
@@ -166,6 +178,11 @@ public:
       break;
     case AccessLevel::Internal:
       // 'internal' is the default, don't add it.
+      break;
+    case AccessLevel::Package:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "package ");
       break;
     case AccessLevel::Public:
       addChunkWithTextNoCopy(
@@ -359,7 +376,7 @@ public:
     if (escapeAllKeywords) {
 #define KEYWORD(kw) .Case(#kw, true)
       shouldEscape = llvm::StringSwitch<bool>(Word)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
         .Default(false);
     } else {
       shouldEscape = !canBeArgumentLabel(Word);

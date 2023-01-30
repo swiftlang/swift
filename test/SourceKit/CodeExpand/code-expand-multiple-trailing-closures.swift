@@ -22,16 +22,16 @@ withMulti2UnlabeledFirst(_: <#T##() -> ()#>, b: <#T##() -> ()#>)
 // CHECK-NEXT: }
 
 // FIXME: we may ban second argument unlabeled.
-withMulti2Unlabled(_: <#T##() -> ()#>, _: <#T##() -> ()#>)
-// CHECK:      withMulti2Unlabled {
+withMulti2Unlabeled(_: <#T##() -> ()#>, _: <#T##() -> ()#>)
+// CHECK:      withMulti2Unlabeled {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: } _: {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
 // FIXME: we may ban second argument unlabeled.
-withMulti2Unlabled(<#T##() -> ()#>, <#T##() -> ()#>)
-// CHECK:      withMulti2Unlabled {
+withMulti2Unlabeled(<#T##() -> ()#>, <#T##() -> ()#>)
+// CHECK:      withMulti2Unlabeled {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: } _: {
 // CHECK-NEXT: <#code#>

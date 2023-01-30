@@ -1,7 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only)
 
 // REQUIRES: executable_test
-// REQUIRES: optimized_stdlib
 
 import StdlibUnittest
 
@@ -17,7 +16,7 @@ suite.test("copy") {
 suite.test("move") {
   let k = Klass()
   let k2 = k
-  expectTrue(k2 === _move(k))
+  expectTrue(k2 === _move k)
 }
 
 runAllTests()

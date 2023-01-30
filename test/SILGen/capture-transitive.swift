@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
-// SR-8398
+
+// https://github.com/apple/swift/issues/50924
+
 func fibonacci(_ n: Int) -> Int {
   var cache: [Int: Int] = [:]
 

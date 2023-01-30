@@ -51,9 +51,9 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
     Module(Module),
     Name(Name),
     LoweredType(LoweredType),
-    Location(Loc.getValueOr(SILLocation::invalid())),
+    Location(Loc.value_or(SILLocation::invalid())),
     Linkage(unsigned(Linkage)),
-    HasLocation(Loc.hasValue()),
+    HasLocation(Loc.has_value()),
     VDecl(Decl) {
   setSerialized(isSerialized);
   IsDeclaration = isAvailableExternally(Linkage);

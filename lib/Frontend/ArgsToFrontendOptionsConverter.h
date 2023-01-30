@@ -55,6 +55,8 @@ private:
 
   bool checkForUnusedOutputPaths() const;
 
+  bool checkBuildFromInterfaceOnlyOptions() const;
+
 public:
   ArgsToFrontendOptionsConverter(DiagnosticEngine &Diags,
                                  const llvm::opt::ArgList &Args,

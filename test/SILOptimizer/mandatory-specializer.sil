@@ -18,11 +18,11 @@ bb0(%0 : $*Int):
   return %4 : $()
 }
 
-// CHECK-LABEL: sil [no_allocation] @dont_do_dead_alloc_eimination_on_non_ossa
+// CHECK-LABEL: sil [no_allocation] @dont_do_dead_alloc_elimination_on_non_ossa
 // CHECK:         alloc_stack
 // CHECK-NOT:     load
-// CHECK:       } // end sil function 'dont_do_dead_alloc_eimination_on_non_ossa'
-sil [no_allocation] @dont_do_dead_alloc_eimination_on_non_ossa : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+// CHECK:       } // end sil function 'dont_do_dead_alloc_elimination_on_non_ossa'
+sil [no_allocation] @dont_do_dead_alloc_elimination_on_non_ossa : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
   %1 = alloc_stack $Builtin.Int32
   store %0 to %1 : $*Builtin.Int32

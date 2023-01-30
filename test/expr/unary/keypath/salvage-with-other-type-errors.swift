@@ -32,7 +32,7 @@ extension A: K {
   // expected-note@-2 {{overloads for '+' exist with these partially matching parameter lists: (String, String)}}
 }
 
-// SR-5034
+// https://github.com/apple/swift/issues/47610
 
 struct B {
     let v: String
@@ -47,7 +47,7 @@ func f3() {
     B(v: "").f1(block: { _ in }).f2(keyPath: \B.v) // expected-error{{unable to infer type of a closure parameter '_' in the current context}}
 }
 
-// SR-5375
+// https://github.com/apple/swift/issues/47949
 
 protocol Bindable: class { }
 

@@ -257,6 +257,7 @@ getConcurrencyFixBehavior(
   switch (constraintKind) {
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::Subtype:
     break;
 
   default:
@@ -462,6 +463,23 @@ SkipSameTypeRequirement *
 SkipSameTypeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                 ConstraintLocator *locator) {
   return new (cs.getAllocator()) SkipSameTypeRequirement(cs, lhs, rhs, locator);
+}
+
+bool SkipSameShapeRequirement::diagnose(const Solution &solution,
+                                       bool asNote) const {
+  if (getLocator()->isLastElement<LocatorPathElt::PackShape>()) {
+    SameShapeExpansionFailure failure(solution, LHS, RHS, getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  SameShapeRequirementFailure failure(solution, LHS, RHS, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SkipSameShapeRequirement *
+SkipSameShapeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SkipSameShapeRequirement(cs, lhs, rhs, locator);
 }
 
 bool SkipSuperclassRequirement::diagnose(const Solution &solution,
@@ -2004,18 +2022,18 @@ IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
       IgnoreResultBuilderWithReturnStmts(cs, builderTy, locator);
 }
 
-bool IgnoreInvalidNamedPattern::diagnose(const Solution &solution,
-                                         bool asNote) const {
+bool IgnoreUnresolvedPatternVar::diagnose(const Solution &solution,
+                                          bool asNote) const {
   // Not being able to infer the type of a pattern should already have been
   // diagnosed on the pattern's initializer or as a structural issue of the AST.
   return true;
 }
 
-IgnoreInvalidNamedPattern *
-IgnoreInvalidNamedPattern::create(ConstraintSystem &cs, NamedPattern *pattern,
-                                  ConstraintLocator *locator) {
+IgnoreUnresolvedPatternVar *
+IgnoreUnresolvedPatternVar::create(ConstraintSystem &cs, Pattern *pattern,
+                                   ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      IgnoreInvalidNamedPattern(cs, pattern, locator);
+      IgnoreUnresolvedPatternVar(cs, pattern, locator);
 }
 
 bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(
@@ -2413,6 +2431,9 @@ bool AddExplicitExistentialCoercion::isRequired(
                                   ArrayRef<Requirement> requirements) {
       for (const auto &req : requirements) {
         switch (req.getKind()) {
+        case RequirementKind::SameShape:
+          llvm_unreachable("Same-shape requirement not supported here");
+
         case RequirementKind::Superclass:
         case RequirementKind::Conformance:
         case RequirementKind::Layout: {
@@ -2446,6 +2467,9 @@ bool AddExplicitExistentialCoercion::isRequired(
         auto requirementSig = protocol->getRequirementSignature();
         for (const auto &req : requirementSig.getRequirements()) {
           switch (req.getKind()) {
+          case RequirementKind::SameShape:
+            llvm_unreachable("Same-shape requirement not supported here");
+
           case RequirementKind::Conformance:
           case RequirementKind::Layout:
           case RequirementKind::Superclass: {
@@ -2576,4 +2600,42 @@ RenameConflictingPatternVariables::create(ConstraintSystem &cs, Type expectedTy,
       size, alignof(RenameConflictingPatternVariables));
   return new (mem)
       RenameConflictingPatternVariables(cs, expectedTy, conflicts, locator);
+}
+
+bool MacroMissingPound::diagnose(const Solution &solution,
+                                                 bool asNote) const {
+  AddMissingMacroPound failure(solution, macro, getLocator());
+  return failure.diagnose(asNote);
+}
+
+MacroMissingPound *
+MacroMissingPound::create(ConstraintSystem &cs, MacroDecl *macro,
+                          ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MacroMissingPound(cs, macro, locator);
+}
+
+bool MacroMissingArguments::diagnose(const Solution &solution,
+                                     bool asNote) const {
+  AddMissingMacroArguments failure(solution, macro, getLocator());
+  return failure.diagnose(asNote);
+}
+
+MacroMissingArguments *
+MacroMissingArguments::create(ConstraintSystem &cs, MacroDecl *macro,
+                              ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MacroMissingArguments(cs, macro, locator);
+}
+
+bool AllowGlobalActorMismatch::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  GlobalActorFunctionMismatchFailure failure(solution, getFromType(),
+                                             getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowGlobalActorMismatch *
+AllowGlobalActorMismatch::create(ConstraintSystem &cs, Type fromType,
+                                 Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowGlobalActorMismatch(cs, fromType, toType, locator);
 }

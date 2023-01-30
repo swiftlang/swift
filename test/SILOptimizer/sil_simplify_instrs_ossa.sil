@@ -405,8 +405,8 @@ protocol SomeP {}
 public enum SpecialEnum : SomeP {}
 
 // CHECK-LABEL: sil [ossa] @testSimplifyMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
-// CHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
-// CHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+// CHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick any Any.Type
+// CHECK:   init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick any Any.Type
 // CHECK: }  // end sil function 'testSimplifyMetatype'
 sil [ossa] @testSimplifyMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
 bb0(%0 : $@thick SpecialEnum.Type):

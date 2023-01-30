@@ -134,7 +134,7 @@ def map_line_to_source_file(target_filename, target_line_num):
     >>> t.close()
     >>> os.remove(t.name)
     """
-    assert(target_line_num > 0)
+    assert target_line_num > 0
     map = fline_map(target_filename)
     index = bisect.bisect_left(map, (target_line_num, '', 0))
     base = map[index - 1]
@@ -191,7 +191,7 @@ def map_line_from_source_file(source_filename, source_line_num,
     >>> t.close()
     >>> os.remove(t.name)
     """
-    assert(source_line_num > 0)
+    assert source_line_num > 0
     map = fline_map(target_filename)
 
     for i, (target_line_num, found_source_filename,

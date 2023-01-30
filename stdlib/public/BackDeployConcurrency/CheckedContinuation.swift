@@ -119,7 +119,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 /// you can replace one with the other in most circumstances,
 /// without making other changes.
 @available(SwiftStdlib 5.1, *)
-public struct CheckedContinuation<T, E: Error> {
+public struct CheckedContinuation<T, E: Error>: Sendable {
   private let canary: CheckedContinuationCanary
   
   /// Creates a checked continuation from an unsafe continuation.
@@ -185,9 +185,6 @@ public struct CheckedContinuation<T, E: Error> {
     }
   }
 }
-
-@available(SwiftStdlib 5.1, *)
-extension CheckedContinuation: Sendable where T: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 extension CheckedContinuation {
@@ -265,6 +262,7 @@ extension CheckedContinuation {
 ///   - body: A closure that takes a `CheckedContinuation` parameter.
 ///     You must resume the continuation exactly once.
 @available(SwiftStdlib 5.1, *)
+@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 public func withCheckedContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T, Never>) -> Void
@@ -287,6 +285,7 @@ public func withCheckedContinuation<T>(
 /// If `resume(throwing:)` is called on the continuation,
 /// this function throws that error.
 @available(SwiftStdlib 5.1, *)
+@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 public func withCheckedThrowingContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T, Error>) -> Void

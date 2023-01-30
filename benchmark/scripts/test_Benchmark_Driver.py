@@ -208,7 +208,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
                 self.args,
                 tests=["ignored"],
                 _subprocess=self.subprocess_mock).test_harness,
-            "/benchmarks/Benchmark_O",
+            "/benchmarks/Benchmark_O-*",
         )
         self.args.tests = "/path"
         self.args.optimization = "Suffix"
@@ -217,28 +217,27 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
                 self.args,
                 tests=["ignored"],
                 _subprocess=self.subprocess_mock).test_harness,
-            "/path/Benchmark_Suffix",
+            "/path/Benchmark_Suffix-*",
         )
 
     def test_gets_list_of_precommit_benchmarks(self):
         self.subprocess_mock.expect(
-            "/benchmarks/Benchmark_O --list --delim=\t".split(" "),
-            "#\tTest\t[Tags]\n1\tBenchmark1\t[t1, t2]\n2\tBenchmark2\t[t3]\n",
+            "/benchmarks/Benchmark_O-* --list".split(" "),
+            """1 Benchmark1 ["t1" "t2"]\n"""
+            + """2 Benchmark2 ["t3"]\n""",
         )
         driver = BenchmarkDriver(self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
         self.assertEqual(driver.tests, ["Benchmark1", "Benchmark2"])
         self.assertEqual(driver.all_tests, ["Benchmark1", "Benchmark2"])
-        self.assertEqual(driver.test_number["Benchmark1"], "1")
-        self.assertEqual(driver.test_number["Benchmark2"], "2")
+        self.assertEqual(driver.test_number["Benchmark1"], 1)
+        self.assertEqual(driver.test_number["Benchmark2"], 2)
 
     list_all_tests = (
-        "/benchmarks/Benchmark_O --list --delim=\t --skip-tags=".split(" "),
-        """#	Test	[Tags]
-1	Benchmark1	[t1, t2]
-2	Benchmark2	[t3]
-3	Benchmark3	[t3, t4]
-""",
+        "/benchmarks/Benchmark_O-* --list --skip-tags=".split(" "),
+        """1 Benchmark1 ["t1","t2"]\n"""
+        + """2 Benchmark2 ["t3"]\n"""
+        + """3 Benchmark3 ["t3","t4"]\n""",
     )
 
     def test_gets_list_of_all_benchmarks_when_benchmarks_args_exist(self):
@@ -251,7 +250,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         self.assertEqual(driver.all_tests, ["Benchmark1", "Benchmark2", "Benchmark3"])
 
     def test_filters_benchmarks_by_pattern(self):
-        self.args.filters = "-f .+3".split()
+        self.args.filters = [".+3"]
         self.subprocess_mock.expect(*self.list_all_tests)
         driver = BenchmarkDriver(self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
@@ -310,7 +309,7 @@ class LogParserStub(object):
     @staticmethod
     def results_from_string(log_contents):
         LogParserStub.results_from_string_called = True
-        r = PerformanceTestResult("3,b1,1,123,123,123,0,123".split(","))
+        r = PerformanceTestResult("""{"number":3,"name":"b1","samples":[123]}""")
         return {"b1": r}
 
 
@@ -320,8 +319,8 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.parser_stub = LogParserStub()
         self.subprocess_mock = SubprocessMock()
         self.subprocess_mock.expect(
-            "/benchmarks/Benchmark_O --list --delim=\t".split(" "),
-            "#\tTest\t[Tags]\n1\tb1\t[tag]\n",
+            "/benchmarks/Benchmark_O-* --list".split(" "),
+            """1 b1 ["tag"]""",
         )
         self.driver = BenchmarkDriver(
             self.args, _subprocess=self.subprocess_mock, parser=self.parser_stub
@@ -329,28 +328,30 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
 
     def test_run_benchmark_with_multiple_samples(self):
         self.driver.run("b1")
-        self.subprocess_mock.assert_called_with(("/benchmarks/Benchmark_O", "b1"))
+        self.subprocess_mock.assert_called_with(
+            ("/benchmarks/Benchmark_O-*", "b1")
+        )
         self.driver.run("b2", num_samples=5)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O", "b2", "--num-samples=5")
+            ("/benchmarks/Benchmark_O-*", "b2", "--num-samples=5")
         )
 
     def test_run_benchmark_with_specified_number_of_iterations(self):
         self.driver.run("b", num_iters=1)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O", "b", "--num-iters=1")
+            ("/benchmarks/Benchmark_O-*", "b", "--num-iters=1")
         )
 
     def test_run_benchmark_for_specified_time(self):
         self.driver.run("b", sample_time=0.5)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O", "b", "--sample-time=0.5")
+            ("/benchmarks/Benchmark_O-*", "b", "--sample-time=0.5")
         )
 
     def test_run_benchmark_in_verbose_mode(self):
         self.driver.run("b", verbose=True)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O", "b", "--verbose")
+            ("/benchmarks/Benchmark_O-*", "b", "--verbose")
         )
 
     def test_run_batch(self):
@@ -361,7 +362,9 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         """
         self.driver.tests = ["b1", "bx"]
         self.driver.run()
-        self.subprocess_mock.assert_called_with(("/benchmarks/Benchmark_O", "1", "bx"))
+        self.subprocess_mock.assert_called_with(
+            ("/benchmarks/Benchmark_O-*", "1", "bx")
+        )
 
     def test_parse_results_from_running_benchmarks(self):
         """Parse measurements results using LogParser.
@@ -379,14 +382,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
     def test_measure_memory(self):
         self.driver.run("b", measure_memory=True)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O", "b", "--memory")
-        )
-
-    def test_report_quantiles(self):
-        """Use delta compression for quantile reports."""
-        self.driver.run("b", quantile=4)
-        self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O", "b", "--quantile=4", "--delta")
+            ("/benchmarks/Benchmark_O-*", "b", "--memory")
         )
 
     def test_run_benchmark_independent_samples(self):
@@ -396,12 +392,10 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.assertEqual(
             self.subprocess_mock.calls.count(
                 (
-                    "/benchmarks/Benchmark_O",
+                    "/benchmarks/Benchmark_O-*",
                     "b1",
                     "--num-iters=1",
                     "--memory",
-                    "--quantile=20",
-                    "--delta",
                 )
             ),
             3,
@@ -412,38 +406,36 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         def mock_run(test):
             self.assertEqual(test, "b1")
             return PerformanceTestResult(
-                "3,b1,5,101,1,1,1,1,888".split(","),
-                quantiles=True,
-                delta=True,
-                memory=True,
+                """{"number":3,"""
+                + """"name":"b1","""
+                + """"samples":[101,102,103,104,105],"""
+                + """"max_rss":888}"""
             )
 
         driver = BenchmarkDriver(tests=["b1"], args=Stub(output_dir=None))
         driver.run_independent_samples = mock_run  # patching
 
         with captured_output() as (out, _):
-            log = driver.run_and_log()
+            driver.run_and_log()
 
         header = (
             "#,TEST,SAMPLES,MIN(μs),Q1(μs),MEDIAN(μs),Q3(μs),MAX(μs)," + "MAX_RSS(B)\n"
         )
-        csv_log = "3,b1,5,101,102,103,104,105,888\n"
-        self.assertEqual(log, None)
+        csv_log = "3,b1,5,101,101.5,103,104.5,105,888\n"
         self.assertEqual(
             out.getvalue(),
             header + csv_log + "\n" + "Total performance tests executed: 1\n",
         )
 
         with captured_output() as (out, _):
-            log = driver.run_and_log(csv_console=False)
+            driver.run_and_log(csv_console=False)
 
-        self.assertEqual(log, header + csv_log)
         self.assertEqual(
             out.getvalue(),
             "  # TEST                                     SAMPLES MIN(μs)"
             + " Q1(μs) MEDIAN(μs) Q3(μs) MAX(μs) MAX_RSS(B)\n"
             + "  3 b1                                             5     101"
-            + "    102        103    104     105        888\n"
+            + "  101.5        103  104.5     105        888\n"
             + "\n"
             + "Total performance tests executed: 1\n",
         )
@@ -459,7 +451,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
                 openmode = "r"  # 'U' mode is deprecated in Python 3
             with open(log_file, openmode) as f:
                 text = f.read()
-            self.assertEqual(text, "formatted output")
+            self.assertEqual(text, "formatted output\n")
 
         try:
             import tempfile  # setUp
@@ -469,7 +461,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
             driver = BenchmarkDriver(Stub(), tests=[""])
 
             self.assertFalse(os.path.exists(log_dir))
-            content = "formatted output"
+            content = ["formatted output"]
             log_file = os.path.join(log_dir, "1.log")
             with captured_output() as (out, _):
                 driver.log_results(content, log_file=log_file)
@@ -512,7 +504,7 @@ class BenchmarkDriverMock(Mock):
     def record_and_respond(self, test, num_samples, num_iters, verbose, measure_memory):
         args = (test, num_samples, num_iters, verbose, measure_memory)
         self.calls.append(args)
-        return self.respond.get(args, _PTR(min=700))
+        return self.respond.get(args, _PTR(min_value=700))
 
 
 class TestLoggingReportFormatter(unittest.TestCase):
@@ -615,9 +607,9 @@ class TestMarkdownReportHandler(unittest.TestCase):
         self.assert_contains(["| `QuotedName`"])
 
 
-def _PTR(min=700, mem_pages=1000, setup=None):
+def _PTR(min_value=700, mem_pages=1000, setup=None):
     """Create PerformanceTestResult Stub."""
-    return Stub(samples=Stub(min=min), mem_pages=mem_pages, setup=setup)
+    return Stub(min_value=min_value, mem_pages=mem_pages, setup=setup)
 
 
 def _run(test, num_samples=None, num_iters=None, verbose=None, measure_memory=False):
@@ -688,7 +680,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
                     # calibration run, returns a stand-in for PerformanceTestResult
                     (
                         _run("B1", num_samples=3, num_iters=1, verbose=True),
-                        _PTR(min=300),
+                        _PTR(min_value=300),
                     )
                 ]
                 +
@@ -704,7 +696,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
                                 verbose=True,
                                 measure_memory=True,
                             ),
-                            _PTR(min=300),
+                            _PTR(min_value=300),
                         )
                     ]
                     * 5
@@ -721,7 +713,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
                                 verbose=True,
                                 measure_memory=True,
                             ),
-                            _PTR(min=300),
+                            _PTR(min_value=300),
                         )
                     ]
                     * 5
@@ -849,8 +841,8 @@ class TestBenchmarkDoctor(unittest.TestCase):
         def measurements(name, runtime):
             return {
                 "name": name,
-                name + " O i1a": _PTR(min=runtime + 2),
-                name + " O i2a": _PTR(min=runtime),
+                name + " O i1a": _PTR(min_value=runtime + 2),
+                name + " O i2a": _PTR(min_value=runtime),
             }
 
         with captured_output() as (out, _):
@@ -863,8 +855,8 @@ class TestBenchmarkDoctor(unittest.TestCase):
             doctor.analyze(
                 {
                     "name": "OverheadTurtle",
-                    "OverheadTurtle O i1a": _PTR(min=800000),
-                    "OverheadTurtle O i2a": _PTR(min=700000),
+                    "OverheadTurtle O i1a": _PTR(min_value=800000),
+                    "OverheadTurtle O i2a": _PTR(min_value=700000),
                 }
             )
         output = out.getvalue()
@@ -920,30 +912,34 @@ class TestBenchmarkDoctor(unittest.TestCase):
                 {
                     "name": "NoOverhead",  # not 'significant' enough
                     # Based on DropFirstArray a10/e10: overhead 3.7% (6 μs)
-                    "NoOverhead O i1a": _PTR(min=162),
-                    "NoOverhead O i2a": _PTR(min=159),
+                    "NoOverhead O i1a": _PTR(min_value=162),
+                    "NoOverhead O i2a": _PTR(min_value=159),
                 }
             )
             doctor.analyze(
                 {
                     "name": "SO",  # Setup Overhead
                     # Based on SuffixArrayLazy a10/e10: overhead 5.8% (4 μs)
-                    "SO O i1a": _PTR(min=69),
-                    "SO O i1b": _PTR(min=70),
-                    "SO O i2a": _PTR(min=67),
-                    "SO O i2b": _PTR(min=68),
+                    "SO O i1a": _PTR(min_value=69),
+                    "SO O i1b": _PTR(min_value=70),
+                    "SO O i2a": _PTR(min_value=67),
+                    "SO O i2b": _PTR(min_value=68),
                 }
             )
             doctor.analyze(
-                {"name": "Zero", "Zero O i1a": _PTR(min=0), "Zero O i2a": _PTR(min=0)}
+                {
+                    "name": "Zero",
+                    "Zero O i1a": _PTR(min_value=0),
+                    "Zero O i2a": _PTR(min_value=0)
+                }
             )
             doctor.analyze(
                 {
                     "name": "LOA",  # Limit of Accuracy
                     # Impossible to detect overhead:
                     # Even 1μs change in 20μs runtime is 5%.
-                    "LOA O i1a": _PTR(min=21),
-                    "LOA O i2a": _PTR(min=20),
+                    "LOA O i1a": _PTR(min_value=21),
+                    "LOA O i2a": _PTR(min_value=20),
                 }
             )
         output = out.getvalue()

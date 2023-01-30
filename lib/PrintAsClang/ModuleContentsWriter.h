@@ -23,6 +23,7 @@ namespace clang {
 }
 
 namespace swift {
+class Decl;
 class ModuleDecl;
 class SwiftToClangInteropContext;
 
@@ -35,12 +36,20 @@ void printModuleContentsAsObjC(raw_ostream &os,
                                ModuleDecl &M,
                                SwiftToClangInteropContext &interopContext);
 
-/// Prints the declarations of \p M to \p os in C++ language mode and collects
-/// imports in \p imports along the way.
-void printModuleContentsAsCxx(raw_ostream &os,
-                              llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+struct EmittedClangHeaderDependencyInfo {
+    /// The set of imported modules used by this module.
+    SmallPtrSet<ImportModuleTy, 8> imports;
+    /// True if the printed module depends on types from the Stdlib module.
+    bool dependsOnStandardLibrary = false;
+};
+
+/// Prints the declarations of \p M to \p os in C++ language mode.
+///
+/// \returns Dependencies required by this module.
+EmittedClangHeaderDependencyInfo printModuleContentsAsCxx(raw_ostream &os,
                               ModuleDecl &M,
-                              SwiftToClangInteropContext &interopContext);
+                              SwiftToClangInteropContext &interopContext,
+                              bool requiresExposedAttribute);
 
 } // end namespace swift
 

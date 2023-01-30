@@ -32,70 +32,6 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 STATISTIC(NumDiscardedSolutions, "Number of solutions discarded");
 
-static StringRef getScoreKindName(ScoreKind kind) {
-  switch (kind) {
-  case SK_Hole:
-    return "hole in the constraint system";
-
-  case SK_Unavailable:
-    return "use of an unavailable declaration";
-
-  case SK_AsyncInSyncMismatch:
-    return "async-in-synchronous mismatch";
-
-  case SK_SyncInAsync:
-    return "sync-in-asynchronous";
-
-  case SK_ForwardTrailingClosure:
-    return "forward scan when matching a trailing closure";
-
-  case SK_Fix:
-    return "attempting to fix the source";
-
-  case SK_DisfavoredOverload:
-    return "disfavored overload";
-
-  case SK_UnresolvedMemberViaOptional:
-    return "unwrapping optional at unresolved member base";
-
-  case SK_ForceUnchecked:
-    return "force of an implicitly unwrapped optional";
-
-  case SK_UserConversion:
-    return "user conversion";
-
-  case SK_FunctionConversion:
-    return "function conversion";
-
-  case SK_NonDefaultLiteral:
-    return "non-default literal";
-
-  case SK_CollectionUpcastConversion:
-    return "collection upcast conversion";
-
-  case SK_ValueToOptional:
-    return "value to optional";
-
-  case SK_EmptyExistentialConversion:
-    return "empty-existential conversion";
-
-  case SK_KeyPathSubscript:
-    return "key path subscript";
-
-  case SK_ValueToPointerConversion:
-    return "value-to-pointer conversion";
-
-  case SK_FunctionToAutoClosureConversion:
-    return "function to autoclosure parameter";
-
-  case SK_ImplicitValueConversion:
-    return "value-to-value conversion";
-
-  case SK_UnappliedFunction:
-    return "overloaded unapplied function";
-  }
-}
-
 void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   if (isForCodeCompletion()) {
     switch (kind) {
@@ -118,8 +54,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
 
   if (isDebugMode() && value > 0) {
     if (solverState)
-      llvm::errs().indent(solverState->depth * 2);
-    llvm::errs() << "(increasing score due to " << getScoreKindName(kind) << ")\n";
+      llvm::errs().indent(solverState->getCurrentIndent());
+    llvm::errs() << "(increasing '" << Score::getNameFor(kind) << "' score by "
+                 << value << ")\n";
   }
 
   unsigned index = static_cast<unsigned>(kind);
@@ -135,8 +72,8 @@ bool ConstraintSystem::worseThanBestSolution() const {
     return false;
 
   if (isDebugMode()) {
-    llvm::errs().indent(solverState->depth * 2)
-      << "(solution is worse than the best solution)\n";
+    llvm::errs().indent(solverState->getCurrentIndent())
+        << "(solution is worse than the best solution)\n";
   }
 
   return true;
@@ -301,33 +238,38 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
     return false;
 
-  GenericParamList *gp1 = nullptr, *gp2 = nullptr;
+  bool bothGeneric = false;
+  GenericSignature sig1, sig2;
 
   auto func1 = dyn_cast<FuncDecl>(decl1);
   auto func2 = dyn_cast<FuncDecl>(decl2);
   if (func1 && func2) {
-    gp1 = func1->getGenericParams();
-    gp2 = func2->getGenericParams();
+    bothGeneric = func1->isGeneric() && func2->isGeneric();
+
+    sig1 = func1->getGenericSignature();
+    sig2 = func2->getGenericSignature();
   }
 
   auto subscript1 = dyn_cast<SubscriptDecl>(decl1);
   auto subscript2 = dyn_cast<SubscriptDecl>(decl2);
   if (subscript1 && subscript2) {
-    gp1 = subscript1->getGenericParams();
-    gp2 = subscript2->getGenericParams();
+    bothGeneric = subscript1->isGeneric() && subscript2->isGeneric();
+
+    sig1 = subscript1->getGenericSignature();
+    sig2 = subscript2->getGenericSignature();
   }
 
-  if (gp1 && gp2) {
-    auto params1 = gp1->getParams();
-    auto params2 = gp2->getParams();
+  if (bothGeneric) {
+    auto params1 = sig1.getInnermostGenericParams();
+    auto params2 = sig2.getInnermostGenericParams();
       
     if (params1.size() == params2.size()) {
       for (size_t i = 0; i < params1.size(); i++) {
         auto p1 = params1[i];
         auto p2 = params2[i];
           
-        int np1 = static_cast<int>(p1->getConformingProtocols().size());
-        int np2 = static_cast<int>(p2->getConformingProtocols().size());
+        int np1 = static_cast<int>(sig1->getRequiredProtocols(p1).size());
+        int np2 = static_cast<int>(sig2->getRequiredProtocols(p2).size());
         int aDelta = np1 - np2;
           
         if (aDelta)
@@ -382,7 +324,7 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
 
   // Solve the system. If the first extension is at least as specialized as the
   // second, we're done.
-  return cs.solveSingle().hasValue();
+  return cs.solveSingle().has_value();
 }
 
 /// Retrieve the adjusted parameter type for overloading purposes.
@@ -725,6 +667,9 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
 static Type getUnlabeledType(Type type, ASTContext &ctx) {
   return type.transform([&](Type type) -> Type {
     if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
+      if (tupleType->getNumElements() == 1)
+        return ParenType::get(ctx, tupleType->getElementType(0));
+
       SmallVector<TupleTypeElt, 8> elts;
       for (auto elt : tupleType->getElements()) {
         elts.push_back(elt.getWithoutName());
@@ -847,10 +792,10 @@ getConstructorParamsAsTuples(ASTContext &ctx, Type boundTy1, Type boundTy2) {
     return bindings;
   }
 
-  auto tuple1 = AnyFunctionType::composeTuple(ctx, initParams1,
-                                              /*wantParamFlags*/ false);
-  auto tuple2 = AnyFunctionType::composeTuple(ctx, initParams2,
-                                              /*wantParamFlags*/ false);
+  auto tuple1 = AnyFunctionType::composeTuple(
+      ctx, initParams1, ParameterFlagHandling::IgnoreNonEmpty);
+  auto tuple2 = AnyFunctionType::composeTuple(
+      ctx, initParams2, ParameterFlagHandling::IgnoreNonEmpty);
   return TypeBindingsToCompare(tuple1, tuple2);
 }
 
@@ -858,8 +803,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
   if (cs.isDebugMode()) {
-    llvm::errs().indent(cs.solverState->depth * 2)
-      << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
+    llvm::errs().indent(cs.solverState->getCurrentIndent())
+        << "comparing solutions " << idx1 << " and " << idx2 << "\n";
   }
 
   // Whether the solutions are identical.
@@ -1415,13 +1360,15 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     return 0;
 
   if (isDebugMode()) {
-    llvm::errs().indent(solverState->depth * 2)
-        << "Comparing " << viable.size() << " viable solutions\n";
+    auto indent = solverState->getCurrentIndent();
+    auto &log = llvm::errs();
 
+    log.indent(indent) << "Comparing " << viable.size()
+                       << " viable solutions\n";
     for (unsigned i = 0, n = viable.size(); i != n; ++i) {
-      llvm::errs().indent(solverState->depth * 2)
-          << "--- Solution #" << i << " ---\n";
-      viable[i].dump(llvm::errs().indent(solverState->depth * 2));
+      log << "\n";
+      log.indent(indent) << "--- Solution #" << i << " ---\n";
+      viable[i].dump(llvm::errs(), indent);
     }
   }
 

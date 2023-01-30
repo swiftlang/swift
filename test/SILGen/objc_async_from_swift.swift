@@ -78,7 +78,7 @@ class SlowSwiftServer: NSObject, SlowServing {
     // CHECK:         [[BLOCK_BORROW:%.*]] = begin_borrow [[BLOCK_COPY]]
     // CHECK:         [[NIL_ERROR:%.*]] = enum $Optional<NSError>, #Optional.none
     // CHECK:         apply [[BLOCK_BORROW]]({{%.*}}, [[NIL_ERROR]])
-    // CHECK:       [[ERROR]]([[NATIVE_RESULT:%.*]] : @owned $Error):
+    // CHECK:       [[ERROR]]([[NATIVE_RESULT:%.*]] : @owned $any Error):
     // CHECK:         [[BLOCK_BORROW:%.*]] = begin_borrow [[BLOCK_COPY]]
     // CHECK:         [[NIL_NSSTRING:%.*]] = enum $Optional<NSString>, #Optional.none
     // CHECK:         apply [[BLOCK_BORROW]]([[NIL_NSSTRING]], {{%.*}})

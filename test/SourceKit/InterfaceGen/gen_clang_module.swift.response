@@ -3314,6 +3314,11 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 10
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 6397,
+    key.length: 1
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 6400,
     key.length: 10
@@ -3357,6 +3362,11 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.kind: source.lang.swift.syntaxtype.number,
     key.offset: 6480,
     key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 6486,
+    key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -3437,6 +3447,11 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
     key.offset: 6661,
     key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 6672,
+    key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,

@@ -42,28 +42,44 @@ static std::string getInstrProfSection(IRGenModule &IGM,
   return llvm::getInstrProfSectionName(SK, IGM.Triple.getObjectFormat());
 }
 
-void IRGenModule::emitCoverageMapping() {
-  std::vector<const SILCoverageMap *> Mappings;
-  for (const auto &M : getSILModule().getCoverageMaps()) {
-    // Check whether this coverage mapping can reference its name data within
-    // the profile symbol table. If the name global is gone, this function has
-    // been optimized out.
-    StringRef PGOFuncName = M.second->getPGOFuncName();
-    std::string PGOFuncNameVar = llvm::getPGOFuncNameVarName(
-        PGOFuncName, llvm::GlobalValue::LinkOnceAnyLinkage);
-    if (!Module.getNamedGlobal(PGOFuncNameVar))
-      continue;
-    Mappings.push_back(M.second);
-  }
-
+void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
   // If there aren't any coverage maps, there's nothing to emit.
   if (Mappings.empty())
     return;
 
+  SmallVector<llvm::Constant *, 4> UnusedFuncNames;
+  for (const auto *Mapping : Mappings) {
+    auto FuncName = Mapping->getPGOFuncName();
+    auto VarLinkage = llvm::GlobalValue::LinkOnceAnyLinkage;
+    auto FuncNameVarName = llvm::getPGOFuncNameVarName(FuncName, VarLinkage);
+
+    // Check whether this coverage mapping can reference its name data within
+    // the profile symbol table. If the name global isn't there, this function
+    // has been optimized out. We need to tell LLVM about it by emitting the
+    // name data separately.
+    if (!Module.getNamedGlobal(FuncNameVarName)) {
+      auto *Var = llvm::createPGOFuncNameVar(Module, VarLinkage, FuncName);
+      UnusedFuncNames.push_back(llvm::ConstantExpr::getBitCast(Var, Int8PtrTy));
+    }
+  }
+
+  // Emit the name data for any unused functions.
+  if (!UnusedFuncNames.empty()) {
+    auto NamePtrsTy = llvm::ArrayType::get(Int8PtrTy, UnusedFuncNames.size());
+    auto NamePtrs = llvm::ConstantArray::get(NamePtrsTy, UnusedFuncNames);
+
+    // Note we don't mark this variable as used, as it doesn't need to be
+    // present in the object file, it gets picked up by the LLVM instrumentation
+    // lowering pass.
+    new llvm::GlobalVariable(Module, NamePtrsTy, /*IsConstant*/ true,
+                             llvm::GlobalValue::InternalLinkage, NamePtrs,
+                             llvm::getCoverageUnusedNamesVarName());
+  }
+
   std::vector<StringRef> Files;
   for (const auto &M : Mappings)
-    if (std::find(Files.begin(), Files.end(), M->getFile()) == Files.end())
-      Files.push_back(M->getFile());
+    if (std::find(Files.begin(), Files.end(), M->getFilename()) == Files.end())
+      Files.push_back(M->getFilename());
 
   auto remapper = getOptions().CoveragePrefixMap;
 
@@ -97,7 +113,7 @@ void IRGenModule::emitCoverageMapping() {
     std::string FuncRecordName = "__covrec_" + llvm::utohexstr(NameHash);
 
     unsigned FileID =
-        std::find(Files.begin(), Files.end(), M->getFile()) - Files.begin();
+        std::find(Files.begin(), Files.end(), M->getFilename()) - Files.begin();
     std::vector<CounterMappingRegion> Regions;
     for (const auto &MR : M->getMappedRegions())
       Regions.emplace_back(CounterMappingRegion::makeRegion(
@@ -173,4 +189,30 @@ void IRGenModule::emitCoverageMapping() {
   CovData->setSection(getInstrProfSection(*this, llvm::IPSK_covmap));
   CovData->setAlignment(llvm::Align(8));
   addUsedGlobal(CovData);
+}
+
+void IRGenerator::emitCoverageMapping() {
+  if (SIL.getCoverageMaps().empty())
+    return;
+
+  // Shard the coverage maps across their designated IRGenModules. This is
+  // necessary to ensure we don't output N copies of a coverage map when doing
+  // parallel IRGen, where N is the number of output object files.
+  //
+  // Note we don't just dump all the coverage maps into the primary IGM as
+  // that would require creating unecessary name data entries, since the name
+  // data is likely to already be present in the IGM that contains the entity
+  // being profiled (unless it has been optimized out). Matching the coverage
+  // map to its originating SourceFile also matches the behavior of a debug
+  // build where the files are compiled separately.
+  llvm::DenseMap<IRGenModule *, std::vector<const SILCoverageMap *>> MapsToEmit;
+  for (const auto &M : SIL.getCoverageMaps()) {
+    auto &Mapping = M.second;
+    auto *SF = Mapping->getParentSourceFile();
+    MapsToEmit[getGenModule(SF)].push_back(Mapping);
+  }
+  for (auto &IGMPair : *this) {
+    auto *IGM = IGMPair.second;
+    IGM->emitCoverageMaps(MapsToEmit[IGM]);
+  }
 }

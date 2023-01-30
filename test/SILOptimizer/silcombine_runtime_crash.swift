@@ -5,7 +5,7 @@
 
 // REQUIRES: executable_test
 
-// This is an end-to-end test for SR-9627.
+// This is an end-to-end test for https://github.com/apple/swift/issues/52073.
 
 @inline(never)
 func save(value: Double?) {

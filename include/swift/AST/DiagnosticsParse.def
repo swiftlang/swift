@@ -91,9 +91,6 @@ ERROR(forbidden_interpolated_string,none,
 ERROR(forbidden_extended_escaping_string,none,
       "%0 cannot be an extended escaping string literal", (StringRef))
 
-ERROR(regex_literal_parsing_error,none,
-      "%0", (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -199,11 +196,12 @@ ERROR(lex_conflict_marker_in_file,none,
 // MARK: Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
-NOTE(note_in_decl_extension,none,
-     "in %select{declaration|extension}0 of %1", (bool, DeclNameRef))
+NOTE(note_in_decl_of,none,
+     "in declaration of %0", (DeclNameRef))
+NOTE(note_in_extension_of,none,
+     "in extension of %0", (TypeRepr *))
 ERROR(line_directive_style_deprecated,none,
-        "#line directive was renamed to #sourceLocation",
-        ())
+      "#line directive was renamed to #sourceLocation", ())
 
 ERROR(declaration_same_line_without_semi,none,
       "consecutive declarations on a line must be separated by ';'", ())
@@ -231,8 +229,6 @@ ERROR(disallowed_var_multiple_getset,none,
 
 ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
-ERROR(var_init_self_referential,none,
-      "variable used within its own initial value", ())
 
 ERROR(disallowed_enum_element,none,
       "enum 'case' is not allowed outside of an enum", ())
@@ -517,6 +513,9 @@ ERROR(silfunc_and_silarg_have_incompatible_sil_value_ownership,none,
       "SILFunction and SILArgument have mismatching ValueOwnershipKinds. "
       "Function type specifies: '@%0'. SIL argument specifies: '@%1'.",
       (StringRef, StringRef))
+ERROR(sil_arg_both_lexical_and_eagerMove,none,
+      "Function argument is annotated both @_eagerMove and @_noEagerMove, "
+      "but these are incompatible alternatives", ())
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
 ERROR(expected_sil_tuple_index,none,
@@ -530,6 +529,16 @@ ERROR(sil_invalid_attribute_for_instruction,none,
 ERROR(sil_invalid_attribute_for_expected,none,
       "Invalid attribute '%0' (expected '%1').", 
       (StringRef, StringRef))
+ERROR(expected_sil_profiler_counter_idx,none,
+      "expected profiler counter index", ())
+ERROR(expected_sil_profiler_counter_pgo_func_name,none,
+      "expected profiler counter PGO function name", ())
+ERROR(expected_sil_profiler_counter_total,none,
+      "expected profiler counter total", ())
+ERROR(expected_sil_profiler_counter_hash,none,
+      "expected profiler counter hash", ())
+ERROR(expected_sil_test_specification_body,none,
+      "expected a string consisting of the space-separated test arguments", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -664,6 +673,10 @@ ERROR(sil_moveonlytocopyable_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
 ERROR(sil_moveonlytocopyable_requires_attribute,none,
       "moveonlywrapper_to_copyable requires either a [guaranteed] or [owned] attribute", ())
+ERROR(expected_generic_signature,none,
+      "expected a generic signature", ())
+ERROR(sil_expected_uuid,none,
+      "expected a UUID string literal", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -710,6 +723,14 @@ ERROR(sil_vtable_bad_entry_kind,none,
       "expected 'inherited' or 'override'", ())
 ERROR(sil_vtable_expect_rsquare,none,
       "expected ']' after vtable entry kind", ())
+
+// SIL MoveOnlyDeinit
+ERROR(expected_sil_moveonlydeinit_colon,none,
+      "expected ':' in a MoveOnlyDeinit entry", ())
+ERROR(sil_moveonlydeinit_func_not_found,none,
+      "sil function not found %0", (Identifier))
+ERROR(sil_moveonlydeinit_nominal_not_found,none,
+      "sil nominal decl not found %0", (Identifier))
 
 // SIL Global
 ERROR(sil_global_variable_not_found,none,
@@ -851,8 +872,6 @@ NOTE(subscript_array_element_fix_it_remove_space, none,
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,
       "expected ')' at end of tuple list", ())
-ERROR(multiple_ellipsis_in_tuple,none,
-      "only a single element can be variadic", ())
 ERROR(tuple_type_init,none,
       "default argument not permitted in a tuple type", ())
 ERROR(protocol_method_argument_init,none,
@@ -874,6 +893,10 @@ ERROR(deprecated_protocol_composition_single,none,
       "'protocol<...>' composition syntax has been removed and is not needed here", ())
 ERROR(deprecated_any_composition,none,
       "'protocol<>' syntax has been removed; use 'Any' instead", ())
+
+// Pack Types
+ERROR(expected_rbrace_pack_type_list,none,
+      "expected '}' at end of pack type list", ())
 
 // SIL box Types
 ERROR(sil_box_expected_var_or_let,none,
@@ -958,8 +981,6 @@ ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
 ERROR(expected_assignment_instead_of_comparison_operator,none,
       "expected '=' instead of '==' to assign default value for parameter", ())
-ERROR(parameter_vararg_default,none,
-      "variadic parameter cannot have a default value", ())
 ERROR(parameter_specifier_as_attr_disallowed,none,
       "'%0' before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
@@ -985,19 +1006,8 @@ WARNING(parameter_unnamed_warn,none,
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
 
-ERROR(availability_cannot_be_mixed,none,
-      "#available and #unavailable cannot be in the same statement", ())
-
-ERROR(false_available_is_called_unavailable,none,
-      "#available cannot be used as an expression, did you mean to use '#unavailable'?", ())
-
 ERROR(initializer_as_typed_pattern,none,
       "unexpected initializer in pattern; did you mean to use '='?", ())
-
-ERROR(unlabeled_parameter_following_variadic_parameter,none,
-      "a parameter following a variadic parameter requires a label", ())
-ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
-      "no parameters may follow a variadic parameter in a closure", ())
 
 ERROR(enum_element_empty_arglist,none,
       "enum element with associated values must have at least one "
@@ -1032,10 +1042,6 @@ ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
 ERROR(labeled_block_needs_do,none,
       "labeled block needs 'do'", ())
-
-ERROR(snake_case_deprecated,none,
-      "%0 has been replaced with %1 in Swift 3",
-      (StringRef, StringRef))
 
 // Assignment statement
 ERROR(expected_expr_assignment,none,
@@ -1286,7 +1292,7 @@ ERROR(string_literal_no_atsign,none,
 ERROR(invalid_float_literal_missing_leading_zero,none,
       "'.%0' is not a valid floating point literal; it must be written '0.%0'",
       (StringRef))
-ERROR(availability_query_outside_if_stmt_guard, none,
+ERROR(special_condition_outside_if_stmt_guard, none,
       "%0 may only be used as condition of an 'if', 'guard'"
       " or 'while' statement", (StringRef))
 
@@ -1332,25 +1338,26 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
 // Object literal expressions
 ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
       "expected argument list in object literal", ())
-ERROR(legacy_object_literal,none,
-      "'%select{|[}0#%1(...)%select{|#]}0' has been renamed to '#%2(...)'",
-      (bool, StringRef, StringRef))
 
 // Unknown pound expression.
 ERROR(unknown_pound_expr,none,
       "use of unknown directive '#%0'", (StringRef))
 
-// If expressions
-ERROR(expected_expr_after_if_question,none,
+// Ternary expressions
+ERROR(expected_expr_after_ternary_question,none,
       "expected expression after '?' in ternary expression", ())
-ERROR(expected_colon_after_if_question,none,
+ERROR(expected_colon_after_ternary_question,none,
       "expected ':' after '? ...' in ternary expression", ())
-ERROR(expected_expr_after_if_colon,none,
+ERROR(expected_expr_after_ternary_colon,none,
       "expected expression after '? ... :' in ternary expression", ())
 ERROR(expected_expr_after_try, none,
       "expected expression after 'try'", ())
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
+ERROR(expected_expr_after_move, none,
+      "expected expression after '_move'", ())
+ERROR(expected_expr_after_borrow, none,
+      "expected expression after '_borrow'", ())
 
 // Cast expressions
 ERROR(expected_type_after_is,none,
@@ -1467,6 +1474,9 @@ ERROR(attr_expected_integer_literal,none,
 ERROR(attr_expected_option_such_as,none,
       "expected '%0' option such as '%1'", (StringRef, StringRef))
 
+ERROR(attr_expected_option_identifier,none,
+      "expected '%0' option to be an identifier", (StringRef))
+
 ERROR(attr_unknown_option,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
@@ -1480,17 +1490,8 @@ ERROR(attr_expected_colon_after_label,none,
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
-ERROR(swift_native_objc_runtime_base_must_be_identifier,none,
-      "@_swift_native_objc_runtime_base class name must be an identifier", ())
-
-ERROR(objc_runtime_name_must_be_identifier,none,
-      "@_objcRuntimeName name must be an identifier", ())
-
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
-
-ERROR(projection_value_property_not_identifier,none,
-      "@_projectedValueProperty name must be an identifier", ())
 
 // Access control
 ERROR(attr_access_expected_set,none,
@@ -1519,7 +1520,10 @@ ERROR(attr_availability_multiple_kinds ,none,
 WARNING(attr_availability_invalid_duplicate,none,
         "'%0' argument has already been specified", (StringRef))
 WARNING(attr_availability_unknown_platform,none,
-      "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+       "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+WARNING(attr_availability_suggest_platform,none,
+       "unknown platform '%0' for attribute '%1'; did you mean '%2'?",
+       (StringRef, StringRef, StringRef))
 ERROR(attr_availability_expected_platform,none,
       "expected platform in '%0' attribute", (StringRef))
 ERROR(attr_availability_invalid_renamed,none,
@@ -1762,6 +1766,28 @@ WARNING(warn_attr_unsafe_removed,none,
         "'%0' attribute has been removed in favor of @preconcurrency",
         (StringRef))
 
+// _documentation
+ERROR(documentation_attr_expected_argument,none,
+      "@_documentation attribute expected 'visibility' or 'metadata' argument",
+      ())
+ERROR(documentation_attr_unknown_argument,none,
+      "unknown argument '%0', expected 'visibility' or 'metadata'",
+      (StringRef))
+ERROR(documentation_attr_expected_access_level,none,
+      "@_documentation attribute's 'visibility' argument expected an access level",
+      ())
+ERROR(documentation_attr_unknown_access_level,none,
+      "unknown visibility '%0', expected an access level keyword",
+      (StringRef))
+ERROR(documentation_attr_duplicate_visibility,none,
+      "cannot give more than one visibility to the same item", ())
+ERROR(documentation_attr_metadata_expected_text,none,
+      "@_documentation attribute's 'metadata' argument expected an identifier or "
+      "quoted string",
+      ())
+ERROR(documentation_attr_duplicate_metadata,none,
+      "cannot give more than one metadata argument to the same item", ())
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1851,11 +1877,20 @@ WARNING(likely_simulator_platform_condition,none,
       "use 'targetEnvironment(simulator)' instead",
       ())
 
-ERROR(canimport_two_parameters, none, "canImport can take only two parameters", ())
-
-ERROR(canimport_label, none, "2nd parameter of canImport should be labeled as _version or _underlyingVersion", ())
-
-ERROR(canimport_version, none, "cannot parse module version: %0", (StringRef))
+ERROR(canimport_two_parameters,none,
+      "canImport can take only two parameters", ())
+ERROR(canimport_label,none,
+      "2nd parameter of canImport should be labeled as "
+      "_version or _underlyingVersion", ())
+ERROR(canimport_invalid_version,none,
+      "cannot parse module version '%0'",
+      (StringRef))
+ERROR(canimport_empty_version,none,
+      "%0 argument cannot be empty",
+      (StringRef))
+WARNING(canimport_version_too_many_components,none,
+        "trailing components of version '%0' are ignored",
+        (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Availability query parsing diagnostics
@@ -1872,6 +1907,10 @@ ERROR(avail_query_expected_rparen,PointsToFirstBadToken,
 
 WARNING(avail_query_unrecognized_platform_name,
         PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
+WARNING(avail_query_suggest_platform_name,
+        PointsToFirstBadToken, "unrecognized platform name %0;"
+        " did you mean '%1'?",
+        (Identifier, StringRef))
 
 ERROR(avail_query_disallowed_operator, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))
@@ -1904,10 +1943,36 @@ ERROR(pound_available_package_description_not_allowed, none,
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
 
+ERROR(availability_cannot_be_mixed,none,
+      "#available and #unavailable cannot be in the same statement", ())
+
+ERROR(false_available_is_called_unavailable,none,
+      "#available cannot be used as an expression, did you mean to use '#unavailable'?", ())
+
+//------------------------------------------------------------------------------
+// MARK: #_hasSymbol query parsing diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(has_symbol_expected_lparen,PointsToFirstBadToken,
+      "expected '(' in #_hasSymbol directive", ())
+
+ERROR(has_symbol_expected_expr,PointsToFirstBadToken,
+      "expected expression in #_hasSymbol", ())
+
+ERROR(has_symbol_expected_rparen,PointsToFirstBadToken,
+      "expected ')' in #_hasSymbol condition", ())
+
 ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
       "concurrency is enabled",
       (StringRef, bool))
+
+//------------------------------------------------------------------------------
+// MARK: Variadics
+//------------------------------------------------------------------------------
+
+ERROR(associatedtype_cannot_be_variadic,none,
+      "associated types cannot be variadic", ())
 
 //------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
@@ -1925,6 +1990,71 @@ ERROR(expected_closure_literal,none,
 
 ERROR(expected_multiple_closures_block_rbrace,none,
       "expected '}' at the end of a trailing closures block", ())
+
+//------------------------------------------------------------------------------
+// MARK: diagnostics emitted by Swift libraries
+//------------------------------------------------------------------------------
+
+ERROR(foreign_diagnostic,none,
+      "%0", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: macros
+//------------------------------------------------------------------------------
+ERROR(expected_macro_value_type,PointsToFirstBadToken,
+      "expected macro value type following ':'", ())
+ERROR(no_default_arg_macro,none,
+      "default arguments are not allowed in macros", ())
+ERROR(expected_lparen_macro,PointsToFirstBadToken,
+      "expected '(' for macro parameters or ':' for a value-like macro", ())
+ERROR(expected_type_macro_result,PointsToFirstBadToken,
+      "expected macro result type", ())
+ERROR(macro_decl_expected_macro_definition,PointsToFirstBadToken,
+      "expected macro definition following '=''", ())
+
+ERROR(macro_expansion_expr_expected_macro_identifier,PointsToFirstBadToken,
+      "expected a macro identifier for a pound literal expression", ())
+ERROR(macro_expansion_decl_expected_macro_identifier,PointsToFirstBadToken,
+      "expected a macro identifier for a pound literal declaration", ())
+
+ERROR(declaration_attr_expected_kind,PointsToFirstBadToken,
+      "expected a declaration macro kind ('freestanding' or 'attached')", ())
+
+ERROR(macro_role_attr_expected_kind,PointsToFirstBadToken,
+      "expected %select{a freestanding|an attached}0 macro role such as "
+      "%select{'expression'|'accessor'}0", (bool))
+ERROR(macro_role_syntax_mismatch,PointsToFirstBadToken,
+      "expected %select{a freestanding|an attached}0 macro cannot have "
+      "the %1 role", (bool, Identifier))
+ERROR(macro_attribute_unknown_label,PointsToFirstBadToken,
+      "@%select{freestanding|attached}0 has no argument with label %1",
+      (bool, Identifier))
+ERROR(macro_attribute_duplicate_label,PointsToFirstBadToken,
+      "@%select{freestanding|attached}0 already has an argument with "
+      "label %1", (bool, Identifier))
+ERROR(macro_attribute_missing_label,PointsToFirstBadToken,
+      "@%select{freestanding|attached}0 argument is missing label '%1'",
+      (bool, StringRef))
+ERROR(macro_attribute_unknown_name_kind,PointsToFirstBadToken,
+      "unknown introduced name kind %0", (Identifier))
+ERROR(macro_attribute_unknown_argument_form,PointsToFirstBadToken,
+      "introduced name argument should be an identifier", ())
+ERROR(macro_attribute_introduced_name_requires_argument,PointsToFirstBadToken,
+      "introduced name kind %0 requires a single argument '(name)'", (Identifier))
+ERROR(macro_attribute_introduced_name_requires_no_argument,PointsToFirstBadToken,
+      "introduced name kind %0 must not have an argument", (Identifier))
+WARNING(macro_expression_attribute_removed,PointsToFirstBadToken,
+      "@expression has been removed in favor of @freestanding(expression)", ())
+
+ERROR(unexpected_attribute_expansion,PointsToFirstBadToken,
+      "unexpected token '%0' in expanded attribute list'",
+      (StringRef))
+
+ERROR(parser_round_trip_error,none,
+      "source file did not round-trip through the new Swift parser", ())
+ERROR(parser_new_parser_errors,none,
+      "new Swift parser generated errors for code that C++ parser accepted",
+       ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

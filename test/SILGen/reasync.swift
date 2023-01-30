@@ -22,14 +22,14 @@ func asyncCaller(_ fn: () async -> ()) async {
    await reasyncFunction(fn)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s7reasync23throwingReasyncFunctionyyyyYaKXEYaKF : $@convention(thin) @async (@noescape @async @callee_guaranteed () -> @error Error) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @$s7reasync23throwingReasyncFunctionyyyyYaKXEYaKF : $@convention(thin) @async (@noescape @async @callee_guaranteed () -> @error any Error) -> @error any Error {
 func throwingReasyncFunction(_ a: () async throws -> ()) reasync throws {
 	try await a()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s7reasync18throwingSyncCalleryyyyXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> @error Error {
-// CHECK: [[FN:%.*]] = function_ref @$s7reasync23throwingReasyncFunctionyyyyYaKXEYaKF : $@convention(thin) @async (@noescape @async @callee_guaranteed () -> @error Error) -> @error Error
-// CHECK: try_apply [noasync] [[FN]]({{.*}}) : $@convention(thin) @async (@noescape @async @callee_guaranteed () -> @error Error) -> @error Error, normal bb1, error bb2
+// CHECK-LABEL: sil hidden [ossa] @$s7reasync18throwingSyncCalleryyyyXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> @error any Error {
+// CHECK: [[FN:%.*]] = function_ref @$s7reasync23throwingReasyncFunctionyyyyYaKXEYaKF : $@convention(thin) @async (@noescape @async @callee_guaranteed () -> @error any Error) -> @error any Error
+// CHECK: try_apply [noasync] [[FN]]({{.*}}) : $@convention(thin) @async (@noescape @async @callee_guaranteed () -> @error any Error) -> @error any Error, normal bb1, error bb2
 func throwingSyncCaller(_ fn: () -> ()) throws {
 	try throwingReasyncFunction(fn)
 }

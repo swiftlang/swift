@@ -35,10 +35,12 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
 
   // Clang declarations are public and can't be assured of having a
   // unique defining location.
-  if (isa<ClangModuleUnit>(fileContext))
+  if (isa<ClangModuleUnit>(fileContext) &&
+          !D->getObjCImplementationDecl())
     return FormalLinkage::PublicNonUnique;
 
   switch (D->getEffectiveAccess()) {
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
     return FormalLinkage::PublicUnique;
@@ -163,6 +165,7 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
     // a dependent type.
 
     switch (req.getKind()) {
+    case RequirementKind::SameShape:
     case RequirementKind::Layout:
       continue;
 
@@ -353,7 +356,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
         return false;
       
       auto indexTy = index->getInterfaceType()
-                        ->getCanonicalType(sub->getGenericSignatureOfContext());
+                        ->getReducedType(sub->getGenericSignatureOfContext());
       
       // TODO: Handle reabstraction and tuple explosion in thunk generation.
       // This wasn't previously a concern because anything that was Hashable

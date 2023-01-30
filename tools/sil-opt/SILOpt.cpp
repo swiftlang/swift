@@ -21,6 +21,7 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -113,6 +114,10 @@ static llvm::cl::opt<bool>
 DisableObjCInterop("disable-objc-interop",
                    llvm::cl::desc("Disable Objective-C interoperability."));
 
+static llvm::cl::list<std::string>
+ExperimentalFeatures("enable-experimental-feature",
+                     llvm::cl::desc("Enable the given experimental feature."));
+
 static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
@@ -136,6 +141,10 @@ static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
                    llvm::cl::desc("Enable experimental distributed actors."));
 
+static llvm::cl::opt<bool> EnableExperimentalTypeWrappers(
+    "enable-experimental-type-wrappers",
+    llvm::cl::desc("Enable experimental type wrappers."));
+
 static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
@@ -143,6 +152,10 @@ VerifyExclusivity("enable-verify-exclusivity",
 static llvm::cl::opt<bool>
 EnableSpeculativeDevirtualization("enable-spec-devirt",
                   llvm::cl::desc("Enable Speculative Devirtualization pass."));
+
+static llvm::cl::opt<bool>
+EnableMoveInoutStackProtection("enable-move-inout-stack-protector",
+                  llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
 static llvm::cl::opt<bool> EnableOSSAModules(
     "enable-ossa-modules",
@@ -554,6 +567,7 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
+  Invocation.getLangOptions().EnableDeserializationSafety = false;
   if (auto overrideKind = getASTOverrideKind()) {
     Invocation.getLangOptions().ASTVerifierOverride = *overrideKind;
   }
@@ -563,6 +577,15 @@ int main(int argc, char **argv) {
       toOptionalBool(EnableExperimentalMoveOnly);
   if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly)
     Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
+  for (auto &featureName : ExperimentalFeatures) {
+    if (auto feature = getExperimentalFeature(featureName)) {
+      Invocation.getLangOptions().Features.insert(*feature);
+    } else {
+      llvm::errs() << "error: unknown feature "
+                   << QuotedString(featureName) << "\n";
+      exit(-1);
+    }
+  }
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
@@ -579,6 +602,10 @@ int main(int argc, char **argv) {
   if (EnableExperimentalDifferentiableProgramming) {
     Invocation.getLangOptions().Features.insert(
         Feature::DifferentiableProgramming);
+  }
+
+  if (EnableExperimentalTypeWrappers) {
+    Invocation.getLangOptions().Features.insert(Feature::TypeWrappers);
   }
 
   Invocation.getLangOptions().EnableCXXInterop = EnableCxxInterop;
@@ -598,6 +625,8 @@ int main(int argc, char **argv) {
   SILOpts.OptRecordPasses = RemarksPasses;
   SILOpts.checkSILModuleLeaks = true;
   SILOpts.EnablePerformanceAnnotations = true;
+  SILOpts.EnableStackProtection = true;
+  SILOpts.EnableMoveInoutStackProtection = EnableMoveInoutStackProtection;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
@@ -818,7 +847,7 @@ int main(int argc, char **argv) {
     }
 
     SerializationOptions serializationOpts;
-    serializationOpts.OutputPath = OutputFile.c_str();
+    serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = EmitSIB;
     serializationOpts.IsSIB = EmitSIB;
 

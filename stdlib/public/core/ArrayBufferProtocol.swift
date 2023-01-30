@@ -166,7 +166,7 @@ extension _ArrayBufferProtocol {
       // so as not to self-clobber.
       newTailStart.moveInitialize(from: oldTailStart, count: tailCount)
 
-      // Assign over the original subrange
+      // Update the original subrange
       var i = newValues.startIndex
       for j in subrange {
         elements[j] = newValues[i]
@@ -199,17 +199,17 @@ extension _ArrayBufferProtocol {
       let shrinkage = -growth
       if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
 
-        // Assign over the rest of the replaced range with the first
+        // Update the rest of the replaced range with the first
         // part of the tail.
-        newTailStart.moveAssign(from: oldTailStart, count: shrinkage)
+        newTailStart.moveUpdate(from: oldTailStart, count: shrinkage)
 
         // Slide the rest of the tail back
         oldTailStart.moveInitialize(
           from: oldTailStart + shrinkage, count: tailCount - shrinkage)
       }
       else {                      // Tail fits within erased elements
-        // Assign over the start of the replaced range with the tail
-        newTailStart.moveAssign(from: oldTailStart, count: tailCount)
+        // Update the start of the replaced range with the tail
+        newTailStart.moveUpdate(from: oldTailStart, count: tailCount)
 
         // Destroy elements remaining after the tail in subrange
         (newTailStart + tailCount).deinitialize(

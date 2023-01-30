@@ -132,7 +132,7 @@ static bool canParameterizeCallOperand(const CallInst *CI, unsigned opIdx) {
       return false;
   }
   if (isCalleeOperand(CI, opIdx) &&
-      CI->getOperandBundle(LLVMContext::OB_ptrauth).hasValue()) {
+      CI->getOperandBundle(LLVMContext::OB_ptrauth).has_value()) {
     // The operand is the callee and it has already been signed. Ignore this
     // because we cannot add another ptrauth bundle to the call instruction.
     return false;
@@ -1260,6 +1260,29 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
   ++NumSwiftThunksWritten;
 }
 
+static llvm::AttributeList
+fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
+                                        llvm::AttributeList attrList) {
+  auto &context = fnType->getContext();
+  if (!context.supportsTypedPointers())
+    return attrList;
+
+  for (unsigned i = 0; i < fnType->getNumParams(); ++i) {
+    auto paramTy = fnType->getParamType(i);
+    auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
+    if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
+        paramTy->getNonOpaquePointerElementType() != attrList.getParamStructRetType(i))
+      attrList = attrList.replaceAttributeTypeAtIndex(
+          context, attrListIndex, llvm::Attribute::StructRet,
+          paramTy->getNonOpaquePointerElementType());
+    if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
+        paramTy->getNonOpaquePointerElementType() != attrList.getParamByValType(i))
+      attrList = attrList.replaceAttributeTypeAtIndex(
+          context, attrListIndex, llvm::Attribute::ByVal,
+          paramTy->getNonOpaquePointerElementType());
+  }
+  return attrList;
+}
 /// Replace direct callers of Old with New. Also add parameters to the call to
 /// \p New, which are defined by the FuncIdx's value in \p Params.
 bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
@@ -1329,9 +1352,11 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     NewCI->setCallingConv(CI->getCallingConv());
     // Don't transfer attributes from the function to the callee. Function
     // attributes typically aren't relevant to the calling convention or ABI.
-    NewCI->setAttributes(AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
+    auto newAttrList = AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
                                             NewPAL.getRetAttrs(),
-                                            NewArgAttrs));
+                                            NewArgAttrs);
+    newAttrList = fixUpTypesInByValAndStructRetAttributes(FType, newAttrList);
+    NewCI->setAttributes(newAttrList);
     CI->replaceAllUsesWith(NewCI);
     CI->eraseFromParent();
   }

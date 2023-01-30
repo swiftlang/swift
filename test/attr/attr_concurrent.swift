@@ -2,9 +2,11 @@
 // REQUIRES: concurrency
 
 // Concurrent attribute on a function type.
+// expected-note@+1{{found this candidate}}
 func f(_ fn: @Sendable (Int) -> Int) { }
 
 // Okay to overload @Sendable vs. not concurrent
+// expected-note@+1{{found this candidate}}
 func f(_ fn: (Int) -> Int) { }
 
 // Concurrent attribute with other function attributes.
@@ -24,8 +26,10 @@ func passingConcurrentOrNot(
   _ cfn: @Sendable (Int) -> Int,
   ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-sendable}}{{9-9=@Sendable }}
 ) {
+  // Ambiguous because preconcurrency code doesn't consider `@Sendable`.
+  f(cfn) // expected-error{{ambiguous use of 'f'}}
+
   // Okay due to overloading
-  f(cfn)
   f(ncfn)
 
   acceptsConcurrent(cfn) // okay

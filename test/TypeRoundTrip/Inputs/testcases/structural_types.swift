@@ -49,8 +49,9 @@ public func test() {
   roundTripType(Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>.Type.self)
   #endif
 
-  // rdar://81587763: [SR-15025]: Function type syntax doesn't accept variadics
-  // or __owned
+  // rdar://81587763
+  // https://github.com/apple/swift/issues/57353
+  // Function type syntax doesn't accept variadics or __owned
   //
   //roundTripType(((__owned String) -> ()).self)
   //roundTripType(((__owned String) -> ()).Type.self)

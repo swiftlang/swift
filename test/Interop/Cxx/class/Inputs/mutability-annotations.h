@@ -25,7 +25,7 @@ struct HasMutableProperty {
 
   int noAnnotation() const { return b; }
 
-  // expected-warning@+1 {{attribute 'nonmutating' is ignored when combined with attribute 'mutating'}}
+  // expected-warning@+1 {{attribute 'mutating' is ignored when combined with attribute 'nonmutating'}}
   int contradictingAnnotations() const __attribute__((__swift_attr__("nonmutating"))) __attribute__((__swift_attr__("mutating"))) {
     return b;
   }

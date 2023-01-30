@@ -1,0 +1,335 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s
+import Swift
+import Builtin
+
+class SuperKlass {}
+
+class Klass : SuperKlass {}
+
+struct Wrapper1 {
+  var val1: Wrapper2
+}
+
+struct Wrapper2 {
+  var val2: Klass
+}
+
+sil @use_superklass : $@convention(thin) (@guaranteed SuperKlass) -> ()
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil @use_wrapper2 : $@convention(thin) (@guaranteed Wrapper2) -> ()
+
+sil [ossa] @test_forwarded_phi1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %outer = begin_borrow %0 : $Klass
+  br bb1
+
+bb1:
+  %cast1 = unchecked_ref_cast %outer : $Klass to $SuperKlass
+  br bb2(%cast1 : $SuperKlass)
+
+bb2(%phi : @guaranteed $SuperKlass):
+  %f = function_ref @use_superklass : $@convention(thin) (@guaranteed SuperKlass) -> ()
+  apply %f(%phi) : $@convention(thin) (@guaranteed SuperKlass) -> ()
+  end_borrow %outer : $Klass
+  destroy_value %0 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_forwarded_phi2 : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  br bb1
+
+bb1:
+  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
+  br bb2(%ex1 : $Wrapper2)
+
+bb2(%phi1 : @guaranteed $Wrapper2):
+  %ex2 = struct_extract %phi1 : $Wrapper2, #Wrapper2.val2
+  br bb3(%ex2 : $Klass)
+
+bb3(%phi2 : @guaranteed $Klass):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %outer : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_forwarded_phi3 : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  br bb1
+
+bb1:
+  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
+  br bb2(%ex1 : $Wrapper2, %outer : $Wrapper1)
+
+bb2(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
+  %ex2 = struct_extract %phi1 : $Wrapper2, #Wrapper2.val2
+  br bb3(%ex2 : $Klass)
+
+bb3(%phi3 : @guaranteed $Klass):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %phi2 : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_forwarded_phi4 : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  br bb1
+
+bb1:
+  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
+  br bb2(%ex1 : $Wrapper2, %outer : $Wrapper1)
+
+bb2(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
+  %ex2 = struct_extract %phi1 : $Wrapper2, #Wrapper2.val2
+  br bb3(%ex2 : $Klass, %phi2 : $Wrapper1)
+
+bb3(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %phi4 : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_forwarded_phi5 : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  br bb1
+
+bb1:
+  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
+  br bb2(%ex1 : $Wrapper2, %outer : $Wrapper1, %0 : $Wrapper1)
+
+bb2(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1, %phi3 : @owned $Wrapper1):
+  %ex2 = struct_extract %phi1 : $Wrapper2, #Wrapper2.val2
+  br bb3(%ex2 : $Klass, %phi2 : $Wrapper1, %phi3 : $Wrapper1)
+
+bb3(%phi4 : @guaranteed $Klass, %phi5 : @guaranteed $Wrapper1, %phi6 : @owned $Wrapper1):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi4) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %phi5 : $Wrapper1
+  destroy_value %phi6 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_forwarded_phi6 : $@convention(thin) (@owned Wrapper1, @owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1, %1 : @owned $Wrapper1):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %b1 = begin_borrow %0 : $Wrapper1
+  %ex1 = struct_extract %b1 : $Wrapper1, #Wrapper1.val1
+  br bb3(%ex1 : $Wrapper2, %b1 : $Wrapper1)
+
+bb2:
+  %b2 = begin_borrow %1 : $Wrapper1
+  %ex2 = struct_extract %b2 : $Wrapper1, #Wrapper1.val1
+  br bb3(%ex2 : $Wrapper2, %b2 : $Wrapper1)
+
+bb3(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
+  %ex3 = struct_extract %phi1 : $Wrapper2, #Wrapper2.val2
+  br bb4(%ex3 : $Klass, %phi2 : $Wrapper1)
+
+bb4(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %phi4 : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  destroy_value %1 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_forwarded_phi7 : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
+  br bb1(%ex1 : $Wrapper2, %outer : $Wrapper1)
+
+bb1(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
+  %f = function_ref @use_wrapper2 : $@convention(thin) (@guaranteed Wrapper2) -> ()
+  apply %f(%phi1) : $@convention(thin) (@guaranteed Wrapper2) -> ()
+  %ex2 = struct_extract %phi2 : $Wrapper1, #Wrapper1.val1
+  br bb3(%ex2 : $Wrapper2, %phi2 : $Wrapper1)
+
+bb3(%phi3 : @guaranteed $Wrapper2, %phi4 : @guaranteed $Wrapper1):
+  apply %f(%phi3) : $@convention(thin) (@guaranteed Wrapper2) -> ()
+  end_borrow %phi4 : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_forwarded_phi8 : $@convention(method) (@guaranteed Wrapper1) -> (UInt64, UInt64) {
+bb0(%0 : @guaranteed $Wrapper1):
+  %2 = struct_extract %0 : $Wrapper1, #Wrapper1.val1
+  %3 = begin_borrow %0 : $Wrapper1
+  %4 = struct_extract %3 : $Wrapper1, #Wrapper1.val1
+  br bb1(%4 : $Wrapper2, %3 : $Wrapper1)
+
+bb1(%6 : @guaranteed $Wrapper2, %7 : @guaranteed $Wrapper1):
+  %8 = copy_value %6 : $Wrapper2
+  %9 = unchecked_trivial_bit_cast %8 : $Wrapper2 to $UInt64
+  destroy_value %8 : $Wrapper2
+  end_borrow %7 : $Wrapper1
+  %12 = tuple (%9 : $UInt64, %9 : $UInt64)
+  return %12 : $(UInt64, UInt64)
+}
+
+sil [ossa] @test_forwarded_phi9 : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
+  %ex2 = struct_extract %ex1 : $Wrapper2, #Wrapper2.val2
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%ex2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %outer : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+struct TStruct {
+}
+
+sil [ossa] @test_forwarding_phi10 : $@convention(thin) (@owned Wrapper2) -> (TStruct, TStruct) {
+bb0(%0 : @owned $Wrapper2):
+  %outer = begin_borrow %0 : $Wrapper2
+  %ex1 = struct_extract %outer : $Wrapper2, #Wrapper2.val2
+  br bb2(%ex1 : $Klass, %outer : $Wrapper2)
+
+bb2(%phi1 : @guaranteed $Klass, %phi2 : @guaranteed $Wrapper2):
+  %copy = copy_value %phi1 : $Klass
+  %cast = unchecked_trivial_bit_cast %copy : $Klass to $TStruct
+  destroy_value %copy : $Klass
+  end_borrow %phi2 : $Wrapper2
+  destroy_value %0 : $Wrapper2
+  %t = tuple (%cast : $TStruct, %cast : $TStruct)
+  return %t : $(TStruct, TStruct)
+}
+
+sil [ossa] @test_cycle1 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %b0 = begin_borrow %0 : $Klass
+  br bb3(%b0 : $Klass)
+
+bb2:
+  %b1 = begin_borrow %1 : $Klass
+  br bb3(%b1 : $Klass)
+
+bb3(%2 : @guaranteed $Klass):
+  cond_br undef, bb4, bb5
+
+bb4:
+  end_borrow %2 : $Klass
+  %b = begin_borrow %0 : $Klass
+  br bb3(%b : $Klass)
+
+bb5:
+  end_borrow %2 : $Klass
+  %999 = tuple ()
+  return %999 : $()
+}
+
+sil [ossa] @test_cycle2 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %b = begin_borrow %0 : $Klass
+  br bb1(%b : $Klass)
+
+bb1(%arg : @guaranteed $Klass):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%arg : $Klass)
+
+bb3:
+  end_borrow %arg : $Klass
+  destroy_value %0 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_cycle3 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  %ld1 = load_borrow %stk : $*Klass
+  br bb1(%ld1 : $Klass)
+
+bb1(%ld2 : @guaranteed $Klass):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%ld2 : $Klass)
+
+bb3:
+  end_borrow %ld2 : $Klass
+  destroy_addr %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_reborrow : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %b1 = begin_borrow %0 : $Klass
+  br bb3(%b1 : $Klass)
+
+bb2:
+  %b2 = begin_borrow %0 : $Klass
+  br bb3(%b2 : $Klass)
+
+bb3(%2 : @guaranteed $Klass):
+  end_borrow %2 : $Klass
+  br bb4
+
+bb4:
+  destroy_value %0 : $Klass
+  destroy_value %1 : $Klass
+  %999 = tuple ()
+  return %999 : $()
+}
+
+sil [ossa] @test_forwarded_separate_base_values : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %unrelated = begin_borrow %0 : $Wrapper1
+  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
+  br bb3(%ex1 : $Wrapper2, %unrelated : $Wrapper1)
+
+bb2:
+  %inner = begin_borrow %0 : $Wrapper1
+  %ex2 = struct_extract %inner : $Wrapper1, #Wrapper1.val1
+  br bb3(%ex2 : $Wrapper2, %inner : $Wrapper1)
+
+bb3(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
+  %f = function_ref @use_wrapper2 : $@convention(thin) (@guaranteed Wrapper2) -> ()
+  apply %f(%phi1) : $@convention(thin) (@guaranteed Wrapper2) -> ()
+  end_borrow %phi2 : $Wrapper1
+  end_borrow %outer : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}

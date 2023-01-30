@@ -45,11 +45,15 @@ import ChainedFilterMap
 import CharacterLiteralsLarge
 import CharacterLiteralsSmall
 import CharacterProperties
+import CharacterRecognizer
 import Chars
 import ClassArrayGetter
 import CodableTest
 import Combos
 import CreateObjects
+import CxxSetToCollection
+import CxxStringConversion
+import CxxVectorSum
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -97,6 +101,7 @@ import IntegerParsing
 import Integrate
 import IterateData
 import Join
+import KeyPathPerformanceTests
 import LazyFilter
 import LinkedList
 import LuhnAlgoEager
@@ -164,6 +169,7 @@ import SequenceAlgos
 import SetTests
 import SevenBoom
 import Sim2DArray
+//import SimpleArraySpecialization
 import SortArrayInClass
 import SortIntPyramids
 import SortLargeExistentials
@@ -175,6 +181,7 @@ import StrComplexWalk
 import StrToInt
 import StringBuilder
 import StringComparison
+import StringDistance
 import StringEdits
 import StringEnum
 import StringInterpolation
@@ -226,11 +233,15 @@ register(ChainedFilterMap.benchmarks)
 register(CharacterLiteralsLarge.benchmarks)
 register(CharacterLiteralsSmall.benchmarks)
 register(CharacterProperties.benchmarks)
+register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
+register(CxxSetToCollection.benchmarks)
+register(CxxStringConversion.benchmarks)
+register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)
@@ -279,6 +290,7 @@ register(Integrate.benchmarks)
 register(IterateData.benchmarks)
 register(Join.benchmarks)
 register(LazyFilter.benchmarks)
+register(KeyPathPerformanceTests.benchmarks)
 register(LinkedList.benchmarks)
 register(LuhnAlgoEager.benchmarks)
 register(LuhnAlgoLazy.benchmarks)
@@ -346,6 +358,7 @@ register(SequenceAlgos.benchmarks)
 register(SetTests.benchmarks)
 register(SevenBoom.benchmarks)
 register(Sim2DArray.benchmarks)
+//register(SimpleArraySpecialization.benchmarks)
 register(SortArrayInClass.benchmarks)
 register(SortIntPyramids.benchmarks)
 register(SortLargeExistentials.benchmarks)
@@ -356,9 +369,10 @@ register(StaticArray.benchmarks)
 register(StrComplexWalk.benchmarks)
 register(StrToInt.benchmarks)
 register(StringBuilder.benchmarks)
+register(StringComparison.benchmarks)
+register(StringDistance.benchmarks)
 register(StringEdits.benchmarks)
 register(StringEnum.benchmarks)
-register(StringComparison.benchmarks)
 register(StringInterpolation.benchmarks)
 register(StringMatch.benchmarks)
 register(StringRemoveDupes.benchmarks)

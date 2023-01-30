@@ -12,7 +12,7 @@ import Foundation
 // --- initializer `let` of CFString.
 // The verifier should ignore this.
 
-// CHECK_LABEL: sil private @{{.*}}WZ : $@convention(c) (Builtin.RawPointer) -> () {
+// CHECK-LABEL: sil private {{.*}}WZ : $@convention(c) (Builtin.RawPointer) -> () {
 // CHECK: bb0(%0 : $Builtin.RawPointer):
 // CHECK:   alloc_global @$s25access_marker_verify_objc12testCFStringC8cfStringSo0F3RefavpZ
 // CHECK:   [[GA:%.*]] = global_addr @$s25access_marker_verify_objc12testCFStringC8cfStringSo0F3RefavpZ : $*CFString
@@ -62,7 +62,7 @@ class HasBlockImpl: HasBlock {
 // CHECK: switch_enum [[STR]] : $Optional<CFString>, case #Optional.some!enumelt: [[SOMEBB:bb.*]], case #Optional.none!enumelt: bb{{.*}}
 // CHECK:   [[SOMEBB]]([[R:%.*]] : @owned $CFString):
 // CHECK:   return [[R]] : $CFString
-// CHECK_LABEL: } // end sil function '$s25access_marker_verify_objc14GlobalPropertyC14globalCFStringSo0H3RefavgZ'
+// CHECK-LABEL: } // end sil function '$s25access_marker_verify_objc14GlobalPropertyC14globalCFStringSo0H3RefavgZ'
 class GlobalProperty {
   public class var globalCFString: CFString { return constCGlobal }
 }

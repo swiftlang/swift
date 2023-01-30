@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -33,7 +34,7 @@
 
 using namespace swift;
 
-// Tracing within the implementation can also be activiated by the pass.
+// Tracing within the implementation can also be activated by the pass.
 #define DEBUG_TYPE pass.debugType
 
 llvm::cl::opt<bool> EnableLoadSplittingDebugInfo(
@@ -79,7 +80,7 @@ killInstAndIncidentalUses(SingleValueInstruction *inst,
 //===----------------------------------------------------------------------===//
 
 // If simplification is successful, return a valid iterator to the next
-// intruction that wasn't erased.
+// instruction that wasn't erased.
 static Optional<SILBasicBlock::iterator>
 simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
   // Erase the simplified instruction and any instructions that end its
@@ -135,6 +136,77 @@ static void replaceUsesOfExtract(SingleValueInstruction *extract,
   LLVM_DEBUG(llvm::dbgs() << "Replacing " << *extract << "    with "
                           << *loadedVal << "\n");
   extract->replaceAllUsesWith(loadedVal);
+}
+
+// If \p loadInst has an debug uses, then move it into a separate unsafe access
+// scope. This hides it from the exclusivity checker.
+//
+// If \p loadInst was successfully hidden, then this returns the next
+// instruction following \p loadInst and following any newly inserted
+// instructions. Otherwise this returns nullptr. Returning nullptr is a signal
+// to delete \p loadInst.
+//
+// Before:
+//
+//   %a = begin_access %0 [read] [unknown]
+//   %proj = some_projections %a
+//   %whole = load %proj             // <-- loadInst
+//   %field = struct_element_addr %proj, #field
+//   %part = load %field
+//
+// After:
+//
+//   %a = begin_access %0 [read] [unknown]
+//   %proj = some_projections %a
+//   %a2 = begin_access %0 [read] [unsafe] // NEW
+//   %proj2 = some_projections %a          // CLONED
+//   %whole = load %proj2                  // <-- loadInst
+//   end_access %a2                        // NEW
+//   %field = struct_element_addr %proj, #field
+//   %part = load %field
+//
+static SILInstruction *
+moveLoadToUnsafeAccessScope(LoadInst *loadInst,
+                            CanonicalizeInstruction &pass) {
+  if (llvm::none_of(loadInst->getUses(), [](Operand *use) {
+        return use->getUser()->isDebugInstruction();
+      })) {
+    return nullptr;
+  }
+  SILValue accessScope = getAccessScope(loadInst->getOperand());
+  auto *access = dyn_cast<BeginAccessInst>(accessScope);
+  if (access && access->getEnforcement() == SILAccessEnforcement::Unsafe)
+    return nullptr;
+
+  auto checkBaseAddress = [=](SILValue addr) {
+    if (addr != accessScope)
+      return SILValue();
+
+    // the base of the new unsafe scope
+    if (access)
+      return access->getOperand();
+
+    return accessScope;
+  };
+
+  if (!canCloneUseDefChain(loadInst->getOperand(), checkBaseAddress))
+    return nullptr;
+
+  SILValue newBase =
+      cloneUseDefChain(loadInst->getOperand(), loadInst, checkBaseAddress);
+
+  auto *beginUnsafe = SILBuilderWithScope(loadInst).createBeginAccess(
+      loadInst->getLoc(), newBase, SILAccessKind::Read,
+      SILAccessEnforcement::Unsafe, true, false);
+  loadInst->setOperand(beginUnsafe);
+  auto nextInst = loadInst->getNextInstruction();
+  auto *endUnsafe = SILBuilderWithScope(nextInst).createEndAccess(
+      loadInst->getLoc(), beginUnsafe, false);
+
+  pass.notifyNewInstruction(beginUnsafe);
+  pass.notifyNewInstruction(endUnsafe);
+
+  return nextInst;
 }
 
 // Given a load with multiple struct_extracts/tuple_extracts and no other uses,
@@ -208,7 +280,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
       user = borrowedOper->getUser();
     } else {
       if (isa<EndBorrowInst>(user) &&
-          !loadInst.getOwnershipQualifier().hasValue()) {
+          !loadInst.getOwnershipQualifier().has_value()) {
         lifetimeEndingInsts.push_back(user);
         continue;
       }
@@ -284,7 +356,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     // When loading a trivial subelement, convert ownership.
     Optional<LoadOwnershipQualifier> loadOwnership =
         loadInst.getOwnershipQualifier();
-    if (loadOwnership.hasValue()) {
+    if (loadOwnership.has_value()) {
       if (*loadOwnership != LoadOwnershipQualifier::Unqualified &&
           projInst->getType().isTrivial(*projInst->getFunction()))
         loadOwnership = LoadOwnershipQualifier::Trivial;
@@ -301,16 +373,9 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     }
     pass.notifyNewInstruction(**lastNewLoad);
 
-    // FIXME: This drops debug info at -Onone load-splitting is required at
-    // -Onone for exclusivity diagnostics. Fix this by
-    // 
-    // 1. At -Onone, preserve the original load when pass.preserveDebugInfo is
-    // true, but moving it out of its current access scope and into an "unknown"
-    // access scope, which won't be enforced as an exclusivity violation.
-    //
-    // 2. At -O, create "debug fragments" recover as much debug info as possible
-    // by creating debug_value fragments for each new partial load. Currently
-    // disabled because of LLVM back-end crashes.
+    // FIXME: At -O, create "debug fragments" recover as much debug info as
+    // possible by creating debug_value fragments for each new partial
+    // load. Currently disabled because it caused on LLVM back-end crash.
     if (!pass.preserveDebugInfo && EnableLoadSplittingDebugInfo) {
       createDebugFragments(*loadInst, proj, lastNewLoad->getLoadInst());
     }
@@ -340,13 +405,23 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   for (auto *borrow : borrows)
     nextII = killInstAndIncidentalUses(borrow, nextII, pass);
 
+  // When pass.preserveDebugInfo is true, keep the original load so that debug
+  // info refers to the loaded value, rather than a memory location which may
+  // not be reused. Move the wide load out of its current access scope and into
+  // an "unknown" access scope, which won't be enforced as an exclusivity
+  // violation.
+  if (pass.preserveDebugInfo) {
+    if (auto *regularLoad = dyn_cast<LoadInst>(loadInst.getLoadInst())) {
+      if (auto *nextInst = moveLoadToUnsafeAccessScope(regularLoad, pass))
+        return nextInst->getIterator();
+    }
+  }
   // Erase the old load.
   for (auto *destroy : lifetimeEndingInsts)
     nextII = killInstruction(destroy, nextII, pass);
 
   // FIXME: remove this temporary hack to advance the iterator beyond
-  // debug_value. A soon-to-be merged commit migrates CanonicalizeInstruction to
-  // use InstructionDeleter.
+  // debug_value.
   while (nextII != loadInst->getParent()->end()
          && nextII->isDebugInstruction()) {
     ++nextII;
@@ -556,7 +631,7 @@ tryEliminateUnneededForwardingInst(SILInstruction *i,
 SILBasicBlock::iterator
 CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   if (auto nextII = simplifyAndReplace(inst, *this))
-    return nextII.getValue();
+    return nextII.value();
 
   if (auto li = LoadOperation(inst)) {
     return splitAggregateLoad(li, *this);

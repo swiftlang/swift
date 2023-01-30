@@ -21,15 +21,20 @@
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBridging.h"
+#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -120,8 +125,12 @@ swift::createDecrementBefore(SILValue ptr, SILInstruction *insertPt) {
   return builder.createReleaseValue(loc, ptr, builder.getDefaultAtomicity());
 }
 
-static bool isOSSAEndScopeWithNoneOperand(SILInstruction *i) {
+/// Returns true if OSSA scope ending instructions end_borrow/destroy_value can
+/// be deleted trivially
+static bool canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
   if (!isa<EndBorrowInst>(i) && !isa<DestroyValueInst>(i))
+    return false;
+  if (isa<StoreBorrowInst>(i->getOperand(0)))
     return false;
   return i->getOperand(0)->getOwnershipKind() == OwnershipKind::None;
 }
@@ -172,7 +181,7 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   //
   // Examples of ossa end_scope instructions: end_borrow, destroy_value.
   if (inst->getFunction()->hasOwnership() &&
-      isOSSAEndScopeWithNoneOperand(inst))
+      canTriviallyDeleteOSSAEndScopeInst(inst))
     return true;
 
   if (!inst->mayHaveSideEffects())
@@ -631,22 +640,6 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     auto *noneBB = builder->getFunction().createBasicBlockAfter(someBB);
 
     auto *phi = contBB->createPhiArgument(destTy, value->getOwnershipKind());
-    if (phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
-      auto createEndBorrow = [&](SILBasicBlock::iterator insertPt) {
-        builder->setInsertionPoint(insertPt);
-        builder->createEndBorrow(loc, phi);
-      };
-      for (SILInstruction *user : usePoints) {
-        if (isa<TermInst>(user)) {
-          assert(!isa<BranchInst>(user) && "no branch as guaranteed use point");
-          for (auto *succBB : user->getParent()->getSuccessorBlocks()) {
-            createEndBorrow(succBB->begin());
-          }
-          continue;
-        }
-        createEndBorrow(std::next(user->getIterator()));
-      }
-    }
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> caseBBs;
     caseBBs.push_back(std::make_pair(someDecl, someBB));
@@ -672,17 +665,11 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     // rewrapped Optional.
     SILValue someValue =
         builder->createOptionalSome(loc, castedUnwrappedValue, destTy);
-    if (phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
-       someValue = builder->createBeginBorrow(loc, someValue);
-    }
     builder->createBranch(loc, contBB, {someValue});
 
     // Handle the None case.
     builder->setInsertionPoint(noneBB);
     SILValue noneValue = builder->createOptionalNone(loc, destTy);
-    if (phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
-       noneValue = builder->createBeginBorrow(loc, noneValue);
-    }
     builder->createBranch(loc, contBB, {noneValue});
     builder->setInsertionPoint(contBB->begin());
 
@@ -923,15 +910,6 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
   emitDestroyOperation(builder, loc, arg, callbacks);
 }
 
-void swift::deallocPartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
-                                           SILValue arg,
-                                           SILParameterInfo paramInfo) {
-  if (!paramInfo.isIndirectInGuaranteed())
-    return;
-
-  builder.createDeallocStack(loc, arg);
-}
-
 static bool
 deadMarkDependenceUser(SILInstruction *inst,
                        SmallVectorImpl<SILInstruction *> &deleteInsts) {
@@ -967,16 +945,16 @@ void swift::getConsumedPartialApplyArgs(PartialApplyInst *pai,
 }
 
 bool swift::collectDestroys(SingleValueInstruction *inst,
-                            SmallVectorImpl<SILInstruction *> &destroys) {
+                            SmallVectorImpl<Operand *> &destroys) {
   bool isDead = true;
   for (Operand *use : inst->getUses()) {
     SILInstruction *user = use->getUser();
     if (useHasTransitiveOwnership(user)) {
       if (!collectDestroys(cast<SingleValueInstruction>(user), destroys))
         isDead = false;
-      destroys.push_back(user);
+      destroys.push_back(use);
     } else if (useDoesNotKeepValueAlive(user)) {
-      destroys.push_back(user);
+      destroys.push_back(use);
     } else {
       isDead = false;
     }
@@ -992,7 +970,7 @@ bool swift::collectDestroys(SingleValueInstruction *inst,
 ///       weirdness of the old retain/release ARC model. Most likely this will
 ///       not be needed anymore with OSSA.
 static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
-                                        ArrayRef<SILInstruction *> paiUsers,
+                                        ArrayRef<Operand *> paiUses,
                                         SILBuilderContext &builderCtxt,
                                         InstModCallbacks callbacks) {
   SmallVector<Operand *, 8> argsToHandle;
@@ -1004,7 +982,7 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
   // Compute the set of endpoints, which will be used to insert destroys of
   // temporaries. This may fail if the frontier is located on a critical edge
   // which we may not split.
-  ValueLifetimeAnalysis vla(pai, paiUsers);
+  ValueLifetimeAnalysis vla(pai, paiUses);
 
   ValueLifetimeAnalysis::Frontier partialApplyFrontier;
   if (!vla.computeFrontier(partialApplyFrontier,
@@ -1062,9 +1040,9 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     return true;
   }
 
-  // Collect all destroys of the closure (transitively including destorys of
+  // Collect all destroys of the closure (transitively including destroys of
   // copies) and check if those are the only uses of the closure.
-  SmallVector<SILInstruction *, 16> closureDestroys;
+  SmallVector<Operand *, 16> closureDestroys;
   if (!collectDestroys(closure, closureDestroys))
     return false;
 
@@ -1079,7 +1057,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
                                        callbacks))
         return false;
     } else {
-      // A preceeding partial_apply -> apply conversion (done in
+      // A preceding partial_apply -> apply conversion (done in
       // tryOptimizeApplyOfPartialApply) already ensured that the arguments are
       // kept alive until the end of the partial_apply's lifetime.
       SmallVector<Operand *, 8> argsToHandle;
@@ -1098,7 +1076,8 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
 
   // Delete all copy and destroy instructions in order so that leaf uses are
   // deleted first.
-  for (SILInstruction *user : closureDestroys) {
+  for (auto *use : closureDestroys) {
+    auto *user = use->getUser();
     assert(
         (useDoesNotKeepValueAlive(user) || useHasTransitiveOwnership(user)) &&
         "We expect only ARC operations without "
@@ -1365,6 +1344,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module, ValueDecl *vd) {
   case AccessLevel::Open:
     return false;
   case AccessLevel::Public:
+  case AccessLevel::Package:
     if (isa<ConstructorDecl>(vd)) {
       // Constructors are special: a derived class in another module can
       // "override" a constructor if its class is "open", although the
@@ -1474,7 +1454,7 @@ void swift::insertDestroyOfCapturedArguments(
   ApplySite site(pai);
   SILFunctionConventions calleeConv(site.getSubstCalleeType(),
                                     pai->getModule());
-  auto loc = RegularLocation::getAutoGeneratedLocation();
+  auto loc = CleanupLocation(RegularLocation::getAutoGeneratedLocation());
   for (auto &arg : pai->getArgumentOperands()) {
     if (!shouldInsertDestroy(arg.get()))
       continue;
@@ -1485,19 +1465,53 @@ void swift::insertDestroyOfCapturedArguments(
   }
 }
 
-void swift::insertDeallocOfCapturedArguments(
-    PartialApplyInst *pai, SILBuilder &builder) {
+void swift::insertDeallocOfCapturedArguments(PartialApplyInst *pai,
+                                             DominanceInfo *domInfo) {
   assert(pai->isOnStack());
 
   ApplySite site(pai);
   SILFunctionConventions calleeConv(site.getSubstCalleeType(),
                                     pai->getModule());
-  auto loc = RegularLocation::getAutoGeneratedLocation();
   for (auto &arg : pai->getArgumentOperands()) {
     unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
     assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
     auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
-    deallocPartialApplyCapturedArg(builder, loc, arg.get(), paramInfo);
+    if (!paramInfo.isIndirectInGuaranteed())
+      continue;
+
+    SmallVector<SILBasicBlock *, 4> boundary;
+    auto *asi = cast<AllocStackInst>(arg.get());
+    computeDominatedBoundaryBlocks(asi->getParent(), domInfo, boundary);
+
+    SmallVector<Operand *, 2> uses;
+    auto useFinding = findTransitiveUsesForAddress(asi, &uses);
+    InstructionSet users(asi->getFunction());
+    if (useFinding != AddressUseKind::Unknown) {
+      for (auto use : uses) {
+        users.insert(use->getUser());
+      }
+    }
+
+    for (auto *block : boundary) {
+      auto *terminator = block->getTerminator();
+      if (isa<UnreachableInst>(terminator))
+        continue;
+      SILInstruction *insertionPoint = nullptr;
+      if (useFinding != AddressUseKind::Unknown) {
+        insertionPoint = &block->front();
+        for (auto &instruction : llvm::reverse(*block)) {
+          if (users.contains(&instruction)) {
+            insertionPoint = instruction.getNextInstruction();
+            break;
+          }
+        }
+      } else {
+        insertionPoint = terminator;
+      }
+      auto builder = SILBuilder(insertionPoint);
+      builder.createDeallocStack(CleanupLocation(insertionPoint->getLoc()),
+                                 arg.get());
+    }
   }
 }
 
@@ -1629,7 +1643,7 @@ swift::replaceAllUsesAndErase(SILValue oldValue, SILValue newValue,
 }
 
 /// Given that we are going to replace use's underlying value, if the use is a
-/// lifetime ending use, insert an end scope scope use for the underlying value
+/// lifetime ending use, insert an end scope use for the underlying value
 /// before we RAUW.
 static void cleanupUseOldValueBeforeRAUW(Operand *use, SILBuilder &builder,
                                          SILLocation loc,
@@ -1692,7 +1706,7 @@ SILValue swift::makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock)
   if (value->getOwnershipKind() == OwnershipKind::None)
     return value;
 
-  auto insertPt = getInsertAfterPoint(value).getValue();
+  auto insertPt = getInsertAfterPoint(value).value();
   SILBuilderWithScope builder(insertPt);
   auto *copy = builder.createCopyValue(
       RegularLocation::getAutoGeneratedLocation(), value);
@@ -1837,7 +1851,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       if (VarInfo->DIExpr.hasFragment())
         // Since we can't merge two different op_fragment
         // now, we're simply bailing out if there is an
-        // existing op_fragment in DIExpresison.
+        // existing op_fragment in DIExpression.
         // TODO: Try to merge two op_fragment expressions here.
         continue;
       for (VarDecl *FD : FieldDecls) {

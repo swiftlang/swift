@@ -39,7 +39,10 @@ internal func _roundUp(_ offset: UInt, toAlignment alignment: Int) -> UInt {
 @inlinable
 internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
   _internalInvariant(offset >= 0)
-  return Int(_roundUpImpl(UInt(bitPattern: offset), toAlignment: alignment))
+  let offset = UInt(bitPattern: offset)
+  let result = Int(bitPattern: _roundUpImpl(offset, toAlignment: alignment))
+  _internalInvariant(result >= 0)
+  return result
 }
 
 /// Returns a tri-state of 0 = no, 1 = yes, 2 = maybe.

@@ -117,24 +117,6 @@ bb0(%0: $Base2):
 // CHECK: bb[[GENCALL]]{{.*}}:
 // CHECK:  apply [[METH]]
 
-// Don't devirtualize 'unsafeGuaranteed' self calls.
-// CHECK-LABEL: sil @test_unsafeGuaranteed
-// CHECK-NOT: check_cast_br
-// CHECK: return
-sil @test_unsafeGuaranteed : $@convention(thin) (@guaranteed Base2) -> () {
-bb0(%0: $Base2):
-  strong_retain %0 : $Base2
-  %4 = builtin "unsafeGuaranteed"<Base2>(%0 : $Base2) : $(Base2, Builtin.Int8)
-  %5 = tuple_extract %4 : $(Base2, Builtin.Int8), 0
-  %6 = tuple_extract %4 : $(Base2, Builtin.Int8), 1
-  %1 = class_method %0 : $Base2, #Base2.foo : (Base2) -> () -> (), $@convention(method) (@guaranteed Base2) -> ()
-  %2 = apply %1(%5) : $@convention(method) (@guaranteed Base2) -> ()
-  strong_release %5 : $Base2
-  %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
-  %3 = tuple()
-  return %3 : $()
-}
-
 // Check that NoReturn functions are devirtualized properly.
 // The new apply should be followed by an unreachable instruction
 // instead of a branch instruction.
@@ -166,7 +148,7 @@ class S2 : Throw {
   override func mayThrow() throws
 }
 
-sil hidden [thunk] @$S4main4ThrowC8mayThrowyyKF : $@convention(method) (@guaranteed Throw) -> @error Error {
+sil hidden [thunk] @$S4main4ThrowC8mayThrowyyKF : $@convention(method) (@guaranteed Throw) -> @error any Error {
 bb0(%0 : $Throw):
   %1 = tuple ()
   return %1 : $()
@@ -178,7 +160,7 @@ bb0(%0 : $S1):
   return %1 : $()
 }
 
-sil hidden [thunk] [always_inline] @$S4main2S2C8mayThrowyyKF : $@convention(method) (@guaranteed S2) -> @error Error {
+sil hidden [thunk] [always_inline] @$S4main2S2C8mayThrowyyKF : $@convention(method) (@guaranteed S2) -> @error any Error {
 bb0(%0 : $S2):
   %1 = tuple ()
   return %1 : $()
@@ -190,8 +172,8 @@ bb0(%0 : $S2):
 
 sil hidden [noinline] @test_devirt_of_throw_without_error : $@convention(thin) (@owned Throw) -> () {
 bb0(%0 : $Throw):
-  %80 = class_method %0 : $Throw, #Throw.mayThrow : (Throw) -> () throws -> (), $@convention(method) (@guaranteed Throw) -> @error Error // user: %81
-  try_apply %80(%0) : $@convention(method) (@guaranteed Throw) -> @error Error, normal bb7, error bb6
+  %80 = class_method %0 : $Throw, #Throw.mayThrow : (Throw) -> () throws -> (), $@convention(method) (@guaranteed Throw) -> @error any Error // user: %81
+  try_apply %80(%0) : $@convention(method) (@guaranteed Throw) -> @error any Error, normal bb7, error bb6
 
 bb6(%82 : $Error):
   br bb1

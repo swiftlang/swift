@@ -571,9 +571,9 @@ namespace {
             auto nextSpace = subSpace.minus(other, DC, minusCount);
             if (!nextSpace)
               return None;
-            if (nextSpace.getValue().isEmpty())
+            if (nextSpace.value().isEmpty())
               return Space();
-            newSubSpaces.push_back(nextSpace.getValue());
+            newSubSpaces.push_back(nextSpace.value());
           }
           return Space::forConstructor(this->getType(), this->getHead(),
                                        newSubSpaces);
@@ -1059,7 +1059,7 @@ namespace {
         return;
       }
       
-      auto uncovered = diff.getValue();
+      auto uncovered = diff.value();
       if (unknownCase && uncovered.isEmpty()) {
         DE.diagnose(unknownCase->getLoc(), diag::redundant_particular_case)
           .highlight(unknownCase->getSourceRange());
@@ -1185,7 +1185,7 @@ namespace {
         return;
       case RequiresDefault::UncoveredSwitch: {
         OS << tok::kw_default << ":\n" << placeholder << "\n";
-        DE.diagnose(startLoc, mainDiagType.getValue());
+        DE.diagnose(startLoc, mainDiagType.value());
         DE.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
           .fixItInsert(insertLoc, buffer.str());
       }
@@ -1203,8 +1203,8 @@ namespace {
       if (uncovered.isEmpty()) return;
 
       // Check if we still have to emit the main diagnostic.
-      if (mainDiagType.hasValue())
-        DE.diagnose(startLoc, mainDiagType.getValue());
+      if (mainDiagType.has_value())
+        DE.diagnose(startLoc, mainDiagType.value());
 
       // Add notes to explain what's missing.
       auto processUncoveredSpaces =

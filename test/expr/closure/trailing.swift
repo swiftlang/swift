@@ -39,7 +39,8 @@ func notPostfix() {
 }
 
 func notLiterals() {
-  struct SR3671 { // <https://bugs.swift.org/browse/SR-3671>
+  // https://github.com/apple/swift/issues/46256
+  struct S {
     var v: Int = 1 { // expected-error {{variable with getter/setter cannot have an initial value}}
       get {
         return self.v
@@ -218,10 +219,12 @@ func r23036383(foo: Foo23036383?, obj: Foo23036383) {
   if let _ = (foo?.map {$0+1}.map({$0+1})).map({$0+1}) {} // OK
 }
 
+// https://github.com/apple/swift/issues/51245
+
 func id<T>(fn: () -> T) -> T { return fn() }
 func any<T>(fn: () -> T) -> Any { return fn() }
 
-func testSR8736() {
+func test_51245() {
   if !id { true } { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
   
   if id { true } == true { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}

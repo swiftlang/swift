@@ -24,21 +24,54 @@ public final class X {
   public init() { }
 }
 
-// CHECK-FR-MODULE-DAG: sil [escapes !%0.**] [canonical] @$s6Module17noInlineNoEffectsySiAA1XCF :
+// CHECK-FR-MODULE-LABEL: sil [canonical] @$s6Module17noInlineNoEffectsySiAA1XCF :
+// CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
+// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  {{^[^[]}}
 // CHECK-LE-MODULE-NOT: @$s6Module17noInlineNoEffectsySiAA1XCF
 public func noInlineNoEffects(_ x: X) -> Int {
   return x.i
 }
 
-// CHECK-FR-MODULE-DAG: sil [escapes !%0.**] [canonical] @$s6Module14internalCalleeySiAA1XCF :
-// CHECK-LE-MODULE-DAG: sil [canonical] @$s6Module14internalCalleeySiAA1XCF :
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
+// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  {{^[^[]}}
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-LE-MODULE-NEXT:  {{^[^[]}}
+@inlinable
+@inline(never)
+public func inlineNoEffects(_ x: X) -> Int {
+  return internalCallee(x)
+}
+
+// CHECK-FR-MODULE-LABEL: sil [canonical] @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
+// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  {{^[^[]}}
+// CHECK-LE-MODULE-LABEL: sil [canonical] @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int{{$}}
 @usableFromInline
 func internalCallee(_ x: X) -> Int {
   return x.i
 }
 
-// CHECK-FR-MODULE-DAG: sil [serialized] [noinline] [defined_escapes !%0.**] [canonical] @$s6Module17inlineWithEffectsySiAA1XCF :
-// CHECK-LE-MODULE-DAG: sil [serialized] [noinline] [defined_escapes !%0.**] [canonical] @$s6Module17inlineWithEffectsySiAA1XCF :
+// CHECK-FR-MODULE-LABEL: sil [canonical] @$s6Module19noInlineWithEffectsySiAA1XCF :
+// CHECK-FR-MODULE-NEXT:  [%0: noescape! **, read c0.v**]
+// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  {{^[^[]}}
+// CHECK-LE-MODULE-NOT: @$s6Module19noInlineWithEffectsySiAA1XCF
+@_effects(notEscaping x.**)
+public func noInlineWithEffects(_ x: X) -> Int {
+  return x.i
+}
+
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module17inlineWithEffectsySiAA1XCF :
+// CHECK-FR-MODULE-NEXT:  [%0: noescape! **, read c0.v**]
+// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  {{^[^[]}}
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module17inlineWithEffectsySiAA1XCF :
+// CHECK-LE-MODULE-NEXT:  [%0: noescape! **]
+// CHECK-LE-MODULE-NEXT:  {{^[^[]}}
 @inlinable
 @inline(never)
 @_effects(notEscaping x.**)
@@ -46,27 +79,35 @@ public func inlineWithEffects(_ x: X) -> Int {
   return internalCallee(x)
 }
 
-// CHECK-FR-MODULE-DAG: sil [serialized] [noinline] [escapes !%0.**] [canonical] @$s6Module15inlineNoEffectsySiAA1XCF :
-// CHECK-LE-MODULE-DAG: sil [serialized] [noinline] [canonical] @$s6Module15inlineNoEffectsySiAA1XCF :
-@inlinable
-@inline(never)
-public func inlineNoEffects(_ x: X) -> Int {
-  return internalCallee(x)
-}
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] @loadWeakX_from : {{.*}} {
+// CHECK-LE-MODULE:       {{^[^[]}}
+// CHECK-LE-MODULE-LABEL: } // end sil function 'loadWeakX_from'
 
-// CHECK-FR-MODULE-DAG: sil [defined_escapes !%0.**] [canonical] @$s6Module19noInlineWithEffectsySiAA1XCF :
-// CHECK-LE-MODULE-NOT: @$s6Module19noInlineWithEffectsySiAA1XCF
-@_effects(notEscaping x.**)
-public func noInlineWithEffects(_ x: X) -> Int {
-  return x.i
-}
-
-// CHECK-FR-MODULE-DAG: sil [serialized] [noinline] [escapes !%0.**] [canonical] @$s6Module12simpleInlineySiAA1XCF :
-// CHECK-LE-MODULE-DAG: sil [serialized] [noinline] [canonical] @$s6Module12simpleInlineySiAA1XCF :
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
+// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  {{^[^[]}}
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-LE-MODULE-NEXT:  {{^[^[]}}
 @inlinable
 @inline(never)
 public func simpleInline(_ x: X) -> Int {
   return x.i
+}
+
+public struct S {
+  public init(_ x: X) { self.x = x }
+  public weak var x: X?
+}
+
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] @loadWeakX_from : {{.*}} {
+// CHECK-FR-MODULE:       [global: deinit_barrier]
+// CHECK-FR-MODULE-LABEL: } // end sil function 'loadWeakX_from'
+@inlinable
+@inline(never)
+@_silgen_name("loadWeakX_from")
+public func loadWeakX(from s: S) -> X? {
+  return s.x
 }
 
 #else
@@ -75,7 +116,7 @@ import Module
 
 // CHECK-MAIN-LABEL: sil [noinline] @$s4Main7callit1SiyF :
 // CHECK-FR-MAIN:       alloc_ref [stack] $X
-// CHECK-EV-MAIN:       alloc_ref $X
+// CHECK-LE-MAIN:       alloc_ref $X
 // CHECK-MAIN:       } // end sil function '$s4Main7callit1SiyF'
 @inline(never)
 public func callit1() -> Int {
@@ -83,12 +124,15 @@ public func callit1() -> Int {
   return noInlineNoEffects(x)
 }
 
-// CHECK-FR-MAIN: sil [escapes !%0.**] @$s6Module17noInlineNoEffectsySiAA1XCF : 
-// CHECK-EV-MAIN: sil @$s6Module17noInlineNoEffectsySiAA1XCF : 
+// CHECK-FR-MAIN-LABEL: sil @$s6Module17noInlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int
+// CHECK-FR-MAIN-NEXT:  [%0: noescape **, read c0.v**]
+// CHECK-FR-MAIN-NEXT:  [global: ]
+// CHECK-FR-MAIN-NEXT:  {{^[^[]}}
+// CHECK-LE-MAIN-LABEL: sil @$s6Module17noInlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int{{$}}
 
 // CHECK-MAIN-LABEL: sil [noinline] @$s4Main7callit2SiyF :
 // CHECK-FR-MAIN:       alloc_ref [stack] $X
-// CHECK-EV-MAIN:       alloc_ref $X
+// CHECK-LE-MAIN:       alloc_ref $X
 // CHECK-MAIN:       } // end sil function '$s4Main7callit2SiyF'
 @inline(never)
 public func callit2() -> Int {
@@ -96,12 +140,16 @@ public func callit2() -> Int {
   return inlineNoEffects(x)
 }
 
-// CHECK-FR-MAIN: sil public_external [noinline] [escapes !%0.**] @$s6Module15inlineNoEffectsySiAA1XCF :
-// CHECK-EV-MAIN: sil public_external [noinline] @$s6Module15inlineNoEffectsySiAA1XCF :
+// CHECK-FR-MAIN-LABEL: sil public_external [noinline] @$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MAIN-NEXT:  [%0: noescape **, read c0.v**]
+// CHECK-FR-MAIN-NEXT:  [global: ]
+// CHECK-FR-MAIN-NEXT:  {{^[^[]}}
+// CHECK-LE-MAIN-LABEL: sil public_external [noinline] @$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-LE-MAIN-NEXT:  {{^[^[]}}
 
 // CHECK-MAIN-LABEL: sil [noinline] @$s4Main7callit3SiyF :
 // CHECK-FR-MAIN:       alloc_ref [stack] $X
-// CHECK-EV-MAIN:       alloc_ref [stack] $X
+// CHECK-LE-MAIN:       = function_ref @$s6Module1XCACycfc
 // CHECK-MAIN:       } // end sil function '$s4Main7callit3SiyF'
 @inline(never)
 public func callit3() -> Int {
@@ -109,12 +157,13 @@ public func callit3() -> Int {
   return noInlineWithEffects(x)
 }
 
-// CHECK-FR-MAIN: sil [defined_escapes !%0.**] @$s6Module19noInlineWithEffectsySiAA1XCF
-// CHECK-EV-MAIN: sil @$s6Module17noInlineNoEffectsySiAA1XCF : 
+// CHECK-FR-MAIN-LABEL: sil @$s6Module19noInlineWithEffectsySiAA1XCF
+// CHECK-FR-MAIN-NEXT:  [%0: noescape! **]
+// CHECK-FR-MAIN-NEXT:  {{^[^[]}}
 
 // CHECK-MAIN-LABEL: sil [noinline] @$s4Main7callit4SiyF :
 // CHECK-FR-MAIN:       alloc_ref [stack] $X
-// CHECK-EV-MAIN:       alloc_ref [stack] $X
+// CHECK-LE-MAIN:       = function_ref @$s6Module1XCACycfc
 // CHECK-MAIN:       } // end sil function '$s4Main7callit4SiyF'
 @inline(never)
 public func callit4() -> Int {
@@ -122,12 +171,16 @@ public func callit4() -> Int {
   return inlineWithEffects(x)
 }
 
-// CHECK-FR-MAIN: sil public_external [noinline] [defined_escapes !%0.**] @$s6Module17inlineWithEffectsySiAA1XCF :
-// CHECK-EV-MAIN: sil public_external [noinline] @$s6Module17inlineWithEffectsySiAA1XCF :
+// CHECK-FR-MAIN-LABEL: sil public_external [noinline] @$s6Module17inlineWithEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MAIN-NEXT:  [%0: noescape! **]
+// CHECK-FR-MAIN-NEXT:  {{^[^[]}}
+// CHECK-LE-MAIN-LABEL: sil public_external [noinline] @$s6Module17inlineWithEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-LE-MAIN-NEXT:  [%0: noescape! **]
+// CHECK-LE-MAIN-NEXT:  {{^[^[]}}
 
 // CHECK-MAIN-LABEL: sil [noinline] @$s4Main7callit5SiyF :
 // CHECK-FR-MAIN:       alloc_ref [stack] $X
-// CHECK-EV-MAIN:       alloc_ref $X
+// CHECK-LE-MAIN:       alloc_ref $X
 // CHECK-MAIN:       } // end sil function '$s4Main7callit5SiyF'
 @inline(never)
 public func callit5() -> Int {
@@ -135,11 +188,39 @@ public func callit5() -> Int {
   return simpleInline(x)
 }
 
-// CHECK-FR-MAIN: sil public_external [noinline] [escapes !%0.**] @$s6Module12simpleInlineySiAA1XCF :
-// CHECK-EV-MAIN: sil public_external [noinline] @$s6Module12simpleInlineySiAA1XCF :
+// CHECK-FR-MAIN-LABEL: sil public_external [noinline] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MAIN-NEXT:  [%0: noescape **, read c0.v**]
+// CHECK-FR-MAIN-NEXT:  [global: ]
+// CHECK-FR-MAIN-NEXT:  {{^[^[]}}
+// CHECK-LE-MAIN-LABEL: sil public_external [noinline] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-LE-MAIN-NEXT:  {{^[^[]}}
 
-// CHECK-FR-MAIN: sil [escapes !%0.**] @$s6Module14internalCalleeySiAA1XCF :
-// CHECK-EV-MAIN: sil @$s6Module14internalCalleeySiAA1XCF :
+// CHECK-MAIN-LABEL: sil [noinline] @callit6 : {{.*}} {
+// CHECK-MAIN:         [[GET_X:%[^,]+]] = function_ref @$s6Module1XCACycfc
+// CHECK-MAIN:         [[X:%[^,]+]] = apply [[GET_X]]({{%[^,]+}})
+// CHECK-MAIN:         [[LOAD_WEAK_X_FROM:%[^,]+]] = function_ref @loadWeakX_from
+// CHECK-MAIN:         apply [[LOAD_WEAK_X_FROM]]({{%[^,]+}})
+// CHECK-MAIN:         strong_release [[X]]
+// CHECK-MAIN-LABEL: } // end sil function 'callit6'
+@_silgen_name("callit6")
+@inline(never)
+public func callit6() -> X? {
+  let x = X()
+  let s = S(x)
+  let out = loadWeakX(from: s)
+  return out
+}
+
+// CHECK-MAIN-LABEL: sil public_external [noinline] @loadWeakX_from : {{.*}} {
+// CHECK-FR-MAIN:       [global: deinit_barrier]
+// CHECK-LE-MAIN:       {{^[^[]}}
+// CHECK-MAIN-LABEL: } // end sil function 'loadWeakX_from'
+
+// CHECK-FR-MAIN-LABEL: sil @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MAIN-NEXT:  [%0: noescape **, read c0.v**]
+// CHECK-FR-MAIN-NEXT:  [global: ]
+// CHECK-FR-MAIN-NEXT:  {{^[^[]}}
+// CHECK-LE-MAIN-LABEL: sil @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int{{$}}
 
 #endif
 

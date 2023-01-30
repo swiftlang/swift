@@ -1,7 +1,9 @@
-// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
-// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
+// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
+// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
 //
 // TODO: migrate the remaining tests from destroy_hoisting.sil.
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -58,6 +60,11 @@ struct I {
   var value: Builtin.Int64
 }
 
+struct Slice {
+    var _startIndex: I
+    var _guts: AnyObject
+}
+
 typealias TXXI = (X, X, I)
 
 struct SXXI {
@@ -74,6 +81,12 @@ struct STXXITXXII {
 
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
+
+// This function is not a synchronization point.
+sil @empty : $@convention(thin) () -> () {
+  %retval = tuple ()
+  return %retval : $()
+}
 
 sil @f_out : $@convention(thin) <T> () -> @out T
 sil @f_bool : $@convention(thin) () -> Builtin.Int1
@@ -114,14 +127,14 @@ bb1:
 
 // CHECK-LABEL: sil [ossa] @combine_copy_addr
 // CHECK:      bb0(%0 : $*S, %1 : $*S):
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %0
 // CHECK-NEXT:   br bb1
 // CHECK:      bb1:
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 sil [ossa] @combine_copy_addr : $@convention(thin) (@in S) -> @out S {
 bb0(%0 : $*S, %1 : $*S):
-  copy_addr %1 to [initialization] %0 : $*S
+  copy_addr %1 to [init] %0 : $*S
   br bb1
 bb1:
   destroy_addr %1 : $*S
@@ -162,10 +175,10 @@ bb4:
 // CHECK: [[A:%.*]] = alloc_stack $T
 // CHECK: apply
 // CHECK: debug_value [[A]] : $*T, expr op_deref
-// CHECK-OPT: copy_addr [take] [[A]] to [initialization] %0 : $*T
+// CHECK-OPT: copy_addr [take] [[A]] to [init] %0 : $*T
 // CHECKOPT-NOT: destroy_addr
 // CHECKOPT-NOT: debug_value [[A]]
-// CHECKDEB: copy_addr [[A]] to [initialization] %0 : $*T
+// CHECKDEB: copy_addr [[A]] to [init] %0 : $*T
 // CHECKDEB: debug_value [[A]]
 // CHECKDEB-NEXT: destroy_addr [[A]] : $*T
 // CHECK-LABEL: } // end sil function 'backward_init'
@@ -175,7 +188,7 @@ bb0(%0 : $*T):
   %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   debug_value %l1 : $*T, expr op_deref
-  copy_addr %l1 to [initialization] %0 : $*T
+  copy_addr %l1 to [init] %0 : $*T
   debug_value %0 : $*T, expr op_deref
   debug_value %l1 : $*T, expr op_deref
   destroy_addr %l1 : $*T
@@ -188,9 +201,9 @@ bb0(%0 : $*T):
 // bb2.  Dead debug instructions then need to be deleted before the
 // destroy can be merged back onto bb3.
 //
-// CHECK-LABEL: sil hidden [ossa] @destroyDiamond : $@convention(thin) <T> (@in_guaranteed T, Builtin.Int1) -> () {
+// CHECK-LABEL: sil hidden [ossa] @destroyDiamond_lexical : $@convention(thin) <T> (@in_guaranteed T, Builtin.Int1) -> () {
 // CHECK: bb0(%0 : $*T, %1 : $Builtin.Int1):
-// CHECK:   [[ALLOC:%.*]] = alloc_stack $T, var, name "t"
+// CHECK:   [[ALLOC:%.*]] = alloc_stack [lexical] $T, var, name "t"
 // CHECK-NOT: destroy
 // CHECK:   cond_br %{{.*}}, bb1, bb2
 // CHECK: bb1:
@@ -199,18 +212,18 @@ bb0(%0 : $*T):
 // CHECK:   br bb3
 // CHECK: bb2:
 // CHECKDEB: debug_value [[ALLOC]] : $*T, let, name "t"
-// CHECK-NOT: debug_val [[ALLOC]]
+// CHECK-NOT: debug_value [[ALLOC]]
 // CHECK:   br bb3
 // CHECK: bb3:
 // CHECK:   destroy_addr [[ALLOC]] : $*T
 // CHECK:   return
-// CHECK-LABEL: } // end sil function 'destroyDiamond'
-sil hidden [ossa] @destroyDiamond : $@convention(thin) <T> (@in_guaranteed T, Builtin.Int1) -> () {
+// CHECK-LABEL: } // end sil function 'destroyDiamond_lexical'
+sil hidden [ossa] @destroyDiamond_lexical : $@convention(thin) <T> (@in_guaranteed T, Builtin.Int1) -> () {
 bb0(%0 : $*T, %1 : $Builtin.Int1):
   debug_value %0 : $*T, let, name "arg", argno 1, expr op_deref
   debug_value %1 : $Builtin.Int1, let, name "z", argno 2
-  %4 = alloc_stack $T, var, name "t"
-  copy_addr %0 to [initialization] %4 : $*T
+  %4 = alloc_stack [lexical] $T, var, name "t"
+  copy_addr %0 to [init] %4 : $*T
   cond_br %1, bb1, bb2
 
 bb1:
@@ -229,8 +242,55 @@ bb3:
   return %14 : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @destroyLoop : $@convention(thin) <T> (@in_guaranteed T) -> () {
-// CHECK:   [[ALLOC:%.*]] = alloc_stack $T, var, name "t"
+// In contrast to the lexical variant (destroyDiamond_lexical), the destroy can
+// be hoisted over the unknown apply.  In the debug case, it can't be hoisted
+// over the debug_value.  In the optimized case, it can be hoisted up to the
+// entry block.
+//
+// CHECK-LABEL:   sil hidden [ossa] @destroyDiamond_nonlexical : $@convention(thin) <T> (@in_guaranteed T, Builtin.Int1) -> () {
+// CHECK:         {{bb[0-9]+}}
+// CHECK:           [[ALLOC:%.*]] = alloc_stack
+// CHECK-OPT:       destroy_addr [[ALLOC]]
+// CHECK:           cond_br %{{.*}}, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:         [[LEFT]]:
+// CHECK-DBG:       destroy_addr [[ALLOC]]
+// CHECK:           apply %{{.*}}()
+// CHECK-NOT:       destroy_addr
+// CHECK:           br [[EXIT:bb[0-9]+]]
+// CHECK:         [[RIGHT]]:
+// CHECK-OPT-NOT:   debug_value [[ALLOC]]
+// CHECK-DBG:       debug_value [[ALLOC]]
+// CHECK-DBG:       destroy_addr [[ALLOC]]
+// CHECK:           br [[EXIT]]
+// CHECK:         [[EXIT]]:
+// CHECK:           return
+// CHECK-LABEL:   } // end sil function 'destroyDiamond_nonlexical'
+sil hidden [ossa] @destroyDiamond_nonlexical : $@convention(thin) <T> (@in_guaranteed T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1 : $Builtin.Int1):
+  debug_value %0 : $*T, let, name "arg", argno 1, expr op_deref
+  debug_value %1 : $Builtin.Int1, let, name "z", argno 2
+  %4 = alloc_stack $T, var, name "t"
+  copy_addr %0 to [init] %4 : $*T
+  cond_br %1, bb1, bb2
+
+bb1:
+  %8 = function_ref @unknown : $@convention(thin) () -> ()
+  %9 = apply %8() : $@convention(thin) () -> ()
+  br bb3
+
+bb2:
+  debug_value %4 : $*T, let, name "t"
+  br bb3
+
+bb3:
+  destroy_addr %4 : $*T
+  dealloc_stack %4 : $*T
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @destroyLoop_lexical : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK:   [[ALLOC:%.*]] = alloc_stack [lexical] $T, var, name "t"
 // CHECK:   br bb1
 // CHECK: bb1:
 // CHECK:   apply %{{.*}}() : $@convention(thin) () -> Builtin.Int1
@@ -242,11 +302,48 @@ bb3:
 // CHECKOPT-NOT: debug_value
 // CHECK:   destroy_addr [[ALLOC]] : $*T
 // CHECK:   dealloc_stack [[ALLOC]] : $*T
-// CHECK-LABEL: } // end sil function 'destroyLoop'
-sil hidden [ossa] @destroyLoop : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK-LABEL: } // end sil function 'destroyLoop_lexical'
+sil hidden [ossa] @destroyLoop_lexical : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %a = alloc_stack [lexical] $T, var, name "t"
+  copy_addr %0 to [init] %a : $*T
+  br bb1
+
+bb1:
+  %f = function_ref @f_bool : $@convention(thin) () -> Builtin.Int1
+  %c = apply %f() : $@convention(thin) () -> Builtin.Int1
+  cond_br %c, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  debug_value %a : $*T, let, name "t"
+  destroy_addr %a : $*T
+  dealloc_stack %a : $*T
+  %16 = tuple ()
+  return %16 : $()
+}
+
+// CHECK-LABEL:   sil hidden [ossa] @destroyLoop_nonlexical : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK:           [[ALLOC:%.*]] = alloc_stack $T, var, name "t"
+// CHECK-OPT:       destroy_addr [[ALLOC]]
+// CHECK:           br bb1
+// CHECK:         bb1:
+// CHECK:           apply %{{.*}}() : $@convention(thin) () -> Builtin.Int1
+// CHECK-NEXT:      cond_br %{{.*}}, bb2, bb3
+// CHECK:         bb2:
+// CHECK-NEXT:      br bb1
+// CHECK:         bb3:
+// CHECK-DEB:       debug_value [[ALLOC]] : $*T, let, name "t"
+// CHECK-OPT-NOT:   debug_value
+// CHECK-DEB:       destroy_addr [[ALLOC]] : $*T
+// CHECK:           dealloc_stack [[ALLOC]] : $*T
+// CHECK-LABEL:   } // end sil function 'destroyLoop_nonlexical'
+sil hidden [ossa] @destroyLoop_nonlexical : $@convention(thin) <T> (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
   %a = alloc_stack $T, var, name "t"
-  copy_addr %0 to [initialization] %a : $*T
+  copy_addr %0 to [init] %a : $*T
   br bb1
 
 bb1:
@@ -352,11 +449,34 @@ exit:
 // unreachable-at-begin block is added to the worklist but its predecessor
 // isn't discovered.
 //
-// CHECK-LABEL: sil [ossa] @undiscovered_predecessor_of_unreachable_at_begin : {{.*}} {
+// CHECK-LABEL: sil [ossa] @undiscovered_predecessor_of_unreachable_at_begin_lexical : {{.*}} {
 // CHECK:         apply undef
 // CHECK-NEXT:    destroy_addr
-// CHECK-LABEL: } // end sil function 'undiscovered_predecessor_of_unreachable_at_begin'
-sil [ossa] @undiscovered_predecessor_of_unreachable_at_begin : $@convention(thin) (@owned S) -> () {
+// CHECK-LABEL: } // end sil function 'undiscovered_predecessor_of_unreachable_at_begin_lexical'
+sil [ossa] @undiscovered_predecessor_of_unreachable_at_begin_lexical : $@convention(thin) (@owned S) -> () {
+entry(%instance : @owned $S):
+  %addr = alloc_stack [lexical] $S
+  store %instance to [init] %addr : $*S
+  br applier
+
+applier:
+  apply undef() : $@convention(thin) () -> ()
+  br good
+
+good:
+  destroy_addr %addr : $*S
+  dealloc_stack %addr : $*S
+  %retval = tuple ()
+  return %retval : $()
+}
+  
+// In contrast to the lexical case (undiscovered_predecessor_of_unreachable_at_begin_lexical)
+//
+// CHECK-LABEL: sil [ossa] @undiscovered_predecessor_of_unreachable_at_begin_nonlexical : {{.*}} {
+// CHECK:         store
+// CHECK-NEXT:    destroy_addr
+// CHECK-LABEL: } // end sil function 'undiscovered_predecessor_of_unreachable_at_begin_nonlexical'
+sil [ossa] @undiscovered_predecessor_of_unreachable_at_begin_nonlexical : $@convention(thin) (@owned S) -> () {
 entry(%instance : @owned $S):
   %addr = alloc_stack $S
   store %instance to [init] %addr : $*S
@@ -458,7 +578,7 @@ exit:
 sil [ossa] @hoist_over_load_from_stack : $@convention(thin) (@in X) -> @owned X {
 entry(%in_addr : $*X):
   %stack_addr = alloc_stack $X
-  copy_addr %in_addr to [initialization] %stack_addr : $*X
+  copy_addr %in_addr to [init] %stack_addr : $*X
   %unknown = function_ref @unknown : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
   %retval = load [take] %stack_addr : $*X
@@ -545,10 +665,32 @@ entry(%instance : @owned $S):
 
 // Don't fold when there's a deinit barrier in the way.
 //
-// CHECK-LABEL: sil [ossa] @nofold_scoped_load_barrier : {{.*}} {
+// CHECK-LABEL: sil [ossa] @nofold_scoped_load_barrier_lexical : {{.*}} {
 // CHECK: load [copy]
-// CHECK-LABEL: // end sil function 'nofold_scoped_load_barrier'
-sil [ossa] @nofold_scoped_load_barrier : $@convention(thin) (@owned S) -> (@owned S) {
+// CHECK-LABEL: // end sil function 'nofold_scoped_load_barrier_lexical'
+sil [ossa] @nofold_scoped_load_barrier_lexical : $@convention(thin) (@owned S) -> (@owned S) {
+entry(%instance : @owned $S):
+  %addr = alloc_stack [lexical] $S
+  %store_scope = begin_access [modify] [static] %addr : $*S
+  store %instance to [init] %store_scope : $*S
+  end_access %store_scope : $*S
+  %load_scope = begin_access [read] [static] %addr : $*S
+  %value = load [copy] %load_scope : $*S
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+  end_access %load_scope : $*S
+  destroy_addr %addr : $*S
+  dealloc_stack %addr : $*S
+  return %value : $S
+}
+
+// Fold when there's a deinit barrier in the way if the alloc_stack is
+// non-lexical.
+//
+// CHECK-LABEL: sil [ossa] @nofold_scoped_load_barrier_nonlexical : {{.*}} {
+// CHECK: load [take]
+// CHECK-LABEL: // end sil function 'nofold_scoped_load_barrier_nonlexical'
+sil [ossa] @nofold_scoped_load_barrier_nonlexical : $@convention(thin) (@owned S) -> (@owned S) {
 entry(%instance : @owned $S):
   %addr = alloc_stack $S
   %store_scope = begin_access [modify] [static] %addr : $*S
@@ -602,7 +744,7 @@ entry(%instance : @owned $S):
   %inner = begin_access [read] [static] %outer : $*S
   %field_addr = struct_element_addr %inner : $*S, #S.x
   %field_addr_2 =  struct_element_addr %addr_2 : $*S, #S.x
-  copy_addr %field_addr to [initialization] %field_addr_2 : $*X
+  copy_addr %field_addr to [init] %field_addr_2 : $*X
   end_access %inner : $*S
   destroy_addr %outer : $*S
   end_access %outer : $*S
@@ -627,7 +769,7 @@ entry(%instance : @owned $S):
   %outer = begin_access [read] [static] %addr : $*S
   apply undef(%outer) : $@convention(thin) (@inout S) -> ()
   %inner = begin_access [read] [static] %outer : $*S
-  copy_addr %inner to [initialization] %addr_2 : $*S
+  copy_addr %inner to [init] %addr_2 : $*S
   end_access %inner : $*S
   destroy_addr %outer : $*S
   end_access %outer : $*S
@@ -647,8 +789,8 @@ entry(%instance : @owned $S):
 sil [ossa] @nofold_unrelated_scoped_load_copy : $@convention(thin) (@owned X) -> (@owned X) {
 entry(%instance : @owned $X):
   %copy = copy_value %instance : $X
-  %addr_1 = alloc_stack $X
-  %addr_2 = alloc_stack $X
+  %addr_1 = alloc_stack [lexical] $X
+  %addr_2 = alloc_stack [lexical] $X
   store %instance to [init] %addr_1 : $*X
   store %copy to [init] %addr_2 : $*X
 
@@ -730,8 +872,8 @@ entry(%instance : @owned $SXXI):
     store %instance to [init] %addr : $*SXXI
     %x_1_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_1
     %x_2_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_2
-    copy_addr %x_1_addr to [initialization] %x_1_alone : $*X
-    copy_addr %x_2_addr to [initialization] %x_2_alone : $*X
+    copy_addr %x_1_addr to [init] %x_1_alone : $*X
+    copy_addr %x_2_addr to [init] %x_2_alone : $*X
     destroy_addr %addr : $*SXXI
     %barrier = function_ref @unknown : $@convention(thin) () -> ()
     apply %barrier() : $@convention(thin) () -> ()
@@ -767,9 +909,9 @@ entry(%instance : @owned $STXXITXXII):
     %txxi_2_x_0_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 0
     %txxi_2_x_1_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 1
 
-    copy_addr %txxi_1_x_0_addr to [initialization] %txxi_1_alone : $*X
+    copy_addr %txxi_1_x_0_addr to [init] %txxi_1_alone : $*X
     %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
-    copy_addr %txxi_2_x_0_addr to [initialization] %txxi_2_alone : $*X
+    copy_addr %txxi_2_x_0_addr to [init] %txxi_2_alone : $*X
     %x2x1 = load [copy] %txxi_2_x_1_addr : $*X
     destroy_addr %addr : $*STXXITXXII
     %barrier = function_ref @unknown : $@convention(thin) () -> ()
@@ -802,7 +944,7 @@ entry(%instance : @owned $STXXITXXII):
     %txxi_1_x_0_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 0
     %txxi_1_x_1_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 1
 
-    copy_addr %txxi_1_x_0_addr to [initialization] %txxi_1_alone : $*X
+    copy_addr %txxi_1_x_0_addr to [init] %txxi_1_alone : $*X
     %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
     %txxi2 = load [copy] %txxi_2_addr : $*(X, X, I)
     destroy_addr %addr : $*STXXITXXII
@@ -911,7 +1053,7 @@ entry(%out : $*T, %instance : @owned $AnyObject):
     %addr = alloc_stack $AnyObject
     store %instance to [init] %addr : $*AnyObject
     %cast_addr = unchecked_addr_cast %addr : $*AnyObject to $*T
-    copy_addr %cast_addr to [initialization] %out : $*T
+    copy_addr %cast_addr to [init] %out : $*T
     destroy_addr %addr : $*AnyObject
     dealloc_stack %addr : $*AnyObject
     %retval = tuple ()
@@ -934,4 +1076,72 @@ entry(%instance : @owned $AnyObject):
     destroy_addr %addr : $*AnyObject
     dealloc_stack %addr : $*AnyObject
     return %cast : $X
+}
+
+// Don't fold a destroy_addr into a copy_addr of the whole aggregate if there
+// is an access to some trivial subobject afterwards.
+// CHECK-LABEL: sil [ossa] @nofold_destroy_addr_into_whole_with_later_trivial_subobject_use : {{.*}} {
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nofold_destroy_addr_into_whole_with_later_trivial_subobject_use'
+sil [ossa] @nofold_destroy_addr_into_whole_with_later_trivial_subobject_use : $@convention(thin) (@in Slice) -> (@out Slice) {
+bb0(%out : $*Slice, %4 : $*Slice):
+  copy_addr %4 to [init] %out : $*Slice
+  %8 = alloc_stack $I
+  %9 = struct_element_addr %4 : $*Slice, #Slice._startIndex
+  copy_addr %9 to [init] %8 : $*I
+  destroy_addr %4 : $*Slice
+  dealloc_stack %8 : $*I
+  %19 = tuple ()
+  return %19 : $()
+}
+
+// Like fold_struct_enclosing_tuples_leaf_fields_mixed_insts but with an access
+// of a trivial field afterwards.
+// CHECK-LABEL: sil [ossa] @nofold_struct_enclosing_tuples_leaf_fields_mixed_insts_with_later_trivial_subobject : {{.*}} {
+// CHECK:         load [trivial]
+// CHECK:         destroy_addr {{%[^,]+}} : $*STXXITXXII
+// CHECK-LABEL: } // end sil function 'nofold_struct_enclosing_tuples_leaf_fields_mixed_insts_with_later_trivial_subobject'
+sil [ossa] @nofold_struct_enclosing_tuples_leaf_fields_mixed_insts_with_later_trivial_subobject : $@convention(thin) (@owned STXXITXXII) -> @owned (X, X) {
+entry(%instance : @owned $STXXITXXII):
+    %addr = alloc_stack $STXXITXXII
+    %txxi_1_alone = alloc_stack $X
+    %txxi_2_alone = alloc_stack $X
+    store %instance to [init] %addr : $*STXXITXXII
+    %txxi_1_addr = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.txxi_1
+    %txxi_2_addr = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.txxi_2
+    %txxi_1_x_0_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 0
+    %txxi_1_x_1_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 1
+    %txxi_2_x_0_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 0
+    %txxi_2_x_1_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 1
+    %trivial = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.i
+
+    copy_addr %txxi_1_x_0_addr to [init] %txxi_1_alone : $*X
+    %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
+    copy_addr %txxi_2_x_0_addr to [init] %txxi_2_alone : $*X
+    %x2x1 = load [copy] %txxi_2_x_1_addr : $*X
+    %i = load [trivial] %trivial : $*I
+    destroy_addr %addr : $*STXXITXXII
+    %barrier = function_ref @unknown : $@convention(thin) () -> ()
+    apply %barrier() : $@convention(thin) () -> ()
+
+    destroy_addr %txxi_1_alone : $*X
+    destroy_addr %txxi_2_alone : $*X
+    dealloc_stack %txxi_2_alone : $*X
+    dealloc_stack %txxi_1_alone : $*X
+    dealloc_stack %addr : $*STXXITXXII
+    %retval = tuple (%x1x1 : $X, %x2x1 : $X)
+    return %retval : $(X, X)
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_over_apply_of_non_barrier_fn : {{.*}} {
+// CHECK:         destroy_addr
+// CHECK:         apply
+// CHECK-LABEL: } // end sil function 'hoist_over_apply_of_non_barrier_fn'
+sil [ossa] @hoist_over_apply_of_non_barrier_fn : $@convention(thin) (@in X) -> () {
+entry(%addr : $*X):
+  %empty = function_ref @empty : $@convention(thin) () -> ()
+  apply %empty() : $@convention(thin) () -> ()
+  destroy_addr %addr : $*X
+  %retval = tuple ()
+  return %retval : $()
 }

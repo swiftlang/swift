@@ -1064,11 +1064,15 @@ bb0(%0 : @guaranteed $ClassWithStoredProperty, %1 : $Int32):
   return %v : $()
 }
 
-// <rdar://problem/41976355> [SR-8201]: Swift 4.2 Crash in DiagnoseStaticExclusivity (llvm_unreachable)
-// mutatingNoescapeWithThunk and mutatingNoescapeConflictWithThunk.
-// Test that noescape closure verification allows a closure with @inout_aliasable argument convention,
-// which may only be used as a nonescaping closure, can be passed to a reabstraction thunk
-// without the @noescape function-type argument convention.
+// rdar://problem/41976355
+// https://github.com/apple/swift/issues/50733
+// Swift 4.2 crash in 'DiagnoseStaticExclusivity' (llvm_unreachable)
+//
+// Test that '@noescape' closure verification allows a closure with
+// '@inout_aliasable' argument convention, which may only be used as a
+// nonescaping closure, to be passed to a reabstraction thunk without the
+// '@noescape' function-type argument convention ('mutatingNoescapeWithThunk'
+// and 'mutatingNoescapeConflictWithThunk').
 
 sil [ossa] @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> () {
 bb0(%0 : $Optional<UnsafePointer<Int32>>, %1 : $*Int32):
@@ -1206,16 +1210,18 @@ bb3(%block : @owned $@convention(block) @noescape () -> ()):
 }
 
 // -----------------------------------------------------------------------------
-// <rdar://problem/42242406> [SR-8266]: Compiler crash when checking
-// exclusivity of inout alias:
-// closureWithNoCapture
-// closureWithConflict,
-// partialApplyPhiThunk
-// testPartialApplyPhi.
-// testDirectPartialApplyPhi.
+// rdar://problem/42242406
+// https://github.com/apple/swift/issues/50797
+// Compiler crash when checking exclusivity of 'inout' alias
 //
-// Test that 'checkNoEscapePartialApply' does not assert on a noescape
-// closure passed through a block argument.
+// Test that 'checkNoEscapePartialApply' does not assert on a '@noescape'
+// closure passed through a block argument:
+//
+// closureWithNoCapture
+// closureWithConflict
+// partialApplyPhiThunk
+// testPartialApplyPhi
+// testDirectPartialApplyPhi
 
 sil hidden [ossa] @closureWithNoCapture : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):

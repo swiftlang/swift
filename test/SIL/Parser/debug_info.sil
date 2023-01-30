@@ -11,8 +11,9 @@ struct TheStruct {
 
 sil_scope 1 {  parent @struct_debug_info_test : $@convention(thin) (TheStruct) -> TheStruct }
 
-// SR-14814: Make sure the `forwarding` directive being optional in the presence
-// of debug info directives (i.e. `loc` and `scope`)
+// https://github.com/apple/swift/issues/57162
+// Make sure of the `forwarding` directive being optional in the presence of
+// debug info directives (i.e. `loc` and `scope`).
 
 // CHECK-LABEL: sil [transparent] @struct_debug_info_test :
 sil [transparent] @struct_debug_info_test : $@convention(thin) (TheStruct) -> TheStruct {

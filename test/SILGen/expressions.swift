@@ -296,7 +296,7 @@ func archetype_member_ref<T : Runcible>(_ x: T) {
   x.free_method()
   // CHECK:      [[READ:%.*]] = begin_access [read] [unknown] [[X:%.*]]
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
-  // CHECK-NEXT: copy_addr [[READ]] to [initialization] [[TEMP]]
+  // CHECK-NEXT: copy_addr [[READ]] to [init] [[TEMP]]
   // CHECK-NEXT: end_access [[READ]]
   // CHECK-NEXT: witness_method $T, #Runcible.free_method :
   // CHECK-NEXT: apply
@@ -392,8 +392,7 @@ func tuple() -> (Int, Float) { return (1, 1.0) }
 func tuple_element(_ x: (Int, Float)) {
   var x = x
   // CHECK: [[XADDR:%.*]] = alloc_box ${ var (Int, Float) }
-  // CHECK: [[XLIFETIME:%.*]] = begin_borrow [lexical] [[XADDR]]
-  // CHECK: [[PB:%.*]] = project_box [[XLIFETIME]]
+  // CHECK: [[PB:%.*]] = project_box [[XADDR]]
 
   int(x.0)
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
@@ -419,8 +418,8 @@ func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s11expressions7if_expr{{[_0-9a-zA-Z]*}}F
-func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s11expressions12ternary_expr{{[_0-9a-zA-Z]*}}F
+func ternary_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var a = a
   var b = b
   var x = x
@@ -428,20 +427,15 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var z = z
   // CHECK: bb0({{.*}}):
   // CHECK: [[AB:%[0-9]+]] = alloc_box ${ var Bool }
-  // CHECK: [[AL:%[0-9]+]] = begin_borrow [lexical] [[AB]]
-  // CHECK: [[PBA:%.*]] = project_box [[AL]]
+  // CHECK: [[PBA:%.*]] = project_box [[AB]]
   // CHECK: [[BB:%[0-9]+]] = alloc_box ${ var Bool }
-  // CHECK: [[BL:%[0-9]+]] = begin_borrow [lexical] [[BB]]
-  // CHECK: [[PBB:%.*]] = project_box [[BL]]
+  // CHECK: [[PBB:%.*]] = project_box [[BB]]
   // CHECK: [[XB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[XL:%[0-9]+]] = begin_borrow [lexical] [[XB]]
-  // CHECK: [[PBX:%.*]] = project_box [[XL]]
+  // CHECK: [[PBX:%.*]] = project_box [[XB]]
   // CHECK: [[YB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[YL:%[0-9]+]] = begin_borrow [lexical] [[YB]]
-  // CHECK: [[PBY:%.*]] = project_box [[YL]]
+  // CHECK: [[PBY:%.*]] = project_box [[YB]]
   // CHECK: [[ZB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[ZL:%[0-9]+]] = begin_borrow [lexical] [[ZB]]
-  // CHECK: [[PBZ:%.*]] = project_box [[ZL]]
+  // CHECK: [[PBZ:%.*]] = project_box [[ZB]]
 
   return a
     ? x
@@ -641,7 +635,7 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 // CHECK-NEXT: [[S_READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: [[KP:%[0-9]+]] = upcast [[KP_TEMP]]
 // CHECK-NEXT: [[S_TEMP:%[0-9]+]] = alloc_stack $NonTrivialStruct
-// CHECK-NEXT: copy_addr [[S_READ]] to [initialization] [[S_TEMP]]
+// CHECK-NEXT: copy_addr [[S_READ]] to [init] [[S_TEMP]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @swift_getAtKeyPath :
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int

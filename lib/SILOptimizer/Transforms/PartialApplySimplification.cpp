@@ -162,7 +162,6 @@ static bool isSimplePartialApply(SILModule &M,
   if (isOnStack) {
     switch (contextParam.getConvention()) {
     case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
       // Indirect arguments are trivially word sized.
@@ -450,7 +449,6 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
       boxFields.push_back(SILField(param.getInterfaceType(), /*mutable*/false));
       break;
@@ -485,11 +483,17 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
   // TODO: SILBoxType is only implemented for a single field right now, and we
   // don't yet have a corresponding type for nonescaping captures, so
   // represent the captures as a tuple for now.
-  llvm::SmallVector<TupleTypeElt, 4> tupleElts;
-  for (auto field : boxFields) {
-    tupleElts.push_back(TupleTypeElt(field.getLoweredType()));
+  CanType tupleTy;
+
+  if (boxFields.size() == 1) {
+    tupleTy = boxFields[0].getLoweredType();
+  } else {
+    llvm::SmallVector<TupleTypeElt, 4> tupleElts;
+    for (auto field : boxFields) {
+      tupleElts.push_back(TupleTypeElt(field.getLoweredType()));
+    }
+    tupleTy = TupleType::get(tupleElts, C)->getCanonicalType();
   }
-  auto tupleTy = TupleType::get(tupleElts, C)->getCanonicalType();
   
   CanType contextTy;
   SILParameterInfo contextParam;
@@ -596,8 +600,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
           // Load a copy of the value from the box.
           projectedArg = B.createLoad(loc, proj, LoadOwnershipQualifier::Copy);
           break;
-        case ParameterConvention::Indirect_In:
-        case ParameterConvention::Indirect_In_Constant: {
+        case ParameterConvention::Indirect_In: {
           // Allocate space for a copy of the value that can be consumed by the
           // function body. We'll need to deallocate the stack slot after the
           // cloned body.
@@ -638,8 +641,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
           projectedArg = B.createLoad(loc, proj, LoadOwnershipQualifier::Unqualified);
           B.createRetainValue(loc, projectedArg, Atomicity::Atomic);
           break;
-        case ParameterConvention::Indirect_In:
-        case ParameterConvention::Indirect_In_Constant: {
+        case ParameterConvention::Indirect_In: {
           // Allocate space for a copy of the value that can be consumed by the
           // function body. We'll need to deallocate the stack slot after the
           // cloned body.
@@ -771,7 +773,6 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
         break;
           
       case ParameterConvention::Indirect_In_Guaranteed:
-      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In:
         // Move the value from its current memory location to the box.
         B.createCopyAddr(loc, arg, proj, IsTake, IsInitialization);
@@ -781,7 +782,8 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
       case ParameterConvention::Indirect_Inout: {
         // Pass a pointer to the argument into the box.
         auto p = B.createAddressToPointer(loc, arg,
-                                          SILType::getRawPointerType(C));
+                                          SILType::getRawPointerType(C),
+                                          /*needsStackProtection=*/ false);
         if (caller->hasOwnership()) {
           B.createStore(loc, p, proj, StoreOwnershipQualifier::Trivial);
         } else {

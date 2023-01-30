@@ -159,7 +159,10 @@ final class SubKlass: Klass<[S]> {}
 public struct S {}
 
 // rdar://88700507 - redundant conformance of @MainActor-isolated subclass to 'Sendable'
+@available(SwiftStdlib 5.1, *)
 @MainActor class MainSuper {}
+
+@available(SwiftStdlib 5.1, *)
 class MainSub: MainSuper, @unchecked Sendable {}
 
 class SendableSuper: @unchecked Sendable {}

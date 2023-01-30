@@ -423,7 +423,7 @@ func testNSNumberBridgeFromInt32() {
             
             let float = (number!) as? Float
             let expectedFloat = Float(exactly: int32!)
-            // these are disabled because of https://bugs.swift.org/browse/SR-4634
+            // FIXME: These are disabled because of https://github.com/apple/swift/issues/47211
             if (int32! != Int32.min && int32! != Int32.max &&
                 int32! != Int32.min + 1 && int32! != Int32.max - 1) {
                 testFloat(expectedFloat, float)
@@ -468,7 +468,7 @@ func testNSNumberBridgeFromUInt32() {
             
             let float = (number!) as? Float
             let expectedFloat = Float(uint32!)
-            // these are disabled because of https://bugs.swift.org/browse/SR-4634
+            // FIXME: These are disabled because of https://github.com/apple/swift/issues/47211
             if (uint32! != UInt32.max && uint32! != UInt32.max - UInt32(1)) {
                 testFloat(expectedFloat, float)
             }

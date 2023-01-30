@@ -67,9 +67,10 @@ class HeapTypeInfo
 protected:
   using super::asDerived;
 public:
-  HeapTypeInfo(llvm::PointerType *storage, Size size, SpareBitVector spareBits,
-               Alignment align)
-    : super(storage, size, spareBits, align) {}
+  HeapTypeInfo(ReferenceCounting refcounting, llvm::PointerType *storage,
+               Size size, SpareBitVector spareBits, Alignment align)
+    : super(swift::irgen::refcountingToScalarKind(refcounting), storage,
+            size, spareBits, align) {}
 
   bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                  ReferenceCounting *refcounting) const override {
@@ -234,9 +235,10 @@ public:
 
   LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                               Address addr) const override {
+    auto style = asDerived().getReferenceCounting();
     llvm::Value *ptr =
-      IGF.emitLoadRefcountedPtr(addr, asDerived().getReferenceCounting());
-    return LoadedRef(ptr, true);
+      IGF.emitLoadRefcountedPtr(addr, style);
+    return LoadedRef(ptr, true, style);
   }
 
   ReferenceCounting getReferenceCountingType() const override {

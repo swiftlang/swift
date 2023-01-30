@@ -134,13 +134,13 @@ in the following ``C.array1`` and ``D.array1`` will be accessed directly
   }
 
   func usingC(_ c: C) {
-     c.array1[i] = ... // Can directly access C.array without going through dynamic dispatch.
-     c.doSomething() = ... // Can directly call C.doSomething without going through virtual dispatch.
+    c.array1[i] = ... // Can directly access C.array without going through dynamic dispatch.
+    c.doSomething() = ... // Can directly call C.doSomething without going through virtual dispatch.
   }
 
   func usingD(_ d: D) {
-     d.array1[i] = ... // Can directly access D.array1 without going through dynamic dispatch.
-     d.array2[i] = ... // Will access D.array2 through dynamic dispatch.
+    d.array1[i] = ... // Can directly access D.array1 without going through dynamic dispatch.
+    d.array2[i] = ... // Will access D.array2 through dynamic dispatch.
   }
 
 Advice: Use 'private' and 'fileprivate' when declaration does not need to be accessed outside of file
@@ -465,23 +465,23 @@ construct such a data structure:
 
   final class Ref<T> {
     var val: T
-    init(_ v: T) {val = v}
+    init(_ v: T) { val = v }
   }
 
   struct Box<T> {
-      var ref: Ref<T>
-      init(_ x: T) { ref = Ref(x) }
+    var ref: Ref<T>
+    init(_ x: T) { ref = Ref(x) }
 
-      var value: T {
-          get { return ref.val }
-          set {
-            if !isKnownUniquelyReferenced(&ref) {
-              ref = Ref(newValue)
-              return
-            }
-            ref.val = newValue
-          }
+    var value: T {
+      get { return ref.val }
+      set {
+        if !isKnownUniquelyReferenced(&ref) {
+          ref = Ref(newValue)
+          return
+        }
+        ref.val = newValue
       }
+    }
   }
 
 The type ``Box`` can replace the array in the code sample above.
@@ -501,9 +501,9 @@ count operations are expensive and unavoidable when using Swift classes.
 .. code-block:: swift
 
   final class Node {
-   var next: Node?
-   var data: Int
-   ...
+    var next: Node?
+    var data: Int
+    ...
   }
 
 
@@ -525,27 +525,27 @@ alive.
 
 .. code-block:: swift
 
-    // The call to ``withExtendedLifetime(Head)`` makes sure that the lifetime of
-    // Head is guaranteed to extend over the region of code that uses Unmanaged
-    // references. Because there exists a reference to Head for the duration
-    // of the scope and we don't modify the list of ``Node``s there also exist a
-    // reference through the chain of ``Head.next``, ``Head.next.next``, ...
-    // instances.
+  // The call to ``withExtendedLifetime(Head)`` makes sure that the lifetime of
+  // Head is guaranteed to extend over the region of code that uses Unmanaged
+  // references. Because there exists a reference to Head for the duration
+  // of the scope and we don't modify the list of ``Node``s there also exist a
+  // reference through the chain of ``Head.next``, ``Head.next.next``, ...
+  // instances.
 
-    withExtendedLifetime(Head) {
+  withExtendedLifetime(Head) {
 
-      // Create an Unmanaged reference.
-      var Ref: Unmanaged<Node> = Unmanaged.passUnretained(Head)
+    // Create an Unmanaged reference.
+    var Ref: Unmanaged<Node> = Unmanaged.passUnretained(Head)
 
-      // Use the unmanaged reference in a call/variable access. The use of
-      // _withUnsafeGuaranteedRef allows the compiler to remove the ultimate
-      // retain/release across the call/access.
+    // Use the unmanaged reference in a call/variable access. The use of
+    // _withUnsafeGuaranteedRef allows the compiler to remove the ultimate
+    // retain/release across the call/access.
 
-      while let Next = Ref._withUnsafeGuaranteedRef { $0.next } {
-        ...
-        Ref = Unmanaged.passUnretained(Next)
-      }
+    while let Next = Ref._withUnsafeGuaranteedRef { $0.next } {
+      ...
+      Ref = Unmanaged.passUnretained(Next)
     }
+  }
 
 
 .. _Unmanaged.swift: https://github.com/apple/swift/blob/main/stdlib/public/core/Unmanaged.swift

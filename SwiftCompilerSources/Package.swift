@@ -22,6 +22,8 @@ private extension Target {
       "-Xcc", "-I", "-Xcc", "../include",
       // LLVM modules and headers
       "-Xcc", "-I", "-Xcc", "../../llvm-project/llvm/include",
+      // Clang modules and headers
+      "-Xcc", "-I", "-Xcc", "../../llvm-project/clang/include",
       "-cross-module-optimization"
     ]),
   ]

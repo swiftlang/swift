@@ -35,6 +35,10 @@ func testSubscript(x: X, i: Int) {
 func testUnresolvedMember(i: Int) -> X {
   // CHECK: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:)
   // CHECK-NEXT: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:_:_:)
+  // CHECK-NEXT: (removed constraint: disjunction
+  // CHECK-NEXT: > [[A:\$T[0-9]+]] bound to decl overload_filtering
+  // CHECK-NEXT: > [disabled] [[A]] bound to decl overload_filtering
+  // CHECK-NEXT: > [disabled] [[A]] bound to decl overload_filtering
   // CHECK-NEXT: introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:_:)
   return .init(i, i)
 }
@@ -56,6 +60,10 @@ func test_member_filtering() {
   func test(s: S) {
     // CHECK: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).test_member_filtering().S.bar(v:)
     // CHECK-NEXT: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).test_member_filtering().S.bar(a:b:)
+    // CHECK-NEXT: (removed constraint: disjunction
+    // CHECK-NEXT: > [[B:\$T[0-9]+]] bound to decl overload_filtering
+    // CHECK-NEXT: > [disabled] [[B]] bound to decl overload_filtering
+    // CHECK-NEXT: > [disabled] [[B]] bound to decl overload_filtering
     // CHECK-NEXT: introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).test_member_filtering().S.bar
     s.foo(42).bar(42)
   }

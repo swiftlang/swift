@@ -1,0 +1,148 @@
+# Lines starting with '#' are comments.
+# Each line is a case-sensitive file pattern followed by one or more owners.
+# Order is important. The last matching pattern has the most precedence.
+# More information: https://docs.github.com/en/articles/about-code-owners
+
+# .github
+/.github/                         @shahmishal
+/.github/CODEOWNERS               @AnthonyLatsis @shahmishal
+/.github/ISSUE_TEMPLATE/          @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
+/.github/PULL_REQUEST_TEMPLATE.md @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
+
+# docs
+/docs/HowToGuides/ @AnthonyLatsis @LucianoPAlmeida @xedin
+/docs/Generics/    @slavapestov
+/docs/Generics.rst @slavapestov
+
+# Standard Library
+# TODO: /stdlib/
+/stdlib/public/Cxx/        @zoecarver @hyp @egorzhdan
+/stdlib/public/Distributed/ @ktoso
+/stdlib/public/Windows/    @compnerd
+# TODO: /*test/stdlib/
+# TODO: /unittests/stdlib/
+
+# ASTGen
+/lib/ASTGen/  @zoecarver @CodaFi
+/test/ASTGen/ @zoecarver @CodaFi
+
+# Dependency scanning
+include/swift/DependencyScan                 @artemcm
+lib/DependencyScan                           @artemcm
+lib/Frontend/ModuleInterfaceLoader.cpp       @artemcm
+lib/Serialization/SerializedModuleLoader.cpp @artemcm
+test/ScanDependencies                        @artemcm
+
+# Driver
+include/swift/Driver @artemcm
+lib/Driver           @artemcm
+test/Driver          @artemcm
+
+# Owners of the parser
+/include/swift/Parse/ @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+/lib/Parse/           @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+/*test/Parse/         @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+/unittests/Parse/     @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+
+SwiftCompilerSources @eeckstein
+
+# C++ Interop
+include/swift/ClangImporter @zoecarver @hyp @egorzhdan
+include/swift/PrintAsClang  @zoecarver @hyp @egorzhdan
+lib/ClangImporter           @zoecarver @hyp @egorzhdan
+lib/PrintAsClang            @zoecarver @hyp @egorzhdan
+test/Interop                @zoecarver @hyp @egorzhdan
+
+# Threading implementation
+include/swift/Threading @al45tair
+lib/Threading           @al45tair
+
+# Windows support
+cmake/**/*Windows*    @compnerd
+lib/Basic/Windows     @compnerd
+utils/*windows*       @compnerd
+
+# Repository checkout utils
+
+/utils/update_checkout/ @shahmishal
+/utils/update-checkout* @shahmishal
+
+
+# AST
+/include/swift/AST/               @hborla @slavapestov @xedin
+/include/swift/AST/*Conformance*  @slavapestov
+/include/swift/AST/*Distributed*  @ktoso
+/include/swift/AST/Evaluator*     @CodaFi @slavapestov
+/include/swift/AST/*Generic*      @hborla @slavapestov
+/include/swift/AST/*Protocol*     @hborla @slavapestov
+/include/swift/AST/*Requirement*  @hborla @slavapestov
+/include/swift/AST/*Substitution* @slavapestov
+/lib/AST/                         @hborla @slavapestov @xedin
+/lib/AST/*Conformance*            @slavapestov
+/lib/AST/Evaluator*               @CodaFi @slavapestov
+/lib/AST/*Generic*                @hborla @slavapestov
+/lib/AST/ModuleLoader.cpp         @artemcm
+/lib/AST/*Requirement*            @hborla @slavapestov
+/lib/AST/RequirementMachine/      @slavapestov
+/lib/AST/*Substitution            @slavapestov
+/unittests/AST/                   @hborla @slavapestov @xedin
+/unittests/AST/*Evaluator*        @CodaFi @slavapestov
+
+# Sema
+/include/swift/Sema/                     @hborla @slavapestov @xedin
+/include/swift/Sema/Constraint*          @hborla @xedin
+/include/swift/Sema/CS*                  @hborla @xedin
+/lib/Sema/                               @hborla @slavapestov @xedin
+/lib/Sema/Constraint*                    @hborla @xedin
+/lib/Sema/CS*                            @hborla @xedin
+/lib/Sema/CodeSynthesisDistributed*      @hborla @ktoso
+/lib/Sema/DerivedConformance*            @slavapestov
+/lib/Sema/DerivedConformanceDistributed* @ktoso @slavapestov
+/lib/Sema/TypeCheckDistributed*          @hborla @ktoso @xedin
+/lib/Sema/TypeCheckType*                 @AnthonyLatsis @hborla @slavapestov @xedin
+/lib/Sema/TypeCheckProtocol*             @AnthonyLatsis @hborla @slavapestov
+/test/Constraints/                       @hborla @xedin
+/test/decl/                              @hborla @slavapestov
+/test/decl/protocol/                     @AnthonyLatsis @hborla @slavapestov
+# FIXME: This file could have a dedicated directory.
+/test/decl/protocol/special/DistributedActor.swift  @ktoso
+# FIXME: Should there be a 'Sema' folder under 'Distributed'? Or perhaps it
+# should be the other way around, i.e 'Sema/Distributed', 'SILGen/Distributed',
+# etc.?
+/test/Distributed/*                      @ktoso
+# FIXME: Is there a better way to structure this high-level 'Inputs' dir.? We
+# want only the Sema bits here.
+/test/Distributed/Inputs/                @ktoso
+/test/expr/                              @hborla @slavapestov @xedin
+/test/Generics/                          @hborla @slavapestov
+/test/Sema/                              @hborla @slavapestov @xedin
+/test/stmt/                              @hborla @xedin
+/test/type/                              @hborla @slavapestov @xedin
+/validation-test/Sema/                   @hborla @slavapestov @xedin
+/unittests/Sema/                         @hborla @xedin
+
+# SIL/SILGen
+# TODO: /include/swift/SIL/
+# TODO: /lib/SIL/
+# TODO: /lib/SILGen/
+/lib/SILGen/*Distributed* @ktoso
+/test/Distributed/SIL/    @ktoso
+# TODO: /*test/SIL/
+# TODO: /*test/SILGen/
+# TODO: /unittests/SIL/
+
+# SILOptimizer
+# TODO: /include/swift/SILOptimizer/
+/include/swift/SILOptimizer/Utils/Distributed* @ktoso
+# TODO: /lib/SILOptimizer/
+/lib/SILOptimizer/Utils/Distributed*           @ktoso
+# TODO: /*test/SILOptimizer/
+
+# IRGen
+# TODO: /include/swift/IRGen/
+# TODO: /lib/IRGen/
+/lib/IRGen/*Distributed* @ktoso
+# TODO: /*test/IRGen/
+
+# TODO: Find a better place for this entry.
+/test/Distributed/Runtime @ktoso

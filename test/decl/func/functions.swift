@@ -181,7 +181,7 @@ func parentheticalInout2(_ fn: (((inout Int)), Int) -> ()) {
   fn(&value, 0)
 }
 
-// SR-11724
+// https://github.com/apple/swift/issues/54133
 // FIXME: None of these diagnostics is particularly good.
 func bogusDestructuring() {
   struct Bar {}

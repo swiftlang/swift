@@ -279,8 +279,9 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
   switch (user->getKind()) {
   default:
     return false;
-  case SILInstructionKind::AutoreleaseValueInst:
+  case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::DestroyValueInst:
+  case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::StrongReleaseInst:
@@ -324,10 +325,8 @@ bool swift::isInstrumentation(SILInstruction *Instruction) {
   if (isSanitizerInstrumentation(Instruction))
     return true;
 
-  if (BuiltinInst *bi = dyn_cast<BuiltinInst>(Instruction)) {
-    if (bi->getBuiltinKind() == BuiltinValueKind::IntInstrprofIncrement)
-      return true;
-  }
+  if (isa<IncrementProfilerCounterInst>(Instruction))
+    return true;
 
   return false;
 }
@@ -482,11 +481,19 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::LinearFunctionInst:
   case SILInstructionKind::LinearFunctionExtractInst:
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
+  case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::HasSymbolInst:
+  case SILInstructionKind::DynamicPackIndexInst:
+  case SILInstructionKind::PackPackIndexInst:
+  case SILInstructionKind::ScalarPackIndexInst:
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::DebugValueInst:
     // Ignore runtime calls of debug_value
+    return RuntimeEffect::NoEffect;
+  case SILInstructionKind::TestSpecificationInst:
+    // Ignore runtime calls of test-only instructions
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::GetAsyncContinuationInst:
@@ -550,6 +557,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::InitExistentialMetatypeInst:
   case SILInstructionKind::ObjCToThickMetatypeInst:
     impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::MetaData;
+
+  case SILInstructionKind::OpenPackElementInst:
+    // We do potentially have to build type metadata as part of this
+    // instruction (if we have to materialize a concrete pack).
+    // The interface doesn't let us be specific about what metadata,
+    // though.
+    impactType = SILType();
     return RuntimeEffect::MetaData;
 
   case SILInstructionKind::OpenExistentialAddrInst:
@@ -623,6 +638,15 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
 
   case SILInstructionKind::CopyAddrInst: {
     auto *ca = cast<CopyAddrInst>(inst);
+    impactType = ca->getSrc()->getType();
+    if (!ca->isInitializationOfDest())
+      return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
+    if (!ca->isTakeOfSrc())
+      return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
+    return RuntimeEffect::MetaData;
+  }
+  case SILInstructionKind::ExplicitCopyAddrInst: {
+    auto *ca = cast<ExplicitCopyAddrInst>(inst);
     impactType = ca->getSrc()->getType();
     if (!ca->isInitializationOfDest())
       return RuntimeEffect::MetaData | RuntimeEffect::Releasing;

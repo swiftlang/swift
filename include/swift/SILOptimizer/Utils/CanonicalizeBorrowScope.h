@@ -37,6 +37,8 @@
 
 namespace swift {
 
+class BasicCalleeAnalysis;
+
 //===----------------------------------------------------------------------===//
 //                       MARK: CanonicalizeBorrowScope
 //===----------------------------------------------------------------------===//
@@ -61,7 +63,7 @@ private:
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
   /// ending". end_borrows do not end a liverange that may include owned copies.
-  PrunedLiveness liveness;
+  SSAPrunedLiveness liveness;
 
   InstructionDeleter &deleter;
 
@@ -87,7 +89,7 @@ public:
 
   BorrowedValue getBorrowedValue() const { return borrowedValue; }
 
-  const PrunedLiveness &getLiveness() const { return liveness; }
+  const SSAPrunedLiveness &getLiveness() const { return liveness; }
 
   InstructionDeleter &getDeleter() { return deleter; }
 
@@ -137,7 +139,7 @@ protected:
 
     updatedCopies.clear();
     borrowedValue = borrow;
-    liveness.initializeDefBlock(borrowedValue->getParentBlock());
+    liveness.initializeDef(borrowedValue.value);
   }
 
   bool computeBorrowLiveness();
@@ -149,6 +151,7 @@ protected:
 
 bool shrinkBorrowScope(
     BeginBorrowInst const &bbi, InstructionDeleter &deleter,
+    BasicCalleeAnalysis *calleeAnalysis,
     SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts);
 
 MoveValueInst *foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
@@ -157,7 +160,8 @@ MoveValueInst *foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
 
 bool hoistDestroysOfOwnedLexicalValue(SILValue const value,
                                       SILFunction &function,
-                                      InstructionDeleter &deleter);
+                                      InstructionDeleter &deleter,
+                                      BasicCalleeAnalysis *calleeAnalysis);
 
 } // namespace swift
 

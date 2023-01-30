@@ -31,8 +31,8 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL_DECL_E_1 | %FileCheck %s -check-prefix=NESTED_NOMINAL_DECL_E_1
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SR627_SUBCLASS | %FileCheck %s -check-prefix=SR627_SUBCLASS
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SR627_SUB_SUBCLASS | %FileCheck %s -check-prefix=SR627_SUB_SUBCLASS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ISSUE_43244_SUBCLASS | %FileCheck %s -check-prefix=ISSUE_43244_SUBCLASS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ISSUE_43244_SUB_SUBCLASS | %FileCheck %s -check-prefix=ISSUE_43244_SUB_SUBCLASS
 
 //===---
 //===--- Test that we can code complete in methods, and correctly distinguish
@@ -598,22 +598,23 @@ func testOuterE() {
 // NESTED_NOMINAL_DECL_E_1-NOT: dFunc6()
 // NESTED_NOMINAL_DECL_E_1: End completions
 
-class SR627_BaseClass<T> {
-  func myFunction(_ x: T) -> T? {
-    return nil
+// https://github.com/apple/swift/issues/43244
+do {
+  class BaseClass<T> {
+    func myFunction(_ x: T) -> T? {}
   }
-}
 
-class SR627_Subclass: SR627_BaseClass<String> {
-  #^SR627_SUBCLASS^#
-// SR627_SUBCLASS: Begin completions
-// SR627_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(:)
-// SR627_SUBCLASS: End completions
-}
+  class Subclass: BaseClass<String> {
+    #^ISSUE_43244_SUBCLASS^#
+  // ISSUE_43244_SUBCLASS: Begin completions
+  // ISSUE_43244_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(:)
+  // ISSUE_43244_SUBCLASS: End completions
+  }
 
-class SR627_SubSubclass: SR627_Subclass {
-  #^SR627_SUB_SUBCLASS^#
-  // SR627_SUB_SUBCLASS: Begin completions
-  // SR627_SUB_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(:)
-  // SR627_SUB_SUBCLASS: End completions
+  class SubSubclass: Subclass {
+    #^ISSUE_43244_SUB_SUBCLASS^#
+    // ISSUE_43244_SUB_SUBCLASS: Begin completions
+    // ISSUE_43244_SUB_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(:)
+    // ISSUE_43244_SUB_SUBCLASS: End completions
+  }
 }

@@ -20,6 +20,21 @@ func noKind() {}
 @available(badPlatform, unavailable) // expected-warning {{unknown platform 'badPlatform' for attribute 'available'}}
 func unavailable_bad_platform() {}
 
+@available(macos, unavailable) // expected-warning {{unknown platform 'macos' for attribute 'available'; did you mean 'macOS'?}} {{12-17=macOS}}
+func incorrect_platform_case() {}
+
+@available(mscos, unavailable) // expected-warning {{unknown platform 'mscos' for attribute 'available'; did you mean 'macOS'?}} {{12-17=macOS}}
+func incorrect_platform_similar1() {}
+
+@available(macoss, unavailable) // expected-warning {{unknown platform 'macoss' for attribute 'available'; did you mean 'macOS'?}} {{12-18=macOS}}
+func incorrect_platform_similar2() {}
+
+@available(mac, unavailable) // expected-warning {{unknown platform 'mac' for attribute 'available'; did you mean 'macOS'?}} {{12-15=macOS}}
+func incorrect_platform_similar3() {}
+
+@available(notValid, unavailable) // expected-warning {{unknown platform 'notValid' for attribute 'available'}} {{none}}
+func incorrect_platform_not_similar() {}
+
 // Handle unknown platform.
 @available(HAL9000, unavailable) // expected-warning {{unknown platform 'HAL9000'}}
 func availabilityUnknownPlatform() {}
@@ -224,6 +239,16 @@ func shortFormWithUnrecognizedPlatform() {
 // expected-warning@-2 {{unrecognized platform name 'iRefrigeratorOS'}}
 func shortFormWithTwoUnrecognizedPlatforms() {
 }
+
+@available(ios 8.0, macos 10.12, *)
+// expected-warning@-1 {{unrecognized platform name 'ios'; did you mean 'iOS'?}}
+// expected-warning@-2 {{unrecognized platform name 'macos'; did you mean 'macOS'?}}
+func shortFormWithTwoPlatformsIncorrectCase() {
+}
+
+@available(os 8.0, *)
+// expected-warning@-1 {{unrecognized platform name 'os'; did you mean 'iOS'?}} {{12-14=iOS}}
+func iosIsClosestThanMacOS() {}
 
 // Make sure that even after the parser hits an unrecognized
 // platform it validates the availability.
@@ -589,6 +614,62 @@ func testFactoryMethods() {
   Int.factory(other: 1) // expected-error {{'factory(other:)' has been replaced by 'init(other:)'}} {{6-14=}}
   Int.factory2(other: 1) // expected-error {{'factory2(other:)' has been replaced by 'Int.init(other:)'}} {{3-15=Int}}
 }
+
+class DeprecatedInitBase {
+  @available(*, deprecated, renamed: "init(new:)")
+  init(old: Int) {}
+
+  init(new: Int) {}
+
+  convenience init(testSelf: Int) {
+    // https://github.com/apple/swift/issues/57354
+    // The fix-it should not remove `.init`
+    self.init(old: testSelf) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{15-18=new}}
+  }
+
+  init(testSuper: Int) {}
+
+  @available(*, deprecated, renamed: "init(new:)")
+  @available(*, deprecated, renamed: "init(new:)")
+  init(multipleEqualAvailabilityAttributes: Int) {}
+
+  @available(*, deprecated, renamed: "init(old:)")
+  @available(*, deprecated, renamed: "init(testSuper:)")
+  @available(*, deprecated, renamed: "init(new:)")
+  init(multipleUnequalAvailabilityAttributes: Int) {}
+}
+
+class DeprecatedInitSub1: DeprecatedInitBase {
+  override init(testSuper: Int) {
+    // https://github.com/apple/swift/issues/57354
+    // The fix-it should not remove `.init`
+    super.init(old: testSuper) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{16-19=new}}
+  }
+}
+
+class DeprecatedInitSub2: DeprecatedInitBase { }
+
+_ = DeprecatedInitBase(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{24-27=new}}
+_ = DeprecatedInitBase.init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{29-32=new}}
+let _: DeprecatedInitBase = .init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{35-38=new}}
+_ = DeprecatedInitSub2(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{24-27=new}}
+_ = DeprecatedInitSub2.init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{29-32=new}}
+let _: DeprecatedInitSub2 = .init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{35-38=new}}
+
+_ = DeprecatedInitBase(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{24-59=new}}
+_ = DeprecatedInitBase.init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{29-64=new}}
+let _: DeprecatedInitBase = .init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{35-70=new}}
+_ = DeprecatedInitSub2(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{24-59=new}}
+_ = DeprecatedInitSub2.init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{29-64=new}}
+let _: DeprecatedInitSub2 = .init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{35-70=new}}
+
+_ = DeprecatedInitBase(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{24-61=new}}
+_ = DeprecatedInitBase.init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{29-66=new}}
+let _: DeprecatedInitBase = .init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}} expected-note {{use 'init(new:)' instead}} {{35-72=new}}
+_ = DeprecatedInitSub2(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated}} expected-note {{use 'init(new:)' instead}} {{24-61=new}}
+_ = DeprecatedInitSub2.init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated}} expected-note {{use 'init(new:)' instead}} {{29-66=new}}
+let _: DeprecatedInitSub2 = .init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated}} expected-note {{use 'init(new:)' instead}} {{35-72=new}}
+
 
 class Base {
   @available(*, unavailable)
@@ -1048,23 +1129,17 @@ struct UnavailableAccessors {
   }
 }
 
-class BaseDeprecatedInit {
-  @available(*, deprecated) init(bad: Int) { }
-}
-
-class SubInheritedDeprecatedInit: BaseDeprecatedInit { }
-
-_ = SubInheritedDeprecatedInit(bad: 0) // expected-warning {{'init(bad:)' is deprecated}}
-
+// https://github.com/apple/swift/issues/51149
 // Should produce no warnings.
-enum SR8634_Enum: Int {
+
+enum Enum_51149: Int {
   case a
   @available(*, deprecated, message: "I must not be raised in synthesized code")
   case b
   case c
 }
 
-struct SR8634_Struct: Equatable {
+struct Struct_51149: Equatable {
   @available(*, deprecated, message: "I must not be raised in synthesized code", renamed: "x")
   let a: Int
 }

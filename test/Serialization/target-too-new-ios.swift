@@ -12,5 +12,5 @@
 
 // REQUIRES: OS=ios
 
-// CHECK: :[[@LINE+1]]:8: error: compiling for iOS 12.0, but module 'empty' has a minimum deployment target of iOS 50.50.1: {{.*}}empty.swiftmodule{{$}}
+// CHECK: :[[@LINE+1]]:8: error: compiling for iOS 12, but module 'empty' has a minimum deployment target of iOS 50.50.1: {{.*}}empty.swiftmodule{{$}}
 import empty

@@ -5,7 +5,8 @@ module Classes {
 
 module ClassesSecondHeader {
   // TODO: we shouldn't have to include both of these, and the decls defined in
-  // these headers should be added to the correct module: SR-14214.
+  // these headers should be added to the correct module
+  // (https://github.com/apple/swift/issues/56592).
   header "classes.h"
   header "classes-second-header.h"
   requires cplusplus

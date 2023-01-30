@@ -75,13 +75,9 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
-  class SyntaxParsingCache;
   class ASTScope;
   class SourceLookupCache;
 
-  namespace syntax {
-  class SourceFileSyntax;
-}
 namespace ast_scope {
 class ASTSourceFileScope;
 }
@@ -106,7 +102,8 @@ enum class SourceFileKind {
   Library,  ///< A normal .swift file.
   Main,     ///< A .swift file that can have top-level code.
   SIL,      ///< Came from a .sil file.
-  Interface ///< Came from a .swiftinterface file, representing another module.
+  Interface, ///< Came from a .swiftinterface file, representing another module.
+  MacroExpansion, ///< Came from a macro expansion.
 };
 
 /// Contains information about where a particular path is used in
@@ -158,6 +155,10 @@ enum class ResilienceStrategy : unsigned {
 
 class OverlayFile;
 
+/// A mapping used to find the source file that contains a particular source
+/// location.
+class ModuleSourceFileLocationMap;
+
 /// The minimum unit of compilation.
 ///
 /// A module is made up of several file-units, which are all part of the same
@@ -172,6 +173,8 @@ class ModuleDecl
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
 
+  /// The name of the package this module belongs to
+  mutable Identifier PackageName;
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -228,6 +231,13 @@ private:
   DebuggerClient *DebugClient = nullptr;
 
   SmallVector<FileUnit *, 2> Files;
+
+  /// Mapping used to find the source file associated with a given source
+  /// location.
+  ModuleSourceFileLocationMap *sourceFileLocationMap = nullptr;
+
+  /// The set of auxiliary source files build as part of this module.
+  SmallVector<SourceFile *, 2> AuxiliaryFiles;
 
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
@@ -328,6 +338,13 @@ public:
   /// SynthesizedFileUnit instead.
   void addFile(FileUnit &newFile);
 
+  /// Add an auxiliary source file, introduced as part of the translation.
+  void addAuxiliaryFile(SourceFile &sourceFile);
+
+  /// Produces the source file that contains the given source location, or
+  /// \c nullptr if the source location isn't in this module.
+  SourceFile *getSourceFileContainingLocation(SourceLoc loc);
+
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
   /// strings, diagnosing any conflicts.
   ///
@@ -385,6 +402,14 @@ public:
     ModuleABIName = name;
   }
 
+  /// Get the package name of the module
+  Identifier getPackageName() const { return PackageName; }
+
+  /// Set the name of the package this module belongs to
+  void setPackageName(Identifier name) {
+    PackageName = name;
+  }
+
   /// Retrieve the actual module name of an alias used for this module (if any).
   ///
   /// For example, if '-module-alias Foo=Bar' is passed in when building the main module,
@@ -403,7 +428,19 @@ public:
     return UserModuleVersion;
   }
 
+  void addAllowableClientName(Identifier name) {
+    allowableClientNames.push_back(name);
+  }
+  ArrayRef<Identifier> getAllowableClientNames() const {
+    return allowableClientNames;
+  }
+  bool allowImportedBy(ModuleDecl *importer) const;
 private:
+
+  /// An array of module names that are allowed to import this one.
+  /// Any module can import this one if empty.
+  std::vector<Identifier> allowableClientNames;
+
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
   Optional<std::pair<ModuleDecl *, Identifier>> declaringModuleAndBystander;
@@ -414,11 +451,13 @@ private:
   /// present overlays as if they were part of their underlying module.
   std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
 
+  /// Update the source-file location map to make it current.
+  void updateSourceFileLocationMap();
+
+public:
   ///  If this is a traditional (non-cross-import) overlay, get its underlying
   ///  module if one exists.
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
-
-public:
 
   /// Returns true if this module is an underscored cross import overlay
   /// declared by \p other or its underlying clang module, either directly or
@@ -543,6 +582,15 @@ public:
   }
   void setIsSystemModule(bool flag = true) {
     Bits.ModuleDecl.IsSystemModule = flag;
+  }
+
+  /// Returns true if the module was rebuilt from a module interface instead
+  /// of being built from the full source.
+  bool isBuiltFromInterface() const {
+    return Bits.ModuleDecl.IsBuiltFromInterface;
+  }
+  void setIsBuiltFromInterface(bool flag = true) {
+    Bits.ModuleDecl.IsBuiltFromInterface = flag;
   }
 
   /// Returns true if this module is a non-Swift module that was imported into
@@ -686,6 +734,9 @@ public:
   // Is \p spiGroup accessible as an explicitly imported SPI from this module?
   bool isImportedAsSPI(Identifier spiGroup, const ModuleDecl *fromModule) const;
 
+  /// Is \p module imported as \c @_weakLinked from this module?
+  bool isImportedAsWeakLinked(const ModuleDecl *module) const;
+
   /// \sa getImportedModules
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
@@ -694,11 +745,13 @@ public:
     Default = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
     ImplementationOnly = 1 << 2,
-    /// Include imports of SPIs declared with `@_spi`
+    /// Include imports of SPIs declared with `@_spi`.
     SPIAccessControl = 1 << 3,
+    /// Include imports declared with `@_spiOnly`.
+    SPIOnly = 1 << 4,
     /// Include imports shadowed by a cross-import overlay. Unshadowed imports
     /// are included whether or not this flag is specified.
-    ShadowedByCrossImportOverlay = 1 << 4
+    ShadowedByCrossImportOverlay = 1 << 5
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;
@@ -709,6 +762,10 @@ public:
   /// in this list.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                           ImportFilter filter = ImportFilterKind::Exported) const;
+
+  /// Lists modules that are not imported from a file and used in API.
+  void
+  getMissingImportedModules(SmallVectorImpl<ImportedModule> &imports) const;
 
   /// Looks up which modules are imported by this module, ignoring any that
   /// won't contain top-level decls.
@@ -801,6 +858,21 @@ public:
   /// string if this is not applicable.
   StringRef getModuleFilename() const;
 
+  /// Get the path to the file defining this module, what we consider the
+  /// source of truth about the module. Usually a swiftinterface file for a
+  /// resilient module, a swiftmodule for a non-resilient module, or the
+  /// modulemap for a clang module. Returns an empty string if not applicable.
+  StringRef getModuleSourceFilename() const;
+
+  /// Get the path to the file loaded by the compiler. Usually the binary
+  /// swiftmodule file or a pcm in the cache. Returns an empty string if not
+  /// applicable.
+  StringRef getModuleLoadedFilename() const;
+
+  /// \returns true if this module is defined under the SDK path.
+  /// If no SDK path is defined, this always returns false.
+  bool isSDKModule() const;
+
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 
@@ -833,8 +905,14 @@ public:
     return EntryPointInfo.hasEntryPoint();
   }
 
+  NominalTypeDecl *getMainTypeDecl() const;
+
   /// Returns the associated clang module if one exists.
   const clang::Module *findUnderlyingClangModule() const;
+
+  /// Does this module or the underlying clang module defines export_as with
+  /// a value corresponding to the \p other module?
+  bool isExportedAs(const ModuleDecl *other) const;
 
   /// Returns a generator with the components of this module's full,
   /// hierarchical name.
@@ -951,7 +1029,8 @@ inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
 /// Collects modules that this module imports via `@_exported import`.
 void collectParsedExportedImports(const ModuleDecl *M,
                                   SmallPtrSetImpl<ModuleDecl *> &Imports,
-                                  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports);
+                                  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
+                                  llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport = nullptr);
 
 } // end namespace swift
 

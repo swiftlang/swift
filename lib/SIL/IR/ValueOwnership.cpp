@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -107,6 +107,7 @@ CONSTANT_OWNERSHIP_INST(None, DynamicFunctionRef)
 CONSTANT_OWNERSHIP_INST(None, PreviousDynamicFunctionRef)
 CONSTANT_OWNERSHIP_INST(None, GlobalAddr)
 CONSTANT_OWNERSHIP_INST(None, BaseAddrForOffset)
+CONSTANT_OWNERSHIP_INST(None, HasSymbol)
 CONSTANT_OWNERSHIP_INST(None, IndexAddr)
 CONSTANT_OWNERSHIP_INST(None, IndexRawPointer)
 CONSTANT_OWNERSHIP_INST(None, InitEnumDataAddr)
@@ -128,6 +129,7 @@ CONSTANT_OWNERSHIP_INST(None, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(None, RefTailAddr)
 CONSTANT_OWNERSHIP_INST(None, RefToRawPointer)
 CONSTANT_OWNERSHIP_INST(None, SelectEnumAddr)
+CONSTANT_OWNERSHIP_INST(None, SelectValue)
 CONSTANT_OWNERSHIP_INST(None, StringLiteral)
 CONSTANT_OWNERSHIP_INST(None, StructElementAddr)
 CONSTANT_OWNERSHIP_INST(None, SuperMethod)
@@ -152,6 +154,10 @@ CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuationAddr)
 CONSTANT_OWNERSHIP_INST(None, ThinToThickFunction)
 CONSTANT_OWNERSHIP_INST(None, ExtractExecutor)
+CONSTANT_OWNERSHIP_INST(None, OpenPackElement)
+CONSTANT_OWNERSHIP_INST(None, DynamicPackIndex)
+CONSTANT_OWNERSHIP_INST(None, PackPackIndex)
+CONSTANT_OWNERSHIP_INST(None, ScalarPackIndex)
 
 #undef CONSTANT_OWNERSHIP_INST
 
@@ -166,7 +172,6 @@ CONSTANT_OWNERSHIP_INST(None, ExtractExecutor)
   }
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
-CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, SelectValue)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DifferentiableFunctionExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)
 // OpenExistentialValue opens the boxed value inside an existential
@@ -194,16 +199,12 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MarkUninitialized)
 // be compatible so that TBAA doesn't allow the destroy to be hoisted above uses
 // of the cast, or the programmer must use Builtin.fixLifetime.
 //
-// FIXME
-// -----
-//
-// SR-7175: Since we model this as unowned, then we must copy the
-// value before use. This directly contradicts the semantics mentioned
-// above since we will copy the value upon any use lest we use an
-// unowned value in an owned or guaranteed way. So really all we will
-// do here is perhaps add a copy slightly earlier unless the unowned
-// value immediately is cast to something trivial. In such a case, we
-// should be able to simplify the cast to just a trivial value and
+// FIXME(https://github.com/apple/swift/issues/49723): Since we model this as unowned, then we must copy the value before use.
+// This directly contradicts the semantics mentioned above since we will copy
+// the value upon any use lest we use an unowned value in an owned or guaranteed
+// way. So really all we will do here is perhaps add a copy slightly earlier
+// unless the unowned value immediately is cast to something trivial. In such a
+// case, we should be able to simplify the cast to just a trivial value and
 // then eliminate the copy. That being said, we should investigate
 // this since this is used in reinterpret_cast which is important from
 // a performance perspective.
@@ -386,7 +387,8 @@ struct ValueOwnershipKindBuiltinVisitor
 // This returns a value at +1 that is destroyed strictly /after/ the
 // UnsafeGuaranteedEnd. This provides the guarantee that we want.
 CONSTANT_OWNERSHIP_BUILTIN(Owned, COWBufferForReading)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, UnsafeGuaranteed)
+CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfBorrowOpaque)
+CONSTANT_OWNERSHIP_BUILTIN(None, UnprotectedAddressOfBorrowOpaque)
 CONSTANT_OWNERSHIP_BUILTIN(None, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericAShr)
 CONSTANT_OWNERSHIP_BUILTIN(None, Add)
@@ -497,6 +499,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, SToSCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, SToUCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, UToUCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, IntToFPWithOverflow)
+CONSTANT_OWNERSHIP_BUILTIN(None, BitWidth)
+CONSTANT_OWNERSHIP_BUILTIN(None, IsNegative)
+CONSTANT_OWNERSHIP_BUILTIN(None, WordAtIndex)
 
 // This is surprising, Builtin.unreachable returns a "Never" value which is
 // trivially typed.
@@ -507,7 +512,6 @@ CONSTANT_OWNERSHIP_BUILTIN(None, Unreachable)
 CONSTANT_OWNERSHIP_BUILTIN(None, AtomicRMW)
 
 CONSTANT_OWNERSHIP_BUILTIN(None, CondUnreachable)
-CONSTANT_OWNERSHIP_BUILTIN(None, UnsafeGuaranteedEnd)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetObjCTypeEncoding)
 CONSTANT_OWNERSHIP_BUILTIN(None, CanBeObjCClass)
 CONSTANT_OWNERSHIP_BUILTIN(None, WillThrow)
@@ -534,7 +538,6 @@ CONSTANT_OWNERSHIP_BUILTIN(None, TSanInoutAccess)
 CONSTANT_OWNERSHIP_BUILTIN(None, Swift3ImplicitObjCEntrypoint)
 CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
-CONSTANT_OWNERSHIP_BUILTIN(None, IntInstrprofIncrement)
 CONSTANT_OWNERSHIP_BUILTIN(None, TargetOSVersionAtLeast)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
@@ -560,9 +563,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLet)
 CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLetWithLocalBuffer)
 CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLetLifetime)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
+CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroupWithFlags)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRunInline)
-CONSTANT_OWNERSHIP_BUILTIN(None, Move)
 CONSTANT_OWNERSHIP_BUILTIN(None, Copy)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN

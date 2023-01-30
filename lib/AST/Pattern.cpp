@@ -166,30 +166,36 @@ namespace {
     
     WalkToVarDecls(const std::function<void(VarDecl*)> &fn)
     : fn(fn) {}
-    
-    Pattern *walkToPatternPost(Pattern *P) override {
+
+    PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) override {
       // Handle vars.
       if (auto *Named = dyn_cast<NamedPattern>(P))
         fn(Named->getDecl());
-      return P;
+      return Action::Continue(P);
     }
 
     // Only walk into an expression insofar as it doesn't open a new scope -
     // that is, don't walk into a closure body.
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<ClosureExpr>(E)) {
-        return { false, E };
+        return Action::SkipChildren(E);
       }
-      return { true, E };
+      return Action::Continue(E);
     }
 
     // Don't walk into anything else.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      return Action::SkipChildren(S);
     }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToParameterListPre(ParameterList *PL) override { return false; }
-    bool walkToDeclPre(Decl *D) override { return false; }
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::SkipChildren();
+    }
+    PreWalkAction walkToParameterListPre(ParameterList *PL) override {
+      return Action::SkipChildren();
+    }
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::SkipChildren();
+    }
   };
 } // end anonymous namespace
 
@@ -372,6 +378,11 @@ Identifier NamedPattern::getBoundName() const {
 TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                                    ArrayRef<TuplePatternElt> elts,
                                    SourceLoc rp) {
+#ifndef NDEBUG
+  if (elts.size() == 1)
+    assert(!elts[0].getLabel().empty());
+#endif
+
   unsigned n = elts.size();
   void *buffer = C.Allocate(totalSizeToAlloc<TuplePatternElt>(n),
                             alignof(TuplePattern));
@@ -387,7 +398,7 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
   assert(lp.isValid() == rp.isValid());
 
   if (elements.size() == 1 &&
-      elements[0].getPattern()->getBoundName().empty()) {
+      elements[0].getLabel().empty()) {
     auto &first = const_cast<TuplePatternElt&>(elements.front());
     return new (C) ParenPattern(lp, first.getPattern(), rp);
   }

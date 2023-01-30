@@ -66,5 +66,16 @@ extension MyObject {
     public override convenience init() {} // expected-error{{initializer 'init()' with Objective-C selector 'init' conflicts with implicit initializer 'init()' with the same Objective-C selector}}
 }
 
+// Ensure that we don't have cycles with the "renamed decl" request.
+@available(SwiftStdlib 5.1, *)
+@objc protocol MyProtocolWithAsync {
+  @available(*, renamed: "confirm(thing:)")
+  @objc(confirmThing:completion:)
+  optional func confirm(thing: AnyObject, completion: @escaping (AnyObject) -> Void)
+
+  @objc(confirmThing:completion:)
+  optional func confirm(thing: AnyObject) async -> AnyObject
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'nsstringProperty2' previously declared here

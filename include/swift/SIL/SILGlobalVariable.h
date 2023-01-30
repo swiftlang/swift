@@ -125,6 +125,12 @@ public:
     return getLoweredTypeInContext(context).castTo<SILFunctionType>();
   }
 
+  void unsafeSetLoweredType(SILType newType) { LoweredType = newType; }
+  void unsafeAppend(SILInstruction *i) { StaticInitializerBlock.push_back(i); }
+  void unsafeRemove(SILInstruction *i, SILModule &mod) {
+    StaticInitializerBlock.erase(i, mod);
+  }
+
   StringRef getName() const { return Name; }
   
   void setDeclaration(bool isD) { IsDeclaration = isD; }

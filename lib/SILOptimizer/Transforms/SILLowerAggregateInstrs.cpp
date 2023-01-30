@@ -87,7 +87,7 @@ static bool shouldExpandShim(SILFunction *fn, SILType type) {
 ///     strong_release %old : $T
 ///     store %new to %1 : $*T
 ///
-/// copy_addr %0 to [initialization] %1 : $*T
+/// copy_addr %0 to [init] %1 : $*T
 /// ->
 ///     %new = load [copy] %0 : $*T
 ///     store %new to [init] %1 : $*T
@@ -97,7 +97,7 @@ static bool shouldExpandShim(SILFunction *fn, SILType type) {
 ///     // no load/release of %old!
 ///     store %new to %1 : $*T
 ///
-/// copy_addr [take] %0 to [initialization] %1 : $*T
+/// copy_addr [take] %0 to [init] %1 : $*T
 /// ->
 ///     %new = load [take] %0 : $*T
 ///     store %new to [init] %1 : $*T

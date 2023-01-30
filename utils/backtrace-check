@@ -75,7 +75,7 @@ def main():
         # First see if we found the start of our stack trace start. If so, set
         # the found stack trace flag and continue.
         if line == 'Current stack trace:':
-            assert(not found_stack_trace_start)
+            assert not found_stack_trace_start
             found_stack_trace_start = True
             continue
 
@@ -97,11 +97,11 @@ def main():
 
         # Check for unavailable symbols, if that was requested.
         if args.check_unavailable:
-            assert('unavailable' not in matches.group('routine'))
+            assert 'unavailable' not in matches.group('routine')
 
     # Once we have processed all of the lines, make sure that we found at least
     # one stack trace entry.
-    assert(found_stack_trace_entry)
+    assert found_stack_trace_entry
 
 
 if __name__ == '__main__':

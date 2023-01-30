@@ -13,7 +13,7 @@
 import Basic
 import SILBridging
 
-public struct Type : CustomStringConvertible, CustomReflectable {
+public struct Type : CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedType
   
   public var isAddress: Bool { SILType_isAddress(bridged) != 0 }
@@ -23,19 +23,23 @@ public struct Type : CustomStringConvertible, CustomReflectable {
     return SILType_isTrivial(bridged, function.bridged) != 0
   }
 
+  /// Returns true if the type is a trivial type and is and does not contain a Builtin.RawPointer.
+  public func isTrivialNonPointer(in function: Function) -> Bool {
+    return SILType_isNonTrivialOrContainsRawPointer(bridged, function.bridged) == 0
+  }
+
   public func isReferenceCounted(in function: Function) -> Bool {
     return SILType_isReferenceCounted(bridged, function.bridged) != 0
   }
 
-  public func isNonTrivialOrContainsRawPointer(in function: Function) -> Bool {
-    return SILType_isNonTrivialOrContainsRawPointer(bridged, function.bridged) != 0
-  }
+  public var hasArchetype: Bool { SILType_hasArchetype(bridged) }
 
   public var isNominal: Bool { SILType_isNominal(bridged) != 0 }
   public var isClass: Bool { SILType_isClass(bridged) != 0 }
   public var isStruct: Bool { SILType_isStruct(bridged) != 0 }
   public var isTuple: Bool { SILType_isTuple(bridged) != 0 }
   public var isEnum: Bool { SILType_isEnum(bridged) != 0 }
+  public var isFunction: Bool { SILType_isFunction(bridged) }
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
 
@@ -43,6 +47,8 @@ public struct Type : CustomStringConvertible, CustomReflectable {
     NominalFieldsArray(type: self, function: function)
   }
 
+  public var isCalleeConsumedFunction: Bool { SILType_isCalleeConsumedFunction(bridged) }
+  
   public func getIndexOfEnumCase(withName name: String) -> Int? {
     let idx = name._withStringRef {
       SILType_getCaseIdxOfEnumType(bridged, $0)
@@ -53,8 +59,6 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   public var description: String {
     String(_cxxString: SILType_debugDescription(bridged))
   }
-
-  public var customMirror: Mirror { Mirror(self, children: []) }
 }
 
 extension Type: Equatable {
@@ -79,6 +83,10 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
       SILType_getFieldIdxOfNominalType(type.bridged, $0)
     }
     return idx >= 0 ? idx : nil
+  }
+
+  public func getNameOfField(withIndex idx: Int) -> StringRef {
+    StringRef(bridged: SILType_getNominalFieldName(type.bridged, idx))
   }
 }
 

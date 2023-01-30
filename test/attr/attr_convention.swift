@@ -11,28 +11,30 @@ let f4c: @convention(c, cType: "int (*)(int)") (Int32) -> Int32 = { $0 }
 
 let f5: @convention(INTERCAL) (Int) -> Int = { $0 } // expected-error{{convention 'INTERCAL' not supported}}
 
-// SR-11027
+// https://github.com/apple/swift/issues/53417
 
-func sr11027(_ f: @convention(block) @autoclosure () -> Int) -> Void {} // expected-error {{'@convention(block)' attribute is not allowed on '@autoclosure' types}} 
-sr11027(1)
+do {
+  func block(_ f: @convention(block) @autoclosure () -> Int) -> Void {} // expected-error {{'@convention(block)' attribute is not allowed on '@autoclosure' types}}
+  block(1)
 
-func sr11027_c(_ f: @convention(c) @autoclosure () -> Int) -> Void {} // expected-error{{'@convention(c)' attribute is not allowed on '@autoclosure' types}}
-sr11027_c(1)
+  func c(_ f: @convention(c) @autoclosure () -> Int) -> Void {} // expected-error{{'@convention(c)' attribute is not allowed on '@autoclosure' types}}
+  c(1)
 
-func sr11027_swift(_ f: @convention(swift) @autoclosure () -> Int) -> Void {} // OK
-sr11027_swift(1)
+  func swift(_ f: @convention(swift) @autoclosure () -> Int) -> Void {} // OK
+  swift(1)
 
-func sr11027_thin(_ f: @convention(thin) @autoclosure () -> Int) -> Void {} // OK
-sr11027_thin(1)
+  func thin(_ f: @convention(thin) @autoclosure () -> Int) -> Void {} // OK
+  thin(1)
 
-func sr11027_2(_ f: @autoclosure @convention(block) () -> Int) -> Void {} // expected-error {{'@convention(block)' attribute is not allowed on '@autoclosure' types}} 
-sr11027_2(1)
+  func block2(_ f: @autoclosure @convention(block) () -> Int) -> Void {} // expected-error {{'@convention(block)' attribute is not allowed on '@autoclosure' types}}
+  block2(1)
 
-func sr11027_c_2(_ f: @autoclosure @convention(c) () -> Int) -> Void {} // expected-error {{'@convention(c)' attribute is not allowed on '@autoclosure' types}} 
-sr11027_c_2(1)
+  func c2(_ f: @autoclosure @convention(c) () -> Int) -> Void {} // expected-error {{'@convention(c)' attribute is not allowed on '@autoclosure' types}}
+  c2(1)
 
-func sr11027_swift_2(_ f: @autoclosure @convention(swift) () -> Int) -> Void {} // OK
-sr11027_swift_2(1)
+  func swift2(_ f: @autoclosure @convention(swift) () -> Int) -> Void {} // OK
+  swift2(1)
 
-func sr11027_thin_2(_ f: @autoclosure @convention(thin) () -> Int) -> Void {} // OK
-sr11027_thin_2(1)
+  func thin2(_ f: @autoclosure @convention(thin) () -> Int) -> Void {} // OK
+  thin2(1)
+}

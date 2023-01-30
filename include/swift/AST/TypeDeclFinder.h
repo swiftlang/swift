@@ -19,7 +19,7 @@
 namespace swift {
 
 class BoundGenericType;
-class ComponentIdentTypeRepr;
+class IdentTypeRepr;
 class NominalType;
 class TypeAliasType;
 
@@ -44,7 +44,7 @@ public:
 /// equivalently and where generic arguments can be walked to separately from
 /// the generic type.
 class SimpleTypeDeclFinder : public TypeDeclFinder {
-  /// The function to call when a ComponentIdentTypeRepr is seen.
+  /// The function to call when a \c IdentTypeRepr is seen.
   llvm::function_ref<Action(const TypeDecl *)> Callback;
 
   Action visitNominalType(NominalType *ty) override;
@@ -57,19 +57,21 @@ public:
     : Callback(callback) {}
 };
 
-/// Walks a TypeRepr to find all ComponentIdentTypeReprs with bound TypeDecls.
+/// Walks a \c TypeRepr to find all \c IdentTypeRepr nodes with bound
+/// type declarations.
 ///
 /// Subclasses can either override #visitTypeDecl if they only care about
-/// types on their own, or #visitComponentIdentTypeRepr if they want to keep
+/// types on their own, or #visitIdentTypeRepr if they want to keep
 /// the TypeRepr around.
 class TypeReprIdentFinder : public ASTWalker {
-  /// The function to call when a ComponentIdentTypeRepr is seen.
-  llvm::function_ref<bool(const ComponentIdentTypeRepr *)> Callback;
+  /// The function to call when a \c IdentTypeRepr is seen.
+  llvm::function_ref<bool(const IdentTypeRepr *)> Callback;
 
-  bool walkToTypeReprPost(TypeRepr *TR) override;
+  PostWalkAction walkToTypeReprPost(TypeRepr *TR) override;
+
 public:
   explicit TypeReprIdentFinder(
-      llvm::function_ref<bool(const ComponentIdentTypeRepr *)> callback)
+      llvm::function_ref<bool(const IdentTypeRepr *)> callback)
     : Callback(callback) {}
 };
 

@@ -84,12 +84,18 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
                                           dispatch_qos_class_t qos) {
   dispatchEnqueueFuncType func = nullptr;
 
-  // Always fall back to plain dispatch_async_f on Windows for now, and
-  // also for back-deployed concurrency.
-#if !defined(_WIN32) && !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
+  // Always fall back to plain dispatch_async_f for back-deployed concurrency.
+#if !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
   if (runtime::environment::concurrencyEnableJobDispatchIntegration())
+#if defined(_WIN32)
+    func = reinterpret_cast<dispatchEnqueueFuncType>(
+        GetProcAddress(LoadLibraryW(L"dispatch.dll"),
+        "dispatch_async_swift_job"));
+#else
     func = reinterpret_cast<dispatchEnqueueFuncType>(
         dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
+
+#endif
 #endif
 
   if (!func)
@@ -110,6 +116,8 @@ static void dispatchEnqueue(dispatch_queue_t queue, Job *job,
 static constexpr size_t globalQueueCacheCount =
     static_cast<size_t>(JobPriority::UserInteractive) + 1;
 static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
+
+static constexpr size_t dispatchQueueCooperativeFlag = 4;
 
 #if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__APPLE__)
 extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
@@ -153,8 +161,14 @@ static dispatch_queue_t getGlobalQueue(JobPriority priority) {
   // If we don't have a queue cached for this priority, cache it now. This may
   // race with other threads doing this at the same time for this priority, but
   // that's OK, they'll all end up writing the same value.
-  queue = dispatch_get_global_queue((dispatch_qos_class_t)priority,
-                                    /*flags*/ 0);
+  if (runtime::environment::concurrencyEnableCooperativeQueues())
+    queue = dispatch_get_global_queue((dispatch_qos_class_t)priority,
+                                      dispatchQueueCooperativeFlag);
+  // If dispatch doesn't support dispatchQueueCooperativeFlag, it will return
+  // NULL. Fall back to a standard global queue.
+  if (!queue)
+    queue = dispatch_get_global_queue((dispatch_qos_class_t)priority,
+                                      /*flags*/ 0);
 
   // Unconditionally store it back in the cache. If we raced with another
   // thread, we'll just overwrite the entry with the same value.
@@ -162,6 +176,18 @@ static dispatch_queue_t getGlobalQueue(JobPriority priority) {
 #endif
 
   return queue;
+}
+
+// Get a queue suitable for dispatch_after. Use the cooperative queues on OS
+// versions where they work with dispatch_after, and use a standard global
+// queue where cooperative queues don't work.
+static dispatch_queue_t getTimerQueue(JobPriority priority) {
+  // On newer OSes, we can use the cooperative queues.
+  if (__builtin_available(macOS 12.3, iOS 15.4, tvOS 15.4, watchOS 8.5, *))
+    return getGlobalQueue(priority);
+
+  // On older OSes, use a standard global queue.
+  return dispatch_get_global_queue((dispatch_qos_class_t)priority, /*flags*/ 0);
 }
 
 SWIFT_CC(swift)
@@ -216,7 +242,7 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
 
   JobPriority priority = job->getPriority();
 
-  auto queue = getGlobalQueue(priority);
+  auto queue = getTimerQueue(priority);
 
   job->SchedulerPrivate[Job::DispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
@@ -306,7 +332,7 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 
   JobPriority priority = job->getPriority();
 
-  auto queue = getGlobalQueue(priority);
+  auto queue = getTimerQueue(priority);
 
   job->SchedulerPrivate[Job::DispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;

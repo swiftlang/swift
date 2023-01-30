@@ -46,6 +46,22 @@ public struct ResilientContainer {
     let x = computedProperty
     print(x)
   }
+
+  @inlinable
+  @_eagerMove
+  @_specialize(where T == Int)
+  public func genericEagerMoveInlineableContext<T>(_ t: T) {
+    let x = computedProperty
+    print(x)
+    print(t)
+  }
+
+  @inlinable
+  @_eagerMove
+  public func eagerMoveInlineableContext() {
+    let x = computedProperty
+    print(x)
+  }
 }
 
 public struct WrapperP2<Wrapped: ExternalP2>: ExternalP2 {

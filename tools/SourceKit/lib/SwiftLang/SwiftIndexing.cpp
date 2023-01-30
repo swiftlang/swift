@@ -277,7 +277,8 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
                                    IndexingConsumer &IdxConsumer,
                                    ArrayRef<const char *> OrigArgs) {
   std::string Error;
-  auto InputBuf = ASTMgr->getMemoryBuffer(InputFile, Error);
+  auto InputBuf =
+      ASTMgr->getMemoryBuffer(InputFile, llvm::vfs::getRealFileSystem(), Error);
   if (!InputBuf) {
     IdxConsumer.failed(Error);
     return;

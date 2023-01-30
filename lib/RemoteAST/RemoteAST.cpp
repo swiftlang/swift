@@ -496,7 +496,7 @@ public:
     auto result = Reader.readMetadataFromInstance(*pointerval);
     if (!result)
       return getFailure<OpenedExistential>();
-    auto typeResult = Reader.readTypeFromMetadata(result.getValue());
+    auto typeResult = Reader.readTypeFromMetadata(result.value());
     if (!typeResult)
       return getFailure<OpenedExistential>();
     return OpenedExistential(std::move(typeResult),

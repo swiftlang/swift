@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../SwiftShims/Visibility.h"
 #include "Private.h"
 #include "SwiftHashableSupport.h"
 #include "SwiftValue.h"
@@ -20,6 +19,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/shims/Visibility.h"
 
 #include <new>
 

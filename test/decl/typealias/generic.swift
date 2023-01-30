@@ -2,7 +2,10 @@
 
 struct MyType<TyA, TyB> { // expected-note {{generic type 'MyType' declared here}}
   // expected-note @-1 {{arguments to generic parameter 'TyB' ('S' and 'Int') are expected to be equal}}
-  // expected-note @-2 4 {{arguments to generic parameter 'TyA' ('Float' and 'Int') are expected to be equal}}
+  // expected-note @-2 6 {{arguments to generic parameter 'TyA' ('Float' and 'Int') are expected to be equal}}
+  // expected-note @-3 2 {{arguments to generic parameter 'TyA' ('Float' and 'Double') are expected to be equal}}
+  // expected-note @-4 2 {{arguments to generic parameter 'TyB' ('Int' and 'Float') are expected to be equal}}
+  // expected-note @-5 2 {{arguments to generic parameter 'TyB' ('Double' and 'Float') are expected to be equal}}
   var a : TyA, b : TyB
 }
 
@@ -23,6 +26,22 @@ struct Container {
 let _: OurType<Int, String>
 let _: YourType<Int>
 let _: Container.YourType<Int>
+
+// The question of whether a type alias is implicitly generic should not
+// arise until after we attempt to resolve the underlying type.
+do {
+  struct Outer<T> {
+    typealias NotGeneric = Outer
+    struct Inner<U> {
+      typealias NotGeneric = Outer
+    }
+  }
+
+  let _: Outer<Int>.NotGeneric<Bool>
+  // expected-error@-1 {{cannot specialize non-generic type 'Outer<Int>.NotGeneric' (aka 'Outer<Int>')}}
+  let _: Outer<Int>.Inner<Never>.NotGeneric<Bool>
+  // expected-error@-1 {{cannot specialize non-generic type 'Outer<Int>.Inner<Never>.NotGeneric' (aka 'Outer<Int>')}}
+}
 
 //
 // Bona-fide generic type aliases
@@ -246,8 +265,14 @@ let _: ConcreteStruct.O<Int> = ConcreteStruct.O<Int>(123)
 // In the other cases, we manage to fold the UnresolvedSpecializeExpr in the
 // precheckExpression() phase, which handles generic typealiases correctly.
 
-let _ = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
-let _ = GenericClass.TA<Float>(a: 1, b: 4.0)
+do {
+  let x1 = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
+  let x2 = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME
+
+  // FIXME: Should not diagnose
+  let _: MyType<Double, Float> = x1 // expected-error {{cannot assign value of type 'MyType<Float, Int>' to type 'MyType<Double, Float>'}}
+  let _: MyType<Int, Float> = x2 // expected-error {{cannot assign value of type 'MyType<Float, Double>' to type 'MyType<Int, Float>'}}
+}
 
 let _ = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _ = GenericClass<Int>.TA(a: 1, b: 4.0)
@@ -258,8 +283,14 @@ let _ = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 let _: GenericClass.TA = GenericClass.TA(a: 4.0, b: 1)
 let _: GenericClass.TA = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
-let _: GenericClass.TA = GenericClass.TA<Float>(a: 1, b: 4.0)
+do {
+  let x1: GenericClass.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
+  let x2: GenericClass.TA = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME
+
+  // FIXME: Should not diagnose
+  let _: MyType<Double, Float> = x1 // expected-error {{cannot assign value of type 'MyType<Float, Int>' to type 'MyType<Double, Float>'}}
+  let _: MyType<Int, Float> = x2 // expected-error {{cannot assign value of type 'MyType<Float, Double>' to type 'MyType<Int, Float>'}}
+}
 
 let _: GenericClass.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
@@ -306,7 +337,7 @@ func takesSugaredType2(m: GenericClass<Int>.TA<Float>) {
 // parameters of A<>.
 extension A {}
 
-extension A<T> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
+extension A<Int> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
 extension A<Float,Int> {}
 extension C<T> {}  // expected-error {{cannot find type 'T' in scope}}
 extension C<Int> {}

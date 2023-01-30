@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/struct-with-refcounted-member.swift -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %S/struct-with-refcounted-member.swift -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-structs-execution.o
 // RUN: %target-interop-build-swift %S/struct-with-refcounted-member.swift -o %t/swift-structs-execution -Xlinker %t/swift-structs-execution.o -module-name Structs -Xfrontend -entry-point-function-name -Xfrontend swiftMain

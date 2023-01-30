@@ -35,7 +35,7 @@ public func v2APIsAreStripped() -> Bool {
 /// Describes types that can be appended to.
 public protocol Appendable {
   associatedtype Element
-  mutating func append(_ x: Element)
+  mutating func append(_ x: __owned Element)
 }
 
 /// Describes types that can be counted.
@@ -46,6 +46,9 @@ public protocol Countable {
 public enum BadError: Error, Equatable {
   /// Indicates badness
   case bad
+
+  /// Even worse
+  case reallyBad
 }
 
 
@@ -107,7 +110,7 @@ public func pleaseThrow(_ shouldThrow: Bool) throws -> Bool {
 @_backDeploy(before: BackDeploy 2.0)
 public func genericAppend<T: Appendable>(
   _ a: inout T,
-  _ x: T.Element
+  _ x: __owned T.Element
 ) {
   return a.append(x)
 }
@@ -122,6 +125,10 @@ extension IntArray {
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
   public var values: [Int] { _values }
+
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public init() { self.init([]) }
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
@@ -140,6 +147,7 @@ extension IntArray {
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
+  @inlinable
   public subscript(_ i: Int) -> Int {
     get { _values[i] }
     _modify { yield &_values[i] }
@@ -150,9 +158,20 @@ extension IntArray {
   public var rawValues: [Int] {
     _read { yield _values }
   }
+
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public mutating func removeLast() -> Int? {
+    defer { _values.removeLast() }
+    return _values.last
+  }
 }
 
 extension ReferenceIntArray {
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public convenience init() { self.init([]) }
+
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
   public final var values: [Int] { _values }
@@ -180,6 +199,7 @@ extension ReferenceIntArray {
 
   @available(BackDeploy 1.0, *)
   @_backDeploy(before: BackDeploy 2.0)
+  @inlinable
   public final subscript(_ i: Int) -> Int {
     get { _values[i] }
     _modify { yield &_values[i] }
@@ -190,6 +210,13 @@ extension ReferenceIntArray {
   public final var rawValues: [Int] {
     _read { yield _values }
   }
+
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public final func removeLast() -> Int? {
+    defer { _values.removeLast() }
+    return _values.last
+  }
 }
 
 extension Array {
@@ -197,6 +224,18 @@ extension Array {
   @_backDeploy(before: BackDeploy 2.0)
   public func print() {
     testPrint(handle: #dsohandle, description)
+  }
+}
+
+extension BadError {
+  @available(BackDeploy 1.0, *)
+  @_backDeploy(before: BackDeploy 2.0)
+  public init?(fromEmoji emoji: Character) {
+    switch emoji {
+    case "❗️": self = .bad
+    case "‼️": self = .reallyBad
+    default: return nil
+    }
   }
 }
 

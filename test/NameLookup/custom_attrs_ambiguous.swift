@@ -5,7 +5,7 @@
 import custom_attrs_A
 import custom_attrs_B
 
-// SR-13470
+// https://github.com/apple/swift/issues/55912
 
 struct Test {
   @Wrapper var x: Int = 17

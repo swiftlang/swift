@@ -753,7 +753,7 @@ public:
 class SpecializedProtocolConformance : public ProtocolConformance,
                                        public llvm::FoldingSetNode {
   /// The generic conformance from which this conformance was derived.
-  ProtocolConformance *GenericConformance;
+  RootProtocolConformance *GenericConformance;
 
   /// The substitutions applied to the generic conformance to produce this
   /// conformance.
@@ -772,7 +772,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
   friend class ASTContext;
 
   SpecializedProtocolConformance(Type conformingType,
-                                 ProtocolConformance *genericConformance,
+                                 RootProtocolConformance *genericConformance,
                                  SubstitutionMap substitutions);
 
   void computeConditionalRequirements() const;
@@ -780,7 +780,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 public:
   /// Get the generic conformance from which this conformance was derived,
   /// if there is one.
-  ProtocolConformance *getGenericConformance() const {
+  RootProtocolConformance *getGenericConformance() const {
     return GenericConformance;
   }
 
@@ -866,7 +866,7 @@ public:
   }
 
   static void Profile(llvm::FoldingSetNodeID &ID, Type type,
-                      ProtocolConformance *genericConformance,
+                      RootProtocolConformance *genericConformance,
                       SubstitutionMap subs) {
     ID.AddPointer(type.getPointer());
     ID.AddPointer(genericConformance);

@@ -19,7 +19,7 @@ public extension Proto {
   // extension for `AttributesSlice1`, we replace `Self` by
   // `AttributesSlice1<T>` but `S` remains an generic parameter. We thus
   // have a type that contains both an archetype (namely `T` as the generic
-  // paramter of `AttributedSlice1<T>`) and an unbound generic paramters.
+  // parameter of `AttributedSlice1<T>`) and an unbound generic parameters.
   // This used to cause issues when printing the type.
   func formatted<S>(width: ListFormatStyle<S, Self>.Width) -> String {
 // CHECK: func formatted<S>(width width: test.ListFormatStyle<S, test.AttributesSlice1<T>>.Width) -> String

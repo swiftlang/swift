@@ -1,7 +1,7 @@
 
 // RUN: %target-swift-emit-silgen -verify %s | %FileCheck %s
 
-// SR-3090:
+// https://github.com/apple/swift/issues/45680
 
 class Box<T> {
     public let value: T

@@ -1,10 +1,5 @@
-is_sdk_requested(WINDOWS swift_build_windows)
 set(libcxxshim_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
-  if(swift_build_windows)
-    continue()
-  endif()
-
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
     set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
     set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
@@ -12,83 +7,51 @@ foreach(sdk ${SWIFT_SDKS})
     set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
     set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
 
-    set(libcxxshim_header "libcxxshim.h")
-    set(libcxxshim_header_out "${module_dir}/libcxxshim.h")
-    set(libcxxshim_header_out_static "${module_dir_static}/libcxxshim.h")
-    set(libcxxshim_modulemap "libcxxshim.modulemap")
-    set(libcxxshim_modulemap_out "${module_dir}/libcxxshim.modulemap")
-    set(libcxxshim_modulemap_out_static "${module_dir_static}/libcxxshim.modulemap")
-
-    add_custom_command_target(
-            copy_libcxxshim_modulemap
-            COMMAND
-            "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
-            COMMAND
-            "${CMAKE_COMMAND}" "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${libcxxshim_modulemap}" "${libcxxshim_modulemap_out}"
-            OUTPUT ${libcxxshim_modulemap_out}
-            DEPENDS ${libcxxshim_modulemap}
-            COMMENT "Copying libcxxshim modulemap to resources")
-    list(APPEND libcxxshim_modulemap_target_list ${copy_libcxxshim_modulemap})
-    add_dependencies(swift-stdlib-${arch_suffix} ${copy_libcxxshim_modulemap})
-
-    add_custom_command_target(
-            copy_libcxxshim_header
-            COMMAND
-            "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
-            COMMAND
-            "${CMAKE_COMMAND}" "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${libcxxshim_header}" "${libcxxshim_header_out}"
-            OUTPUT ${libcxxshim_header_out}
-            DEPENDS ${libcxxshim_header}
-            COMMENT "Copying libcxxshim header to resources")
-    list(APPEND libcxxshim_modulemap_target_list ${copy_libcxxshim_header})
-    add_dependencies(swift-stdlib-${arch_suffix} ${copy_libcxxshim_header})
-
+    add_custom_command(OUTPUT ${module_dir}
+                       COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${module_dir}")
     if(SWIFT_BUILD_STATIC_STDLIB)
-      add_custom_command_target(
-              copy_libcxxshim_modulemap_static
-              COMMAND
-              "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
-              COMMAND
-              "${CMAKE_COMMAND}" "-E" "copy_if_different"
-              "${libcxxshim_modulemap_out}" "${libcxxshim_modulemap_out_static}"
-              OUTPUT ${libcxxshim_modulemap_out_static}
-              DEPENDS ${copy_libcxxshim_modulemap}
-              COMMENT "Copying libcxxshim modulemap to static resources")
-      list(APPEND libcxxshim_modulemap_target_list ${copy_libcxxshim_modulemap_static})
-      add_dependencies(swift-stdlib-${arch_suffix} ${copy_libcxxshim_modulemap_static})
-
-      add_custom_command_target(
-              copy_libcxxshim_header_static
-              COMMAND
-              "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
-              COMMAND
-              "${CMAKE_COMMAND}" "-E" "copy_if_different"
-              "${libcxxshim_header_out}" "${libcxxshim_header_out_static}"
-              OUTPUT ${libcxxshim_header_out_static}
-              DEPENDS ${copy_libcxxshim_header}
-              COMMENT "Copying libcxxshim header to static resources")
-      list(APPEND libcxxshim_modulemap_target_list ${copy_libcxxshim_header_static})
-      add_dependencies(swift-stdlib-${arch_suffix} ${copy_libcxxshim_header_static})
+      add_custom_command(OUTPUT ${module_dir_static}
+                         COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${module_dir_static}")
     endif()
 
-    swift_install_in_component(FILES "${libcxxshim_modulemap_out}"
-            DESTINATION "lib/swift/${arch_subdir}"
-            COMPONENT sdk-overlay)
-    swift_install_in_component(FILES "${libcxxshim_header_out}"
-            DESTINATION "lib/swift/${arch_subdir}"
-            COMPONENT sdk-overlay)
+    set(outputs)
+    foreach(source libcxxshim.modulemap libcxxshim.h)
+      add_custom_command(OUTPUT ${module_dir}/${source}
+                         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}
+                         COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${source}" "${module_dir}/${source}"
+                         COMMENT "Copying ${source} to ${module_dir}")
+      list(APPEND outputs "${module_dir}/${source}")
 
+      if(SWIFT_BUILD_STATIC_STDLIB)
+        add_custom_command(OUTPUT ${module_dir_static}/${source}
+                           DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}
+                           COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${source}" "${module_dir_static}/${source}"
+                           COMMENT "Copying ${source} to ${module_dir_static}")
+        list(APPEND outputs "${module_dir_static}/${source}")
+      endif()
+    endforeach()
+    list(APPEND outputs ${module_dir})
     if(SWIFT_BUILD_STATIC_STDLIB)
-      swift_install_in_component(FILES "${libcxxshim_modulemap_out_static}"
-              DESTINATION "lib/swift_static/${arch_subdir}"
-              COMPONENT sdk-overlay)
-      swift_install_in_component(FILES "${libcxxshim_header_out_static}"
-              DESTINATION "lib/swift_static/${arch_subdir}"
-              COMPONENT sdk-overlay)
+      list(APPEND outputs ${module_dir_static})
+    endif()
+
+    add_custom_target(cxxshim-${sdk}-${arch} ALL
+                      DEPENDS ${outputs}
+                      COMMENT "Copying cxxshims to ${module_dir}")
+    list(APPEND libcxxshim_modulemap_target_list cxxshim-${sdk}-${arch})
+
+
+    swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h
+                               DESTINATION "lib/swift/${arch_subdir}"
+                               COMPONENT sdk-overlay)
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h
+                                 DESTINATION "lib/swift_static/${arch_subdir}"
+                                 COMPONENT sdk-overlay)
     endif()
   endforeach()
 endforeach()
 
-add_custom_target(libcxxshim-modulemap DEPENDS ${libcxxshim_modulemap_target_list})
-set_property(TARGET libcxxshim-modulemap PROPERTY FOLDER "Miscellaneous")
-add_dependencies(sdk-overlay libcxxshim-modulemap)
+add_custom_target(libcxxshim_modulemap DEPENDS ${libcxxshim_modulemap_target_list})
+set_property(TARGET libcxxshim_modulemap PROPERTY FOLDER "Miscellaneous")
+add_dependencies(sdk-overlay libcxxshim_modulemap)

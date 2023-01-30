@@ -109,9 +109,10 @@ func testUnreachableCase5(a : Tree) {
   }
 }
 
+// https://github.com/apple/swift/issues/48333
 func testOptionalEvaluationBreak(a : Tree) {
-  class SR5763 { func foo() {} }
-  func createOptional() -> SR5763? { return SR5763() }
+  class C { func foo() {} }
+  func createOptional() -> C? { return C() }
   switch a {
   case _:
     break
@@ -130,7 +131,8 @@ class TestThrowInInit {
   }
 }
 
-func sr6141() {
+// https://github.com/apple/swift/issues/48696
+func f_48696() {
   var bar: String? = ""
   return;
   bar?.append("x")  // expected-warning{{code after 'return' will never be executed}}
@@ -147,11 +149,12 @@ func testUnreachableCatchClause() {
   }
 }
 
-func sr13639() -> Int {
+// https://github.com/apple/swift/issues/56075
+func f_56075() -> Int {
   return Foo.bar
   struct Foo { // no-warning
     static var bar = 0
-    // CHECK: sil private @$s16unreachable_code7sr13639SiyF3FooL_V7fooFuncyyF : $@convention(method) (Foo) -> ()
+    // CHECK: sil private @$s16unreachable_code7f_56075SiyF3FooL_V7fooFuncyyF : $@convention(method) (Foo) -> ()
     func fooFunc() {}
   }
   func appendix() {} // no-warning

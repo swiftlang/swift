@@ -288,7 +288,8 @@ class ThisDerived1 : ThisBase1 {
     self.Type // expected-error {{type 'ThisDerived1' has no member 'Type'}}
   }
 
-  // FIXME(SR-15250): Partial application diagnostic is applied incorrectly for some test cases.
+  // FIXME: Partial application diagnostic is applied incorrectly for some
+  // test cases (https://github.com/apple/swift/issues/57572).
   class func staticTestSuper1() {
     super.baseInstanceVar = 42 // expected-error {{member 'baseInstanceVar' cannot be used on type 'ThisBase1'}}
     super.baseProp = 42 // expected-error {{member 'baseProp' cannot be used on type 'ThisBase1'}}
@@ -585,8 +586,8 @@ func foo1() {
   _ = MyGenericEnum<Int>.OneTwo // expected-error {{enum type 'MyGenericEnum<Int>' has no case 'OneTwo'; did you mean 'oneTwo'?}}{{26-32=oneTwo}}
 }
 
-// SR-4082
-func foo2() {
+// https://github.com/apple/swift/issues/46665
+do {
   let x = 5
   if x < 0, let x = Optional(1) { } // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 }
@@ -649,8 +650,8 @@ struct PatternBindingWithTwoVars3 { var x = y, y = x }
 // expected-note@-11 {{through reference here}}
 // expected-note@-12 {{through reference here}}
 
-// https://bugs.swift.org/browse/SR-9015
-func sr9015() {
+// https://github.com/apple/swift/issues/51518
+do {
   let closure1 = { closure2() } // expected-error {{circular reference}} expected-note {{through reference here}} expected-note {{through reference here}}
   let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}} expected-note {{through reference here}}
 }

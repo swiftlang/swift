@@ -153,7 +153,7 @@ var someInt = co.a // expected-error{{value of optional type 'C?' must be unwrap
 // expected-note@-1{{chain the optional using '?' to access member 'a' only for non-'nil' base values}}{{17-17=?}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{17-17=!}}
 
-// SR-839
+// https://github.com/apple/swift/issues/43451
 struct Q {
   let s: String?
 }
@@ -172,19 +172,22 @@ let c = q.s.utf8 // expected-error{{value of optional type 'String?' must be unw
 // expected-note@-1{{chain the optional using '?' to access member 'utf8' only for non-'nil' base values}}{{12-12=?}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{12-12=!}}
 
-// SR-1116
-struct S1116 {
-  var s: Int?
-}
+// https://github.com/apple/swift/issues/43729
+do {
+  struct S {
+    var s: Int?
+  }
 
-let a1116: [S1116] = []
-var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-// expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{53-53= ?? <#default value#>}}
-// expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{53-53=!}}
+  let x: [S] = []
+  var y = Set(1...10).subtracting(x.map({ $0.s })) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{47-47= ?? <#default value#>}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{47-47=!}}
+}
 
 func makeArray<T>(_ x: T) -> [T] { [x] }
 
-func sr12399(_ x: Int?) {
+// https://github.com/apple/swift/issues/54837
+func f_54837(_ x: Int?) {
   _ = Set(0...10).subtracting(makeArray(x)) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
   // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{42-42= ?? <#default value#>}}
   // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{42-42=!}}
@@ -320,7 +323,7 @@ let _: Int? = thing?.f() // expected-error {{value of optional type 'Int??' must
 // expected-note@-1{{coalesce}}
 // expected-note@-2{{force-unwrap}}
 
-// SR-9851 - https://bugs.swift.org/browse/SR-9851
+// https://github.com/apple/swift/issues/52262
 func coalesceWithParensRootExprFix() {
   let optionalBool: Bool? = false
   if !optionalBool { }  // expected-error{{value of optional type 'Bool?' must be unwrapped to a value of type 'Bool'}}
@@ -342,7 +345,7 @@ func test_explicit_call_with_overloads() {
   // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{14-14=()}}
 }
 
-// SR-11476
+// https://github.com/apple/swift/issues/53876
 func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
   struct S {
     subscript(x: Int) -> Int { x }
@@ -357,7 +360,8 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
   _ = \S.[fn] // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{13-13=()}}
 }
 
-func sr12426(a: Any, _ str: String?) {
+// https://github.com/apple/swift/issues/54865
+func f_54865(a: Any, _ str: String?) {
   a == str // expected-error {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
   // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (String, String)}}
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_closures %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping  -module-name coverage_closures %s | %FileCheck %s
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 func bar(arr: [(Int32) -> Int32]) {
@@ -35,7 +35,8 @@ func foo() {
   f1 { left, right in left == 0 || right == 1 }
 }
 
-// SR-2615: Display coverage for implicit member initializers without crashing
+// https://github.com/apple/swift/issues/45220
+// Display coverage for implicit member initializers without crashing.
 struct C1 {
   // CHECK-LABEL: sil_coverage_map{{.*}}// variable initialization expression of coverage_closures.C1
   // CHECK-NEXT: [[@LINE+1]]:24 -> [[@LINE+1]]:34 : 0
@@ -53,4 +54,19 @@ class C2 {
       print("hello")
     }
   }
+}
+
+// https://github.com/apple/swift/issues/61129 – Make sure we don't emit
+// duplicate coverage for closure expressions as property initializers.
+struct S {
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s17coverage_closures1SV1xSiycvpfi" {{.*}} // variable initialization expression of coverage_closures.S.x : () -> Swift.Int
+  // CHECK-NEXT:  [[@LINE+8]]:11 -> [[@LINE+8]]:30 : 0
+  // CHECK-NEXT:  }
+
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s17coverage_closures1SV1xSiycvpfiSiycfU_" {{.*}} // closure #1 () -> Swift.Int in variable initialization expression of coverage_closures.S.x : () -> Swift.Int
+  // CHECK-NEXT: [[@LINE+4]]:24 -> [[@LINE+4]]:25 : 1
+  // CHECK-NEXT: [[@LINE+3]]:28 -> [[@LINE+3]]:29 : (0 - 1)
+  // CHECK-NEXT: [[@LINE+2]]:11 -> [[@LINE+2]]:30 : 0
+  // CHECK-NEXT: }
+  var x = {.random() ? 1 : 2}
 }

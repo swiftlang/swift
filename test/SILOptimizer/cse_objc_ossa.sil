@@ -91,7 +91,7 @@ bb0(%0 : @owned $Bar):
 }
 
 // CHECK-LABEL: sil hidden [ossa] @_TF4test9trytowalkFPS_8Walkable_T_ :
-// CHECK:           bb0(%0 : @owned $Walkable):
+// CHECK:           bb0(%0 : @owned $any Walkable):
 // CHECK-NEXT:      {{%.*}} = open_existential_ref
 // CHECK-NEXT:      {{%.*}} = objc_method
 // CHECK-NEXT:      {{%.*}} = apply
@@ -103,12 +103,12 @@ bb0(%0 : @owned $Bar):
 // CHECK-LABEL: } // end sil function '_TF4test9trytowalkFPS_8Walkable_T_'
 sil hidden [ossa] @_TF4test9trytowalkFPS_8Walkable_T_ : $@convention(thin) (@owned Walkable) -> () {
 bb0(%0 : @owned $Walkable):
-  %2 = open_existential_ref %0 : $Walkable to $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable
-  %3 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
-  %4 = apply %3<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
-  %5 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
-  %6 = apply %5<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
-  destroy_value %2 :  $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable
+  %2 = open_existential_ref %0 : $Walkable to $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self
+  %3 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self, #Walkable.walk!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  %4 = apply %3<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  %5 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self, #Walkable.walk!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  %6 = apply %5<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  destroy_value %2 :  $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A", Walkable) Self
   %9 = tuple ()
   return %9 : $()
 }
@@ -138,32 +138,32 @@ bb0(%0 : @owned $Walkable):
 sil [ossa] @cse_open_existential_in_bbarg1 : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
   %copy0 = copy_value %0 : $AnyObject
-  %1 = open_existential_ref %0 : $AnyObject to $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  dynamic_method_br %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.foreign, bb1, bb2
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
+  dynamic_method_br %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self, #NSProxy.description!getter.foreign, bb1, bb2
 
-bb1(%3 : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
-  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+bb1(%3 : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self) -> @autoreleased Optional<NSString>):
+  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self) -> @autoreleased Optional<NSString>
   %6 = apply %5() : $@callee_owned () -> @owned Optional<NSString>
-  %7 = open_existential_ref %copy0 : $AnyObject to $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  dynamic_method_br %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.foreign, bb3, bb4
+  %7 = open_existential_ref %copy0 : $AnyObject to $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
+  dynamic_method_br %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self, #NSProxy.description!getter.foreign, bb3, bb4
 
 bb2:
   destroy_value %copy0 : $AnyObject
-  destroy_value %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
   br bb5
 
-bb3(%9 : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
-  %copy7 = copy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  %10 = partial_apply %9(%copy7) : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+bb3(%9 : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self) -> @autoreleased Optional<NSString>):
+  %copy7 = copy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
+  %10 = partial_apply %9(%copy7) : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self) -> @autoreleased Optional<NSString>
   %11 = apply %10() : $@callee_owned () -> @owned Optional<NSString>
   destroy_value %6 : $Optional<NSString>
-  destroy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
   destroy_value %11 : $Optional<NSString>
   br bb5
 
 bb4:
   destroy_value %6 : $Optional<NSString>
-  destroy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
   br bb5
 
 bb5:
@@ -178,30 +178,30 @@ bb5:
 sil [ossa] @cse_open_existential_in_bbarg2 : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
   %copy0 = copy_value %0 : $AnyObject
-  %1 = open_existential_ref %0 : $AnyObject to $@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  dynamic_method_br %1 : $@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.foreign, bb1, bb2
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
+  dynamic_method_br %1 : $@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self, #NSProxy.description!getter.foreign, bb1, bb2
 
-bb1(%3 : $@convention(objc_method) (@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
-  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+bb1(%3 : $@convention(objc_method) (@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self) -> @autoreleased Optional<NSString>):
+  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self) -> @autoreleased Optional<NSString>
   %6 = apply %5() : $@callee_owned () -> @owned Optional<NSString>
-  %7 = open_existential_ref %copy0 : $AnyObject to $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  br bb3(%7 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject)
+  %7 = open_existential_ref %copy0 : $AnyObject to $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
+  br bb3(%7 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self)
 
 bb2:
   destroy_value %copy0 : $AnyObject
-  destroy_value %1 : $@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %1 : $@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
   br bb5
 
-bb3(%9 : @owned $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject):
-  %copy9 = copy_value %9 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+bb3(%9 : @owned $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self):
+  %copy9 = copy_value %9 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
   destroy_value %6 : $Optional<NSString>
-  destroy_value %9 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  destroy_value %copy9 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %9 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
+  destroy_value %copy9 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
   br bb5
 
 bb4:
   destroy_value %6 : $Optional<NSString>
-  destroy_value %7 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %7 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60", AnyObject) Self
   br bb5
 
 bb5:
@@ -247,9 +247,9 @@ class B {}
 
 // CHECK-LABEL: sil [ossa] @nocse_existential_metatype_addr :
 // CHECK: store
-// CHECK: existential_metatype $@thick Any.Type
+// CHECK: existential_metatype $@thick any Any.Type
 // CHECK: store
-// CHECK: existential_metatype $@thick Any.Type
+// CHECK: existential_metatype $@thick any Any.Type
 // CHECK-LABEL: } // end sil function 'nocse_existential_metatype_addr'
 sil [ossa] @nocse_existential_metatype_addr : $@convention(thin) (@owned B, @owned B) -> (@thick Any.Type, @thick Any.Type) {
 bb0(%0 : @owned $B, %1 : @owned $B):

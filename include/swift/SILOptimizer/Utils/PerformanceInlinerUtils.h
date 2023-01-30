@@ -28,7 +28,7 @@ using namespace swift;
 extern llvm::cl::opt<bool> EnableSILInliningOfGenerics;
 
 namespace swift {
-class SideEffectAnalysis;
+class BasicCalleeAnalysis;
 
 // Controls the decision to inline functions with @_semantics, @effect and
 // global_init attributes.
@@ -45,7 +45,7 @@ SILFunction *getEligibleFunction(FullApplySite AI,
 
 // Returns true if this is a pure call, i.e. the callee has no side-effects
 // and all arguments are constants.
-bool isPureCall(FullApplySite AI, SideEffectAnalysis *SEA);
+bool isPureCall(FullApplySite AI, BasicCalleeAnalysis *BCA);
 
 /// Fundamental @_semantic tags provide additional semantics for optimization
 /// beyond what SIL analysis can discover from the function body. They should be

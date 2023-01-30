@@ -152,7 +152,6 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::IsEscapingClosureInst:
-  case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndAccessInst:
@@ -162,6 +161,9 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::EndBorrowInst:
     return true;
+  case SILInstructionKind::IsUniqueInst:
+    // TODO: Consider is_unique to be a barrier for optimization.
+    return !Inst->getFunction()->hasOwnership();
   default:
     return false;
   }
@@ -700,7 +702,7 @@ SILValue BlockState::reduceValuesAtEndOfBlock(RLEContext &Ctx, LSLocation &L) {
   for (unsigned i = 0; i < Locs.size(); ++i) {
     auto Val = Ctx.getValue(OTM[Ctx.getLocationBit(Locs[i])]);
     auto AvailVal = makeCopiedValueAvailable(Val.getBase(), BB);
-    Values[Locs[i]] = LSValue(AvailVal, Val.getPath().getValue());
+    Values[Locs[i]] = LSValue(AvailVal, Val.getPath().value());
   }
 
   // Second, reduce the available values into a single SILValue we can use to
@@ -1401,7 +1403,7 @@ bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
     if (!Val.isCoveringValue()) {
       auto AvailValue =
           makeCopiedValueAvailable(Val.getBase(), BB);
-      Values[X] = LSValue(AvailValue, Val.getPath().getValue());
+      Values[X] = LSValue(AvailValue, Val.getPath().value());
       continue;
     }
     Values[X] = Val;

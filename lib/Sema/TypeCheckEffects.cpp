@@ -399,7 +399,7 @@ template <class Impl>
 class EffectsHandlingWalker : public ASTWalker {
   Impl &asImpl() { return *static_cast<Impl*>(this); }
 public:
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     ShouldRecurse_t recurse = ShouldRecurse;
     // Skip the implementations of all local declarations... except
     // PBD.  We should really just have a PatternBindingStmt.
@@ -411,10 +411,10 @@ public:
     } else {
       recurse = ShouldNotRecurse;
     }
-    return bool(recurse);
+    return Action::VisitChildrenIf(bool(recurse));
   }
 
-  std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     visitExprPre(E);
     ShouldRecurse_t recurse = ShouldRecurse;
     if (isa<ErrorExpr>(E)) {
@@ -444,13 +444,13 @@ public:
     // type checking. If an unchecked expression is still around, the code was
     // invalid.
 #define UNCHECKED_EXPR(KIND, BASE) \
-    else if (isa<KIND##Expr>(E)) return {false, nullptr};
+    else if (isa<KIND##Expr>(E)) return Action::Stop();
 #include "swift/AST/ExprNodes.def"
 
-    return {bool(recurse), E};
+    return Action::VisitChildrenIf(bool(recurse), E);
   }
 
-  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     ShouldRecurse_t recurse = ShouldRecurse;
     if (auto doCatch = dyn_cast<DoCatchStmt>(S)) {
       recurse = asImpl().checkDoCatch(doCatch);
@@ -459,7 +459,10 @@ public:
     } else if (auto forEach = dyn_cast<ForEachStmt>(S)) {
       recurse = asImpl().checkForEach(forEach);
     }
-    return {bool(recurse), S};
+    if (!recurse)
+      return Action::SkipChildren(S);
+
+    return Action::Continue(S);
   }
 
   ShouldRecurse_t checkDoCatch(DoCatchStmt *S) {
@@ -724,12 +727,6 @@ public:
   DeclContext *RethrowsDC = nullptr;
   DeclContext *ReasyncDC = nullptr;
 
-  // Indicates if `classifyApply` will attempt to classify SelfApplyExpr
-  // because that should be done only in certain contexts like when infering
-  // if "async let" implicit auto closure wrapping initialize expression can
-  // throw.
-  bool ClassifySelfApplyExpr = false;
-
   DeclContext *getPolymorphicEffectDeclContext(EffectKind kind) const {
     switch (kind) {
     case EffectKind::Throws: return RethrowsDC;
@@ -758,20 +755,6 @@ public:
 
     if (auto *SAE = dyn_cast<SelfApplyExpr>(E)) {
       assert(!E->isImplicitlyAsync());
-
-      if (ClassifySelfApplyExpr) {
-        // Do not consider throw properties in SelfAssignExpr with an implicit
-        // conversion base.
-        if (isa<ImplicitConversionExpr>(SAE->getBase()))
-          return Classification();
-
-        auto fnType = E->getType()->getAs<AnyFunctionType>();
-        if (fnType && fnType->isThrowing()) {
-          return Classification::forUnconditional(
-              EffectKind::Throws, PotentialEffectReason::forApply());
-        }
-      }
-      return Classification();
     }
 
     auto type = E->getFn()->getType();
@@ -779,17 +762,22 @@ public:
     auto fnType = type->getAs<AnyFunctionType>();
     if (!fnType) return Classification::forInvalidCode();
 
-    // If the function doesn't have any effects, we're done here.
+    auto fnRef = AbstractFunction::getAppliedFn(E);
+    auto conformances = fnRef.getSubstitutions().getConformances();
+    const auto hasAnyConformances = !conformances.empty();
+
+    // If the function doesn't have any effects or conformances, we're done
+    // here.
     if (!fnType->isThrowing() &&
         !E->implicitlyThrows() &&
         !fnType->isAsync() &&
-        !E->isImplicitlyAsync()) {
+        !E->isImplicitlyAsync() &&
+        !hasAnyConformances) {
       return Classification();
     }
 
     // Decompose the application.
     auto *args = E->getArgs();
-    auto fnRef = AbstractFunction::getAppliedFn(E);
 
     // If any of the arguments didn't type check, fail.
     for (auto arg : *args) {
@@ -962,9 +950,9 @@ private:
     auto conditionalKind = classifyFunctionBodyImpl(fn, fn->getBody(),
                                                     /*allowNone*/ false,
                                                     kind);
-    if (conditionalKind.hasValue()) {
+    if (conditionalKind.has_value()) {
       return Classification::forEffect(kind,
-                                       conditionalKind.getValue(),
+                                       conditionalKind.value(),
                                        reason);
     }
     return Classification::forInvalidCode();
@@ -992,9 +980,9 @@ private:
     auto conditionalKind = classifyFunctionBodyImpl(closure, body,
                                                     /*allowNone*/ isAutoClosure,
                                                     kind);
-    if (conditionalKind.hasValue()) {
+    if (conditionalKind.has_value()) {
       return Classification::forEffect(kind,
-                                       conditionalKind.getValue(),
+                                       conditionalKind.value(),
                                        reason);
     }
     return Classification::forInvalidCode();
@@ -1403,7 +1391,10 @@ public:
     CatchGuard,
 
     /// A defer body
-    DeferBody
+    DeferBody,
+
+    // A runtime discoverable attribute initialization expression.
+    RuntimeAttribute,
   };
 
 private:
@@ -1545,6 +1536,10 @@ public:
 
     if (isa<PropertyWrapperInitializer>(init)) {
       return Context(Kind::PropertyWrapper);
+    }
+
+    if (isa<RuntimeAttributeInitializer>(init)) {
+      return Context(Kind::RuntimeAttribute);
     }
 
     auto *binding = cast<PatternBindingInitializer>(init)->getBinding();
@@ -1787,9 +1782,6 @@ public:
   void diagnoseUnhandledThrowSite(DiagnosticEngine &Diags, ASTNode E,
                                   bool isTryCovered,
                                   const PotentialEffectReason &reason) {
-    if (E.isImplicit())
-      return;
-
     switch (getKind()) {
     case Kind::PotentiallyHandled:
       if (IsNonExhaustiveCatch) {
@@ -1826,6 +1818,7 @@ public:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
+    case Kind::RuntimeAttribute:
       Diags.diagnose(E.getStartLoc(), diag::throwing_op_in_illegal_context,
                  static_cast<unsigned>(getKind()), getEffectSourceName(reason));
       return;
@@ -1862,6 +1855,7 @@ public:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
+    case Kind::RuntimeAttribute:
       Diags.diagnose(S->getStartLoc(), diag::throw_in_illegal_context,
                      static_cast<unsigned>(getKind()));
       return;
@@ -1888,6 +1882,7 @@ public:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
+    case Kind::RuntimeAttribute:
       assert(!DiagnoseErrorOnTry);
       // Diagnosed at the call sites.
       return;
@@ -1903,10 +1898,10 @@ public:
     if (forAwait)
       return 2;
 
-    if (!maybeReason.hasValue())
+    if (!maybeReason.has_value())
       return 0; // Unspecified
 
-    switch(maybeReason.getValue().getKind()) {
+    switch(maybeReason.value().getKind()) {
     case PotentialEffectReason::Kind::ByClosure:
     case PotentialEffectReason::Kind::ByDefaultClosure:
     case PotentialEffectReason::Kind::ByConformance:
@@ -1945,10 +1940,9 @@ public:
     } else if (auto patternBinding = dyn_cast_or_null<PatternBindingDecl>(
                    node.dyn_cast<Decl *>())) {
       if (patternBinding->isAsyncLet()) {
-        auto var = patternBinding->getAnchoringVarDecl(0);
-        Diags.diagnose(
-            e->getLoc(), diag::async_let_in_illegal_context,
-            var->getName(), static_cast<unsigned>(getKind()));
+        Diags.diagnose(patternBinding->getLoc(),
+                       diag::async_let_binding_illegal_context,
+                       static_cast<unsigned>(getKind()));
         return;
       }
     }
@@ -1989,6 +1983,7 @@ public:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
+    case Kind::RuntimeAttribute:
       diagnoseAsyncInIllegalContext(Diags, node);
       return;
     }
@@ -2492,15 +2487,30 @@ private:
         effects.push_back(EffectKind::Async);
       }
 
-      checkThrowAsyncSite(E, getter->hasThrows(),
+      bool requiresTry = getter->hasThrows();
+      checkThrowAsyncSite(E, requiresTry,
                           Classification::forEffect(effects,
                                   ConditionalEffectKind::Always,
                                   getKindOfEffectfulProp(member)));
 
-    } else if (E->isImplicitlyAsync()) {
-      checkThrowAsyncSite(E, /*requiresTry=*/false,
-            Classification::forUnconditional(EffectKind::Async,
-                                             getKindOfEffectfulProp(member)));
+    } else {
+      EffectList effects;
+      bool requiresTry = false;
+      if (E->isImplicitlyAsync()) {
+        effects.push_back(EffectKind::Async);
+      }
+      if (E->isImplicitlyThrows()) {
+        // E.g. it may be a distributed computed property, accessed across actors.
+        effects.push_back(EffectKind::Throws);
+        requiresTry = true;
+      }
+
+      if (!effects.empty()) {
+        checkThrowAsyncSite(E, requiresTry,
+                            Classification::forEffect(effects,
+                                                      ConditionalEffectKind::Always,
+                                                      getKindOfEffectfulProp(member)));
+      }
     }
 
     return ShouldRecurse;
@@ -2587,17 +2597,17 @@ private:
       CheckEffectsCoverage &CEC;
       ConservativeThrowChecker(CheckEffectsCoverage &CEC) : CEC(CEC) {}
       
-      Expr *walkToExprPost(Expr *E) override {
+      PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
         if (isa<TryExpr>(E))
           CEC.Flags.set(ContextFlags::HasAnyThrowSite);
-        return E;
+        return Action::Continue(E);
       }
       
-      Stmt *walkToStmtPost(Stmt *S) override {
+      PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
         if (isa<ThrowStmt>(S))
           CEC.Flags.set(ContextFlags::HasAnyThrowSite);
 
-        return S;
+        return Action::Continue(S);
       }
     };
 
@@ -2899,15 +2909,15 @@ private:
 
 // Find nested functions and perform effects checking on them.
 struct LocalFunctionEffectsChecker : ASTWalker {
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
       if (func->getDeclContext()->isLocalContext())
         TypeChecker::checkFunctionEffects(func);
 
-      return false;
+      return Action::SkipChildren();
     }
 
-    return true;
+    return Action::Continue();
   }
 };
 
@@ -2921,8 +2931,10 @@ void TypeChecker::checkTopLevelEffects(TopLevelCodeDecl *code) {
   if (ctx.LangOpts.EnableThrowWithoutTry)
     checker.setTopLevelThrowWithoutTry();
 
-  code->getBody()->walk(checker);
-  code->getBody()->walk(LocalFunctionEffectsChecker());
+  if (auto *body = code->getBody()) {
+    body->walk(checker);
+    body->walk(LocalFunctionEffectsChecker());
+  }
 }
 
 void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
@@ -2983,7 +2995,6 @@ void TypeChecker::checkPropertyWrapperEffects(
 
 bool TypeChecker::canThrow(Expr *expr) {
   ApplyClassifier classifier;
-  classifier.ClassifySelfApplyExpr = true;
-  return (classifier.classifyExpr(expr, EffectKind::Throws) ==
-          ConditionalEffectKind::Always);
+  auto effect = classifier.classifyExpr(expr, EffectKind::Throws);
+  return (effect != ConditionalEffectKind::None);
 }

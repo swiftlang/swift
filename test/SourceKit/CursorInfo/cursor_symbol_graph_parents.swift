@@ -11,7 +11,7 @@ struct Parent {
 
     /// Something about variable member
     let member = 1
-    /// Something aboout method
+    /// Something about method
     func method() {}
 
     func localContext() {

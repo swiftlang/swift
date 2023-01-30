@@ -19,7 +19,7 @@ func metatypeToObject(_ x: C.Type) -> AnyObject {
 
 // CHECK-LABEL: sil hidden [ossa] @$s26metatype_object_conversion27existentialMetatypeToObjectyyXlAA2CP_pXpF
 func existentialMetatypeToObject(_ x: CP.Type) -> AnyObject {
-  // CHECK: bb0([[THICK:%.*]] : $@thick CP.Type):
+  // CHECK: bb0([[THICK:%.*]] : $@thick any CP.Type):
   // CHECK:   [[OBJC:%.*]] = thick_to_objc_metatype [[THICK]]
   // CHECK:   [[OBJECT:%.*]] = objc_existential_metatype_to_object [[OBJC]]
   // CHECK:   return [[OBJECT]]

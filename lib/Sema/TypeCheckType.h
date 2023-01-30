@@ -26,7 +26,7 @@ namespace swift {
 
 class ASTContext;
 class TypeRepr;
-class ComponentIdentTypeRepr;
+class IdentTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
 
@@ -67,12 +67,33 @@ enum class TypeResolutionFlags : uint16_t {
   /// Needed to enforce that \c any P<some Q> does not resolve to a
   /// parameterized existential with an opaque type constraint.
   DisallowOpaqueTypes = 1 << 9,
+
+  /// We are in a `@preconcurrency` declaration.
+  Preconcurrency = 1 << 10,
+
+  /// Whether references to type parameter packs are allowed.
+  ///
+  /// Pack references are only allowed inside pack expansions
+  /// and in generic requirements.
+  AllowPackReferences = 1 << 11,
 };
 
 /// Type resolution contexts that require special handling.
 enum class TypeResolverContext : uint8_t {
   /// No special type handling is required.
   None,
+
+  /// Whether we are checking generic arguments of a bound generic type.
+  GenericArgument,
+
+  /// Whether we are checking generic arguments of a parameterized protocol type.
+  ProtocolGenericArgument,
+
+  /// Whether we are checking a tuple element type.
+  TupleElement,
+
+  /// Whether we are checking a pack element type.
+  PackElement,
 
   /// Whether we are checking the parameter list of a function.
   AbstractFunctionDecl,
@@ -94,8 +115,7 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this is an 'inout' function input.
   InoutFunctionInput,
 
-  /// Whether we are in the result type of a function, including multi-level
-  /// tuple return values. See also: TypeResolutionFlags::Direct
+  /// Whether we are in the result type of a function.
   FunctionResult,
 
   /// Whether this is a pattern binding entry.
@@ -119,6 +139,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this type is the value carried in an enum case.
   EnumElementDecl,
+
+  /// Whether this type is a part of a macro declaration.
+  MacroDecl,
 
   /// Whether this is the payload subpattern of an enum pattern.
   EnumPatternPayload,
@@ -151,8 +174,14 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this is the type of an editor placeholder.
   EditorPlaceholderExpr,
 
-  /// Whether this is an "inherited" type.
+  /// Whether this is an inheritance clause of a concrete type.
   Inherited,
+
+  /// Whether this is an inheritance clause of a generic parameter.
+  GenericParameterInherited,
+
+  /// Whether this is an inheritance clause of an associated type.
+  AssociatedTypeInherited,
 
   /// Whether this is a custom attribute.
   CustomAttr
@@ -224,6 +253,10 @@ public:
     case Context::ClosureExpr:
       return true;
     case Context::None:
+    case Context::GenericArgument:
+    case Context::ProtocolGenericArgument:
+    case Context::TupleElement:
+    case Context::PackElement:
     case Context::FunctionInput:
     case Context::VariadicFunctionInput:
     case Context::InoutFunctionInput:
@@ -231,6 +264,7 @@ public:
     case Context::ExtensionBinding:
     case Context::SubscriptDecl:
     case Context::EnumElementDecl:
+    case Context::MacroDecl:
     case Context::EnumPatternPayload:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
@@ -242,6 +276,8 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::Inherited:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
       return false;
     }
@@ -253,6 +289,8 @@ public:
   bool isConstraintImplicitExistential() const {
     switch (context) {
     case Context::Inherited:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
     case Context::ExtensionBinding:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
@@ -261,6 +299,10 @@ public:
     case Context::MetatypeBase:
       return false;
     case Context::None:
+    case Context::GenericArgument:
+    case Context::ProtocolGenericArgument:
+    case Context::PackElement:
+    case Context::TupleElement:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:
@@ -273,6 +315,7 @@ public:
     case Context::FunctionResult:
     case Context::SubscriptDecl:
     case Context::EnumElementDecl:
+    case Context::MacroDecl:
     case Context::EnumPatternPayload:
     case Context::SameTypeRequirement:
     case Context::ProtocolMetatypeBase:
@@ -283,32 +326,87 @@ public:
     }
   }
 
-  /// Whether parameterized protocol types are supported in this context.
-  bool isParameterizedProtocolSupported() const {
+  /// Whether pack expansion types are supported in this context.
+  bool isPackExpansionSupported(DeclContext *dc) const {
     switch (context) {
+    case Context::FunctionInput:
+    case Context::VariadicFunctionInput:
+    case Context::PackElement:
+    case Context::TupleElement:
+    case Context::GenericArgument:
+      return true;
+
+    // Local variable packs are supported, but property packs
+    // are not.
+    case Context::PatternBindingDecl:
+      return !dc->isTypeContext();
+
+    case Context::None:
+    case Context::ProtocolGenericArgument:
     case Context::Inherited:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
     case Context::ExtensionBinding:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
     case Context::ExistentialConstraint:
     case Context::MetatypeBase:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::MacroDecl:
+    case Context::EnumPatternPayload:
+    case Context::SameTypeRequirement:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+      return false;
+    }
+  }
+
+  /// Whether we are resolving a type in a `where` clause, generic parameter
+  /// declaration inheritance clause, or associated type inheritance clause.
+  bool isGenericRequirement() const {
+    switch (base) {
+    case Context::GenericRequirement:
+    case Context::SameTypeRequirement:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
       return true;
+
     case Context::None:
+    case Context::Inherited:
+    case Context::FunctionInput:
+    case Context::PackElement:
+    case Context::TupleElement:
+    case Context::GenericArgument:
+    case Context::ProtocolGenericArgument:
+    case Context::ExtensionBinding:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:
     case Context::PatternBindingDecl:
     case Context::EditorPlaceholderExpr:
     case Context::ClosureExpr:
-    case Context::FunctionInput:
     case Context::VariadicFunctionInput:
     case Context::InoutFunctionInput:
     case Context::FunctionResult:
     case Context::SubscriptDecl:
     case Context::EnumElementDecl:
+    case Context::MacroDecl:
     case Context::EnumPatternPayload:
-    case Context::SameTypeRequirement:
     case Context::ProtocolMetatypeBase:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
@@ -389,6 +487,11 @@ using OpenUnboundGenericTypeFn = llvm::function_ref<Type(UnboundGenericType *)>;
 using HandlePlaceholderTypeReprFn =
     llvm::function_ref<Type(ASTContext &, PlaceholderTypeRepr *)>;
 
+/// A function reference used to replace pack references with opened
+/// element archetypes when resolving a \c PackReferenceTypeRepr.
+using OpenPackElementFn =
+    llvm::function_ref<Type(Type, PackReferenceTypeRepr *)>;
+
 /// Handles the resolution of types within a given declaration context,
 /// which might involve resolving generic parameters to a particular
 /// stage.
@@ -398,19 +501,20 @@ class TypeResolution {
   TypeResolutionOptions options;
   OpenUnboundGenericTypeFn unboundTyOpener;
   HandlePlaceholderTypeReprFn placeholderHandler;
+  OpenPackElementFn packElementOpener;
 
 private:
-  /// The generic environment used to map to archetypes.
-  GenericEnvironment *genericEnv;
+  GenericSignature genericSig;
 
   TypeResolution(DeclContext *dc, TypeResolutionStage stage,
                  TypeResolutionOptions options,
                  OpenUnboundGenericTypeFn unboundTyOpener,
-                 HandlePlaceholderTypeReprFn placeholderHandler)
+                 HandlePlaceholderTypeReprFn placeholderHandler,
+                 OpenPackElementFn packElementOpener)
       : dc(dc), stage(stage), options(options),
         unboundTyOpener(unboundTyOpener),
         placeholderHandler(placeholderHandler),
-        genericEnv(nullptr) {}
+        packElementOpener(packElementOpener) {}
 
 public:
   /// Form a type resolution for the structure of a type, which does not
@@ -419,22 +523,25 @@ public:
   static TypeResolution
   forStructural(DeclContext *dc, TypeResolutionOptions opts,
                 OpenUnboundGenericTypeFn unboundTyOpener,
-                HandlePlaceholderTypeReprFn placeholderHandler);
+                HandlePlaceholderTypeReprFn placeholderHandler,
+                OpenPackElementFn packElementOpener);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution
   forInterface(DeclContext *dc, TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
-               HandlePlaceholderTypeReprFn placeholderHandler);
+               HandlePlaceholderTypeReprFn placeholderHandler,
+               OpenPackElementFn packElementOpener);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution
-  forInterface(DeclContext *dc, GenericEnvironment *genericEnv,
+  forInterface(DeclContext *dc, GenericSignature genericSig,
                TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
-               HandlePlaceholderTypeReprFn placeholderHandler);
+               HandlePlaceholderTypeReprFn placeholderHandler,
+               OpenPackElementFn packElementOpener);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given generic
@@ -444,12 +551,14 @@ public:
                         TypeResolutionOptions opts,
                         OpenUnboundGenericTypeFn unboundTyOpener,
                         HandlePlaceholderTypeReprFn placeholderHandler,
+                        OpenPackElementFn packElementOpener,
                         GenericParamList *silParams = nullptr);
 
   static Type resolveContextualType(
-      TypeRepr *TyR, DeclContext *dc, GenericEnvironment *genericEnv,
+      TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
       TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
       HandlePlaceholderTypeReprFn placeholderHandler,
+      OpenPackElementFn packElementOpener,
       GenericParamList *silParams = nullptr);
 
 public:
@@ -476,6 +585,10 @@ public:
     return placeholderHandler;
   }
 
+  OpenPackElementFn getPackElementOpener() const {
+    return packElementOpener;
+  }
+
   /// Retrieves the generic signature for the context, or NULL if there is
   /// no generic signature to resolve types.
   GenericSignature getGenericSignature() const;
@@ -496,7 +609,7 @@ public:
   /// name.
   Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                   SourceRange baseRange,
-                                  ComponentIdentTypeRepr *ref) const;
+                                  IdentTypeRepr *repr) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.

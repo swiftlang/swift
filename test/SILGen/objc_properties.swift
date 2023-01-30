@@ -226,9 +226,9 @@ class NonObjCBaseClass : NSObject {
 // CHECK-LABEL: sil private [thunk] [ossa] @$s15objc_properties12ObjCSubclassC8propertySivsTo
 
 // Make sure lazy properties that witness @objc protocol requirements are
-// correctly formed
+// correctly formed.
 //
-// <https://bugs.swift.org/browse/SR-1825>
+// https://github.com/apple/swift/issues/44434
 
 @objc protocol HasProperty {
     @objc var window: NSObject? { get set }
@@ -290,10 +290,10 @@ class SomeWrapperTests {
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsCyACSScfc : $@convention(method) (@owned String, @owned SomeWrapperTests) -> @owned SomeWrapperTests {
 // CHECK:  [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC04someD0SivsTD
 // CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[M]]({{.*}})
-// CHECK: assign_by_wrapper {{%.*}}: $Int to {{%.*}} : $*SomeWrapper, init {{.*}} : $@callee_guaranteed (Int) -> SomeWrapper, set [[C]] : $@callee_guaranteed (Int) -> ()
+// CHECK: assign_by_wrapper origin property_wrapper, {{%.*}}: $Int to {{%.*}} : $*SomeWrapper, init {{.*}} : $@callee_guaranteed (Int) -> SomeWrapper, set [[C]] : $@callee_guaranteed (Int) -> ()
 // CHECK: [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC1sSSSgvsTD
 // CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[M]](
-// CHECK:  assign_by_wrapper {{.*}} : $Optional<String> to {{.*}} : $*W<Optional<String>>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @owned W<Optional<String>>, set [[C]] : $@callee_guaranteed (@owned Optional<String>) -> ()
+// CHECK:  assign_by_wrapper origin property_wrapper, {{.*}} : $Optional<String> to {{.*}} : $*W<Optional<String>>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @owned W<Optional<String>>, set [[C]] : $@callee_guaranteed (@owned Optional<String>) -> ()
   init(_ s: String) {
     someWrapper = 1000
     self.s = s

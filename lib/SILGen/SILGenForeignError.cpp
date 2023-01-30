@@ -251,7 +251,7 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 static FunctionSection
 functionSectionForConvention(Optional<ForeignAsyncConvention> foreignAsync) {
   // If there is a foreign async convention too, the error block branches to
-  // the block awaiting the conteinuation.
+  // the block awaiting the continuation.
   return foreignAsync ? FunctionSection::Ordinary : FunctionSection::Postmatter;
 }
 
@@ -270,8 +270,8 @@ SILValue SILGenFunction::emitForeignErrorBlock(
   // unconditionally is fine because we want to assume it's nil in the
   // other path.
   SILValue errorV;
-  if (errorSlot.hasValue()) {
-    errorV = B.emitLoadValueOperation(loc, errorSlot.getValue().forward(*this),
+  if (errorSlot.has_value()) {
+    errorV = B.emitLoadValueOperation(loc, errorSlot.value().forward(*this),
                                       LoadOwnershipQualifier::Take);
   } else {
     // If we are not provided with an errorSlot value, then we are passed the

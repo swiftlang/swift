@@ -219,7 +219,7 @@ func implicitInit() {
   _ = G // expected-error {{expected member name or constructor call after type name}} expected-note {{add arguments}} {{8-8=()}} expected-note {{use '.self'}} {{8-8=.self}}
 }
 
-// https://bugs.swift.org/browse/SR-502
+// https://github.com/apple/swift/issues/43119
 func testFunctionCollectionTypes() {
   _ = [(Int) -> Int]()
   _ = [(Int, Int) -> Int]()

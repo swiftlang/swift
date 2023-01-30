@@ -645,9 +645,12 @@ class NewtypeUser {
   @objc func intNewtype(a: MyInt) {}
   @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   @objc func intNewtypeArray(a: [MyInt]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-1 {{Swift structs cannot be represented in Objective-C}}
   @objc func intNewtypeDictionary(a: [MyInt: NSObject]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-1 {{Swift structs cannot be represented in Objective-C}}
   @objc func cfNewtype(a: CFNewType) {}
   @objc func cfNewtypeArray(a: [CFNewType]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-1 {{Swift structs cannot be represented in Objective-C}}
 
   typealias MyTuple = (Int, AnyObject?)
   typealias MyNamedTuple = (a: Int, b: AnyObject?)

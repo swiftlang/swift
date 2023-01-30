@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-public-decls -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// CHECK-LABEL: namespace Functions {
+// CHECK-LABEL: namespace Functions __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Functions") {
 
 // CHECK-LABEL: namespace _impl {
 
@@ -18,13 +18,13 @@
 
 public func passIntReturnVoid(x: CInt) { print("passIntReturnVoid \(x)") }
 
-// CHECK: inline void passIntReturnVoid(int x) noexcept {
+// CHECK: inline void passIntReturnVoid(int x) noexcept SWIFT_SYMBOL("s:9Functions17passIntReturnVoid1xys5Int32V_tF") {
 // CHECK: return _impl::$s9Functions17passIntReturnVoid1xys5Int32V_tF(x);
 // CHECK: }
 
 public func passTwoIntReturnInt(x: CInt, y: CInt) -> CInt { return x + y }
 
-// CHECK: inline int passTwoIntReturnInt(int x, int y) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline int passTwoIntReturnInt(int x, int y) noexcept SWIFT_SYMBOL("s:9Functions016passTwoIntReturnD01x1ys5Int32VAF_AFtF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: return _impl::$s9Functions016passTwoIntReturnD01x1ys5Int32VAF_AFtF(x, y);
 // CHECK: }
 
@@ -33,18 +33,18 @@ public func passTwoIntReturnIntNoArgLabel(_: CInt, _: CInt) -> CInt {
   return 42
 }
 
-// CHECK: inline int passTwoIntReturnIntNoArgLabel(int _1, int _2) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline int passTwoIntReturnIntNoArgLabel(int _1, int _2) noexcept SWIFT_SYMBOL("s:9Functions016passTwoIntReturnD10NoArgLabelys5Int32VAD_ADtF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: return _impl::$s9Functions016passTwoIntReturnD10NoArgLabelys5Int32VAD_ADtF(_1, _2);
 // CHECK: }
 
 public func passTwoIntReturnIntNoArgLabelParamName(_ x2: CInt, _ y2: CInt) -> CInt { return x2 + y2 }
 
-// CHECK: inline int passTwoIntReturnIntNoArgLabelParamName(int x2, int y2) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline int passTwoIntReturnIntNoArgLabelParamName(int x2, int y2) noexcept SWIFT_SYMBOL("s:9Functions016passTwoIntReturnD19NoArgLabelParamNameys5Int32VAD_ADtF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK:   return _impl::$s9Functions016passTwoIntReturnD19NoArgLabelParamNameys5Int32VAD_ADtF(x2, y2);
 // CHECK: }
 
 public func passVoidReturnVoid() { print("passVoidReturnVoid") }
 
-// CHECK: inline void passVoidReturnVoid() noexcept {
+// CHECK: inline void passVoidReturnVoid() noexcept SWIFT_SYMBOL("s:9Functions014passVoidReturnC0yyF") {
 // CHECK: return _impl::$s9Functions014passVoidReturnC0yyF();
 // CHECK: }

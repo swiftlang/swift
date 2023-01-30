@@ -48,8 +48,8 @@ class NonFinalClass : P {
   subscript(_: T) -> Self { self }
 }
 
-// Test for default implementation that comes from a constrained extension
-// - https://bugs.swift.org/browse/SR-7422
+// (https://github.com/apple/swift/issues/49965) Test for default implementation
+// that comes from a constrained extension.
 
 // FIXME: Better error message here?
 
@@ -78,7 +78,7 @@ extension HasDefault where Self : SeriousClass {
 
 extension SeriousClass : HasDefault {}
 
-// https://bugs.swift.org/browse/SR-7428
+// https://github.com/apple/swift/issues/49971
 
 protocol Node {
   associatedtype ValueType = Int
@@ -94,28 +94,30 @@ extension Node {
 
 class IntNode: Node {}
 
-// SR-8902
-protocol P8902 {
+// https://github.com/apple/swift/issues/51408
+
+protocol P_51408 {
     associatedtype A
     func f(_ x: A) -> Self
 }
-struct S : P8902 {
-    func f(_ x: Bool) -> S { fatalError() }
+struct S : P_51408 {
+    func f(_ x: Bool) -> S {}
 }
-class C8902 : P8902 {
-    func f(_ x: Bool) -> C8902 { fatalError() } // expected-error {{method 'f' in non-final class 'C8902' must return 'Self' to conform to protocol 'P8902'}}
+class C1_51408 : P_51408 {
+    func f(_ x: Bool) -> C1_51408 {} // expected-error {{method 'f' in non-final class 'C1_51408' must return 'Self' to conform to protocol 'P_51408'}}
 }
-final class C8902b : P8902 {
-    func f(_ x: Bool) -> C8902b { fatalError() }
+final class C2_51408 : P_51408 {
+    func f(_ x: Bool) -> C2_51408 {}
 }
-class C8902c : P8902 {
-    func f(_ x: Bool) -> Self { fatalError() }
+class C3_51408 : P_51408 {
+    func f(_ x: Bool) -> Self {}
 }
-protocol P8902complex {
+
+protocol P_51408_Complex {
   associatedtype A
   func f() -> (A, Self?)
 }
-final class C8902complex : P8902complex {
-  func f() -> (Bool, C8902complex?) { fatalError() }
+final class C_51408_Complex : P_51408_Complex {
+  func f() -> (Bool, C_51408_Complex?) {}
 }
 

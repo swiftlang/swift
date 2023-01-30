@@ -465,9 +465,10 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
   auto *fn = functionBuilder.createFunction(
       orig->getLinkage(), clonedName, clonedTy, orig->getGenericEnvironment(),
       orig->getLocation(), orig->isBare(), IsNotTransparent, serialized,
-      IsNotDynamic, IsNotDistributed, orig->getEntryCount(), orig->isThunk(),
-      orig->getClassSubclassScope(), orig->getInlineStrategy(),
-      orig->getEffectsKind(), orig, orig->getDebugScope());
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
+      orig->getEntryCount(), orig->isThunk(), orig->getClassSubclassScope(),
+      orig->getInlineStrategy(), orig->getEffectsKind(), orig,
+      orig->getDebugScope());
   for (auto &attr : orig->getSemanticsAttrs())
     fn->addSemanticsAttr(attr);
   return fn;
@@ -491,8 +492,9 @@ void ClosureCloner::populateCloned() {
   for (; ai != ae; ++argNo, ++ai) {
     if (!promotableIndices.count(argNo)) {
       // Simply create a new argument which copies the original argument
-      SILValue mappedValue = clonedEntryBB->createFunctionArgument(
+      auto *mappedValue = clonedEntryBB->createFunctionArgument(
           (*ai)->getType(), (*ai)->getDecl());
+      mappedValue->copyFlags(cast<SILFunctionArgument>(*ai));
       entryArgs.push_back(mappedValue);
       continue;
     }
@@ -504,8 +506,10 @@ void ClosureCloner::populateCloned() {
     auto boxedTy = getSILBoxFieldType(TypeExpansionContext(*cloned), boxTy,
                                       cloned->getModule().Types, 0)
                        .getObjectType();
-    SILValue mappedValue =
+    auto *newArg =
         clonedEntryBB->createFunctionArgument(boxedTy, (*ai)->getDecl());
+    newArg->copyFlags(cast<SILFunctionArgument>(*ai));
+    SILValue mappedValue = newArg;
 
     // If SIL ownership is enabled, we need to perform a borrow here if we have
     // a non-trivial value. We know that our value is not written to and it does
@@ -1640,7 +1644,7 @@ void CapturePromotionPass::processFunction(
         processPartialApplyInst(funcBuilder, pai, indicesPair.second, worklist);
     (void)clonedFn;
   }
-  invalidateAnalysis(func, SILAnalysis::InvalidationKind::Everything);
+  invalidateAnalysis(func, SILAnalysis::InvalidationKind::FunctionBody);
 }
 
 SILTransform *swift::createCapturePromotion() {

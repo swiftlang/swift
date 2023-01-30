@@ -1,0 +1,64 @@
+// RUN: %empty-directory(%t)
+
+// rdar://77217762 – The increment_profiler_counter in $foo gets optimized out by
+// LLVM function optimization, but make sure we still emit the name data which
+// is required by the coverage record.
+
+// Make sure both the legacy and new pass manager work.
+// We need to disable SIL optimizations to ensure LLVM optimizes out the
+// profiler increment.
+// RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -O -Xfrontend -disable-sil-perf-optzns -Xfrontend -disable-new-llvm-pass-manager -o %t/main1
+// RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -O -Xfrontend -disable-sil-perf-optzns -Xfrontend -enable-new-llvm-pass-manager -o %t/main2
+
+// This unusual use of 'sh' allows the path of the profraw file to be
+// substituted by %target-run.
+// RUN: %target-codesign %t/main1
+// RUN: %target-codesign %t/main2
+// RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default1.profraw %t/main1
+// RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default2.profraw %t/main2
+
+// RUN: %llvm-profdata merge %t/default1.profraw -o %t/default1.profdata
+// RUN: %llvm-profdata merge %t/default2.profraw -o %t/default2.profdata
+
+// RUN: %llvm-cov report %t/main1 -instr-profile=%t/default1.profdata
+// RUN: %llvm-cov report %t/main2 -instr-profile=%t/default2.profdata
+
+// REQUIRES: profile_runtime
+// REQUIRES: executable_test
+// REQUIRES: OS=macosx
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  increment_profiler_counter 0, "__tlcd_line:12:1", num_counters 1, hash 0
+  %3 = function_ref @$foo : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  return %6 : $Int32
+}
+
+sil [ossa] @$foo : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int1, 0
+  cond_br %1, bb1, bb2
+
+bb1:
+  increment_profiler_counter 0, "$foo", num_counters 1, hash 0
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil_coverage_map "main.swift" "$foo" "$foo" 0 {
+  10:6 -> 10:11 : 0
+}

@@ -66,7 +66,7 @@ private func _RegexLiteralLexingFn(
       let diagEngine = DiagnosticEngine(bridged: bridged)
       let startLoc = SourceLoc(
         locationInFile: error.location.assumingMemoryBound(to: UInt8.self))!
-      diagEngine.diagnose(startLoc, .regex_literal_parsing_error, error.message)
+      diagEngine.diagnose(startLoc, .foreign_diagnostic, error.message)
     }
     return error.completelyErroneous
   }
@@ -113,7 +113,7 @@ public func _RegexLiteralParsingFn(
       let offset = str.utf8.distance(from: str.startIndex, to: errorLoc)
       diagLoc = _diagLoc.advanced(by: offset)
     }
-    diagEngine.diagnose(diagLoc, .regex_literal_parsing_error, error.message)
+    diagEngine.diagnose(diagLoc, .foreign_diagnostic, error.message)
     return true
   } catch {
     fatalError("Expected CompilerParseError")

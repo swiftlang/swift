@@ -119,9 +119,6 @@ def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
 
-def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
-  HelpText<"Verify that no unknown nodes exist in the libSyntax tree">;
-
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
   
@@ -342,6 +339,9 @@ def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
 
 def debug_requirement_machine : Joined<["-"], "debug-requirement-machine=">,
   HelpText<"Fine-grained debug output from the generics implementation">;
+
+def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
+  HelpText<"Dumps the results of each macro expansion">;
 
 def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -564,16 +564,19 @@ def disable_deserialization_recovery :
   Flag<["-"], "disable-deserialization-recovery">,
   HelpText<"Don't attempt to recover from missing xrefs (etc) in swiftmodules">;
 
+def enable_deserialization_safety :
+  Flag<["-"], "enable-deserialization-safety">,
+  HelpText<"Avoid reading potentially unsafe decls in swiftmodules">;
+def disable_deserialization_safety :
+  Flag<["-"], "disable-deserialization-safety">,
+  HelpText<"Don't avoid reading potentially unsafe decls in swiftmodules">;
+
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
 def disable_experimental_string_processing :
   Flag<["-"], "disable-experimental-string-processing">,
   HelpText<"Disable experimental string processing">;
-
-def enable_experimental_variadic_generics :
-  Flag<["-"], "enable-experimental-variadic-generics">,
-  HelpText<"Enable experimental support for variadic generic types">;
 
 def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
@@ -836,9 +839,6 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
            "ease diffing">;
 
-def emit_syntax : Flag<["-"], "emit-syntax">,
-  HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
-
 def cxx_interop_getters_setters_as_properties :
   Flag<["-"], "cxx-interop-getters-setters-as-properties">,
   HelpText<"Import getters and setters as computed properties in Swift">,
@@ -877,6 +877,14 @@ def compile_module_from_interface :
   HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
   ModeOpt;
 
+def explicit_interface_module_build :
+  Flag<["-"], "explicit-interface-module-build">,
+  HelpText<"Use the specified command-line to build the module from interface, instead of flags specified in the interface">;
+
+def direct_clang_cc1_module_build :
+  Flag<["-"], "direct-clang-cc1-module-build">,
+  HelpText<"Use the specified -Xcc options to build a PCM by using Clang frontend directly, bypassing the Clang driver">;
+
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
   Alias<compile_module_from_interface>,
@@ -892,9 +900,23 @@ def module_interface_preserve_types_as_written :
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
 
+def alias_module_names_in_module_interface :
+  Flag<["-"], "alias-module-names-in-module-interface">,
+  HelpText<"When emitting a module interface, disambiguate modules using "
+           "distinct alias names">;
+def disable_alias_module_names_in_module_interface :
+  Flag<["-"], "disable-alias-module-names-in-module-interface">,
+  HelpText<"When emitting a module interface, disable disambiguating modules "
+           "using distinct alias names">;
+
 def experimental_spi_imports :
   Flag<["-"], "experimental-spi-imports">,
   HelpText<"Enable experimental support for SPI imports">;
+
+def disable_print_missing_imports_in_module_interface :
+  Flag<["-"], "disable-print-missing-imports-in-module-interface">,
+  HelpText<"Disable adding to the module interface imports used from API and "
+           "missing from the sources">;
 
 // [FIXME: Clang-type-plumbing] Make this a SIL-only option once we start
 // unconditionally emitting non-canonical Clang types in swiftinterfaces.
@@ -1060,14 +1082,17 @@ def skip_import_in_public_interface:
   HelpText<"Skip the import statement corresponding to a module name "
            "when printing the public interface.">;
 
-def clang_header_expose_public_decls:
-  Flag<["-"], "clang-header-expose-public-decls">,
-  HelpText<"Expose all public declarations in the generated clang header">,
-  Flags<[FrontendOption, HelpHidden]>;
-  
-def enable_ad_hoc_availability :
-  Flag<["-"], "enable-ad-hoc-availability">,
-  HelpText<"Enable experimental support for ad hoc availability">;
+def clang_header_expose_decls:
+  Joined<["-"], "clang-header-expose-decls=">,
+  HelpText<"Which declarations should be exposed in the generated clang header.">,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"all-public|has-expose-attr">;
+
+def weak_link_at_target :
+  Flag<["-"], "weak-link-at-target">,
+  HelpText<"Weakly link symbols for declarations that were introduced at the "
+           "deployment target. Symbols introduced before the deployment "
+           "target are still strongly linked.">;
 
 def concurrency_model :
     Separate<["-"], "concurrency-model">,
@@ -1077,10 +1102,54 @@ def concurrency_model_EQ :
     Joined<["-"], "concurrency-model=">,
     Alias<concurrency_model>;
 
+def enable_stack_protector :
+  Flag<["-"], "enable-stack-protector">,
+  HelpText<"Enable the stack protector">;
+def disable_stack_protector :
+  Flag<["-"], "disable-stack-protector">,
+  HelpText<"Disable the stack-protector">;
+def enable_move_inout_stack_protector :
+  Flag<["-"], "enable-move-inout-stack-protector">,
+  HelpText<"Enable the stack protector by moving values to temporaries">;
+
+def enable_import_ptrauth_field_function_pointers :
+  Flag<["-"], "enable-import-ptrauth-field-function-pointers">,
+  HelpText<"Enable import of custom ptrauth qualified field function pointers">;
+def disable_import_ptrauth_field_function_pointers :
+  Flag<["-"], "disable-import-ptrauth-field-function-pointers">,
+  HelpText<"Disable import of custom ptrauth qualified field function pointers">;
+
+def enable_collocate_metadata_functions :
+  Flag<["-"], "enable-collocate-metadata-functions">,
+  HelpText<"Enable collocate metadata functions">;
+def disable_collocate_metadata_functions :
+  Flag<["-"], "disable-collocate-metadata-functions">,
+  HelpText<"Disable collocate metadata functions">;
+
+def enable_relative_protocol_witness_tables :
+  Flag<["-"], "enable-relative-protocol-witness-tables">,
+  HelpText<"Enable relative protocol witness tables">;
+def disable_relative_protocol_witness_tables :
+  Flag<["-"], "disable-relative-protocol-witness-tables">,
+  HelpText<"Disable relative protocol witness tables">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;
 def disable_new_llvm_pass_manager :
   Flag<["-"], "disable-new-llvm-pass-manager">,
   HelpText<"Disable the new llvm pass manager">;
+
+def disable_emit_generic_class_ro_t_list :
+  Flag<["-"], "disable-emit-generic-class-ro_t-list">,
+  HelpText<"Disable emission of a section with references to class_ro_t of "
+           "generic class patterns">;
+def enable_emit_generic_class_ro_t_list :
+  Flag<["-"], "enable-emit-generic-class-ro_t-list">,
+  HelpText<"Enable emission of a section with references to class_ro_t of "
+           "generic class patterns">;
+
+def experimental_spi_only_imports :
+  Flag<["-"], "experimental-spi-only-imports">,
+  HelpText<"Enable use of @_spiOnly imports">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

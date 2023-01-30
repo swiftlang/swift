@@ -138,6 +138,9 @@ enum class TypeCheckExprFlags {
 
   /// Don't type check expressions for correct availability.
   DisableExprAvailabilityChecking = 0x08,
+
+  /// Don't expand macros.
+  DisableMacroExpansions = 0x10,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -253,7 +256,7 @@ public:
   const RequirementFailureInfo &getRequirementFailureInfo() const {
     assert(Knd == RequirementFailure);
 
-    return ReqFailureInfo.getValue();
+    return ReqFailureInfo.value();
   }
 
   operator Kind() const { return Knd; }
@@ -341,8 +344,7 @@ Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member, Type baseTy,
 /// typealias GX2<A> = X<A, A>
 /// typealias GX3<A, B> = X<B, A>
 /// \endcode
-bool isPassThroughTypealias(TypeAliasDecl *typealias, Type underlyingType,
-                            NominalTypeDecl *nominal);
+bool isPassThroughTypealias(TypeAliasDecl *typealias, NominalTypeDecl *nominal);
 
 /// Determine whether one type is a subtype of another.
 ///
@@ -440,6 +442,10 @@ Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 /// \returns \c true if there was an error type checking, \c false otherwise.
 bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
                                    DeclContext *dc);
+
+/// Returns the unique decl ref identified by the expr according to the
+/// requirements of the \c #_hasSymbol() condition type.
+ConcreteDeclRef getReferencedDeclForHasSymbolCondition(Expr *E);
 
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
@@ -905,11 +911,15 @@ lookupMemberType(DeclContext *dc, Type type, DeclNameRef name,
 
 /// Given an expression that's known to be an infix operator,
 /// look up its precedence group.
-PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,
-                                                           Expr *op);
+PrecedenceGroupDecl *
+lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op, bool diagnose);
 
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
+
+SmallVector<MacroDecl *, 1>
+lookupMacros(DeclContext *dc, DeclNameRef macroName, SourceLoc loc,
+             MacroRoles contexts);
 
 enum class UnsupportedMemberTypeAccessKind : uint8_t {
   None,
@@ -924,7 +934,8 @@ enum class UnsupportedMemberTypeAccessKind : uint8_t {
 /// member of the given base type.
 UnsupportedMemberTypeAccessKind
 isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
-                              bool hasUnboundOpener);
+                              bool hasUnboundOpener,
+                              bool isExtensionBinding = false);
 
 /// @}
 
@@ -1234,10 +1245,20 @@ UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
 /// Checks whether a result builder type has a well-formed result builder
 /// method with the given name. If provided and non-empty, the argument labels
 /// are verified against any candidates.
+ResultBuilderOpSupport
+checkBuilderOpSupport(Type builderType, DeclContext *dc, Identifier fnName,
+                      ArrayRef<Identifier> argLabels = {},
+                      SmallVectorImpl<ValueDecl *> *allResults = nullptr);
+
+/// Checks whether a result builder type has a well-formed result builder
+/// method with the given name. If provided and non-empty, the argument labels
+/// are verified against any candidates.
+///
+/// This will return \c true even if the builder method is unavailable. Use
+/// \c checkBuilderOpSupport if availability should be checked.
 bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
                            ArrayRef<Identifier> argLabels = {},
-                           SmallVectorImpl<ValueDecl *> *allResults = nullptr,
-                           bool checkAvailability = false);
+                           SmallVectorImpl<ValueDecl *> *allResults = nullptr);
 
 /// Forces all changes specified by the module's access notes file to be
 /// applied to this declaration. It is safe to call this function more than
@@ -1483,6 +1504,22 @@ diagnoseAndRemoveAttr(const Decl *D, const DeclAttribute *attr,
 
   return diagnoseAttrWithRemovalFixIt(D, attr, std::forward<ArgTypes>(Args)...);
 }
+
+/// Look for closure discriminators within an AST.
+class DiscriminatorFinder : public ASTWalker {
+  unsigned FirstDiscriminator = AbstractClosureExpr::InvalidDiscriminator;
+  unsigned NextDiscriminator = 0;
+
+public:
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
+
+  // Get the next available closure discriminator.
+  unsigned getNextDiscriminator();
+
+  unsigned getFirstDiscriminator() const {
+    return FirstDiscriminator;
+  }
+};
 
 } // end namespace swift
 

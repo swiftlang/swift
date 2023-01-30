@@ -435,6 +435,52 @@ protected:
   }
 };
 
+/// Diagnose failures related to same-shape generic requirements, e.g.
+/// ```swift
+/// func foo<T..., U...>(t: T..., u: U...) -> (T, U)... {}
+/// func bar<T..., U...>(t: T..., u: U...) {
+///   foo(t: t..., u: u...)
+/// }
+/// ```
+///
+/// The generic parameter packs `T` and `U` are not known to have the same
+/// shape, which is required by `foo()`.
+class SameShapeRequirementFailure final : public RequirementFailure {
+public:
+  SameShapeRequirementFailure(const Solution &solution, Type lhs, Type rhs,
+                              ConstraintLocator *locator)
+      : RequirementFailure(solution, lhs, rhs, locator) {
+#ifndef NDEBUG
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == RequirementKind::SameShape);
+#endif
+  }
+
+protected:
+  DiagOnDecl getDiagnosticOnDecl() const override {
+    return diag::types_not_same_shape_decl;
+  }
+
+  DiagInReference getDiagnosticInRereference() const override {
+    return diag::types_not_same_shape_in_decl_ref;
+  }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_same_shape_requirement;
+  }
+};
+
+class SameShapeExpansionFailure final : public FailureDiagnostic {
+  Type lhs, rhs;
+
+public:
+  SameShapeExpansionFailure(const Solution &solution, Type lhs, Type rhs,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), lhs(lhs), rhs(rhs) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related to superclass generic requirements, e.g.
 /// ```swift
 /// class A {
@@ -2570,7 +2616,7 @@ public:
 private:
   std::tuple<Type, Type, int> unwrappedTypes() const;
 
-  bool diagnoseIfExpr() const;
+  bool diagnoseTernaryExpr() const;
 
   bool diagnoseForcedCastExpr() const;
 
@@ -2806,6 +2852,67 @@ public:
   }
 
   bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where we end up type checking a reference to a macro
+/// that was not indicated as a missing # in the source.:
+///
+/// \code
+/// func print(_ value: Any)
+/// @expression macro print<Value...>(_ value: Value...)
+///
+/// func test(e: E) {
+///   print(a, b, c) // missing # to use the macro
+/// }
+/// \endcode
+class AddMissingMacroPound final : public FailureDiagnostic {
+  MacroDecl *macro;
+
+public:
+  AddMissingMacroPound(const Solution &solution, MacroDecl *macro,
+                       ConstraintLocator *locator)
+    : FailureDiagnostic(solution, locator),
+      macro(macro) { }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where we end up type checking a reference to a macro
+/// that has parameters, but was not provided any arguments.
+///
+/// \code
+/// func print(_ value: Any)
+/// @expression macro print<Value...>(_ value: Value...)
+///
+/// func test(e: E) {
+///   #print
+/// }
+/// \endcode
+class AddMissingMacroArguments final : public FailureDiagnostic {
+  MacroDecl *macro;
+
+public:
+  AddMissingMacroArguments(const Solution &solution, MacroDecl *macro,
+                       ConstraintLocator *locator)
+    : FailureDiagnostic(solution, locator),
+      macro(macro) { }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose function types global actor mismatches
+/// e.g.  `@MainActor () -> Void` vs.`@OtherActor () -> Void`
+class GlobalActorFunctionMismatchFailure final : public ContextualFailure {
+public:
+  GlobalActorFunctionMismatchFailure(const Solution &solution, Type fromType,
+                                     Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  Diag<Type, Type> getDiagnosticMessage() const;
+  bool diagnoseTupleElement();
 };
 
 } // end namespace constraints

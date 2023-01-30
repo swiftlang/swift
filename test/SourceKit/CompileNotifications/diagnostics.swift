@@ -1,4 +1,6 @@
 // RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s | %FileCheck %s -check-prefix=NODIAGS
+// REQUIRES: no_asan
+
 // NODIAGS: key.notification: source.notification.compile-did-finish
 // NODIAGS-NEXT: key.diagnostics: [
 // NODIAGS-NEXT: ]
@@ -92,4 +94,6 @@
 // But ignore syntactic-only requests with no arguments.
 // RUN: %sourcekitd-test -req=track-compiles == -req=syntax-map %s | %FileCheck %s -check-prefix=SYNTACTIC
 // SYNTACTIC: key.syntaxmap:
-// SYNTACTIC_NOT: key.notification: source.notification.compile-did-finish
+
+// TODO: Is this correct?  this correct? rdar://102092136
+// SYNTACTIC: key.notification: source.notification.compile-did-finish

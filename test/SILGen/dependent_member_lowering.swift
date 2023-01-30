@@ -30,7 +30,7 @@ protocol P1: P0 where Foo == String {
   func foo() -> String
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s25dependent_member_lowering26existentialDependentMemberySSAA2P1_pF : $@convention(thin) (@in_guaranteed P1) -> @owned String
+// CHECK-LABEL: sil hidden [ossa] @$s25dependent_member_lowering26existentialDependentMemberySSAA2P1_pF : $@convention(thin) (@in_guaranteed any P1) -> @owned String
 func existentialDependentMember(_ p1: any P1) -> String {
   // CHECK: $@convention(witness_method: P0) <τ_0_0 where τ_0_0 : P0> (@in_guaranteed τ_0_0) -> @out τ_0_0.Foo
   return p1.foo()

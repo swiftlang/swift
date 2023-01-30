@@ -39,11 +39,13 @@ namespace swift {
 // Set to 1 to enable helpful debug spew to stderr
 // If this is enabled, tests with `swift_task_debug_log` requirement can run.
 #if 0
+#define SWIFT_TASK_DEBUG_LOG_ENABLED 1
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
-  fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
-          (unsigned long)Thread::current()::platformThreadId(), __FILE__,      \
+  fprintf(stderr, "[%#lx] [%s:%d](%s) " fmt "\n",                              \
+          (unsigned long)Thread::current().platformThreadId(), __FILE__,       \
           __LINE__, __FUNCTION__, __VA_ARGS__)
 #else
+#define SWIFT_TASK_DEBUG_LOG_ENABLED 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
 #endif
 
@@ -79,6 +81,21 @@ void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
+/// Set the active task reference for the current thread.
+AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
+
+/// Cancel all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is either called from the
+/// owning task of the task group or while holding the owning task's
+/// status record lock.
+void _swift_taskGroup_cancelAllChildren(TaskGroup *group);
+
+/// Remove the given task from the given task group.
+///
+/// This is an internal API; clients outside of the TaskGroup implementation
+/// should generally use a higher-level function.
+void _swift_taskGroup_detachChild(TaskGroup *group, AsyncTask *child);
 
 /// release() establishes a happens-before relation with a preceding acquire()
 /// on the same address.
@@ -89,7 +106,7 @@ void _swift_tsan_release(void *addr);
 /// executors.
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
 
-#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 inline SerialExecutorWitnessTable *
 _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
   extern SerialExecutorWitnessTable wtable
@@ -118,6 +135,12 @@ namespace {
 ///
 ///   @_silgen_name("swift_taskGroup_wait_next_throwing")
 ///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+///
+///   @_silgen_name("swift_taskGroup_waitAll")
+///   func _taskGroupWaitAll<T>(
+///     group: Builtin.RawPointer,
+///     bodyError: Swift.Error?
+///   ) async throws -> T?
 ///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
@@ -273,7 +296,7 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
   // ActiveTaskStatusWithoutEscalation in
-  // include/swift/Reflection/RuntimeInternals.h. Any changes to the layout here
+  // include/swift/RemoteInspection/RuntimeInternals.h. Any changes to the layout here
   // must also be made there.
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;
@@ -712,7 +735,9 @@ retry:;
 ///
 /// rdar://88366470 (Direct handoff behaviour when tasks switch executors)
 inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
-
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
+#else
   SWIFT_TASK_DEBUG_LOG("%p->flagAsAndEnqueueOnExecutor()", this);
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
@@ -746,7 +771,7 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
         oldStatus.getStoredPriority(), this);
       swift_dispatch_lock_override_end((qos_class_t) oldStatus.getStoredPriority());
     }
-#endif
+#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
     swift_task_exitThreadLocalContext((char *)&_private().ExclusivityAccessSet[0]);
     restoreTaskVoucher(this);
   }
@@ -759,6 +784,7 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
       Flags.task_isAsyncLetTask());
 
   swift_task_enqueue(this, newExecutor);
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
 inline void AsyncTask::flagAsSuspended() {

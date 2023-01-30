@@ -90,7 +90,7 @@
 // 
 // When viewed this way, the fact that a property is declared 'let' is mostly
 // irrelevant to this optimization--it can be expanded to handle non-'let'
-// properties. The more salient feature is whether the propery has a public
+// properties. The more salient feature is whether the property has a public
 // setter.
 //
 // For now, this optimization only recognizes class properties because class
@@ -360,6 +360,10 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
     // properties should be accessible by the extension.
 
     auto *Ty = dyn_cast<NominalTypeDecl>(Property->getDeclContext());
+
+    // Check for "unusual" decl contexts, e.g. ObjC extensions.
+    if (!Ty)
+      return true;
 
     // Initializer for a let property of a class cannot exist externally.
     // It cannot be defined by an extension or a derived class.

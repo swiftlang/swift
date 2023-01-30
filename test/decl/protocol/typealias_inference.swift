@@ -1,7 +1,10 @@
 // RUN: %target-typecheck-verify-swift
 
-// SR-8813
-// By itself in this file because this particular expected error is omitted if there have been any other diagnostics.
+// https://github.com/apple/swift/issues/51321
+//
+// By itself in this file because this particular expected error is omitted if
+// there have been any other diagnostics.
+
 protocol BaseProtocol {
   associatedtype Value
   typealias Closure = () -> Value

@@ -1399,10 +1399,10 @@ class infer_instanceVar1 {
   weak var var_Weak7: Protocol_ObjC1?
   weak var var_Weak8: (Protocol_ObjC1 & Protocol_ObjC2)?
 
-// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak1: @sil_weak Class_ObjC1
-// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak2: @sil_weak Protocol_ObjC1
-// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak5: @sil_weak AnyObject
-// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak7: @sil_weak Protocol_ObjC1
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak1: @sil_weak Class_ObjC1?
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak2: @sil_weak Protocol_ObjC1?
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak5: @sil_weak AnyObject?
+// CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak7: @sil_weak Protocol_ObjC1?
 // CHECK-LABEL: @objc @_hasInitialValue weak var var_Weak8: @sil_weak (Protocol_ObjC1 & Protocol_ObjC2)?
 
   weak var var_Weak_fail1: PlainClass?
@@ -1556,6 +1556,7 @@ class infer_instanceVar1 {
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType3_}}
   var var_ArrayType3_: [PlainStruct]
   // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType4: [(AnyObject) -> AnyObject] // no-error
   // CHECK-LABEL: {{^}}  var var_ArrayType4: [(AnyObject) -> AnyObject]
@@ -1563,6 +1564,7 @@ class infer_instanceVar1 {
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType4_}}
   var var_ArrayType4_: [(AnyObject) -> AnyObject]
   // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType5: [Protocol_ObjC1]
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType5: [Protocol_ObjC1]
@@ -1582,6 +1584,7 @@ class infer_instanceVar1 {
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType7_}}
   var var_ArrayType7_: [PlainClass]
   // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType8: [PlainProtocol]
   // CHECK-LABEL: {{^}}  var var_ArrayType8: [PlainProtocol]
@@ -1589,6 +1592,7 @@ class infer_instanceVar1 {
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType8_}}
   var var_ArrayType8_: [PlainProtocol]
   // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType9: [Protocol_ObjC1 & PlainProtocol]
   // CHECK-LABEL: {{^}}  var var_ArrayType9: [PlainProtocol & Protocol_ObjC1]
@@ -1596,6 +1600,7 @@ class infer_instanceVar1 {
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType9_}}
   var var_ArrayType9_: [Protocol_ObjC1 & PlainProtocol]
   // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType10: [Protocol_ObjC1 & Protocol_ObjC2]
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType10: [Protocol_ObjC1 & Protocol_ObjC2]
@@ -1616,6 +1621,7 @@ class infer_instanceVar1 {
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType13_}}
   var var_ArrayType13_: [Any?]
   // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType15: [AnyObject?]
   // CHECK-LABEL: {{^}}  var var_ArrayType15: [AnyObject?]
@@ -1623,6 +1629,7 @@ class infer_instanceVar1 {
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType15_}}
   var var_ArrayType15_: [AnyObject?]
   // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType16: [[@convention(block) (AnyObject) -> AnyObject]] // no-error
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType16: {{\[}}[@convention(block) (AnyObject) -> AnyObject]]
@@ -1636,6 +1643,7 @@ class infer_instanceVar1 {
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType17_}}
   var var_ArrayType17_: [[(AnyObject) -> AnyObject]]
   // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 }
 
 @objc // access-note-move{{ObjCBase}}
@@ -2572,7 +2580,7 @@ class NeverReturningMethod {
   func doesNotReturn() -> Never {}
 }
 
-// SR-5025
+// https://github.com/apple/swift/issues/47601
 class User: NSObject {
 }
 
@@ -2640,20 +2648,22 @@ private extension MyObjCClass {
   private func notExposedToObjC() {}
 }
 
-// SR-9035
+// https://github.com/apple/swift/issues/51538
 
-class SR_9035_C {}
+class issue51538_C {}
 
-@objc // access-note-move{{SR_9035_P}}
-protocol SR_9035_P {
+@objc // access-note-move{{issue51538_P}}
+protocol issue51538_P {
   func throwingMethod1() throws -> Unmanaged<CFArray> // Ok
-  func throwingMethod2() throws -> Unmanaged<SR_9035_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
+  func throwingMethod2() throws -> Unmanaged<issue51538_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
   // expected-note@-1 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 }
 
-// SR-12801: Make sure we reject an @objc generic subscript.
-class SR12801 {
-  @objc // bad-access-note-move{{SR12801.subscript(_:)}}
+// https://github.com/apple/swift/issues/55246
+// Make sure we reject an @objc generic subscript.
+class issue55246 {
+  @objc // bad-access-note-move{{issue55246.subscript(_:)}}
   subscript<T>(foo : [T]) -> Int { return 0 }
   // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
 }
@@ -2661,8 +2671,7 @@ class SR12801 {
 // @_backDeploy
 
 public class BackDeployClass {
-  @available(macOS 11.0, *)
-  @_backDeploy(before: macOS 12.0)
-  @objc // expected-error {{'@objc' cannot be applied to a back deployed instance method}}
+  @_backDeploy(before: macOS 12.0) // expected-error {{'@_backDeploy' must not be used on an '@objc' instance method}}
+  @objc
   final public func objcMethod() {}
 }

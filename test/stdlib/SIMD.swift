@@ -78,7 +78,7 @@ SIMDCodableTests.test("roundTrip") {
 /* Apparently these fail to round trip not only for i386 but also on older
    macOS versions, so we'll disable them entirely for now.
 #if !arch(i386)
-  // https://bugs.swift.org/browse/SR-9759
+  // https://github.com/apple/swift-corelibs-foundation/issues/3548
   testRoundTrip(SIMD2<Float>.self)
   testRoundTrip(SIMD3<Float>.self)
   testRoundTrip(SIMD4<Float>.self)

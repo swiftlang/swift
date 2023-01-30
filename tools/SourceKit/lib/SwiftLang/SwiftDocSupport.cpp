@@ -28,7 +28,7 @@
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
-#include "swift/IDE/Refactoring.h"
+#include "swift/Refactoring/Refactoring.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Config.h"
@@ -142,18 +142,18 @@ public:
   }
 
   bool shouldContinuePre(const Decl *D, Optional<BracketOptions> Bracket) {
-    assert(Bracket.hasValue());
-    if (!Bracket.getValue().shouldOpenExtension(D) &&
+    assert(Bracket.has_value());
+    if (!Bracket.value().shouldOpenExtension(D) &&
         isa<ExtensionDecl>(D))
       return false;
     return true;
   }
 
   bool shouldContinuePost(const Decl *D, Optional<BracketOptions> Bracket) {
-    assert(Bracket.hasValue());
-    if (!Bracket.getValue().shouldCloseNominal(D) && isa<NominalTypeDecl>(D))
+    assert(Bracket.has_value());
+    if (!Bracket.value().shouldCloseNominal(D) && isa<NominalTypeDecl>(D))
       return false;
-    if (!Bracket.getValue().shouldCloseExtension(D) &&
+    if (!Bracket.value().shouldCloseExtension(D) &&
         isa<ExtensionDecl>(D))
       return false;
     return true;
@@ -266,7 +266,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
 
   // If we have a synthesized target, map from its base type into the this
   // declaration's innermost type context, or if we're dealing with the
-  // synthesized extention itself rather than a member, into its extended
+  // synthesized extension itself rather than a member, into its extended
   // nominal (the extension's own requirements shouldn't be considered in the
   // substitution).
   unsigned TypeContextDepth = 0;
@@ -508,6 +508,7 @@ static bool initDocEntityInfo(const Decl *D,
     case DeclContextKind::SerializedLocal:
     case DeclContextKind::ExtensionDecl:
     case DeclContextKind::GenericTypeDecl:
+    case DeclContextKind::MacroDecl:
       break;
 
     // We report sub-module information only for top-level decls.
@@ -787,6 +788,7 @@ public:
         return true;
       break;
 
+    case SyntaxNodeKind::Operator:
     case SyntaxNodeKind::DollarIdent:
     case SyntaxNodeKind::Integer:
     case SyntaxNodeKind::Floating:
@@ -967,15 +969,15 @@ public:
              llvm::MutableArrayRef<TextEntity*> FuncEnts)
     : SM(SM), BufferID(BufferID), FuncEnts(FuncEnts) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
-      return false; // Skip body.
+      return Action::SkipChildren(); // Skip body.
 
     if (FuncEnts.empty())
-      return false;
+      return Action::SkipChildren();
 
     if (!isa<AbstractFunctionDecl>(D) && !isa<SubscriptDecl>(D))
-      return true;
+      return Action::Continue();
 
     unsigned Offset = SM.getLocOffsetInBuffer(D->getLoc(), BufferID);
     auto Found = FuncEnts.end();
@@ -988,14 +990,14 @@ public:
         });
     }
     if (Found == FuncEnts.end() || (*Found)->LocOffset != Offset)
-      return false;
+      return Action::SkipChildren();
     if (auto FD = dyn_cast<AbstractFunctionDecl>(D)) {
       addParameters(FD, **Found, SM, BufferID);
     } else {
       addParameters(cast<SubscriptDecl>(D), **Found, SM, BufferID);
     }
     FuncEnts = llvm::MutableArrayRef<TextEntity*>(Found+1, FuncEnts.end());
-    return false; // skip body.
+    return Action::SkipChildren(); // skip body.
   }
 };
 } // end anonymous namespace
@@ -1086,7 +1088,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
   ASTContext &Ctx = CI.getASTContext();
   registerIDERequestFunctions(Ctx.evaluator);
 
-  // Load implict imports so that Clang importer can use it.
+  // Load implicit imports so that Clang importer can use it.
   for (auto unloadedImport :
        CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
     (void)Ctx.getModule(unloadedImport.module.getModulePath());
@@ -1490,7 +1492,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
   unsigned BufferID = ParseCI.getInputBufferIDs().back();
   for (auto Unit : ParseCI.getMainModule()->getFiles()) {
     if (auto Current = dyn_cast<SourceFile>(Unit)) {
-      if (Current->getBufferID().getValue() == BufferID) {
+      if (Current->getBufferID().value() == BufferID) {
         SF = Current;
         break;
       }

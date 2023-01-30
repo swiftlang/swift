@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
 //
 // REQUIRES: executable_test
 //
@@ -7,14 +7,9 @@
 
 import StdlibUnittest
 import StdVector
-import std.vector
+import CxxStdlib.vector
 
 var StdVectorTestSuite = TestSuite("StdVector")
-
-extension Vector : RandomAccessCollection {
-  public var startIndex: Int { 0 }
-  public var endIndex: Int { size() }
-}
 
 StdVectorTestSuite.test("init") {
     let v = Vector()

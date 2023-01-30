@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -51,7 +51,7 @@ static bool isSinkable(SILInstruction &inst) {
 static bool isBarrier(SILInstruction *inst) {
   // Calls hide many dangers, from checking reference counts, to beginning
   // keypath access, to forcing memory to be live. Checking for these and other
-  // possible barries at ever call is certainly not worth it.
+  // possible barriers at ever call is certainly not worth it.
   if (FullApplySite::isa(inst) != FullApplySite())
     return true;
 
@@ -75,7 +75,7 @@ static bool isBarrier(SILInstruction *inst) {
     // Whitelist the safe builtin categories. Builtins should generally be
     // treated conservatively, because introducing a new builtin does not
     // require updating all passes to be aware of it.
-    switch (kind.getValue()) {
+    switch (kind.value()) {
     case BuiltinValueKind::None:
       llvm_unreachable("Builtin must has a non-empty kind.");
 
@@ -129,6 +129,9 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::SToSCheckedTrunc:
     case BuiltinValueKind::UToUCheckedTrunc:
     case BuiltinValueKind::IntToFPWithOverflow:
+    case BuiltinValueKind::BitWidth:
+    case BuiltinValueKind::IsNegative:
+    case BuiltinValueKind::WordAtIndex:
     case BuiltinValueKind::ZeroInitializer:
     case BuiltinValueKind::Once:
     case BuiltinValueKind::OnceWithContext:
@@ -141,13 +144,13 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::TargetOSVersionAtLeast:
     case BuiltinValueKind::GlobalStringTablePointer:
     case BuiltinValueKind::COWBufferForReading:
-    case BuiltinValueKind::IntInstrprofIncrement:
     case BuiltinValueKind::GetCurrentAsyncTask:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContext:
     case BuiltinValueKind::EndAsyncLet:
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
+    case BuiltinValueKind::CreateTaskGroupWithFlags:
     case BuiltinValueKind::DestroyTaskGroup:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::StackDealloc:
@@ -175,10 +178,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssignCopyArrayFrontToBack:
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
-    case BuiltinValueKind::UnsafeGuaranteed:
-    case BuiltinValueKind::Move:
     case BuiltinValueKind::Copy:
-    case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTask:
@@ -197,6 +197,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::ResumeThrowingContinuationThrowing:
     case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
     case BuiltinValueKind::AutoDiffAllocateSubcontext:
+    case BuiltinValueKind::AddressOfBorrowOpaque:
+    case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
       return true;
     }
   }

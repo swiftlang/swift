@@ -80,6 +80,13 @@ class Rule final {
   /// dropped from the minimal set of requirements.
   unsigned Conflicting : 1;
 
+  /// A 'recursive' rule is a concrete type or superclass rule where the right
+  /// hand side occurs as a proper prefix of one of its substitutions.
+  ///
+  /// Recursive rules are detected in RewriteSystem::computeRecursiveRules(),
+  /// and are dropped from the minimal set of requirements.
+  unsigned Recursive : 1;
+
   /// Whether this rule is now finalized and immutable.
   unsigned Frozen : 1;
 
@@ -94,6 +101,7 @@ public:
     SubstitutionSimplified = false;
     Redundant = false;
     Conflicting = false;
+    Recursive = false;
     Frozen = false;
   }
 
@@ -156,6 +164,10 @@ public:
     return Conflicting;
   }
 
+  bool isRecursive() const {
+    return Recursive;
+  }
+
   bool isFrozen() const {
     return Frozen;
   }
@@ -215,6 +227,13 @@ public:
     assert(!Frozen);
     assert(!Permanent && "Permanent rule should not conflict with anything");
     Conflicting = true;
+  }
+
+  void markRecursive() {
+    assert(!Frozen);
+    assert(!Permanent && "Permanent rule should not be recursive");
+    assert(!Recursive);
+    Recursive = true;
   }
 
   void freeze() {

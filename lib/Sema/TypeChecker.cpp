@@ -146,7 +146,7 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
   case ObjectLiteralExpr::Name:                                                \
     return TypeChecker::getProtocol(Context, expr->getLoc(),                   \
                                     KnownProtocolKind::Protocol);
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
     }
   }
 
@@ -183,15 +183,6 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   return dc->getParentModule();
 }
 
-/// Bind the given extension to the given nominal type.
-static void bindExtensionToNominal(ExtensionDecl *ext,
-                                   NominalTypeDecl *nominal) {
-  if (ext->alreadyBoundToNominal())
-    return;
-
-  nominal->addExtension(ext);
-}
-
 void swift::bindExtensions(ModuleDecl &mod) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
@@ -199,7 +190,7 @@ void swift::bindExtensions(ModuleDecl &mod) {
     assert(!ext->canNeverBeBound() &&
            "Only extensions that can ever be bound get here.");
     if (auto nominal = ext->computeExtendedNominal()) {
-      bindExtensionToNominal(ext, nominal);
+      nominal->addExtension(ext);
       return true;
     }
 
@@ -221,8 +212,10 @@ void swift::bindExtensions(ModuleDecl &mod) {
           worklist.push_back(ED);;
     };
 
-    for (auto *D : SF->getTopLevelDecls())
-      visitTopLevelDecl(D);
+    for (auto item : SF->getTopLevelItems()) {
+      if (auto D = item.dyn_cast<Decl *>())
+        visitTopLevelDecl(D);
+    }
 
     for (auto *D : SF->getHoistedDecls())
       visitTopLevelDecl(D);
@@ -275,6 +268,7 @@ static void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
 
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::MacroExpansion:
     break;
   }
 
@@ -338,11 +332,20 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
   diagnoseUnnecessaryPreconcurrencyImports(*SF);
 
-  // Check to see if there's any inconsistent @_implementationOnly imports.
+  // Check to see if there are any inconsistent imports.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentImplementationOnlyImportsRequest{SF->getParentModule()},
       {});
+
+  evaluateOrDefault(
+      Ctx.evaluator,
+      CheckInconsistentSPIOnlyImportsRequest{SF},
+      {});
+
+  evaluateOrDefault(
+      Ctx.evaluator,
+      CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
 
   // Perform various AST transforms we've been asked to perform.
   if (!Ctx.hadError() && Ctx.LangOpts.DebuggerTestingTransform)
@@ -366,6 +369,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   switch (SF.Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::MacroExpansion:
     diagnoseObjCMethodConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
     diagnoseUnintendedObjCMethodOverrides(SF);
@@ -391,7 +395,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   public:
     DerivativeFinder() {}
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
         for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
           // Resolve derivative function configurations from `@derivative`
@@ -400,12 +404,13 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
         }
       }
 
-      return true;
+      return Action::Continue();
     }
   };
 
   switch (SF.Kind) {
   case SourceFileKind::Library:
+  case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
     DerivativeFinder finder;
     SF.walkContext(finder);
@@ -431,7 +436,7 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
 
 Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
                                   bool isSILMode, bool isSILType,
-                                  GenericEnvironment *GenericEnv,
+                                  GenericSignature GenericSig,
                                   GenericParamList *GenericParams,
                                   DeclContext *DC, bool ProduceDiagnostics) {
   TypeResolutionOptions options = None;
@@ -445,7 +450,7 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
     suppression.emplace(Ctx.Diags);
 
   return TypeResolution::forInterface(
-             DC, GenericEnv, options,
+             DC, GenericSig, options,
              [](auto unboundTy) {
                // FIXME: Don't let unbound generic types escape type resolution.
                // For now, just return the unbound generic type.
@@ -453,7 +458,8 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
              },
              // FIXME: Don't let placeholder types escape type resolution.
              // For now, just return the placeholder type.
-             PlaceholderType::get)
+             PlaceholderType::get,
+             /*packElementOpener*/ nullptr)
       .resolveType(TyR, GenericParams);
 }
 
@@ -467,21 +473,23 @@ namespace {
                             GenericParamList *params)
         : dc(dc), params(params) {}
 
-    bool walkToTypeReprPre(TypeRepr *T) override {
-      if (auto *ident = dyn_cast<IdentTypeRepr>(T)) {
-        auto firstComponent = ident->getComponentRange().front();
-        auto name = firstComponent->getNameRef().getBaseIdentifier();
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
+      if (auto *identBase =
+              dyn_cast<IdentTypeRepr>(declRefTR->getBaseComponent())) {
+        auto name = identBase->getNameRef().getBaseIdentifier();
         if (auto *paramDecl = params->lookUpGenericParam(name))
-          firstComponent->setValue(paramDecl, dc);
+          identBase->setValue(paramDecl, dc);
       }
+    }
 
-      return true;
+      return Action::Continue();
     }
   };
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-GenericEnvironment *
+GenericSignature
 swift::handleSILGenericParams(GenericParamList *genericParams,
                               DeclContext *DC) {
   if (genericParams == nullptr)
@@ -509,10 +517,8 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
       /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
       {}, {}, /*allowConcreteGenericParams=*/true};
-  auto sig = evaluateOrDefault(DC->getASTContext().evaluator, request,
-                               GenericSignatureWithError()).getPointer();
-
-  return sig.getGenericEnvironment();
+  return evaluateOrDefault(DC->getASTContext().evaluator, request,
+                           GenericSignatureWithError()).getPointer();
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
@@ -546,6 +552,11 @@ bool swift::typeCheckForCodeCompletion(
     llvm::function_ref<void(const constraints::Solution &)> callback) {
   return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
                                                  callback);
+}
+
+Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
+                                bool replaceInvalidRefsWithErrors) {
+  return TypeChecker::resolveDeclRefExpr(UDRE, Context, replaceInvalidRefsWithErrors);
 }
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
@@ -708,6 +719,28 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
       if (repr) {
           diag.highlight((*repr)->getResultTypeRepr()->getSourceRange());
       }
+    }
+
+    // If the result type is void, we need to have at least one differentiable
+    // inout argument
+    if (result->isVoid() &&
+        llvm::find_if(params,
+                      [&](AnyFunctionType::Param param) {
+                        if (param.isNoDerivative())
+                          return false;
+                        return param.isInOut() &&
+                          TypeChecker::isDifferentiable(param.getPlainType(),
+                                                        /*tangentVectorEqualsSelf*/ isLinear,
+                                                        dc, stage);
+                      }) == params.end()) {
+      auto diagLoc = repr ? (*repr)->getResultTypeRepr()->getLoc() : loc;
+      auto resultStr = fnTy->getResult()->getString();
+      auto diag = ctx.Diags.diagnose(
+        diagLoc, diag::differentiable_function_type_void_result);
+      hadAnyError = true;
+
+      if (repr)
+        diag.highlight((*repr)->getResultTypeRepr()->getSourceRange());
     }
   }
 

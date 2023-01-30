@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -print-module -module-to-print=std -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t > %t/interface.swift
+// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t > %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-STD < %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-SIZE-T < %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-TO-STRING < %t/interface.swift
@@ -11,10 +11,10 @@
 // REQUIRES: OS=linux-gnu
 
 // CHECK-STD: enum std {
-// CHECK-STRING:   struct {{__CxxTemplateInstNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE|__CxxTemplateInstSs}} {
+// CHECK-STRING:   struct {{__CxxTemplateInstNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE|__CxxTemplateInstSs}} : CxxRandomAccessCollection {
 // CHECK-STRING:     typealias value_type = std.__CxxTemplateInstSt11char_traitsIcE.char_type
 // CHECK-STRING:   }
-// CHECK-STRING:   struct {{__CxxTemplateInstNSt7__cxx1112basic_stringIwSt11char_traitsIwESaIwEEE|__CxxTemplateInstSbIwSt11char_traitsIwESaIwEE}} {
+// CHECK-STRING:   struct {{__CxxTemplateInstNSt7__cxx1112basic_stringIwSt11char_traitsIwESaIwEEE|__CxxTemplateInstSbIwSt11char_traitsIwESaIwEE}} : CxxRandomAccessCollection {
 // CHECK-STRING:     typealias value_type = std.__CxxTemplateInstSt11char_traitsIwE.char_type
 // CHECK-STRING:   }
 

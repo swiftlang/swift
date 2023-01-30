@@ -101,10 +101,16 @@ struct S11: Sendable {
 @_nonSendable public struct S12 { }
 
 // Don't complain about global-actor-qualified classes or their subclasses.
+@available(SwiftStdlib 5.1, *)
 @MainActor
 open class TestThing {}
+
+@available(SwiftStdlib 5.1, *)
 open class TestSubThing : TestThing {}
 
+@available(SwiftStdlib 5.1, *)
 @MainActor(unsafe)
 open class TestThing2 {}
+
+@available(SwiftStdlib 5.1, *)
 open class TestSubThing2 : TestThing2 {}

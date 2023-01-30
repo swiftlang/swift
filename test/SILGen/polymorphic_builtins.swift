@@ -12,9 +12,9 @@ func concreteAddTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Builti
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericAddTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_add"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericAddTest{{.*}}'
 func genericAddTest<T>(_ x : T, _ y : T) -> T {
@@ -33,9 +33,9 @@ func concreteAndTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Builti
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericAndTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_and"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericAndTest{{.*}}'
 func genericAndTest<T>(_ x : T, _ y : T) -> T {
@@ -54,9 +54,9 @@ func concreteAshrTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Built
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericAshrTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_ashr"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericAshrTest{{.*}}'
 func genericAshrTest<T>(_ x : T, _ y : T) -> T {
@@ -75,9 +75,9 @@ func concreteLshrTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Built
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericLshrTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_lshr"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericLshrTest{{.*}}'
 func genericLshrTest<T>(_ x : T, _ y : T) -> T {
@@ -96,9 +96,9 @@ func concreteMulTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Builti
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericMulTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_mul"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericMulTest{{.*}}'
 func genericMulTest<T>(_ x : T, _ y : T) -> T {
@@ -117,9 +117,9 @@ func concreteOrTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Builtin
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericOrTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_or"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericOrTest{{.*}}'
 func genericOrTest<T>(_ x : T, _ y : T) -> T {
@@ -138,9 +138,9 @@ func concreteSdivTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Built
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericSdivTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_sdiv"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericSdivTest{{.*}}'
 func genericSdivTest<T>(_ x : T, _ y : T) -> T {
@@ -159,9 +159,9 @@ func concreteSdivExactTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> 
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericSdivExactTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_sdiv_exact"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericSdivExactTest{{.*}}'
 func genericSdivExactTest<T>(_ x : T, _ y : T) -> T {
@@ -180,9 +180,9 @@ func concreteShlTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Builti
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericShlTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_shl"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericShlTest{{.*}}'
 func genericShlTest<T>(_ x : T, _ y : T) -> T {
@@ -201,9 +201,9 @@ func concreteSremTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Built
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericSremTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_srem"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericSremTest{{.*}}'
 func genericSremTest<T>(_ x : T, _ y : T) -> T {
@@ -222,9 +222,9 @@ func concreteSubTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Builti
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericSubTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_sub"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericSubTest{{.*}}'
 func genericSubTest<T>(_ x : T, _ y : T) -> T {
@@ -243,9 +243,9 @@ func concreteUdivTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Built
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericUdivTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_udiv"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericUdivTest{{.*}}'
 func genericUdivTest<T>(_ x : T, _ y : T) -> T {
@@ -264,9 +264,9 @@ func concreteUdivExactTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> 
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericUdivExactTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_udiv_exact"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericUdivExactTest{{.*}}'
 func genericUdivExactTest<T>(_ x : T, _ y : T) -> T {
@@ -285,9 +285,9 @@ func concreteXorTest(_ x: Builtin.Vec4xInt32, _ y: Builtin.Vec4xInt32) -> Builti
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericXorTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_xor"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericXorTest{{.*}}'
 func genericXorTest<T>(_ x : T, _ y : T) -> T {
@@ -306,9 +306,9 @@ func concreteFaddTest(_ x: Builtin.Vec4xFPIEEE32, _ y: Builtin.Vec4xFPIEEE32) ->
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericFaddTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_fadd"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericFaddTest{{.*}}'
 func genericFaddTest<T>(_ x : T, _ y : T) -> T {
@@ -327,9 +327,9 @@ func concreteFdivTest(_ x: Builtin.Vec4xFPIEEE32, _ y: Builtin.Vec4xFPIEEE32) ->
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericFdivTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_fdiv"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericFdivTest{{.*}}'
 func genericFdivTest<T>(_ x : T, _ y : T) -> T {
@@ -348,9 +348,9 @@ func concreteFmulTest(_ x: Builtin.Vec4xFPIEEE32, _ y: Builtin.Vec4xFPIEEE32) ->
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericFmulTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_fmul"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericFmulTest{{.*}}'
 func genericFmulTest<T>(_ x : T, _ y : T) -> T {
@@ -369,9 +369,9 @@ func concreteFremTest(_ x: Builtin.Vec4xFPIEEE32, _ y: Builtin.Vec4xFPIEEE32) ->
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericFremTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_frem"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericFremTest{{.*}}'
 func genericFremTest<T>(_ x : T, _ y : T) -> T {
@@ -390,9 +390,9 @@ func concreteFsubTest(_ x: Builtin.Vec4xFPIEEE32, _ y: Builtin.Vec4xFPIEEE32) ->
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericFsubTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_fsub"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericFsubTest{{.*}}'
 func genericFsubTest<T>(_ x : T, _ y : T) -> T {
@@ -411,9 +411,9 @@ func concreteUremTest(_ x: Builtin.Int64, _ y: Builtin.Int64) -> Builtin.Int64 {
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}genericUremTest{{.*}} : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK_SLOT_0:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG0]] to [initialization] [[STACK_SLOT_0]]
+// CHECK:   copy_addr [[ARG0]] to [init] [[STACK_SLOT_0]]
 // CHECK:   [[STACK_SLOT_1:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK_SLOT_1]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[STACK_SLOT_1]]
 // CHECK:   builtin "generic_urem"<T>([[RESULT]] : $*T, [[STACK_SLOT_0]] : $*T, [[STACK_SLOT_1]] : $*T) : $()
 // CHECK: } // end sil function '$s20polymorphic_builtins{{.*}}genericUremTest{{.*}}'
 func genericUremTest<T>(_ x : T, _ y : T) -> T {

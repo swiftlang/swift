@@ -321,7 +321,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
       // In case of a string enum we are calling the _findStringSwitchCase
       // function from the library and switching on the returned Int value.
       stringExprs.push_back(litExpr);
-      litExpr = IntegerLiteralExpr::createFromUnsigned(C, Idx); 
+      litExpr = IntegerLiteralExpr::createFromUnsigned(C, Idx, SourceLoc()); 
     }
     auto litPat = new (C) ExprPattern(litExpr, /*isResolved*/ true,
                                       nullptr, nullptr);
@@ -332,7 +332,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
 
     // If checkAvailability() discovered we need a runtime version check,
     // add it now.
-    if (versionCheck.hasValue())
+    if (versionCheck.has_value())
       stmts.push_back(ASTNode(versionCheck->createEarlyReturnStmt(C)));
 
     // Create a statement which assigns the case to self.

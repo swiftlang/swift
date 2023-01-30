@@ -65,7 +65,8 @@ extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator
 /// types must conform to `UnsafeCxxInputIterator`.
 public protocol CxxSequence: Sequence {
   associatedtype RawIterator: UnsafeCxxInputIterator
-  associatedtype Element = RawIterator.Pointee
+  override associatedtype Element = RawIterator.Pointee
+  override associatedtype Iterator = CxxIterator<Self>
 
   // `begin()` and `end()` have to be mutating, otherwise calling 
   // `self.sequence.begin()` will copy `self.sequence` into a temporary value,
@@ -79,22 +80,39 @@ public protocol CxxSequence: Sequence {
   mutating func __endUnsafe() -> RawIterator
 }
 
-public class CxxIterator<T>: IteratorProtocol where T: CxxSequence {
-  // Declared as a class instead of a struct to avoid copies of this object,
-  // which would result in dangling pointers for some C++ sequence types.
+/// Prevents a C++ sequence from being copied or moved implicitly. Makes sure
+/// that raw C++ iterators pointing into the sequence are not invalidated.
+@usableFromInline
+internal final class CxxSequenceBox<T> where T: CxxSequence {
+  @usableFromInline
+  internal var sequence: T
 
-  public typealias Element = T.RawIterator.Pointee
-  private var sequence: T
-  private var rawIterator: T.RawIterator
-  private let endIterator: T.RawIterator
-
-  public init(sequence: T) {
+  @usableFromInline
+  internal init(_ sequence: __shared T) {
     self.sequence = sequence
-    self.rawIterator = self.sequence.__beginUnsafe()
-    self.endIterator = self.sequence.__endUnsafe()
+  }
+}
+
+@frozen
+public struct CxxIterator<T>: IteratorProtocol where T: CxxSequence {
+  public typealias Element = T.RawIterator.Pointee
+
+  @usableFromInline
+  internal let sequence: CxxSequenceBox<T>
+  @usableFromInline
+  internal var rawIterator: T.RawIterator
+  @usableFromInline
+  internal let endIterator: T.RawIterator
+
+  @inlinable
+  public init(sequence: __shared T) {
+    self.sequence = CxxSequenceBox<T>(sequence)
+    self.rawIterator = self.sequence.sequence.__beginUnsafe()
+    self.endIterator = self.sequence.sequence.__endUnsafe()
   }
 
-  public func next() -> Element? {
+  @inlinable
+  public mutating func next() -> Element? {
     if self.rawIterator == self.endIterator {
       return nil
     }
@@ -105,6 +123,13 @@ public class CxxIterator<T>: IteratorProtocol where T: CxxSequence {
 }
 
 extension CxxSequence {
+  /// Returns an iterator over the elements of this C++ container.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements in the C++
+  ///   container when each element is copied in O(1). Note that this might not
+  ///   be true for certain C++ types, e.g. those with a custom copy
+  ///   constructor that performs additional logic.
+  @inlinable
   public func makeIterator() -> CxxIterator<Self> {
     return CxxIterator(sequence: self)
   }

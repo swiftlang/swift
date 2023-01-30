@@ -32,6 +32,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/DriverTool/DriverTool.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Errno.h"
@@ -144,7 +145,7 @@ static bool shouldDisallowNewDriver(DiagnosticEngine &diags,
   StringRef disableArg = "-disallow-use-new-driver";
   StringRef disableEnv = "SWIFT_USE_OLD_DRIVER";
   auto shouldWarn = !llvm::sys::Process::
-    GetEnv("SWIFT_AVOID_WARNING_USING_OLD_DRIVER").hasValue();
+    GetEnv("SWIFT_AVOID_WARNING_USING_OLD_DRIVER").has_value();
   // If user specified using the old driver, don't forward.
   if (llvm::find_if(argv, [&](const char* arg) {
     return StringRef(arg) == disableArg;
@@ -153,7 +154,7 @@ static bool shouldDisallowNewDriver(DiagnosticEngine &diags,
       diags.diagnose(SourceLoc(), diag::old_driver_deprecated, disableArg);
     return true;
   }
-  if (llvm::sys::Process::GetEnv(disableEnv).hasValue()) {
+  if (llvm::sys::Process::GetEnv(disableEnv).has_value()) {
     if (shouldWarn)
       diags.diagnose(SourceLoc(), diag::old_driver_deprecated, disableEnv);
     return true;
@@ -168,12 +169,13 @@ static bool appendSwiftDriverName(SmallString<256> &buffer) {
     return true;
   }
 
-  llvm::sys::path::append(buffer, "swift-driver");
+  StringRef execSuffix(llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows() ? ".exe" : "");
+  llvm::sys::path::append(buffer, "swift-driver" + execSuffix);
   if (llvm::sys::fs::exists(buffer)) {
     return true;
   }
   llvm::sys::path::remove_filename(buffer);
-  llvm::sys::path::append(buffer, "swift-driver-new");
+  llvm::sys::path::append(buffer, "swift-driver-new" + execSuffix);
   if (llvm::sys::fs::exists(buffer)) {
     return true;
   }
@@ -191,6 +193,7 @@ static int run_driver(StringRef ExecName,
   bool isRepl = false;
 
   // Handle integrated tools.
+  StringRef DriverModeArg;
   if (argv.size() > 1) {
     StringRef FirstArg(argv[1]);
 
@@ -217,6 +220,8 @@ static int run_driver(StringRef ExecName,
     if (FirstArg == "repl") {
       isRepl = true;
       argv = argv.drop_front();
+    } else if (FirstArg.startswith("--driver-mode=")) {
+      DriverModeArg = FirstArg;
     }
   }
 
@@ -237,7 +242,9 @@ static int run_driver(StringRef ExecName,
       std::vector<const char *> subCommandArgs;
       // Rewrite the program argument.
       subCommandArgs.push_back(NewDriverPath.c_str());
-      if (ExecName == "swiftc") {
+      if (!DriverModeArg.empty()) {
+        subCommandArgs.push_back(DriverModeArg.data());
+      } else if (ExecName == "swiftc") {
         subCommandArgs.push_back("--driver-mode=swiftc");
       } else {
         assert(ExecName == "swift");
@@ -379,15 +386,16 @@ int swift::mainEntry(int argc_, const char **argv_) {
     subCommandArgs.erase(&subCommandArgs[1]);
     // We are running as a subcommand, try to find the subcommand adjacent to
     // the executable we are running as.
-    SmallString<256> SubcommandPath(
-      llvm::sys::path::parent_path(getExecutablePath(argv[0])));
-    llvm::sys::path::append(SubcommandPath, SubcommandName);
-
-    // If we didn't find the tool there, let the OS search for it.
-    if (!llvm::sys::fs::exists(SubcommandPath)) {
+    SmallString<256> SubcommandPath(SubcommandName);
+    auto result = llvm::sys::findProgramByName(SubcommandName,
+      { llvm::sys::path::parent_path(getExecutablePath(argv[0])) });
+    if (!result.getError()) {
+      SubcommandPath = *result;
+    } else {
+      // If we didn't find the tool there, let the OS search for it.
+      result = llvm::sys::findProgramByName(SubcommandName);
       // Search for the program and use the path if found. If there was an
       // error, ignore it and just let the exec fail.
-      auto result = llvm::sys::findProgramByName(SubcommandName);
       if (!result.getError())
         SubcommandPath = *result;
     }

@@ -7,15 +7,14 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 file(GLOB_RECURSE _LIBSWIFT_REGEX_PARSER_SOURCES
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_RegexParser/*.swift")
+  "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/_RegexParser/*.swift")
 set(LIBSWIFT_REGEX_PARSER_SOURCES)
 foreach(source ${_LIBSWIFT_REGEX_PARSER_SOURCES})
   file(TO_CMAKE_PATH "${source}" source)
   list(APPEND LIBSWIFT_REGEX_PARSER_SOURCES ${source})
 endforeach()
-message(STATUS "Using Experimental String Processing library for libswift _RegexParser (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
+message(STATUS "Using Experimental String Processing library for libswift _RegexParser (${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}).")
 
 add_swift_compiler_module(_CompilerRegexParser
-  ADD_TO_SYNTAXPARSE
   SOURCES
   "${LIBSWIFT_REGEX_PARSER_SOURCES}")

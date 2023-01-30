@@ -20,17 +20,17 @@ extension Value {
 
 extension Builder {
   static func insert(after inst: Instruction, location: Location,
-                     _ context: PassContext, insertFunc: (Builder) -> ()) {
+                     _ context: some MutatingContext, insertFunc: (Builder) -> ()) {
     if inst is TermInst {
-      for succ in inst.block.successors {
+      for succ in inst.parentBlock.successors {
         assert(succ.hasSinglePredecessor,
                "the terminator instruction must not have critical successors")
-        let builder = Builder(at: succ.instructions.first!, location: location,
+        let builder = Builder(before: succ.instructions.first!, location: location,
                               context)
         insertFunc(builder)
       }
     } else {
-      let builder = Builder(at: inst.next!, location: location, context)
+      let builder = Builder(after: inst, location: location, context)
       insertFunc(builder)
     }
   }
@@ -43,11 +43,11 @@ extension Value {
   /// is in a different control region than this value. For example, if `destBlock` is
   /// in a loop while this value is not in that loop, the value has to be copied for
   /// each loop iteration.
-  func makeAvailable(in destBlock: BasicBlock, _ context: PassContext) -> Value {
-    precondition(uses.isEmpty)
-    precondition(ownership == .owned)
+  func makeAvailable(in destBlock: BasicBlock, _ context: some MutatingContext) -> Value {
+    assert(uses.isEmpty)
+    assert(ownership == .owned)
 
-    let beginBlock = definingBlock
+    let beginBlock = parentBlock
     var useToDefRange = BasicBlockRange(begin: beginBlock, context)
     defer { useToDefRange.deinitialize() }
 
@@ -55,13 +55,13 @@ extension Value {
 
     // The value needs to be destroyed at every exit of the liferange.
     for exitBlock in useToDefRange.exits {
-      let builder = Builder(at: exitBlock.instructions.first!, context)
+      let builder = Builder(before: exitBlock.instructions.first!, context)
       builder.createDestroyValue(operand: self)
     }
   
     if useToDefRange.contains(destBlock) {
       // The `destBlock` is within a loop, so we need to copy the value at each iteration.
-      let builder = Builder(at: destBlock.instructions.first!, context)
+      let builder = Builder(before: destBlock.instructions.first!, context)
       return builder.createCopyValue(operand: self)
     }
     return self
@@ -71,9 +71,53 @@ extension Value {
   ///
   /// For details see `makeAvailable`.
   func copy(at insertionPoint: Instruction, andMakeAvailableIn destBlock: BasicBlock,
-            _ context: PassContext) -> Value {
-    let builder = Builder(at: insertionPoint, context)
+            _ context: some MutatingContext) -> Value {
+    let builder = Builder(before: insertionPoint, context)
     let copiedValue = builder.createCopyValue(operand: self)
     return copiedValue.makeAvailable(in: destBlock, context)
   }
+}
+
+extension ProjectedValue {
+  /// Returns true if the address can alias with `rhs`.
+  ///
+  /// Example:
+  ///   %1 = struct_element_addr %s, #field1
+  ///   %2 = struct_element_addr %s, #field2
+  ///
+  /// `%s`.canAddressAlias(with: `%1`) -> true
+  /// `%s`.canAddressAlias(with: `%2`) -> true
+  /// `%1`.canAddressAlias(with: `%2`) -> false
+  ///
+  func canAddressAlias(with rhs: ProjectedValue, _ context: some Context) -> Bool {
+    // self -> rhs will succeed (= return false) if self is a non-escaping "local" object,
+    // but not necessarily rhs.
+    if !isEscaping(using: EscapesToValueVisitor(target: rhs), context) {
+      return false
+    }
+    // The other way round: rhs -> self will succeed if rhs is a non-escaping "local" object,
+    // but not necessarily self.
+    if !rhs.isEscaping(using: EscapesToValueVisitor(target: self), context) {
+      return false
+    }
+    return true
+  }
+}
+
+private struct EscapesToValueVisitor : EscapeVisitor {
+  let target: ProjectedValue
+
+  mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+    if operand.value == target.value && path.projectionPath.mayOverlap(with: target.path) {
+      return .abort
+    }
+    if operand.instruction is ReturnInst {
+      // Anything which is returned cannot escape to an instruction inside the function.
+      return .ignore
+    }
+    return .continueWalk
+  }
+
+  var followTrivialTypes: Bool { true }
+  var followLoads: Bool { false }
 }

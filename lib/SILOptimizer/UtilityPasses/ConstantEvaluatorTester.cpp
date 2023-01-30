@@ -74,7 +74,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
                        << "\n";
           break;
         }
-        llvm::errs() << "Returns " << returnVal.getValue() << "\n";
+        llvm::errs() << "Returns " << returnVal.value() << "\n";
         break;
       }
 
@@ -95,7 +95,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
 
       // Diagnose errors in the evaluation. Unknown symbolic values produced
       // by skipping instructions are not considered errors.
-      if (errorVal.hasValue() &&
+      if (errorVal.has_value() &&
           !errorVal->isUnknownDueToUnevaluatedInstructions()) {
         errorVal->emitUnknownDiagnosticNotes(inst->getLoc());
         break;
@@ -108,7 +108,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
         break;
       }
 
-      currI = nextInstOpt.getValue();
+      currI = nextInstOpt.value();
     }
   }
 };

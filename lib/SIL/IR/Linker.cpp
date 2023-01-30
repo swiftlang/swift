@@ -16,10 +16,7 @@
 /// deserializing functions, vtables and witness tables.
 ///
 /// The behavior of the linker is controlled by a LinkMode value. The LinkMode
-/// has three possible values:
-///
-/// - LinkNone: The linker does not deserialize anything. This is only used for
-///   debugging and testing purposes, and never during normal operation.
+/// has two possible values:
 ///
 /// - LinkNormal: The linker deserializes bodies for declarations that must be
 ///   emitted into the client because they do not have definitions available

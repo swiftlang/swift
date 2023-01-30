@@ -39,27 +39,30 @@ class C3 {
 // INHERIT-NOT: ValueString2
 // INHERIT-NOT: TopLevelFunc
 
+// https://github.com/apple/swift/issues/56788
 
-class Sr14432<T, U> {}
+class C4<T, U> {}
 
-_ = Sr14432<#^GENERIC_TYPE_PARAM^# >()
-_ = Sr14432<SomeType, #^SECOND_GENERIC_TYPE_PARAM^# >()
+_ = C4<#^GENERIC_TYPE_PARAM^# >()
+_ = C4<SomeType, #^SECOND_GENERIC_TYPE_PARAM^# >()
 // GENERIC_TYPE_PARAM: Begin completions
 // GENERIC_TYPE_PARAM-DAG: Decl[Class]/CurrModule:             C1[#C1#];
 // GENERIC_TYPE_PARAM: End completions
 
-struct Sr14627 {
+// https://github.com/apple/swift/issues/56979
+
+struct S2 {
   struct Nested<Elements> {
-    init() { fatalError() }
+    init() {}
   }
 }
 
-var sr14627_globalVar = Sr14627.Nested< #^GENERIC_PARAM_ON_NESTED_TYPE_GLOBAL_VAR^#>()
+var s2_globalVar = S2.Nested< #^GENERIC_PARAM_ON_NESTED_TYPE_GLOBAL_VAR^#>()
 
 func someFunction() {
-  var sr14627_localVar = Sr14627.Nested< #^GENERIC_PARAM_ON_NESTED_TYPE_LOCAL_VAR^#>()
+  var s2_localVar = S2.Nested< #^GENERIC_PARAM_ON_NESTED_TYPE_LOCAL_VAR^#>()
 }
 
 // GENERIC_PARAM_ON_NESTED_TYPE: Begin completions
-// GENERIC_PARAM_ON_NESTED_TYPE-DAG: Decl[Struct]/CurrModule:            Sr14627[#Sr14627#];
+// GENERIC_PARAM_ON_NESTED_TYPE-DAG: Decl[Struct]/CurrModule:            S2[#S2#];
 // GENERIC_PARAM_ON_NESTED_TYPE: End completions

@@ -2,13 +2,14 @@
 // XFAIL: OS=windows-msvc
 // RUN: %empty-directory(%t)
 
+// rdar://100558042
 // UNSUPPORTED: CPU=arm64e
 
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable -module-name TypeLowering -o %t/TypesToReflect
 
-// RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) -binary-filename %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-reflection-dump -binary-filename %t/TypesToReflect -binary-filename %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-reflection-dump %t/TypesToReflect %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
 12TypeLowering11BasicStructV
 // CHECK-64:      (struct TypeLowering.BasicStruct)
@@ -1085,7 +1086,7 @@
 // CHECK-64-NEXT:       (case name=C index=2)
 // CHECK-64-NEXT:       (case name=D index=3)))
 // CHECK-64-NEXT:   (field name=sillyNoPayload offset=1
-// CHECK-64-NEXT:    (multi_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
+// CHECK-64-NEXT:    (multi_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:      (case name=A index=0 offset=0
 // CHECK-64-NEXT:        (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
 // CHECK-64-NEXT:      (case name=B index=1 offset=0

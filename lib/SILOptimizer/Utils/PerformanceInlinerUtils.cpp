@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
-#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -872,7 +872,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
 /// might prevent inlining a pure function.
 static bool hasInterestingSideEffect(SILInstruction *I) {
   switch (I->getKind()) {
-    // Those instructions turn into no-ops after inlining, redundante load
+    // Those instructions turn into no-ops after inlining, redundant load
     // elimination, constant folding and dead-object elimination.
     case swift::SILInstructionKind::StrongRetainInst:
     case swift::SILInstructionKind::StrongReleaseInst:
@@ -933,14 +933,11 @@ static bool isConstantArg(Operand *Arg) {
 }
 
 
-bool swift::isPureCall(FullApplySite AI, SideEffectAnalysis *SEA) {
+bool swift::isPureCall(FullApplySite AI, BasicCalleeAnalysis *BCA) {
   // If a call has only constant arguments and the call is pure, i.e. has
   // no side effects, then we should always inline it.
   // This includes arguments which are objects initialized with constant values.
-  FunctionSideEffects ApplyEffects;
-  SEA->getCalleeEffects(ApplyEffects, AI);
-  auto GE = ApplyEffects.getGlobalEffects();
-  if (GE.mayRead() || GE.mayWrite() || GE.mayRetain() || GE.mayRelease())
+  if (BCA->getMemoryBehavior(AI, /*observeRetains*/ true) != SILInstruction::MemoryBehavior::None)
     return false;
   // Check if all parameters are constant.
   auto Args = AI.getArgumentOperands().slice(AI.getNumIndirectSILResults());

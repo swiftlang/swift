@@ -14,13 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Ownership.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
 
 using namespace swift;
 using namespace Demangle;
@@ -306,6 +307,7 @@ private:
     case Node::Kind::MetatypeRepresentation:
     case Node::Kind::Module:
     case Node::Kind::Tuple:
+    case Node::Kind::Pack:
     case Node::Kind::ConstrainedExistential:
     case Node::Kind::ConstrainedExistentialRequirementList:
     case Node::Kind::ConstrainedExistentialSelf:
@@ -336,6 +338,7 @@ private:
     case Node::Kind::ProtocolListWithAnyObject:
       return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
 
+    case Node::Kind::PackExpansion:
     case Node::Kind::ProtocolListWithClass:
     case Node::Kind::AccessorFunctionReference:
     case Node::Kind::Allocator:
@@ -365,6 +368,7 @@ private:
     case Node::Kind::DependentGenericConformanceRequirement:
     case Node::Kind::DependentGenericLayoutRequirement:
     case Node::Kind::DependentGenericSameTypeRequirement:
+    case Node::Kind::DependentGenericSameShapeRequirement:
     case Node::Kind::DependentPseudogenericSignature:
     case Node::Kind::Destructor:
     case Node::Kind::DidSet:
@@ -434,6 +438,8 @@ private:
     case Node::Kind::LazyProtocolWitnessTableAccessor:
     case Node::Kind::LazyProtocolWitnessTableCacheVariable:
     case Node::Kind::LocalDeclName:
+    case Node::Kind::Macro:
+    case Node::Kind::MacroExpansion:
     case Node::Kind::MaterializeForSet:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
@@ -574,7 +580,8 @@ private:
     case Node::Kind::OpaqueType:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     case Node::Kind::OpaqueReturnType:
-    case Node::Kind::OpaqueReturnTypeIndexed:
+    case Node::Kind::OpaqueReturnTypeIndex:
+    case Node::Kind::OpaqueReturnTypeParent:
     case Node::Kind::OpaqueReturnTypeOf:
     case Node::Kind::CanonicalSpecializedGenericMetaclass:
     case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
@@ -603,6 +610,9 @@ private:
     case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::SymbolicExtendedExistentialType:
+    case Node::Kind::HasSymbolQuery:
+    case Node::Kind::RuntimeDiscoverableAttributeRecord:
+    case Node::Kind::RuntimeAttributeGenerator:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1322,6 +1332,15 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return printEntity(
         Node, depth, asPrefixContext, TypePrinting::FunctionStyle,
         /*hasName*/ false, /*ExtraName*/ "", /*ExtraIndex*/ -1, "subscript");
+  case Node::Kind::Macro:
+    return printEntity(Node, depth, asPrefixContext,
+                       Node->getNumChildren() == 3? TypePrinting::WithColon
+                                                  : TypePrinting::FunctionStyle,
+                       /*hasName*/ true);
+  case Node::Kind::MacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::GenericTypeParamDecl:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/ true);
@@ -1461,6 +1480,17 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::TupleElementName:
     Printer << Node->getText() << ": ";
     return nullptr;
+  case Node::Kind::Pack: {
+    Printer << "Pack{";
+    printChildren(Node, depth, ", ");
+    Printer << "}";
+    return nullptr;
+  }
+  case Node::Kind::PackExpansion: {
+    print(Node->getChild(0), depth + 1);
+    Printer << "...";
+    return nullptr;
+  }
   case Node::Kind::ReturnType:
     if (Node->getNumChildren() == 0)
       Printer << " -> " << Node->getText();
@@ -2052,6 +2082,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::AccessibleFunctionRecord:
     if (!Options.ShortenThunk) {
       Printer << "accessible function runtime record for ";
+    }
+    return nullptr;
+  case Node::Kind::RuntimeDiscoverableAttributeRecord:
+    if (!Options.ShortenThunk) {
+      Printer << "runtime discoverable attribute record for ";
     }
     return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
@@ -2659,6 +2694,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(snd, depth + 1);
     return nullptr;
   }
+  case Node::Kind::DependentGenericSameShapeRequirement: {
+    NodePointer fst = Node->getChild(0);
+    NodePointer snd = Node->getChild(1);
+
+    print(fst, depth + 1);
+    Printer << ".shape == ";
+    print(snd, depth + 1);
+    Printer << ".shape";
+    return nullptr;
+  }
   case Node::Kind::DependentGenericParamType: {
     unsigned index = Node->getChild(1)->getIndex();
     unsigned depth = Node->getChild(0)->getIndex();
@@ -2883,7 +2928,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << ")";
     return nullptr;
   case Node::Kind::OpaqueReturnType:
-  case Node::Kind::OpaqueReturnTypeIndexed:
     Printer << "some";
     return nullptr;
   case Node::Kind::OpaqueReturnTypeOf:
@@ -3045,6 +3089,19 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
 
     return nullptr;
   }
+  case Node::Kind::HasSymbolQuery:
+    Printer << "#_hasSymbol query for ";
+    return nullptr;
+  case Node::Kind::RuntimeAttributeGenerator:
+    printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                /*hasName*/ false,
+                "runtime attribute generator");
+    Printer << " for attribute = " << Node->getChild(1)->getText() << "."
+            << Node->getChild(2)->getText();
+    return nullptr;
+  case Node::Kind::OpaqueReturnTypeIndex:
+  case Node::Kind::OpaqueReturnTypeParent:
+    return nullptr;
   }
 
   printer_unreachable("bad node kind!");
@@ -3110,11 +3167,14 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
   }
 
   if (hasName || !OverwriteName.empty()) {
-    assert(ExtraIndex < 0 && "Can't have a name and extra index");
     if (!ExtraName.empty() && MultiWordName) {
       Printer << ExtraName;
+      if (ExtraIndex >= 0)
+        Printer << ExtraIndex;
+
       Printer << " of ";
       ExtraName = "";
+      ExtraIndex = -1;
     }
     size_t CurrentPos = Printer.getStringRef().size();
     if (!OverwriteName.empty()) {
@@ -3175,7 +3235,8 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
     if (Entity->getKind() == Node::Kind::DefaultArgumentInitializer ||
         Entity->getKind() == Node::Kind::Initializer ||
         Entity->getKind() == Node::Kind::PropertyWrapperBackingInitializer ||
-        Entity->getKind() == Node::Kind::PropertyWrapperInitFromProjectedValue) {
+        Entity->getKind() == Node::Kind::PropertyWrapperInitFromProjectedValue ||
+        Entity->getKind() == Node::Kind::RuntimeAttributeGenerator) {
       Printer << " of ";
     } else {
       Printer << " in ";
@@ -3209,6 +3270,146 @@ void NodePrinter::printEntityType(NodePointer Entity, NodePointer type,
   } else {
     print(type, depth + 1);
   }
+}
+
+NodePointer
+matchSequenceOfKinds(NodePointer start,
+                     std::vector<std::tuple<Node::Kind, size_t>> pattern) {
+  if (start != nullptr) {
+    NodePointer current = start;
+    size_t idx = 0;
+    while (idx < pattern.size()) {
+      std::tuple<Node::Kind, size_t> next = pattern[idx];
+      idx += 1;
+      NodePointer nextChild = current->getChild(std::get<1>(next));
+      if (nextChild != nullptr && nextChild->getKind() == std::get<0>(next)) {
+        current = nextChild;
+      } else {
+        return nullptr;
+      }
+    }
+    if (idx == pattern.size()) {
+      return current;
+    } else {
+      return nullptr;
+    }
+  } else {
+    return nullptr;
+  }
+}
+
+std::string Demangle::keyPathSourceString(const char *MangledName,
+                                          size_t MangledNameLength) {
+  std::string invalid = "";
+  std::string unlabelledArg = "_: ";
+  Context ctx;
+  NodePointer root =
+      ctx.demangleSymbolAsNode(StringRef(MangledName, MangledNameLength));
+  if (!root)
+    return invalid;
+  if (root->getNumChildren() >= 1) {
+    NodePointer firstChild = root->getChild(0);
+    if (firstChild->getKind() == Node::Kind::KeyPathGetterThunkHelper) {
+      NodePointer child = firstChild->getChild(0);
+      switch (child->getKind()) {
+      case Node::Kind::Subscript: {
+        std::string subscriptText = "subscript(";
+        std::vector<std::string> argumentTypeNames;
+        // Multiple arguments case
+        NodePointer argList = matchSequenceOfKinds(
+            child, {
+                       std::make_pair(Node::Kind::Type, 2),
+                       std::make_pair(Node::Kind::FunctionType, 0),
+                       std::make_pair(Node::Kind::ArgumentTuple, 0),
+                       std::make_pair(Node::Kind::Type, 0),
+                       std::make_pair(Node::Kind::Tuple, 0),
+                   });
+        if (argList != nullptr) {
+          size_t numArgumentTypes = argList->getNumChildren();
+          size_t idx = 0;
+          while (idx < numArgumentTypes) {
+            NodePointer argumentType = argList->getChild(idx);
+            idx += 1;
+            if (argumentType->getKind() == Node::Kind::TupleElement) {
+              argumentType =
+                  argumentType->getChild(0)->getChild(0)->getChild(1);
+              if (argumentType->getKind() == Node::Kind::Identifier) {
+                argumentTypeNames.push_back(
+                    std::string(argumentType->getText()));
+                continue;
+              }
+            }
+            argumentTypeNames.push_back("<Unknown>");
+          }
+        } else {
+          // Case where there is a single argument
+          argList = matchSequenceOfKinds(
+              child, {
+                         std::make_pair(Node::Kind::Type, 2),
+                         std::make_pair(Node::Kind::FunctionType, 0),
+                         std::make_pair(Node::Kind::ArgumentTuple, 0),
+                         std::make_pair(Node::Kind::Type, 0),
+                     });
+          if (argList != nullptr) {
+            argumentTypeNames.push_back(
+                std::string(argList->getChild(0)->getChild(1)->getText()));
+          }
+        }
+        child = child->getChild(1);
+        size_t idx = 0;
+        // There is an argument label:
+        if (child != nullptr) {
+          if (child->getKind() == Node::Kind::LabelList) {
+            size_t numChildren = child->getNumChildren();
+            if (numChildren == 0) {
+              subscriptText += unlabelledArg + argumentTypeNames[0];
+            } else {
+              while (idx < numChildren) {
+                Node *argChild = child->getChild(idx);
+                idx += 1;
+                if (argChild->getKind() == Node::Kind::Identifier) {
+                  subscriptText += std::string(argChild->getText()) + ": " +
+                                   argumentTypeNames[idx - 1];
+                  if (idx != numChildren) {
+                    subscriptText += ", ";
+                  }
+                } else if (argChild->getKind() ==
+                               Node::Kind::FirstElementMarker ||
+                           argChild->getKind() == Node::Kind::VariadicMarker) {
+                  subscriptText += unlabelledArg + argumentTypeNames[idx - 1];
+                }
+              }
+            }
+          }
+        } else {
+          subscriptText += unlabelledArg + argumentTypeNames[0];
+        }
+        return subscriptText + ")";
+      }
+      case Node::Kind::Variable: {
+        child = child->getChild(1);
+        if (child == nullptr) {
+          return invalid;
+        }
+        if (child->getKind() == Node::Kind::PrivateDeclName) {
+          child = child->getChild(1);
+          if (child == nullptr) {
+            return invalid;
+          }
+          if (child->getKind() == Node::Kind::Identifier) {
+            return std::string(child->getText());
+          }
+        } else if (child->getKind() == Node::Kind::Identifier) {
+          return std::string(child->getText());
+        }
+        break;
+      }
+      default:
+        return invalid;
+      }
+    }
+  }
+  return invalid;
 }
 
 std::string Demangle::nodeToString(NodePointer root,

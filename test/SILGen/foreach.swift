@@ -206,28 +206,28 @@ func existentialBreak(_ xx: [P]) {
   funcEnd()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s7foreach24existentialContinueBreakyySayAA1P_pGF : $@convention(thin) (@guaranteed Array<P>) -> () {
-// CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<P>):
-// CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<P>> }, var, name "$x$generator"
+// CHECK-LABEL: sil hidden [ossa] @$s7foreach24existentialContinueBreakyySayAA1P_pGF : $@convention(thin) (@guaranteed Array<any P>) -> () {
+// CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<any P>):
+// CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<any P>> }, var, name "$x$generator"
 // CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
-// CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<P>
+// CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<any P>
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in τ_0_0) -> @out IndexingIterator<τ_0_0>
-// CHECK:   apply [[MAKE_ITERATOR_FUNC]]<[P]>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
-// CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<P>
+// CHECK:   apply [[MAKE_ITERATOR_FUNC]]<[any P]>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
+// CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<any P>
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:
-// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<P>>
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<any P>>
 // CHECK:   [[FUNC_REF:%.*]] = function_ref @$ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@inout IndexingIterator<τ_0_0>) -> @out Optional<τ_0_0.Element>
-// CHECK:   apply [[FUNC_REF]]<[P]>([[ELT_STACK]], [[WRITE]])
-// CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<P>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+// CHECK:   apply [[FUNC_REF]]<[any P]>([[ELT_STACK]], [[WRITE]])
+// CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<any P>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[T0:%.*]] = alloc_stack [lexical] $P, let, name "x"
-// CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<P>, #Optional.some!enumelt
-// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [initialization] [[T0]]
+// CHECK:   [[T0:%.*]] = alloc_stack [lexical] $any P, let, name "x"
+// CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<any P>, #Optional.some!enumelt
+// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
@@ -260,7 +260,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   end_borrow [[ITERATOR_LIFETIME]]
-// CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<P>> }
+// CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<any P>> }
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
 // CHECK: } // end sil function '$s7foreach24existentialContinueBreakyySayAA1P_pGF'
@@ -282,7 +282,7 @@ func existentialContinueBreak(_ xx: [P]) {
 }
 
 //===----------------------------------------------------------------------===//
-// Class Constrainted Existential
+// Class Constrained Existential
 //===----------------------------------------------------------------------===//
 
 func existentialClass(_ xx: [ClassP]) {
@@ -389,7 +389,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK: [[SOME_BB]]:
 // CHECK:   [[T0:%.*]] = alloc_stack [lexical] $GenericStruct<T>, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, #Optional.some!enumelt
-// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [initialization] [[T0]]
+// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
@@ -497,7 +497,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK: [[SOME_BB]]:
 // CHECK:   [[T0:%.*]] = alloc_stack [lexical] $T.Element, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<T.Element>, #Optional.some!enumelt
-// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [initialization] [[T0]]
+// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
@@ -603,7 +603,8 @@ func unusedArgPattern(_ xx: [Int]) {
   }
 }
 
-// Test for SR-11269. Make sure that the sil contains the needed upcast.
+// https://github.com/apple/swift/issues/53670
+// Make sure that the SIL contains the needed upcast.
 //
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach25genericFuncWithConversion4listySayxG_tAA1CCRbzlF
 // CHECK: bb2([[ITER_VAL:%.*]] : @owned $T):
@@ -614,9 +615,10 @@ func genericFuncWithConversion<T: C>(list : [T]) {
   }
 }
 
-// SR-8688: Check that branch on result of next() precedes optional injection.
-// If we branch on the converted result of next(), the loop won't terminate.
-//
+// https://github.com/apple/swift/issues/51201
+// Check that branch on result of 'next()' precedes optional injection.
+// If we branch on the converted result of 'next()', the loop won't terminate.
+
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach32injectForEachElementIntoOptionalyySaySiGF
 // CHECK: [[NEXT_RESULT:%.*]] = load [trivial] {{.*}} : $*Optional<Int>
 // CHECK: switch_enum [[NEXT_RESULT]] : $Optional<Int>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
@@ -627,17 +629,14 @@ func injectForEachElementIntoOptional(_ xs: [Int]) {
   for x : Int? in xs {}
 }
 
-// SR-8688: Check that branch on result of next() precedes optional injection.
-// If we branch on the converted result of next(), the loop won't terminate.
-//
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach32injectForEachElementIntoOptionalyySayxGlF
-// CHECK: copy_addr [take] [[NEXT_RESULT:%.*]] to [initialization] [[NEXT_RESULT_COPY:%.*]] : $*Optional<T>
+// CHECK: copy_addr [take] [[NEXT_RESULT:%.*]] to [init] [[NEXT_RESULT_COPY:%.*]] : $*Optional<T>
 // CHECK: switch_enum_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
 // CHECK: [[BB_SOME]]:
 // CHECK: [[X_BINDING:%.*]] = alloc_stack [lexical] $Optional<T>, let, name "x"
 // CHECK: [[ADDR:%.*]] = unchecked_take_enum_data_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK: [[X_ADDR:%.*]] = init_enum_data_addr [[X_BINDING]] : $*Optional<T>, #Optional.some!enumelt
-// CHECK: copy_addr [take] [[ADDR]] to [initialization] [[X_ADDR]] : $*T
+// CHECK: copy_addr [take] [[ADDR]] to [init] [[X_ADDR]] : $*T
 // CHECK: inject_enum_addr [[X_BINDING]] : $*Optional<T>, #Optional.some!enumelt
 func injectForEachElementIntoOptional<T>(_ xs: [T]) {
   for x : T? in xs {}

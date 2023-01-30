@@ -120,33 +120,34 @@ func testParseErrors4() {
   _ = #selector(C1.subscript) // expected-error{{type 'C1' has no member 'subscript'}}
 }
 
-// SR-1827
+// https://github.com/apple/swift/issues/44436
+do {
+  let optionalSel: Selector?
 
-let optionalSel: Selector? = nil
+  switch optionalSel {
+  case #selector(C1.method1)?:
+    break
+  default:
+    break
+  }
 
-switch optionalSel {
-case #selector(C1.method1)?:
-  break
-default:
-  break
+  @objc class C {
+    @objc func bar() {}
+  }
+
+  switch optionalSel {
+  case #selector(C.bar):
+    break
+  case #selector(C.bar)!: // expected-error{{cannot force unwrap value of non-optional type 'Selector'}}
+    break
+  case #selector(C.bar)?:
+    break
+  default:
+    break
+  }
 }
 
-@objc class SR1827 {
-  @objc func bar() {}
-}
-
-switch optionalSel {
-case #selector(SR1827.bar):
-  break
-case #selector(SR1827.bar)!: // expected-error{{cannot force unwrap value of non-optional type 'Selector'}}
-  break
-case #selector(SR1827.bar)?:
-  break
-default:
-  break
-}
-
-// SR-9391
+// https://github.com/apple/swift/issues/51857
 
 protocol SomeProtocol {
   func someFunction()

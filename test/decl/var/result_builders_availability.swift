@@ -88,8 +88,8 @@ tuplify(true) { x in
 @available(*, unavailable)
 func unavailableFunc(_ x: Bool) -> Bool {} // expected-note {{'unavailableFunc' has been explicitly marked unavailable here}}
 
-// SR-13260: Availability checking not working in the where clause of a for
-// loop.
+// https://github.com/apple/swift/issues/55700
+// Availability checking not working in the 'where' clause of a 'for' loop
 tuplify(true) { b in
   for x in [b] where unavailableFunc(x) { // expected-error {{'unavailableFunc' is unavailable}}
     ""

@@ -283,13 +283,13 @@ class YieldOnceCheck : public SILFunctionTransform {
       Optional<YieldError> errorResult = None;
       auto resultState = transferStateThroughBasicBlock(bb, state, errorResult);
 
-      if (!resultState.hasValue()) {
-        auto error = errorResult.getValue();
+      if (!resultState.has_value()) {
+        auto error = errorResult.value();
 
         // ReturnBeforeYield errors will not be reported until the analysis
         // completes. So record it and continue.
         if (error.errorKind == YieldError::ReturnBeforeYield) {
-          if (!returnBeforeYieldError.hasValue()) {
+          if (!returnBeforeYieldError.has_value()) {
             returnBeforeYieldError = error;
           }
           continue;
@@ -299,7 +299,7 @@ class YieldOnceCheck : public SILFunctionTransform {
         return;
       }
 
-      auto nextState = resultState.getValue();
+      auto nextState = resultState.value();
 
       for (auto *succBB : bb->getSuccessorBlocks()) {
         BBState &succState = bbToStateMap[succBB];
@@ -329,8 +329,8 @@ class YieldOnceCheck : public SILFunctionTransform {
       }
     }
 
-    if (returnBeforeYieldError.hasValue()) {
-      emitDiagnostics(returnBeforeYieldError.getValue(), fun, bbToStateMap);
+    if (returnBeforeYieldError.has_value()) {
+      emitDiagnostics(returnBeforeYieldError.value(), fun, bbToStateMap);
     }
   }
 
@@ -494,9 +494,9 @@ class YieldOnceCheck : public SILFunctionTransform {
         // Find the case that doesn't yield.
         Optional<unsigned> caseNumberOpt =
             switchValue->getUniqueCaseForDestination(noYieldTarget);
-        assert(caseNumberOpt.hasValue());
+        assert(caseNumberOpt.has_value());
 
-        auto caseNumber = caseNumberOpt.getValue();
+        auto caseNumber = caseNumberOpt.value();
         diagnose(
             astCtx, enumCaseLoc, diag::switch_value_case_doesnt_yield,
             (Twine(caseNumber) + llvm::getOrdinalSuffix(caseNumber)).str());

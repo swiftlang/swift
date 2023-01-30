@@ -156,6 +156,7 @@ static bool isKnownFinalClass(ClassDecl *cd, SILModule &module,
   case AccessLevel::Open:
     return false;
   case AccessLevel::Public:
+  case AccessLevel::Package:
   case AccessLevel::Internal:
     if (!module.isWholeModule())
       return false;
@@ -177,6 +178,7 @@ static bool isKnownFinalClass(ClassDecl *cd, SILModule &module,
       case AccessLevel::Open:
         return false;
       case AccessLevel::Public:
+      case AccessLevel::Package:
       case AccessLevel::Internal:
         if (!module.isWholeModule())
           return false;
@@ -948,7 +950,7 @@ getWitnessMethodSubstitutions(
 
         if (depth < baseDepth) {
           paramType = GenericTypeParamType::get(
-              paramType->isTypeSequence(),
+              paramType->isParameterPack(),
               depth, paramType->getIndex(), ctx);
 
           return Type(paramType).subst(baseSubMap);
@@ -957,7 +959,7 @@ getWitnessMethodSubstitutions(
         depth = depth - baseDepth + 1;
 
         paramType = GenericTypeParamType::get(
-            paramType->isTypeSequence(),
+            paramType->isParameterPack(),
             depth, paramType->getIndex(), ctx);
         return Type(paramType).subst(origSubMap);
       },
@@ -979,7 +981,7 @@ getWitnessMethodSubstitutions(
           type = CanType(type.transform([&](Type t) -> Type {
             if (t->isEqual(paramType)) {
               return GenericTypeParamType::get(
-                  paramType->isTypeSequence(),
+                  paramType->isParameterPack(),
                   depth, paramType->getIndex(), ctx);
             }
 
@@ -995,7 +997,7 @@ getWitnessMethodSubstitutions(
         type = CanType(type.transform([&](Type t) -> Type {
           if (t->isEqual(paramType)) {
             return GenericTypeParamType::get(
-                paramType->isTypeSequence(),
+                paramType->isParameterPack(),
                 depth, paramType->getIndex(), ctx);
           }
 
@@ -1122,6 +1124,24 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
   return {newApplySite, changedCFG};
 }
 
+static bool isNonGenericThunkOfGenericExternalFunction(SILFunction *thunk) {
+  if (!thunk->isThunk())
+    return false;
+  if (thunk->getGenericSignature())
+    return false;
+  for (SILBasicBlock &block : *thunk) {
+    for (SILInstruction &inst : block) {
+      if (FullApplySite fas = FullApplySite::isa(&inst)) {
+        if (SILFunction *calledFunc = fas.getReferencedFunctionOrNull()) {
+          if (fas.hasSubstitutions() && !calledFunc->isDefinition())
+            return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
   SILFunction *f;
   SILWitnessTable *wt;
@@ -1147,6 +1167,25 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite) {
       && isa<TryApplyInst>(applySite.getInstruction())) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL: Trying to devirtualize a "
           "try_apply but wtable entry has no error result.\n");
+    return false;
+  }
+
+  // The following check is for performance reasons: if `f` is a non-generic thunk
+  // which calls a (not inlinable) generic function in the defining module, it's
+  // more efficient to not devirtualize, but call the non-generic thunk - even though
+  // it's done through the witness table.
+  // Example:
+  // ```
+  //   protocol P {
+  //     func f(x: [Int])   // not generic
+  //   }
+  //   struct S: P {
+  //     func f(x: some RandomAccessCollection<Int>) { ... } // generic
+  //   }
+  // ```
+  // In the defining module, the generic conformance can be specialized (which is not
+  // possible in the client module, because it's not inlinable).
+  if (isNonGenericThunkOfGenericExternalFunction(f)) {
     return false;
   }
 

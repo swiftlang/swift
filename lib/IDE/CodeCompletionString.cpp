@@ -110,7 +110,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
 StringRef
 CodeCompletionString::getFirstTextChunk(bool includeLeadingPunctuation) const {
   Optional<unsigned> Idx = getFirstTextChunkIndex(includeLeadingPunctuation);
-  if (Idx.hasValue())
+  if (Idx.has_value())
     return getChunks()[*Idx].getText();
   return StringRef();
 }

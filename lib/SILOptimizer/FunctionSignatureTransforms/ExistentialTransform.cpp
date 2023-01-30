@@ -165,8 +165,7 @@ void ExistentialSpecializerCloner::cloneArguments(
           LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
       auto *NewArg =
           ClonedEntryBB->createFunctionArgument(MappedTy, ArgDesc.Decl);
-      NewArg->setOwnershipKind(ValueOwnershipKind(
-          NewF, MappedTy, ArgDesc.Arg->getArgumentConvention()));
+      NewArg->copyFlags(ArgDesc.Arg);
       entryArgs.push_back(NewArg);
       continue;
     }
@@ -180,6 +179,7 @@ void ExistentialSpecializerCloner::cloneArguments(
         GenericSILType, ArgDesc.Decl,
         ValueOwnershipKind(NewF, GenericSILType,
                            ArgDesc.Arg->getArgumentConvention()));
+    NewArg->copyFlags(ArgDesc.Arg);
     // Determine the Conformances.
     SILType ExistentialType = ArgDesc.Arg->getType().getObjectType();
     CanType OpenedType = NewArg->getType().getASTType();
@@ -194,7 +194,7 @@ void ExistentialSpecializerCloner::cloneArguments(
       /// bb0(%0 : $*T):
       /// %3 = alloc_stack $P
       /// %4 = init_existential_addr %3 : $*P, $T
-      /// copy_addr [take] %0 to [initialization] %4 : $*T
+      /// copy_addr [take] %0 to [init] %4 : $*T
       /// %7 = open_existential_addr immutable_access %3 : $*P to
       /// $*@opened P
       auto *ASI =
@@ -311,7 +311,7 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
 
     /// Generate new generic parameter.
     auto *NewGenericParam =
-        GenericTypeParamType::get(/*type sequence*/ false, Depth, GPIdx++, Ctx);
+        GenericTypeParamType::get(/*isParameterPack*/ false, Depth, GPIdx++, Ctx);
     genericParams.push_back(NewGenericParam);
     Requirement NewRequirement(RequirementKind::Conformance, NewGenericParam,
                                constraint);
@@ -345,11 +345,6 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
                                         std::move(GenericParams),
                                         std::move(Requirements));
 
-  /// Create a lambda for GenericParams.
-  auto getCanonicalType = [&](Type t) -> CanType {
-    return t->getCanonicalType(NewGenericSig);
-  };
-
   /// Original list of parameters
   SmallVector<SILParameterInfo, 4> params;
   params.append(FTy->getParameters().begin(), FTy->getParameters().end());
@@ -362,7 +357,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
     auto iter = ArgToGenericTypeMap.find(Idx);
     if (iter != ArgToGenericTypeMap.end()) {
       auto GenericParam = iter->second;
-      InterfaceParams.push_back(SILParameterInfo(getCanonicalType(GenericParam),
+      InterfaceParams.push_back(SILParameterInfo(GenericParam->getReducedType(NewGenericSig),
                                                  param.getConvention()));
     } else {
       InterfaceParams.push_back(param);
@@ -407,7 +402,9 @@ void ExistentialTransform::populateThunkBody() {
   auto *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgumentDescList) {
     auto argumentType = ArgDesc.Arg->getType();
-    ThunkBody->createFunctionArgument(argumentType, ArgDesc.Decl);
+    auto *NewArg =
+        ThunkBody->createFunctionArgument(argumentType, ArgDesc.Decl);
+    NewArg->copyFlags(ArgDesc.Arg);
   }
 
   /// Builder to add new instructions in the Thunk.
@@ -639,8 +636,9 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     NewF = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isSerialized(), IsNotDynamic, IsNotDistributed,
-      F->getEntryCount(), F->isThunk(), F->getClassSubclassScope(),
-      F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
+      IsNotRuntimeAccessible, F->getEntryCount(), F->isThunk(),
+      F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
+      nullptr, F->getDebugScope());
 
     /// Set the semantics attributes for the new function.
     for (auto &Attr : F->getSemanticsAttrs())

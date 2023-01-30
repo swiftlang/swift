@@ -193,8 +193,17 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Extended existential type shapes in flight.
   PointerAuthSchema ExtendedExistentialTypeShape;
 
+  // The c type descriminator for TaskContinuationFunction*.
+  PointerAuthSchema ClangTypeTaskContinuationFunction;
+
   /// Non-unique extended existential type shapes in flight.
   PointerAuthSchema NonUniqueExtendedExistentialTypeShape;
+
+  /// C type GetExtraInhabitantTag function descriminator.
+  PointerAuthSchema GetExtraInhabitantTagFunction;
+
+  /// C type StoreExtraInhabitantTag function descriminator.
+  PointerAuthSchema StoreExtraInhabitantTagFunction;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -401,11 +410,20 @@ public:
   /// Internalize symbols (static library) - do not export any public symbols.
   unsigned InternalizeSymbols : 1;
 
+  /// Emit a section with references to class_ro_t* in generic class patterns.
+  unsigned EmitGenericRODatas : 1;
+
   /// Whether to avoid emitting zerofill globals as preallocated type metadata
   /// and protocol conformance caches.
   unsigned NoPreallocatedInstantiationCaches : 1;
 
   unsigned DisableReadonlyStaticObjects : 1;
+
+  /// Collocate metadata functions in their own section.
+  unsigned CollocatedMetadataFunctions : 1;
+
+  /// Use relative (and constant) protocol witness tables.
+  unsigned UseRelativeProtocolWitnessTables : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -436,6 +454,7 @@ public:
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
   Optional<llvm::VersionTuple>
       AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
+  bool AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary;
 
   JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 
@@ -454,10 +473,10 @@ public:
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        Playground(false), EmitStackPromotionChecks(false),
-        UseSingleModuleLLVMEmission(false), FunctionSections(false),
-        PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
-        LLVMLTOKind(IRGenLLVMLTOKind::None),
+        Playground(false),
+        EmitStackPromotionChecks(false), UseSingleModuleLLVMEmission(false),
+        FunctionSections(false), PrintInlineTree(false),
+        EmbedMode(IRGenEmbedMode::None), LLVMLTOKind(IRGenLLVMLTOKind::None),
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false), ValueNames(false),
         ReflectionMetadata(ReflectionMetadataMode::Runtime),
@@ -475,8 +494,10 @@ public:
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
-        NoPreallocatedInstantiationCaches(false),
-        DisableReadonlyStaticObjects(false), CmdArgs(),
+        EmitGenericRODatas(false), NoPreallocatedInstantiationCaches(false),
+        DisableReadonlyStaticObjects(false),
+        CollocatedMetadataFunctions(false),
+        UseRelativeProtocolWitnessTables(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {
 #ifndef NDEBUG
@@ -534,6 +555,12 @@ public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
+    return llvm::hash_value(0);
+  }
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Dependency Scanning hash.
+  llvm::hash_code getModuleScanningHashComponents() const {
     return llvm::hash_value(0);
   }
 
