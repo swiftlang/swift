@@ -1150,7 +1150,6 @@ public:
     // the following token is something that can introduce a type. Thankfully
     // none of these tokens overlap with the set of tokens that can follow an
     // identifier in a type production.
-    
     return Tok.is(tok::identifier)
       && peekToken().isAny(tok::at_sign,
                            tok::kw_inout,

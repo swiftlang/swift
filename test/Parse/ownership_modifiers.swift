@@ -1,4 +1,3 @@
-// TODO: implement new parser support for borrowing and consuming modifiers
 // RUN: %target-typecheck-verify-swift
 
 struct borrowing {}
@@ -26,3 +25,24 @@ func zoop(x: (borrowing consuming, consuming borrowing) -> ()) {}
 
 func worster(x: borrowing borrowing borrowing) {} // expected-error{{at most one}}
 func worstest(x: (borrowing borrowing borrowing) -> ()) {} // expected-error{{at most one}}
+
+// Parameter specifier names are regular identifiers in other positions,
+// including argument labels.
+
+func argumentLabel(borrowing consuming: Int) {}
+func argumentLabel(consuming borrowing: Int) {}
+func argumentLabel(__shared __owned: Int) {}
+func argumentLabel(__owned __shared: Int) {}
+
+// We should parse them as argument labels in function types, even though that
+// isn't currently supported.
+
+func argumentLabel(borrowingInClosure: (borrowing consuming: Int) -> ()) {} // expected-error{{function types cannot have argument labels}}
+func argumentLabel(consumingInClosure: (consuming borrowing: Int) -> ()) {} // expected-error{{function types cannot have argument labels}}
+func argumentLabel(sharedInClosure: (__shared __owned: Int) -> ()) {} // expected-error{{function types cannot have argument labels}}
+func argumentLabel(ownedInClosure: (__shared __owned: Int) -> ()) {} // expected-error{{function types cannot have argument labels}}
+
+func argumentLabel(anonBorrowingInClosure: (_ consuming: Int) -> ()) {}
+func argumentLabel(anonConsumingInClosure: (_ borrowing: Int) -> ()) {}
+func argumentLabel(anonSharedInClosure: (_ __owned: Int) -> ()) {}
+func argumentLabel(anonOwnedInClosure: (_ __owned: Int) -> ()) {}

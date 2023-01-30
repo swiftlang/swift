@@ -171,14 +171,14 @@ bool Parser::startsParameterName(bool isClosure) {
         !Tok.is(tok::kw_repeat))
       return true;
 
-    // "isolated" can be an argument label, but it's also a contextual keyword,
-    // so look ahead one more token (two total) see if we have a ':' that would
+    // Parameter specifiers can be an argument label, but they're also
+    // contextual keywords, so look ahead one more token (two total) and see
+    // if we have a ':' that would
     // indicate that this is an argument label.
     return lookahead<bool>(2, [&](CancellableBacktrackingScope &) {
       if (Tok.is(tok::colon))
         return true; // isolated :
 
-      // isolated x :
       return Tok.canBeArgumentLabel() && nextTok.is(tok::colon);
     });
   }
@@ -262,6 +262,17 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                      || Tok.isContextualKeyword("consuming")
                      || Tok.isContextualKeyword("isolated")
                      || Tok.isContextualKeyword("_const")))) {
+        // is this token the identifier of an argument label?
+        bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+          if (Tok.is(tok::colon))
+            return true;  // isolated :
+
+          return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
+        });
+
+        if (partOfArgumentLabel)
+          break;
+
         if (Tok.isContextualKeyword("isolated")) {
           // did we already find an 'isolated' type modifier?
           if (param.IsolatedLoc.isValid()) {
@@ -270,18 +281,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             consumeToken();
             continue;
           }
-
-          // is this 'isolated' token the identifier of an argument label?
-          bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
-            if (Tok.is(tok::colon))
-              return true;  // isolated :
-
-            // isolated x :
-            return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
-          });
-
-          if (partOfArgumentLabel)
-            break;
 
           // consume 'isolated' as type modifier
           param.IsolatedLoc = consumeToken();
