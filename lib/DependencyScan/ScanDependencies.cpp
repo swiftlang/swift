@@ -1195,6 +1195,13 @@ identifyMainModuleDependencies(CompilerInstance &instance) {
       mainDependencies.addModuleImport(mainModule->getName().str(),
                                            &alreadyAddedModules);
     }
+
+    // All modules specified with `-embed-tbd-for-module` are treated as implicit
+    // dependnecies for this compilation since they are not guaranteed to be impored
+    // in the source.
+    for (const auto &tbdSymbolModule : instance.getInvocation().getTBDGenOptions().embedSymbolsFromModules) {
+      mainDependencies.addModuleImport(tbdSymbolModule, &alreadyAddedModules);
+    }
   }
 
   return mainDependencies;
