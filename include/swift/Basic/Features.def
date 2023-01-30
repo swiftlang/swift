@@ -167,6 +167,11 @@ EXPERIMENTAL_FEATURE(BuiltinMacros, false)
 /// declare an attribute which is discoverable and constructable at runtime.
 EXPERIMENTAL_FEATURE(RuntimeDiscoverableAttrs, false)
 
+/// Import C++ class templates as semantically-meaningless symbolic
+/// Swift types and C++ methods as symbolic functions with blank
+/// signatures.
+EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
