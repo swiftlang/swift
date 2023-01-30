@@ -1159,7 +1159,8 @@ public:
                            tok::kw_Any,
                            tok::kw_Self,
                            tok::kw__,
-                           tok::kw_var);
+                           tok::kw_var,
+                           tok::kw_let);
   }
 
   ParserStatus parseTypeAttributeList(ParamDecl::Specifier &Specifier,

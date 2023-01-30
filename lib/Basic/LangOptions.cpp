@@ -32,9 +32,8 @@ using namespace swift;
 LangOptions::LangOptions() {
   // Note: Introduce default-on language options here.
 #ifndef NDEBUG
-#warning "reinstate parser round trip features once SwiftSyntax support is done"
-  //Features.insert(Feature::ParserRoundTrip);
-  //Features.insert(Feature::ParserValidation);
+  Features.insert(Feature::ParserRoundTrip);
+  Features.insert(Feature::ParserValidation);
 #endif
 }
 

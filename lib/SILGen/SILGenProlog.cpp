@@ -376,9 +376,19 @@ struct ArgumentInitHelper {
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
-      auto kind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
-      if (pd->isOwned())
+      MarkMustCheckInst::CheckKind kind;
+      switch (pd->getValueOwnership()) {
+      case ValueOwnership::Default:
+      case ValueOwnership::Shared:
+      case ValueOwnership::InOut:
+        kind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
+        break;
+
+      case ValueOwnership::Owned:
         kind = MarkMustCheckInst::CheckKind::ConsumableAndAssignable;
+        break;
+      }
+
       value = SGF.B.createMarkMustCheckInst(loc, value, kind);
       SGF.emitManagedRValueWithCleanup(value);
       return completeUpdate(value);

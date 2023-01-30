@@ -2353,8 +2353,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Attributed:
     return resolveAttributedType(cast<AttributedTypeRepr>(repr), options);
   case TypeReprKind::Ownership:
-    return resolveSpecifierTypeRepr(cast<SpecifierTypeRepr>(repr), options);
-
+    return resolveOwnershipTypeRepr(cast<OwnershipTypeRepr>(repr), options);
   case TypeReprKind::Isolated:
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
   case TypeReprKind::CompileTimeConst:

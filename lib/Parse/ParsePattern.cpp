@@ -262,17 +262,20 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                      || Tok.isContextualKeyword("consuming")
                      || Tok.isContextualKeyword("isolated")
                      || Tok.isContextualKeyword("_const")))) {
-        // is this token the identifier of an argument label?
-        bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
-          if (Tok.is(tok::colon))
-            return true;  // isolated :
+        // is this token the identifier of an argument label? `inout` is a
+        // reserved keyword but the other modifiers are not.
+        if (!Tok.is(tok::kw_inout)) {
+          bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+            if (Tok.is(tok::colon))
+              return true;  // isolated :
 
-          return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
-        });
+            return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
+          });
 
-        if (partOfArgumentLabel)
-          break;
-
+          if (partOfArgumentLabel)
+            break;
+        }
+        
         if (Tok.isContextualKeyword("isolated")) {
           // did we already find an 'isolated' type modifier?
           if (param.IsolatedLoc.isValid()) {
