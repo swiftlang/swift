@@ -1659,6 +1659,15 @@ LookupConformanceInModuleRequest::evaluate(
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+      // Only move-only nominals are not Copyable
+      if (nominal->isMoveOnly()) {
+        return ProtocolConformanceRef::forInvalid();
+      } else {
+        // FIXME: this should probably follow the Sendable case in that
+        // we should synthesize and append a ProtocolConformance to the `conformances` list.
+       return ProtocolConformanceRef(protocol);
+      }
     } else {
       // Was unable to infer the missing conformance.
       return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);

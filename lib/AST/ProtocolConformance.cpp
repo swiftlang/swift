@@ -1097,11 +1097,6 @@ void NominalTypeDecl::prepareConformanceTable() const {
   if (mutableThis->getAttrs().hasAttribute<GlobalActorAttr>()) {
     addSynthesized(ctx.getProtocol(KnownProtocolKind::GlobalActor));
   }
-
-  // All nominal types that are not move-only conform to Copyable.
-  if (!mutableThis->isMoveOnly()) {
-    addSynthesized(ctx.getProtocol(KnownProtocolKind::Copyable));
-  }
 }
 
 bool NominalTypeDecl::lookupConformance(
@@ -1239,7 +1234,11 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   // Concrete types may synthesize some conformances
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
-    trySynthesize(KnownProtocolKind::Copyable);
+
+    // FIXME(kavon): make sure this conformance doesn't show up in swiftinterfaces
+    // before do this synthesis unconditionally.
+    if (dc->getASTContext().LangOpts.hasFeature(Feature::MoveOnly))
+      trySynthesize(KnownProtocolKind::Copyable);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those
