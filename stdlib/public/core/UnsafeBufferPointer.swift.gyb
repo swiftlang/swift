@@ -14,9 +14,6 @@
 % for mutable in (True, False):
 %  Self = 'UnsafeMutableBufferPointer' if mutable else 'UnsafeBufferPointer'
 %  Mutable = 'Mutable' if mutable else ''
-// FIXME: rdar://18157434 - until this is fixed, this has to be fixed layout
-// to avoid a hang in Foundation, which has the following setup:
-// struct A { struct B { let x: UnsafeMutableBufferPointer<...> } let b: B }
 /// A nonowning collection interface to a buffer of ${Mutable.lower()}
 /// elements stored contiguously in memory.
 ///
