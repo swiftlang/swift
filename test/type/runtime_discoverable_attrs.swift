@@ -318,3 +318,34 @@ class MultiAttrTest {
 }
 
 extension MultiAttrTest : Flagged & EnumFlagged {} // Ok
+
+@Flag
+class BaseClass {}
+
+@Flag
+class ValidChild : BaseClass {} // Ok
+
+class InvalidChild : BaseClass {}
+// expected-error@-1 {{superclass 'BaseClass' requires reflection metadata attribute @Flag}}
+// expected-note@-2 {{add missing reflection metadata attribute @Flag}} {{1-1=@Flag }}
+// expected-note@-3 {{opt-out of reflection metadata attribute @Flag using unavailable extension}} {{34-34=\n\n@available(*, unavailable)\n@Flag extension InvalidChild {\}\n}}
+
+class OptedOutChild : BaseClass {} // Ok (used unavailable extension to opt-out of the attribute)
+
+@available(*, unavailable)
+@Flag
+extension OptedOutChild {}
+
+protocol InvalidProtoWithSuperclass : BaseClass {}
+// expected-error@-1 {{superclass 'BaseClass' requires reflection metadata attribute @Flag}}
+// expected-note@-2 {{add missing reflection metadata attribute @Flag}} {{1-1=@Flag }}
+// expected-note@-3 {{opt-out of reflection metadata attribute @Flag using unavailable extension}} {{51-51=\n\n@available(*, unavailable)\n@Flag extension InvalidProtoWithSuperclass {\}\n}}
+
+@Flag
+protocol ValidProtoWithSuperclass : BaseClass {} // Ok
+
+protocol OptedOutProtoWithSuperclass : BaseClass {} // Ok
+
+@available(*, unavailable)
+@Flag
+extension OptedOutProtoWithSuperclass {}

@@ -105,3 +105,6 @@ struct TestSelfUse {
   // CHECK-NEXT: {{.*}} = apply [[FLAG_INIT_REF]]<String, (TestSelfUse) -> ()>({{.*}}, [[PROP_VAL_COPY]], [[FUNC_NAME_STR]], {{.*}})
   @Flag(value: Self.question) func test() {}
 }
+
+// This make sure that Child is valid even though it opted-out of attribute.
+_ = Child()

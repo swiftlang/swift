@@ -2965,12 +2965,6 @@ static bool usesFeatureTypeWrappers(Decl *decl) {
 }
 
 static bool usesFeatureRuntimeDiscoverableAttrs(Decl *decl) {
-  if (decl->getAttrs().hasAttribute<RuntimeMetadataAttr>())
-    return true;
-
-  if (auto *VD = dyn_cast<ValueDecl>(decl))
-    return !VD->getRuntimeDiscoverableAttrs().empty();
-
   return false;
 }
 

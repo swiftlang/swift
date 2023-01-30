@@ -7149,7 +7149,16 @@ void AttributeChecker::visitCompilerInitializedAttr(
 }
 
 void AttributeChecker::visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::RuntimeDiscoverableAttrs)) {
+  auto isEnabled = [&]() {
+    if (Ctx.LangOpts.hasFeature(Feature::RuntimeDiscoverableAttrs))
+      return true;
+
+    // Accept attributes that come from swiftinterface files.
+    auto *parentSF = D->getDeclContext()->getParentSourceFile();
+    return parentSF && parentSF->Kind == SourceFileKind::Interface;
+  };
+
+  if (!isEnabled()) {
     diagnose(attr->getLocation(),
              diag::runtime_discoverable_attrs_are_experimental);
     attr->setInvalid();
@@ -7453,7 +7462,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 
 template <typename ATTR>
 static void forEachCustomAttribute(
-    ValueDecl *decl,
+    Decl *decl,
     llvm::function_ref<void(CustomAttr *attr, NominalTypeDecl *)> fn) {
   auto &ctx = decl->getASTContext();
 
@@ -7513,6 +7522,57 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
     return copy;
   };
 
+  // Verify that a subclass or a protocol has all of the reflection
+  // metadata attributes expected by the superclass.
+  auto verifySuperclassAttrRequirements = [&](NominalTypeDecl *typeDecl,
+                                              ClassDecl *superclass) {
+    auto attrRequirements = superclass->getRuntimeDiscoverableAttrs();
+    if (attrRequirements.empty())
+      return;
+
+    // All of the reflection metadata attributes declared in
+    // unavailable extensions of this type in the same module.
+    llvm::SmallPtrSet<NominalTypeDecl *, 4> unavailableAttrs;
+    for (auto *extension : typeDecl->getExtensions()) {
+      if (extension->isConstrainedExtension() ||
+          extension->getParentModule() != typeDecl->getParentModule())
+        continue;
+
+      forEachCustomAttribute<RuntimeMetadataAttr>(
+          extension, [&](CustomAttr *attr, NominalTypeDecl *attrDecl) {
+            unavailableAttrs.insert(attrDecl);
+          });
+    }
+
+    for (auto *attr : attrRequirements) {
+      auto *attrDecl = superclass->getRuntimeDiscoverableAttrTypeDecl(attr);
+      if (attrs.count(attrDecl) || unavailableAttrs.count(attrDecl))
+        continue;
+
+      std::string attrName = attrDecl->getNameStr().str();
+      std::string subclassName = typeDecl->getNameStr().str();
+
+      ctx.Diags.diagnose(
+          typeDecl, diag::missing_reflection_metadata_attribute_on_subclass,
+          superclass->getName(), attrName);
+
+      ctx.Diags
+          .diagnose(typeDecl, diag::add_missing_reflection_metadata_attr,
+                    attrName)
+          .fixItInsert(
+              typeDecl->getAttributeInsertionLoc(/*forModifier=*/false),
+              "@" + attrName + " ");
+
+      ctx.Diags
+          .diagnose(typeDecl,
+                    diag::opt_out_from_missing_reflection_metadata_attr,
+                    attrName)
+          .fixItInsertAfter(typeDecl->getEndLoc(),
+                            "\n\n@available(*, unavailable)\n@" + attrName +
+                                " extension " + subclassName + " {}\n");
+    }
+  };
+
   // Gather reflection metadata attributes only if this extension is:
   //  - unavailable;
   //  - unconstrained;
@@ -7530,9 +7590,17 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
   gatherRuntimeAttrsOnDecl(decl, attrs, GatheringMode::Direct);
 
   auto *NTD = dyn_cast<NominalTypeDecl>(decl);
-  // Attribute inference is only possible from protocol conformances.
-  if (!NTD || isa<ProtocolDecl>(NTD) || NTD->getDeclContext()->isLocalContext())
+  if (!NTD || NTD->getDeclContext()->isLocalContext())
     return copyAttrs(attrs);
+
+  // If this is a protocol, let's check whether superclass
+  // has any reflection metadata attribute requirements.
+  if (auto *protocol = dyn_cast<ProtocolDecl>(NTD)) {
+    if (auto *superclass = protocol->getSuperclassDecl())
+      verifySuperclassAttrRequirements(NTD, superclass);
+
+    return copyAttrs(attrs);
+  }
 
   // Gather any attributes inferred from (explicit) protocol conformances
   // associated with the declaration of the type.
@@ -7549,6 +7617,12 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
       continue;
 
     gatherRuntimeAttrsOnDecl(protocol, attrs, GatheringMode::Inference);
+  }
+
+  // Check superclass attribute requirements after inference.
+  if (auto *classDecl = dyn_cast<ClassDecl>(NTD)) {
+    if (auto *superclass = classDecl->getSuperclassDecl())
+      verifySuperclassAttrRequirements(NTD, superclass);
   }
 
   return copyAttrs(attrs);
