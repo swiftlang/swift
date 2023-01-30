@@ -1995,6 +1995,9 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OS << "-----\n";
   }
   OS << "SECONDARY SYMBOLS END\n";
+  OS << "DID REUSE AST CONTEXT: "
+     << sourcekitd_variant_dictionary_get_bool(Info, KeyReusingASTContext)
+     << '\n';
 }
 
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,

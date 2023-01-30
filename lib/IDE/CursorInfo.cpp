@@ -140,7 +140,7 @@ private:
   DeclContext *getCurrentDeclContext() { return DeclContextStack.back(); }
 
   bool rangeContainsLocToResolve(SourceRange Range) const {
-    return Range.contains(LocToResolve);
+    return getSourceMgr().containsRespectingReplacedRanges(Range, LocToResolve);
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {

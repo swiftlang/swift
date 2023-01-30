@@ -363,6 +363,7 @@ public:
     return RequestResult();
   }
 
+  bool isValue() const { return type == Value; }
   const T &value() const {
     assert(type == Value);
     return *data;
@@ -588,8 +589,14 @@ struct CursorInfoData {
   llvm::ArrayRef<CursorSymbolInfo> Symbols;
   /// All available actions on the code under cursor.
   llvm::ArrayRef<RefactoringInfo> AvailableActions;
+  /// Whether the ASTContext was reused for this cursor info.
+  bool DidReuseAST = false;
 
-  void print(llvm::raw_ostream &OS, std::string Indentation) const {
+  /// If \p ForSolverBasedCursorInfoVerification is \c true, fields that are
+  /// acceptable to differ between the AST-based and the solver-based result,
+  /// will be excluded.
+  void print(llvm::raw_ostream &OS, std::string Indentation,
+             bool ForSolverBasedCursorInfoVerification = false) const {
     OS << Indentation << "CursorInfoData" << '\n';
     OS << Indentation << "  Symbols:" << '\n';
     for (auto Symbol : Symbols) {
@@ -598,6 +605,9 @@ struct CursorInfoData {
     OS << Indentation << "  AvailableActions:" << '\n';
     for (auto AvailableAction : AvailableActions) {
       AvailableAction.print(OS, Indentation + "    ");
+    }
+    if (!ForSolverBasedCursorInfoVerification) {
+      OS << Indentation << "DidReuseAST: " << DidReuseAST << '\n';
     }
   }
 
