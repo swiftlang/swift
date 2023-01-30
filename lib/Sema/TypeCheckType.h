@@ -76,6 +76,9 @@ enum class TypeResolutionFlags : uint16_t {
   /// Pack references are only allowed inside pack expansions
   /// and in generic requirements.
   AllowPackReferences = 1 << 11,
+
+  /// Whether this is a resolution based on a pack reference.
+  FromPackReference = 1 << 12,
 };
 
 /// Type resolution contexts that require special handling.
