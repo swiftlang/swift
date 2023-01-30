@@ -5216,6 +5216,9 @@ ERROR(pack_reference_outside_expansion,none,
 ERROR(each_non_pack,none,
       "'each' cannot be applied to non-pack type %0",
       (Type))
+ERROR(pack_expansion_missing_pack_reference,none,
+      "pack expansion %0 must specify a pack reference",
+      (TypeRepr*))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
 ERROR(multiple_ellipsis_in_tuple,none,
