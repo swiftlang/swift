@@ -2634,7 +2634,8 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
   auto &IGM = IGF.IGM;
   if (!IGM.IRGen.Opts.UseRelativeProtocolWitnessTables) {
     auto baseWTable =
-      emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+      emitInvariantLoadOfOpaqueWitness(IGF,/*isProtocolWitness*/true, wtable,
+                                       index);
     return baseWTable;
   }
   auto &Builder = IGF.Builder;
@@ -2659,7 +2660,8 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
 
   Builder.emitBlock(isNotCondBB);
   auto baseWTable2 =
-      emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+      emitInvariantLoadOfOpaqueWitness(IGF,/*isProtocolWitness*/true, wtable,
+                                       index);
   baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
                                           IGF.IGM.WitnessTablePtrTy);
   Builder.CreateBr(endBB);
@@ -2677,7 +2679,8 @@ llvm::Value *irgen::loadConditionalConformance(IRGenFunction &IGF,
 
   auto &IGM = IGF.IGM;
   if (!IGM.IRGen.Opts.UseRelativeProtocolWitnessTables) {
-    return emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+    return emitInvariantLoadOfOpaqueWitness(IGF, /*isProtocolWitness*/true,
+                                            wtable, index);
   }
 
   auto &Builder = IGF.Builder;

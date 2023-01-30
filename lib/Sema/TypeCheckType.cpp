@@ -3821,6 +3821,14 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     // The base component uses unqualified lookup.
     result = resolveUnqualifiedIdentTypeRepr(resolution.withOptions(options),
                                              genericParams, identBase);
+
+    if (result && result->isParameterPack() &&
+        options.contains(TypeResolutionFlags::AllowPackReferences) &&
+        !options.contains(TypeResolutionFlags::FromPackReference)) {
+      diagnose(repr->getLoc(), diag::pack_expansion_missing_pack_reference,
+               repr);
+      return ErrorType::get(result);
+    }
   } else {
     result = resolveType(baseComp, options);
   }
@@ -4294,6 +4302,7 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
 NeverNullType TypeResolver::resolvePackReference(PackReferenceTypeRepr *repr,
                                                  TypeResolutionOptions options) {
   auto &ctx = getASTContext();
+  options |= TypeResolutionFlags::FromPackReference;
   auto packReference = resolveType(repr->getPackType(), options);
 
   // If we already failed, don't diagnose again.

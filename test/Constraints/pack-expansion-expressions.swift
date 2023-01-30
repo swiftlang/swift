@@ -77,3 +77,19 @@ func sameShapeDiagnostics<T..., U...>(t: repeat each T, u: repeat each U) {
   _ = repeat Array<(each T, each U)>() // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
   _ = repeat (Array<each T>(), each u) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
 }
+
+func returnPackExpansionType<T...>(_ t: repeat each T) -> repeat each T { // expected-error {{variadic expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+  fatalError()
+}
+
+func returnEachPackReference<T...>(_ t: repeat each T) -> each T { // expected-error {{pack reference 'T' can only appear in pack expansion or generic requirement}}
+  fatalError()
+}
+
+func returnRepeatTuple<T...>(_ t: repeat each T) -> (repeat T) { // expected-error {{pack expansion 'T' must specify a pack reference}}
+  fatalError()
+}
+
+func paremeterAsPackTypeWithoutExpansion<T...>(_ t: T) -> repeat each T { // expected-error {{variadic expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+  fatalError()
+}

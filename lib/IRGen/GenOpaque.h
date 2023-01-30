@@ -52,6 +52,7 @@ namespace irgen {
   /// The load is marked invariant. This should not be used in contexts where
   /// the referenced witness table is still undergoing initialization.
   llvm::Value *emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                bool isProtocolWitness,
                                                 llvm::Value *table,
                                                 WitnessIndex index,
                                                 llvm::Value **slot = nullptr);
@@ -62,6 +63,7 @@ namespace irgen {
   /// The load is marked invariant. This should not be used in contexts where
   /// the referenced witness table is still undergoing initialization.
   llvm::Value *emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                bool isProtocolWitness,
                                                 llvm::Value *table,
                                                 llvm::Value *index,
                                                 llvm::Value **slot = nullptr);
