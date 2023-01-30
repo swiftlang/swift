@@ -3540,13 +3540,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return false;
 
     // In a public-override-internal case, the override doesn't have ABI
-    // implications.
+    // implications. This corresponds to hiding the override keyword from the
+    // module interface.
     auto isPublic = [](const ValueDecl *VD) {
       return VD->getFormalAccessScope(VD->getDeclContext(),
                                       /*treatUsableFromInlineAsPublic*/true)
                .isPublic();
     };
-    if (isPublic(override) && !isPublic(overridden))
+    if (override->getDeclContext()->getParentModule()->isResilient() &&
+        isPublic(override) && !isPublic(overridden))
       return false;
 
     return true;
