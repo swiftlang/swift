@@ -331,10 +331,9 @@ getForwardedPackArchetypeType(CanPackType packType) {
   return packArchetype;
 }
 
-MetadataResponse
-irgen::emitTypeMetadataPackRef(IRGenFunction &IGF,
-                               CanPackType packType,
-                               DynamicMetadataRequest request) {
+static MetadataResponse
+tryGetLocalPackTypeMetadata(IRGenFunction &IGF, CanPackType packType,
+                            DynamicMetadataRequest request) {
   if (auto result = IGF.tryGetLocalTypeMetadata(packType, request))
     return result;
 
@@ -342,6 +341,15 @@ irgen::emitTypeMetadataPackRef(IRGenFunction &IGF,
     if (auto result = IGF.tryGetLocalTypeMetadata(packArchetypeType, request))
       return result;
   }
+
+  return MetadataResponse();
+}
+
+MetadataResponse
+irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
+                               DynamicMetadataRequest request) {
+  if (auto result = tryGetLocalPackTypeMetadata(IGF, packType, request))
+    return result;
 
   auto pack = emitTypeMetadataPack(IGF, packType, request);
   auto *metadata = IGF.Builder.CreateConstArrayGEP(
