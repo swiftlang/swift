@@ -10,7 +10,7 @@
 // RUN: %target-run-simple-swift(-O)
 //
 // rdar://104232602
-// UNSUPPORTED: CPU=x86_64 && (DARWIN_SIMULATOR=ios || DARWIN_SIMULATOR=watchos || DARWIN_SIMULATOR=tvos)
+// UNSUPPORTED: CPU=x86_64 && (DARWIN_SIMULATOR=ios || DARWIN_SIMULATOR=watchos || DARWIN_SIMULATOR=tvos || OS=linux-gnu)
 //
 // END.
 //

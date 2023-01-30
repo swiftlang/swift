@@ -1,6 +1,9 @@
 // Statically link a "hello world" program
 // REQUIRES: OS=linux-gnu
 // REQUIRES: static_stdlib
+
+// REQUIRES: rdar104232602
+
 print("hello world!")
 // RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -static-stdlib -o %t/static-stdlib %s
