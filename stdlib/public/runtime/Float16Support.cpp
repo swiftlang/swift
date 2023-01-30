@@ -15,6 +15,7 @@
 // __gnu_h2f_ieee
 // __gnu_f2h_ieee
 // __truncdfhf2
+// __extendhfxf2
 //
 // On Darwin platforms, these are provided by the host compiler-rt, but we
 // can't depend on that everywhere, so we have to provide them in the Swift
@@ -147,6 +148,29 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
     if (fabs < dabs) e |= 1;
     f = fromEncoding(e);
   }
+  return __gnu_f2h_ieee(f);
+}
+
+// Convert from Float16 to long double.
+//
+// Since Float32 covers the entire range
+// of Float16 values and since we already know how to convert Float32 to long
+// double (which, at least on x86, doesn't involve function calls), we just
+// let the compiler do the latter part for us.
+//
+// There's no risk of rounding problems from the double conversion, because
+// we're extending.
+SWIFT_RUNTIME_EXPORT long double __extendhfxf2(short h) {
+  return __gnu_h2f_ieee(h);
+}
+
+// This is just an alternative name for __gnu_h2f_ieee
+SWIFT_RUNTIME_EXPORT float __extendhfsf2(unsigned short h) {
+  return __gnu_h2f_ieee(h);
+}
+
+// Same again but for __gnu_f2h_ieee
+SWIFT_RUNTIME_EXPORT unsigned short __truncsfhf2(float f) {
   return __gnu_f2h_ieee(f);
 }
 
