@@ -461,6 +461,8 @@ static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
 }
 
 static int performShellExecution(ArrayRef<const char *> Args) {
+  llvm::outs().flush();
+  llvm::errs().flush();
   auto Program = llvm::sys::findProgramByName(Args[0]);
   if (std::error_code ec = Program.getError()) {
     llvm::errs() << "command not found: " << Args[0] << "\n";
