@@ -1369,7 +1369,7 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     return ProtocolConformanceRef(specialized);
   }
 
-  /// For some known protocols like Sendable and Copyable, a tuple type
+  /// For some known protocols (KPs) like Sendable and Copyable, a tuple type
   /// conforms to the protocol KP when all of their element types conform to KP.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
       protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
@@ -1458,8 +1458,8 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
                                   BuiltinConformanceKind::Synthesized));
   }
 
-  // Functions cannot destroy move-only vars/lets that they capture, so it's
-  // safe to copy functions, as if they're classes.
+  // Functions cannot permanently destroy a move-only var/let
+  // that they capture, so it's safe to copy functions, like classes.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol, GenericSignature(), {},
@@ -1547,7 +1547,6 @@ LookupConformanceInModuleRequest::evaluate(
   if (auto archetype = type->getAs<ArchetypeType>()) {
 
     // All archetypes conform to Copyable since they represent a generic.
-    // FIXME: can't tell whether this is a hack.
     if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable))
       return ProtocolConformanceRef(protocol);
 
