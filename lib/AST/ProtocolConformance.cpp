@@ -1239,8 +1239,7 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   // Concrete types may synthesize some conformances
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
-    trySynthesize(KnownProtocolKind::Copyable); // FIXME: we do it when the conformance table is generaetd
-                                                // so this is actually useless now.
+    trySynthesize(KnownProtocolKind::Copyable);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those

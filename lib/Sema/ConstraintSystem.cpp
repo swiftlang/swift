@@ -1810,6 +1810,10 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
     ProtocolDecl *copyable = TypeChecker::getProtocol(
         getASTContext(), SourceLoc(), KnownProtocolKind::Copyable);
 
+    // FIXME(kavon): there's a dependency ordering issues here with the
+    // protocol being defined in the stdlib, because when trying to build
+    // the stdlib itself, or a Swift program with -parse-stdlib, we can't
+    // load the protocol to add this constraint. (rdar://104898230)
     assert(copyable && "stdlib is missing _Copyable protocol!");
     addConstraint(
         ConstraintKind::ConformsTo, typeVar,
