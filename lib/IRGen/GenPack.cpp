@@ -318,6 +318,19 @@ irgen::emitTypeMetadataPack(IRGenFunction &IGF,
   return pack;
 }
 
+static CanPackArchetypeType
+getForwardedPackArchetypeType(CanPackType packType) {
+  if (packType->getNumElements() != 1)
+    return CanPackArchetypeType();
+  auto uncastElement = packType.getElementType(0);
+  auto element = dyn_cast<PackExpansionType>(uncastElement);
+  if (!element)
+    return CanPackArchetypeType();
+  auto patternType = element.getPatternType();
+  auto packArchetype = dyn_cast<PackArchetypeType>(patternType);
+  return packArchetype;
+}
+
 MetadataResponse
 irgen::emitTypeMetadataPackRef(IRGenFunction &IGF,
                                CanPackType packType,
@@ -325,14 +338,9 @@ irgen::emitTypeMetadataPackRef(IRGenFunction &IGF,
   if (auto result = IGF.tryGetLocalTypeMetadata(packType, request))
     return result;
 
-  if (packType->getNumElements() == 1 &&
-      isa<PackExpansionType>(packType.getElementType(0))) {
-    if (auto packArchetypeType = dyn_cast<PackArchetypeType>(
-            cast<PackExpansionType>(packType.getElementType(0))
-                .getPatternType())) {
-      if (auto result = IGF.tryGetLocalTypeMetadata(packArchetypeType, request))
-        return result;
-    }
+  if (auto packArchetypeType = getForwardedPackArchetypeType(packType)) {
+    if (auto result = IGF.tryGetLocalTypeMetadata(packArchetypeType, request))
+      return result;
   }
 
   auto pack = emitTypeMetadataPack(IGF, packType, request);
