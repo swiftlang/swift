@@ -2439,17 +2439,21 @@ public:
 
     /// A string r-value needs to be converted to a pointer type.
     RValueStringToPointer,
-    
+
     /// A function conversion needs to occur.
     FunctionConversion,
-    
+
     LastRVKind = FunctionConversion,
-    
+
     /// This is an immutable borrow from an l-value.
     BorrowedLValue,
 
     /// A default argument that needs to be evaluated.
     DefaultArgument,
+
+    /// This is a consume of an l-value. It acts like a BorrowedLValue, but we
+    /// use a deinit access scope.
+    ConsumedLValue,
   };
 
 private:
@@ -2495,10 +2499,16 @@ private:
     ClaimedParamsRef ParamsToEmit;
   };
 
+  struct ConsumedLValueStorage {
+    LValue LV;
+    SILLocation Loc;
+    AbstractionPattern OrigParamType;
+    ClaimedParamsRef ParamsToEmit;
+  };
+
   using ValueMembers =
-    ExternalUnionMembers<RValueStorage, LValueStorage,
-                         DefaultArgumentStorage,
-                         BorrowedLValueStorage>;
+      ExternalUnionMembers<RValueStorage, LValueStorage, DefaultArgumentStorage,
+                           BorrowedLValueStorage, ConsumedLValueStorage>;
   static ValueMembers::Index getValueMemberIndexForKind(KindTy kind) {
     switch (kind) {
     case InOut:
@@ -2513,6 +2523,8 @@ private:
       return ValueMembers::indexOf<DefaultArgumentStorage>();
     case BorrowedLValue:
       return ValueMembers::indexOf<BorrowedLValueStorage>();
+    case ConsumedLValue:
+      return ValueMembers::indexOf<ConsumedLValueStorage>();
     }
     llvm_unreachable("bad kind");
   }
@@ -2586,13 +2598,18 @@ public:
   }
 
   DelayedArgument(LValue &&lv, SILLocation loc,
-                  AbstractionPattern origResultType,
-                  ClaimedParamsRef params)
-    : Kind(BorrowedLValue) {
-    Value.emplaceAggregate<BorrowedLValueStorage>(Kind, std::move(lv), loc,
-                                                  origResultType, params);
+                  AbstractionPattern origResultType, ClaimedParamsRef params,
+                  bool isBorrowed = true)
+      : Kind(isBorrowed ? BorrowedLValue : ConsumedLValue) {
+    if (isBorrowed) {
+      Value.emplaceAggregate<BorrowedLValueStorage>(Kind, std::move(lv), loc,
+                                                    origResultType, params);
+    } else {
+      Value.emplaceAggregate<ConsumedLValueStorage>(Kind, std::move(lv), loc,
+                                                    origResultType, params);
+    }
   }
-  
+
   DelayedArgument(SILLocation loc,
                   ConcreteDeclRef defaultArgsOwner,
                   unsigned destIndex,
@@ -2654,6 +2671,10 @@ public:
       emitBorrowedLValue(SGF, Value.get<BorrowedLValueStorage>(Kind),
                          args, argIndex);
       return;
+    case ConsumedLValue:
+      emitConsumedLValue(SGF, Value.get<ConsumedLValueStorage>(Kind), args,
+                         argIndex);
+      return;
     }
     llvm_unreachable("bad kind");
   }
@@ -2700,6 +2721,10 @@ private:
                           SmallVectorImpl<ManagedValue> &args,
                           size_t &argIndex);
 
+  void emitConsumedLValue(SILGenFunction &SGF, ConsumedLValueStorage &info,
+                          SmallVectorImpl<ManagedValue> &args,
+                          size_t &argIndex);
+
   // (value, owner)
   std::pair<ManagedValue, ManagedValue>
   finishOriginalExpr(SILGenFunction &SGF, Expr *expr) {
@@ -2741,6 +2766,7 @@ private:
     switch (Kind) {
     case InOut:
     case BorrowedLValue:
+    case ConsumedLValue:
     case DefaultArgument:
       llvm_unreachable("no original expr to finish in these cases");
 
@@ -3184,6 +3210,13 @@ private:
         return;
     }
 
+    if (param.isConsumed()) {
+      if (tryEmitConsumedMoveOnly(std::move(arg), loweredSubstArgType,
+                                  loweredSubstParamType, origParamType,
+                                  paramSlice))
+        return;
+    }
+
     if (SGF.silConv.isSILIndirect(param)) {
       emitIndirect(std::move(arg), loweredSubstArgType, origParamType, param);
       return;
@@ -3423,6 +3456,55 @@ private:
       SGF.getLoweredType(origParamType, substArgType);
 
     return emitBorrowed(arg, loweredSubstArgType, loweredSubstParamType,
+                        origParamType, claimedParams);
+  }
+
+  bool tryEmitConsumedMoveOnly(ArgumentSource &&arg,
+                               SILType loweredSubstArgType,
+                               SILType loweredSubstParamType,
+                               AbstractionPattern origParamType,
+                               ClaimedParamsRef paramsSlice) {
+    assert(paramsSlice.size() == 1);
+
+    // Try to find an expression we can emit as a borrowed l-value.
+    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnlyBorrow(SGF);
+    if (!lvExpr)
+      return false;
+
+    emitConsumed(lvExpr, loweredSubstArgType, loweredSubstParamType,
+                 origParamType, paramsSlice);
+
+    return true;
+  }
+
+  void emitConsumed(Expr *arg, SILType loweredSubstArgType,
+                    SILType loweredSubstParamType,
+                    AbstractionPattern origParamType,
+                    ClaimedParamsRef claimedParams) {
+    auto emissionKind = SGFAccessKind::OwnedAddressConsume;
+
+    LValue argLV = SGF.emitLValue(arg, emissionKind);
+
+    if (loweredSubstParamType.hasAbstractionDifference(Rep,
+                                                       loweredSubstArgType)) {
+      argLV.addSubstToOrigComponent(origParamType, loweredSubstParamType);
+    }
+
+    DelayedArguments.emplace_back(std::move(argLV), arg, origParamType,
+                                  claimedParams, false /*is borrowed*/);
+    Args.push_back(ManagedValue());
+  }
+
+  void emitExpandedConsumed(Expr *arg, AbstractionPattern origParamType) {
+    CanType substArgType = arg->getType()->getCanonicalType();
+    auto count = getFlattenedValueCount(origParamType, substArgType);
+    auto claimedParams = claimNextParameters(count);
+
+    SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
+    SILType loweredSubstParamType =
+        SGF.getLoweredType(origParamType, substArgType);
+
+    return emitConsumed(arg, loweredSubstArgType, loweredSubstParamType,
                         origParamType, claimedParams);
   }
 
@@ -3806,6 +3888,66 @@ void DelayedArgument::emitBorrowedLValue(SILGenFunction &SGF,
   // That should drain all the parameters.
   assert(params.empty());
 }
+
+static void emitConsumedLValueRecursive(SILGenFunction &SGF, SILLocation loc,
+                                        ManagedValue value,
+                                        AbstractionPattern origParamType,
+                                        ClaimedParamsRef &params,
+                                        MutableArrayRef<ManagedValue> args,
+                                        size_t &argIndex) {
+  // Recurse into tuples.
+  if (origParamType.isTuple()) {
+    SGF.B.emitDestructureOperation(
+        loc, value, [&](unsigned eltIndex, ManagedValue eltValue) {
+          auto origEltType = origParamType.getTupleElementType(eltIndex);
+          // Recurse.
+          emitConsumedLValueRecursive(SGF, loc, eltValue, origEltType, params,
+                                      args, argIndex);
+        });
+    return;
+  }
+
+  // Claim the next parameter.
+  auto param = params.front();
+  params = params.slice(1);
+
+  // Load if necessary.
+  assert(param.isConsumed() && "Should have a consumed parameter?");
+  if (value.getType().isAddress()) {
+    if (!param.isIndirectIn() || !SGF.silConv.useLoweredAddresses()) {
+      value = SGF.B.createFormalAccessLoadTake(loc, value);
+    }
+  }
+
+  assert(param.getInterfaceType() == value.getType().getASTType());
+  args[argIndex++] = value;
+}
+
+void DelayedArgument::emitConsumedLValue(SILGenFunction &SGF,
+                                         ConsumedLValueStorage &info,
+                                         SmallVectorImpl<ManagedValue> &args,
+                                         size_t &argIndex) {
+  // Begin the access.
+  auto value = SGF.emitConsumedLValue(info.Loc, std::move(info.LV));
+  ClaimedParamsRef params = info.ParamsToEmit;
+
+  // We inserted exactly one space in the argument array, so fix that up
+  // to have the right number of spaces.
+  if (params.size() == 0) {
+    args.erase(args.begin() + argIndex);
+    return;
+  } else if (params.size() > 1) {
+    args.insert(args.begin() + argIndex + 1, params.size() - 1, ManagedValue());
+  }
+
+  // Recursively expand.
+  emitConsumedLValueRecursive(SGF, info.Loc, value, info.OrigParamType, params,
+                              args, argIndex);
+
+  // That should drain all the parameters.
+  assert(params.empty());
+}
+
 } // end anonymous namespace
 
 namespace {
