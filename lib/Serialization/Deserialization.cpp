@@ -3138,6 +3138,10 @@ public:
     } else if (overriddenOrError.errorIsA<FatalDeserializationError>()) {
       // Pass through fatal deserialization errors.
       return overriddenOrError.takeError();
+    } else if (MF.allowCompilerErrors()) {
+      // Drop overriding relationship when allowing errors.
+      llvm::consumeError(overriddenOrError.takeError());
+      overridden = nullptr;
     } else {
       llvm::consumeError(overriddenOrError.takeError());
       if (overriddenAffectsABI || !ctx.LangOpts.EnableDeserializationRecovery) {
