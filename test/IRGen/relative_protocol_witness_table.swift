@@ -3,6 +3,10 @@
 // REQUIRES: CPU=x86_64 || CPU=arm64
 // UNSUPPORTED: CPU=arm64e
 
+func testVWT<T>(_ t: T) {
+  var local = t
+}
+
 protocol FuncOnly {
     func a()
     func b()
@@ -184,6 +188,18 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK-SAME:  i32 trunc (i64 sub (i64 ptrtoint (void (%swift.opaque*, %T1A17ConditionalStructV*, %swift.type*, i8**)* @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlAaEP04initD00D4TypeQzyFTW" to i64),
 // CHECK-SAME:                      i64 ptrtoint (i32* getelementptr inbounds ([4 x i32], [4 x i32]* @"$s1A17ConditionalStructVyxGAA20WithAssocConformanceA2A8FuncOnlyRzAA5InitPRzlWP", i32 0, i32 3) to i64)) to i32)
 // CHECK-SAME: ], align 8
+
+// Make sure value witness table lookup is done right.
+
+// CHECK: define{{.*}} swiftcc void @"$s1A7testVWTyyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T:%.*]])
+// CHECK:  [[T0:%.*]] = bitcast %swift.type* [[T]] to i8***
+// CHECK:  [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK:  [[VWT_PTR:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK:  [[T1:%.*]] = getelementptr inbounds i8*, i8** [[VWT_PTR]], i32 2
+// CHECK:  [[T2:%.*]] = load i8*, i8** [[T1]]
+// CHECK:  [[T3:%.*]] = bitcast i8* [[T2]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
+// CHECK:  call %swift.opaque* [[T3]](%swift.opaque* {{.*}}, %swift.opaque* {{.*}}, %swift.type* [[T]])
+
 
 // Simple witness entry access.
 
