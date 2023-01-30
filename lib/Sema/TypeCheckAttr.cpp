@@ -7463,7 +7463,6 @@ static void forEachCustomAttribute(
     auto *nominal = evaluateOrDefault(
         ctx.evaluator,
         CustomAttrNominalRequest{mutableAttr, decl->getDeclContext()}, nullptr);
-
     if (!nominal)
       continue;
 
@@ -7474,7 +7473,7 @@ static void forEachCustomAttribute(
 
 ArrayRef<CustomAttr *>
 GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
-                                           ValueDecl *decl) const {
+                                           Decl *decl) const {
   auto &ctx = decl->getASTContext();
 
   llvm::SmallMapVector<NominalTypeDecl *, CustomAttr *, 4> attrs;
@@ -7482,7 +7481,7 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
   enum class GatheringMode { Direct, Inference };
 
   auto gatherRuntimeAttrsOnDecl =
-      [&](ValueDecl *decl,
+      [&](Decl *decl,
           llvm::SmallMapVector<NominalTypeDecl *, CustomAttr *, 4> &attrs,
           GatheringMode mode) {
         forEachCustomAttribute<RuntimeMetadataAttr>(
@@ -7513,6 +7512,19 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
     }
     return copy;
   };
+
+  // Gather reflection metadata attributes only if this extension is:
+  //  - unavailable;
+  //  - unconstrained;
+  //  - declared in the same module as the extended type.
+  if (auto *ED = dyn_cast<ExtensionDecl>(decl)) {
+    if (!AvailableAttr::isUnavailable(ED))
+      return copyAttrs(attrs);
+
+    if (ED->isConstrainedExtension() ||
+        ED->getParentModule() != decl->getDeclContext()->getParentModule())
+      return copyAttrs(attrs);
+  }
 
   // First, gather all of the runtime attributes directly on the decl.
   gatherRuntimeAttrsOnDecl(decl, attrs, GatheringMode::Direct);

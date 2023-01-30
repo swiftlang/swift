@@ -1883,6 +1883,11 @@ bool isNonSendableExtension(const Decl *D) {
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    // Always print unavilable extensions that carry reflection
+    // metadata attributes.
+    if (!ED->getRuntimeDiscoverableAttrs().empty())
+      return true;
+
     if (Options.printExtensionContentAsMembers(ED))
       return false;
   }
