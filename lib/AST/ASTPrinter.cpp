@@ -2300,7 +2300,15 @@ static void addNamespaceMembers(Decl *decl,
 
   // This is only to keep track of the members we've already seen.
   llvm::SmallPtrSet<Decl *, 16> addedMembers;
+  const auto *declOwner = namespaceDecl->getOwningModule();
+  if (declOwner)
+    declOwner = declOwner->getTopLevelModule();
   for (auto redecl : namespaceDecl->redecls()) {
+    // Skip namespace declarations that come from other top-level modules.
+    if (const auto *redeclOwner = redecl->getOwningModule()) {
+      if (declOwner && declOwner != redeclOwner->getTopLevelModule())
+        continue;
+    }
     for (auto member : redecl->decls()) {
       if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
         // Add all specializations to a worklist so we don't accidently mutate
