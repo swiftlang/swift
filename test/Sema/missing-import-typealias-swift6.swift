@@ -7,11 +7,11 @@
 // RUN: %target-swift-emit-module-interface(%t/Aliases.swiftinterface) %t/Aliases.swift -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Aliases.swiftinterface) -I %t
 
-// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesNoImport.swift -I %t -swift-version 6
+// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesNoImport.swift -enable-library-evolution -I %t -swift-version 6
 
 // REQUIRES: asserts
 
-// This test is a simplified version of implicit-import-typealias.swift that
+// This test is a simplified version of missing-import-typealias.swift that
 // verifies errors are emitted instead of warnings in Swift 6.
 
 //--- Original.swift
