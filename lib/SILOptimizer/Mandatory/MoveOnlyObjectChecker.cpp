@@ -290,6 +290,22 @@ bool swift::siloptimizer::cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(
         cvi->replaceAllUsesWith(expCopy);
         cvi->eraseFromParent();
         localChanged = true;
+        continue;
+      }
+
+      // Also eliminate any mark_must_check on objects, just to be safe. We
+      // emitted an object level diagnostic and if the user wants to get more
+      // diagnostics, they should fix these diagnostics and recompile.
+      if (auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii)) {
+        ++ii;
+
+        if (mmci->getType().isAddress())
+          continue;
+
+        mmci->replaceAllUsesWith(mmci->getOperand());
+        mmci->eraseFromParent();
+        localChanged = true;
+        continue;
       }
 
       ++ii;
