@@ -350,7 +350,8 @@ public:
   llvm::SMDiagnostic GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
                                 const Twine &Msg,
                                 ArrayRef<llvm::SMRange> Ranges,
-                                ArrayRef<llvm::SMFixIt> FixIts) const;
+                                ArrayRef<llvm::SMFixIt> FixIts,
+                                bool EmitMacroExpansionFiles = false) const;
 
   /// Verifies that all buffers are still valid.
   void verifyAllBuffers() const;
