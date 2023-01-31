@@ -1476,6 +1476,15 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     }
   }
 
+  for (const Arg *arg: Args.filtered(OPT_emit_macro_expansion_files)) {
+    StringRef contents = arg->getValue();
+    bool negated = contents.startswith("no-");
+    if (negated)
+      contents = contents.drop_front(3);
+    if (contents == "diagnostics")
+      Opts.EmitMacroExpansionFiles = !negated;
+  }
+
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);

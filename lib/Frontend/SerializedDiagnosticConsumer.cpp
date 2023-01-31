@@ -103,12 +103,15 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
 class SerializedDiagnosticConsumer : public DiagnosticConsumer {
   /// State shared among the various clones of this diagnostic consumer.
   llvm::IntrusiveRefCntPtr<SharedState> State;
+  bool EmitMacroExpansionFiles = false;
   bool CalledFinishProcessing = false;
   bool CompilationWasComplete = true;
 
 public:
-  SerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath)
-      : State(new SharedState(serializedDiagnosticsPath)) {
+  SerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath,
+                               bool emitMacroExpansionFiles)
+      : State(new SharedState(serializedDiagnosticsPath)),
+        EmitMacroExpansionFiles(emitMacroExpansionFiles) {
     emitPreamble();
   }
 
@@ -213,8 +216,11 @@ private:
 
 namespace swift {
 namespace serialized_diagnostics {
-  std::unique_ptr<DiagnosticConsumer> createConsumer(StringRef outputPath) {
-    return std::make_unique<SerializedDiagnosticConsumer>(outputPath);
+  std::unique_ptr<DiagnosticConsumer> createConsumer(
+      StringRef outputPath, bool emitMacroExpansionFiles
+  ) {
+    return std::make_unique<SerializedDiagnosticConsumer>(
+        outputPath, emitMacroExpansionFiles);
   }
 } // namespace serialized_diagnostics
 } // namespace swift
@@ -256,7 +262,8 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(
   // The source range that this buffer was generated from, expressed as
   // offsets into the original buffer.
   if (generatedInfo->originalSourceRange.isValid()) {
-    auto originalFilename = SM.getDisplayNameForLoc(generatedInfo->originalSourceRange.Start);
+    auto originalFilename = SM.getDisplayNameForLoc(generatedInfo->originalSourceRange.Start,
+                                EmitMacroExpansionFiles);
     addRangeToRecord(
         Lexer::getCharSourceRangeFromSourceRange(
             SM, generatedInfo->originalSourceRange),
@@ -532,7 +539,7 @@ emitDiagnosticMessage(SourceManager &SM,
 
   StringRef filename = "";
   if (Loc.isValid())
-    filename = SM.getDisplayNameForLoc(Loc);
+    filename = SM.getDisplayNameForLoc(Loc, EmitMacroExpansionFiles);
 
   // Emit the RECORD_DIAG record.
   Record.clear();
