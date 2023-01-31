@@ -86,7 +86,7 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts);
   SILParserState parserState(*silMod.get());
-  Parser parser(*bufferID, *SF, &parserState);
+  Parser parser(*bufferID, *SF, /*PersistentState=*/nullptr, &parserState);
   PrettyStackTraceParser StackTrace(parser);
 
   if (ParseSerializedSIL) {
