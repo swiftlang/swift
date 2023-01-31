@@ -153,6 +153,7 @@ class Lexer {
         CommentRetentionMode RetainComments);
 
   void initialize(unsigned Offset, unsigned EndOffset);
+  void initialize(Optional<CharSourceRange> Range);
 
   /// Retrieve the diagnostic engine for emitting diagnostics for the current
   /// token.
@@ -168,7 +169,7 @@ class Lexer {
   }
 
 public:
-  /// Create a normal lexer that scans the whole source buffer.
+  /// Create a normal lexer that scans the whole source buffer by default.
   ///
   /// \param Options - the language options under which to lex.  By
   ///   design, language options only affect whether a token is valid
@@ -185,7 +186,8 @@ public:
       const LangOptions &Options, const SourceManager &SourceMgr,
       unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
       HashbangMode HashbangAllowed = HashbangMode::Disallowed,
-      CommentRetentionMode RetainComments = CommentRetentionMode::None);
+      CommentRetentionMode RetainComments = CommentRetentionMode::None,
+      Optional<CharSourceRange> Range = None);
 
   /// Create a lexer that scans a subrange of the source buffer.
   Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
