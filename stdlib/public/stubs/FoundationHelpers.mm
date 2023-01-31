@@ -58,10 +58,10 @@ void *
 _swift_stdlib_createTaggedPointerString(const _swift_shims_UInt8 * _Nonnull bytes,
                                         _swift_shims_CFIndex length) {
   initializeBridgingFunctions();
-  if (_CFStringCreateTaggedPointerString != NULL) {
+ // if (_CFStringCreateTaggedPointerString != NULL) {
     return (void *)_CFStringCreateTaggedPointerString(bytes, length);
-  }
-  return nil;
+ // }
+ // return nil;
 }
 
 __swift_uint8_t
