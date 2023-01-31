@@ -1240,7 +1240,7 @@ extension _StringObject {
 
   @inline(never)
   internal func _dump() {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && !SWIFT_STDLIB_STATIC_PRINT
     let raw = self.rawBits
     let word0 = ("0000000000000000" + String(raw.0, radix: 16)).suffix(16)
     let word1 = ("0000000000000000" + String(raw.1, radix: 16)).suffix(16)
