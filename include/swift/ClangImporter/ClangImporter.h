@@ -572,6 +572,13 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 /// Whether the given parameter name identifies a completion handler.
 bool isCompletionHandlerParamName(StringRef paramName);
 
+namespace importer {
+
+/// Returns true if the given module has a 'cplusplus' requirement.
+bool requiresCPlusPlus(const clang::Module *module);
+
+} // namespace importer
+
 } // end namespace swift
 
 #endif

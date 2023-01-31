@@ -396,23 +396,6 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  const PathRemapper &pathRemapper,
                                  SourceFile *initialFile);
 
-// FIXME (Alex): Share code with importer.
-inline bool requiresCPlusPlus(const clang::Module *module) {
-  // The libc++ modulemap doesn't currently declare the requirement.
-  if (module->getTopLevelModuleName() == "std")
-    return true;
-
-  // Modulemaps often declare the requirement for the top-level module only.
-  if (auto parent = module->Parent) {
-    if (requiresCPlusPlus(parent))
-      return true;
-  }
-
-  return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
-    return req.first == "cplusplus";
-  });
-}
-
 static void
 appendSymbolicInterfaceToIndexStorePath(SmallVectorImpl<char> &resultingPath) {
   llvm::sys::path::append(resultingPath, "interfaces");
@@ -490,7 +473,7 @@ static void emitSymbolicInterfaceForClangModule(
     return;
   // Skip system modules without an explicit 'cplusplus' requirement.
   bool isSystem = clangModUnit->isSystemModule();
-  if (isSystem && !requiresCPlusPlus(clangModule))
+  if (isSystem && !importer::requiresCPlusPlus(clangModule))
     return;
 
   // Make sure the `interfaces` directory is created.
