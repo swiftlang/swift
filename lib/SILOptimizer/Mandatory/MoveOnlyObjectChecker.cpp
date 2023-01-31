@@ -328,9 +328,16 @@ struct MoveOnlyChecker {
   /// A set of mark_must_check that we are actually going to process.
   SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
 
+  BorrowToDestructureTransform::IntervalMapAllocator allocator;
+
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks) : fn(fn) {}
 
-  void check(DominanceInfo *domTree);
+  void check(DominanceInfo *domTree, PostOrderAnalysis *poa);
+
+  bool convertBorrowExtractsToOwnedDestructures(MarkMustCheckInst *mmci,
+                                                DiagnosticEmitter &emitter,
+                                                DominanceInfo *domTree,
+                                                PostOrderAnalysis *poa);
 
   /// After we have emitted a diagnostic, we need to clean up the instruction
   /// stream by converting /all/ copies of move only typed things to use
@@ -347,11 +354,63 @@ struct MoveOnlyChecker {
 
 } // namespace
 
+bool MoveOnlyChecker::convertBorrowExtractsToOwnedDestructures(
+    MarkMustCheckInst *mmci, DiagnosticEmitter &diagnosticEmitter,
+    DominanceInfo *domTree, PostOrderAnalysis *poa) {
+  StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
+
+  // If we failed to gather borrows due to the transform not understanding part
+  // of the SIL, fail and return false.
+  if (!BorrowToDestructureTransform::gatherBorrows(mmci, borrowWorklist))
+    return false;
+
+  // If we do not have any borrows to process, return true early to show we
+  // succeeded in processing.
+  if (borrowWorklist.empty())
+    return true;
+
+  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+
+  // Now that we have found all of our borrows, we want to find struct_extract
+  // uses of our borrow as well as any operands that cannot use an owned value.
+  SWIFT_DEFER { discoveredBlocks.clear(); };
+  BorrowToDestructureTransform transform(allocator, mmci, diagnosticEmitter,
+                                         poa, discoveredBlocks);
+
+  // Attempt to gather uses. Return false if we saw something that we did not
+  // understand.
+  if (!transform.gatherUses(borrowWorklist))
+    return false;
+
+  // Next make sure that any destructure needing instructions are on the
+  // boundary in a per bit field sensitive manner.
+  unsigned diagnosticCount = diagnosticEmitter.getDiagnosticCount();
+  transform.checkDestructureUsesOnBoundary();
+
+  // If we emitted any diagnostic, break out. We return true since we actually
+  // succeeded in our processing by finding the error. We only return false if
+  // we want to tell the rest of the checker that there was an internal
+  // compiler error that we need to emit a "compiler doesn't understand
+  // error".
+  if (diagnosticCount != diagnosticEmitter.getDiagnosticCount())
+    return true;
+
+  // At this point, we know that all of our destructure requiring uses are on
+  // the boundary of our live range. Now we need to do the rewriting.
+  transform.blockToAvailableValues.emplace(transform.liveness);
+  transform.rewriteUses();
+
+  // Now that we have done our rewritting, we need to do a few cleanups.
+  transform.cleanup(borrowWorklist);
+
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: Main Routine
 //===----------------------------------------------------------------------===//
 
-void MoveOnlyChecker::check(DominanceInfo *domTree) {
+void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
         if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
@@ -402,11 +461,31 @@ void MoveOnlyChecker::check(DominanceInfo *domTree) {
     moveIntroducers = moveIntroducers.drop_front(1);
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
 
+    // Before we do anything, we need to look for borrowed extracted values and
+    // convert them to destructure operations.
+    unsigned diagnosticCount = diagnosticEmitter.getDiagnosticCount();
+    if (!convertBorrowExtractsToOwnedDestructures(
+            markedValue, diagnosticEmitter, domTree, poa)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Borrow extract to owned destructure transformation didn't "
+                    "understand part of the SIL\n");
+      diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
+      continue;
+    }
+
+    // If we emitted any non-exceptional diagnostics in
+    // convertBorrowExtractsToOwnedDestructures, continue and process the next
+    // instruction. The user can fix and re-compile. We want the OSSA
+    // canonicalizer to be able to assume that all such borrow + struct_extract
+    // uses were already handled.
+    if (diagnosticCount != diagnosticEmitter.getDiagnosticCount()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Emitting diagnostic in BorrowExtractToOwnedDestructure "
+                    "transformation!\n");
+      continue;
+    }
+
     // First canonicalize ownership.
-    //
-    // NOTE: We previously ran BorrowToDestructureTransform to ensure that any
-    // struct_extract/tuple_extracts that we see are converted to destructures
-    // or we errored.
     if (!canonicalizer.canonicalize(markedValue)) {
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
       LLVM_DEBUG(
@@ -525,9 +604,10 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
+    auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
 
     MoveOnlyChecker checker(getFunction(), deAnalysis);
-    checker.check(domTree);
+    checker.check(domTree, postOrderAnalysis);
     if (checker.changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
