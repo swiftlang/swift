@@ -1168,22 +1168,6 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
                                   /*PersistentState=*/nullptr));
 }
 
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
-                       unsigned BufferID, unsigned Offset, unsigned EndOffset)
-    : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
-                               TypeCheckerOptions(), SILOptions(), "input")) {
-
-  std::unique_ptr<Lexer> Lex;
-  Lex.reset(new Lexer(Impl.LangOpts, SM,
-                      BufferID, &Impl.Diags,
-                      LexerMode::Swift,
-                      HashbangMode::Allowed,
-                      CommentRetentionMode::None,
-                      Offset, EndOffset));
-  Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,
-                                  /*PersistentState=*/nullptr));
-}
-
 ParserUnit::~ParserUnit() {
   delete &Impl;
 }

@@ -298,8 +298,6 @@ namespace swift {
                const LangOptions &LangOpts, const TypeCheckerOptions &TyOpts,
                const SILOptions &SILOpts, StringRef ModuleName);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
-    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-               unsigned Offset, unsigned EndOffset);
 
     ~ParserUnit();
 
