@@ -1063,7 +1063,8 @@ ManglingError Remangler::mangleMacro(Node *node, unsigned depth) {
   return mangleChildNodes(node, depth + 1);
 }
 
-ManglingError Remangler::mangleMacroExpansion(Node *node, unsigned depth) {
+ManglingError Remangler::mangleFreestandingMacroExpansion(
+    Node *node, unsigned depth) {
   Buffer << "fMf";
   RETURN_IF_ERROR(mangleIndex(node, depth + 1));
   return mangleChildNodes(node, depth + 1);

@@ -3899,7 +3899,7 @@ NodePointer Demangler::demangleMacroExpansion() {
   Node::Kind kind;
   switch (nextChar()) {
   case 'f':
-    kind = Node::Kind::MacroExpansion;
+    kind = Node::Kind::FreestandingMacroExpansion;
     break;
 
   default:
