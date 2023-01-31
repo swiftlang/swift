@@ -39,6 +39,11 @@
 #include <mutex>
 #endif
 
+#if defined(__APPLE__)
+#include <asl.h>
+#include <unistd.h>
+#endif
+
 #if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
@@ -1074,6 +1079,15 @@ static void _enqueueCompletedTask(NaiveTaskGroupQueue<ReadyQueueItem> *readyQueu
   assert(readyItem.getTask()->isFuture());
   readyQueue->enqueue(readyItem);
 }
+
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+static void _enqueueRawError(DiscardingTaskGroup *group,
+                             NaiveTaskGroupQueue<ReadyQueueItem> *readyQueue,
+                             SwiftError *error) {
+  auto readyItem = ReadyQueueItem::getRawError(group, error);
+  readyQueue->enqueue(readyItem);
+}
+#endif
 
 // TaskGroup is locked upon entry and exit
 void AccumulatingTaskGroup::enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) {
