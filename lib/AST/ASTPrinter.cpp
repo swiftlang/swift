@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "InlinableText.h"
 #include "swift/AST/ASTPrinter.h"
+#include "InlinableText.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -61,6 +61,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
@@ -2299,7 +2300,15 @@ static void addNamespaceMembers(Decl *decl,
 
   // This is only to keep track of the members we've already seen.
   llvm::SmallPtrSet<Decl *, 16> addedMembers;
+  const auto *declOwner = namespaceDecl->getOwningModule();
+  if (declOwner)
+    declOwner = declOwner->getTopLevelModule();
   for (auto redecl : namespaceDecl->redecls()) {
+    // Skip namespace declarations that come from other top-level modules.
+    if (const auto *redeclOwner = redecl->getOwningModule()) {
+      if (declOwner && declOwner != redeclOwner->getTopLevelModule())
+        continue;
+    }
     for (auto member : redecl->decls()) {
       if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
         // Add all specializations to a worklist so we don't accidently mutate
@@ -2323,10 +2332,16 @@ static void addNamespaceMembers(Decl *decl,
       if (!name)
         continue;
 
-      CXXNamespaceMemberLookup lookupRequest({cast<EnumDecl>(decl), name});
-      for (auto found : evaluateOrDefault(ctx.evaluator, lookupRequest, {})) {
-        if (addedMembers.insert(found).second)
-          members.push_back(found);
+      auto allResults = evaluateOrDefault(
+          ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
+
+      for (auto found : allResults) {
+        auto clangMember = found.get<clang::NamedDecl *>();
+        if (auto importedDecl =
+                ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
+          if (addedMembers.insert(importedDecl).second)
+            members.push_back(importedDecl);
+        }
       }
     }
   }
@@ -3593,6 +3608,13 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
 }
 
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
+  if (const auto *namespaceDecl =
+          dyn_cast_or_null<clang::NamespaceDecl>(decl->getClangDecl())) {
+    // Enum that correponds to the C++ namespace should only be printed once.
+    if (!Printer.shouldPrintRedeclaredClangDecl(
+            namespaceDecl->getOriginalNamespace()))
+      return;
+  }
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
