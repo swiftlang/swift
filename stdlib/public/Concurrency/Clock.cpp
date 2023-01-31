@@ -50,7 +50,7 @@ void swift_get_time(
       // count by 1,000,000,000 to get nanosecond resolution. By multiplying
       // first, we maintain high precision. The resulting value is the tick
       // count in nanoseconds. Use 128-bit math to avoid overflowing.
-      auto quadPart = static_cast<unsigned __int128>(count.QuadPart);
+      auto quadPart = static_cast<unsigned _BitInt(128)>(count.QuadPart);
       auto ns = (quadPart * 1'000'000'000) / freq.QuadPart;
       continuous.tv_sec = ns / 1'000'000'000;
       continuous.tv_nsec = ns % 1'000'000'000;
