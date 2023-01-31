@@ -1931,15 +1931,19 @@ createDispatchingDiagnosticConsumerIfNeeded(
 /// If no serialized diagnostics are being produced, returns null.
 static std::unique_ptr<DiagnosticConsumer>
 createSerializedDiagnosticConsumerIfNeeded(
-    const FrontendInputsAndOutputs &inputsAndOutputs) {
+    const FrontendInputsAndOutputs &inputsAndOutputs,
+    bool emitMacroExpansionFiles
+) {
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
-      [](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
+      [emitMacroExpansionFiles](
+          const InputFile &input
+      ) -> std::unique_ptr<DiagnosticConsumer> {
         auto serializedDiagnosticsPath = input.getSerializedDiagnosticsPath();
         if (serializedDiagnosticsPath.empty())
           return nullptr;
         return serialized_diagnostics::createConsumer(
-            serializedDiagnosticsPath);
+            serializedDiagnosticsPath, emitMacroExpansionFiles);
       });
 }
 
@@ -2270,7 +2274,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // See https://github.com/apple/swift/issues/45288 for details.
   std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher =
       createSerializedDiagnosticConsumerIfNeeded(
-        Invocation.getFrontendOptions().InputsAndOutputs);
+        Invocation.getFrontendOptions().InputsAndOutputs,
+        Invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
   if (SerializedConsumerDispatcher)
     Instance->addDiagnosticConsumer(SerializedConsumerDispatcher.get());
 
@@ -2287,6 +2292,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   PDC.setFormattingStyle(
       Invocation.getDiagnosticOptions().PrintedFormattingStyle);
+
+  PDC.setEmitMacroExpansionFiles(
+      Invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
 
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();
