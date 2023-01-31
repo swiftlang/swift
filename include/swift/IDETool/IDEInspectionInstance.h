@@ -161,7 +161,7 @@ class IDEInspectionInstance {
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
-      DiagnosticConsumer *DiagC, bool IgnoreSwiftSourceInfo,
+      DiagnosticConsumer *DiagC,
       std::shared_ptr<std::atomic<bool>> CancellationFlag,
       llvm::function_ref<void(CancellableResult<IDEInspectionInstanceResult>)>
           Callback);
