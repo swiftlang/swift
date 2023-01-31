@@ -2,14 +2,11 @@
 // RUN: %target-build-swift -g -lswiftSwiftReflectionTest %s -o %t/reflect_Enum_MultiPayload_degenerate
 // RUN: %target-codesign %t/reflect_Enum_MultiPayload_degenerate
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_MultiPayload_degenerate | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_MultiPayload_degenerate | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
-
-// Currently broken rdar://104199930
-// UNSUPPORTED: OS=watchos
 
 import SwiftReflectionTest
 
@@ -22,12 +19,13 @@ case b(Void)
 
 reflect(enum: FooVoid.a([]))
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_Enum_MultiPayload_degenerate.FooVoid)
+// CHECK: Reflecting an enum.
+// CHECK: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK: Type reference:
+// CHECK: (enum reflect_Enum_MultiPayload_degenerate.FooVoid)
 
-// CHECK-64: Type info:
+// CHECK: Type info:
+
 // CHECK-64: (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
 // CHECK-64:   (case name=a index=0 offset=0
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
@@ -37,25 +35,38 @@ reflect(enum: FooVoid.a([]))
 // CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
 // CHECK-64:               (field name=rawValue offset=0
 // CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:   (case name=b index=1 offset=0
-// CHECK-64:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
-// CHECK-64: Mangled name: $s36reflect_Enum_MultiPayload_degenerate7FooVoidO
-// CHECK-64: Demangled name: reflect_Enum_MultiPayload_degenerate.FooVoid
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=a index=0
-// CHECK-64: (bound_generic_struct Swift.Array
-// CHECK-64:   (struct Swift.Int))
-// CHECK-64: )
+// CHECK-32: (multi_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:   (case name=a index=0 offset=0
+// CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:       (field name=_buffer offset=0
+// CHECK-32:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:           (field name=_storage offset=0
+// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:               (field name=rawValue offset=0
+// CHECK-32:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+
+// CHECK:   (case name=b index=1 offset=0
+// CHECK:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
+
+// CHECK: Mangled name: $s36reflect_Enum_MultiPayload_degenerate7FooVoidO
+// CHECK: Demangled name: reflect_Enum_MultiPayload_degenerate.FooVoid
+
+// CHECK: Enum value:
+// CHECK: (enum_value name=a index=0
+// CHECK: (bound_generic_struct Swift.Array
+// CHECK:   (struct Swift.Int))
+// CHECK: )
 
 reflect(enum: FooVoid.b(()))
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_Enum_MultiPayload_degenerate.FooVoid)
+// CHECK: Reflecting an enum.
+// CHECK: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK: Type reference:
+// CHECK: (enum reflect_Enum_MultiPayload_degenerate.FooVoid)
 
-// CHECK-64: Type info:
+// CHECK: Type info:
+
 // CHECK-64: (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
 // CHECK-64:   (case name=a index=0 offset=0
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
@@ -65,15 +76,26 @@ reflect(enum: FooVoid.b(()))
 // CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
 // CHECK-64:               (field name=rawValue offset=0
 // CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:   (case name=b index=1 offset=0
-// CHECK-64:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
-// CHECK-64: Mangled name: $s36reflect_Enum_MultiPayload_degenerate7FooVoidO
-// CHECK-64: Demangled name: reflect_Enum_MultiPayload_degenerate.FooVoid
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=b index=1
-// CHECK-64:   (tuple)
-// CHECK-64: )
+// CHECK-32: (multi_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:   (case name=a index=0 offset=0
+// CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:       (field name=_buffer offset=0
+// CHECK-32:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:           (field name=_storage offset=0
+// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:               (field name=rawValue offset=0
+// CHECK-32:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+
+// CHECK:   (case name=b index=1 offset=0
+// CHECK:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK: Mangled name: $s36reflect_Enum_MultiPayload_degenerate7FooVoidO
+// CHECK: Demangled name: reflect_Enum_MultiPayload_degenerate.FooVoid
+
+// CHECK: Enum value:
+// CHECK: (enum_value name=b index=1
+// CHECK:   (tuple)
+// CHECK: )
 
 
 // Same as above, except the first payload has zero size
@@ -84,12 +106,13 @@ case b([Int])
 
 reflect(enum: FooVoid2.a(()))
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_Enum_MultiPayload_degenerate.FooVoid2)
+// CHECK: Reflecting an enum.
+// CHECK: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK: Type reference:
+// CHECK: (enum reflect_Enum_MultiPayload_degenerate.FooVoid2)
 
-// CHECK-64: Type info:
+// CHECK: Type info:
+
 // CHECK-64: (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
 // CHECK-64:   (case name=b index=0 offset=0
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
@@ -99,24 +122,36 @@ reflect(enum: FooVoid2.a(()))
 // CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
 // CHECK-64:               (field name=rawValue offset=0
 // CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:   (case name=a index=1 offset=0
-// CHECK-64:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
-// CHECK-64: Mangled name: $s36reflect_Enum_MultiPayload_degenerate8FooVoid2O
-// CHECK-64: Demangled name: reflect_Enum_MultiPayload_degenerate.FooVoid2
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=a index=1
-// CHECK-64:   (tuple)
-// CHECK-64: )
+// CHECK-32: (multi_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:   (case name=b index=0 offset=0
+// CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:       (field name=_buffer offset=0
+// CHECK-32:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:           (field name=_storage offset=0
+// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:               (field name=rawValue offset=0
+// CHECK-32:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+
+// CHECK:   (case name=a index=1 offset=0
+// CHECK:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK: Mangled name: $s36reflect_Enum_MultiPayload_degenerate8FooVoid2O
+// CHECK: Demangled name: reflect_Enum_MultiPayload_degenerate.FooVoid2
+
+// CHECK: Enum value:
+// CHECK: (enum_value name=a index=1
+// CHECK:   (tuple)
+// CHECK: )
 
 reflect(enum: FooVoid2.b([]))
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_Enum_MultiPayload_degenerate.FooVoid2)
+// CHECK: Reflecting an enum.
+// CHECK: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK: Type reference:
+// CHECK: (enum reflect_Enum_MultiPayload_degenerate.FooVoid2)
 
-// CHECK-64: Type info:
+// CHECK: Type info:
+
 // CHECK-64: (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
 // CHECK-64:   (case name=b index=0 offset=0
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
@@ -126,16 +161,27 @@ reflect(enum: FooVoid2.b([]))
 // CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
 // CHECK-64:               (field name=rawValue offset=0
 // CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:   (case name=a index=1 offset=0
-// CHECK-64:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
-// CHECK-64: Mangled name: $s36reflect_Enum_MultiPayload_degenerate8FooVoid2O
-// CHECK-64: Demangled name: reflect_Enum_MultiPayload_degenerate.FooVoid2
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=b index=0
-// CHECK-64: (bound_generic_struct Swift.Array
-// CHECK-64:   (struct Swift.Int))
-// CHECK-64: )
+// CHECK-32: (multi_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:   (case name=b index=0 offset=0
+// CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:       (field name=_buffer offset=0
+// CHECK-32:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:           (field name=_storage offset=0
+// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:               (field name=rawValue offset=0
+// CHECK-32:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+
+// CHECK:   (case name=a index=1 offset=0
+// CHECK:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK: Mangled name: $s36reflect_Enum_MultiPayload_degenerate8FooVoid2O
+// CHECK: Demangled name: reflect_Enum_MultiPayload_degenerate.FooVoid2
+
+// CHECK: Enum value:
+// CHECK: (enum_value name=b index=0
+// CHECK: (bound_generic_struct Swift.Array
+// CHECK:   (struct Swift.Int))
+// CHECK: )
 
 
 // As above, this is laid out as a single-payload enum
@@ -148,12 +194,13 @@ case b(B)
 
 reflect(enum: FooEmptyStruct.a([]))
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_Enum_MultiPayload_degenerate.FooEmptyStruct)
+// CHECK: Reflecting an enum.
+// CHECK: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK: Type reference:
+// CHECK: (enum reflect_Enum_MultiPayload_degenerate.FooEmptyStruct)
 
-// CHECK-64: Type info:
+// CHECK: Type info:
+
 // CHECK-64: (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
 // CHECK-64:   (case name=a index=0 offset=0
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
@@ -163,25 +210,37 @@ reflect(enum: FooEmptyStruct.a([]))
 // CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
 // CHECK-64:               (field name=rawValue offset=0
 // CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:   (case name=b index=1 offset=0
-// CHECK-64:     (struct size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
-// CHECK-64: Mangled name: $s36reflect_Enum_MultiPayload_degenerate14FooEmptyStructO
-// CHECK-64: Demangled name: reflect_Enum_MultiPayload_degenerate.FooEmptyStruct
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=a index=0
-// CHECK-64: (bound_generic_struct Swift.Array
-// CHECK-64:   (struct Swift.Int))
-// CHECK-64: )
+// CHECK-32: (multi_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:   (case name=a index=0 offset=0
+// CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:       (field name=_buffer offset=0
+// CHECK-32:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:           (field name=_storage offset=0
+// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:               (field name=rawValue offset=0
+// CHECK-32:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
+
+// CHECK:   (case name=b index=1 offset=0
+// CHECK:     (struct size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK: Mangled name: $s36reflect_Enum_MultiPayload_degenerate14FooEmptyStructO
+// CHECK: Demangled name: reflect_Enum_MultiPayload_degenerate.FooEmptyStruct
+
+// CHECK: Enum value:
+// CHECK: (enum_value name=a index=0
+// CHECK: (bound_generic_struct Swift.Array
+// CHECK:   (struct Swift.Int))
+// CHECK: )
 
 reflect(enum: FooEmptyStruct.b(B()))
 
-// CHECK-64: Reflecting an enum.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (enum reflect_Enum_MultiPayload_degenerate.FooEmptyStruct)
+// CHECK: Reflecting an enum.
+// CHECK: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK: Type reference:
+// CHECK: (enum reflect_Enum_MultiPayload_degenerate.FooEmptyStruct)
 
-// CHECK-64: Type info:
+// CHECK: Type info:
+
 // CHECK-64: (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
 // CHECK-64:   (case name=a index=0 offset=0
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
@@ -191,22 +250,30 @@ reflect(enum: FooEmptyStruct.b(B()))
 // CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1
 // CHECK-64:               (field name=rawValue offset=0
 // CHECK-64:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1))))))))
-// CHECK-64:   (case name=b index=1 offset=0
-// CHECK-64:     (struct size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
-// CHECK-64: Mangled name: $s36reflect_Enum_MultiPayload_degenerate14FooEmptyStructO
-// CHECK-64: Demangled name: reflect_Enum_MultiPayload_degenerate.FooEmptyStruct
 
-// CHECK-64: Enum value:
-// CHECK-64: (enum_value name=b index=1
-// CHECK-64:   (struct reflect_Enum_MultiPayload_degenerate.B)
-// CHECK-64: )
+// CHECK-32: (multi_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095 bitwise_takable=1
+// CHECK-32:   (case name=a index=0 offset=0
+// CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:       (field name=_buffer offset=0
+// CHECK-32:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:           (field name=_storage offset=0
+// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32:               (field name=rawValue offset=0
+// CHECK-32:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))))))))
 
+// CHECK:   (case name=b index=1 offset=0
+// CHECK:     (struct size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK: Mangled name: $s36reflect_Enum_MultiPayload_degenerate14FooEmptyStructO
+// CHECK: Demangled name: reflect_Enum_MultiPayload_degenerate.FooEmptyStruct
+
+// CHECK: Enum value:
+// CHECK: (enum_value name=b index=1
+// CHECK:   (struct reflect_Enum_MultiPayload_degenerate.B)
+// CHECK: )
 
 
 // TODO: Variations of Foo where `b` payload is class, Bool
 
 doneReflecting()
-
-// CHECK-32: FAIL
 
 // CHECK: Done.
