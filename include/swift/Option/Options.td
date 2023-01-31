@@ -747,11 +747,11 @@ def strict_concurrency : Joined<["-"], "strict-concurrency=">,
 
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
   HelpText<"Enable an experimental feature">;
 
 def enable_upcoming_feature : Separate<["-"], "enable-upcoming-feature">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
   HelpText<"Enable a feature that will be introduced in an upcoming language "
            "version">;
 
