@@ -73,6 +73,9 @@ public:
   /// descriptive style that's specific to Swift (currently experimental).
   FormattingStyle PrintedFormattingStyle = FormattingStyle::LLVM;
 
+  /// Whether to emit macro expansion buffers into separate, temporary files.
+  bool EmitMacroExpansionFiles = false;
+
   std::string DiagnosticDocumentationPath = "";
 
   std::string LocalizationCode = "";

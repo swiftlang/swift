@@ -33,6 +33,7 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   llvm::raw_ostream &Stream;
   bool ForceColors = false;
   bool PrintEducationalNotes = false;
+  bool EmitMacroExpansionFiles = false;
   bool DidErrorOccur = false;
   DiagnosticOptions::FormattingStyle FormattingStyle =
       DiagnosticOptions::FormattingStyle::LLVM;
@@ -75,6 +76,10 @@ public:
 
   void setFormattingStyle(DiagnosticOptions::FormattingStyle style) {
     FormattingStyle = style;
+  }
+
+  void setEmitMacroExpansionFiles(bool ShouldEmit) {
+    EmitMacroExpansionFiles = ShouldEmit;
   }
 
   bool didErrorOccur() {
