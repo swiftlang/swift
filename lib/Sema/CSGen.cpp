@@ -2901,18 +2901,12 @@ namespace {
       struct CollectVarRefs : public ASTWalker {
         ConstraintSystem &cs;
         llvm::SmallPtrSet<TypeVariableType *, 4> varRefs;
-        bool hasErrorExprs = false;
 
         CollectVarRefs(ConstraintSystem &cs) : cs(cs) { }
 
         bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
         PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-          // If there are any error expressions in this closure
-          // it wouldn't be possible to infer its type.
-          if (isa<ErrorExpr>(expr))
-            hasErrorExprs = true;
-
           // Retrieve type variables from references to var decls.
           if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
             if (auto *varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
@@ -2953,15 +2947,6 @@ namespace {
       } collectVarRefs(CS);
 
       closure->walk(collectVarRefs);
-
-      // If walker discovered error expressions, let's fail constraint
-      // generation only if closure is going to participate
-      // in the type-check. This allows us to delay validation of
-      // multi-statement closures until body is opened.
-      if (CS.participatesInInference(closure) &&
-          collectVarRefs.hasErrorExprs) {
-        return Type();
-      }
 
       auto inferredType = inferClosureType(closure);
       if (!inferredType || inferredType->hasError())

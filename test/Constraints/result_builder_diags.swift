@@ -78,7 +78,7 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   static func buildDo<T>(_ value: T) -> T { return value }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note 2{{in call to function 'tuplify(_:body:)'}}
   print(body(cond))
 }
 
@@ -88,7 +88,7 @@ func tuplifyWithoutIf<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T)
 
 func testDiags() {
   // For loop
-  tuplify(true) { _ in
+  tuplify(true) { _ in // expected-error {{generic parameter 'T' could not be inferred}}
     17
     for c in name {
     // expected-error@-1 {{cannot find 'name' in scope}}
@@ -464,7 +464,7 @@ struct TestConstraintGenerationErrors {
   }
 
   func buildTupleClosure() {
-    tuplify(true) { _ in
+    tuplify(true) { _ in // expected-error {{generic parameter 'T' could not be inferred}}
       let a = nothing // expected-error {{cannot find 'nothing' in scope}}
       String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
