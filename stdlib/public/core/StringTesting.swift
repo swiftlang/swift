@@ -23,7 +23,8 @@ struct _StringRepresentation {
     case _cocoa(object: AnyObject)
     case _native(object: AnyObject)
     case _immortal(address: UInt)
-    // TODO: shared native
+    // Introduced in SwiftStdlib 5.9:
+    case _shared(object: AnyObject)
   }
   public var _form: _Form
 
@@ -31,6 +32,7 @@ struct _StringRepresentation {
     switch _form {
       case ._cocoa(let object): return ObjectIdentifier(object)
       case ._native(let object): return ObjectIdentifier(object)
+      case ._shared(let object): return ObjectIdentifier(object)
       default: return nil
     }
   }
@@ -72,7 +74,6 @@ extension _StringGuts {
       return result
     }
 
-    // TODO: shared native
     _internalInvariant(_object.providesFastUTF8)
     if _object.isImmortal {
       result._form = ._immortal(
@@ -82,6 +83,10 @@ extension _StringGuts {
     if _object.hasNativeStorage {
       _internalInvariant(_object.largeFastIsTailAllocated)
       result._form = ._native(object: _object.nativeStorage)
+      return result
+    }
+    if _object.hasSharedStorage {
+      result._form = ._shared(object: _object.sharedStorage)
       return result
     }
     fatalError()

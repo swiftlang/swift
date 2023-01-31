@@ -1276,6 +1276,9 @@ extension _StringObject {
     case ._cocoa(object: let object):
       let address: UnsafeRawPointer = Builtin.reinterpretCast(object)
       print("Cocoa(address: \(address))")
+    case ._shared(object: let object):
+      let address: UnsafeRawPointer = Builtin.reinterpretCast(object)
+      print("Shared(address: \(address))")
     }
 #endif // INTERNAL_CHECKS_ENABLED
   }
