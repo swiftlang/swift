@@ -74,7 +74,7 @@ public:
   FormattingStyle PrintedFormattingStyle = FormattingStyle::LLVM;
 
   /// Whether to emit macro expansion buffers into separate, temporary files.
-  bool EmitMacroExpansionFiles = false;
+  bool EmitMacroExpansionFiles = true;
 
   std::string DiagnosticDocumentationPath = "";
 
