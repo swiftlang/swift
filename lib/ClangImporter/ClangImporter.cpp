@@ -6565,9 +6565,17 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   return {CustomRefCountingOperationResult::tooManyFound, nullptr, name};
 }
 
-void ClangImporter::enableSymbolicImportFeature(bool isEnabled) {
-  Impl.importSymbolicCXXDecls = isEnabled;
-  Impl.nameImporter->enableSymbolicImportFeature(isEnabled);
+void ClangImporter::withSymbolicFeatureEnabled(
+    llvm::function_ref<void(void)> callback) {
+  llvm::SaveAndRestore<bool> oldImportSymbolicCXXDecls(
+      Impl.importSymbolicCXXDecls, true);
+  Impl.nameImporter->enableSymbolicImportFeature(true);
+  auto importedDeclsCopy = Impl.ImportedDecls;
+  Impl.ImportedDecls.clear();
+  callback();
+  Impl.ImportedDecls = std::move(importedDeclsCopy);
+  Impl.nameImporter->enableSymbolicImportFeature(
+      oldImportSymbolicCXXDecls.get());
 }
 
 bool importer::requiresCPlusPlus(const clang::Module *module) {

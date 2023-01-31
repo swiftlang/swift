@@ -544,18 +544,6 @@ void swift::ide::printModuleInterface(
   auto &SwiftContext = TopLevelMod->getASTContext();
   auto &Importer =
       static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
-  if (Options.PrintSymbolicCXXDecls)
-    Importer.enableSymbolicImportFeature(true);
-  struct SymbolicImportRAII {
-    bool PrintSymbolicCXXDecls;
-    ClangImporter &Importer;
-    SymbolicImportRAII(bool PrintSymbolicCXXDecls, ClangImporter &Importer)
-        : PrintSymbolicCXXDecls(PrintSymbolicCXXDecls), Importer(Importer) {}
-    ~SymbolicImportRAII() {
-      if (PrintSymbolicCXXDecls)
-        Importer.enableSymbolicImportFeature(false);
-    }
-  } deferDisableSymbolicImport(Options.PrintSymbolicCXXDecls, Importer);
 
   auto AdjustedOptions = Options;
   adjustPrintOptions(AdjustedOptions);
@@ -1159,9 +1147,14 @@ void swift::ide::printSymbolicSwiftClangModuleInterface(
   opts |= ModuleTraversal::VisitSubmodules;
   auto popts =
       PrintOptions::printModuleInterface(/*printFullConvention=*/false);
-  popts.PrintSymbolicCXXDecls = true;
   popts.PrintDocumentationComments = false;
   popts.PrintRegularClangComments = false;
-  printModuleInterface(M, {}, opts, Printer, popts,
-                       /*SynthesizeExtensions=*/false);
+
+  auto &SwiftContext = M->getTopLevelModule()->getASTContext();
+  auto &Importer =
+      static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
+  Importer.withSymbolicFeatureEnabled([&]() {
+    printModuleInterface(M, {}, opts, Printer, popts,
+                         /*SynthesizeExtensions=*/false);
+  });
 }

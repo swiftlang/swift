@@ -556,8 +556,8 @@ public:
   /// of the provided baseType.
   void diagnoseMemberValue(const DeclName &name, const Type &baseType) override;
 
-  /// Enable/disable the symbolic import experimental feature.
-  void enableSymbolicImportFeature(bool isEnabled = true);
+  /// Enable the symbolic import experimental feature for the given callback.
+  void withSymbolicFeatureEnabled(llvm::function_ref<void(void)> callback);
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
