@@ -121,4 +121,8 @@ Var _StringGuts._isContiguousUTF16 has been removed
 Var _StringGuts.startUTF16 has been removed
 Func _persistCString(_:) has been removed
 
+// Language inconsistency: enum cases with associated values cannot have availability, but
+// the ABI checker wants to see one anyway.
+EnumElement _StringRepresentation._Form._shared is a new API without @available attribute
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
