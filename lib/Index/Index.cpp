@@ -1008,7 +1008,7 @@ private:
       return false;
 
     // Do not handle non-public imported decls.
-    if (IsModuleFile && !D->isAccessibleFrom(nullptr))
+    if (IsModuleFile && D->getFormalAccess() < AccessLevel::Public)
       return false;
 
     if (!IdxConsumer.indexLocals() && isLocalSymbol(D))
