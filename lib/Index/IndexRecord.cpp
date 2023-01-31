@@ -12,6 +12,7 @@
 
 #include "swift/Index/IndexRecord.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Expr.h"
@@ -24,13 +25,15 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/Index/Index.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Frontend/CompilerInstance.h"
-#include "clang/Index/IndexingAction.h"
 #include "clang/Index/IndexRecordWriter.h"
 #include "clang/Index/IndexUnitWriter.h"
+#include "clang/Index/IndexingAction.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Serialization/ASTReader.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -393,6 +396,176 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  const PathRemapper &pathRemapper,
                                  SourceFile *initialFile);
 
+// FIXME (Alex): Share code with importer.
+inline bool requiresCPlusPlus(const clang::Module *module) {
+  // The libc++ modulemap doesn't currently declare the requirement.
+  if (module->getTopLevelModuleName() == "std")
+    return true;
+
+  // Modulemaps often declare the requirement for the top-level module only.
+  if (auto parent = module->Parent) {
+    if (requiresCPlusPlus(parent))
+      return true;
+  }
+
+  return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
+    return req.first == "cplusplus";
+  });
+}
+
+static void
+appendSymbolicInterfaceToIndexStorePath(SmallVectorImpl<char> &resultingPath) {
+  llvm::sys::path::append(resultingPath, "interfaces");
+}
+
+static bool initSymbolicInterfaceStorePath(StringRef storePath,
+                                           std::string &error) {
+  using namespace llvm::sys;
+  SmallString<128> subPath = storePath;
+  appendSymbolicInterfaceToIndexStorePath(subPath);
+  std::error_code ec = fs::create_directories(subPath);
+  if (ec) {
+    llvm::raw_string_ostream err(error);
+    err << "failed to create directory '" << subPath << "': " << ec.message();
+    return true;
+  }
+  return false;
+}
+
+static void appendSymbolicInterfaceClangModuleFilename(
+    StringRef filePath, SmallVectorImpl<char> &resultingPath) {
+  llvm::sys::path::append(resultingPath, llvm::sys::path::filename(filePath));
+  StringRef extension = ".symbolicswiftinterface";
+  resultingPath.append(extension.begin(), extension.end());
+}
+
+// FIXME (Alex): Share code with IndexUnitWriter in LLVM after refactoring it.
+static Optional<bool>
+isFileUpToDateForOutputFile(StringRef filePath,
+                            Optional<StringRef> timeCompareFilePath,
+                            std::string &error) {
+  llvm::sys::fs::file_status unitStat;
+  if (std::error_code ec = llvm::sys::fs::status(filePath, unitStat)) {
+    if (ec != std::errc::no_such_file_or_directory) {
+      llvm::raw_string_ostream err(error);
+      err << "could not access path '" << filePath << "': " << ec.message();
+      return {};
+    }
+    return false;
+  }
+
+  if (!timeCompareFilePath)
+    return true;
+
+  llvm::sys::fs::file_status compareStat;
+  if (std::error_code ec =
+          llvm::sys::fs::status(*timeCompareFilePath, compareStat)) {
+    if (ec != std::errc::no_such_file_or_directory) {
+      llvm::raw_string_ostream err(error);
+      err << "could not access path '" << *timeCompareFilePath
+          << "': " << ec.message();
+      return {};
+    }
+    return true;
+  }
+
+  // Return true (unit is up-to-date) if the file to compare is older than the
+  // unit file.
+  return compareStat.getLastModificationTime() <=
+         unitStat.getLastModificationTime();
+}
+
+/// Emit the symbolic swift interface file for an imported Clang module into the
+/// index store directory.
+///
+/// The swift interface file is emitted only when it doesn't exist yet, or when
+/// the PCM for the Clang module has been updated.
+///
+/// System modules without the 'cplusplus' requirement are not emitted.
+static void emitSymbolicInterfaceForClangModule(
+    ClangModuleUnit *clangModUnit, ModuleDecl *M,
+    const clang::Module *clangModule, StringRef indexStorePath,
+    const clang::CompilerInstance &clangCI, DiagnosticEngine &diags) {
+  if (!M->getASTContext().LangOpts.EnableCXXInterop)
+    return;
+  // Skip system modules without an explicit 'cplusplus' requirement.
+  bool isSystem = clangModUnit->isSystemModule();
+  if (isSystem && !requiresCPlusPlus(clangModule))
+    return;
+
+  // Make sure the `interfaces` directory is created.
+  std::string error;
+  if (initSymbolicInterfaceStorePath(indexStorePath, error)) {
+    diags.diagnose(SourceLoc(), diag::error_create_index_dir, error);
+    return;
+  }
+
+  // Determine the output name for the symbolic interface file.
+  clang::serialization::ModuleFile *ModFile =
+      clangCI.getASTReader()->getModuleManager().lookup(
+          clangModule->getASTFile());
+  assert(ModFile && "no module file loaded for module ?");
+  SmallString<128> interfaceOutputPath = indexStorePath;
+  appendSymbolicInterfaceToIndexStorePath(interfaceOutputPath);
+  appendSymbolicInterfaceClangModuleFilename(ModFile->FileName,
+                                             interfaceOutputPath);
+
+  // Check if the symbolic interface file is already up to date.
+  auto upToDate = isFileUpToDateForOutputFile(
+      interfaceOutputPath, StringRef(ModFile->FileName), error);
+  if (!upToDate) {
+    diags.diagnose(SourceLoc(), diag::error_index_failed_status_check, error);
+    return;
+  }
+  if (M->getASTContext().LangOpts.EnableIndexingSystemModuleRemarks) {
+    diags.diagnose(SourceLoc(), diag::remark_emitting_symbolic_interface_module,
+                   interfaceOutputPath, *upToDate);
+  }
+  if (*upToDate)
+    return;
+
+  // Output the interface to a temporary file first.
+  SmallString<128> tempOutputPath;
+  tempOutputPath = llvm::sys::path::parent_path(interfaceOutputPath);
+  llvm::sys::path::append(tempOutputPath,
+                          llvm::sys::path::filename(interfaceOutputPath));
+  tempOutputPath += "-%%%%%%%%";
+  int tempFD;
+  if (llvm::sys::fs::createUniqueFile(tempOutputPath.str(), tempFD,
+                                      tempOutputPath)) {
+    llvm::raw_string_ostream errOS(error);
+    errOS << "failed to create temporary file: " << tempOutputPath;
+    diags.diagnose(SourceLoc(), diag::error_write_index_record, errOS.str());
+    return;
+  }
+
+  llvm::raw_fd_ostream os(tempFD, /*shouldClose=*/true);
+  std::unique_ptr<ASTPrinter> printer;
+  printer.reset(new StreamPrinter(os));
+  ide::printSymbolicSwiftClangModuleInterface(M, *printer, clangModule);
+  os.close();
+
+  if (os.has_error()) {
+    llvm::raw_string_ostream errOS(error);
+    errOS << "failed to write '" << tempOutputPath
+          << "': " << os.error().message();
+    diags.diagnose(SourceLoc(), diag::error_write_index_record, errOS.str());
+    os.clear_error();
+    return;
+  }
+
+  // Move the resulting output to the destination symbolic interface file.
+  std::error_code ec = llvm::sys::fs::rename(
+      /*from=*/tempOutputPath.c_str(), /*to=*/interfaceOutputPath.c_str());
+  if (ec) {
+    llvm::raw_string_ostream errOS(error);
+    errOS << "failed to rename '" << tempOutputPath << "' to '"
+          << interfaceOutputPath << "': " << ec.message();
+    diags.diagnose(SourceLoc(), diag::error_write_index_record, errOS.str());
+    return;
+  }
+}
+
 static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                   StringRef indexStorePath,
                                   bool indexClangModules,
@@ -444,6 +617,9 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
               if (shouldIndexModule)
                 clang::index::emitIndexDataForModuleFile(clangMod,
                                                          clangCI, unitWriter);
+              // Emit the symbolic interface file in addition to index data.
+              emitSymbolicInterfaceForClangModule(
+                  clangModUnit, mod, clangMod, indexStorePath, clangCI, diags);
             }
           } else {
             // Serialized AST file.

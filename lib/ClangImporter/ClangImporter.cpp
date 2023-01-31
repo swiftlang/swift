@@ -6564,3 +6564,8 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
 
   return {CustomRefCountingOperationResult::tooManyFound, nullptr, name};
 }
+
+void ClangImporter::enableSymbolicImportFeature(bool isEnabled) {
+  Impl.importSymbolicCXXDecls = isEnabled;
+  Impl.nameImporter->enableSymbolicImportFeature(isEnabled);
+}

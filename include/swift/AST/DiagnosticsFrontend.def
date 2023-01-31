@@ -270,6 +270,10 @@ REMARK(remark_indexing_system_module,none,
        "indexing system module at %0"
        "%select{|; skipping because of a broken swiftinterface}1",
        (StringRef, bool))
+REMARK(remark_emitting_symbolic_interface_module,none,
+       "emitting symbolic interface at %0"
+       "%select{|; skipping because it's up to date}1",
+       (StringRef, bool))
 
 ERROR(error_wrong_number_of_arguments,none,
       "wrong number of '%0' arguments (expected %1, got %2)",

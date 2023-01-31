@@ -544,6 +544,18 @@ void swift::ide::printModuleInterface(
   auto &SwiftContext = TopLevelMod->getASTContext();
   auto &Importer =
       static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
+  if (Options.PrintSymbolicCXXDecls)
+    Importer.enableSymbolicImportFeature(true);
+  struct SymbolicImportRAII {
+    bool PrintSymbolicCXXDecls;
+    ClangImporter &Importer;
+    SymbolicImportRAII(bool PrintSymbolicCXXDecls, ClangImporter &Importer)
+        : PrintSymbolicCXXDecls(PrintSymbolicCXXDecls), Importer(Importer) {}
+    ~SymbolicImportRAII() {
+      if (PrintSymbolicCXXDecls)
+        Importer.enableSymbolicImportFeature(false);
+    }
+  } deferDisableSymbolicImport(Options.PrintSymbolicCXXDecls, Importer);
 
   auto AdjustedOptions = Options;
   adjustPrintOptions(AdjustedOptions);
@@ -1133,4 +1145,23 @@ void ClangCommentPrinter::updateLastEntityLine(clang::FileID FID,
   unsigned &LastEntiyLine = LastEntityLines[FID];
   if (LineNo > LastEntiyLine)
     LastEntiyLine = LineNo;
+}
+
+void swift::ide::printSymbolicSwiftClangModuleInterface(
+    ModuleDecl *M, ASTPrinter &Printer, const clang::Module *clangModule) {
+  std::string headerComment;
+  llvm::raw_string_ostream(headerComment)
+      << "// Swift interface for " << (clangModule->IsSystem ? "system " : "")
+      << "module '" << clangModule->Name << "'\n";
+  Printer.printText(headerComment);
+
+  ModuleTraversalOptions opts;
+  opts |= ModuleTraversal::VisitSubmodules;
+  auto popts =
+      PrintOptions::printModuleInterface(/*printFullConvention=*/false);
+  popts.PrintSymbolicCXXDecls = true;
+  popts.PrintDocumentationComments = false;
+  popts.PrintRegularClangComments = false;
+  printModuleInterface(M, {}, opts, Printer, popts,
+                       /*SynthesizeExtensions=*/false);
 }

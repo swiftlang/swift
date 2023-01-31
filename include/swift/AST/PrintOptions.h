@@ -562,6 +562,10 @@ struct PrintOptions {
   /// If false, we print them as ordinary associated types.
   bool PrintPrimaryAssociatedTypes = true;
 
+  /// If true, import and print C++ declarations with symbolic import feature
+  /// enabled.
+  bool PrintSymbolicCXXDecls = false;
+
   /// If this is not \c nullptr then function bodies (including accessors
   /// and constructors) will be printed by this function.
   std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;

@@ -458,6 +458,10 @@ public:
                             clang::ObjCInterfaceDecl *classDecl,
                             bool forInstance);
 
+  inline void enableSymbolicImportFeature(bool isEnabled) {
+    importSymbolicCXXDecls = isEnabled;
+  }
+
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }
 

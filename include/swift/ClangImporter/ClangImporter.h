@@ -555,6 +555,9 @@ public:
   /// Emit diagnostics for declarations named name that are members
   /// of the provided baseType.
   void diagnoseMemberValue(const DeclName &name, const Type &baseType) override;
+
+  /// Enable/disable the symbolic import experimental feature.
+  void enableSymbolicImportFeature(bool isEnabled = true);
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
