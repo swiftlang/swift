@@ -482,12 +482,7 @@ public:
     const auto options =
         TypeResolutionOptions(None) | TypeResolutionFlags::SilenceErrors;
 
-    DeclRefTypeRepr *repr = nullptr;
-    if (components.size() == 1) {
-      repr = components.front();
-    } else {
-      repr = MemberTypeRepr::create(Context, components);
-    }
+    DeclRefTypeRepr *repr = MemberTypeRepr::create(Context, components);
 
     // See if the repr resolves to a type.
     const auto ty = TypeResolution::resolveContextualType(
@@ -609,12 +604,7 @@ public:
 
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
-      DeclRefTypeRepr *prefixRepr = nullptr;
-      if (components.size() == 1) {
-        prefixRepr = components.front();
-      } else {
-        prefixRepr = MemberTypeRepr::create(Context, components);
-      }
+      DeclRefTypeRepr *prefixRepr = MemberTypeRepr::create(Context, components);
 
       // See first if the entire repr resolves to a type.
       const Type enumTy = TypeResolution::resolveContextualType(
