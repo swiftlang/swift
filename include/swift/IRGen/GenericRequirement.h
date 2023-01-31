@@ -17,9 +17,16 @@
 #include "swift/AST/Type.h"
 #include "llvm/Support/raw_ostream.h"
 
+namespace llvm {
+class Type;
+}
+
 namespace swift {
 
 class ProtocolDecl;
+namespace irgen {
+class IRGenModule;
+}
 
 /// The three kinds of entities passed in the runtime calling convention for
 /// generic code: pack shapes, type metadata, and witness tables.
@@ -85,6 +92,13 @@ public:
   static GenericRequirement forWitnessTable(CanType type, ProtocolDecl *proto) {
     assert(proto != nullptr);
     return GenericRequirement(Kind::WitnessTable, type, proto);
+  }
+
+  static llvm::Type *typeForKind(irgen::IRGenModule &IGM,
+                                 GenericRequirement::Kind kind);
+
+  llvm::Type *getType(irgen::IRGenModule &IGM) const {
+    return typeForKind(IGM, getKind());
   }
 
   void dump(llvm::raw_ostream &out) const {

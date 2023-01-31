@@ -3898,13 +3898,11 @@ namespace {
                                ClassDecl *forClass) {
       switch (requirement.getKind()) {
       case GenericRequirement::Kind::Shape:
-        B.addInt(IGM.SizeTy, 0);
+        B.addInt(cast<llvm::IntegerType>(requirement.getType(IGM)), 0);
         break;
       case GenericRequirement::Kind::Metadata:
-        B.addNullPointer(IGM.TypeMetadataPtrTy);
-        break;
       case GenericRequirement::Kind::WitnessTable:
-        B.addNullPointer(IGM.WitnessTablePtrTy);
+        B.addNullPointer(cast<llvm::PointerType>(requirement.getType(IGM)));
         break;
       }
     }
