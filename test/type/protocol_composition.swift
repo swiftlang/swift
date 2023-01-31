@@ -132,16 +132,31 @@ typealias B1 = protocol<P1,P2> // expected-error {{'protocol<...>' composition s
 typealias B2 = protocol<P1, P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-32=P1 & P2}}
 typealias B3 = protocol<P1 ,P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-32=P1 & P2}}
 typealias B4 = protocol<P1 , P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-33=P1 & P2}}
-typealias C1 = protocol<Any, P1> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{16-33=P1}}
-typealias C2 = protocol<P1, Any> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{16-33=P1}}
+typealias C1 = protocol<Any, P1> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-33=Any & P1}}
+typealias C2 = protocol<P1, Any> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-33=P1 & Any}}
 typealias D = protocol<P1> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-27=P1}}
 typealias E = protocol<Any> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-28=Any}}
-typealias F = protocol<Any, Any> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-33=Any}}
+typealias F = protocol<Any, Any> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{15-33=Any & Any}}
 typealias G = protocol<P1>.Type // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-27=P1}}
 typealias H = protocol<P1>! // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-28=P1!}}
 // expected-warning@-1 {{using '!' is not allowed here; treating this as '?' instead}}
 typealias J = protocol<P1, P2>.Protocol // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{15-31=(P1 & P2)}}
 typealias K = protocol<P1, P2>? // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{15-32=(P1 & P2)?}}
+typealias L = protocol<(P1), P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{15-33=(P1) & P2}}
+
+// Deprecated protocol composition syntax in expression context.
+do {
+  func typesAreEqual<T>(_: T.Type, _: T.Type) {}
+
+  typesAreEqual(Optional<P1 & P2>.self,
+                Optional<protocol<P1, P2>>.self)
+  // expected-error@-1 {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{26-43=P1 & P2>}}
+
+  // Test that we parse non-identifier components.
+  typesAreEqual(Optional<P1 & P2>.self,
+                Optional<protocol<P1, (P2)>>.self)
+  // expected-error@-1 {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{26-45=P1 & (P2)>}}
+}
 
 typealias T01 = P1.Protocol & P2 // expected-error {{non-protocol, non-class type '(any P1).Type' cannot be used within a protocol-constrained type}}
 typealias T02 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'any P1.Type' cannot be used within a protocol-constrained type}}
