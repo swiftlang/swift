@@ -131,7 +131,8 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 // Find all use points of \p guaranteedValue within its borrow scope. All uses
 // are naturally dominated by \p guaranteedValue. If a PointerEscape is found,
 // then no assumption can be made about \p guaranteedValue's lifetime. Therefore
-// the use points are incomplete and this returns false.
+// the use points are incomplete and this returns false. The escape point that
+// was found must still be in \p usePoints to distinguish from dead addresses.
 //
 // Accumulate results in \p usePoints, ignoring existing elements.
 //
@@ -982,6 +983,8 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
 
   AddressUseKind result = AddressUseKind::NonEscaping;
 
+  // Record all uses that aren't transitively followed. These are either
+  // instanteneous uses of the addres, or cause a pointer escape.
   auto leafUse = [foundUses](Operand *use) {
     if (foundUses)
       foundUses->push_back(use);
@@ -1011,6 +1014,7 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
     // the apply to be a use point.
     if (isa<PartialApplyInst>(user) || isa<AddressToPointerInst>(user)) {
       result = meet(result, AddressUseKind::PointerEscape);
+      leafUse(op);
       continue;
     }
     // First, eliminate "end point uses" that we just need to check liveness at
@@ -1035,6 +1039,7 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
     if (isa<UnconditionalCheckedCastAddrInst>(user)
         || isa<MarkFunctionEscapeInst>(user)) {
       assert(!user->hasResults());
+      leafUse(op);
       continue;
     }
 
@@ -1108,6 +1113,7 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
       (*onError)(op);
     }
     result = meet(result, AddressUseKind::Unknown);
+    leafUse(op);
   }
   return result;
 }
