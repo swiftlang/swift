@@ -129,6 +129,12 @@
 #error Masking ISAs are incompatible with opaque ISAs
 #endif
 
+#if defined(__LP64__) && __has_include(<malloc_type_private.h>) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+# define SWIFT_STDLIB_HAS_MALLOC_TYPE 1
+#else
+# define SWIFT_STDLIB_HAS_MALLOC_TYPE 0
+#endif
+
 /// Which bits in the class metadata are used to distinguish Swift classes
 /// from ObjC classes?
 #ifndef SWIFT_CLASS_IS_SWIFT_MASK
