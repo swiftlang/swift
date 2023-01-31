@@ -525,7 +525,7 @@ StringTests.test("_isIdentical(to:)") {
   let f = String(repeating: "foo", count: 1000)
   let g = String(repeating: "foo", count: 1000)
   expectEqual(f, g)
-  expectFalse(f._isIdentical(to: g)) // To large, distinct native strings
+  expectFalse(f._isIdentical(to: g)) // Two large, distinct native strings
   expectTrue(f._isIdentical(to: f))
   expectTrue(g._isIdentical(to: g))
 }
