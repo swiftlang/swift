@@ -7629,7 +7629,18 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
 }
 
 void TypeChecker::checkReflectionMetadataAttributes(ExtensionDecl *ED) {
+  auto &ctx = ED->getASTContext();
   auto *extendedType = ED->getExtendedNominal();
+
+  // If extension has any reflection metadata attributes, trigger the
+  // request to set their types.
+  for (auto *attr : ED->getRuntimeDiscoverableAttrs()) {
+    (void)evaluateOrDefault(
+        ctx.evaluator,
+        CustomAttrTypeRequest{attr, ED->getDeclContext(),
+                              CustomAttrTypeKind::RuntimeMetadata},
+        nullptr);
+  }
 
   for (auto *protocol : ED->getLocalProtocols()) {
     forEachCustomAttribute<RuntimeMetadataAttr>(
@@ -7640,7 +7651,6 @@ void TypeChecker::checkReflectionMetadataAttributes(ExtensionDecl *ED) {
                     return extendedType->getRuntimeDiscoverableAttrTypeDecl(
                                typeAttr) == attrType;
                   })) {
-            auto &ctx = protocol->getASTContext();
             ctx.Diags.diagnose(ED->getLoc(), diag::type_does_not_conform,
                                ED->getExtendedType(),
                                protocol->getDeclaredInterfaceType());

@@ -18,7 +18,7 @@ public class BaseClass {}
 public class TestClass : BaseClass {}
 
 // CHECK: @available(*, unavailable)
-// CHECK-NEXT: @Flag extension CRM.TestClass {
+// CHECK-NEXT: @CRM.Flag extension CRM.TestClass {
 // CHECK-NEXT: }
 
 @available(*, unavailable)
