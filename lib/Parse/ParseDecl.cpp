@@ -4164,6 +4164,33 @@ ParserStatus Parser::parseTypeAttribute(TypeAttributes &Attributes,
     break;
   }
 
+  case TAK_pack_element: {
+    if (!isInSILMode()) {
+      diagnose(AtLoc, diag::only_allowed_in_sil, "pack_element");
+      return makeParserSuccess();
+    }
+
+    // Parse the opened ID string in parens
+    SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
+    if (consumeIfNotAtStartOfLine(tok::l_paren)) {
+      idLoc = Tok.getLoc();
+      UUID id;
+      if (!parseUUIDString(id, diag::opened_attribute_id_value))
+        Attributes.OpenedID = id;
+
+      // TODO: allow more information so that these can be parsed
+      // prior to the open instruction.
+
+      parseMatchingToken(tok::r_paren, endLoc,
+                         diag::opened_attribute_expected_rparen,
+                         beginLoc);
+    } else {
+      diagnose(Tok, diag::pack_element_attribute_expected_lparen);
+    }
+
+    break;
+  }
+
   case TAK_differentiable: {
     Attributes.differentiabilityKind = DifferentiabilityKind::Normal;
     if (parseDifferentiableTypeAttributeArgument(

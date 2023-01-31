@@ -157,13 +157,20 @@ namespace swift {
     llvm::DenseMap<SILBasicBlock*,
                    Located<Identifier>> UndefinedBlocks;
 
+    /// The set of opened packs in the function, indexed by UUID.
+    /// Note that we don't currently support parsing references to
+    /// opened packs prior to their instruction, although this is
+    /// theoretically possible if basic blocks are not sorted in
+    /// dominance order.
+    SILTypeResolutionContext::OpenedPackElementsMap OpenedPackElements;
+
     /// Data structures used to perform name lookup for local values.
     llvm::StringMap<ValueBase*> LocalValues;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
     Type performTypeResolution(TypeRepr *TyR, bool IsSILType,
                                GenericSignature GenericSig,
-                               GenericParamList *GenericParams) const;
+                               GenericParamList *GenericParams);
 
     void convertRequirements(ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To,
@@ -1253,11 +1260,12 @@ static bool parseDeclSILOptional(bool *isTransparent,
 
 Type SILParser::performTypeResolution(TypeRepr *TyR, bool IsSILType,
                                       GenericSignature GenericSig,
-                                      GenericParamList *GenericParams) const {
+                                      GenericParamList *GenericParams) {
   if (!GenericSig)
     GenericSig = ContextGenericSig;
 
-  SILTypeResolutionContext SILContext(IsSILType, GenericParams);
+  SILTypeResolutionContext SILContext(IsSILType, GenericParams,
+                                      &OpenedPackElements);
 
   return swift::performTypeResolution(TyR, P.Context, GenericSig,
                                       &SILContext, &P.SF);
@@ -3408,7 +3416,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     auto openedEnv = GenericEnvironment::forOpenedElement(openedElementSig,
                          uuid, shapeClass, openedSubMap);
 
-    ResultVal = B.createOpenPackElement(InstLoc, Val, openedEnv);
+    auto openInst = B.createOpenPackElement(InstLoc, Val, openedEnv);
+    ResultVal = openInst;
+
+    auto &entry = OpenedPackElements[uuid];
+    if (entry.DefinitionPoint.isValid()) {
+      P.diagnose(OpcodeLoc, diag::multiple_open_pack_element);
+      P.diagnose(entry.DefinitionPoint, diag::sil_previous_instruction);
+    } else {
+      entry.DefinitionPoint = OpcodeLoc;
+      entry.Params = openedGenerics;
+      entry.Environment = openedEnv;
+    }
     break;
   }
 
@@ -7593,7 +7612,8 @@ static bool parseSILWitnessTableEntry(
         return true;
 
       SILTypeResolutionContext silContext(/*isSILType=*/false,
-                                          witnessParams);
+                                          witnessParams,
+                                          /*openedPacks=*/nullptr);
       auto Ty =
           swift::performTypeResolution(TyR.get(), P.Context,
                                        witnessSig, &silContext,
@@ -7657,7 +7677,8 @@ static bool parseSILWitnessTableEntry(
       return true;
 
     SILTypeResolutionContext silContext(/*isSILType=*/false,
-                                        witnessParams);
+                                        witnessParams,
+                                        /*openedPacks=*/nullptr);
     auto Ty =
         swift::performTypeResolution(TyR.get(), P.Context,
                                      witnessSig, &silContext,

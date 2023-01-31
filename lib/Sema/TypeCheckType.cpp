@@ -1975,6 +1975,10 @@ namespace {
         TypeAttributes &attrs, TypeRepr *repr,
         TypeResolutionOptions options);
 
+    NeverNullType resolvePackElementArchetype(
+        TypeAttributes &attrs, TypeRepr *repr,
+        TypeResolutionOptions options);
+
     NeverNullType resolveAttributedType(AttributedTypeRepr *repr,
                                         TypeResolutionOptions options);
     NeverNullType resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
@@ -2507,6 +2511,71 @@ TypeResolver::resolveOpenedExistentialArchetype(
   return archetypeType;
 }
 
+/// In SIL, handle '@pack_element(UUID) interfaceType',
+/// which creates an opened archetype.
+NeverNullType
+TypeResolver::resolvePackElementArchetype(
+    TypeAttributes &attrs, TypeRepr *repr,
+    TypeResolutionOptions options) {
+  assert(silContext);
+  assert(attrs.has(TAK_pack_element));
+  assert(attrs.OpenedID.hasValue());
+
+  attrs.clearAttribute(TAK_pack_element);
+
+  auto dc = getDeclContext();
+  auto &ctx = dc->getASTContext();
+
+  const SILTypeResolutionContext::OpenedPackElement *entry = nullptr;
+  if (const auto *openedPacksMap = silContext->OpenedPackElements) {
+    auto it = openedPacksMap->find(*attrs.OpenedID);
+    if (it != openedPacksMap->end()) {
+      entry = &it->second;
+    }
+  }
+  if (!entry) {
+    diagnoseInvalid(repr, attrs.getLoc(TAK_pack_element),
+                    diag::sil_pack_element_uuid_not_found);
+    return ErrorType::get(ctx);
+  }
+
+  options.setContext(None);
+
+  // The interface type is the type wrapped by the attribute. Resolve it
+  // within the generic parameter list for the opened generic environment.
+  // Use structural resolution to avoid querying the DeclContext's
+  // generic signature, which is not the right signature for this.
+  auto structuralResolution = TypeResolution::forStructural(
+      dc, options,
+      /*unboundTyOpener*/ nullptr,
+      /*placeholderHandler*/ nullptr,
+      /*packElementOpener*/ nullptr);
+  auto interfaceType = [&] {
+    SILInnerGenericContextRAII scope(silContext, entry->Params);
+
+    TypeResolver interfaceTypeResolver(structuralResolution, silContext);
+    return interfaceTypeResolver.resolveType(repr, options);
+  }();
+
+  if (!interfaceType->isTypeParameter()) {
+    diagnoseInvalid(repr, attrs.getLoc(TAK_pack_element),
+                    diag::opened_bad_interface_type,
+                    interfaceType);
+
+    return ErrorType::get(ctx);
+  }
+
+  // Map the interface type into the element context.
+  auto archetypeType =
+    entry->Environment->mapPackTypeIntoElementContext(interfaceType);
+  if (archetypeType->hasError()) {
+    diagnoseInvalid(repr, attrs.getLoc(TAK_pack_element),
+                    diag::opened_bad_interface_type,
+                    interfaceType);
+  }
+  return archetypeType;
+}
+
 /// \returns true iff the # of isolated params is > \c lowerBound
 static bool hasMoreIsolatedParamsThan(FunctionTypeRepr* fnTy, unsigned lowerBound) {
   unsigned count = 0;
@@ -2953,6 +3022,8 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
   if (attrs.has(TAK_opened)) {
     ty = resolveOpenedExistentialArchetype(attrs, repr, options);
+  } else if (attrs.has(TAK_pack_element)) {
+    ty = resolvePackElementArchetype(attrs, repr, options);
   }
 
   auto instanceOptions = options;
