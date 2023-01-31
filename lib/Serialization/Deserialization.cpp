@@ -3094,7 +3094,7 @@ public:
     GenericSignatureID genericSigID;
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
-    bool needsNewVTableEntry, firstTimeRequired;
+    bool overriddenAffectsABI, needsNewVTableEntry, firstTimeRequired;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -3104,6 +3104,7 @@ public:
                                                async, throws, storedInitKind,
                                                genericSigID,
                                                overriddenID,
+                                               overriddenAffectsABI,
                                                rawAccessLevel,
                                                needsNewVTableEntry,
                                                firstTimeRequired,
@@ -3130,15 +3131,25 @@ public:
       attrs.setRawAttributeChain(DAttrs);
     }
 
-    auto overridden = MF.getDeclChecked(overriddenID);
-    if (!overridden) {
-      // Pass through deserialization errors.
-      if (overridden.errorIsA<FatalDeserializationError>())
-        return overridden.takeError();
+    Expected<Decl *> overriddenOrError = MF.getDeclChecked(overriddenID);
+    Decl *overridden;
+    if (overriddenOrError) {
+      overridden = overriddenOrError.get();
+    } else if (overriddenOrError.errorIsA<FatalDeserializationError>()) {
+      // Pass through fatal deserialization errors.
+      return overriddenOrError.takeError();
+    } else if (MF.allowCompilerErrors()) {
+      // Drop overriding relationship when allowing errors.
+      llvm::consumeError(overriddenOrError.takeError());
+      overridden = nullptr;
+    } else {
+      llvm::consumeError(overriddenOrError.takeError());
+      if (overriddenAffectsABI || !ctx.LangOpts.EnableDeserializationRecovery) {
+        return llvm::make_error<OverrideError>(name, errorFlags,
+                                               numVTableEntries);
+      }
 
-      llvm::consumeError(overridden.takeError());
-      return llvm::make_error<OverrideError>(
-          name, errorFlags, numVTableEntries);
+      overridden = nullptr;
     }
 
     for (auto dependencyID : argNameAndDependencyIDs.slice(numArgNames)) {
@@ -3198,7 +3209,7 @@ public:
     ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{ctor},
                               std::move(needsNewVTableEntry));
 
-    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
+    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden));
     if (auto *overridden = ctor->getOverriddenDecl()) {
       if (!attributeChainContains<RequiredAttr>(DAttrs) ||
           !overridden->isRequired()) {

@@ -39,6 +39,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class IdentTypeRepr;
   class IDEInspectionCallbacks;
   class IDEInspectionCallbacksFactory;
   class DefaultArgumentInitializer;
@@ -1327,19 +1328,29 @@ public:
                                      SourceLoc &LAngleLoc,
                                      SourceLoc &RAngleLoc);
 
-  /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
+  /// Parses and returns the base type for a qualified declaration name,
+  /// positioning the parser at the '.' before the final declaration name. This
+  /// position is important for parsing final declaration names like '.init' via
+  /// `parseUnqualifiedDeclName`. For example, 'Foo.Bar.f' parses as 'Foo.Bar'
+  /// and the parser is positioned at '.f'. If there is no base type qualifier
+  /// (e.g. when parsing just 'f'), returns an empty parser error.
   ///
-  /// When `isParsingQualifiedDeclBaseType` is true:
-  /// - Parses and returns the base type for a qualified declaration name,
-  ///   positioning the parser at the '.' before the final declaration name.
-  //    This position is important for parsing final declaration names like
-  //    '.init' via `parseUnqualifiedDeclName`.
-  /// - For example, 'Foo.Bar.f' parses as 'Foo.Bar' and the parser is
-  ///   positioned at '.f'.
-  /// - If there is no base type qualifier (e.g. when parsing just 'f'), returns
-  ///   an empty parser error.
-  ParserResult<TypeRepr> parseTypeIdentifier(
-      bool isParsingQualifiedDeclBaseType = false);
+  /// \verbatim
+  ///   qualified-decl-name-base-type:
+  ///     identifier generic-args? ('.' identifier generic-args?)*
+  /// \endverbatim
+  ParserResult<TypeRepr> parseQualifiedDeclNameBaseType();
+
+  /// Parse an identifier type, e.g 'Foo' or 'Bar<Int>'.
+  ///
+  /// \verbatim
+  /// type-identifier: identifier generic-args?
+  /// \endverbatim
+  ParserResult<IdentTypeRepr> parseTypeIdentifier();
+
+  /// Parse a dotted type, e.g. 'Foo<X>.Y.Z', 'P.Type', '[X].Y'.
+  ParserResult<TypeRepr> parseTypeDotted(ParserResult<TypeRepr> Base);
+
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
@@ -1587,10 +1598,7 @@ public:
   /// \verbatim
   ///   simple-type-identifier: identifier generic-argument-list?
   /// \endverbatim
-  bool canParseSimpleTypeIdentifier();
-
   bool canParseTypeIdentifier();
-  bool canParseTypeIdentifierOrTypeComposition();
   bool canParseOldStyleProtocolComposition();
   bool canParseTypeTupleBody();
   bool canParseTypeAttribute();
@@ -1599,10 +1607,6 @@ public:
   bool canParseTypedPattern();
 
   /// Returns true if a qualified declaration name base type can be parsed.
-  ///
-  /// \verbatim
-  ///   qualified-decl-name-base-type: simple-type-identifier '.'
-  /// \endverbatim
   bool canParseBaseTypeForQualifiedDeclName();
 
   /// Returns true if the current token is '->' or effects specifiers followed

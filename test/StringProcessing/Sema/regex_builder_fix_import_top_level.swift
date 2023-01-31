@@ -19,11 +19,7 @@ Regex { // expected-error {{regex builder requires the 'RegexBuilder' module be 
   /g(h)(i)/
 }
 
-// FIXME: Unfortunately we bail from CSGen if we end up with an ErrorExpr, so
-// don't get a chance to diagnose. We ought to try solving with holes.
-// For now at least, this error should at least hopefully nudge users into
-// realizing they have a missing import.
-Regex {
+Regex { // expected-error {{regex builder requires the 'RegexBuilder' module be imported'}}
   Capture { // expected-error {{cannot find 'Capture' in scope}}
     /abc/
   }

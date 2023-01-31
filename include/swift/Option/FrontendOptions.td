@@ -342,6 +342,8 @@ def debug_requirement_machine : Joined<["-"], "debug-requirement-machine=">,
 
 def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
   HelpText<"Dumps the results of each macro expansion">;
+def emit_macro_expansion_files : Separate<["-"], "emit-macro-expansion-files">,
+  HelpText<"Specify when to emit macro expansion file: 'none', 'debug', or 'diagnostics'">;
 
 def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
