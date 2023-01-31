@@ -541,6 +541,25 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
     Printer.printNewline();
 }
 
+static void printShortFormBackDeployed(ArrayRef<const DeclAttribute *> Attrs,
+                                       ASTPrinter &Printer,
+                                       const PrintOptions &Options) {
+  assert(!Attrs.empty());
+  Printer << "@_backDeploy(before: ";
+  bool isFirst = true;
+
+  for (auto *DA : Attrs) {
+    if (!isFirst)
+      Printer << ", ";
+    auto *attr = cast<BackDeployAttr>(DA);
+    Printer << platformString(attr->Platform) << " "
+            << attr->Version.getAsString();
+    isFirst = false;
+  }
+  Printer << ")";
+  Printer.printNewline();
+}
+
 /// The kind of a parameter in a `wrt:` differentiation parameters clause:
 /// either a differentiability parameter or a linearity parameter. Used for
 /// printing `@differentiable`, `@derivative`, and `@transpose` attributes.
@@ -752,6 +771,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector shortAvailableAttributes;
   const DeclAttribute *swiftVersionAvailableAttribute = nullptr;
   const DeclAttribute *packageDescriptionVersionAvailableAttribute = nullptr;
+  AttributeVector backDeployAttributes;
   AttributeVector longAttributes;
   AttributeVector attributes;
   AttributeVector modifiers;
@@ -789,6 +809,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     }
 
     AttributeVector &which = DA->isDeclModifier() ? modifiers :
+                             isa<BackDeployAttr>(DA) ? backDeployAttributes :
                              isShortAvailable(DA) ? shortAvailableAttributes :
                              DA->isLongAttribute() ? longAttributes :
                              attributes;
@@ -801,6 +822,8 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     printShortFormAvailable(packageDescriptionVersionAvailableAttribute, Printer, Options);
   if (!shortAvailableAttributes.empty())
     printShortFormAvailable(shortAvailableAttributes, Printer, Options);
+  if (!backDeployAttributes.empty())
+    printShortFormBackDeployed(backDeployAttributes, Printer, Options);
 
   for (auto DA : longAttributes)
     DA->print(Printer, Options, D);
