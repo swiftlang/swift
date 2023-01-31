@@ -440,6 +440,7 @@ private:
     case Node::Kind::LazyProtocolWitnessTableCacheVariable:
     case Node::Kind::LocalDeclName:
     case Node::Kind::Macro:
+    case Node::Kind::MacroExpansionUniqueName:
     case Node::Kind::MaterializeForSet:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
@@ -1340,6 +1341,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::FreestandingMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "freestanding macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::MacroExpansionUniqueName:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "unique name #",
                        (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::GenericTypeParamDecl:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,

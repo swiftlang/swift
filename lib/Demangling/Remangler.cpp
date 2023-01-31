@@ -2880,6 +2880,14 @@ ManglingError Remangler::mangleFreestandingMacroExpansion(
   return mangleChildNode(node, 2, depth + 1);
 }
 
+ManglingError Remangler::mangleMacroExpansionUniqueName(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMu";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
 ManglingError Remangler::mangleSuffix(Node *node, unsigned depth) {
   // Just add the suffix back on.
   Buffer << node->getText();

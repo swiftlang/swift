@@ -218,10 +218,25 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
       throw CustomError.message("#bitwidthNumberedStructs macro requires a string literal")
     }
 
+    if prefix.content.text == "BUG" {
+      return [
+        """
+
+        struct \(raw: prefix) {
+          func \(context.createUniqueName("method"))() { return 1 }
+          func \(context.createUniqueName("method"))() { return 1 }
+        }
+        """
+      ]
+    }
+
     return [8, 16, 32, 64].map { bitwidth in
       """
 
-      struct \(raw: prefix)\(raw: String(bitwidth)) { }
+      struct \(raw: prefix)\(raw: String(bitwidth)) {
+        func \(context.createUniqueName("method"))() { }
+        func \(context.createUniqueName("method"))() { }
+      }
       """
     }
   }

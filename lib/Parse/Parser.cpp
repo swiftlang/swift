@@ -520,6 +520,18 @@ bool Parser::allowTopLevelCode() const {
   return SF.isScriptMode();
 }
 
+bool Parser::isInMacroExpansion(SourceLoc loc) const {
+  if (loc.isInvalid())
+    return false;
+
+  auto bufferID = SourceMgr.findBufferContainingLoc(loc);
+  auto generatedSourceInfo = SourceMgr.getGeneratedSourceInfo(bufferID);
+  if (!generatedSourceInfo)
+    return false;
+
+  return true;
+}
+
 const Token &Parser::peekToken() {
   return L->peekNextToken();
 }

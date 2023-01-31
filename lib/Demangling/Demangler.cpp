@@ -3902,12 +3902,18 @@ NodePointer Demangler::demangleMacroExpansion() {
     kind = Node::Kind::FreestandingMacroExpansion;
     break;
 
+  case 'u':
+    kind = Node::Kind::MacroExpansionUniqueName;
+    break;
+
   default:
     return nullptr;
   }
 
   NodePointer name = popNode(Node::Kind::Identifier);
-  NodePointer context = popContext();
+  NodePointer context = popNode(Node::Kind::FreestandingMacroExpansion);
+  if (!context)
+    context = popContext();
   NodePointer discriminator = demangleIndexAsNode();
   return createWithChildren(kind, context, name, discriminator);
 }

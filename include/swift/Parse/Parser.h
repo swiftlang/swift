@@ -195,6 +195,8 @@ public:
 
   bool allowTopLevelCode() const;
 
+  bool isInMacroExpansion(SourceLoc loc) const;
+
   const std::vector<Token> &getSplitTokens() const { return SplitTokens; }
 
   void markSplitToken(tok Kind, StringRef Txt);
@@ -575,7 +577,8 @@ public:
       return;
 
     if (tok.getText().size() == 1 || Context.LangOpts.EnableDollarIdentifiers ||
-        isInSILMode() || L->isSwiftInterface())
+        isInSILMode() || L->isSwiftInterface() ||
+        isInMacroExpansion(tok.getLoc()))
       return;
 
     diagnose(tok.getLoc(), diag::dollar_identifier_decl,
