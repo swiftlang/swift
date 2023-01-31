@@ -6051,16 +6051,19 @@ public:
   }
 };
 
+/// An invocation of a macro expansion, spelled with `#` for freestanding
+/// macros or `@` for attached macros.
 class MacroExpansionExpr final : public Expr {
 private:
   DeclContext *DC;
-  SourceLoc PoundLoc;
+  SourceLoc SigilLoc;
   DeclNameRef MacroName;
   DeclNameLoc MacroNameLoc;
   SourceLoc LeftAngleLoc, RightAngleLoc;
   ArrayRef<TypeRepr *> GenericArgs;
   ArgumentList *ArgList;
   Expr *Rewritten;
+  MacroRoles Roles;
 
   /// The referenced macro.
   ConcreteDeclRef macroRef;
@@ -6069,21 +6072,22 @@ public:
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
   explicit MacroExpansionExpr(DeclContext *dc,
-                              SourceLoc poundLoc, DeclNameRef macroName,
+                              SourceLoc sigilLoc, DeclNameRef macroName,
                               DeclNameLoc macroNameLoc,
                               SourceLoc leftAngleLoc,
                               ArrayRef<TypeRepr *> genericArgs,
                               SourceLoc rightAngleLoc,
                               ArgumentList *argList,
+                              MacroRoles roles,
                               bool isImplicit = false,
                               Type ty = Type())
       : Expr(ExprKind::MacroExpansion, isImplicit, ty),
-        DC(dc), PoundLoc(poundLoc),
+        DC(dc), SigilLoc(sigilLoc),
         MacroName(macroName), MacroNameLoc(macroNameLoc),
         LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
         GenericArgs(genericArgs),
         ArgList(argList),
-        Rewritten(nullptr) {
+        Rewritten(nullptr), Roles(roles) {
     Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
   }
 
@@ -6102,7 +6106,9 @@ public:
   ArgumentList *getArgs() const { return ArgList; }
   void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
 
-  SourceLoc getLoc() const { return PoundLoc; }
+  MacroRoles getMacroRoles() const { return Roles; }
+
+  SourceLoc getLoc() const { return SigilLoc; }
 
   ConcreteDeclRef getMacroRef() const { return macroRef; }
   void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }

@@ -105,7 +105,7 @@ func testDiags(a: Int, b: Int) {
 
   struct Foo {
     #unaryDeclMacro("abc", blah: false) // okay
-    #unaryDeclMacro("abc", blah: false, oh: 2) // expected-error {{extra argument 'oh' in call}}
+    #unaryDeclMacro("abc", blah: false, oh: 2) // expected-error {{extra argument 'oh' in macro expansion}}
     #genericDeclMacro(2, 4.0) // okay
     #genericDeclMacro(2, "not a number") // expected-error {{macro 'genericDeclMacro' requires that 'String' conform to 'Numeric'}}
   }
