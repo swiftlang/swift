@@ -27,6 +27,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -131,6 +132,7 @@ namespace {
 } // namespace
 
 namespace swift {
+  /// The parser for an individual SIL function.
   class SILParser {
     friend SILParserState;
   public:
@@ -1255,10 +1257,10 @@ Type SILParser::performTypeResolution(TypeRepr *TyR, bool IsSILType,
   if (!GenericSig)
     GenericSig = ContextGenericSig;
 
-  return swift::performTypeResolution(TyR, P.Context,
-                                      /*isSILMode=*/true, IsSILType,
-                                      GenericSig, GenericParams,
-                                      &P.SF);
+  SILTypeResolutionContext SILContext(IsSILType, GenericParams);
+
+  return swift::performTypeResolution(TyR, P.Context, GenericSig,
+                                      &SILContext, &P.SF);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -7590,12 +7592,11 @@ static bool parseSILWitnessTableEntry(
       if (TyR.isNull())
         return true;
 
+      SILTypeResolutionContext silContext(/*isSILType=*/false,
+                                          witnessParams);
       auto Ty =
           swift::performTypeResolution(TyR.get(), P.Context,
-                                       /*isSILMode=*/false,
-                                       /*isSILType=*/false,
-                                       witnessSig,
-                                       witnessParams,
+                                       witnessSig, &silContext,
                                        &P.SF);
       if (witnessSig) {
         Ty = witnessSig.getGenericEnvironment()->mapTypeIntoContext(Ty);
@@ -7655,11 +7656,11 @@ static bool parseSILWitnessTableEntry(
     if (TyR.isNull())
       return true;
 
+    SILTypeResolutionContext silContext(/*isSILType=*/false,
+                                        witnessParams);
     auto Ty =
         swift::performTypeResolution(TyR.get(), P.Context,
-                                     /*isSILMode=*/false,
-                                     /*isSILType=*/false,
-                                     witnessSig, witnessParams,
+                                     witnessSig, &silContext,
                                      &P.SF);
     if (witnessSig) {
       Ty = witnessSig.getGenericEnvironment()->mapTypeIntoContext(Ty);

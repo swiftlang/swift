@@ -5302,6 +5302,8 @@ NOTE(overridden_required_initializer_here,none,
 // Functions
 ERROR(attribute_requires_function_type,none,
       "@%0 attribute only applies to function types", (StringRef))
+ERROR(generic_function_type,none,
+      "function values cannot be generic", ())
 ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
 ERROR(unreferenced_generic_parameter,NoUsage,
