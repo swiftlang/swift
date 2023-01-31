@@ -2065,6 +2065,7 @@ bool Parser::parseDocumentationAttributeArgument(Optional<StringRef> &Metadata,
       llvm::StringSwitch<Optional<AccessLevel>>(ArgumentValue)
         .Case("open", AccessLevel::Open)
         .Case("public", AccessLevel::Public)
+        .Case("package", AccessLevel::Package)
         .Case("internal", AccessLevel::Internal)
         .Case("private", AccessLevel::Private)
         .Case("fileprivate", AccessLevel::FilePrivate)
@@ -2742,6 +2743,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       .Case("private", AccessLevel::Private)
       .Case("fileprivate", AccessLevel::FilePrivate)
       .Case("internal", AccessLevel::Internal)
+      .Case("package", AccessLevel::Package)
       .Case("public", AccessLevel::Public)
       .Case("open", AccessLevel::Open);
 

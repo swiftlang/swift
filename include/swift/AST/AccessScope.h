@@ -86,8 +86,10 @@ public:
   }
 
   /// Returns true if this scope is more restrictive than the argument scope.
-  /// It's often used to compute the min access scope. The order of restrictiveness
-  /// is: private (most restrictive), fileprivate, internal, package, public (least restrictive).
+  /// This function does _not_ check if the access level is more restrictive than the argument access level.
+  /// It checks if the scope of this use site is more restrictive than the scope of the argument (decl site).
+  /// For example, the scope is FileUnit for a fileprivate decl, Module for an internal decl, and null for a public
+  /// or package decl.
   /// \see DeclContext::isChildContextOf
   bool isChildOf(AccessScope AS) const {
     if (isInternalOrLess()) {
