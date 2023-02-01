@@ -777,7 +777,13 @@ bool swift::expandFreestandingDeclarationMacro(
 static SourceFile *
 evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
                       bool passParentContext, MacroRole role) {
-  auto *dc = attachedTo->getInnermostDeclContext();
+  DeclContext *dc;
+  if (role == MacroRole::Peer) {
+    dc = attachedTo->getDeclContext();
+  } else {
+    dc = attachedTo->getInnermostDeclContext();
+  }
+
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
 
@@ -931,6 +937,9 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
     break;
   case MacroRole::Member:
     generatedSourceKind = GeneratedSourceInfo::MemberMacroExpansion;
+    break;
+  case MacroRole::Peer:
+    generatedSourceKind = GeneratedSourceInfo::PeerMacroExpansion;
     break;
   case MacroRole::Expression:
   case MacroRole::Declaration:

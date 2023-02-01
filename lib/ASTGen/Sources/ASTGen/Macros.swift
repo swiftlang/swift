@@ -38,6 +38,7 @@ enum MacroRole: UInt8 {
   case Accessor = 0x04
   case MemberAttribute = 0x08
   case Member = 0x10
+  case Peer = 0x20
 }
 
 /// Resolve a reference to type metadata into a macro, if posible.
@@ -427,6 +428,21 @@ func expandAttachedMacro(
 
       // Form a buffer of member declarations to return to the caller.
       evaluatedSyntaxStr = members.map {
+        $0.trimmedDescription
+      }.joined(separator: "\n\n")
+
+    case (let attachedMacro as PeerMacro.Type, .Peer):
+      let peers = try attachedMacro.expansion(
+        of: sourceManager.detach(
+          customAttrNode,
+          foldingWith: OperatorTable.standardOperators
+        ),
+        providingPeersOf: sourceManager.detach(declarationNode),
+        in: context
+      )
+
+      // Form a buffer of peer declarations to return to the caller.
+      evaluatedSyntaxStr = peers.map {
         $0.trimmedDescription
       }.joined(separator: "\n\n")
 

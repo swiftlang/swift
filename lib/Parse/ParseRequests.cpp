@@ -198,6 +198,12 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       parser.parseExpandedAttributeList(items);
       break;
     }
+
+    case GeneratedSourceInfo::PeerMacroExpansion: {
+      // FIXME: this does not work for top-level or local peer expansions.
+      parser.parseExpandedMemberList(items);
+      break;
+    }
     }
   } else {
     parser.parseTopLevelItems(items);

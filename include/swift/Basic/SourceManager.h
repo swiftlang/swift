@@ -47,6 +47,9 @@ public:
     /// The expansion of an attached member macro.
     MemberMacroExpansion,
 
+    /// The expansion of an attached peer macro.
+    PeerMacroExpansion,
+
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
 

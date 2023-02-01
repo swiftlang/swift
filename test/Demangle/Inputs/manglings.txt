@@ -455,3 +455,4 @@ $s9MacroUser13testStringify1a1bySi_SitF9stringifyfMf1_ ---> freestanding macro e
 $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0_ ---> unique name #2 of method in freestanding macro expansion #1 of bitwidthNumberedStructs in Foo3 #1 in MacroUser.testFreestandingMacroExpansion() -> ()
 @__swiftmacro_1a13testStringifyAA1bySi_SitF9stringifyfMf_  ---> freestanding macro expansion #1 of stringify in a.testStringify(a: Swift.Int, b: Swift.Int) -> ()
 @__swiftmacro_15accessor_macros8MyStructV4nameSSvp17myPropertyWrapperfMa_ ---> accessor macro expansion #1 of myPropertyWrapper in accessor_macros.MyStruct.name : Swift.String
+@__swiftmacro_18macro_expand_peers1SV1f1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_ ---> peer macro expansion #1 of addCompletionHandler in macro_expand_peers.S.f(a: Swift.Int, for: Swift.String, _: Swift.Double) async -> Swift.String
