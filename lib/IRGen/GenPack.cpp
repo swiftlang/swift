@@ -164,30 +164,9 @@ static Address emitFixedSizeMetadataPackRef(IRGenFunction &IGF,
   return pack;
 }
 
-static void emitPackExpansionType(IRGenFunction &IGF,
-                                  Address pack,
-                                  CanPackExpansionType expansionTy,
-                                  llvm::Value *dynamicIndex,
-                                  llvm::Value *dynamicLength,
-                                  DynamicMetadataRequest request) {
-  auto *prev = IGF.Builder.GetInsertBlock();
-  auto *check = IGF.createBasicBlock("pack-expansion-check");
-  auto *loop = IGF.createBasicBlock("pack-expansion-loop");
-  auto *rest = IGF.createBasicBlock("pack-expansion-rest");
-
-  IGF.Builder.CreateBr(check);
-  IGF.Builder.emitBlock(check);
-
-  // An index into the source metadata pack.
-  auto *phi = IGF.Builder.CreatePHI(IGF.IGM.SizeTy, 2);
-  phi->addIncoming(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), prev);
-
-  // If we reach the end, jump to the continuation block.
-  auto *cond = IGF.Builder.CreateICmpULT(phi, dynamicLength);
-  IGF.Builder.CreateCondBr(cond, loop, rest);
-
-  IGF.Builder.emitBlock(loop);
-
+static llvm::Value *emitPackExpansionElementMetadata(
+    IRGenFunction &IGF, CanPackExpansionType expansionTy, llvm::Value *phi,
+    DynamicMetadataRequest request) {
   auto patternTy = expansionTy.getPatternType();
 
   // Find all the pack archetypes appearing in the pattern type.
@@ -247,6 +226,34 @@ static void emitPackExpansionType(IRGenFunction &IGF,
   // Emit the element metadata.
   auto element = IGF.emitTypeMetadataRef(instantiatedPatternTy, request)
       .getMetadata();
+  return element;
+}
+
+static void emitPackExpansionType(IRGenFunction &IGF, Address pack,
+                                  CanPackExpansionType expansionTy,
+                                  llvm::Value *dynamicIndex,
+                                  llvm::Value *dynamicLength,
+                                  DynamicMetadataRequest request) {
+  auto *prev = IGF.Builder.GetInsertBlock();
+  auto *check = IGF.createBasicBlock("pack-expansion-check");
+  auto *loop = IGF.createBasicBlock("pack-expansion-loop");
+  auto *rest = IGF.createBasicBlock("pack-expansion-rest");
+
+  IGF.Builder.CreateBr(check);
+  IGF.Builder.emitBlock(check);
+
+  // An index into the source metadata pack.
+  auto *phi = IGF.Builder.CreatePHI(IGF.IGM.SizeTy, 2);
+  phi->addIncoming(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), prev);
+
+  // If we reach the end, jump to the continuation block.
+  auto *cond = IGF.Builder.CreateICmpULT(phi, dynamicLength);
+  IGF.Builder.CreateCondBr(cond, loop, rest);
+
+  IGF.Builder.emitBlock(loop);
+
+  auto *element =
+      emitPackExpansionElementMetadata(IGF, expansionTy, phi, request);
 
   // Store the element metadata into to the current destination index.
   auto *eltIndex = IGF.Builder.CreateAdd(dynamicIndex, phi);
