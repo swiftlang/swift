@@ -1768,6 +1768,14 @@ private:
       // Evaluate the expression, then produce a return statement that
       // returns nothing.
       TypeChecker::checkIgnoredExpr(resultExpr);
+
+      // For a single expression closure, we can just preserve the result expr,
+      // and leave the return as implied. This avoids neededing to jump through
+      // nested brace statements to dig out the single expression in
+      // ClosureExpr::getSingleExpressionBody.
+      if (context.isSingleExpressionClosure(cs))
+        return resultExpr;
+
       auto &ctx = solution.getConstraintSystem().getASTContext();
       auto newReturnStmt =
           new (ctx) ReturnStmt(
