@@ -6,13 +6,13 @@
 
 // REQUIRES: OS=macosx
 
-@_backDeploy(before: macOS 10.52)
+@backDeployed(before: macOS 10.52)
 public func someFunc() {}
 
 public struct S<T> {
   @usableFromInline var _x: T
 
-  @_backDeploy(before: macOS 10.52)
+  @backDeployed(before: macOS 10.52)
   public var x: T {
     get { _x }
     set { _x = newValue }
@@ -59,7 +59,7 @@ func aeicCaller(_ s: inout S<Z>) {
 }
 
 // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy0A14DeployedCalleryyAA1SVyAA1ZVGzFTwB
-@_backDeploy(before: macOS 10.52)
+@backDeployed(before: macOS 10.52)
 public func backDeployedCaller(_ s: inout S<Z>) {
   // CHECK: function_ref @$s11back_deploy8someFuncyyFTwb : $@convention(thin) () -> ()
   someFunc()
