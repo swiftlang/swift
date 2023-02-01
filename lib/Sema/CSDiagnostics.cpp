@@ -4634,7 +4634,8 @@ ASTNode MissingArgumentsFailure::getAnchor() const {
 }
 
 SourceLoc MissingArgumentsFailure::getLoc() const {
-  if (auto *argList = getArgumentListFor(getLocator()))
+  auto *argList = getArgumentListFor(getLocator());
+  if (argList && !argList->isImplicit())
     return argList->getLoc();
   return FailureDiagnostic::getLoc();
 }
@@ -4729,17 +4730,25 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 
   // TODO(diagnostics): We should be able to suggest this fix-it
   // unconditionally.
-  if (args && args->empty()) {
-    SmallString<32> scratch;
-    llvm::raw_svector_ostream fixIt(scratch);
+  SmallString<32> scratch;
+  llvm::raw_svector_ostream fixIt(scratch);
+  auto appendMissingArgsToFix = [&]() {
     interleave(
         SynthesizedArgs,
         [&](const SynthesizedArg &arg) {
           forFixIt(fixIt, arg.param);
         },
         [&] { fixIt << ", "; });
+  };
 
+  if (args && args->empty() && !args->isImplicit()) {
+    appendMissingArgsToFix();
     diag.fixItInsertAfter(args->getLParenLoc(), fixIt.str());
+  } else if (isExpr<MacroExpansionExpr>(getRawAnchor())) {
+    fixIt << "(";
+    appendMissingArgsToFix();
+    fixIt << ")";
+    diag.fixItInsertAfter(getRawAnchor().getEndLoc(), fixIt.str());
   }
 
   diag.flush();
@@ -8520,35 +8529,6 @@ bool ConflictingPatternVariables::diagnoseAsError() {
 bool AddMissingMacroPound::diagnoseAsError() {
   emitDiagnostic(diag::macro_expansion_missing_pound, macro->getName())
     .fixItInsert(getLoc(), "#");
-  return true;
-}
-
-bool AddMissingMacroArguments::diagnoseAsError() {
-  std::string argumentString;
-  {
-    llvm::raw_string_ostream out(argumentString);
-    out << "(";
-    llvm::interleave(
-        macro->parameterList->begin(), macro->parameterList->end(),
-        [&](ParamDecl *param) {
-          if (!param->getArgumentName().empty()) {
-            out << param->getArgumentName() << ": ";
-          }
-
-          out << "<#" << param->getInterfaceType().getString() << "#" << ">";
-        },
-        [&] {
-          out << ", ";
-        });
-    out << ")";
-  }
-
-  auto insertLoc = getRawAnchor().getEndLoc();
-  emitDiagnostic(diag::macro_expansion_missing_arguments, macro->getName())
-    .fixItInsertAfter(insertLoc, argumentString);
-  macro->diagnose(
-      diag::kind_declname_declared_here, macro->getDescriptiveKind(),
-      macro->getName());
   return true;
 }
 

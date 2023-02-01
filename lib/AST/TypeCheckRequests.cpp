@@ -1676,6 +1676,16 @@ DeclNameRef UnresolvedMacroReference::getMacroName() const {
   llvm_unreachable("Unhandled case");
 }
 
+SourceLoc UnresolvedMacroReference::getSigilLoc() const {
+  if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
+    return med->getPoundLoc();
+  if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
+    return mee->getLoc();
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>())
+    return attr->getRangeWithAt().Start;
+  llvm_unreachable("Unhandled case");
+}
+
 DeclNameLoc UnresolvedMacroReference::getMacroNameLoc() const {
   if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
     return med->getMacroLoc();
