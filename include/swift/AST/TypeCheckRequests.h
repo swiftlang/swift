@@ -3927,7 +3927,7 @@ public:
 
 class GetRuntimeDiscoverableAttributes
     : public SimpleRequest<GetRuntimeDiscoverableAttributes,
-                           ArrayRef<CustomAttr *>(ValueDecl *),
+                           ArrayRef<CustomAttr *>(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3935,7 +3935,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<CustomAttr *> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  ArrayRef<CustomAttr *> evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }

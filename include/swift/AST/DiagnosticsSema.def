@@ -6917,6 +6917,14 @@ ERROR(invalid_decl_for_runtime_discoverable_attr,none,
       "@%0 can only be applied to non-generic types, methods, "
       "instance properties, and global functions", (StringRef))
 
+ERROR(invalid_decl_for_runtime_discoverable_attr_in_extension,none,
+      "@%0 can only be applied to unavailable extensions in the same module"
+      " as %1", (StringRef, DeclName))
+
+ERROR(invalid_attr_redeclaration_in_extension,none,
+      "@%0 is already applied to type %1; did you want to remove it?",
+      (StringRef, DeclName))
+
 ERROR(duplicate_runtime_discoverable_attr,none,
       "duplicate runtime discoverable attribute", ())
 
@@ -6933,6 +6941,26 @@ ERROR(runtime_attribute_type_requirement_not_accessible,none,
       "more restrictive access than its enclosing runtime attribute type %3 "
       "(which is %select{private|fileprivate|internal|package|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+
+ERROR(cannot_use_attr_with_custom_arguments_on_protocol,none,
+      "reflection metadata attributes applied to protocols cannot have"
+      " additional attribute arguments; attribute arguments must be"
+      " explicitly written on the conforming type",
+      ())
+
+NOTE(missing_reflection_metadata_attribute_on_type,none,
+     "protocol %0 requires reflection metadata attribute @%1",
+     (DeclName, StringRef))
+
+ERROR(missing_reflection_metadata_attribute_on_subclass,none,
+      "superclass %0 requires reflection metadata attribute @%1",
+      (DeclName, StringRef))
+NOTE(add_missing_reflection_metadata_attr,none,
+     "add missing reflection metadata attribute @%0", (StringRef))
+NOTE(opt_out_from_missing_reflection_metadata_attr,none,
+     "opt-out of reflection metadata attribute @%0 using"
+     " unavailable extension",
+     (StringRef))
 
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

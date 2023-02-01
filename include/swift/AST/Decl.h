@@ -859,6 +859,10 @@ public:
     return Attrs;
   }
 
+  /// Retrieve runtime discoverable attributes (if any) associated
+  /// with this declaration.
+  ArrayRef<CustomAttr *> getRuntimeDiscoverableAttrs() const;
+
   /// Returns the semantic attributes attached to this declaration,
   /// including attributes that are generated as the result of member
   /// attribute macro expansion.
@@ -2851,9 +2855,6 @@ public:
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
 
-  /// Retrieve runtime discoverable attributes (if any) associated
-  /// with this declaration.
-  ArrayRef<CustomAttr *> getRuntimeDiscoverableAttrs() const;
   /// Retrieve a nominal type declaration backing given runtime discoverable
   /// attribute.
   ///
