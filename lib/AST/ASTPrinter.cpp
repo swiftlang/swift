@@ -5460,6 +5460,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
       if (archetype->isParameterPack() && Options.PrintExplicitEach)
         return false;
+      if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
+        return false;
     }
     return T->hasSimpleTypeRepr();
   }
@@ -6621,12 +6623,58 @@ public:
     }
   }
 
+  static Type findPackForElementArchetype(ElementArchetypeType *T) {
+    // The type in @pack_element is looked up in the generic params
+    // of the identified open_pack_element instruction.  The param list
+    // is long gone, but the sugar survives in the type parameters of
+    // the generic signature of the contextual substitution map in the
+    // opened element environment.
+    auto env = T->getGenericEnvironment();
+    auto subs = env->getPackElementContextSubstitutions();
+    auto sig = subs.getGenericSignature();
+    auto params = sig.getGenericParams();
+
+    auto elementShapeClass =
+      env->getOpenedElementShapeClass()->mapTypeOutOfContext();
+
+    // The element archetypes are at a depth one past the max depth
+    // of the base signature.
+    unsigned elementDepth = params.back()->getDepth() + 1;
+
+    // Transform the archetype's interface type to be based on the
+    // corresponding non-canonical type parameter.
+    auto interfaceType = T->getInterfaceType();
+    return interfaceType.subst([&](SubstitutableType *type) -> Type {
+      // Don't transform types that aren't element type parameters.
+      auto *elementParam = type->getAs<GenericTypeParamType>();
+      if (!elementParam || elementParam->getDepth() != elementDepth)
+        return Type();
+
+      // Loop through the type parameters looking for the type parameter
+      // pack at the appropriate index.  We only expect to actually do
+      // this once for each type, so it's fine to do it in the callback.
+      unsigned nextIndex = 0;
+      for (auto *genericParam : params) {
+        if (!genericParam->isParameterPack())
+          continue;
+
+        if (!sig->haveSameShape(genericParam, elementShapeClass))
+          continue;
+
+        if (nextIndex == elementParam->getIndex())
+          return genericParam;
+        nextIndex++;
+      }
+      llvm_unreachable("ran out of type parameters");
+      return Type();
+    }, LookUpConformanceInSignature(sig.getPointer()));
+  }
+
   void visitElementArchetypeType(ElementArchetypeType *T) {
     if (Options.PrintForSIL) {
-      Printer << "@element(\"" << T->getOpenedElementID() << ") ";
-
-      auto interfaceTy = T->getInterfaceType();
-      visit(interfaceTy);
+      Printer << "@pack_element(\"" << T->getOpenedElementID() << "\") ";
+      auto packTy = findPackForElementArchetype(T);
+      visit(packTy);
     } else {
       visit(T->getInterfaceType());
     }

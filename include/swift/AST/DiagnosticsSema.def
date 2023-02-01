@@ -5302,6 +5302,8 @@ NOTE(overridden_required_initializer_here,none,
 // Functions
 ERROR(attribute_requires_function_type,none,
       "@%0 attribute only applies to function types", (StringRef))
+ERROR(generic_function_type,none,
+      "function values cannot be generic", ())
 ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
 ERROR(unreferenced_generic_parameter,NoUsage,
@@ -5383,6 +5385,9 @@ ERROR(illegal_sil_type,none,
       "type %0 is not a legal SIL value type", (Type))
 ERROR(sil_box_arg_mismatch,none,
       "SIL box type has wrong number of generic arguments for layout", ())
+ERROR(sil_pack_element_uuid_not_found,none,
+      "open_pack_element instruction not found for @pack_element type UUID; "
+      "possible forward reference?", ())
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,
       "metatypes in SIL must have @thin, @thick, or @objc_metatype attribute",
