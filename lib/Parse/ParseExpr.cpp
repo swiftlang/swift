@@ -1806,7 +1806,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
   // by the lexer, so there is no reason to emit another diagnostic.
   case tok::unknown:
-    if (Tok.getText().startswith("\"\"\"")) {
+    if (startsWithMultilineStringDelimiter(Tok)) {
       // This was due to unterminated multi-line string.
       IsInputIncomplete = true;
     }
