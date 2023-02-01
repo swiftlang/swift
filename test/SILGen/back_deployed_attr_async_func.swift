@@ -43,7 +43,7 @@
 // -- Original definition of trivialFunc()
 // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy9asyncFuncyyYaF : $@convention(thin) @async () -> ()
 @available(macOS 10.51, *)
-@_backDeploy(before: macOS 10.52)
+@backDeployed(before: macOS 10.52)
 public func asyncFunc() async {
   await otherFunc()
 }
