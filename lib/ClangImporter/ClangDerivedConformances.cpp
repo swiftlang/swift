@@ -521,3 +521,41 @@ void swift::conformToCxxSequenceIfNeeded(
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::CxxConvertibleToCollection});
 }
+
+void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
+                                    NominalTypeDecl *decl,
+                                    const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to CxxSet", decl);
+
+  assert(decl);
+  assert(clangDecl);
+  ASTContext &ctx = decl->getASTContext();
+
+  // Only auto-conform types from the C++ standard library. Custom user types
+  // might have a similar interface but different semantics.
+  if (!clangDecl->isInStdNamespace())
+    return;
+  if (!clangDecl->getIdentifier())
+    return;
+  StringRef name = clangDecl->getName();
+  if (name != "set" && name != "unordered_set" && name != "multiset")
+    return;
+
+  auto valueTypeId = ctx.getIdentifier("value_type");
+  auto valueTypes = lookupDirectWithoutExtensions(decl, valueTypeId);
+  if (valueTypes.size() != 1)
+    return;
+  auto valueType = dyn_cast<TypeAliasDecl>(valueTypes.front());
+
+  auto sizeTypeId = ctx.getIdentifier("size_type");
+  auto sizeTypes = lookupDirectWithoutExtensions(decl, sizeTypeId);
+  if (sizeTypes.size() != 1)
+    return;
+  auto sizeType = dyn_cast<TypeAliasDecl>(sizeTypes.front());
+
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
+                               valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               sizeType->getUnderlyingType());
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSet});
+}

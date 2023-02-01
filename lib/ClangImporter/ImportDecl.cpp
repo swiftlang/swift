@@ -2609,6 +2609,7 @@ namespace {
         auto nominalDecl = cast<NominalTypeDecl>(result);
         conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
         conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
+        conformToCxxSetIfNeeded(Impl, nominalDecl, decl);
       }
 
       if (auto *ntd = dyn_cast<NominalTypeDecl>(result))

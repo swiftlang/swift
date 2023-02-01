@@ -420,6 +420,12 @@ llvm::ErrorOr<ModuleDependencyInfo> SerializedModuleLoaderBase::scanModuleFile(
     if (dependency.isHeader())
       continue;
 
+    // Transitive @_implementationOnly dependencies of
+    // binary modules are not required to be imported during normal builds
+    // TODO: This is worth revisiting for debugger purposes
+    if (dependency.isImplementationOnly())
+      continue;
+
     // Find the top-level module name.
     auto modulePathStr = dependency.getPrettyPrintedPath();
     StringRef moduleName = modulePathStr;
