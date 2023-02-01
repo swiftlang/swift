@@ -87,14 +87,9 @@ VarDecl *LinearMapInfo::addVarDecl(NominalTypeDecl *nominal, StringRef name,
 
 void LinearMapInfo::computeAccessLevel(NominalTypeDecl *nominal,
                                        SILLinkage originalLinkage) {
-  auto &astCtx = nominal->getASTContext();
   switch (originalLinkage) {
   case swift::SILLinkage::Public:
   case swift::SILLinkage::PublicNonABI:
-    nominal->setAccess(AccessLevel::Internal);
-    nominal->getAttrs().add(new (astCtx)
-                                UsableFromInlineAttr(/*Implicit*/ true));
-    break;
   case swift::SILLinkage::Hidden:
   case swift::SILLinkage::Shared:
     nominal->setAccess(AccessLevel::Internal);
@@ -139,6 +134,7 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   branchingTraceDecl->setImplicit();
   // Branching trace enums shall not be resilient.
   branchingTraceDecl->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
+  branchingTraceDecl->getAttrs().add(new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
   if (genericSig)
     branchingTraceDecl->setGenericSignature(genericSig);
   computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
@@ -209,6 +205,7 @@ LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
   linearMapStruct->setImplicit();
   // Linear map structs shall not be resilient.
   linearMapStruct->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
+  linearMapStruct->getAttrs().add(new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
   if (genericSig)
     linearMapStruct->setGenericSignature(genericSig);
   computeAccessLevel(linearMapStruct, original->getEffectiveSymbolLinkage());
