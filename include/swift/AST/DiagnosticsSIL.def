@@ -727,6 +727,8 @@ ERROR(noimplicitcopy_used_on_generic_or_existential, none,
 // move only checker diagnostics
 ERROR(sil_moveonlychecker_owned_value_consumed_more_than_once, none,
       "'%0' consumed more than once", (StringRef))
+ERROR(sil_moveonlychecker_owned_value_consumed_and_used_at_same_time, none,
+      "'%0' consumed and used at the same time", (StringRef))
 ERROR(sil_moveonlychecker_value_used_after_consume, none,
       "'%0' used after consume. Lifetime extension of variable requires a copy", (StringRef))
 ERROR(sil_moveonlychecker_guaranteed_value_consumed, none,
@@ -752,6 +754,10 @@ NOTE(sil_moveonlychecker_boundary_use, none,
      "boundary use here", ())
 NOTE(sil_moveonlychecker_consuming_use_here, none,
      "consuming use", ())
+NOTE(sil_moveonlychecker_two_consuming_uses_here, none,
+     "two consuming uses here", ())
+NOTE(sil_moveonlychecker_consuming_and_non_consuming_uses_here, none,
+     "consuming and non-consuming uses here", ())
 NOTE(sil_moveonlychecker_consuming_closure_use_here, none,
      "closure capture", ())
 NOTE(sil_moveonlychecker_nonconsuming_use_here, none,

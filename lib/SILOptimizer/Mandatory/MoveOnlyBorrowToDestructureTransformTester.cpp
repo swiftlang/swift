@@ -106,6 +106,19 @@ static bool runTransform(SILFunction *fn,
       continue;
     }
 
+    // Then check if we had two consuming uses on the same instruction or a
+    // consuming/non-consuming use on the same isntruction.
+    transform.checkForErrorsOnSameInstruction();
+
+    // If we emitted any diagnostic, set madeChange to true, eliminate our mmci,
+    // and continue.
+    if (currentDiagnosticCount != diagnosticEmitter.getDiagnosticCount()) {
+      mmci->replaceAllUsesWith(mmci->getOperand());
+      mmci->eraseFromParent();
+      madeChange = true;
+      continue;
+    }
+
     // At this point, we know that all of our destructure requiring uses are on
     // the boundary of our live range. Now we need to do the rewriting.
     transform.blockToAvailableValues.emplace(transform.liveness);

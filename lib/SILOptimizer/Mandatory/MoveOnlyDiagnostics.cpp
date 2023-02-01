@@ -453,3 +453,56 @@ void DiagnosticEmitter::emitObjectDestructureNeededWithinBorrowBoundary(
   }
   registerDiagnosticEmitted(markedValue);
 }
+
+void DiagnosticEmitter::emitObjectConsumesDestructuredValueTwice(
+    MarkMustCheckInst *markedValue, Operand *firstUse, Operand *secondUse) {
+  assert(firstUse->getUser() == secondUse->getUser());
+  assert(firstUse->isConsuming());
+  assert(secondUse->isConsuming());
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "Emitting object consumes destructure twice error!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
+  LLVM_DEBUG(llvm::dbgs() << "    User: " << *firstUse->getUser());
+  LLVM_DEBUG(llvm::dbgs() << "    First Conflicting Operand: "
+                          << firstUse->getOperandNumber() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "    Second Conflicting Operand: "
+                          << secondUse->getOperandNumber() << '\n');
+
+  auto &astContext = markedValue->getModule().getASTContext();
+  StringRef varName = getVariableNameForValue(markedValue);
+  diagnose(astContext,
+           markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+           diag::sil_moveonlychecker_owned_value_consumed_more_than_once,
+           varName);
+  diagnose(astContext, firstUse->getUser()->getLoc().getSourceLoc(),
+           diag::sil_moveonlychecker_two_consuming_uses_here);
+  registerDiagnosticEmitted(markedValue);
+}
+
+void DiagnosticEmitter::emitObjectConsumesAndUsesDestructuredValue(
+    MarkMustCheckInst *markedValue, Operand *consumingUse,
+    Operand *nonConsumingUse) {
+  assert(consumingUse->getUser() == nonConsumingUse->getUser());
+  assert(consumingUse->isConsuming());
+  assert(!nonConsumingUse->isConsuming());
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "Emitting object consumes destructure twice error!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
+  LLVM_DEBUG(llvm::dbgs() << "    User: " << *consumingUse->getUser());
+  LLVM_DEBUG(llvm::dbgs() << "    Consuming Operand: "
+                          << consumingUse->getOperandNumber() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "    Non Consuming Operand: "
+                          << nonConsumingUse->getOperandNumber() << '\n');
+
+  auto &astContext = markedValue->getModule().getASTContext();
+  StringRef varName = getVariableNameForValue(markedValue);
+  diagnose(astContext,
+           markedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+           diag::sil_moveonlychecker_owned_value_consumed_and_used_at_same_time,
+           varName);
+  diagnose(astContext, consumingUse->getUser()->getLoc().getSourceLoc(),
+           diag::sil_moveonlychecker_consuming_and_non_consuming_uses_here);
+  registerDiagnosticEmitted(markedValue);
+}

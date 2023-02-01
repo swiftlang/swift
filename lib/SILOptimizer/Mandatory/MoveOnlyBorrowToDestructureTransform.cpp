@@ -28,18 +28,20 @@
 #include "MoveOnlyDiagnostics.h"
 #include "MoveOnlyObjectChecker.h"
 
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/FrozenMultiMap.h"
+#include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
-#include "swift/Basic/BlotSetVector.h"
-#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallBitVector.h"
 
 using namespace swift;
 using namespace swift::siloptimizer;
@@ -143,6 +145,7 @@ bool BorrowToDestructureTransform::gatherUses(
           {nextUse, {*leafRange, false /*is lifetime ending*/}});
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             false /*is lifetime ending*/);
+      instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
       continue;
     }
 
@@ -166,6 +169,7 @@ bool BorrowToDestructureTransform::gatherUses(
                           {nextUse, {*leafRange, true /*is lifetime ending*/}});
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             true /*is lifetime ending*/);
+      instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
       continue;
     }
 
@@ -198,34 +202,144 @@ bool BorrowToDestructureTransform::gatherUses(
   return true;
 }
 
+void BorrowToDestructureTransform::checkForErrorsOnSameInstruction() {
+  // At this point, we have emitted all boundary checks. We also now need to
+  // check if any of our consuming uses that are on the boundary are used by the
+  // same instruction as a different consuming or non-consuming use.
+  instToInterestingOperandIndexMap.setFrozen();
+  SmallBitVector usedBits(liveness.getNumSubElements());
+
+  for (auto instRangePair : instToInterestingOperandIndexMap.getRange()) {
+    SWIFT_DEFER { usedBits.reset(); };
+
+    // First loop through our uses and handle any consuming twice errors. We
+    // also setup usedBits to check for non-consuming uses that may overlap.
+    Operand *badOperand = nullptr;
+    Optional<TypeTreeLeafTypeRange> badRange;
+    for (auto *use : instRangePair.second) {
+      if (!use->isConsuming())
+        continue;
+
+      auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use->get(), mmci);
+      for (unsigned index : destructureUseSpan.getRange()) {
+        if (usedBits[index]) {
+          // If we get that we used the same bit twice, we have an error. We set
+          // the badIndex error and break early.
+          badOperand = use;
+          badRange = destructureUseSpan;
+          break;
+        }
+
+        usedBits[index] = true;
+      }
+
+      // If we set badOperand, break so we can emit an error for this
+      // instruction.
+      if (badOperand)
+        break;
+    }
+
+    // If we did not set badIndex for consuming uses, we did not have any
+    // conflicts among consuming uses. see if we have any conflicts with
+    // non-consuming uses. Otherwise, we continue.
+    if (!badOperand) {
+      for (auto *use : instRangePair.second) {
+        if (use->isConsuming())
+          continue;
+
+        auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use->get(), mmci);
+        for (unsigned index : destructureUseSpan.getRange()) {
+          if (!usedBits[index])
+            continue;
+
+          // If we get that we used the same bit twice, we have an error. We set
+          // the badIndex error and break early.
+          badOperand = use;
+          badRange = destructureUseSpan;
+          break;
+        }
+
+        // If we set badOperand, break so we can emit an error for this
+        // instruction.
+        if (badOperand)
+          break;
+      }
+
+      // If we even did not find a non-consuming use that conflicts, then
+      // continue.
+      if (!badOperand)
+        continue;
+    }
+
+    // If badIndex is set, we broke out of the inner loop and need to emit an
+    // error. Use a little more compile time to identify the other operand that
+    // caused the failure. NOTE: badOperand /could/ be a non-consuming use, but
+    // the use we are identifying here will always be consuming.
+    usedBits.reset();
+
+    // Reinitialize use bits with the bad bits.
+    for (unsigned index : badRange->getRange())
+      usedBits[index] = true;
+
+    // Now loop back through looking for the original operand that set the used
+    // bits. This will always be a consuming use.
+    for (auto *use : instRangePair.second) {
+      if (!use->isConsuming())
+        continue;
+
+      auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use->get(), mmci);
+      bool emittedError = false;
+      for (unsigned index : destructureUseSpan.getRange()) {
+        if (!usedBits[index])
+          continue;
+
+        if (badOperand->isConsuming())
+          diagnosticEmitter.emitObjectConsumesDestructuredValueTwice(
+              mmci, use, badOperand);
+        else
+          diagnosticEmitter.emitObjectConsumesAndUsesDestructuredValue(
+              mmci, use, badOperand);
+        emittedError = true;
+      }
+
+      // Once we have emitted the error, just break out of the loop.
+      if (emittedError)
+        break;
+    }
+  }
+}
+
 void BorrowToDestructureTransform::checkDestructureUsesOnBoundary() const {
   LLVM_DEBUG(llvm::dbgs() << "Checking destructure uses on boundary!\n");
+
   // Now that we have found all of our destructure needing uses and liveness
   // needing uses, make sure that none of our destructure needing uses are
-  // within our boundary. If so, we have an automatic error.
+  // within our boundary. If so, we have an automatic error since we have a
+  // use-after-free.
   for (auto *use : destructureNeedingUses) {
     LLVM_DEBUG(llvm::dbgs()
                << "    DestructureNeedingUse: " << *use->getUser());
+
     auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use->get(), mmci);
-    if (liveness.isWithinBoundary(use->getUser(), destructureUseSpan)) {
-      LLVM_DEBUG(llvm::dbgs() << "        Within boundary! Emitting error!\n");
-      // Emit an error. We have a use after free.
-      //
-      // NOTE: Since we are going to emit an error here, we do the boundary
-      // computation to ensure that we only do the boundary computation once:
-      // when we emit an error or once we know we need to do rewriting.
-      //
-      // TODO: Fix diagnostic to use destructure needing use and boundary
-      // uses.
-      FieldSensitivePrunedLivenessBoundary boundary(
-          liveness.getNumSubElements());
-      liveness.computeBoundary(boundary);
-      diagnosticEmitter.emitObjectDestructureNeededWithinBorrowBoundary(
-          mmci, use->getUser(), destructureUseSpan, boundary);
-      return;
-    } else {
-      LLVM_DEBUG(llvm::dbgs() << "        On boundary! No error!\n");
+    if (!liveness.isWithinBoundary(use->getUser(), destructureUseSpan)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "        On boundary or within boundary! No error!\n");
+      continue;
     }
+
+    // Emit an error. We have a use after free.
+    //
+    // NOTE: Since we are going to emit an error here, we do the boundary
+    // computation to ensure that we only do the boundary computation once:
+    // when we emit an error or once we know we need to do rewriting.
+    //
+    // TODO: Fix diagnostic to use destructure needing use and boundary
+    // uses.
+    LLVM_DEBUG(llvm::dbgs() << "        Within boundary! Emitting error!\n");
+    FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
+    liveness.computeBoundary(boundary);
+    diagnosticEmitter.emitObjectDestructureNeededWithinBorrowBoundary(
+        mmci, use->getUser(), destructureUseSpan, boundary);
   }
 }
 
