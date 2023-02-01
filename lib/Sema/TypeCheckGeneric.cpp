@@ -79,6 +79,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         .diagnose(repr->getLoc(), diag::opaque_type_in_protocol_requirement)
         .fixItInsert(fixitLoc, result)
         .fixItReplace(repr->getSourceRange(), placeholder);
+    repr->setInvalid();
 
     return nullptr;
   }
@@ -162,6 +163,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
              .diagnose(currentRepr->getLoc(), diag::opaque_of_optional_rewrite)
              .fixItReplaceChars(currentRepr->getStartLoc(),
                                 currentRepr->getEndLoc(), stream.str());
+          repr->setInvalid();
           return nullptr;
         }
       }
@@ -199,6 +201,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         // Error out if the constraint type isn't a class or existential type.
         ctx.Diags.diagnose(currentRepr->getLoc(),
                            diag::opaque_type_invalid_constraint);
+        currentRepr->setInvalid();
         return nullptr;
       }
 
@@ -246,6 +249,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         ctx.Diags.diagnose(repr->getLoc(),
                            diag::opaque_type_in_parameter,
                            false, interfaceType);
+        repr->setInvalid();
         return true;
       }
     }

@@ -2365,8 +2365,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     bool isInExistential = diagnoseDisallowedExistential(opaqueRepr);
     
     if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
-      if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr))
-        return getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal);
+      if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr)){
+        if(!isInExistential)
+          return getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal);
+      }
     }
 
     // Check whether any of the generic parameters in the context represents
@@ -2382,7 +2384,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       }
     }
     
-    if (!isInExistential){
+    if (!repr->isInvalid()){
       // We are not inside an `OpaqueTypeDecl`, so diagnose an error.
       if (!(options & TypeResolutionFlags::SilenceErrors)) {
         diagnose(opaqueRepr->getOpaqueLoc(),
@@ -4712,6 +4714,7 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
   if (constraintType->hasError())
     return ErrorType::get(getASTContext());
 
+  //TO-DO: generalize this and emit the same erorr for some P?
   if (!constraintType->isConstraintType()) {
     // Emit a tailored diagnostic for the incorrect optional
     // syntax 'any P?' with a fix-it to add parenthesis.
