@@ -345,6 +345,20 @@ void BorrowToDestructureTransform::checkDestructureUsesOnBoundary() const {
 
 bool BorrowToDestructureTransform::gatherBorrows(
     MarkMustCheckInst *mmci, StackList<BeginBorrowInst *> &borrowWorklist) {
+  // If we have a no implicit copy mark_must_check, we do not run the borrow to
+  // destructure transform since:
+  //
+  // 1. If we have a move only type, we should have emitted an earlier error
+  //    saying that move only types should not be marked as no implicit copy.
+  //
+  // 2. If we do not have a move only type, then we know that all fields that we
+  //    access directly and would cause a need to destructure must be copyable,
+  //    so no transformation/error is needed.
+  if (mmci->getType().isMoveOnlyWrapped()) {
+    LLVM_DEBUG(llvm::dbgs() << "Skipping move only wrapped inst: " << *mmci);
+    return true;
+  }
+
   LLVM_DEBUG(llvm::dbgs() << "Searching for borrows for inst: " << *mmci);
 
   StackList<Operand *> worklist(mmci->getFunction());
