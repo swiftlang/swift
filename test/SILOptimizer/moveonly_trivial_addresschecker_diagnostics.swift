@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s
+// RUN: %target-swift-emit-sil -verify -enable-experimental-move-only %s
 
 //////////////////
 // Declarations //
@@ -11,17 +11,14 @@ public struct NonTrivialStruct {
     var i: Int = 0
 }
 
-public func nonConsumingUseNonTrivialStruct(_ s: NonTrivialStruct) {}
-public func classUseMoveOnlyWithoutEscaping(_ x: Int) {
-}
-public func classUseMoveOnlyWithoutEscaping(_ x: MoveOnlyInt) {
-}
-public func classUseMoveOnlyWithoutEscaping(_ x: NonTrivialStruct) {
-}
-public func classConsume(_ x: Int) {}
-public func classConsume(_ x: __owned MoveOnlyInt) {}
-public func classConsume(_ x: __owned NonTrivialStruct) {
-}
+public func borrowVal(_ x: __shared Int) {}
+public func borrowVal(_ x: __shared MoveOnlyInt) {}
+public func borrowVal(_ x: __shared NonTrivialStruct) {}
+
+public func consumeVal(_ x: __owned Int) {}
+public func consumeVal(_ x: __owned MoveOnlyInt) {}
+public func consumeVal(_ x: __owned NonTrivialStruct) {}
+public func consumeVal(_ x: __owned EnumTy) {}
 
 @_moveOnly
 public enum NonTrivialEnum {
@@ -142,13 +139,13 @@ public func aggStructMultipleNonConsumingUseTest() {
     x2 = AggStruct()
     aggStructUseMoveOnlyWithoutEscaping(x2)
     aggStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    aggStructConsume(x2)
 }
 
 public func aggStructMultipleNonConsumingUseTestArg(_ x2: inout AggStruct) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
     aggStructUseMoveOnlyWithoutEscaping(x2)
     aggStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2) // expected-note {{consuming use}}
+    aggStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggStructUseAfterConsume() {
@@ -156,7 +153,7 @@ public func aggStructUseAfterConsume() {
     x2 = AggStruct()
     aggStructUseMoveOnlyWithoutEscaping(x2)
     aggStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggStructUseAfterConsumeArg(_ x2: inout AggStruct) {
@@ -164,7 +161,7 @@ public func aggStructUseAfterConsumeArg(_ x2: inout AggStruct) {
     // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
     aggStructUseMoveOnlyWithoutEscaping(x2)
     aggStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggStructConsume(x2) // expected-note {{consuming use}}
               // expected-note @-1 {{consuming use}}
 }
 
@@ -247,16 +244,16 @@ public func aggStructDiamondInLoopArg(_ x2: inout AggStruct) {
 public func aggStructAccessField() {
     var x2 = AggStruct()
     x2 = AggStruct()
-    classUseMoveOnlyWithoutEscaping(x2.lhs)
+    borrowVal(x2.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.lhs)
+        borrowVal(x2.lhs)
     }
 }
 
 public func aggStructAccessFieldArg(_ x2: inout AggStruct) {
-    classUseMoveOnlyWithoutEscaping(x2.lhs)
+    borrowVal(x2.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.lhs)
+        borrowVal(x2.lhs)
     }
 }
 
@@ -264,9 +261,9 @@ public func aggStructConsumeField() {
     var x2 = AggStruct() // expected-error {{'x2' consumed by a use in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggStruct()
-    classConsume(x2.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.lhs) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
 }
@@ -274,25 +271,25 @@ public func aggStructConsumeField() {
 public func aggStructConsumeFieldArg(_ x2: inout AggStruct) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
-    classConsume(x2.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggStructAccessGrandField() {
     var x2 = AggStruct()
     x2 = AggStruct()
-    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+        borrowVal(x2.pair.lhs)
     }
 }
 
 public func aggStructAccessGrandFieldArg(_ x2: inout AggStruct) {
-    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+        borrowVal(x2.pair.lhs)
     }
 }
 
@@ -300,9 +297,9 @@ public func aggStructConsumeGrandField() {
     var x2 = AggStruct() // expected-error {{'x2' consumed by a use in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggStruct()
-    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
 }
@@ -310,9 +307,9 @@ public func aggStructConsumeGrandField() {
 public func aggStructConsumeGrandFieldArg(_ x2: inout AggStruct) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
-    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -321,7 +318,7 @@ public func aggStructConsumeGrandFieldArg(_ x2: inout AggStruct) {
 //////////////////////////////
 
 @_moveOnly
-public struct AggGenericStruct<T> {
+public struct AggGenericStruct<T> { // FIXME: this generic parameter should probably be used for better coverage.
     var lhs = MoveOnlyInt(value: 5)
     var rhs: UnsafeRawPointer? = nil
     var pair = KlassPair(lhs: MoveOnlyInt(value: 5), rhs: 6)
@@ -374,74 +371,74 @@ public struct AggGenericStruct<T> {
     }
 }
 
-public func aggGenericStructUseMoveOnlyWithoutEscaping(_ x: AggGenericStruct<NonTrivialStruct>) {
+public func aggGenericStructUseMoveOnlyWithoutEscaping(_ x: AggGenericStruct<String>) {
 }
-public func aggGenericStructConsume(_ x: __owned AggGenericStruct<NonTrivialStruct>) {
+public func aggGenericStructConsume(_ x: __owned AggGenericStruct<String>) {
 }
 
 public func aggGenericStructSimpleChainTest() {
-    var x2 = AggGenericStruct<NonTrivialStruct>()
-    x2 = AggGenericStruct<NonTrivialStruct>()
+    var x2 = AggGenericStruct<String>()
+    x2 = AggGenericStruct<String>()
     let y2 = x2
     let k2 = y2
     aggGenericStructUseMoveOnlyWithoutEscaping(k2)
 }
 
-public func aggGenericStructSimpleChainTestArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+public func aggGenericStructSimpleChainTestArg(_ x2: inout AggGenericStruct<String>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
     let y2 = x2 // expected-note {{consuming use}}
     let k2 = y2
     aggGenericStructUseMoveOnlyWithoutEscaping(k2)
 }
 
 public func aggGenericStructSimpleNonConsumingUseTest() {
-    var x2 = AggGenericStruct<NonTrivialStruct>()
-    x2 = AggGenericStruct<NonTrivialStruct>()
+    var x2 = AggGenericStruct<String>()
+    x2 = AggGenericStruct<String>()
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
 }
 
-public func aggGenericStructSimpleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) {
+public func aggGenericStructSimpleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<String>) {
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
 }
 
 public func aggGenericStructMultipleNonConsumingUseTest() {
-    var x2 = AggGenericStruct<NonTrivialStruct>()
-    x2 = AggGenericStruct<NonTrivialStruct>()
+    var x2 = AggGenericStruct<String>()
+    x2 = AggGenericStruct<String>()
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    aggGenericStructConsume(x2)
 }
 
-public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<String>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggGenericStructUseAfterConsume() {
-    var x2 = AggGenericStruct<NonTrivialStruct>() // expected-error {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<NonTrivialStruct>()
+    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed more than once}}
+    x2 = AggGenericStruct<String>()
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
-public func aggGenericStructUseAfterConsumeArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) {
+public func aggGenericStructUseAfterConsumeArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed more than once}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
     // expected-note @-1 {{consuming use}}x
 }
 
 public func aggGenericStructDoubleConsume() {
-    var x2 = AggGenericStruct<NonTrivialStruct>()  // expected-error {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<NonTrivialStruct>()
+    var x2 = AggGenericStruct<String>()  // expected-error {{'x2' consumed more than once}}
+    x2 = AggGenericStruct<String>()
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
-public func aggGenericStructDoubleConsumeArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) {
+public func aggGenericStructDoubleConsumeArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed more than once}}
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
@@ -450,22 +447,22 @@ public func aggGenericStructDoubleConsumeArg(_ x2: inout AggGenericStruct<NonTri
 }
 
 public func aggGenericStructLoopConsume() {
-    var x2 = AggGenericStruct<NonTrivialStruct>() // expected-error {{'x2' consumed by a use in a loop}}
-    x2 = AggGenericStruct<NonTrivialStruct>()
+    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed by a use in a loop}}
+    x2 = AggGenericStruct<String>()
     for _ in 0..<1024 {
         aggGenericStructConsume(x2) // expected-note {{consuming use}}
     }
 }
 
-public func aggGenericStructLoopConsumeArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+public func aggGenericStructLoopConsumeArg(_ x2: inout AggGenericStruct<String>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
     for _ in 0..<1024 {
         aggGenericStructConsume(x2) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructDiamond() {
-    var x2 = AggGenericStruct<NonTrivialStruct>()
-    x2 = AggGenericStruct<NonTrivialStruct>()
+    var x2 = AggGenericStruct<String>()
+    x2 = AggGenericStruct<String>()
     if boolValue {
         aggGenericStructConsume(x2)
     } else {
@@ -473,7 +470,7 @@ public func aggGenericStructDiamond() {
     }
 }
 
-public func aggGenericStructDiamondArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) {
+public func aggGenericStructDiamondArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
     if boolValue {
@@ -484,9 +481,9 @@ public func aggGenericStructDiamondArg(_ x2: inout AggGenericStruct<NonTrivialSt
 }
 
 public func aggGenericStructDiamondInLoop() {
-    var x2 = AggGenericStruct<NonTrivialStruct>() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed by a use in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<NonTrivialStruct>()
+    x2 = AggGenericStruct<String>()
     for _ in 0..<1024 {
       if boolValue {
           aggGenericStructConsume(x2) // expected-note {{consuming use}}
@@ -497,7 +494,7 @@ public func aggGenericStructDiamondInLoop() {
     }
 }
 
-public func aggGenericStructDiamondInLoopArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) {
+public func aggGenericStructDiamondInLoopArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
     for _ in 0..<1024 {
@@ -510,83 +507,83 @@ public func aggGenericStructDiamondInLoopArg(_ x2: inout AggGenericStruct<NonTri
 }
 
 public func aggGenericStructAccessField() {
-    var x2 = AggGenericStruct<NonTrivialStruct>()
-    x2 = AggGenericStruct<NonTrivialStruct>()
-    classUseMoveOnlyWithoutEscaping(x2.lhs)
+    var x2 = AggGenericStruct<String>()
+    x2 = AggGenericStruct<String>()
+    borrowVal(x2.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.lhs)
+        borrowVal(x2.lhs)
     }
 }
 
-public func aggGenericStructAccessFieldArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) {
-    classUseMoveOnlyWithoutEscaping(x2.lhs)
+public func aggGenericStructAccessFieldArg(_ x2: inout AggGenericStruct<String>) {
+    borrowVal(x2.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.lhs)
+        borrowVal(x2.lhs)
     }
 }
 
 public func aggGenericStructConsumeField() {
-    var x2 = AggGenericStruct<NonTrivialStruct>() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed by a use in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<NonTrivialStruct>()
-    classConsume(x2.lhs) // expected-note {{consuming use}}
+    x2 = AggGenericStruct<String>()
+    consumeVal(x2.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.lhs) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
 }
 
-public func aggGenericStructConsumeFieldArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) {
+public func aggGenericStructConsumeFieldArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
-    classConsume(x2.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructAccessGrandField() {
-    var x2 = AggGenericStruct<NonTrivialStruct>()
-    x2 = AggGenericStruct<NonTrivialStruct>()
-    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    var x2 = AggGenericStruct<String>()
+    x2 = AggGenericStruct<String>()
+    borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+        borrowVal(x2.pair.lhs)
     }
 }
 
-public func aggGenericStructAccessGrandFieldArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) {
-    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+public func aggGenericStructAccessGrandFieldArg(_ x2: inout AggGenericStruct<String>) {
+    borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+        borrowVal(x2.pair.lhs)
     }
 }
 
 public func aggGenericStructConsumeGrandField() {
-    var x2 = AggGenericStruct<NonTrivialStruct>() // expected-error {{'x2' consumed by a use in a loop}}
+    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed by a use in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<NonTrivialStruct>()
-    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    x2 = AggGenericStruct<String>()
+    consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
 }
 
 public func aggGenericStructConsumeGrandField2() {
-    var x2 = AggGenericStruct<NonTrivialStruct>() // expected-error {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<NonTrivialStruct>()
-    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    var x2 = AggGenericStruct<String>() // expected-error {{'x2' consumed more than once}}
+    x2 = AggGenericStruct<String>()
+    consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
     }
-    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
 }
 
-public func aggGenericStructConsumeGrandFieldArg(_ x2: inout AggGenericStruct<NonTrivialStruct>) {
+public func aggGenericStructConsumeGrandFieldArg(_ x2: inout AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
-    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -628,13 +625,13 @@ public func aggGenericStructMultipleNonConsumingUseTest<T>(_ x: T.Type) {
     x2 = AggGenericStruct<T>()
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    aggGenericStructConsume(x2)
 }
 
 public func aggGenericStructMultipleNonConsumingUseTestArg<T>(_ x2: inout AggGenericStruct<T>) { //expected-error {{'x2' consumed but not reinitialized before end of function}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggGenericStructUseAfterConsume<T>(_ x: T.Type) {
@@ -642,7 +639,7 @@ public func aggGenericStructUseAfterConsume<T>(_ x: T.Type) {
     x2 = AggGenericStruct<T>()
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggGenericStructUseAfterConsumeArg<T>(_ x2: inout AggGenericStruct<T>) {
@@ -650,7 +647,7 @@ public func aggGenericStructUseAfterConsumeArg<T>(_ x2: inout AggGenericStruct<T
     // expected-error @-2 {{'x2' consumed more than once}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
     // expected-note @-1 {{consuming use}}
 }
 
@@ -732,16 +729,16 @@ public func aggGenericStructDiamondInLoopArg<T>(_ x2: inout AggGenericStruct<T>)
 public func aggGenericStructAccessField<T>(_ x: T.Type) {
     var x2 = AggGenericStruct<T>()
     x2 = AggGenericStruct<T>()
-    classUseMoveOnlyWithoutEscaping(x2.lhs)
+    borrowVal(x2.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.lhs)
+        borrowVal(x2.lhs)
     }
 }
 
 public func aggGenericStructAccessFieldArg<T>(_ x2: inout AggGenericStruct<T>) {
-    classUseMoveOnlyWithoutEscaping(x2.lhs)
+    borrowVal(x2.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.lhs)
+        borrowVal(x2.lhs)
     }
 }
 
@@ -749,9 +746,9 @@ public func aggGenericStructConsumeField<T>(_ x: T.Type) {
     var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed by a use in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggGenericStruct<T>()
-    classConsume(x2.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.lhs) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
 }
@@ -759,25 +756,25 @@ public func aggGenericStructConsumeField<T>(_ x: T.Type) {
 public func aggGenericStructConsumeFieldArg<T>(_ x2: inout AggGenericStruct<T>) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
-    classConsume(x2.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.lhs) // expected-note {{consuming use}}
     }
 }
 
 public func aggGenericStructAccessGrandField<T>(_ x: T.Type) {
     var x2 = AggGenericStruct<T>()
     x2 = AggGenericStruct<T>()
-    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+        borrowVal(x2.pair.lhs)
     }
 }
 
 public func aggGenericStructAccessGrandFieldArg<T>(_ x2: inout AggGenericStruct<T>) {
-    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+        borrowVal(x2.pair.lhs)
     }
 }
 
@@ -785,9 +782,9 @@ public func aggGenericStructConsumeGrandField<T>(_ x: T.Type) {
     var x2 = AggGenericStruct<T>() // expected-error {{'x2' consumed by a use in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
     x2 = AggGenericStruct<T>()
-    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
 }
@@ -795,9 +792,9 @@ public func aggGenericStructConsumeGrandField<T>(_ x: T.Type) {
 public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: inout AggGenericStruct<T>) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
-    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
     for _ in 0..<1024 {
-        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+        consumeVal(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -847,13 +844,13 @@ public func enumMultipleNonConsumingUseTest() {
     x2 = EnumTy.klass(NonTrivialStruct())
     enumUseMoveOnlyWithoutEscaping(x2)
     enumUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    consumeVal(x2)
 }
 
 public func enumMultipleNonConsumingUseTestArg(_ x2: inout EnumTy) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
     enumUseMoveOnlyWithoutEscaping(x2)
     enumUseMoveOnlyWithoutEscaping(x2)
-    print(x2) // expected-note {{consuming use}}
+    consumeVal(x2) // expected-note {{consuming use}}
 }
 
 public func enumUseAfterConsume() {
@@ -861,7 +858,7 @@ public func enumUseAfterConsume() {
     x2 = EnumTy.klass(NonTrivialStruct())
     enumUseMoveOnlyWithoutEscaping(x2)
     enumConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    consumeVal(x2) // expected-note {{consuming use}}
 }
 
 public func enumUseAfterConsumeArg(_ x2: inout EnumTy) {
@@ -869,7 +866,7 @@ public func enumUseAfterConsumeArg(_ x2: inout EnumTy) {
     // expected-error @-2 {{'x2' consumed more than once}}
     enumUseMoveOnlyWithoutEscaping(x2)
     enumConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    consumeVal(x2) // expected-note {{consuming use}}
     // expected-note @-1 {{consuming use}}
 }
 
@@ -955,7 +952,7 @@ public func enumAssignToVar1() {
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = EnumTy.klass(NonTrivialStruct())
-    print(x3)
+    consumeVal(x3)
 }
 
 public func enumAssignToVar1Arg(_ x2: inout EnumTy) {
@@ -966,7 +963,7 @@ public func enumAssignToVar1Arg(_ x2: inout EnumTy) {
     x3 = x2 // expected-note {{consuming use}}
     // expected-note @-1 {{consuming use}}
     x3 = EnumTy.klass(NonTrivialStruct())
-    print(x3)
+    consumeVal(x3)
 }
 
 public func enumAssignToVar2() {
@@ -991,31 +988,31 @@ public func enumAssignToVar3() {
     x2 = EnumTy.klass(NonTrivialStruct())
     var x3 = x2
     x3 = EnumTy.klass(NonTrivialStruct())
-    print(x3)
+    consumeVal(x3)
 }
 
 public func enumAssignToVar3Arg(_ x2: inout EnumTy) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
                                                             
     var x3 = x2 // expected-note {{consuming use}}
     x3 = EnumTy.klass(NonTrivialStruct())
-    print(x3)
+    consumeVal(x3)
 }
 
 public func enumAssignToVar4() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed more than once}}
     x2 = EnumTy.klass(NonTrivialStruct())
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
-    print(x3)
+    consumeVal(x2) // expected-note {{consuming use}}
+    consumeVal(x3)
 }
 
 public func enumAssignToVar4Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed more than once}} 
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    consumeVal(x2) // expected-note {{consuming use}}
     // expected-note @-1 {{consuming use}}
-    print(x3)
+    consumeVal(x3)
 }
 
 public func enumAssignToVar5() {
@@ -1024,7 +1021,7 @@ public func enumAssignToVar5() {
     var x3 = x2 // expected-note {{consuming use}}
     enumUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use}}
     x3 = EnumTy.klass(NonTrivialStruct())
-    print(x3)
+    consumeVal(x3)
 }
 
 public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
@@ -1032,17 +1029,17 @@ public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' u
     var x3 = x2 // expected-note {{consuming use}}
     enumUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use}}
     x3 = EnumTy.klass(NonTrivialStruct())
-    print(x3)
+    consumeVal(x3)
 }
 
 public func enumPatternMatchIfLet1() {
     var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' consumed more than once}}
     x2 = EnumTy.klass(NonTrivialStruct())
     if case let EnumTy.klass(x) = x2 { // expected-note {{consuming use}}
-        classUseMoveOnlyWithoutEscaping(x)
+        borrowVal(x)
     }
     if case let EnumTy.klass(x) = x2 { // expected-note {{consuming use}}
-        classUseMoveOnlyWithoutEscaping(x)
+        borrowVal(x)
     }
 }
 
@@ -1050,11 +1047,11 @@ public func enumPatternMatchIfLet1Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{'x2' consumed more than once}}
     if case let EnumTy.klass(x) = x2 { // expected-note {{consuming use}}
-        classUseMoveOnlyWithoutEscaping(x)
+        borrowVal(x)
     }
     if case let EnumTy.klass(x) = x2 { // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
-        classUseMoveOnlyWithoutEscaping(x)
+        borrowVal(x)
     }
 }
 
@@ -1063,7 +1060,7 @@ public func enumPatternMatchIfLet2() {
     x2 = EnumTy.klass(NonTrivialStruct())
     for _ in 0..<1024 {
         if case let EnumTy.klass(x) = x2 {  // expected-note {{consuming use}}
-            classUseMoveOnlyWithoutEscaping(x)
+            borrowVal(x)
         }
     }
 }
@@ -1071,7 +1068,7 @@ public func enumPatternMatchIfLet2() {
 public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
     for _ in 0..<1024 {
         if case let EnumTy.klass(x) = x2 {  // expected-note {{consuming use}}
-            classUseMoveOnlyWithoutEscaping(x)
+            borrowVal(x)
         }
     }
 }
@@ -1082,7 +1079,7 @@ public func enumPatternMatchSwitch1() {
     x2 = EnumTy.klass(NonTrivialStruct())
     switch x2 { // expected-note {{consuming use}}
     case let EnumTy.klass(k):
-        classUseMoveOnlyWithoutEscaping(k)
+        borrowVal(k)
         // This should be flagged as the use after free use. We are atleast
         // erroring though.
         enumUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use}}
@@ -1094,7 +1091,7 @@ public func enumPatternMatchSwitch1() {
 public func enumPatternMatchSwitch1Arg(_ x2: inout EnumTy) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
     switch x2 { // expected-note {{consuming use}}
     case let EnumTy.klass(k):
-        classUseMoveOnlyWithoutEscaping(k)
+        borrowVal(k)
         // This should be flagged as the use after free use. We are atleast
         // erroring though.
         enumUseMoveOnlyWithoutEscaping(x2)
@@ -1108,7 +1105,7 @@ public func enumPatternMatchSwitch2() {
     x2 = EnumTy.klass(NonTrivialStruct())
     switch x2 {
     case let EnumTy.klass(k):
-        classUseMoveOnlyWithoutEscaping(k)
+        borrowVal(k)
     case .int:
         break
     }
@@ -1117,7 +1114,7 @@ public func enumPatternMatchSwitch2() {
 public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
     switch x2 { // expected-note {{consuming use}}
     case let EnumTy.klass(k):
-        classUseMoveOnlyWithoutEscaping(k)
+        borrowVal(k)
     case .int:
         break
     }
@@ -1130,7 +1127,7 @@ public func enumPatternMatchSwitch2WhereClause() {
     switch x2 { // expected-note {{consuming use}}
     case let EnumTy.klass(k)
            where x2.doSomething(): // expected-note {{non-consuming use}}
-        classUseMoveOnlyWithoutEscaping(k)
+        borrowVal(k)
     case .int:
         break
     case EnumTy.klass:
@@ -1142,7 +1139,7 @@ public func enumPatternMatchSwitch2WhereClauseArg(_ x2: inout EnumTy) { // expec
     switch x2 { // expected-note {{consuming use}}
     case let EnumTy.klass(k)
            where x2.doSomething():
-        classUseMoveOnlyWithoutEscaping(k)
+        borrowVal(k)
     case .int:
         break
     case EnumTy.klass:
@@ -1156,7 +1153,7 @@ public func enumPatternMatchSwitch2WhereClause2() {
     switch x2 {
     case let EnumTy.klass(k)
            where boolValue:
-        classUseMoveOnlyWithoutEscaping(k)
+        borrowVal(k)
     case .int:
         break
     case EnumTy.klass:
@@ -1168,7 +1165,7 @@ public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: inout EnumTy) { // expe
     switch x2 { // expected-note {{consuming use}}
     case let EnumTy.klass(k)
            where boolValue:
-        classUseMoveOnlyWithoutEscaping(k)
+        borrowVal(k)
     case .int:
         break
     case EnumTy.klass:
@@ -1184,9 +1181,9 @@ public func closureClassUseAfterConsume1() {
     let f = {
         var x2 = NonTrivialStruct() // expected-error {{'x2' consumed more than once}}
         x2 = NonTrivialStruct()
-        classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        borrowVal(x2)
+        consumeVal(x2) // expected-note {{consuming use}}
+        consumeVal(x2) // expected-note {{consuming use}}
     }
     f()
 }
@@ -1195,9 +1192,9 @@ public func closureClassUseAfterConsume2() {
     let f = { () in
         var x2 = NonTrivialStruct() // expected-error {{'x2' consumed more than once}}
         x2 = NonTrivialStruct()
-        classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        borrowVal(x2)
+        consumeVal(x2) // expected-note {{consuming use}}
+        consumeVal(x2) // expected-note {{consuming use}}
     }
     f()
 }
@@ -1207,9 +1204,9 @@ public func closureClassUseAfterConsumeArg(_ argX: inout NonTrivialStruct) {
     let f = { (_ x2: inout NonTrivialStruct) in
         // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
         // expected-error @-2 {{'x2' consumed more than once}}
-        classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        borrowVal(x2)
+        consumeVal(x2) // expected-note {{consuming use}}
+        consumeVal(x2) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
     f(&argX)
@@ -1225,11 +1222,11 @@ public func closureCaptureClassUseAfterConsume() {
     // expected-error @-5 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = NonTrivialStruct()
     let f = {
-        classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
+        borrowVal(x2)
+        consumeVal(x2)
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
-        print(x2)
+        consumeVal(x2)
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
         // expected-note @-3 {{consuming use}}
@@ -1247,11 +1244,11 @@ public func closureCaptureClassUseAfterConsumeError() {
     // expected-error @-5 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = NonTrivialStruct()
     let f = {
-        classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2)
+        borrowVal(x2)
+        consumeVal(x2)
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
-        print(x2)
+        consumeVal(x2)
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
         // expected-note @-3 {{consuming use}}
@@ -1269,10 +1266,10 @@ public func closureCaptureClassArgUseAfterConsume(_ x2: inout NonTrivialStruct) 
     // expected-note @-4 {{'x2' is declared 'inout'}}
     let f = { // expected-note {{consuming use}}
         // expected-error @-1 {{escaping closure captures 'inout' parameter 'x2'}}
-        classUseMoveOnlyWithoutEscaping(x2) // expected-note {{captured here}}
-        classConsume(x2) // expected-note {{captured here}}
+        borrowVal(x2) // expected-note {{captured here}}
+        consumeVal(x2) // expected-note {{captured here}}
         // expected-note @-1 {{consuming use}}
-        print(x2) // expected-note {{captured here}}
+        consumeVal(x2) // expected-note {{captured here}}
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
     }
@@ -1287,12 +1284,12 @@ public func deferCaptureClassUseAfterConsume() {
     // expected-error @-3 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = NonTrivialStruct()
     defer { // expected-note {{non-consuming use}}
-        classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        borrowVal(x2)
+        consumeVal(x2) // expected-note {{consuming use}}
+        consumeVal(x2) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
-    print(x2) // expected-note {{consuming use}}
+    consumeVal(x2) // expected-note {{consuming use}}
 }
 
 public func deferCaptureClassUseAfterConsume2() {
@@ -1302,9 +1299,9 @@ public func deferCaptureClassUseAfterConsume2() {
     // expected-error @-3 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = NonTrivialStruct()
     defer { //  expected-note {{non-consuming use}}
-        classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        borrowVal(x2)
+        consumeVal(x2) // expected-note {{consuming use}}
+        consumeVal(x2) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
     let x3 = x2 // expected-note {{consuming use}}
@@ -1314,11 +1311,11 @@ public func deferCaptureClassUseAfterConsume2() {
 public func deferCaptureClassArgUseAfterConsume(_ x2: inout NonTrivialStruct) {
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    classUseMoveOnlyWithoutEscaping(x2)
+    borrowVal(x2)
     defer {
-        classUseMoveOnlyWithoutEscaping(x2)
-        classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        borrowVal(x2)
+        consumeVal(x2) // expected-note {{consuming use}}
+        consumeVal(x2) // expected-note {{consuming use}}
         // expected-note @-1 {{consuming use}}
     }
     print("foo")
@@ -1332,9 +1329,9 @@ public func closureAndDeferCaptureClassUseAfterConsume() {
     x2 = NonTrivialStruct()
     let f = {
         defer {
-            classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2) // expected-note {{consuming use}}
-            print(x2)
+            borrowVal(x2)
+            consumeVal(x2) // expected-note {{consuming use}}
+            consumeVal(x2)
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
         }
@@ -1352,15 +1349,15 @@ public func closureAndDeferCaptureClassUseAfterConsume2() {
     // expected-error @-5 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = NonTrivialStruct()
     let f = {
-        classConsume(x2)
+        consumeVal(x2)
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
         defer {
             // expected-note @-1 {{non-consuming use}}
             // expected-note @-2 {{non-consuming use}}
-            classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2) // expected-note {{consuming use}}
-            print(x2)
+            borrowVal(x2)
+            consumeVal(x2) // expected-note {{consuming use}}
+            consumeVal(x2)
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
         }
@@ -1378,22 +1375,22 @@ public func closureAndDeferCaptureClassUseAfterConsume3() {
     // expected-error @-5 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
     x2 = NonTrivialStruct()
     let f = {
-        classConsume(x2)
+        consumeVal(x2)
         // expected-note @-1 {{consuming use}}
         // expected-note @-2 {{consuming use}}
         defer {
             // expected-note @-1 {{non-consuming use}}
             // expected-note @-2 {{non-consuming use}}
-            classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2) // expected-note {{consuming use}}
-            print(x2)
+            borrowVal(x2)
+            consumeVal(x2) // expected-note {{consuming use}}
+            consumeVal(x2)
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
         }
         print("foo")
     }
     f()
-    classConsume(x2)
+    consumeVal(x2)
 }
 
 public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: inout NonTrivialStruct) {
@@ -1404,10 +1401,10 @@ public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: inout NonTrivial
     let f = { // expected-error {{escaping closure captures 'inout' parameter 'x2'}}
               // expected-note @-1 {{consuming use}}
         defer { // expected-note {{captured indirectly by this call}}
-            classUseMoveOnlyWithoutEscaping(x2) // expected-note {{captured here}}
-            classConsume(x2) // expected-note {{captured here}}
+            borrowVal(x2) // expected-note {{captured here}}
+            consumeVal(x2) // expected-note {{captured here}}
             // expected-note @-1 {{consuming use}}
-            print(x2) // expected-note {{captured here}}
+            consumeVal(x2) // expected-note {{captured here}}
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
         }
@@ -1428,11 +1425,11 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
     x2 = NonTrivialStruct()
     let f = {
         let g = {
-            classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
+            borrowVal(x2)
+            consumeVal(x2)
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
-            print(x2)
+            consumeVal(x2)
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
             // expected-note @-3 {{consuming use}}
@@ -1455,11 +1452,11 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
     x2 = NonTrivialStruct()
     let f = {
         let g = {
-            classUseMoveOnlyWithoutEscaping(x2)
-            classConsume(x2)
+            borrowVal(x2)
+            consumeVal(x2)
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
-            print(x2)
+            consumeVal(x2)
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{consuming use}}
             // expected-note @-3 {{consuming use}}
@@ -1468,7 +1465,7 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
         g()
     }
     f()
-    print(x2)
+    consumeVal(x2)
 }
 
 
@@ -1484,14 +1481,14 @@ public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: inout NonTrivi
         let g = { // expected-error {{escaping closure captures 'inout' parameter 'x2'}}
             // expected-note @-1 {{consuming use}}
             // expected-note @-2 {{captured indirectly by this call}}
-            classUseMoveOnlyWithoutEscaping(x2)
+            borrowVal(x2)
             // expected-note @-1 {{captured here}}
             // expected-note @-2 {{captured here}}
-            classConsume(x2)
+            consumeVal(x2)
             // expected-note @-1 {{captured here}}
             // expected-note @-2 {{captured here}}
             // expected-note @-3 {{consuming use}}
-            print(x2)
+            consumeVal(x2)
             // expected-note @-1 {{captured here}}
             // expected-note @-2 {{captured here}}
             // expected-note @-3 {{consuming use}}

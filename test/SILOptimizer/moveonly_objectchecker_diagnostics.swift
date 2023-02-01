@@ -7,7 +7,7 @@
 @_moveOnly
 public class Klass {
     var intField: Int
-    var k: Klass?
+    var k: Klass
     init() {
         k = Klass()
         intField = 5
@@ -39,7 +39,7 @@ public func nonConsumingUseNonTrivialEnum(_ e : NonTrivialEnum) {}
 
 @_moveOnly
 public final class FinalKlass {
-    var k: Klass? = nil
+    var k: Klass = Klass()
 }
 
 ///////////
@@ -89,19 +89,19 @@ public func classMultipleNonConsumingUseTest(_ x: Klass) { // expected-error {{'
     let x2 = x // expected-note {{consuming use}}
     classUseMoveOnlyWithoutEscaping(x2)
     classUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    classConsume(x2)
 }
 
 public func classMultipleNonConsumingUseArgTest(_ x2: Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     classUseMoveOnlyWithoutEscaping(x2)
     classUseMoveOnlyWithoutEscaping(x2)
-    print(x2) // expected-note {{consuming use}}
+    classConsume(x2) // expected-note {{consuming use}}
 }
 
 public func classMultipleNonConsumingUseOwnedArgTest(_ x2: __owned Klass) {
     classUseMoveOnlyWithoutEscaping(x2)
     classUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    classConsume(x2)
 }
 
 public func classUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -109,19 +109,19 @@ public func classUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guara
                // expected-note @-1 {{consuming use}}
     classUseMoveOnlyWithoutEscaping(x2)
     classConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    classConsume(x2) // expected-note {{consuming use}}
 }
 
 public func classUseAfterConsumeArg(_ x2: Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     classUseMoveOnlyWithoutEscaping(x2)
     classConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    classConsume(x2) // expected-note {{consuming use}}
 }
 
 public func classUseAfterConsumeOwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
     classUseMoveOnlyWithoutEscaping(x2)
     classConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    classConsume(x2) // expected-note {{consuming use}}
 }
 
 public func classDoubleConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -225,7 +225,7 @@ public func classAssignToVar1(_ x: Klass) { // expected-error {{'x' has guarante
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x3)
 }
 
 // TODO: We shouldn't see a consuming use on x3.
@@ -234,10 +234,10 @@ public func classAssignToVar1Arg(_ x: Klass, _ x2: Klass) { // expected-error {{
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x3)
 }
 
-// NOTE: print(x3) shouldn't be marked! This is most likely due to some form of
+// NOTE: classConsume(x3) shouldn't be marked! This is most likely due to some form of
 // load forwarding. We may need to make predictable mem opts more conservative
 // with move only var.
 public func classAssignToVar1OwnedArg(_ x: Klass, _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
@@ -245,7 +245,7 @@ public func classAssignToVar1OwnedArg(_ x: Klass, _ x2: __owned Klass) { // expe
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x3)
 }
 
 public func classAssignToVar2(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -268,47 +268,47 @@ public func classAssignToVar2OwnedArg(_ x2: __owned Klass) { // expected-error {
     classUseMoveOnlyWithoutEscaping(x3)
 }
 
-// NOTE: print(x3) should not be marked.
+// NOTE: classConsume(x3) should not be marked.
 public func classAssignToVar3(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x3)
 }
 
-// NOTE: print(x3) is a bug.
+// NOTE: classConsume(x3) is a bug.
 public func classAssignToVar3Arg(_ x: Klass, _ x2: Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                             // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x3)
 }
 
-// This is a bug around print(x3)
+// This is a bug around classConsume(x3)
 public func classAssignToVar3OwnedArg(_ x: Klass, _ x2: __owned Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x3)
 }
 
 public func classAssignToVar4(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use}}
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x2) // expected-note {{consuming use}}
+    classConsume(x3)
 }
 
 public func classAssignToVar4Arg(_ x2: Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x2) // expected-note {{consuming use}}
+    classConsume(x3)
 }
 
 public func classAssignToVar4OwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x2) // expected-note {{consuming use}}
+    classConsume(x3)
 }
 
 public func classAssignToVar5(_ x: Klass) {  // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -319,7 +319,7 @@ public func classAssignToVar5(_ x: Klass) {  // expected-error {{'x' has guarant
     // appropriately though.
     classUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x3)
 }
 
 public func classAssignToVar5Arg(_ x: Klass, _ x2: Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
@@ -329,7 +329,7 @@ public func classAssignToVar5Arg(_ x: Klass, _ x2: Klass) { // expected-error {{
     // appropriately though.
     classUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x3)
 }
 
 public func classAssignToVar5OwnedArg(_ x: Klass, _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
@@ -339,53 +339,53 @@ public func classAssignToVar5OwnedArg(_ x: Klass, _ x2: __owned Klass) { // expe
     // appropriately though.
     classUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    classConsume(x3)
 }
 
 public func classAccessAccessField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k)
     }
 }
 
 public func classAccessAccessFieldArg(_ x2: Klass) {
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k)
     }
 }
 
 public func classAccessAccessFieldOwnedArg(_ x2: __owned Klass) {
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k)
     }
 }
 
 public func classAccessConsumeField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
     // Since a class is a reference type, we do not emit an error here.
-    classConsume(x2.k!)
+    classConsume(x2.k)
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k)
     }
 }
 
 public func classAccessConsumeFieldArg(_ x2: Klass) {
     // Since a class is a reference type, we do not emit an error here.
-    classConsume(x2.k!)
+    classConsume(x2.k)
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k)
     }
 }
 
 public func classAccessConsumeFieldOwnedArg(_ x2: __owned Klass) {
     // Since a class is a reference type, we do not emit an error here.
-    classConsume(x2.k!)
+    classConsume(x2.k)
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k)
     }
 }
 
@@ -441,19 +441,19 @@ public func finalClassMultipleNonConsumingUseTest(_ x: FinalKlass) { // expected
     let x2 = x // expected-note {{consuming use}}
     finalClassUseMoveOnlyWithoutEscaping(x2)
     finalClassUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    finalClassConsume(x2)
 }
 
 public func finalClassMultipleNonConsumingUseTestArg(_ x2: FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     finalClassUseMoveOnlyWithoutEscaping(x2)
     finalClassUseMoveOnlyWithoutEscaping(x2)
-    print(x2) // expected-note {{consuming use}}
+    finalClassConsume(x2) // expected-note {{consuming use}}
 }
 
 public func finalClassMultipleNonConsumingUseTestownedArg(_ x2: __owned FinalKlass) {
     finalClassUseMoveOnlyWithoutEscaping(x2)
     finalClassUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    finalClassConsume(x2)
 }
 
 public func finalClassUseAfterConsume(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -461,19 +461,19 @@ public func finalClassUseAfterConsume(_ x: FinalKlass) { // expected-error {{'x'
                // expected-note @-1 {{consuming use}}
     finalClassUseMoveOnlyWithoutEscaping(x2)
     finalClassConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    finalClassConsume(x2) // expected-note {{consuming use}}
 }
 
 public func finalClassUseAfterConsumeArg(_ x2: FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     finalClassUseMoveOnlyWithoutEscaping(x2)
     finalClassConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    finalClassConsume(x2) // expected-note {{consuming use}}
 }
 
 public func finalClassUseAfterConsumeOwnedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
     finalClassUseMoveOnlyWithoutEscaping(x2)
     finalClassConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    finalClassConsume(x2) // expected-note {{consuming use}}
 }
 
 public func finalClassDoubleConsume(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -576,7 +576,7 @@ public func finalClassAssignToVar1(_ x: FinalKlass) { // expected-error {{'x' ha
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar1Arg(_ x: FinalKlass, _ x2: FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
@@ -584,7 +584,7 @@ public func finalClassAssignToVar1Arg(_ x: FinalKlass, _ x2: FinalKlass) { // ex
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar1OwnedArg(_ x: FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
@@ -592,7 +592,7 @@ public func finalClassAssignToVar1OwnedArg(_ x: FinalKlass, _ x2: __owned FinalK
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar2(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -619,40 +619,40 @@ public func finalClassAssignToVar3(_ x: FinalKlass) { // expected-error {{'x' ha
     let x2 = x // expected-note {{consuming use}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar3Arg(_ x: FinalKlass, _ x2: FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                                            // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar3OwnedArg(_ x: FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar4(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use}}
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x2) // expected-note {{consuming use}}
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar4Arg(_ x2: FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x2) // expected-note {{consuming use}}
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar4OwnedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x2) // expected-note {{consuming use}}
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar5(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -663,7 +663,7 @@ public func finalClassAssignToVar5(_ x: FinalKlass) { // expected-error {{'x' ha
     // appropriately though.
     finalClassUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar5Arg(_ x: FinalKlass, _ x2: FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
@@ -673,7 +673,7 @@ public func finalClassAssignToVar5Arg(_ x: FinalKlass, _ x2: FinalKlass) { // ex
     // appropriately though.
     finalClassUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x3)
 }
 
 public func finalClassAssignToVar5OwnedArg(_ x: FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
@@ -683,28 +683,28 @@ public func finalClassAssignToVar5OwnedArg(_ x: FinalKlass, _ x2: __owned FinalK
     // appropriately though.
     finalClassUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    finalClassConsume(x3)
 }
 
 public func finalClassAccessField(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k)
     }
 }
 
 public func finalClassAccessFieldArg(_ x2: FinalKlass) {
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k)
     }
 }
 
 public func finalClassAccessFieldOwnedArg(_ x2: __owned FinalKlass) {
-    classUseMoveOnlyWithoutEscaping(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k)
     for _ in 0..<1024 {
-        classUseMoveOnlyWithoutEscaping(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k)
     }
 }
 
@@ -713,27 +713,27 @@ public func finalClassConsumeField(_ x: FinalKlass) { // expected-error {{'x' ha
 
     // No diagnostic here since class is a reference type and we are not copying
     // the class, we are copying its field.
-    classConsume(x2.k!)
+    classConsume(x2.k)
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k)
     }
 }
 
 public func finalClassConsumeFieldArg(_ x2: FinalKlass) {
     // No diagnostic here since class is a reference type and we are not copying
     // the class, we are copying its field.
-    classConsume(x2.k!)
+    classConsume(x2.k)
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k)
     }
 }
 
 public func finalClassConsumeFieldArg(_ x2: __owned FinalKlass) {
     // No diagnostic here since class is a reference type and we are not copying
     // the class, we are copying its field.
-    classConsume(x2.k!)
+    classConsume(x2.k)
     for _ in 0..<1024 {
-        classConsume(x2.k!)
+        classConsume(x2.k)
     }
 }
 
@@ -798,19 +798,19 @@ public func aggStructMultipleNonConsumingUseTest(_ x: AggStruct) { // expected-e
     let x2 = x // expected-note {{consuming use}}
     aggStructUseMoveOnlyWithoutEscaping(x2)
     aggStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    aggStructConsume(x2)
 }
 
 public func aggStructMultipleNonConsumingUseTestArg(_ x2: AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     aggStructUseMoveOnlyWithoutEscaping(x2)
     aggStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2) // expected-note {{consuming use}}
+    aggStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggStructMultipleNonConsumingUseTestOwnedArg(_ x2: __owned AggStruct) {
     aggStructUseMoveOnlyWithoutEscaping(x2)
     aggStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    aggStructConsume(x2)
 }
 
 public func aggStructUseAfterConsume(_ x: AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -818,19 +818,19 @@ public func aggStructUseAfterConsume(_ x: AggStruct) { // expected-error {{'x' h
                // expected-note @-1 {{consuming use}}
     aggStructUseMoveOnlyWithoutEscaping(x2)
     aggStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggStructUseAfterConsumeArg(_ x2: AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     aggStructUseMoveOnlyWithoutEscaping(x2)
     aggStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggStructUseAfterConsumeOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed more than once}}
     aggStructUseMoveOnlyWithoutEscaping(x2)
     aggStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggStructDoubleConsume(_ x: AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -1056,106 +1056,106 @@ public func aggStructConsumeFieldError2(_ x2: __owned AggStruct) {
 //////////////////////////////
 
 @_moveOnly
-public struct AggGenericStruct<T> {
+public struct AggGenericStruct<T> { // FIXME: for better test coverage this should probably use the generic parameter!
     var lhs: Klass
     var rhs: UnsafeRawPointer
     var pair: KlassPair
 }
 
-public func aggGenericStructUseMoveOnlyWithoutEscaping(_ x: AggGenericStruct<Klass>) {
+public func aggGenericStructUseMoveOnlyWithoutEscaping(_ x: AggGenericStruct<String>) {
 }
-public func aggGenericStructConsume(_ x: __owned AggGenericStruct<Klass>) {
+public func aggGenericStructConsume(_ x: __owned AggGenericStruct<String>) {
 }
 
-public func aggGenericStructSimpleChainTest(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructSimpleChainTest(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
     let y2 = x2
     let k2 = y2
     aggGenericStructUseMoveOnlyWithoutEscaping(k2)
 }
 
-public func aggGenericStructSimpleChainTestArg(_ x2: AggGenericStruct<Klass>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructSimpleChainTestArg(_ x2: AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let y2 = x2 // expected-note {{consuming use}}
     let k2 = y2
     aggGenericStructUseMoveOnlyWithoutEscaping(k2)
 }
 
-public func aggGenericStructSimpleChainTestOwnedArg(_ x2: __owned AggGenericStruct<Klass>) {
+public func aggGenericStructSimpleChainTestOwnedArg(_ x2: __owned AggGenericStruct<String>) {
     let y2 = x2
     let k2 = y2
     aggGenericStructUseMoveOnlyWithoutEscaping(k2)
 }
 
-public func aggGenericStructSimpleNonConsumingUseTest(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructSimpleNonConsumingUseTest(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
 }
 
-public func aggGenericStructSimpleNonConsumingUseTestArg(_ x2: AggGenericStruct<Klass>) {
+public func aggGenericStructSimpleNonConsumingUseTestArg(_ x2: AggGenericStruct<String>) {
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
 }
 
-public func aggGenericStructSimpleNonConsumingUseTestOwnedArg(_ x2: __owned AggGenericStruct<Klass>) {
+public func aggGenericStructSimpleNonConsumingUseTestOwnedArg(_ x2: __owned AggGenericStruct<String>) {
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
 }
 
-public func aggGenericStructMultipleNonConsumingUseTest(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructMultipleNonConsumingUseTest(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    aggGenericStructConsume(x2)
 }
 
-public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: AggGenericStruct<Klass>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
-public func aggGenericStructMultipleNonConsumingUseTestOwnedArg(_ x2: __owned AggGenericStruct<Klass>) {
+public func aggGenericStructMultipleNonConsumingUseTestOwnedArg(_ x2: __owned AggGenericStruct<String>) {
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    aggGenericStructConsume(x2)
 }
 
-public func aggGenericStructUseAfterConsume(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructUseAfterConsume(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
-public func aggGenericStructUseAfterConsumeArg(_ x2: AggGenericStruct<Klass>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructUseAfterConsumeArg(_ x2: AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
-public func aggGenericStructUseAfterConsumeOwnedArg(_ x2: __owned AggGenericStruct<Klass>) { // expected-error {{'x2' consumed more than once}}
+public func aggGenericStructUseAfterConsumeOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed more than once}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
-public func aggGenericStructDoubleConsume(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructDoubleConsume(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
                 // expected-note @-1 {{consuming use}}
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
-public func aggGenericStructDoubleConsumeArg(_ x2: AggGenericStruct<Klass>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructDoubleConsumeArg(_ x2: AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
-public func aggGenericStructDoubleConsumeOwnedArg(_ x2: __owned AggGenericStruct<Klass>) { // expected-error {{'x2' consumed more than once}}
+public func aggGenericStructDoubleConsumeOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed more than once}}
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
-public func aggGenericStructLoopConsume(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructLoopConsume(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use}}
     for _ in 0..<1024 {
@@ -1163,19 +1163,19 @@ public func aggGenericStructLoopConsume(_ x: AggGenericStruct<Klass>) { // expec
     }
 }
 
-public func aggGenericStructLoopConsumeArg(_ x2: AggGenericStruct<Klass>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructLoopConsumeArg(_ x2: AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
         aggGenericStructConsume(x2) // expected-note {{consuming use}}
     }
 }
 
-public func aggGenericStructLoopConsumeOwnedArg(_ x2: __owned AggGenericStruct<Klass>) { // expected-error {{'x2' consumed more than once}}
+public func aggGenericStructLoopConsumeOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed more than once}}
     for _ in 0..<1024 {
         aggGenericStructConsume(x2) // expected-note {{consuming use}}
     }
 }
 
-public func aggGenericStructDiamond(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamond(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
     if boolValue {
         aggGenericStructConsume(x2)
@@ -1184,7 +1184,7 @@ public func aggGenericStructDiamond(_ x: AggGenericStruct<Klass>) { // expected-
     }
 }
 
-public func aggGenericStructDiamondArg(_ x2: AggGenericStruct<Klass>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamondArg(_ x2: AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     if boolValue {
         aggGenericStructConsume(x2) // expected-note {{consuming use}}
     } else {
@@ -1192,7 +1192,7 @@ public func aggGenericStructDiamondArg(_ x2: AggGenericStruct<Klass>) { // expec
     }
 }
 
-public func aggGenericStructDiamondOwnedArg(_ x2: __owned AggGenericStruct<Klass>) {
+public func aggGenericStructDiamondOwnedArg(_ x2: __owned AggGenericStruct<String>) {
     if boolValue {
         aggGenericStructConsume(x2)
     } else {
@@ -1200,7 +1200,7 @@ public func aggGenericStructDiamondOwnedArg(_ x2: __owned AggGenericStruct<Klass
     }
 }
 
-public func aggGenericStructDiamondInLoop(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamondInLoop(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use}}
     for _ in 0..<1024 {
@@ -1212,7 +1212,7 @@ public func aggGenericStructDiamondInLoop(_ x: AggGenericStruct<Klass>) { // exp
     }
 }
 
-public func aggGenericStructDiamondInLoopArg(_ x2: AggGenericStruct<Klass>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamondInLoopArg(_ x2: AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
       if boolValue {
           aggGenericStructConsume(x2) // expected-note {{consuming use}}
@@ -1222,7 +1222,7 @@ public func aggGenericStructDiamondInLoopArg(_ x2: AggGenericStruct<Klass>) { //
     }
 }
 
-public func aggGenericStructDiamondInLoopOwnedArg(_ x2: __owned AggGenericStruct<Klass>) { // expected-error {{'x2' consumed more than once}}
+public func aggGenericStructDiamondInLoopOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed more than once}}
     for _ in 0..<1024 {
       if boolValue {
           aggGenericStructConsume(x2) // expected-note {{consuming use}}
@@ -1232,7 +1232,7 @@ public func aggGenericStructDiamondInLoopOwnedArg(_ x2: __owned AggGenericStruct
     }
 }
 
-public func aggGenericStructAccessField(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructAccessField(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
     classUseMoveOnlyWithoutEscaping(x2.lhs)
     for _ in 0..<1024 {
@@ -1240,21 +1240,21 @@ public func aggGenericStructAccessField(_ x: AggGenericStruct<Klass>) { // expec
     }
 }
 
-public func aggGenericStructAccessFieldArg(_ x2: AggGenericStruct<Klass>) {
+public func aggGenericStructAccessFieldArg(_ x2: AggGenericStruct<String>) {
     classUseMoveOnlyWithoutEscaping(x2.lhs)
     for _ in 0..<1024 {
         classUseMoveOnlyWithoutEscaping(x2.lhs)
     }
 }
 
-public func aggGenericStructAccessFieldOwnedArg(_ x2: __owned AggGenericStruct<Klass>) {
+public func aggGenericStructAccessFieldOwnedArg(_ x2: __owned AggGenericStruct<String>) {
     classUseMoveOnlyWithoutEscaping(x2.lhs)
     for _ in 0..<1024 {
         classUseMoveOnlyWithoutEscaping(x2.lhs)
     }
 }
 
-public func aggGenericStructConsumeField(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructConsumeField(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
@@ -1263,7 +1263,7 @@ public func aggGenericStructConsumeField(_ x: AggGenericStruct<Klass>) { // expe
     }
 }
 
-public func aggGenericStructConsumeFieldArg(_ x2: AggGenericStruct<Klass>) {
+public func aggGenericStructConsumeFieldArg(_ x2: AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
@@ -1271,7 +1271,7 @@ public func aggGenericStructConsumeFieldArg(_ x2: AggGenericStruct<Klass>) {
     }
 }
 
-public func aggGenericStructConsumeFieldOwnedArg(_ x2: __owned AggGenericStruct<Klass>) {
+public func aggGenericStructConsumeFieldOwnedArg(_ x2: __owned AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.lhs)
     for _ in 0..<1024 {
@@ -1279,7 +1279,7 @@ public func aggGenericStructConsumeFieldOwnedArg(_ x2: __owned AggGenericStruct<
     }
 }
 
-public func aggGenericStructAccessGrandField(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructAccessGrandField(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
     classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
     for _ in 0..<1024 {
@@ -1287,21 +1287,21 @@ public func aggGenericStructAccessGrandField(_ x: AggGenericStruct<Klass>) { // 
     }
 }
 
-public func aggGenericStructAccessGrandFieldArg(_ x2: AggGenericStruct<Klass>) {
+public func aggGenericStructAccessGrandFieldArg(_ x2: AggGenericStruct<String>) {
     classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
     for _ in 0..<1024 {
         classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
     }
 }
 
-public func aggGenericStructAccessGrandFieldOwnedArg(_ x2: __owned AggGenericStruct<Klass>) {
+public func aggGenericStructAccessGrandFieldOwnedArg(_ x2: __owned AggGenericStruct<String>) {
     classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
     for _ in 0..<1024 {
         classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
     }
 }
 
-public func aggGenericStructConsumeGrandField(_ x: AggGenericStruct<Klass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructConsumeGrandField(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use}}
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
@@ -1310,7 +1310,7 @@ public func aggGenericStructConsumeGrandField(_ x: AggGenericStruct<Klass>) { //
     }
 }
 
-public func aggGenericStructConsumeGrandFieldArg(_ x2: AggGenericStruct<Klass>) {
+public func aggGenericStructConsumeGrandFieldArg(_ x2: AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
@@ -1318,7 +1318,7 @@ public func aggGenericStructConsumeGrandFieldArg(_ x2: AggGenericStruct<Klass>) 
     }
 }
 
-public func aggGenericStructConsumeGrandFieldOwnedArg(_ x2: __owned AggGenericStruct<Klass>) {
+public func aggGenericStructConsumeGrandFieldOwnedArg(_ x2: __owned AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     classConsume(x2.pair.lhs)
     for _ in 0..<1024 {
@@ -1371,19 +1371,19 @@ public func aggGenericStructMultipleNonConsumingUseTest<T>(_ x: AggGenericStruct
     let x2 = x // expected-note {{consuming use}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    aggGenericStructConsume(x2)
 }
 
 public func aggGenericStructMultipleNonConsumingUseTestArg<T>(_ x2: AggGenericStruct<T>) { //expected-error {{'x2' has guaranteed ownership but was consumed}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggGenericStructMultipleNonConsumingUseTestOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) {
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    aggGenericStructConsume(x2)
 }
 
 public func aggGenericStructUseAfterConsume<T>(_ x: AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -1391,19 +1391,19 @@ public func aggGenericStructUseAfterConsume<T>(_ x: AggGenericStruct<T>) { // ex
                // expected-note @-1 {{consuming use}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggGenericStructUseAfterConsumeArg<T>(_ x2: AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggGenericStructUseAfterConsumeOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
     aggGenericStructUseMoveOnlyWithoutEscaping(x2)
     aggGenericStructConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    aggGenericStructConsume(x2) // expected-note {{consuming use}}
 }
 
 public func aggGenericStructDoubleConsume<T>(_ x: AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -1647,19 +1647,19 @@ public func enumMultipleNonConsumingUseTest(_ x: EnumTy) { // expected-error {{'
     let x2 = x // expected-note {{consuming use}}
     enumUseMoveOnlyWithoutEscaping(x2)
     enumUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    enumConsume(x2)
 }
 
 public func enumMultipleNonConsumingUseTestArg(_ x2: EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     enumUseMoveOnlyWithoutEscaping(x2)
     enumUseMoveOnlyWithoutEscaping(x2)
-    print(x2) // expected-note {{consuming use}}
+    enumConsume(x2) // expected-note {{consuming use}}
 }
 
 public func enumMultipleNonConsumingUseTestOwnedArg(_ x2: __owned EnumTy) {
     enumUseMoveOnlyWithoutEscaping(x2)
     enumUseMoveOnlyWithoutEscaping(x2)
-    print(x2)
+    enumConsume(x2)
 }
 
 public func enumUseAfterConsume(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -1667,19 +1667,19 @@ public func enumUseAfterConsume(_ x: EnumTy) { // expected-error {{'x' has guara
                // expected-note @-1 {{consuming use}}
     enumUseMoveOnlyWithoutEscaping(x2)
     enumConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    enumConsume(x2) // expected-note {{consuming use}}
 }
 
 public func enumUseAfterConsumeArg(_ x2: EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     enumUseMoveOnlyWithoutEscaping(x2)
     enumConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    enumConsume(x2) // expected-note {{consuming use}}
 }
 
 public func enumUseAfterConsumeOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
     enumUseMoveOnlyWithoutEscaping(x2)
     enumConsume(x2) // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
+    enumConsume(x2) // expected-note {{consuming use}}
 }
 
 public func enumDoubleConsume(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -1782,7 +1782,7 @@ public func enumAssignToVar1(_ x: EnumTy) { // expected-error {{'x' has guarante
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x3)
 }
 
 public func enumAssignToVar1Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
@@ -1790,7 +1790,7 @@ public func enumAssignToVar1Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x3)
 }
 
 public func enumAssignToVar1OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
@@ -1798,7 +1798,7 @@ public func enumAssignToVar1OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // exp
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x3)
 }
 
 public func enumAssignToVar2(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -1825,40 +1825,40 @@ public func enumAssignToVar3(_ x: EnumTy) { // expected-error {{'x' has guarante
     let x2 = x // expected-note {{consuming use}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x3)
 }
 
 public func enumAssignToVar3Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                              // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x3)
 }
 
 public func enumAssignToVar3OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x3)
 }
 
 public func enumAssignToVar4(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use}}
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x2) // expected-note {{consuming use}}
+    enumConsume(x3)
 }
 
 public func enumAssignToVar4Arg(_ x2: EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x2) // expected-note {{consuming use}}
+    enumConsume(x3)
 }
 
 public func enumAssignToVar4OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
     let x3 = x2 // expected-note {{consuming use}}
-    print(x2) // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x2) // expected-note {{consuming use}}
+    enumConsume(x3)
 }
 
 public func enumAssignToVar5(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -1869,7 +1869,7 @@ public func enumAssignToVar5(_ x: EnumTy) { // expected-error {{'x' has guarante
     // appropriately though.
     enumUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x3)
 }
 
 public func enumAssignToVar5Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
@@ -1879,7 +1879,7 @@ public func enumAssignToVar5Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {
     // appropriately though.
     enumUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x3)
 }
 
 public func enumAssignToVar5OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
@@ -1889,7 +1889,7 @@ public func enumAssignToVar5OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // exp
     // appropriately though.
     enumUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3)
+    enumConsume(x3)
 }
 
 public func enumPatternMatchIfLet1(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -2102,7 +2102,7 @@ public func closureClassUseAfterConsume1(_ x: Klass) {
         // expected-note @-1 {{consuming use}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     f()
 }
@@ -2113,7 +2113,7 @@ public func closureClassUseAfterConsume2(_ argX: Klass) {
                    // expected-note @-1 {{consuming use}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     f(argX)
 }
@@ -2123,7 +2123,7 @@ public func closureClassUseAfterConsumeArg(_ argX: Klass) {
     let f = { (_ x2: Klass) in // expected-error {{'x2' has guaranteed ownership but was consumed}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     f(argX)
 }
@@ -2134,7 +2134,7 @@ public func closureCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     f()
 }
@@ -2147,7 +2147,7 @@ public func closureCaptureClassUseAfterConsumeError(_ x: Klass) { // expected-er
     let f = { // expected-note {{consuming use}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     f()
     let x3 = x2 // expected-note {{consuming use}}
@@ -2160,7 +2160,7 @@ public func closureCaptureClassArgUseAfterConsume(_ x2: Klass) {
     let f = { // expected-note {{closure capture}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     f()
 }
@@ -2170,7 +2170,7 @@ public func closureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     f()
 }
@@ -2181,7 +2181,7 @@ public func closureCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
     let f = { // expected-note {{consuming use}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     f()
     let x3 = x2 // expected-note {{consuming use}}
@@ -2194,9 +2194,9 @@ public func deferCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
-    print(x) // expected-note {{consuming use}}
+    classConsume(x) // expected-note {{consuming use}}
 }
 
 public func deferCaptureClassUseAfterConsume2(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -2206,7 +2206,7 @@ public func deferCaptureClassUseAfterConsume2(_ x: Klass) { // expected-error {{
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     let x3 = x2 // expected-note {{consuming use}}
     let _ = x3
@@ -2218,7 +2218,7 @@ public func deferCaptureClassArgUseAfterConsume(_ x2: Klass) {
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     print("foo")
 }
@@ -2228,7 +2228,7 @@ public func deferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
     print("foo")
 }
@@ -2239,9 +2239,9 @@ public func deferCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
     defer {
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2) // expected-note {{consuming use}}
-        print(x2) // expected-note {{consuming use}}
+        classConsume(x2) // expected-note {{consuming use}}
     }
-    print(x2) // expected-note {{consuming use}}
+    classConsume(x2) // expected-note {{consuming use}}
 }
 
 public func closureAndDeferCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -2251,7 +2251,7 @@ public func closureAndDeferCaptureClassUseAfterConsume(_ x: Klass) { // expected
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         print("foo")
     }
@@ -2267,7 +2267,7 @@ public func closureAndDeferCaptureClassUseAfterConsume2(_ x: Klass) { // expecte
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         print("foo")
     }
@@ -2284,7 +2284,7 @@ public func closureAndDeferCaptureClassUseAfterConsume3(_ x: Klass) { // expecte
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         print("foo")
     }
@@ -2299,7 +2299,7 @@ public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: Klass) {
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         print("foo")
     }
@@ -2312,7 +2312,7 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Kla
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         print("foo")
     }
@@ -2326,12 +2326,12 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Kl
         defer {
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         print("foo")
     }
     f()
-    print(x2) // expected-note {{consuming use}}
+    classConsume(x2) // expected-note {{consuming use}}
 }
 
 public func closureAndClosureCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -2342,7 +2342,7 @@ public func closureAndClosureCaptureClassUseAfterConsume(_ x: Klass) { // expect
         let g = { // expected-note {{closure capture}}
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         g()
     }
@@ -2358,12 +2358,12 @@ public func closureAndClosureCaptureClassUseAfterConsume2(_ x: Klass) { // expec
         let g = { // expected-note {{closure capture}}
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         g()
     }
     f()
-    print(x2) // expected-note {{consuming use}}
+    classConsume(x2) // expected-note {{consuming use}}
 }
 
 
@@ -2375,7 +2375,7 @@ public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: Klass) {
         let g = { // expected-note {{closure capture}}
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         g()
     }
@@ -2389,7 +2389,7 @@ public func closureAndClosureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned K
         let g = { // expected-note {{closure capture}}
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         g()
     }
@@ -2404,12 +2404,12 @@ public func closureAndClosureCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned 
         let g = { // expected-note {{closure capture}}
             classUseMoveOnlyWithoutEscaping(x2)
             classConsume(x2) // expected-note {{consuming use}}
-            print(x2) // expected-note {{consuming use}}
+            classConsume(x2) // expected-note {{consuming use}}
         }
         g()
     }
     f()
-    print(x2) // expected-note {{consuming use}}
+    classConsume(x2) // expected-note {{consuming use}}
 }
 
 /////////////////////////////
