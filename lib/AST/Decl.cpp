@@ -9888,8 +9888,8 @@ ValueDecl::getRuntimeDiscoverableAttrTypeDecl(CustomAttr *attr) const {
   return nominal;
 }
 
-ArrayRef<CustomAttr *> ValueDecl::getRuntimeDiscoverableAttrs() const {
-  auto *mutableSelf = const_cast<ValueDecl *>(this);
+ArrayRef<CustomAttr *> Decl::getRuntimeDiscoverableAttrs() const {
+  auto *mutableSelf = const_cast<Decl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            GetRuntimeDiscoverableAttributes{mutableSelf},
                            nullptr);

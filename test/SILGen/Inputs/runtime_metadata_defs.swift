@@ -8,3 +8,14 @@ public struct Ignore {
 
 @Ignore
 public protocol Ignorable {}
+
+public class Base : Ignorable {
+  public init() {}
+}
+
+public class Child : Base {
+}
+
+@available(*, unavailable)
+@Ignore
+extension Child {}

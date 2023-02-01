@@ -3360,6 +3360,8 @@ public:
       ED->diagnose(diag::moveonly_cannot_conform_to_protocol,
                    nominal->getDescriptiveKind(), nominal->getBaseName());
     }
+
+    TypeChecker::checkReflectionMetadataAttributes(ED);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
