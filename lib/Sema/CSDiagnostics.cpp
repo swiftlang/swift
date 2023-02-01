@@ -8530,35 +8530,6 @@ bool AddMissingMacroPound::diagnoseAsError() {
   return true;
 }
 
-bool AddMissingMacroArguments::diagnoseAsError() {
-  std::string argumentString;
-  {
-    llvm::raw_string_ostream out(argumentString);
-    out << "(";
-    llvm::interleave(
-        macro->parameterList->begin(), macro->parameterList->end(),
-        [&](ParamDecl *param) {
-          if (!param->getArgumentName().empty()) {
-            out << param->getArgumentName() << ": ";
-          }
-
-          out << "<#" << param->getInterfaceType().getString() << "#" << ">";
-        },
-        [&] {
-          out << ", ";
-        });
-    out << ")";
-  }
-
-  auto insertLoc = getRawAnchor().getEndLoc();
-  emitDiagnostic(diag::macro_expansion_missing_arguments, macro->getName())
-    .fixItInsertAfter(insertLoc, argumentString);
-  macro->diagnose(
-      diag::kind_declname_declared_here, macro->getDescriptiveKind(),
-      macro->getName());
-  return true;
-}
-
 bool GlobalActorFunctionMismatchFailure::diagnoseTupleElement() {
   auto *locator = getLocator();
   auto path = locator->getPath();
