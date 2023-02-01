@@ -3151,6 +3151,7 @@ public:
     return pointer.getOpaqueValue();
   }
 
+  SourceLoc getSigilLoc() const;
   DeclNameRef getMacroName() const;
   DeclNameLoc getMacroNameLoc() const;
   SourceRange getGenericArgsRange() const;

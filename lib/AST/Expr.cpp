@@ -2538,14 +2538,14 @@ TypeJoinExpr *TypeJoinExpr::create(ASTContext &ctx, DeclRefExpr *var,
 
 SourceRange MacroExpansionExpr::getSourceRange() const {
   SourceLoc endLoc;
-  if (ArgList)
+  if (ArgList && !ArgList->isImplicit())
     endLoc = ArgList->getEndLoc();
   else if (RightAngleLoc.isValid())
     endLoc = RightAngleLoc;
   else
     endLoc = MacroNameLoc.getEndLoc();
 
-  return SourceRange(PoundLoc, endLoc);
+  return SourceRange(SigilLoc, endLoc);
 }
 
 unsigned MacroExpansionExpr::getDiscriminator() const {
