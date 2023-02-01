@@ -1343,6 +1343,28 @@ ArrayRef<ValueDecl *> ImportDecl::getDecls() const {
                            ScopedImportLookupRequest{mutableThis}, {});
 }
 
+AccessLevel ImportDecl::getAccessLevel() const {
+  if (auto attr = getAttrs().getAttribute<AccessControlAttr>()) {
+    return attr->getAccess();
+  }
+
+  auto &LangOpts = getASTContext().LangOpts;
+  if (LangOpts.isSwiftVersionAtLeast(6) &&
+      LangOpts.hasFeature(Feature::AccessLevelOnImport)) {
+    // Tentative Swift 6 mode where the default import is internal.
+    return AccessLevel::Internal;
+  } else {
+    return AccessLevel::Public;
+  }
+}
+
+bool ImportDecl::isAccessLevelImplicit() const {
+  if (auto attr = getAttrs().getAttribute<AccessControlAttr>()) {
+    return false;
+  }
+  return true;
+}
+
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                            uint64_t contextData) {
   assert(!Bits.NominalTypeDecl.HasLazyConformances &&

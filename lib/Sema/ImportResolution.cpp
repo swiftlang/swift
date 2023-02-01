@@ -543,6 +543,11 @@ UnboundImport::UnboundImport(ImportDecl *ID)
   if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     import.options |= ImportFlags::ImplementationOnly;
 
+  import.accessLevel = ID->getAccessLevel();
+  if (auto attr = ID->getAttrs().getAttribute<AccessControlAttr>()) {
+    import.accessLevelLoc = attr->getLocation();
+  }
+
   if (ID->getAttrs().hasAttribute<SPIOnlyAttr>())
     import.options |= ImportFlags::SPIOnly;
 
