@@ -32,6 +32,13 @@ void conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
                                   NominalTypeDecl *decl,
                                   const clang::CXXRecordDecl *clangDecl);
 
+/// If the decl is an instantiation of C++ `std::set`, `std::unordered_set` or
+/// `std::multiset`, synthesize a conformance to CxxSet, which is defined in the
+/// Cxx module.
+void conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
+                             NominalTypeDecl *decl,
+                             const clang::CXXRecordDecl *clangDecl);
+
 } // namespace swift
 
 #endif // SWIFT_CLANG_DERIVED_CONFORMANCES_H
