@@ -1128,6 +1128,8 @@ ERROR(single_value_stmt_branch_must_end_in_throw,none,
 ERROR(cannot_jump_in_single_value_stmt,none,
       "cannot '%0' in '%1' when used as expression",
       (StmtKind, StmtKind))
+ERROR(effect_marker_on_single_value_stmt,none,
+      "'%0' may not be used on '%1' expression", (StringRef, StmtKind))
 
 ERROR(did_not_call_function_value,none,
       "function value was used as a property; add () to call it",

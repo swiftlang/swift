@@ -2530,6 +2530,16 @@ SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(Expr *E) {
       E = CE->getSubExpr();
       continue;
     }
+    // Look through try/await (this is invalid, but we'll error on it in
+    // effect checking).
+    if (auto *TE = dyn_cast<AnyTryExpr>(E)) {
+      E = TE->getSubExpr();
+      continue;
+    }
+    if (auto *AE = dyn_cast<AwaitExpr>(E)) {
+      E = AE->getSubExpr();
+      continue;
+    }
     break;
   }
   return dyn_cast<SingleValueStmtExpr>(E);
