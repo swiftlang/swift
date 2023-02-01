@@ -6086,9 +6086,16 @@ public:
         MacroName(macroName), MacroNameLoc(macroNameLoc),
         LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
         GenericArgs(genericArgs),
-        ArgList(argList),
         Rewritten(nullptr), Roles(roles) {
     Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
+
+    // Macro expansions always have an argument list. If one is not provided, create
+    // an implicit one.
+    if (argList) {
+      ArgList = argList;
+    } else {
+      ArgList = ArgumentList::createImplicit(dc->getASTContext(), {});
+    }
   }
 
   DeclNameRef getMacroName() const { return MacroName; }

@@ -64,7 +64,7 @@ func overloaded1(_ p: Any) { }
 // expected-warning@-1{{external macro implementation type}}
 
 @freestanding(expression) macro intIdentity(value: Int, _: Float) -> Int = #externalMacro(module: "MissingModule", type: "MissingType")
-// expected-note@-1{{macro 'intIdentity(value:_:)' declared here}}
+// expected-note@-1{{'intIdentity(value:_:)' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 
 @freestanding(declaration) macro unaryDeclMacro(_ x: String)
@@ -94,7 +94,7 @@ func testDiags(a: Int, b: Int) {
   _ = stringify(a + b)
   // expected-error@-1{{expansion of macro 'stringify' requires leading '#'}}{{7-7=#}}
 
-  _ = #intIdentity // expected-error{{expansion of macro 'intIdentity(value:_:)' requires arguments}}{{19-19=(value: <#Int#>, <#Float#>)}}
+  _ = #intIdentity // expected-error{{missing arguments for parameters 'value', #2 in macro expansion}}{{19-19=(value: <#Int#>, <#Float#>)}}
 
   overloaded1(a) // okay, calls the function
   #overloaded1(a) // expected-error{{argument type 'Int' does not conform to expected type 'P'}}

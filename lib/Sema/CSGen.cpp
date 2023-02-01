@@ -3799,16 +3799,11 @@ namespace {
       auto &ctx = CS.getASTContext();
       auto locator = CS.getConstraintLocator(expr);
 
-      // For calls, set up the argument list.
-      bool isCall = expr->getArgs() != nullptr;
-      if (isCall) {
-        CS.associateArgumentList(locator, expr->getArgs());
-      }
+      CS.associateArgumentList(locator, expr->getArgs());
 
       // Look up the macros with this name.
       auto macroIdent = expr->getMacroName().getBaseIdentifier();
-      FunctionRefKind functionRefKind = isCall ? FunctionRefKind::SingleApply
-                                               : FunctionRefKind::Unapplied;
+      FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
       auto macros = lookupMacros(
           macroIdent, expr->getMacroNameLoc().getBaseNameLoc(),
           functionRefKind, expr->getMacroRoles());
@@ -3831,11 +3826,7 @@ namespace {
           return Type();
       }
 
-      // For non-calls, the type variable is the result.
-      if (!isCall)
-        return macroRefType;
-
-      // For calls, form the applicable-function constraint. The result type
+      // Form the applicable-function constraint. The result type
       // is the result of that call.
       SmallVector<AnyFunctionType::Param, 8> params;
       getMatchingParams(expr->getArgs(), params);

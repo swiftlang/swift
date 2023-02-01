@@ -1257,11 +1257,6 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
   if (foundMacros.empty())
     return nullptr;
 
-  // Extract macro arguments, or create an empty list.
-  auto *argList = macroRef.getArgs();
-  if (!argList)
-    argList = ArgumentList::createImplicit(ctx, {});
-
   // If we already have a MacroExpansionExpr, use that. Otherwise,
   // create one.
   MacroExpansionExpr *macroExpansion;
@@ -1273,7 +1268,7 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
       dc, macroRef.getSigilLoc(), macroRef.getMacroName(),
       macroRef.getMacroNameLoc(), genericArgsRange.Start,
       macroRef.getGenericArgs(), genericArgsRange.End,
-      argList, roles);
+      macroRef.getArgs(), roles);
   }
 
   Expr *result = macroExpansion;

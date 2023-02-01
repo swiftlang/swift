@@ -4634,7 +4634,8 @@ ASTNode MissingArgumentsFailure::getAnchor() const {
 }
 
 SourceLoc MissingArgumentsFailure::getLoc() const {
-  if (auto *argList = getArgumentListFor(getLocator()))
+  auto *argList = getArgumentListFor(getLocator());
+  if (argList && !argList->isImplicit())
     return argList->getLoc();
   return FailureDiagnostic::getLoc();
 }
@@ -4729,17 +4730,25 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 
   // TODO(diagnostics): We should be able to suggest this fix-it
   // unconditionally.
-  if (args && args->empty()) {
-    SmallString<32> scratch;
-    llvm::raw_svector_ostream fixIt(scratch);
+  SmallString<32> scratch;
+  llvm::raw_svector_ostream fixIt(scratch);
+  auto appendMissingArgsToFix = [&]() {
     interleave(
         SynthesizedArgs,
         [&](const SynthesizedArg &arg) {
           forFixIt(fixIt, arg.param);
         },
         [&] { fixIt << ", "; });
+  };
 
+  if (args && args->empty() && !args->isImplicit()) {
+    appendMissingArgsToFix();
     diag.fixItInsertAfter(args->getLParenLoc(), fixIt.str());
+  } else if (isExpr<MacroExpansionExpr>(getRawAnchor())) {
+    fixIt << "(";
+    appendMissingArgsToFix();
+    fixIt << ")";
+    diag.fixItInsertAfter(getRawAnchor().getEndLoc(), fixIt.str());
   }
 
   diag.flush();

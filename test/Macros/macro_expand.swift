@@ -19,9 +19,9 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@freestanding(expression) macro customFileID: String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
+@freestanding(expression) macro customFileID() -> String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
-@freestanding(expression) macro fileID<T: ExpressibleByStringLiteral>: T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
+@freestanding(expression) macro fileID<T: ExpressibleByStringLiteral>() -> T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
 @freestanding(expression) macro recurse(_: Bool) = #externalMacro(module: "MacroDefinition", type: "RecursiveMacro")
 
 func testFileID(a: Int, b: Int) {
@@ -116,7 +116,7 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
 }
 
 // Make sure we don't crash with declarations produced by expansions.
-@freestanding(expression) macro nestedDeclInExpr: () -> Void = #externalMacro(module: "MacroDefinition", type: "NestedDeclInExprMacro")
+@freestanding(expression) macro nestedDeclInExpr() -> () -> Void = #externalMacro(module: "MacroDefinition", type: "NestedDeclInExprMacro")
 
 func testNestedDeclInExpr() {
   let _: () -> Void = #nestedDeclInExpr
