@@ -158,12 +158,28 @@ func checkCasting(_ b: any Box, _ mo: MO) {
   _ = MO() as any P // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   _ = MO() as Any // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   _ = MO() as MO
-
-  // TODO: make sure at runtime these casts actually fail, or just make them errors?
-  let _: AnyHashable = MO() as! AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
-
-  // TODO: figure out how this is getting past us! Doesn't seem to hit `typeCheckCheckedCast` at all!
   _ = MO() as AnyObject // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+
+  // FIXME(kavon): make sure at runtime these casts actually fail, or just make them errors? (rdar://104900293)
+
+  _ = MO() is AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
+  _ = MO() is AnyObject // expected-warning {{cast from 'MO' to unrelated type 'AnyObject' always fails}}
+  _ = MO() is Any // expected-warning {{cast from 'MO' to unrelated type 'Any' always fails}}
+  _ = MO() is P // expected-warning {{cast from 'MO' to unrelated type 'any P' always fails}}
+  _ = MO() is MO // expected-warning {{'is' test is always true}}
+
+  _ = MO() as! AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
+  _ = MO() as! AnyObject // expected-warning {{cast from 'MO' to unrelated type 'AnyObject' always fails}}
+  _ = MO() as! Any // expected-warning {{cast from 'MO' to unrelated type 'Any' always fails}}
+  _ = MO() as! P // expected-warning {{cast from 'MO' to unrelated type 'any P' always fails}}
+  _ = MO() as! MO // expected-warning {{forced cast of 'MO' to same type has no effect}}
+
+  _ = MO() as? AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
+  _ = MO() as? AnyObject // expected-warning {{cast from 'MO' to unrelated type 'AnyObject' always fails}}
+  _ = MO() as? Any // expected-warning {{cast from 'MO' to unrelated type 'Any' always fails}}
+  _ = MO() as? P // expected-warning {{cast from 'MO' to unrelated type 'any P' always fails}}
+  _ = MO() as? MO // expected-warning {{conditional cast from 'MO' to 'MO' always succeeds}}
+
 }
 
 func checkStdlibTypes(_ mo: MO) {

@@ -11124,6 +11124,12 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
     return formUnsolved();
 
+  // Move-only types can't be involved in a bridging conversion since a bridged
+  // type assumes the ability to copy.
+  if (type1->isPureMoveOnly()) {
+    return SolutionKind::Error;
+  }
+
   Type unwrappedFromType;
   unsigned numFromOptionals;
   std::tie(unwrappedFromType, numFromOptionals) = unwrapType(type1);
