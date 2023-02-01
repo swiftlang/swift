@@ -65,6 +65,7 @@ namespace swift {
   class SourceFile;
   enum class SourceFileKind;
   class SourceManager;
+  class SourceRange;
   struct TBDGenOptions;
   class Token;
   class TopLevelContext;
@@ -309,6 +310,15 @@ namespace swift {
     struct Implementation;
     Implementation &Impl;
   };
+
+  /// Attempt to parse `type-simple` in the given range \p Range of the given
+  /// source file \p SF, with diagnostics disabled.
+  ///
+  /// The source file must be associated with a buffer.
+  ///
+  /// @Note This entry point is used in Sema in attempts to reparse expressions
+  /// as types.
+  TypeRepr *parseSimpleTypeInRange(SourceFile *SF, SourceRange Range);
 
   /// Register AST-level request functions with the evaluator.
   ///

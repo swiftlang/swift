@@ -1456,3 +1456,54 @@ do {
       case (e: .y, b: true)?: break
   }
 }
+
+// https://github.com/apple/swift/issues/59923
+// Enum element patterns with non-identifier type qualifiers.
+
+extension Optional {
+  typealias WrappedT = Wrapped
+}
+extension Dictionary {
+  typealias ValueT = Value
+}
+do {
+  enum X {
+    case x
+  }
+  enum E {
+    case a
+    case b(X)
+  }
+  let e: E
+
+  // Use switch exhaustivity to ascertain that an enum element pattern was
+  // successfully resolved.
+  //
+  // Unresolved dot expression / call expression
+  switch e {
+    case (E).a: break
+    case (E).b(.x): break
+  }
+  switch e {
+    case E?.WrappedT.a: break
+    case E?.WrappedT.b(.x): break
+  }
+  switch e {
+    case [E].Element.a: break
+    case [E].Element.b(.x): break
+  }
+  switch e {
+    case [Int: E].ValueT.a: break
+    case [Int: E].ValueT.b(.x): break
+  }
+  switch e {
+    case (([Int: ([E])?].ValueT).WrappedT).Element.a: break
+    case (([Int: ([E])?].ValueT).WrappedT).Element.b(.x): break
+  }
+
+  // Special case: "T?" is itself an enum.
+  switch X?.none {
+    case X?.none: break
+    case X?.some(.x): break
+  }
+}

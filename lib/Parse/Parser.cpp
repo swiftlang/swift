@@ -15,8 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParseRequests.h"
@@ -25,16 +25,17 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 
 static void getStringPartTokens(const swift::Token &Tok,
                                 const swift::LangOptions &LangOpts,
@@ -1196,6 +1197,23 @@ const LangOptions &ParserUnit::getLangOptions() const {
 
 SourceFile &ParserUnit::getSourceFile() {
   return *Impl.SF;
+}
+
+TypeRepr *swift::parseSimpleTypeInRange(SourceFile *SF, SourceRange Range) {
+  Parser parser(*SF->getBufferID(), *SF, /*EnableLexerDiags=*/false, Range);
+
+  // Prime the lexer.
+  parser.consumeTokenWithoutFeedingReceiver();
+
+  Optional<DiagnosticSuppression> suppression;
+  suppression.emplace(SF->getASTContext().Diags);
+
+  auto result = parser.parseTypeSimple(diag::expected_type,
+                                       Parser::ParseTypeReason::Unspecified);
+  if (result.isParseError())
+    return nullptr;
+
+  return result.getPtrOrNull();
 }
 
 ParsedDeclName swift::parseDeclName(StringRef name) {
