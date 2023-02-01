@@ -753,15 +753,15 @@ NOTE(sil_moveonlychecker_moveonly_field_consumed_here, none,
 NOTE(sil_moveonlychecker_boundary_use, none,
      "boundary use here", ())
 NOTE(sil_moveonlychecker_consuming_use_here, none,
-     "consuming use", ())
+     "consuming use here", ())
 NOTE(sil_moveonlychecker_two_consuming_uses_here, none,
      "two consuming uses here", ())
 NOTE(sil_moveonlychecker_consuming_and_non_consuming_uses_here, none,
      "consuming and non-consuming uses here", ())
 NOTE(sil_moveonlychecker_consuming_closure_use_here, none,
-     "closure capture", ())
+     "closure capture here", ())
 NOTE(sil_moveonlychecker_nonconsuming_use_here, none,
-     "non-consuming use", ())
+     "non-consuming use here", ())
 ERROR(sil_moveonlychecker_not_understand_no_implicit_copy, none,
       "Usage of @noImplicitCopy that the move checker does not know how to "
       "check!", ())

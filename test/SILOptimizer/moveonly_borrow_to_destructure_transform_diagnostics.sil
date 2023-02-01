@@ -77,7 +77,7 @@ bb0(%0 : @guaranteed $AggStruct2):
   end_borrow %4a : $AggStruct2
   destroy_value %2 : $AggStruct2
   %9 = function_ref @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
-  apply %9(%7) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{consuming use}}
+  apply %9(%7) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{consuming use here}}
   apply %9(%7a) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{boundary use here}}
   %9999 = tuple()
   return %9999 : $()
@@ -141,7 +141,7 @@ bb0(%0 : @owned $AggStruct2):
   %9 = struct_extract %8 : $AggStruct2, #AggStruct2.lhs
   %10 = copy_value %9 : $MoveOnlyKlass
   %11 = function_ref @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
-  %12 = apply %11(%10) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{consuming use}}
+  %12 = apply %11(%10) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{consuming use here}}
   end_borrow %8 : $AggStruct2
   br bb1
 
@@ -153,7 +153,7 @@ bb2:
   %52 = struct_extract %51 : $AggStruct2, #AggStruct2.lhs
   %53 = copy_value %52 : $MoveOnlyKlass
   %54 = function_ref @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
-  %55 = apply %54(%53) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{consuming use}}
+  %55 = apply %54(%53) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{consuming use here}}
   end_borrow %51 : $AggStruct2
   br bb1
 
