@@ -115,6 +115,11 @@ module ucrt [system] {
     }
   }
 
+  module conio {
+    header "conio.h"
+    export *
+  }
+
   module process {
     header "process.h"
     export *
@@ -137,6 +142,11 @@ module corecrt [system] {
   header "corecrt.h"
   header "corecrt_stdio_config.h"
   export *
+
+  module conio {
+    header "corecrt_wconio.h"
+    export *
+  }
 
   module io {
     header "corecrt_io.h"
