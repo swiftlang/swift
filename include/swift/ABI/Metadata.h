@@ -1642,6 +1642,42 @@ using AssociatedWitnessTableAccessFunction =
                                  const Metadata *self,
                                  const WitnessTable *selfConformance);
 
+template<typename Runtime>
+using TargetRelativeProtocolConformanceDescriptorPointer =
+  RelativeIndirectablePointer<const TargetProtocolConformanceDescriptor<Runtime>,
+                              /*nullable*/ false>;
+
+/// A relative witness table for a protocol.
+///
+/// With the exception of the initial protocol conformance descriptor,
+/// the layout of a witness table is dependent on the protocol being
+/// represented.
+/// Entries are relative pointers.
+template <typename Runtime>
+class TargetRelativeWitnessTable {
+  /// The protocol conformance descriptor from which this witness table
+  /// was generated.
+  TargetRelativeProtocolConformanceDescriptorPointer<Runtime> Description;
+
+public:
+  const TargetProtocolConformanceDescriptor<Runtime> *getDescription() const {
+    // "Look through" dynamically allocated witness tables.
+    uintptr_t selfValue = (uintptr_t)this;
+    if (selfValue & 0x1) {
+      selfValue = selfValue & ~((uintptr_t)0x1);
+      auto selfAddr = (TargetRelativeWitnessTable<Runtime> **)selfValue;
+      return (*selfAddr)->Description;
+    }
+    return Description;
+  }
+};
+using RelativeWitnessTable = TargetRelativeWitnessTable<InProcess>;
+
+using AssociatedRelativeWitnessTableAccessFunction =
+  SWIFT_CC(swift) RelativeWitnessTable *(const Metadata *associatedType,
+                                 const Metadata *self,
+                                 const RelativeWitnessTable *selfConformance);
+
 /// The possible physical representations of existential types.
 enum class ExistentialTypeRepresentation {
   /// The type uses an opaque existential representation.

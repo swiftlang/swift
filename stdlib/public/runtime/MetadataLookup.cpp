@@ -1785,12 +1785,23 @@ public:
     if (!assocType) return nullptr;
 
     // Call the associated type access function.
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+    auto tbl = reinterpret_cast<RelativeWitnessTable *>(
+      const_cast<WitnessTable *>(witnessTable));
+    return swift_getAssociatedTypeWitnessRelative(
+                                 MetadataState::Abstract,
+                                 tbl,
+                                 base,
+                                 swiftProtocol->getRequirementBaseDescriptor(),
+                                 *assocType).Value;
+#else
     return swift_getAssociatedTypeWitness(
                                  MetadataState::Abstract,
                                  const_cast<WitnessTable *>(witnessTable),
                                  base,
                                  swiftProtocol->getRequirementBaseDescriptor(),
                                  *assocType).Value;
+#endif
   }
 
 #define REF_STORAGE(Name, ...)                                                 \
