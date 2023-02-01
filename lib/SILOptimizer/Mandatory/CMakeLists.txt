@@ -26,6 +26,7 @@ target_sources(swiftSILOptimizer PRIVATE
   MovedAsyncVarDebugInfoPropagator.cpp
   MoveOnlyAddressChecker.cpp
   MoveOnlyBorrowToDestructureTransform.cpp
+  MoveOnlyBorrowToDestructureTransformTester.cpp
   MoveOnlyDeinitInsertion.cpp
   MoveOnlyDiagnostics.cpp
   MoveOnlyObjectChecker.cpp

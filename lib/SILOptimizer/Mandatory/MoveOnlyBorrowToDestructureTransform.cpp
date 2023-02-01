@@ -10,11 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// \file This is a pass that converts the borrow + gep pattern to destructures
-/// or emits an error if it cannot be done. It is assumed that it runs
-/// immediately before move checking of objects runs. This ensures that the move
-/// checker does not need to worry about this problem and instead can just check
-/// that the newly inserted destructures do not cause move only errors.
+/// \file This is a transform that converts the borrow + gep pattern to
+/// destructures or emits an error if it cannot be done. It is assumed that it
+/// runs immediately before move checking of objects runs. This ensures that the
+/// move checker does not need to worry about this problem and instead can just
+/// check that the newly inserted destructures do not cause move only errors.
+///
+/// This is written as a utility so that we can have a utility pass that tests
+/// this directly but also invoke this via the move only object checker.
+///
+/// TODO: Move this to SILOptimizer/Utils.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -28,14 +33,13 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
+#include "swift/Basic/BlotSetVector.h"
+#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/ADT/ArrayRef.h"
-
-using namespace swift;
-using namespace swift::siloptimizer;
 
 using namespace swift;
 using namespace swift::siloptimizer;
@@ -202,8 +206,8 @@ void BorrowToDestructureTransform::checkDestructureUsesOnBoundary() const {
   for (auto *use : destructureNeedingUses) {
     LLVM_DEBUG(llvm::dbgs()
                << "    DestructureNeedingUse: " << *use->getUser());
-    auto destructureUse = *TypeTreeLeafTypeRange::get(use->get(), mmci);
-    if (liveness.isWithinBoundary(use->getUser(), destructureUse)) {
+    auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use->get(), mmci);
+    if (liveness.isWithinBoundary(use->getUser(), destructureUseSpan)) {
       LLVM_DEBUG(llvm::dbgs() << "        Within boundary! Emitting error!\n");
       // Emit an error. We have a use after free.
       //
@@ -217,7 +221,7 @@ void BorrowToDestructureTransform::checkDestructureUsesOnBoundary() const {
           liveness.getNumSubElements());
       liveness.computeBoundary(boundary);
       diagnosticEmitter.emitObjectDestructureNeededWithinBorrowBoundary(
-          mmci, use->getUser(), destructureUse, boundary);
+          mmci, use->getUser(), destructureUseSpan, boundary);
       return;
     } else {
       LLVM_DEBUG(llvm::dbgs() << "        On boundary! No error!\n");
@@ -1322,116 +1326,4 @@ void BorrowToDestructureTransform::cleanup(
 
   // And finally do the same thing for our initial copy_value.
   addCompensatingDestroys(liveness, boundary, initialValue);
-}
-
-//===----------------------------------------------------------------------===//
-//                            Top Level Entrypoint
-//===----------------------------------------------------------------------===//
-
-static bool runTransform(SILFunction *fn,
-                         ArrayRef<MarkMustCheckInst *> moveIntroducersToProcess,
-                         PostOrderAnalysis *poa,
-                         DiagnosticEmitter &diagnosticEmitter) {
-  BorrowToDestructureTransform::IntervalMapAllocator allocator;
-  bool madeChange = false;
-  while (!moveIntroducersToProcess.empty()) {
-    auto *mmci = moveIntroducersToProcess.back();
-    moveIntroducersToProcess = moveIntroducersToProcess.drop_back();
-
-    StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
-
-    // If we failed to gather borrows due to the transform not understanding
-    // part of the SIL, fail and return false.
-    if (!BorrowToDestructureTransform::gatherBorrows(mmci, borrowWorklist))
-      return madeChange;
-
-    // If we do not have any borrows to process, continue and process the next
-    // instruction.
-    if (borrowWorklist.empty())
-      continue;
-
-    SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-
-    // Now that we have found all of our borrows, we want to find struct_extract
-    // uses of our borrow as well as any operands that cannot use an owned
-    // value.
-    SWIFT_DEFER { discoveredBlocks.clear(); };
-    BorrowToDestructureTransform transform(allocator, mmci, diagnosticEmitter,
-                                           poa, discoveredBlocks);
-
-    // Attempt to gather uses. Return if we saw something that we did not
-    // understand. Return made change so we invalidate as appropriate.
-    if (!transform.gatherUses(borrowWorklist))
-      return madeChange;
-
-    // Next make sure that any destructure needing instructions are on the
-    // boundary in a per bit field sensitive manner.
-    transform.checkDestructureUsesOnBoundary();
-
-    // If we emitted any diagnostic, break out. We return true since we actually
-    // succeeded in our processing by finding the error. We only return false if
-    // we want to tell the rest of the checker that there was an internal
-    // compiler error that we need to emit a "compiler doesn't understand
-    // error".
-    if (diagnosticEmitter.emittedAnyDiagnostics())
-      return madeChange;
-
-    // At this point, we know that all of our destructure requiring uses are on
-    // the boundary of our live range. Now we need to do the rewriting.
-    transform.blockToAvailableValues.emplace(transform.liveness);
-    transform.rewriteUses();
-
-    // Now that we have done our rewritting, we need to do a few cleanups.
-    transform.cleanup(borrowWorklist);
-  }
-
-  return madeChange;
-}
-
-namespace {
-
-class MoveOnlyBorrowToDestructureTransformPass : public SILFunctionTransform {
-  void run() override {
-    auto *fn = getFunction();
-
-    // Only run this pass if the move only language feature is enabled.
-    if (!fn->getASTContext().LangOpts.Features.contains(Feature::MoveOnly))
-      return;
-
-    // Don't rerun diagnostics on deserialized functions.
-    if (getFunction()->wasDeserializedCanonical())
-      return;
-
-    assert(fn->getModule().getStage() == SILStage::Raw &&
-           "Should only run on Raw SIL");
-
-    LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Object Checker. Visiting: "
-                            << fn->getName() << '\n');
-
-    auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
-
-    SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
-    DiagnosticEmitter emitter;
-
-    bool madeChange = searchForCandidateObjectMarkMustChecks(
-        getFunction(), moveIntroducersToProcess, emitter);
-    if (madeChange) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-    }
-
-    if (emitter.emittedAnyDiagnostics())
-      return;
-
-    auto introducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
-                                          moveIntroducersToProcess.end());
-    if (runTransform(fn, introducers, postOrderAnalysis, emitter)) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-    }
-  }
-};
-
-} // namespace
-
-SILTransform *swift::createMoveOnlyBorrowToDestructureTransform() {
-  return new MoveOnlyBorrowToDestructureTransformPass();
 }
