@@ -230,3 +230,7 @@ option(SWIFT_STDLIB_CONCURRENCY_TRACING
   "Enable concurrency tracing in the runtime; assumes the presence of os_log(3)
    and the os_signpost(3) API."
   "${SWIFT_STDLIB_CONCURRENCY_TRACING_default}")
+
+option(SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+       "Use relative protocol witness tables"
+       FALSE)
