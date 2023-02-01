@@ -106,11 +106,13 @@ fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
   }
 }
 
-@_cdecl("swift_ASTGen_evaluateMacro")
+@_cdecl("swift_ASTGen_expandFreestandingMacro")
 @usableFromInline
-func evaluateMacro(
+func expandFreestandingMacro(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
   macroPtr: UnsafeRawPointer,
+  discriminatorText: UnsafePointer<UInt8>,
+  discriminatorTextLength: Int,
   sourceFilePtr: UnsafeRawPointer,
   sourceLocationPtr: UnsafePointer<UInt8>?,
   expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
@@ -144,7 +146,13 @@ func evaluateMacro(
   let sourceManager = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
   sourceManager.insert(sourceFilePtr)
 
-  let context = sourceManager.createMacroExpansionContext()
+  let discriminatorBuffer = UnsafeBufferPointer(
+    start: discriminatorText, count: discriminatorTextLength
+  )
+  let discriminator = String(decoding: discriminatorBuffer, as: UTF8.self)
+  let context = sourceManager.createMacroExpansionContext(
+    discriminator: discriminator
+  )
 
   guard let parentSyntax = token.parent else {
     print("not on a macro expansion node: \(token.recursiveDescription)")

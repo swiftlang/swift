@@ -134,6 +134,7 @@ func testFreestandingMacroExpansion() {
   struct Foo {
     #bitwidthNumberedStructs("MyIntOne")
   }
+
   // CHECK: MyIntOne8
   print(Foo.MyIntOne8.self)
   // CHECK: MyIntOne16
@@ -154,6 +155,17 @@ func testFreestandingMacroExpansion() {
   print(Foo2.MyIntTwo32.self)
   // CHECK: MyIntTwo64
   print(Foo2.MyIntTwo64.self)
+
+  #if TEST_DIAGNOSTICS
+  struct Foo3 {
+#bitwidthNumberedStructs("BUG", blah: false)
+    // expected-note@-1 4{{in expansion of macro 'bitwidthNumberedStructs' here}}
+    // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_.swift
+    // CHECK-DIAGS: struct BUG {
+    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu_()
+    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0{{_?}}()
+  }
+  #endif
 
   // FIXME: Declaration macro expansions in BraceStmt don't work yet.
 //  HECK: MyIntGlobal8

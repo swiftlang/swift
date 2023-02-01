@@ -2872,10 +2872,19 @@ ManglingError Remangler::mangleMacro(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleMacroExpansion(Node *node, unsigned depth) {
+ManglingError Remangler::mangleFreestandingMacroExpansion(
+    Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
   Buffer << "fMf";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
+ManglingError Remangler::mangleMacroExpansionUniqueName(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMu";
   return mangleChildNode(node, 2, depth + 1);
 }
 
