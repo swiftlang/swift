@@ -2616,18 +2616,6 @@ MacroMissingPound::create(ConstraintSystem &cs, MacroDecl *macro,
   return new (cs.getAllocator()) MacroMissingPound(cs, macro, locator);
 }
 
-bool MacroMissingArguments::diagnose(const Solution &solution,
-                                     bool asNote) const {
-  AddMissingMacroArguments failure(solution, macro, getLocator());
-  return failure.diagnose(asNote);
-}
-
-MacroMissingArguments *
-MacroMissingArguments::create(ConstraintSystem &cs, MacroDecl *macro,
-                              ConstraintLocator *locator) {
-  return new (cs.getAllocator()) MacroMissingArguments(cs, macro, locator);
-}
-
 bool AllowGlobalActorMismatch::diagnose(const Solution &solution,
                                         bool asNote) const {
   GlobalActorFunctionMismatchFailure failure(solution, getFromType(),

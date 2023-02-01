@@ -1211,7 +1211,8 @@ namespace {
 
         auto macroIdent = ctx.getIdentifier(kind);
         auto macros = lookupMacros(
-            macroIdent, expr->getLoc(), FunctionRefKind::Unapplied);
+            macroIdent, expr->getLoc(), FunctionRefKind::Unapplied,
+            MacroRole::Expression);
         if (!macros.empty()) {
           // Introduce an overload set for the macro reference.
           auto locator = CS.getConstraintLocator(expr);
@@ -3760,10 +3761,11 @@ namespace {
     /// Lookup all macros with the given macro name.
     SmallVector<OverloadChoice, 1>
     lookupMacros(Identifier macroName, SourceLoc loc,
-                 FunctionRefKind functionRefKind) {
+                 FunctionRefKind functionRefKind,
+                 MacroRoles roles) {
       SmallVector<OverloadChoice, 1> choices;
       auto results = TypeChecker::lookupMacros(
-          CurDC, DeclNameRef(macroName), loc, MacroRole::Expression);
+          CurDC, DeclNameRef(macroName), loc, roles);
       for (const auto &result : results) {
         OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);
         choices.push_back(choice);
@@ -3782,19 +3784,14 @@ namespace {
       auto &ctx = CS.getASTContext();
       auto locator = CS.getConstraintLocator(expr);
 
-      // For calls, set up the argument list.
-      bool isCall = expr->getArgs() != nullptr;
-      if (isCall) {
-        CS.associateArgumentList(locator, expr->getArgs());
-      }
+      CS.associateArgumentList(locator, expr->getArgs());
 
       // Look up the macros with this name.
       auto macroIdent = expr->getMacroName().getBaseIdentifier();
-      FunctionRefKind functionRefKind = isCall ? FunctionRefKind::SingleApply
-                                               : FunctionRefKind::Unapplied;
+      FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
       auto macros = lookupMacros(
           macroIdent, expr->getMacroNameLoc().getBaseNameLoc(),
-          functionRefKind);
+          functionRefKind, expr->getMacroRoles());
       if (macros.empty()) {
         ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                            macroIdent)
@@ -3814,11 +3811,7 @@ namespace {
           return Type();
       }
 
-      // For non-calls, the type variable is the result.
-      if (!isCall)
-        return macroRefType;
-
-      // For calls, form the applicable-function constraint. The result type
+      // Form the applicable-function constraint. The result type
       // is the result of that call.
       SmallVector<AnyFunctionType::Param, 8> params;
       getMatchingParams(expr->getArgs(), params);

@@ -13944,7 +13944,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::NotCompileTimeConst:
   case FixKind::RenameConflictingPatternVariables:
   case FixKind::MacroMissingPound:
-  case FixKind::MacroMissingArguments:
   case FixKind::AllowGlobalActorMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }

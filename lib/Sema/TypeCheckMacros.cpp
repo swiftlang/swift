@@ -1269,37 +1269,30 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
   if (foundMacros.empty())
     return nullptr;
 
-  // Extract macro arguments, or create an empty list.
-  auto *args = macroRef.getArgs();
-  if (!args)
-    args = ArgumentList::createImplicit(ctx, {});
-
-  // Form an `OverloadedDeclRefExpr` with the filtered lookup result above
-  // to ensure @freestanding macros are not considered in overload resolution.
-  FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
-  SmallVector<ValueDecl *> valueDecls;
-  for (auto *macro : foundMacros)
-    valueDecls.push_back(macro);
-  Expr *callee = new (ctx) OverloadedDeclRefExpr(
-      valueDecls, macroRef.getMacroNameLoc(), functionRefKind,
-      /*implicit*/true);
-  auto genArgs = macroRef.getGenericArgs();
-  if (!genArgs.empty()) {
-    auto genArgsRange = macroRef.getGenericArgsRange();
-    callee = UnresolvedSpecializeExpr::create(
-        ctx, callee, genArgsRange.Start, genArgs, genArgsRange.End);
+  // If we already have a MacroExpansionExpr, use that. Otherwise,
+  // create one.
+  MacroExpansionExpr *macroExpansion;
+  if (auto *expr = macroRef.getExpr()) {
+    macroExpansion = expr;
+  } else {
+    SourceRange genericArgsRange = macroRef.getGenericArgsRange();
+    macroExpansion = new (ctx) MacroExpansionExpr(
+      dc, macroRef.getSigilLoc(), macroRef.getMacroName(),
+      macroRef.getMacroNameLoc(), genericArgsRange.Start,
+      macroRef.getGenericArgs(), genericArgsRange.End,
+      macroRef.getArgs(), roles);
   }
-  auto *call = CallExpr::createImplicit(ctx, callee, args);
 
-  Expr *result = call;
+  Expr *result = macroExpansion;
   TypeChecker::typeCheckExpression(result, dc);
 
-  if (auto *fn = dyn_cast<DeclRefExpr>(call->getFn()))
-    if (auto *macro = dyn_cast<MacroDecl>(fn->getDecl()))
-      return macro;
+  auto macroDeclRef = macroExpansion->getMacroRef();
+  if (auto *macroDecl = dyn_cast_or_null<MacroDecl>(macroDeclRef.getDecl()))
+    return macroDecl;
 
   // If we couldn't resolve a macro decl, the attribute is invalid.
   if (auto *attr = macroRef.getAttr())
     attr->setInvalid();
+
   return nullptr;
 }

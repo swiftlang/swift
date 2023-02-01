@@ -40,7 +40,7 @@ struct SkipNestedType {
 }
 
 struct TestMacroArgs {
-  @m1("extra arg") struct Args1 {} // expected-error{{argument passed to call that takes no arguments}}
+  @m1("extra arg") struct Args1 {} // expected-error{{argument passed to macro expansion that takes no arguments}}
 
   @m2(10) struct Args2 {}
 
