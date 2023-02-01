@@ -168,25 +168,7 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
     !(defined(__ANDROID__) || defined(__APPLE__) || defined(_WIN32))
 
 SWIFT_RUNTIME_EXPORT long double __extendhfxf2(uint16_t h) {
-  auto concat = [](uint64_t hi, uint64_t lo) -> __uint128_t {
-    return (((__uint128_t)hi) << 64) | lo;
-  };
-
-  // We need to have two cases; subnormals and zeros, and everything else.
-  // We are in the first case if the exponent field (bits 14:10) is zero:
-  if ((h & 0x7c00) == 0) {
-    // Sign-extend and mask so that we get a subnormal or zero in f32
-    // with the appropriate sign, then multiply by the appropriate scale
-    // factor to produce the f32 result.
-    const __uint128_t mask = concat(0x8000, 0xffffffffffffffff);
-    return 0x1.0p16368L * fromEncoding((__int128_t)h << 53 & mask);
-  }
-  // We have either a normal number of an infinity or NaN. All of these
-  // can be handled by shifting the significand into the correct position,
-  // extending the exponent, and then multiplying by the correct scale.
-  const __uint128_t value = concat(0x7fe0, 0x8000000000000000);
-  return 0x1.0p-16368L * fromEncoding(((__int128_t)(h & 0xfc00) << 54) |
-                                      ((__int128_t)(h & 0x3ff) << 53) | value);
+  return (long double)__gnu_h2f_ieee(h);
 }
 
 #endif // (defined(__i386__) || defined(__x86_64__)) &&
