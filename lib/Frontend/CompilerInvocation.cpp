@@ -1247,6 +1247,16 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.IndexStorePath = A->getValue();
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
+    StringRef clangArg = A->getValue();
+    if (clangArg.consume_front("-working-directory")) {
+      if (!clangArg.empty() && clangArg.front() != '=') {
+        // Have an old -working-directory<path> argument. Convert it into
+        // two separate arguments as Clang no longer supports that format.
+        Opts.ExtraArgs.push_back("-working-directory");
+        Opts.ExtraArgs.push_back(clangArg.str());
+        continue;
+      }
+    }
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
