@@ -587,21 +587,38 @@ private:
   }
 };
 
+class RequirementFix : public ConstraintFix {
+protected:
+  Type LHS;
+  Type RHS;
+
+  RequirementFix(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
+                 ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator), LHS(lhs), RHS(rhs) {}
+
+public:
+  std::string getName() const override = 0;
+
+  Type lhsType() const { return LHS; }
+  Type rhsType() const { return RHS; }
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
+  bool diagnose(const Solution &solution,
+                bool asNote = false) const override = 0;
+};
+
 /// Add a new conformance to the type to satisfy a requirement.
-class MissingConformance final : public ConstraintFix {
+class MissingConformance final : public RequirementFix {
   // Determines whether given protocol type comes from the context e.g.
   // assignment destination or argument comparison.
   bool IsContextual;
 
-  Type NonConformingType;
-  // This could either be a protocol or protocol composition.
-  Type ProtocolType;
-
   MissingConformance(ConstraintSystem &cs, bool isContextual, Type type,
                      Type protocolType, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddConformance, locator),
-        IsContextual(isContextual), NonConformingType(type),
-        ProtocolType(protocolType) {}
+      : RequirementFix(cs, FixKind::AddConformance, type, protocolType,
+                       locator),
+        IsContextual(isContextual) {}
 
 public:
   std::string getName() const override {
@@ -609,8 +626,6 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
                                             Type protocolType,
@@ -620,9 +635,9 @@ public:
                                            Type protocolType,
                                            ConstraintLocator *locator);
 
-  Type getNonConformingType() { return NonConformingType; }
+  Type getNonConformingType() const { return LHS; }
 
-  Type getProtocolType() { return ProtocolType; }
+  Type getProtocolType() const { return RHS; }
 
   bool isEqual(const ConstraintFix *other) const;
 
@@ -633,13 +648,11 @@ public:
 
 /// Skip same-type generic requirement constraint,
 /// and assume that types are equal.
-class SkipSameTypeRequirement final : public ConstraintFix {
-  Type LHS, RHS;
-
+class SkipSameTypeRequirement final : public RequirementFix {
   SkipSameTypeRequirement(ConstraintSystem &cs, Type lhs, Type rhs,
                           ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::SkipSameTypeRequirement, locator), LHS(lhs),
-        RHS(rhs) {}
+      : RequirementFix(cs, FixKind::SkipSameTypeRequirement, lhs, rhs,
+                       locator) {}
 
 public:
   std::string getName() const override {
@@ -647,9 +660,6 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  Type lhsType() { return LHS; }
-  Type rhsType() { return RHS; }
 
   static SkipSameTypeRequirement *create(ConstraintSystem &cs, Type lhs,
                                          Type rhs, ConstraintLocator *locator);
@@ -661,13 +671,11 @@ public:
 
 /// Skip same-shape generic requirement constraint,
 /// and assume that types are equal.
-class SkipSameShapeRequirement final : public ConstraintFix {
-  Type LHS, RHS;
-
+class SkipSameShapeRequirement final : public RequirementFix {
   SkipSameShapeRequirement(ConstraintSystem &cs, Type lhs, Type rhs,
                            ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::SkipSameShapeRequirement, locator), LHS(lhs),
-        RHS(rhs) {}
+      : RequirementFix(cs, FixKind::SkipSameShapeRequirement, lhs, rhs,
+                       locator) {}
 
 public:
   std::string getName() const override {
@@ -675,9 +683,6 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  Type lhsType() { return LHS; }
-  Type rhsType() { return RHS; }
 
   static SkipSameShapeRequirement *create(ConstraintSystem &cs, Type lhs,
                                           Type rhs, ConstraintLocator *locator);
@@ -689,13 +694,11 @@ public:
 
 /// Skip 'superclass' generic requirement constraint,
 /// and assume that types are equal.
-class SkipSuperclassRequirement final : public ConstraintFix {
-  Type LHS, RHS;
-
+class SkipSuperclassRequirement final : public RequirementFix {
   SkipSuperclassRequirement(ConstraintSystem &cs, Type lhs, Type rhs,
                             ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::SkipSuperclassRequirement, locator),
-        LHS(lhs), RHS(rhs) {}
+      : RequirementFix(cs, FixKind::SkipSuperclassRequirement, lhs, rhs,
+                       locator) {}
 
 public:
   std::string getName() const override {
@@ -1838,6 +1841,10 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclNameRef name,

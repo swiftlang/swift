@@ -400,25 +400,26 @@ bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {
     auto &cs = solution.getConstraintSystem();
     auto context = cs.getContextualTypePurpose(locator->getAnchor());
     MissingContextualConformanceFailure failure(
-        solution, context, NonConformingType, ProtocolType, locator);
+        solution, context, getNonConformingType(), getProtocolType(), locator);
     return failure.diagnose(asNote);
   }
 
   MissingConformanceFailure failure(
-      solution, locator, std::make_pair(NonConformingType, ProtocolType));
+      solution, locator,
+      std::make_pair(getNonConformingType(), getProtocolType()));
   return failure.diagnose(asNote);
 }
 
-bool MissingConformance::diagnoseForAmbiguity(
+bool RequirementFix::diagnoseForAmbiguity(
     CommonFixesArray commonFixes) const {
-  auto *primaryFix = commonFixes.front().second->getAs<MissingConformance>();
+  auto *primaryFix = commonFixes.front().second;
   assert(primaryFix);
 
   if (llvm::all_of(
           commonFixes,
           [&primaryFix](
               const std::pair<const Solution *, const ConstraintFix *> &entry) {
-            return primaryFix->isEqual(entry.second);
+            return primaryFix->getLocator() == entry.second->getLocator();
           }))
     return diagnose(*commonFixes.front().first);
 
@@ -433,8 +434,9 @@ bool MissingConformance::isEqual(const ConstraintFix *other) const {
     return false;
 
   return IsContextual == conformanceFix->IsContextual &&
-         NonConformingType->isEqual(conformanceFix->NonConformingType) &&
-         ProtocolType->isEqual(conformanceFix->ProtocolType);
+         getNonConformingType()->isEqual(
+             conformanceFix->getNonConformingType()) &&
+         getProtocolType()->isEqual(conformanceFix->getProtocolType());
 }
 
 MissingConformance *

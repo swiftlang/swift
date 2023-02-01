@@ -907,3 +907,96 @@ func test_associated_values_dont_block_solver_when_unresolved() {
     }
   }
 }
+
+func test_dependent_member_with_unresolved_base_type() {
+  struct Wrapper<A, T: P> : P {
+  }
+
+  @resultBuilder
+  struct Builder<A> {
+    static func buildBlock(_ value: some P) -> some P {
+      value
+    }
+  }
+
+  func test<A, U: P>(data: KeyPath<A, [(Int, U.T)]>, // expected-note {{in call to function 'test(data:_:)'}}
+                     @Builder<U.T> _: () -> U) -> Wrapper<A, U> { fatalError() }
+
+  struct Value : P {
+    typealias T = (Int, String)
+  }
+
+  struct Test : P {
+    struct T {
+      var values: [(Int, Value.T)]
+    }
+
+    var v: some P {
+      test(data: \T.values) { // expected-error {{generic parameter 'U' could not be inferred}}
+        Value()
+      }
+    }
+  }
+}
+
+// rdar://89880662 - incorrect error about unsupported control flow statement
+func test_impact_of_control_flow_fix() {
+  @resultBuilder
+  struct BuilderA {
+    static func buildOptional<T>(_ value: T?) -> T? { return value }
+    static func buildBlock<T>(_ v1: T) -> T { v1 }
+    static func buildBlock<T, U>(_ v1: T, _ v2: U) -> (T, U) { (v1, v2) }
+  }
+
+  @resultBuilder
+  struct BuilderB {
+    static func buildBlock<T>(_ v1: T) -> T { v1 }
+    static func buildBlock<T, U>(_ v1: T, _ v2: U) -> (T, U) { (v1, v2) }
+  }
+
+  func fn<T>(@BuilderA _: () -> T) {}
+  func fn(@BuilderB _: () -> (Int?, Void)) {}
+
+  func test(_: Int) {}
+
+  fn {
+    if true {
+      0
+    }
+
+    test("") // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  }
+}
+
+protocol Q {}
+
+func test_requirement_failure_in_buildBlock() {
+  struct A : P { typealias T = Int }
+  struct B : Q { typealias T = String }
+
+  struct Result<T> : P { typealias T = Int }
+
+  @resultBuilder
+  struct BuilderA {
+    static func buildBlock<T0: P, T1: P>(_: T0, _: T1) -> Result<(T0, T1)> { fatalError() }
+    // expected-note@-1 {{candidate requires that 'B' conform to 'P' (requirement specified as 'T1' : 'P')}}
+  }
+
+  @resultBuilder
+  struct BuilderB {
+    static func buildBlock<U0: Q, U1: Q>(_ v: U0, _: U1) -> some Q { v }
+    // expected-note@-1 {{candidate requires that 'A' conform to 'Q' (requirement specified as 'U0' : 'Q')}}
+  }
+
+  struct Test {
+    func fn<T: P>(@BuilderA _: () -> T) {}
+    func fn<T: Q>(@BuilderB _: () -> T) {}
+
+    func test() {
+      fn { // expected-error {{no exact matches in reference to static method 'buildBlock'}}
+        A()
+        B()
+      }
+    }
+  }
+}
