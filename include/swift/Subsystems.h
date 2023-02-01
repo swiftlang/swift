@@ -18,12 +18,9 @@
 #define SWIFT_SUBSYSTEMS_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
-#include "swift/Basic/Version.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Mutex.h"
 
 #include <memory>
