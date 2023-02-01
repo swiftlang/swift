@@ -88,9 +88,9 @@ using MyType2 = TransitiveStruct<int>;
 
 import CxxModule
 
-// REMARK_NEW: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface{{$}}
+// REMARK_NEW: remark: emitting symbolic interface at {{.*}}{{/|\\}}interfaces{{/|\\}}CxxModule-{{.*}}.pcm.symbolicswiftinterface{{$}}
 
-// REMARK_NO_UPDATE: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface; skipping because it's up to date{{$}}
+// REMARK_NO_UPDATE: remark: emitting symbolic interface at {{.*}}{{/|\\}}interfaces{{/|\\}}CxxModule-{{.*}}.pcm.symbolicswiftinterface; skipping because it's up to date{{$}}
 
 // FILES: CxxModule-{{.*}}.pcm.symbolicswiftinterface
 // FILES-NOT: TransitiveCppMod
