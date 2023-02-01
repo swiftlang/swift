@@ -39,8 +39,11 @@ extern "C" void *swift_ASTGen_resolveMacroType(const void *macroType);
 
 extern "C" void swift_ASTGen_destroyMacro(void *macro);
 
-extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
-    void *diagEngine, void *macro, void *sourceFile,
+extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
+    void *diagEngine, void *macro,
+    const char *discriminator,
+    ptrdiff_t discriminatorLength,
+    void *sourceFile,
     const void *sourceLocation,
     const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
 
@@ -412,6 +415,7 @@ Expr *swift::expandMacroExpr(
     return nullptr;
   }
 
+  std::string discriminator;
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
   case MacroDefinition::Kind::Undefined:
@@ -462,11 +466,17 @@ Expr *swift::expandMacroExpr(
     if (!astGenSourceFile)
       return nullptr;
 
+    if (auto expansionExpr = dyn_cast<MacroExpansionExpr>(expr)) {
+      Mangle::ASTMangler mangler;
+      discriminator = mangler.mangleMacroExpansion(expansionExpr);
+    }
+
     const char *evaluatedSourceAddress;
     ptrdiff_t evaluatedSourceLength;
-    swift_ASTGen_evaluateMacro(
+    swift_ASTGen_expandFreestandingMacro(
         &ctx.Diags,
         externalDef.opaqueHandle,
+        discriminator.data(), discriminator.size(),
         astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
         &evaluatedSourceAddress, &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
@@ -483,12 +493,10 @@ Expr *swift::expandMacroExpr(
 
   // Figure out a reasonable name for the macro expansion buffer.
   std::string bufferName;
-  if (auto expansionExpr = dyn_cast<MacroExpansionExpr>(expr)) {
-    Mangle::ASTMangler mangler;
-    bufferName = adjustMacroExpansionBufferName(
-        mangler.mangleMacroExpansion(expansionExpr));
-  } else {
+  if (discriminator.empty())
     bufferName = "macro-expansion";
+  else {
+    bufferName = adjustMacroExpansionBufferName(discriminator);
   }
 
   // Dump macro expansions to standard output, if requested.
@@ -628,11 +636,15 @@ bool swift::expandFreestandingDeclarationMacro(
     if (!astGenSourceFile)
       return false;
 
+    Mangle::ASTMangler mangler;
+    auto discriminator = mangler.mangleMacroExpansion(med);
+
     const char *evaluatedSourceAddress;
     ptrdiff_t evaluatedSourceLength;
-    swift_ASTGen_evaluateMacro(
+    swift_ASTGen_expandFreestandingMacro(
         &ctx.Diags,
         externalDef.opaqueHandle,
+        discriminator.data(), discriminator.size(),
         astGenSourceFile, med->getStartLoc().getOpaquePointerValue(),
         &evaluatedSourceAddress, &evaluatedSourceLength);
     if (!evaluatedSourceAddress)

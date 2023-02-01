@@ -382,6 +382,7 @@ private:
     case Node::Kind::Extension:
     case Node::Kind::EnumCase:
     case Node::Kind::FieldOffset:
+    case Node::Kind::FreestandingMacroExpansion:
     case Node::Kind::FullObjCResilientClassStub:
     case Node::Kind::FullTypeMetadata:
     case Node::Kind::Function:
@@ -439,7 +440,7 @@ private:
     case Node::Kind::LazyProtocolWitnessTableCacheVariable:
     case Node::Kind::LocalDeclName:
     case Node::Kind::Macro:
-    case Node::Kind::MacroExpansion:
+    case Node::Kind::MacroExpansionUniqueName:
     case Node::Kind::MaterializeForSet:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
@@ -1337,9 +1338,13 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                        Node->getNumChildren() == 3? TypePrinting::WithColon
                                                   : TypePrinting::FunctionStyle,
                        /*hasName*/ true);
-  case Node::Kind::MacroExpansion:
+  case Node::Kind::FreestandingMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "macro expansion #",
+                       /*hasName*/true, "freestanding macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::MacroExpansionUniqueName:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "unique name #",
                        (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::GenericTypeParamDecl:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,

@@ -145,7 +145,7 @@ extension SourceManager {
   }
 
   /// Create a new macro expansion context
-  func createMacroExpansionContext() -> BasicMacroExpansionContext {
+  func createMacroExpansionContext(discriminator: String = "") -> BasicMacroExpansionContext {
     // Collect the set of source files for this context.
     var sourceFiles: [SourceFileSyntax : BasicMacroExpansionContext.KnownSourceFile] = [:]
     for (syntax, exported) in exportedSourceFilesBySyntax {
@@ -155,6 +155,8 @@ extension SourceManager {
       )
     }
 
-    return BasicMacroExpansionContext(sourceFiles: sourceFiles)
+    return BasicMacroExpansionContext(
+      expansionDiscriminator: discriminator, sourceFiles: sourceFiles
+    )
   }
 }
