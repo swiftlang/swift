@@ -738,6 +738,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_CalleeResult:
   case CTP_EnumCaseRawValue:
   case CTP_ExprPattern:
+  case CTP_SingleValueStmtBranch:
     break;
   }
   return None;
@@ -2488,7 +2489,10 @@ bool ContextualFailure::diagnoseAsError() {
     diagnostic = diag::ternary_expr_cases_mismatch;
     break;
   }
-
+  case ConstraintLocator::SingleValueStmtBranch: {
+    diagnostic = diag::single_value_stmt_branches_mismatch;
+    break;
+  }
   case ConstraintLocator::ContextualType: {
     if (diagnoseConversionToBool())
       return true;
@@ -2688,6 +2692,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_WrappedProperty:
   case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
+  case CTP_SingleValueStmtBranch:
     return None;
 
   case CTP_EnumCaseRawValue:
@@ -3441,6 +3446,9 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
   case CTP_WrappedProperty:
     return diag::wrapped_value_mismatch;
+
+  case CTP_SingleValueStmtBranch:
+    return diag::cannot_convert_initializer_value;
 
   case CTP_CaseStmt:
   case CTP_ThrowStmt:

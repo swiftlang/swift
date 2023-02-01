@@ -336,6 +336,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(MagicIdentifierLiteral);
   NO_REFERENCE(DiscardAssignment);
   NO_REFERENCE(LazyInitializer);
+  NO_REFERENCE(SingleValueStmt);
 
   SIMPLE_REFERENCE(DeclRef, getDeclRef);
   SIMPLE_REFERENCE(SuperRef, getSelf);
@@ -669,6 +670,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::MagicIdentifierLiteral:
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
+  case ExprKind::SingleValueStmt:
     return true;
 
   case ExprKind::ObjectLiteral:
@@ -996,6 +998,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::KeyPathDot:
   case ExprKind::OneWay:
   case ExprKind::Tap:
+  case ExprKind::SingleValueStmt:
   case ExprKind::TypeJoin:
   case ExprKind::MacroExpansion:
     return false;
@@ -2469,6 +2472,109 @@ KeyPathExpr::Component::Component(
     ? nullptr : indexHashables.data();
 }
 
+SingleValueStmtExpr *SingleValueStmtExpr::create(ASTContext &ctx, Stmt *S,
+                                                 DeclContext *DC) {
+  return new (ctx) SingleValueStmtExpr(S, DC);
+}
+
+SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
+    ASTContext &ctx, Stmt *S, DeclContext *DC, bool mustBeExpr) {
+  auto *SVE = create(ctx, S, DC);
+
+  // Attempt to wrap any branches that can be wrapped.
+  SmallVector<Stmt *, 4> scratch;
+  for (auto *branch : SVE->getBranches(scratch)) {
+    auto *BS = dyn_cast<BraceStmt>(branch);
+    if (!BS)
+      continue;
+
+    auto elts = BS->getElements();
+    if (elts.size() != 1)
+      continue;
+
+    auto *S = elts.front().dyn_cast<Stmt *>();
+    if (!S)
+      continue;
+
+    if (mustBeExpr) {
+      // If this must be an expression, we can eagerly wrap any exhaustive if
+      // and switch branch.
+      if (auto *IS = dyn_cast<IfStmt>(S)) {
+        if (!IS->isSyntacticallyExhaustive())
+          continue;
+      } else if (!isa<SwitchStmt>(S)) {
+        continue;
+      }
+    } else {
+      // Otherwise do the semantic checking to verify that we can wrap the
+      // branch.
+      if (!S->mayProduceSingleValue(ctx))
+        continue;
+    }
+    BS->setLastElement(
+        SingleValueStmtExpr::createWithWrappedBranches(ctx, S, DC, mustBeExpr));
+  }
+  return SVE;
+}
+
+SingleValueStmtExpr *
+SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(Expr *E) {
+  while (true) {
+    // Look through implicit conversions.
+    if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+      E = ICE->getSubExpr();
+      continue;
+    }
+    // Look through coercions.
+    if (auto *CE = dyn_cast<CoerceExpr>(E)) {
+      E = CE->getSubExpr();
+      continue;
+    }
+    break;
+  }
+  return dyn_cast<SingleValueStmtExpr>(E);
+}
+
+SourceRange SingleValueStmtExpr::getSourceRange() const {
+  return S->getSourceRange();
+}
+
+SingleValueStmtExpr::Kind SingleValueStmtExpr::getStmtKind() const {
+  switch (getStmt()->getKind()) {
+  case StmtKind::If:
+    return Kind::If;
+  case StmtKind::Switch:
+    return Kind::Switch;
+  default:
+    llvm_unreachable("Unhandled kind!");
+  }
+}
+
+ArrayRef<Stmt *>
+SingleValueStmtExpr::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
+  switch (getStmtKind()) {
+  case Kind::If:
+    return cast<IfStmt>(getStmt())->getBranches(scratch);
+  case Kind::Switch:
+    return cast<SwitchStmt>(getStmt())->getBranches(scratch);
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
+ArrayRef<Expr *> SingleValueStmtExpr::getSingleExprBranches(
+    SmallVectorImpl<Expr *> &scratch) const {
+  assert(scratch.empty());
+  SmallVector<Stmt *, 4> stmtScratch;
+  for (auto *branch : getBranches(stmtScratch)) {
+    auto *BS = dyn_cast<BraceStmt>(branch);
+    if (!BS)
+      continue;
+    if (auto *E = BS->getSingleExpressionElement())
+      scratch.push_back(E);
+  }
+  return scratch;
+}
+
 void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx, 
     llvm::function_ref<void(bool, CallExpr *)> callback) {
   auto appendingExpr = getAppendingExpr();
@@ -2529,8 +2635,9 @@ RegexLiteralExpr::createParsed(ASTContext &ctx, SourceLoc loc,
 }
 
 TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
-                           ArrayRef<Expr *> elements)
-    : Expr(ExprKind::TypeJoin, /*implicit=*/true, Type()), Var(nullptr) {
+                           ArrayRef<Expr *> elements, SingleValueStmtExpr *SVE)
+    : Expr(ExprKind::TypeJoin, /*implicit=*/true, Type()), Var(nullptr),
+      SVE(SVE) {
 
   if (auto *varRef = result.dyn_cast<DeclRefExpr *>()) {
     assert(varRef);
@@ -2549,10 +2656,18 @@ TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
 
 TypeJoinExpr *TypeJoinExpr::createImpl(
     ASTContext &ctx, llvm::PointerUnion<DeclRefExpr *, TypeBase *> varOrType,
-    ArrayRef<Expr *> elements, AllocationArena arena) {
+    ArrayRef<Expr *> elements, AllocationArena arena,
+    SingleValueStmtExpr *SVE) {
   size_t size = totalSizeToAlloc<Expr *>(elements.size());
   void *mem = ctx.Allocate(size, alignof(TypeJoinExpr), arena);
-  return new (mem) TypeJoinExpr(varOrType, elements);
+  return new (mem) TypeJoinExpr(varOrType, elements, SVE);
+}
+
+TypeJoinExpr *
+TypeJoinExpr::forBranchesOfSingleValueStmtExpr(ASTContext &ctx, Type joinType,
+                                               SingleValueStmtExpr *SVE,
+                                               AllocationArena arena) {
+  return createImpl(ctx, joinType.getPointer(), /*elements*/ {}, arena, SVE);
 }
 
 SourceRange MacroExpansionExpr::getSourceRange() const {

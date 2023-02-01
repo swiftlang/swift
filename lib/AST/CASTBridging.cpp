@@ -261,6 +261,13 @@ void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable nameId,
       reinterpret_cast<DeclContext *>(dc));
 }
 
+void *SingleValueStmtExpr_createWithWrappedBranches(void *_ctx, void *S,
+                                                    void *DC, bool mustBeExpr) {
+  auto &ctx = *static_cast<ASTContext *>(_ctx);
+  return SingleValueStmtExpr::createWithWrappedBranches(
+      ctx, (Stmt *)S, (DeclContext *)DC, mustBeExpr);
+}
+
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then,
                     void *_Nullable elseLoc, void *_Nullable elseStmt) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
