@@ -1400,19 +1400,25 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
     ArrayRef<std::string> CompiledCandidates,
     DependencyTracker *tracker) {
   
-  // First, check if the expected output already exists and possibly up-to-date w.r.t.
-  // all of the dependencies it was built with. If so, early exit.
-  UpToDateModuleCheker checker(Instance.getASTContext(),
-                               RequireOSSAModules_t(Instance.getSILOptions()));
-  ModuleRebuildInfo rebuildInfo;
-  SmallVector<FileDependency, 3> allDeps;
-  std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-  if (checker.swiftModuleIsUpToDate(outputPath, rebuildInfo, allDeps, moduleBuffer)) {
-    if (Instance.getASTContext().LangOpts.EnableSkipExplicitInterfaceModuleBuildRemarks) {
-      Instance.getDiags().diagnose(SourceLoc(),
-                                   diag::explicit_interface_build_skipped, outputPath);
+  if (!Instance.getInvocation().getIRGenOptions().AlwaysCompile) {
+    // First, check if the expected output already exists and possibly
+    // up-to-date w.r.t. all of the dependencies it was built with. If so, early
+    // exit.
+    UpToDateModuleCheker checker(
+        Instance.getASTContext(),
+        RequireOSSAModules_t(Instance.getSILOptions()));
+    ModuleRebuildInfo rebuildInfo;
+    SmallVector<FileDependency, 3> allDeps;
+    std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+    if (checker.swiftModuleIsUpToDate(outputPath, rebuildInfo, allDeps,
+                                      moduleBuffer)) {
+      if (Instance.getASTContext()
+              .LangOpts.EnableSkipExplicitInterfaceModuleBuildRemarks) {
+        Instance.getDiags().diagnose(
+            SourceLoc(), diag::explicit_interface_build_skipped, outputPath);
+      }
+      return false;
     }
-    return false;
   }
   
   // Read out the compiler version.
