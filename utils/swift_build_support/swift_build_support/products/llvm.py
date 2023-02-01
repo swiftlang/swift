@@ -463,6 +463,6 @@ class LLVM(cmake_product.CMakeProduct):
 
         if self.args.llvm_install_components and system() == 'Darwin':
             clang_dest_dir = '{}{}'.format(host_install_destdir,
-                                           targets.install_prefix())
+                                           self.args.install_prefix)
             self.copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain(
                 clang_dest_dir)

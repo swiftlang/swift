@@ -72,8 +72,13 @@ func test_addr_discriminated_field_fn_read() -> Int32 {
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"$s25ptrauth_field_fptr_import024test_addr_discriminated_B14_fn_ptr_modifyyyF"() #0 {
+// CHECK: entry:
+// CHECK:   [[PTR:%.*]] = load i64, i64* bitcast (%struct.AddressDiscriminatedSecureStruct** @ptr_to_addr_discriminated_secure_struct to i64*), align 8
+// CHECK: 4:                                                ; preds = %entry
+// CHECK:   [[CAST0:%.*]] = inttoptr i64 [[PTR]] to i8*
+// CHECK:   br label %11
 // CHECK: 11:                                               ; preds = %4
-// CHECK:   [[AddressDiscriminatedSecureStruct:%.*]] = phi i8* [ %5, %4 ]
+// CHECK:   [[AddressDiscriminatedSecureStruct:%.*]] = phi i8* [ [[CAST0]], %4 ]
 // CHECK:   [[CAST1:%.*]] = bitcast i8* [[AddressDiscriminatedSecureStruct]] to %TSo32AddressDiscriminatedSecureStructV*
 // CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo32AddressDiscriminatedSecureStructV, %TSo32AddressDiscriminatedSecureStructV* [[CAST1]], i32 0, i32 0
 // CHECK:   [[CAST2:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64*
@@ -91,13 +96,26 @@ func test_addr_discriminated_field_fn_ptr_modify() {
   ptr_to_addr_discriminated_secure_struct!.pointee.secure_func_ptr = returnInt
 }
 
-// TODO: Unimplemented non trivial pointer auth copy function
-// func test_addr_discriminated_copy() -> Int32 {
-//   let struct_with_signed_val = ptr_to_addr_discriminated_secure_struct.pointee
-//   return struct_with_signed_val.secure_func_ptr()
-// }
+// CHECK-LABEL: define hidden swiftcc i32 @"$s25ptrauth_field_fptr_import28test_addr_discriminated_copys5Int32VyF"() #0 {
+// CHECK: entry:
+// CHECK:   [[STRUCT:%.*]] = alloca %TSo32AddressDiscriminatedSecureStructV, align 8
+// CHECK:   [[LD:%.*]] = load i64, i64* bitcast (%struct.AddressDiscriminatedSecureStruct** @ptr_to_addr_discriminated_secure_struct to i64*), align 8
+// CHECK: 6:                                                ; preds = %entry
+// CHECK:   [[CAST0:%.*]] = inttoptr i64 [[LD]] to i8*
+// CHECK:   br label %13
+// CHECK: 13:                                               ; preds = %6
+// CHECK:   [[PHI:%.*]] = phi i8* [ [[CAST0]], %6 ]
+// CHECK:   [[CAST1:%.*]] = bitcast i8* [[PHI]] to %TSo32AddressDiscriminatedSecureStructV*
+// CHECK:   [[CAST2:%.*]] = bitcast %TSo32AddressDiscriminatedSecureStructV* [[STRUCT]] to i8**
+// CHECK:   [[CAST3:%.*]] = bitcast %TSo32AddressDiscriminatedSecureStructV* [[CAST1]] to i8**
+// CHECK:   call void @__copy_assignment_8_8_pa1_88_0(i8** [[CAST2]], i8** [[CAST3]])
+func test_addr_discriminated_copy() -> Int32 {
+  let struct_with_signed_val = ptr_to_addr_discriminated_secure_struct.pointee
+  return struct_with_signed_val.secure_func_ptr()
+}
 
 print(test_field_fn_read())
 test_field_fn_ptr_modify()
 print(test_addr_discriminated_field_fn_read())
 test_addr_discriminated_field_fn_ptr_modify()
+print(test_addr_discriminated_copy())
