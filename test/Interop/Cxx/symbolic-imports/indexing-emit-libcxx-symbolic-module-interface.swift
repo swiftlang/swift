@@ -13,6 +13,7 @@
 // RUN: ls %t/store/interfaces | %FileCheck --check-prefix=FILES %s
 
 // REQUIRES: OS=macosx
+// REQUIRES: cxx-interop-fixed-cf_options
 
 //--- Inputs/module.modulemap
 module CxxModule {
