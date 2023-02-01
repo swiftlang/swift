@@ -2214,15 +2214,12 @@ public:
 
 /// The @_backDeploy(...) attribute, used to make function declarations available
 /// for back deployment to older OSes via emission into the client binary.
-class BackDeployAttr: public DeclAttribute {
+class BackDeployedAttr : public DeclAttribute {
 public:
-  BackDeployAttr(SourceLoc AtLoc, SourceRange Range,
-                 PlatformKind Platform,
-                 const llvm::VersionTuple Version,
-                 bool Implicit)
-    : DeclAttribute(DAK_BackDeploy, AtLoc, Range, Implicit),
-      Platform(Platform),
-      Version(Version) {}
+  BackDeployedAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
+                   const llvm::VersionTuple Version, bool Implicit)
+      : DeclAttribute(DAK_BackDeployed, AtLoc, Range, Implicit),
+        Platform(Platform), Version(Version) {}
 
   /// The platform the symbol is available for back deployment on.
   const PlatformKind Platform;
@@ -2234,7 +2231,7 @@ public:
   bool isActivePlatform(const ASTContext &ctx) const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_BackDeploy;
+    return DA->getKind() == DAK_BackDeployed;
   }
 };
 
@@ -2367,9 +2364,9 @@ public:
   /// otherwise.
   const AvailableAttr *getNoAsync(const ASTContext &ctx) const;
 
-  /// Returns the \c @_backDeploy attribute that is active for the current
+  /// Returns the `@backDeployed` attribute that is active for the current
   /// platform.
-  const BackDeployAttr *getBackDeploy(const ASTContext &ctx) const;
+  const BackDeployedAttr *getBackDeployed(const ASTContext &ctx) const;
 
   SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,

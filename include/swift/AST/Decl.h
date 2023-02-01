@@ -853,9 +853,9 @@ public:
   Optional<llvm::VersionTuple> getIntroducedOSVersion(PlatformKind Kind) const;
 
   /// Returns the OS version in which the decl became ABI as specified by the
-  /// @_backDeploy attribute.
+  /// @backDeployed attribute.
   Optional<llvm::VersionTuple>
-  getBackDeployBeforeOSVersion(ASTContext &Ctx) const;
+  getBackDeployedBeforeOSVersion(ASTContext &Ctx) const;
 
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
@@ -6740,8 +6740,8 @@ public:
   /// \return the synthesized thunk, or null if the base of the call has
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
-  
-  /// Returns 'true' if the function has (or inherits) the @c @_backDeploy
+
+  /// Returns 'true' if the function has (or inherits) the `@backDeployed`
   /// attribute.
   bool isBackDeployed() const;
 

@@ -6009,7 +6009,7 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
   "a property initializer in a '@frozen' type|" \
-  "a '@_backDeploy' function'}"
+  "a '@backDeployed' function'}"
 
 #define DECL_OR_ACCESSOR "%select{%0|%0 for}"
 
