@@ -170,7 +170,7 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
 SWIFT_RUNTIME_EXPORT long double __extendhfxf2(uint16_t h) {
   auto concat = [](uint64_t hi, uint64_t lo) -> __uint128_t {
     return (((__uint128_t)hi) << 64) | lo;
-  }
+  };
 
   // We need to have two cases; subnormals and zeros, and everything else.
   // We are in the first case if the exponent field (bits 14:10) is zero:
