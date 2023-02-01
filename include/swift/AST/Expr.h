@@ -1340,9 +1340,9 @@ public:
                                        TypeDecl *Decl);
 
   /// Create a \c TypeExpr for a member \c TypeDecl of the given parent
-  /// \c DeclRefTypeRepr.
-  static TypeExpr *createForMemberDecl(DeclRefTypeRepr *ParentTR,
-                                       DeclNameLoc NameLoc, TypeDecl *Decl);
+  /// \c TypeRepr.
+  static TypeExpr *createForMemberDecl(TypeRepr *ParentTR, DeclNameLoc NameLoc,
+                                       TypeDecl *Decl);
 
   /// Create a \c TypeExpr from an \c DeclRefTypeRepr with the given arguments
   /// applied at the specified location.
