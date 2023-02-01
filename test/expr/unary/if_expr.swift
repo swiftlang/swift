@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 // MARK: Functions
 
@@ -440,7 +440,7 @@ func stmts() {
 
   if try if .random() { true } else { false } {}
   // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
-  // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-error@-2 {{'try' may not be used on 'if' expression}}
 
   // expected-error@+1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
   guard if .random() { true } else { false } else {
@@ -722,4 +722,50 @@ func return4() throws -> Int {
     0
   }
   return i
+}
+
+// MARK: Effect specifiers
+
+func tryIf1() -> Int {
+  try if .random() { 0 } else { 1 }
+  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+}
+
+func tryIf2() -> Int {
+  let x = try if .random() { 0 } else { 1 }
+  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  return x
+}
+
+func tryIf3() -> Int {
+  return try if .random() { 0 } else { 1 }
+  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+}
+
+func awaitIf1() async -> Int {
+  await if .random() { 0 } else { 1 }
+  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+}
+
+func awaitIf2() async -> Int {
+  let x = await if .random() { 0 } else { 1 }
+  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  return x
+}
+
+func awaitIf3() async -> Int {
+  return await if .random() { 0 } else { 1 }
+  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+}
+
+func tryAwaitIf1() async throws -> Int {
+  try await if .random() { 0 } else { 1 }
+  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+}
+
+func tryAwaitIf2() async throws -> Int {
+  try await if .random() { 0 } else { 1 } as Int
+  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-error@-2 {{'await' may not be used on 'if' expression}}
 }
