@@ -2406,7 +2406,9 @@ static bool parseSILDifferentiabilityWitnessConfigAndFunction(
   auto origFnType = resultOrigFn->getLoweredFunctionType();
   auto *parameterIndices = IndexSubset::get(
       P.Context, origFnType->getNumParameters(), rawParameterIndices);
-  auto *resultIndices = IndexSubset::get(P.Context, origFnType->getNumResults(),
+  auto *resultIndices = IndexSubset::get(P.Context,
+                                         origFnType->getNumResults() +
+                                         origFnType->getNumIndirectMutatingParameters(),
                                          rawResultIndices);
   resultConfig = AutoDiffConfig(parameterIndices, resultIndices, witnessGenSig);
   return false;
