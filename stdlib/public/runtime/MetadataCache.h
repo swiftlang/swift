@@ -449,9 +449,15 @@ class MetadataCacheKey {
                                   const WitnessTable *bwt) {
     if (awt == bwt)
       return 0;
-
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+    auto *aDescription =
+      reinterpret_cast<const RelativeWitnessTable*>(awt)->getDescription();
+    auto *bDescription =
+      reinterpret_cast<const RelativeWitnessTable*>(bwt)->getDescription();
+#else
     auto *aDescription = awt->getDescription();
     auto *bDescription = bwt->getDescription();
+#endif
     return compareProtocolConformanceDescriptors(aDescription, bDescription);
   }
 
