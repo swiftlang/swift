@@ -168,7 +168,7 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
     !(defined(__ANDROID__) || defined(__APPLE__) || defined(_WIN32))
 
 SWIFT_RUNTIME_EXPORT long double __extendhfxf2(uint16_t h) {
-  __uint128_t concat(uint64_t hi, uint64_t lo) {
+  auto concat = [](uint64_t hi, uint64_t lo) -> __uint128_t {
     return (((__uint128_t)hi) << 64) | lo;
   }
 
