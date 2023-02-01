@@ -35,6 +35,8 @@
 
 #include "swift/shims/Visibility.h"
 
+#include <stdint.h>
+
 static unsigned toEncoding(float f) {
   unsigned e;
   static_assert(sizeof e == sizeof f, "float and int must have the same size");
@@ -165,7 +167,7 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
 #if (defined(__i386__) || defined(__x86_64__)) &&                               \
     !(defined(__ANDROID__) || defined(__APPLE__) || defined(_WIN32))
 
-SWIFT_RUNTIME_EXPORT long double __extendhfxf2(_Float16 h) {
+SWIFT_RUNTIME_EXPORT long double __extendhfxf2(uint16_t h) {
   __uint128_t concat(uint64_t hi, uint64_t lo) {
     return (((__uint128_t)hi) << 64) | lo;
   }
@@ -177,14 +179,14 @@ SWIFT_RUNTIME_EXPORT long double __extendhfxf2(_Float16 h) {
     // with the appropriate sign, then multiply by the appropriate scale
     // factor to produce the f32 result.
     const __uint128_t mask = concat(0x8000, 0xffffffffffffffff);
-    return 0x1.0p16368L * fromEncoding((__int128_t)(short)x << 53 & mask);
+    return 0x1.0p16368L * fromEncoding((__int128_t)h << 53 & mask);
   }
   // We have either a normal number of an infinity or NaN. All of these
   // can be handled by shifting the significand into the correct position,
   // extending the exponent, and then multiplying by the correct scale.
   const __uint128_t value = concat(0x7fe0, 0x8000000000000000);
-  return 0x1.0p-16368L * fromEncoding(((__int128_t)(short)(x & 0xfc00) << 54) |
-                                      ((__int128_t)(x & 0x3ff) << 53) | value);
+  return 0x1.0p-16368L * fromEncoding(((__int128_t)(h & 0xfc00) << 54) |
+                                      ((__int128_t)(h & 0x3ff) << 53) | value);
 }
 
 #endif // (defined(__i386__) || defined(__x86_64__)) &&
