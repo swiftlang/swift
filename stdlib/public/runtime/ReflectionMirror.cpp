@@ -406,17 +406,31 @@ getFieldAt(const Metadata *base, unsigned index) {
   }
   auto metadata = typeInfo.getMetadata();
 
-  // We can't actually properly support closures via reflection.
-  // The compiler juggles several representations and runtime
-  // reflection loses enough context to make the closure un-callable.
-  // So we erase closure values in mirrors:
-  if (isa<FunctionTypeMetadata>(metadata)) {
-    typeInfo = TypeInfo({&METADATA_SYM(EMPTY_TUPLE_MANGLING),
-        MetadataState::Complete}, {});
-    metadata = typeInfo.getMetadata();
-    warning(0, "Swift runtime cannot reflect fields that hold closures; "
-            "'%*s' will show up as an empty tuple in Mirrors",
-            (int)name.size(), name.data());
+  // Function types can only be reflected sometimes...
+  if (auto funcType = dyn_cast<FunctionTypeMetadata>(metadata)) {
+    auto convention = funcType->getConvention();
+    switch (convention) {
+    case FunctionMetadataConvention::Block:
+    case FunctionMetadataConvention::CFunctionPointer:
+      // For these, the type uniquely determines the calling convention,
+      // so someone receiving one of these can cast it to the correct
+      // type and call it.
+      break;
+    case FunctionMetadataConvention::Swift:
+    case FunctionMetadataConvention::Thin:
+      // For Swift closure and function types, the type is not
+      // sufficient to determine the calling convention, so
+      // even if you know the type, you can't actually call
+      // the function.
+      // So we replace such functions with Void so that
+      // noone is tempted to try.
+      typeInfo = TypeInfo({&METADATA_SYM(EMPTY_TUPLE_MANGLING),
+	  MetadataState::Complete}, {});
+      metadata = typeInfo.getMetadata();
+      warning(0, "Swift runtime cannot reflect fields that hold closures; "
+	      "field '%*s' will show up as an empty tuple in Mirrors\n",
+	      (int)name.size(), name.data());
+    }
   }
 
   auto fieldType = FieldType(metadata);

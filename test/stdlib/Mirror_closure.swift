@@ -35,6 +35,25 @@ tests.test("Reflect struct with closure field") {
   expectNotNil(childValue as? ())
 }
 
+struct Baz2 {
+  let my_closure_property: @convention(c) () -> Int
+}
+
+func c_closure() -> Int { return 7 }
+
+tests.test("Reflect struct with @convention(c) field") {
+  let baz2 = Baz2(my_closure_property: c_closure)
+  let mirror = Mirror(reflecting: baz2)
+  let children = mirror.children
+  let firstChild = children.first!
+  let childValue: Any = firstChild.value
+  expectNil(childValue as? ())
+  expectNotNil(childValue as? @convention(c) () -> Int)
+  if let closure = childValue as? () -> Int {
+    expectEqual(7, closure())
+  }
+}
+
 struct Quux {
   let my_closure_property: Any
 }
