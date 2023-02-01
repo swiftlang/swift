@@ -261,7 +261,7 @@ static void convertOwnershipConventionsGivenParamInfos(
 
 static bool shouldApplyBackDeploymentThunk(ValueDecl *decl, ASTContext &ctx,
                                            ResilienceExpansion expansion) {
-  auto backDeployBeforeVersion = decl->getBackDeployBeforeOSVersion(ctx);
+  auto backDeployBeforeVersion = decl->getBackDeployedBeforeOSVersion(ctx);
   if (!backDeployBeforeVersion)
     return false;
 
@@ -1139,7 +1139,7 @@ public:
         return SILDeclRef(distributedThunk).asDistributed();
     }
 
-    // A call to `@_backDeploy` function may need to go through a thunk.
+    // A call to `@backDeployed` function may need to go through a thunk.
     if (shouldApplyBackDeploymentThunk(afd, ctx,
                                        SGF.F.getResilienceExpansion())) {
       return SILDeclRef(afd).asBackDeploymentKind(

@@ -466,13 +466,13 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
                 /*allowUsableFromInline=*/true};
       }
 
-      if (AFD->getAttrs().hasAttribute<BackDeployAttr>()) {
+      if (AFD->getAttrs().hasAttribute<BackDeployedAttr>()) {
         return {FragileFunctionKind::BackDeploy,
                 /*allowUsableFromInline=*/true};
       }
 
       // Property and subscript accessors inherit @_alwaysEmitIntoClient,
-      // @_backDeploy, and @inlinable from their storage declarations.
+      // @backDeployed, and @inlinable from their storage declarations.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
         auto *storage = accessor->getStorage();
         if (storage->getAttrs().getAttribute<InlinableAttr>()) {
@@ -483,7 +483,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
           return {FragileFunctionKind::AlwaysEmitIntoClient,
                   /*allowUsableFromInline=*/true};
         }
-        if (storage->getAttrs().hasAttribute<BackDeployAttr>()) {
+        if (storage->getAttrs().hasAttribute<BackDeployedAttr>()) {
           return {FragileFunctionKind::BackDeploy,
                   /*allowUsableFromInline=*/true};
         }
