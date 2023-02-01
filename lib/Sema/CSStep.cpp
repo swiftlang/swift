@@ -1091,3 +1091,33 @@ void ConjunctionStep::restoreOuterState(const Score &solutionScore) const {
       constraint.setActive(true);
   }
 }
+
+void ConjunctionStep::SolverSnapshot::applySolution(const Solution &solution) {
+  CS.applySolution(solution);
+
+  if (!CS.shouldAttemptFixes())
+    return;
+
+  // If inference succeeded, we are done.
+  auto score = solution.getFixedScore();
+  if (score.Data[SK_Fix] == 0)
+    return;
+
+  // If this conjunction represents a closure and inference
+  // has failed, let's bind all of unresolved type variables
+  // in its interface type to holes to avoid extraneous
+  // fixes produced by outer context.
+
+  auto locator = Conjunction->getLocator();
+  if (locator->directlyAt<ClosureExpr>()) {
+    auto closureTy =
+        CS.getClosureType(castToExpr<ClosureExpr>(locator->getAnchor()));
+
+    CS.simplifyType(closureTy).visit([&](Type componentTy) {
+      if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+        CS.assignFixedType(
+            typeVar, PlaceholderType::get(CS.getASTContext(), typeVar));
+      }
+    });
+  }
+}
