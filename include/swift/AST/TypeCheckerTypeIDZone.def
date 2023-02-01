@@ -443,6 +443,9 @@ SWIFT_REQUEST(TypeChecker, BreakTargetRequest,
 SWIFT_REQUEST(TypeChecker, ContinueTargetRequest,
               LabeledStmt *(const ContinueStmt *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PreCheckReturnStmtRequest,
+              Stmt *(ReturnStmt *, DeclContext *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperInitializer,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)

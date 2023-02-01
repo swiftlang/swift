@@ -1353,6 +1353,17 @@ namespace {
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      if (auto *RS = dyn_cast<ReturnStmt>(stmt)) {
+        // Pre-check a return statement, which includes potentially turning it
+        // into a FailStmt.
+        auto &eval = Ctx.evaluator;
+        auto *S = evaluateOrDefault(eval, PreCheckReturnStmtRequest{RS, DC},
+                                    nullptr);
+        if (!S)
+          return Action::Stop();
+
+        return Action::Continue(S);
+      }
       return Action::Continue(stmt);
     }
 

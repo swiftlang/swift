@@ -757,20 +757,20 @@ public:
   Stmt *visitBraceStmt(BraceStmt *BS);
 
   Stmt *visitReturnStmt(ReturnStmt *RS) {
-    auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
+    // First, let's do a pre-check, and bail if the return is completely
+    // invalid.
+    auto &eval = getASTContext().evaluator;
+    auto *S =
+        evaluateOrDefault(eval, PreCheckReturnStmtRequest{RS, DC}, nullptr);
 
-    if (!TheFunc.has_value()) {
-      getASTContext().Diags.diagnose(RS->getReturnLoc(),
-                                     diag::return_invalid_outside_func);
-      return nullptr;
-    }
-    
-    // If the return is in a defer, then it isn't valid either.
-    if (isInDefer()) {
-      getASTContext().Diags.diagnose(RS->getReturnLoc(),
-                                     diag::jump_out_of_defer, "return");
-      return nullptr;
-    }
+    // We do a cast here as it may have been turned into a FailStmt. We should
+    // return that without doing anything else.
+    RS = dyn_cast_or_null<ReturnStmt>(S);
+    if (!RS)
+      return S;
+
+    auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
+    assert(TheFunc && "Should have bailed from pre-check if this is None");
 
     Type ResultTy = TheFunc->getBodyResultType();
     if (!ResultTy || ResultTy->hasError())
@@ -808,40 +808,6 @@ public:
     }
 
     Expr *E = RS->getResult();
-
-    // In an initializer, the only expression allowed is "nil", which indicates
-    // failure from a failable initializer.
-    if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
-                                          TheFunc->getAbstractFunctionDecl())) {
-      // The only valid return expression in an initializer is the literal
-      // 'nil'.
-      auto nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
-      if (!nilExpr) {
-        getASTContext().Diags.diagnose(RS->getReturnLoc(),
-                                       diag::return_init_non_nil)
-          .highlight(E->getSourceRange());
-        RS->setResult(nullptr);
-        return RS;
-      }
-
-      // "return nil" is only permitted in a failable initializer.
-      if (!ctor->isFailable()) {
-        getASTContext().Diags.diagnose(RS->getReturnLoc(),
-                                       diag::return_non_failable_init)
-          .highlight(E->getSourceRange());
-        getASTContext().Diags.diagnose(ctor->getLoc(), diag::make_init_failable,
-                    ctor->getName())
-          .fixItInsertAfter(ctor->getLoc(), "?");
-        RS->setResult(nullptr);
-        return RS;
-      }
-
-      // Replace the "return nil" with a new 'fail' statement.
-      return new (getASTContext()) FailStmt(RS->getReturnLoc(),
-                                            nilExpr->getLoc(),
-                                            RS->isImplicit());
-    }
-    
     TypeCheckExprOptions options = {};
     
     if (LeaveBraceStmtBodyUnchecked) {
@@ -1293,6 +1259,62 @@ public:
 
 };
 } // end anonymous namespace
+
+Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
+                                          DeclContext *DC) const {
+  auto &ctx = DC->getASTContext();
+  auto fn = AnyFunctionRef::fromDeclContext(DC);
+
+  // Not valid outside of a function.
+  if (!fn) {
+    ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_invalid_outside_func);
+    return nullptr;
+  }
+
+  // If the return is in a defer, then it isn't valid either.
+  if (isDefer(DC)) {
+    ctx.Diags.diagnose(RS->getReturnLoc(), diag::jump_out_of_defer, "return");
+    return nullptr;
+  }
+
+  // The rest of the checks only concern return statements with results.
+  if (!RS->hasResult())
+    return RS;
+
+  auto *E = RS->getResult();
+
+  // In an initializer, the only expression allowed is "nil", which indicates
+  // failure from a failable initializer.
+  if (auto *ctor =
+          dyn_cast_or_null<ConstructorDecl>(fn->getAbstractFunctionDecl())) {
+
+    // The only valid return expression in an initializer is the literal
+    // 'nil'.
+    auto *nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
+    if (!nilExpr) {
+      ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
+          .highlight(E->getSourceRange());
+      RS->setResult(nullptr);
+      return RS;
+    }
+
+    // "return nil" is only permitted in a failable initializer.
+    if (!ctor->isFailable()) {
+      ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_non_failable_init)
+          .highlight(E->getSourceRange());
+      ctx.Diags
+          .diagnose(ctor->getLoc(), diag::make_init_failable, ctor->getName())
+          .fixItInsertAfter(ctor->getLoc(), "?");
+      RS->setResult(nullptr);
+      return RS;
+    }
+
+    // Replace the "return nil" with a new 'fail' statement.
+    return new (ctx)
+        FailStmt(RS->getReturnLoc(), nilExpr->getLoc(), RS->isImplicit());
+  }
+  return RS;
+}
 
 static bool isDiscardableType(Type type) {
   return (type->hasError() ||
