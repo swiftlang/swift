@@ -4759,6 +4759,10 @@ void PrintAST::visitErasureExpr(ErasureExpr *expr) {
 void PrintAST::visitKeyPathExpr(KeyPathExpr *expr) {
 }
 
+void PrintAST::visitSingleValueStmtExpr(SingleValueStmtExpr *expr) {
+  visit(expr->getStmt());
+}
+
 void PrintAST::visitForceTryExpr(ForceTryExpr *expr) {
   Printer << "try! ";
   visit(expr->getSubExpr());

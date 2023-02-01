@@ -5395,6 +5395,16 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
+    case ConstraintLocator::SingleValueStmtBranch: {
+      auto branchElt = path[0].castTo<LocatorPathElt::SingleValueStmtBranch>();
+      auto exprIdx = branchElt.getExprBranchIndex();
+      auto *SVE = castToExpr<SingleValueStmtExpr>(anchor);
+      SmallVector<Expr *, 4> scratch;
+      anchor = SVE->getSingleExprBranches(scratch)[exprIdx];
+      path = path.slice(1);
+      continue;
+    }
+
     case ConstraintLocator::KeyPathDynamicMember:
     case ConstraintLocator::ImplicitDynamicMemberSubscript: {
       // Key path dynamic member lookup should be completely transparent.
@@ -6373,7 +6383,8 @@ void SolutionApplicationTargetsKey::dump(raw_ostream &OS) const {
 
 SolutionApplicationTarget::SolutionApplicationTarget(
     Expr *expr, DeclContext *dc, ContextualTypePurpose contextualPurpose,
-    TypeLoc convertType, bool isDiscarded) {
+    TypeLoc convertType, ConstraintLocator *convertTypeLocator,
+    bool isDiscarded) {
   // Verify that a purpose was specified if a convertType was.  Note that it is
   // ok to have a purpose without a convertType (which is used for call
   // return types).
@@ -6396,6 +6407,7 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.dc = dc;
   expression.contextualPurpose = contextualPurpose;
   expression.convertType = convertType;
+  expression.convertTypeLocator = convertTypeLocator;
   expression.pattern = nullptr;
   expression.propertyWrapper.wrappedVar = nullptr;
   expression.propertyWrapper.innermostWrappedValueInit = nullptr;
@@ -6504,7 +6516,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
 
   SolutionApplicationTarget target(
       initializer, dc, CTP_Initialization, contextualType,
-      /*isDiscarded=*/false);
+      /*convertTypeLocator*/ nullptr, /*isDiscarded=*/false);
   target.expression.pattern = pattern;
   target.expression.bindPatternVarsOneWay = bindPatternVarsOneWay;
   target.maybeApplyPropertyWrapper();
@@ -6619,6 +6631,7 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   case CTP_ComposedPropertyWrapper:
   case CTP_CannotFail:
   case CTP_ExprPattern:
+  case CTP_SingleValueStmtBranch:
     return false;
   }
   llvm_unreachable("invalid contextual type");

@@ -5370,6 +5370,10 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
     }
 
+    Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+      llvm_unreachable("Handled by the walker directly");
+    }
+
     Expr *visitOneWayExpr(OneWayExpr *E) {
       auto type = simplifyType(cs.getType(E));
       return coerceToType(E->getSubExpr(), type, cs.getConstraintLocator(E));
@@ -8521,7 +8525,12 @@ namespace {
         return Action::SkipChildren(closure);
       }
 
-      if (auto tap = dyn_cast_or_null<TapExpr>(expr)) {
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
+        rewriteSingleValueStmtExpr(SVE);
+        return Action::SkipChildren(SVE);
+      }
+
+      if (auto tap = dyn_cast<TapExpr>(expr)) {
         // We remember the DeclContext because the code to handle
         // single-expression-body closures above changes it.
         TapsToTypeCheck.push_back(std::make_pair(tap, Rewriter.dc));
@@ -8639,6 +8648,36 @@ namespace {
         return false;
       }
       }
+    }
+
+    bool rewriteSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
+      auto &solution = Rewriter.solution;
+      auto resultTy = solution.getResolvedType(SVE);
+      Rewriter.cs.setType(SVE, resultTy);
+
+      SmallVector<Expr *, 4> scratch;
+      SmallPtrSet<Expr *, 4> exprBranches;
+      for (auto *branch : SVE->getSingleExprBranches(scratch))
+        exprBranches.insert(branch);
+
+      return Rewriter.cs.applySolutionToSingleValueStmt(
+          solution, SVE, solution.getDC(), [&](SolutionApplicationTarget target) {
+            // We need to fixup the conversion type to the full result type,
+            // not the branch result type. This is necessary as there may be
+            // an additional conversion required for the branch.
+            if (auto *E = target.getAsExpr()) {
+              if (exprBranches.contains(E))
+                target.setExprConversionType(resultTy);
+            }
+            auto resultTarget = rewriteTarget(target);
+            if (!resultTarget)
+              return resultTarget;
+
+            if (auto expr = resultTarget->getAsExpr())
+              solution.setExprTypes(expr);
+
+            return resultTarget;
+          });
     }
   };
 } // end anonymous namespace
@@ -9096,26 +9135,27 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     case CTP_ExprPattern:
     case CTP_ForEachStmt:
     case CTP_ForEachSequence:
-    case swift::CTP_ReturnSingleExpr:
-    case swift::CTP_YieldByValue:
-    case swift::CTP_YieldByReference:
-    case swift::CTP_ThrowStmt:
-    case swift::CTP_EnumCaseRawValue:
-    case swift::CTP_DefaultParameter:
-    case swift::CTP_AutoclosureDefaultParameter:
-    case swift::CTP_CalleeResult:
-    case swift::CTP_CallArgument:
-    case swift::CTP_ClosureResult:
-    case swift::CTP_ArrayElement:
-    case swift::CTP_DictionaryKey:
-    case swift::CTP_DictionaryValue:
-    case swift::CTP_CoerceOperand:
-    case swift::CTP_AssignSource:
-    case swift::CTP_SubscriptAssignSource:
-    case swift::CTP_Condition:
-    case swift::CTP_WrappedProperty:
-    case swift::CTP_ComposedPropertyWrapper:
-    case swift::CTP_CannotFail:
+    case CTP_ReturnSingleExpr:
+    case CTP_YieldByValue:
+    case CTP_YieldByReference:
+    case CTP_ThrowStmt:
+    case CTP_EnumCaseRawValue:
+    case CTP_DefaultParameter:
+    case CTP_AutoclosureDefaultParameter:
+    case CTP_CalleeResult:
+    case CTP_CallArgument:
+    case CTP_ClosureResult:
+    case CTP_ArrayElement:
+    case CTP_DictionaryKey:
+    case CTP_DictionaryValue:
+    case CTP_CoerceOperand:
+    case CTP_AssignSource:
+    case CTP_SubscriptAssignSource:
+    case CTP_Condition:
+    case CTP_WrappedProperty:
+    case CTP_ComposedPropertyWrapper:
+    case CTP_CannotFail:
+    case CTP_SingleValueStmtBranch:
       result.setExpr(rewrittenExpr);
       break;
     }
@@ -9329,37 +9369,50 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     // expression function which got deduced to be `Never`.
     Type convertType = target.getExprConversionType();
     auto shouldCoerceToContextualType = [&]() {
-      return convertType &&
-          !convertType->hasPlaceholder() &&
-          !target.isOptionalSomePatternInit() &&
-          !(solution.getResolvedType(resultExpr)->isUninhabited() &&
-            cs.getContextualTypePurpose(target.getAsExpr())
-              == CTP_ReturnSingleExpr);
+      if (!convertType)
+        return false;
+
+      if (convertType->hasPlaceholder())
+        return false;
+
+      if (target.isOptionalSomePatternInit())
+        return false;
+
+      if (solution.getResolvedType(resultExpr)->isUninhabited() ||
+          solution.simplifyType(convertType)->isVoid()) {
+        auto contextPurpose = cs.getContextualTypePurpose(target.getAsExpr());
+        if (contextPurpose == CTP_ReturnSingleExpr ||
+            contextPurpose == CTP_SingleValueStmtBranch) {
+          return false;
+        }
+      }
+      return true;
     };
 
     // If we're supposed to convert the expression to some particular type,
     // do so now.
     if (shouldCoerceToContextualType()) {
-      ConstraintLocator *locator = nullptr;
-
       auto contextualTypePurpose = target.getExprContextualTypePurpose();
-      // Bodies of single-expression closures use a special locator
-      // for contextual type conversion to make sure that result is
-      // convertible to `Void` when `return` is not used explicitly.
-      auto *closure = dyn_cast<ClosureExpr>(target.getDeclContext());
-      if (closure && closure->hasSingleExpressionBody() &&
-          contextualTypePurpose == CTP_ClosureResult) {
-        auto *returnStmt =
-            castToStmt<ReturnStmt>(closure->getBody()->getLastElement());
 
-        locator = cs.getConstraintLocator(
-            closure, LocatorPathElt::ClosureBody(
-                         /*hasReturn=*/!returnStmt->isImplicit()));
-      } else {
-        locator = cs.getConstraintLocator(
-            expr, LocatorPathElt::ContextualType(contextualTypePurpose));
+      auto *locator = target.getExprConvertTypeLocator();
+      if (!locator) {
+        // Bodies of single-expression closures use a special locator
+        // for contextual type conversion to make sure that result is
+        // convertible to `Void` when `return` is not used explicitly.
+        auto *closure = dyn_cast<ClosureExpr>(target.getDeclContext());
+        if (closure && closure->hasSingleExpressionBody() &&
+            contextualTypePurpose == CTP_ClosureResult) {
+          auto *returnStmt =
+              castToStmt<ReturnStmt>(closure->getBody()->getLastElement());
+
+          locator = cs.getConstraintLocator(
+              closure, LocatorPathElt::ClosureBody(
+                           /*hasReturn=*/!returnStmt->isImplicit()));
+        } else {
+          locator = cs.getConstraintLocator(
+              expr, LocatorPathElt::ContextualType(contextualTypePurpose));
+        }
       }
-
       assert(locator);
 
       resultExpr = Rewriter.coerceToType(
