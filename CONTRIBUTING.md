@@ -1,4 +1,4 @@
-By submitting a pull request here, you represent that you have the right to license
+By opening a pull request in this repository, you represent that you have the right to license
 your contribution to Apple and the community, and consent by submitting the patch
 that your contributions are licensed under the [Swift
 license](https://swift.org/LICENSE.txt).
