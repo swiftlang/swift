@@ -500,6 +500,7 @@ void swift::conformToCxxSequenceIfNeeded(
         },
         LookUpConformanceInModule(module));
 
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Element"), pointeeTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Index"), indexTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Indices"), indicesTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("SubSequence"),
@@ -516,9 +517,11 @@ void swift::conformToCxxSequenceIfNeeded(
   // copy of the sequence's elements) by conforming the type to
   // CxxCollectionConvertible. This enables an overload of Array.init declared
   // in the Cxx module.
-  if (!conformedToRAC && cxxConvertibleProto)
+  if (!conformedToRAC && cxxConvertibleProto) {
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Element"), pointeeTy);
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::CxxConvertibleToCollection});
+  }
 }
 
 void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
