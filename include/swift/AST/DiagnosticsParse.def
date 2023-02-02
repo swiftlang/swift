@@ -677,6 +677,7 @@ ERROR(expected_generic_signature,none,
       "expected a generic signature", ())
 ERROR(sil_expected_uuid,none,
       "expected a UUID string literal", ())
+NOTE(sil_previous_instruction,none, "previous instruction", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -1655,6 +1656,14 @@ ERROR(opened_attribute_id_value,none,
       "known id for 'opened' attribute must be a UUID string", ())
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
+
+// pack_element
+ERROR(pack_element_attribute_expected_lparen,none,
+      "expected '(' after 'pack_element' attribute", ())
+ERROR(pack_element_attribute_expected_rparen,none,
+      "expected ')' after id value for 'pack_element' attribute", ())
+ERROR(multiple_open_pack_element,none,
+      "multiple 'open_pack_element' instructions with same UUID", ())
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,

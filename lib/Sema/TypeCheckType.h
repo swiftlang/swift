@@ -29,6 +29,7 @@ class TypeRepr;
 class IdentTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
+class SILTypeResolutionContext;
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -555,14 +556,14 @@ public:
                         OpenUnboundGenericTypeFn unboundTyOpener,
                         HandlePlaceholderTypeReprFn placeholderHandler,
                         OpenPackElementFn packElementOpener,
-                        GenericParamList *silParams = nullptr);
+                        SILTypeResolutionContext *silContext = nullptr);
 
   static Type resolveContextualType(
       TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
       TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
       HandlePlaceholderTypeReprFn placeholderHandler,
       OpenPackElementFn packElementOpener,
-      GenericParamList *silParams = nullptr);
+      SILTypeResolutionContext *silContext = nullptr);
 
 public:
   TypeResolution withOptions(TypeResolutionOptions opts) const;
@@ -602,11 +603,11 @@ public:
   /// to create a well-formed type.
   ///
   /// \param TyR The type representation to check.
-  /// \param silParams Used to look up generic parameters in SIL mode.
+  /// \param silContext Used to look up generic parameters in SIL mode.
   ///
   /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR,
-                   GenericParamList *silParams=nullptr) const;
+                   SILTypeResolutionContext *silContext = nullptr) const;
 
   /// Resolve a reference to a member type of the given (dependent) base and
   /// name.

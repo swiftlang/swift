@@ -3292,8 +3292,7 @@ public:
 
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
-                           Type(const TypeResolution *, TypeRepr *,
-                                GenericParamList *),
+                           Type(const TypeResolution *, TypeRepr *),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3302,12 +3301,15 @@ public:
   // Cycle handling.
   void noteCycleStep(DiagnosticEngine &diags) const;
 
+  static Type evaluate(const TypeResolution &resolution,
+                       TypeRepr *repr);
+
 private:
   friend SimpleRequest;
 
   // Evaluation.
   Type evaluate(Evaluator &evaluator, const TypeResolution *resolution,
-                TypeRepr *repr, GenericParamList *silParams) const;
+                TypeRepr *repr) const;
 };
 
 void simple_display(llvm::raw_ostream &out, const TypeResolution *resolution);

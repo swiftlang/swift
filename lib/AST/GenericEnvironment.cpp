@@ -547,7 +547,7 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
 Type GenericEnvironment::mapTypeIntoContext(
                                 Type type,
                                 LookupConformanceFn lookupConformance) const {
-  assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
+  assert((!type->hasArchetype() || type->hasLocalArchetype()) &&
          "already have a contextual type");
 
   type = maybeApplyOuterContextSubstitutions(type);

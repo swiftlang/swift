@@ -42,6 +42,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -53,7 +54,6 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 
@@ -665,7 +665,7 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
 ///
 /// \param type The generic type to which to apply arguments.
 /// \param resolution The type resolution to perform.
-/// \param silParams Used to look up generic parameters in SIL mode.
+/// \param silContext Used to look up generic parameters in SIL mode.
 /// \param repr The arguments to apply with the angle bracket range for
 /// diagnostics.
 ///
@@ -674,7 +674,7 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
 ///
 /// \see TypeResolution::applyUnboundGenericArguments
 static Type applyGenericArguments(Type type, TypeResolution resolution,
-                                  GenericParamList *silParams,
+                                  SILTypeResolutionContext *silContext,
                                   IdentTypeRepr *repr) {
   auto options = resolution.getOptions();
   auto dc = resolution.getDeclContext();
@@ -781,7 +781,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 
     SmallVector<Type, 2> argTys;
     for (auto *genericArg : genericArgs) {
-      Type argTy = genericResolution.resolveType(genericArg, silParams);
+      Type argTy = genericResolution.resolveType(genericArg, silContext);
       if (!argTy || argTy->hasError())
         return ErrorType::get(ctx);
 
@@ -838,7 +838,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   SmallVector<Type, 2> args;
   for (auto tyR : genericArgs) {
     // Propagate failure.
-    Type substTy = genericResolution.resolveType(tyR, silParams);
+    Type substTy = genericResolution.resolveType(tyR, silContext);
     if (!substTy || substTy->hasError())
       return ErrorType::get(ctx);
 
@@ -1173,7 +1173,8 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
 /// Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
                             TypeResolution resolution,
-                            GenericParamList *silParams, IdentTypeRepr *repr) {
+                            SILTypeResolutionContext *silContext,
+                            IdentTypeRepr *repr) {
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
   Type type = resolution.resolveTypeInContext(typeDecl, foundDC,
@@ -1188,7 +1189,7 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
                                    typeDecl);
   }
 
-  return applyGenericArguments(type, resolution, silParams, repr);
+  return applyGenericArguments(type, resolution, silContext, repr);
 }
 
 static std::string getDeclNameFromContext(DeclContext *dc,
@@ -1489,12 +1490,12 @@ static void diagnoseGenericArgumentsOnSelf(TypeResolution resolution,
 
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
-/// \param silParams Used to look up generic parameters in SIL mode.
+/// \param silContext Used to look up generic parameters in SIL mode.
 ///
 /// \returns Either the resolved type or a null type, the latter of
 /// which indicates that some dependencies were unsatisfied.
 static Type resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
-                                            GenericParamList *silParams,
+                                            SILTypeResolutionContext *silContext,
                                             IdentTypeRepr *repr) {
   const auto options = resolution.getOptions();
   ASTContext &ctx = resolution.getASTContext();
@@ -1508,7 +1509,7 @@ static Type resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
   if (auto *typeDecl = repr->getBoundDecl()) {
     // Resolve the type declaration within this context.
     return resolveTypeDecl(typeDecl, repr->getDeclContext(), resolution,
-                           silParams, repr);
+                           silContext, repr);
   }
 
   // Resolve the representation using unqualified name lookup.
@@ -1517,12 +1518,12 @@ static Type resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
 
   // In SIL mode, we bind generic parameters here, since name lookup
   // won't find them.
-  if (silParams != nullptr) {
+  if (silContext && silContext->GenericParams) {
     auto name = id.getBaseIdentifier();
-    if (auto *paramDecl = silParams->lookUpGenericParam(name)) {
+    if (auto *paramDecl = silContext->GenericParams->lookUpGenericParam(name)) {
       repr->setValue(paramDecl, DC);
 
-      return resolveTypeDecl(paramDecl, DC, resolution, silParams, repr);
+      return resolveTypeDecl(paramDecl, DC, resolution, silContext, repr);
     }
   }
 
@@ -1565,7 +1566,7 @@ static Type resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
 
     // Compute the type of the found declaration when referenced from this
     // location.
-    Type type = resolveTypeDecl(typeDecl, foundDC, resolution, silParams, repr);
+    Type type = resolveTypeDecl(typeDecl, foundDC, resolution, silContext, repr);
     if (type->is<ErrorType>())
       return type;
 
@@ -1668,9 +1669,9 @@ static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
 /// Resolve the given identifier type representation as a qualified
 /// lookup within the given parent type, returning the type it
 /// references.
-/// \param silParams Used to look up generic parameters in SIL mode.
+/// \param silContext Used to look up generic parameters in SIL mode.
 static Type resolveQualifiedIdentTypeRepr(TypeResolution resolution,
-                                          GenericParamList *silParams,
+                                          SILTypeResolutionContext *silContext,
                                           Type parentTy,
                                           SourceRange parentRange,
                                           IdentTypeRepr *repr) {
@@ -1739,7 +1740,7 @@ static Type resolveQualifiedIdentTypeRepr(TypeResolution resolution,
     }
 
     // If there are generic arguments, apply them now.
-    return applyGenericArguments(memberType, resolution, silParams, repr);
+    return applyGenericArguments(memberType, resolution, silContext, repr);
   };
 
   // Short-circuiting.
@@ -1756,7 +1757,7 @@ static Type resolveQualifiedIdentTypeRepr(TypeResolution resolution,
       // type later on.
       if (!memberType->is<DependentMemberType>() ||
           memberType->castTo<DependentMemberType>()->getAssocType()) {
-        return applyGenericArguments(memberType, resolution, silParams, repr);
+        return applyGenericArguments(memberType, resolution, silContext, repr);
       }
 
       return memberType;
@@ -1937,12 +1938,12 @@ namespace {
     const TypeResolution &resolution;
 
     /// Used in SIL mode.
-    GenericParamList *genericParams;
+    SILTypeResolutionContext *silContext;
 
   public:
     explicit TypeResolver(const TypeResolution &resolution,
-                          GenericParamList *genericParams = nullptr)
-        : resolution(resolution), genericParams(genericParams) {}
+                          SILTypeResolutionContext *silContext = nullptr)
+        : resolution(resolution), silContext(silContext) {}
 
     NeverNullType resolveType(TypeRepr *repr, TypeResolutionOptions options);
 
@@ -1971,6 +1972,10 @@ namespace {
     Type diagnoseDisallowedExistential(TypeRepr *repr, Type type);
 
     NeverNullType resolveOpenedExistentialArchetype(
+        TypeAttributes &attrs, TypeRepr *repr,
+        TypeResolutionOptions options);
+
+    NeverNullType resolvePackElementArchetype(
         TypeAttributes &attrs, TypeRepr *repr,
         TypeResolutionOptions options);
 
@@ -2064,6 +2069,28 @@ namespace {
                                           unsigned ordinal,
                                           TypeResolutionOptions options);
   };
+
+  /// A helper class to change to a new generic context in a scope when
+  /// parsing SIL.
+  class SILInnerGenericContextRAII {
+    SILTypeResolutionContext *silContext;
+    GenericParamList *savedParams;
+
+  public:
+    SILInnerGenericContextRAII(SILTypeResolutionContext *silContext,
+                               GenericParamList *newParams)
+      : silContext(silContext),
+        savedParams(silContext->GenericParams) {
+      silContext->GenericParams = newParams;
+    }
+
+    SILInnerGenericContextRAII(const SILInnerGenericContextRAII &) = delete;
+    SILInnerGenericContextRAII &operator=(const SILInnerGenericContextRAII &) = delete;
+
+    ~SILInnerGenericContextRAII() {
+      silContext->GenericParams = savedParams;
+    }
+  };
 } // end anonymous namespace
 
 Type TypeResolution::resolveContextualType(
@@ -2071,10 +2098,10 @@ Type TypeResolution::resolveContextualType(
     OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
     OpenPackElementFn packElementOpener,
-    GenericParamList *silParams) {
+    SILTypeResolutionContext *silContext) {
   return resolveContextualType(TyR, dc, dc->getGenericSignatureOfContext(),
                                opts, unboundTyOpener, placeholderHandler,
-                               packElementOpener);
+                               packElementOpener, silContext);
 }
 
 Type TypeResolution::resolveContextualType(
@@ -2082,22 +2109,39 @@ Type TypeResolution::resolveContextualType(
     TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
     HandlePlaceholderTypeReprFn placeholderHandler,
     OpenPackElementFn packElementOpener,
-    GenericParamList *silParams) {
+    SILTypeResolutionContext *silContext) {
   const auto resolution = TypeResolution::forInterface(
       dc, genericSig, opts, unboundTyOpener, placeholderHandler,
       packElementOpener);
-  const auto ty = resolution.resolveType(TyR, silParams);
+  const auto ty = resolution.resolveType(TyR, silContext);
 
   return GenericEnvironment::mapTypeIntoContext(
       resolution.getGenericSignature().getGenericEnvironment(), ty);
 }
 
+static Type evaluateTypeResolution(const TypeResolution *resolution,
+                                   TypeRepr *TyR,
+                                   SILTypeResolutionContext *silContext);
+
 Type TypeResolution::resolveType(TypeRepr *TyR,
-                                 GenericParamList *silParams) const {
+                                 SILTypeResolutionContext *silContext) const {
+  // Bypass the request evaluator if we have a SIL context.  SIL type
+  // resolution doesn't obey the functional laws of request evaluation
+  // (resolution contexts can be mutable, e.g. to handle local archetypes),
+  // and the SIL parser doesn't benefit from either cycle-checking
+  // (since SIL functions can't declare types) or request caching (since
+  // the SIL parser throws away TypeReprs as soon as it resolves them).
+  //
+  // This also has the mild benefit of reducing the storage overhead of
+  // type resolution caching.
+  if (silContext) {
+    return evaluateTypeResolution(this, TyR, silContext);
+  }
+
   auto &ctx = getASTContext();
   auto Ty =
       evaluateOrDefault(ctx.evaluator,
-                        ResolveTypeRequest{this, TyR, silParams}, Type());
+                        ResolveTypeRequest{this, TyR}, Type());
   if (!Ty)
     return ErrorType::get(ctx);
   return Ty;
@@ -2105,12 +2149,17 @@ Type TypeResolution::resolveType(TypeRepr *TyR,
 
 Type ResolveTypeRequest::evaluate(Evaluator &evaluator,
                                   const TypeResolution *resolution,
-                                  TypeRepr *TyR,
-                                  GenericParamList *silParams) const {
+                                  TypeRepr *TyR) const {
+  return evaluateTypeResolution(resolution, TyR, /*silContext*/ nullptr);
+}
+
+static Type evaluateTypeResolution(const TypeResolution *resolution,
+                                   TypeRepr *TyR,
+                                   SILTypeResolutionContext *silContext) {
   const auto options = resolution->getOptions();
   auto &ctx = resolution->getASTContext();
   auto result =
-      TypeResolver(*resolution, silParams)
+      TypeResolver(*resolution, silContext)
           .resolveType(TyR, resolution->getOptions());
 
   // If we resolved down to an error, make sure to mark the typeRepr as invalid
@@ -2400,6 +2449,8 @@ NeverNullType
 TypeResolver::resolveOpenedExistentialArchetype(
     TypeAttributes &attrs, TypeRepr *repr,
     TypeResolutionOptions options) {
+  assert(silContext);
+
   options.setContext(None);
 
   auto *dc = getDeclContext();
@@ -2415,9 +2466,13 @@ TypeResolver::resolveOpenedExistentialArchetype(
       /*unboundTyOpener*/ nullptr,
       /*placeholderHandler*/ nullptr,
       /*packElementOpener*/ nullptr);
-  TypeResolver interfaceTypeResolver(structuralResolution,
+  auto interfaceType = [&] {
+    SILInnerGenericContextRAII scope(silContext,
                                      ctx.getSelfGenericParamList(dc));
-  auto interfaceType = interfaceTypeResolver.resolveType(repr, options);
+
+    TypeResolver interfaceTypeResolver(structuralResolution, silContext);
+    return interfaceTypeResolver.resolveType(repr, options);
+  }();
 
   // The constraint type is stored inside the attribute. It is resolved
   // normally, as if it were written in the current context.
@@ -2453,6 +2508,71 @@ TypeResolver::resolveOpenedExistentialArchetype(
 
   attrs.clearAttribute(TAK_opened);
 
+  return archetypeType;
+}
+
+/// In SIL, handle '@pack_element(UUID) interfaceType',
+/// which creates an opened archetype.
+NeverNullType
+TypeResolver::resolvePackElementArchetype(
+    TypeAttributes &attrs, TypeRepr *repr,
+    TypeResolutionOptions options) {
+  assert(silContext);
+  assert(attrs.has(TAK_pack_element));
+  assert(attrs.OpenedID.hasValue());
+
+  attrs.clearAttribute(TAK_pack_element);
+
+  auto dc = getDeclContext();
+  auto &ctx = dc->getASTContext();
+
+  const SILTypeResolutionContext::OpenedPackElement *entry = nullptr;
+  if (const auto *openedPacksMap = silContext->OpenedPackElements) {
+    auto it = openedPacksMap->find(*attrs.OpenedID);
+    if (it != openedPacksMap->end()) {
+      entry = &it->second;
+    }
+  }
+  if (!entry) {
+    diagnoseInvalid(repr, attrs.getLoc(TAK_pack_element),
+                    diag::sil_pack_element_uuid_not_found);
+    return ErrorType::get(ctx);
+  }
+
+  options.setContext(None);
+
+  // The interface type is the type wrapped by the attribute. Resolve it
+  // within the generic parameter list for the opened generic environment.
+  // Use structural resolution to avoid querying the DeclContext's
+  // generic signature, which is not the right signature for this.
+  auto structuralResolution = TypeResolution::forStructural(
+      dc, options,
+      /*unboundTyOpener*/ nullptr,
+      /*placeholderHandler*/ nullptr,
+      /*packElementOpener*/ nullptr);
+  auto interfaceType = [&] {
+    SILInnerGenericContextRAII scope(silContext, entry->Params);
+
+    TypeResolver interfaceTypeResolver(structuralResolution, silContext);
+    return interfaceTypeResolver.resolveType(repr, options);
+  }();
+
+  if (!interfaceType->isTypeParameter()) {
+    diagnoseInvalid(repr, attrs.getLoc(TAK_pack_element),
+                    diag::opened_bad_interface_type,
+                    interfaceType);
+
+    return ErrorType::get(ctx);
+  }
+
+  // Map the interface type into the element context.
+  auto archetypeType =
+    entry->Environment->mapPackTypeIntoElementContext(interfaceType);
+  if (archetypeType->hasError()) {
+    diagnoseInvalid(repr, attrs.getLoc(TAK_pack_element),
+                    diag::opened_bad_interface_type,
+                    interfaceType);
+  }
   return archetypeType;
 }
 
@@ -2902,6 +3022,8 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
   if (attrs.has(TAK_opened)) {
     ty = resolveOpenedExistentialArchetype(attrs, repr, options);
+  } else if (attrs.has(TAK_pack_element)) {
+    ty = resolvePackElementArchetype(attrs, repr, options);
   }
 
   auto instanceOptions = options;
@@ -3266,11 +3388,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     bool concurrent, const clang::Type *parsedClangFunctionType,
     DifferentiabilityKind diffKind, Type globalActor) {
 
-  Optional<llvm::SaveAndRestore<GenericParamList *>> saveGenericParams;
-
-  if (auto *genericParams = repr->getGenericParams())
-    saveGenericParams.emplace(this->genericParams, genericParams);
-
   // can't have more than 1 isolated parameter.
   if (!repr->isWarnedAbout() && hasMoreIsolatedParamsThan(repr, 1)) {
     diagnose(repr->getLoc(), diag::isolated_parameter_duplicate_type)
@@ -3292,6 +3409,16 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     diagnose(repr->getInvocationSubstitutions()[0]->getStartLoc(),
              diag::ast_subst_function_type);
     return ErrorType::get(getASTContext());
+  }
+
+  Optional<SILInnerGenericContextRAII> innerGenericContext;
+  if (auto *genericParams = repr->getGenericParams()) {
+    if (!silContext) {
+      diagnose(genericParams->getLAngleLoc(), diag::generic_function_type)
+        .highlight(genericParams->getSourceRange());
+      return ErrorType::get(getASTContext());
+    }
+    innerGenericContext.emplace(silContext, genericParams);
   }
 
   TypeResolutionOptions options = None;
@@ -3362,6 +3489,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
                                               bool capturesGenerics,
                                               TypeResolutionOptions options) {
+  assert(silContext && "resolving SIL box type outside of SIL");
+
   // Resolve the field types.
   SmallVector<SILField, 4> fields;
   {
@@ -3381,8 +3510,8 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
                                        resolution.getPackElementOpener());
     }
 
-    TypeResolver fieldResolver{fieldResolution,
-                               genericParams};
+    SILInnerGenericContextRAII scope(silContext, genericParams);
+    TypeResolver fieldResolver{fieldResolution, silContext};
     for (auto &fieldRepr : repr->getFields()) {
       auto fieldTy = fieldResolver.resolveType(fieldRepr.getFieldType(), options);
       fields.push_back({fieldTy->getCanonicalType(), fieldRepr.isMutable()});
@@ -3425,6 +3554,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     SILCoroutineKind coroutineKind,
     SILFunctionType::ExtInfoBuilder extInfoBuilder, ParameterConvention callee,
     TypeRepr *witnessMethodProtocol) {
+  assert(silContext);
+
   options.setContext(None);
 
   bool hasError = false;
@@ -3440,7 +3571,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(
   // else the function's generic environment, if it has one.
   GenericParamList *genericParams = repr->getGenericParams();
   if (genericParams == nullptr)
-    genericParams = this->genericParams;
+    genericParams = silContext->GenericParams;
   GenericParamList *componentGenericParams = repr->getPatternGenericParams();
   if (componentGenericParams == nullptr)
     componentGenericParams = genericParams;
@@ -3468,7 +3599,10 @@ NeverNullType TypeResolver::resolveSILFunctionType(
           resolution.getPackElementOpener());
     }
 
-    TypeResolver silResolver{functionResolution, componentGenericParams};
+    SILInnerGenericContextRAII innerGenericContext(silContext,
+                                                   componentGenericParams);
+
+    TypeResolver silResolver{functionResolution, silContext};
     for (auto elt : argsTuple->getElements()) {
       auto elementOptions = options;
       elementOptions.setContext(TypeResolverContext::FunctionInput);
@@ -3494,6 +3628,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
       }
     }
   }
+
+  SILInnerGenericContextRAII innerGenericContext(silContext, genericParams);
 
   auto resolveSubstitutions = [&](GenericSignature sig,
                                   ArrayRef<TypeRepr*> args,
@@ -3524,12 +3660,12 @@ NeverNullType TypeResolver::resolveSILFunctionType(
       patternSubs = resolveSubstitutions(repr->getPatternGenericSignature(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolveSILParameters,
-                                                      genericParams});
+                                                      silContext});
     } else {
       patternSubs = resolveSubstitutions(repr->getPatternGenericSignature(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolution,
-                                                      genericParams});
+                                                      silContext});
     }
   }
 
@@ -3539,7 +3675,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     invocationSubs = resolveSubstitutions(repr->getGenericSignature(),
                                           repr->getInvocationSubstitutions(),
                                           TypeResolver{resolution,
-                                                       genericParams});
+                                                       silContext});
   }
 
   if (hasError) {
@@ -3820,7 +3956,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
   if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
     // The base component uses unqualified lookup.
     result = resolveUnqualifiedIdentTypeRepr(resolution.withOptions(options),
-                                             genericParams, identBase);
+                                             silContext, identBase);
 
     if (result && result->isParameterPack() &&
         options.contains(TypeResolutionFlags::AllowPackReferences) &&
@@ -3841,7 +3977,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     SourceRange parentRange = baseComp->getSourceRange();
     for (auto *nestedComp : memberTR->getMemberComponents()) {
       result = resolveQualifiedIdentTypeRepr(resolution.withOptions(options),
-                                             genericParams, result, parentRange,
+                                             silContext, result, parentRange,
                                              nestedComp);
       if (result->hasError())
         return ErrorType::get(result->getASTContext());
