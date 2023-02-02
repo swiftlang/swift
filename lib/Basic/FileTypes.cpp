@@ -109,9 +109,6 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_IndexData:
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_IndexUnitOutputPath:
-  case file_types::TY_SharedLibraryDylib:
-  case file_types::TY_SharedLibrarySO:
-  case file_types::TY_SharedLibraryDLL:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -127,9 +124,6 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_LLVM_IR:
   case file_types::TY_LLVM_BC:
   case file_types::TY_Object:
-  case file_types::TY_SharedLibraryDylib:
-  case file_types::TY_SharedLibrarySO:
-  case file_types::TY_SharedLibraryDLL:
     return true;
   case file_types::TY_Swift:
   case file_types::TY_PCH:
@@ -221,9 +215,6 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_ConstValues:
-  case file_types::TY_SharedLibraryDylib:
-  case file_types::TY_SharedLibrarySO:
-  case file_types::TY_SharedLibraryDLL:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");

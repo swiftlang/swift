@@ -570,6 +570,8 @@ static void computeSwiftModuleTraceInfo(
   SmallVector<std::string, 16> dependencies{deps.begin(), deps.end()};
   auto incrDeps = depTracker.getIncrementalDependencyPaths();
   dependencies.append(incrDeps.begin(), incrDeps.end());
+  auto sharedLibraryExtRegex =
+      llvm::Regex("dylib|so|dll", llvm::Regex::IgnoreCase);
   for (const auto &depPath : dependencies) {
 
     // Decide if this is a swiftmodule based on the extension of the raw
@@ -582,9 +584,7 @@ static void computeSwiftModuleTraceInfo(
     auto isSwiftinterface =
         moduleFileType == file_types::TY_SwiftModuleInterfaceFile;
     auto isSharedLibrary =
-        moduleFileType == file_types::TY_SharedLibraryDylib ||
-        moduleFileType == file_types::TY_SharedLibrarySO ||
-        moduleFileType == file_types::TY_SharedLibraryDLL;
+        sharedLibraryExtRegex.match(llvm::sys::path::extension(depPath));
 
     if (!(isSwiftmodule || isSwiftinterface || isSharedLibrary))
       continue;
