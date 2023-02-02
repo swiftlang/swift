@@ -54,6 +54,10 @@
 #include <io.h>
 #endif
 
+#if defined(__wasi__)
+#include <unistd.h>
+#endif
+
 #include <assert.h>
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
