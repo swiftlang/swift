@@ -2224,7 +2224,8 @@ BraceStmt *swift::applyResultBuilderTransform(
 }
 
 Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
-    FuncDecl *func, Type builderType) {
+    FuncDecl *func, Type builderType,
+    bool ClosuresInResultBuilderDontParticipateInInference) {
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   //
@@ -2280,6 +2281,10 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   }
 
   ConstraintSystemOptions options = ConstraintSystemFlags::AllowFixes;
+  if (ClosuresInResultBuilderDontParticipateInInference) {
+    options |= ConstraintSystemFlags::
+        ClosuresInResultBuildersDontParticipateInInference;
+  }
   auto resultInterfaceTy = func->getResultInterfaceType();
   auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
 
