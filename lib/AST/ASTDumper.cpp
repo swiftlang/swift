@@ -3766,8 +3766,10 @@ namespace {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec("dependent_member_type", DMT);
-      } else {
+      } else if (originator.is<PlaceholderTypeRepr *>()) {
         printFlag("placeholder_type_repr");
+      } else {
+        assert(false && "unknown originator");
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

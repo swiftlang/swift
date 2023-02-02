@@ -622,6 +622,10 @@ bool AllowTupleTypeMismatch::coalesceAndDiagnose(
     purpose = cs.getContextualTypePurpose(locator->getAnchor());
   }
 
+  if (!getFromType()->is<TupleType>() || !getToType()->is<TupleType>()) {
+    return false;
+  }
+
   TupleContextualFailure failure(solution, purpose, getFromType(), getToType(),
                                  indices, locator);
   return failure.diagnose(asNote);

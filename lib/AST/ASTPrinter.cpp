@@ -5702,8 +5702,10 @@ public:
         Printer << "error_expr";
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
-      } else {
+      } else if (originator.is<PlaceholderTypeRepr *>()) {
         Printer << "placeholder_type_repr";
+      } else {
+        assert(false && "unknown originator");
       }
       Printer << ">>";
     } else {
