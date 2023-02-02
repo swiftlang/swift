@@ -147,15 +147,6 @@ public enum AddBlocker: ExpressionMacro {
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
-    let opTable = OperatorTable.standardOperators
-    let node = opTable.foldAll(node) { error in
-      context.diagnose(error.asDiagnostic)
-    }.asProtocol(FreestandingMacroExpansionSyntax.self)!
-
-    guard let argument = node.argumentList.first?.expression else {
-      fatalError("boom")
-    }
-
     let visitor = AddVisitor()
     let result = visitor.visit(Syntax(node))
 
@@ -239,6 +230,35 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
       }
       """
     }
+  }
+}
+
+public struct WarningMacro: ExpressionMacro {
+   public static func expansion(
+     of macro: some FreestandingMacroExpansionSyntax,
+     in context: some MacroExpansionContext
+   ) throws -> ExprSyntax {
+     guard let firstElement = macro.argumentList.first,
+       let stringLiteral = firstElement.expression
+         .as(StringLiteralExprSyntax.self),
+       stringLiteral.segments.count == 1,
+       case let .stringSegment(messageString)? = stringLiteral.segments.first
+     else {
+       throw CustomError.message("#myWarning macro requires a string literal")
+     }
+
+     context.diagnose(
+       Diagnostic(
+         node: Syntax(macro),
+         message: SimpleDiagnosticMessage(
+           message: messageString.content.description,
+           diagnosticID: MessageID(domain: "test", id: "error"),
+           severity: .warning
+         )
+       )
+     )
+
+     return "()"
   }
 }
 
