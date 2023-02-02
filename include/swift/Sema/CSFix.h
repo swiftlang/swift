@@ -2040,15 +2040,13 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static MustBeCopyable *create(ConstraintSystem &cs,
                              Type noncopyableTy,
                              ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix *fix) {
+  static bool classof(ConstraintFix const* fix) {
     return fix->getKind() == FixKind::MustBeCopyable;
   }
 };
