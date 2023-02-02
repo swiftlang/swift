@@ -2657,10 +2657,10 @@ getActualMacroRole(uint8_t context) {
   CASE(Declaration)
   CASE(Accessor)
   CASE(MemberAttribute)
+  CASE(Member)
 #undef CASE
-  default:
-    return None;
   }
+  return None;
 }
 
 static Optional<swift::MacroIntroducedDeclNameKind>
