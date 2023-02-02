@@ -212,7 +212,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-single-threaded-concurrency      "0"               "build Swift concurrency in single-threaded mode"
     swift-stdlib-concurrency-tracing              ""                "whether to enable tracing signposts for concurrency; default is 1 on Darwin platforms, 0 otherwise"
     swift-stdlib-use-relative-protocol-witness-tables "0"            "whether to use relative protocol witness table"
-    swift-enable-runtime-function-counters        "1"               "whether to enable runtime function counters"
+    swift-enable-runtime-function-counters        ""                "whether to enable runtime function counters"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
     swift-stdlib-has-commandline                  "1"               "whether to build stdlib with the CommandLine enum and support for argv/argc"
     swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
