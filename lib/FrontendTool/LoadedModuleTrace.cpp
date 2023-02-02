@@ -552,6 +552,7 @@ void ABIDependencyEvaluator::printABIExportMap(llvm::raw_ostream &os) const {
 // FIXME: Use the VFS instead of handling paths directly. We are particularly
 // sloppy about handling relative paths in the dependency tracker.
 static void computeSwiftModuleTraceInfo(
+    ASTContext &ctx,
     const SmallPtrSetImpl<ModuleDecl *> &abiDependencies,
     const llvm::DenseMap<StringRef, ModuleDecl *> &pathToModuleDecl,
     const DependencyTracker &depTracker, StringRef prebuiltCachePath,
@@ -580,8 +581,12 @@ static void computeSwiftModuleTraceInfo(
     auto isSwiftmodule = moduleFileType == file_types::TY_SwiftModuleFile;
     auto isSwiftinterface =
         moduleFileType == file_types::TY_SwiftModuleInterfaceFile;
+    auto isSharedLibrary =
+        moduleFileType == file_types::TY_SharedLibraryDylib ||
+        moduleFileType == file_types::TY_SharedLibrarySO ||
+        moduleFileType == file_types::TY_SharedLibraryDLL;
 
-    if (!(isSwiftmodule || isSwiftinterface))
+    if (!(isSwiftmodule || isSwiftinterface || isSharedLibrary))
       continue;
 
     auto dep = pathToModuleDecl.find(depPath);
@@ -634,6 +639,34 @@ static void computeSwiftModuleTraceInfo(
                    << "The module <-> path mapping we have is:\n";
       for (auto &m : pathToModuleDecl)
         llvm::errs() << m.second->getName() << " <-> " << m.first << '\n';
+      continue;
+    }
+
+    // If we found a shared library, it must be a compiler plugin dependency.
+    if (isSharedLibrary) {
+      // Infer the module name by dropping the library prefix and extension.
+      // e.g "/path/to/lib/libPlugin.dylib" -> "Plugin"
+      auto moduleName = llvm::sys::path::stem(depPath);
+      #if !defined(_WIN32)
+      moduleName.consume_front("lib");
+      #endif
+
+      StringRef realDepPath =
+          fs::real_path(depPath, buffer, /*expand_tile*/ true)
+              ? StringRef(depPath)
+              : buffer.str();
+
+      traceInfo.push_back(
+          {/*Name=*/
+           ctx.getIdentifier(moduleName),
+           /*Path=*/
+           realDepPath.str(),
+           /*IsImportedDirectly=*/
+           false,
+           /*SupportsLibraryEvolution=*/
+           false});
+      buffer.clear();
+
       continue;
     }
 
@@ -731,8 +764,9 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   }
 
   std::vector<SwiftModuleTraceInfo> swiftModules;
-  computeSwiftModuleTraceInfo(abiDependencies, pathToModuleDecl, *depTracker,
-                              opts.PrebuiltModuleCachePath, swiftModules);
+  computeSwiftModuleTraceInfo(ctxt, abiDependencies, pathToModuleDecl,
+                              *depTracker, opts.PrebuiltModuleCachePath,
+                              swiftModules);
 
   LoadedModuleTraceFormat trace = {
       /*version=*/LoadedModuleTraceFormat::CurrentVersion,

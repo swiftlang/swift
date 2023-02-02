@@ -1268,6 +1268,11 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
       }
     }
   }
+
+  for (auto &path : Ctx.SearchPathOpts.getCompilerPluginLibraryPaths()) {
+    dependencyTracker->addDependency(path, /*isSystem=*/false);
+  }
+
   return M;
 }
 

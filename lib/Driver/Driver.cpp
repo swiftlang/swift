@@ -2082,6 +2082,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_JSONFeatures:
       case file_types::TY_SwiftABIDescriptor:
       case file_types::TY_ConstValues:
+      case file_types::TY_SharedLibraryDylib:
+      case file_types::TY_SharedLibraryDLL:
+      case file_types::TY_SharedLibrarySO:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
