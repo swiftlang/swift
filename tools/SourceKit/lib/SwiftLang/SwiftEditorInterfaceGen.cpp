@@ -694,8 +694,17 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
                                                       SynthesizedExtensions,
                                                       InterestedUSR);
   if (!IFaceGenRef) {
-    Consumer.handleRequestError(ErrMsg.c_str());
-    return;
+      if (Args.back() != StringRef("-enable-experimental-cxx-interop")) {
+          std::vector<const char *> AdjustedArgs(Args.begin(), Args.end());
+          AdjustedArgs.push_back("-Xfrontend");
+          AdjustedArgs.push_back("-enable-experimental-cxx-interop");
+          return editorOpenInterface(Consumer, Name, ModuleName, Group, AdjustedArgs,
+                                     SynthesizedExtensions, InterestedUSR);
+      }
+      else {
+          Consumer.handleRequestError(ErrMsg.c_str());
+          return;
+      }
   }
 
   IFaceGenRef->reportEditorInfo(Consumer);
