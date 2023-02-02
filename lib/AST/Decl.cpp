@@ -417,13 +417,13 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
 }
 
 Optional<llvm::VersionTuple>
-Decl::getBackDeployBeforeOSVersion(ASTContext &Ctx) const {
-  if (auto *attr = getAttrs().getBackDeploy(Ctx))
+Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx) const {
+  if (auto *attr = getAttrs().getBackDeployed(Ctx))
     return attr->Version;
 
-  // Accessors may inherit `@_backDeploy`.
+  // Accessors may inherit `@backDeployed`.
   if (auto *AD = dyn_cast<AccessorDecl>(this))
-    return AD->getStorage()->getBackDeployBeforeOSVersion(Ctx);
+    return AD->getStorage()->getBackDeployedBeforeOSVersion(Ctx);
 
   return None;
 }
@@ -971,8 +971,8 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
   ASTContext &ctx = getASTContext();
 
   // When computing availability for linkage, use the "before" version from
-  // the @_backDeploy attribute, if present.
-  if (auto backDeployVersion = getBackDeployBeforeOSVersion(ctx))
+  // the @backDeployed attribute, if present.
+  if (auto backDeployVersion = getBackDeployedBeforeOSVersion(ctx))
     return AvailabilityContext{VersionRange::allGTE(*backDeployVersion)};
 
   auto containingContext =
@@ -8065,12 +8065,12 @@ bool AbstractFunctionDecl::isSendable() const {
 }
 
 bool AbstractFunctionDecl::isBackDeployed() const {
-  if (getAttrs().hasAttribute<BackDeployAttr>())
+  if (getAttrs().hasAttribute<BackDeployedAttr>())
     return true;
 
   // Property and subscript accessors inherit the attribute.
   if (auto *AD = dyn_cast<AccessorDecl>(this)) {
-    if (AD->getStorage()->getAttrs().hasAttribute<BackDeployAttr>())
+    if (AD->getStorage()->getAttrs().hasAttribute<BackDeployedAttr>())
       return true;
   }
 

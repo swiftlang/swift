@@ -1614,7 +1614,7 @@ namespace  {
     UNINTERESTING_ATTR(NoMetadata)
     UNINTERESTING_ATTR(CompileTimeConst)
 
-    UNINTERESTING_ATTR(BackDeploy)
+    UNINTERESTING_ATTR(BackDeployed)
     UNINTERESTING_ATTR(KnownToBeLocal)
 
     UNINTERESTING_ATTR(UnsafeInheritExecutor)

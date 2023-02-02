@@ -1965,14 +1965,14 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   return makeParserSuccess();
 }
 
-bool Parser::parseBackDeployAttribute(DeclAttributes &Attributes,
-                                      StringRef AttrName, SourceLoc AtLoc,
-                                      SourceLoc Loc) {
+bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
+                                        StringRef AttrName, SourceLoc AtLoc,
+                                        SourceLoc Loc) {
   std::string AtAttrName = (llvm::Twine("@") + AttrName).str();
   auto LeftLoc = Tok.getLoc();
   if (!consumeIf(tok::l_paren)) {
     diagnose(Loc, diag::attr_expected_lparen, AtAttrName,
-             DeclAttribute::isDeclModifier(DAK_BackDeploy));
+             DeclAttribute::isDeclModifier(DAK_BackDeployed));
     return false;
   }
 
@@ -2023,9 +2023,9 @@ bool Parser::parseBackDeployAttribute(DeclAttributes &Attributes,
   assert(!PlatformAndVersions.empty());
   auto AttrRange = SourceRange(Loc, Tok.getLoc());
   for (auto &Item : PlatformAndVersions) {
-    Attributes.add(new (Context)
-                       BackDeployAttr(AtLoc, AttrRange, Item.first, Item.second,
-                                      /*IsImplicit*/ false));
+    Attributes.add(new (Context) BackDeployedAttr(AtLoc, AttrRange, Item.first,
+                                                  Item.second,
+                                                  /*IsImplicit*/ false));
   }
   return true;
 }
@@ -3370,8 +3370,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         message, AtLoc, SourceRange(Loc, Tok.getLoc()), false));
     break;
   }
-  case DAK_BackDeploy: {
-    if (!parseBackDeployAttribute(Attributes, AttrName, AtLoc, Loc))
+  case DAK_BackDeployed: {
+    if (!parseBackDeployedAttribute(Attributes, AttrName, AtLoc, Loc))
       return false;
     break;
   }

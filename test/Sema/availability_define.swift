@@ -96,15 +96,15 @@ public func forbidMacrosInInlinableCode1() {
   }
 }
 
-@_backDeploy(before: _iOS9Aligned)
+@backDeployed(before: _iOS9Aligned)
 public func forbidMacrosInInlinableCode2() {
-  if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
-  if #available(_iOS9, _macOS10_11, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
-  if #available(iOS 9.0, _macOS10_11, tvOS 9.0, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
-  if #unavailable(_iOS9Aligned) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
-  if #unavailable(_iOS9, _macOS10_11) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
-  if #unavailable(iOS 9.0, _macOS10_11, tvOS 9.0) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+  if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
+  if #available(_iOS9, _macOS10_11, *) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
+  if #available(iOS 9.0, _macOS10_11, tvOS 9.0, *) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
+  if #unavailable(_iOS9Aligned) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
+  if #unavailable(_iOS9, _macOS10_11) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
+  if #unavailable(iOS 9.0, _macOS10_11, tvOS 9.0) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
   doIt {
-    if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+    if #available(_iOS9Aligned, *) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
   }
 }

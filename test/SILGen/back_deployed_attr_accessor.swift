@@ -35,7 +35,7 @@ public struct TopLevelStruct {
 
   // -- Original definition of TopLevelStruct.property.getter
   // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvg : $@convention(method) (TopLevelStruct) -> TopLevelStruct
-  @_backDeploy(before: macOS 10.52)
+  @backDeployed(before: macOS 10.52)
   public var property: TopLevelStruct { self }
 }
 
