@@ -91,6 +91,14 @@ public:
       TypeTreeLeafTypeRange destructureNeededBits,
       FieldSensitivePrunedLivenessBoundary &boundary);
 
+  void emitObjectConsumesDestructuredValueTwice(MarkMustCheckInst *markedValue,
+                                                Operand *firstConsumingUse,
+                                                Operand *secondConsumingUse);
+  void
+  emitObjectConsumesAndUsesDestructuredValue(MarkMustCheckInst *markedValue,
+                                             Operand *consumingUse,
+                                             Operand *nonConsumingUse);
+
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing
   /// copy. If filter is non-null, allow for the caller to pre-process operands

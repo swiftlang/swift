@@ -6653,6 +6653,8 @@ ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
       none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
 ERROR(noimplicitcopy_attr_invalid_in_generic_context,
       none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
+ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
+      "'@_noImplicitCopy' has no effect when applied to a move only type", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
