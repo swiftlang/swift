@@ -48,6 +48,16 @@ func test_field_fn_ptr_swap() {
   ptr_to_secure_struct!.pointee.secure_func_ptr2 = t
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s25ptrauth_field_fptr_import05test_B12_fn_ptr_temps5Int32VyF :
+// CHECK:   [[STK:%.*]] = alloc_stack $SecureStruct, let, name "struct_with_signed_val"
+// CHECK:   [[FLD:%.*]] = struct_element_addr [[STK]] : $*SecureStruct, #SecureStruct.secure_func_ptr1
+// CHECK:   [[SIGNED:%.*]] = begin_access [read] [signed] [[FLD]] : $*Optional<@convention(c) () -> Int32>
+// CHECK-LABEL: } // end sil function '$s25ptrauth_field_fptr_import05test_B12_fn_ptr_temps5Int32VyF'
+func test_field_fn_ptr_temp() -> Int32 {
+  let struct_with_signed_val = ptr_to_secure_struct.pointee
+  return struct_with_signed_val.secure_func_ptr1()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @$s25ptrauth_field_fptr_import024test_addr_discriminated_B8_fn_reads5Int32VyF :
 // CHECK: [[GLOB:%.*]] = global_addr @ptr_to_addr_discriminated_secure_struct : $*Optional<UnsafeMutablePointer<AddressDiscriminatedSecureStruct>>
 // CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[GLOB]] : $*Optional<UnsafeMutablePointer<AddressDiscriminatedSecureStruct>>
