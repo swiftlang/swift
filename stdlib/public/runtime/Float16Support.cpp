@@ -51,15 +51,6 @@ static float fromEncoding(unsigned int e) {
   return f;
 }
 
-#if (defined(__i386__) || defined(__x86_64__)) &&                               \
-    !(defined(__ANDROID__) || defined(__APPLE__) || defined(_WIN32))
-static long double fromEncoding(__uint128_t hf) {
-  long double ld;
-  __builtin_memcpy(&ld, &hf, sizeof ld);
-  return ld;
-}
-#endif
-
 #if defined(__x86_64__) && defined(__F16C__)
 
 // If we're compiling the runtime for a target that has the conversion
@@ -167,7 +158,7 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
 #if (defined(__i386__) || defined(__x86_64__)) &&                               \
     !(defined(__ANDROID__) || defined(__APPLE__) || defined(_WIN32))
 
-SWIFT_RUNTIME_EXPORT long double __extendhfxf2(uint16_t h) {
+SWIFT_RUNTIME_EXPORT long double __extendhfxf2(short h) {
   return (long double)__gnu_h2f_ieee(h);
 }
 
