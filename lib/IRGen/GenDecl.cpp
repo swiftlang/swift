@@ -492,7 +492,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
 
     // Only link with std on platforms where the overlay is available.
     // Do not try to link std with itself.
-    if ((target.isOSDarwin() || target.isOSLinux()) &&
+    if ((target.isOSDarwin() || (target.isOSLinux() && !target.isAndroid())) &&
         !getSwiftModule()->getName().is("Cxx") &&
         !getSwiftModule()->getName().is("CxxStdlib") &&
         !getSwiftModule()->getName().is("std")) {
