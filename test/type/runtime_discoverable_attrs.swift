@@ -5,7 +5,6 @@
 // REQUIRES: asserts
 
 import RuntimeAttrs
-import Distributed
 
 @runtimeMetadata
 struct Flag<T> {
@@ -305,35 +304,6 @@ extension InvalidConformanceTest2 : Flagged & EnumFlagged {}
 // expected-error@-2 {{type 'InvalidConformanceTest2' does not conform to protocol 'EnumFlagged'}}
 // expected-note@-3 {{protocol 'Flagged' requires reflection metadata attribute @Flag}}
 // expected-note@-4 {{protocol 'EnumFlagged' requires reflection metadata attribute @EnumFlag}}
-
-typealias DefaultDistributedActorSystem = LocalTestingDistributedActorSystem
-
-distributed actor TestDistributedActor {
-  @FlagForAsyncFuncs distributed func asyncExternallyDist() throws {}
-
-  @FlagForAsyncFuncs distributed func doSomethingDist() async throws {}
-
-  @FlagForAsyncFuncs nonisolated func doSomethingNonisolated(_: Int) async {}
-
-  @FlagForAsyncFuncs distributed func doSomethingDist(_: Int, x: [Int]) async {}
-}
-
-@ActorFlag
-distributed actor TestDistributedActor2 {}
-
-@runtimeMetadata
-enum ActorFlag<A> {
-  case actor(A.Type)
-  case distributedActor(A.Type)
-}
-
-extension ActorFlag where A: Actor {
-  init(attachedTo: A.Type) { self = .actor(attachedTo) }
-}
-extension ActorFlag where A: DistributedActor {
-  init(attachedTo: A.Type) { self = .distributedActor(attachedTo) }
-}
-
 
 @Flag
 struct ValidConformance1 {}
