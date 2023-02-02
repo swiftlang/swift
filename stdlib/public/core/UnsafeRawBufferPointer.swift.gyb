@@ -324,26 +324,23 @@ extension Unsafe${Mutable}RawBufferPointer {
 
     var i = startIndex
 
-    let stride = MemoryLayout<UInt>.stride
+    let stride = MemoryLayout<UInt64>.stride
 
-    let aligned = ptr.alignedUp(for: UInt.self)
+    let aligned = ptr.alignedUp(for: UInt64.self)
     while ptr.advanced(by: i) < aligned && i < endIndex {
       guard self[i] != element else { return Optional(i) }
       i &+= 1
     }
 
-    var mask = UInt(0)
+    var mask = UInt64(0)
     withUnsafeMutableBytes(of: &mask) {
       _ = $0.initializeMemory(as: UInt8.self, repeating: element)
     }
 
-    var word7f = UInt(0)
-    withUnsafeMutableBytes(of: &word7f) {
-      _ = $0.initializeMemory(as: UInt8.self, repeating: 0x7f)
-    }
+    let word7f = UInt64(0x7f7f_7f7f_7f7f_7f7f)
 
     while (i &+ stride) <= endIndex {
-      let word = ptr.load(fromByteOffset: i, as: UInt.self)
+      let word = ptr.load(fromByteOffset: i, as: UInt64.self)
       let input = word ^ mask
       let tmp = (input & word7f) + word7f
       guard ~(tmp | input | word7f) == 0 else { break }
@@ -365,27 +362,24 @@ extension Unsafe${Mutable}RawBufferPointer {
 
     var i = endIndex - 1
 
-    let stride = MemoryLayout<UInt>.stride
+    let stride = MemoryLayout<UInt64>.stride
 
     while (address &+ i + 1) % stride != 0 && i >= startIndex {
       guard self[i] != element else { return Optional(i) }
       i &-= 1
     }
 
-    var mask = UInt(0)
+    var mask = UInt64(0)
     withUnsafeMutableBytes(of: &mask) {
       _ = $0.initializeMemory(as: UInt8.self, repeating: element)
     }
 
-    var word7f = UInt(0)
-    withUnsafeMutableBytes(of: &word7f) {
-      _ = $0.initializeMemory(as: UInt8.self, repeating: 0x7f)
-    }
+    let word7f = UInt64(0x7f7f_7f7f_7f7f_7f7f)
 
     while true {
       let index = i &- stride + 1
       guard index >= startIndex else { break }
-      let word = ptr.load(fromByteOffset: index, as: UInt.self)
+      let word = ptr.load(fromByteOffset: index, as: UInt64.self)
       let input = word ^ mask
       let tmp = (input & word7f) + word7f
       guard ~(tmp | input | word7f) == 0 else { break }
