@@ -76,13 +76,17 @@ extension SourceManager {
       return nil
     }
 
-    // Recursively find the root and its offset. This also must succeed.
+    // Recursively find the root and its offset.
     guard let (rootSF, parentOffset) = rootSourceFile(of: parent) else {
       return nil
     }
 
-    // Add our offset to our parent's offset, and we're done.
-    return (rootSF, parentOffset + SourceLength(utf8Length: offset))
+    // The position of our node is...
+    let finalPosition =
+      node.position                      // Our position relative to its root
+      + SourceLength(utf8Length: offset) // and that root's offset in its parent
+      + SourceLength(utf8Length: parentOffset.utf8Offset)
+    return (rootSF, finalPosition)
   }
 
   /// Produce the C++ source location for a given position based on a
@@ -106,7 +110,7 @@ extension SourceManager {
     // node.
     let position = position ?? node.position
     let offsetWithinSyntaxNode =
-       position.utf8Offset - node.root.position.utf8Offset
+       position.utf8Offset - node.position.utf8Offset
     let offsetFromSourceFile = rootPosition.utf8Offset + offsetWithinSyntaxNode
 
     // Compute the resulting address.

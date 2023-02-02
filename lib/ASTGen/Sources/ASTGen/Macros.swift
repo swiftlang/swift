@@ -199,11 +199,11 @@ func expandFreestandingMacro(
         print("not on a macro expansion node: \(token.recursiveDescription)")
         return -1
       }
+      macroName = parentExpansion.macro.text
       let decls = try declMacro.expansion(
         of: sourceManager.detach(parentExpansion, in: context),
         in: context
       )
-      macroName = parentExpansion.macro.text
       evaluatedSyntax = Syntax(CodeBlockItemListSyntax(
         decls.map { CodeBlockItemSyntax(item: .decl($0)) }))
 
@@ -213,11 +213,12 @@ func expandFreestandingMacro(
     }
   } catch {
     // Record the error
-    context.diagnose(
-      Diagnostic(
+    sourceManager.diagnose(
+      diagnostic: Diagnostic(
         node: parentSyntax,
         message: ThrownErrorDiagnostic(message: String(describing: error))
-      )
+      ),
+      messageSuffix: " (from macro '\(macroName)')"
     )
     return -1
   }
@@ -426,11 +427,12 @@ func expandAttachedMacro(
   } catch {
     // Record the error
     // FIXME: Need to decide where to diagnose the error:
-    context.diagnose(
-      Diagnostic(
+    sourceManager.diagnose(
+      diagnostic: Diagnostic(
         node: Syntax(declarationNode),
         message: ThrownErrorDiagnostic(message: String(describing: error))
-      )
+      ),
+      messageSuffix: " (from macro '\(macroName)')"
     )
 
     return 1
