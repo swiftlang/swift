@@ -602,9 +602,8 @@ public:
 
   bool isPlaceholder();
 
-  /// Returns true if this is a move only type. Returns false if this is a
-  /// non-move only type or a move only wrapped type.
-  bool isPureMoveOnly() const;
+  /// Returns true if this is a move-only type.
+  bool isPureMoveOnly();
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }

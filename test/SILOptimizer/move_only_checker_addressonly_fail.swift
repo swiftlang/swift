@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -parse-stdlib -emit-sil
+// RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -emit-sil
 
 func useValue<T>(_ x: T) {}
 func consumeValue<T>(_ x: __owned T) {}

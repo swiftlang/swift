@@ -2582,6 +2582,7 @@ public:
       }
     }
 
+    // FIXME(kavon): see if these can be integrated into other parts of Sema
     diagnoseCopyableTypeContainingMoveOnlyType(ED);
     diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(ED);
 
