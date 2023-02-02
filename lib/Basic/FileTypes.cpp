@@ -222,8 +222,8 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_ConstValues:
   case file_types::TY_SharedLibraryDylib:
-  case file_types::TY_SharedLibraryDLL:
   case file_types::TY_SharedLibrarySO:
+  case file_types::TY_SharedLibraryDLL:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");

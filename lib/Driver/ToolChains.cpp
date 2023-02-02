@@ -969,8 +969,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SwiftABIDescriptor:
     case file_types::TY_ConstValues:
     case file_types::TY_SharedLibraryDylib:
-    case file_types::TY_SharedLibraryDLL:
     case file_types::TY_SharedLibrarySO:
+    case file_types::TY_SharedLibraryDLL:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
