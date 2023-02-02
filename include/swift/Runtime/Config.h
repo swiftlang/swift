@@ -129,9 +129,13 @@
 #error Masking ISAs are incompatible with opaque ISAs
 #endif
 
-#if defined(__LP64__) && __has_include(<malloc_type_private.h>) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
-# define SWIFT_STDLIB_HAS_MALLOC_TYPE 1
-#else
+#if defined(__APPLE__) && defined(__LP64__) && __has_include(<malloc_type_private.h>) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+# include <TargetConditionals.h>
+# if TARGET_OS_IOS && !TARGET_OS_SIMULATOR
+#  define SWIFT_STDLIB_HAS_MALLOC_TYPE 1
+# endif
+#endif
+#ifndef SWIFT_STDLIB_HAS_MALLOC_TYPE
 # define SWIFT_STDLIB_HAS_MALLOC_TYPE 0
 #endif
 
