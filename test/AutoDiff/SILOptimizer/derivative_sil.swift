@@ -26,6 +26,20 @@ func foo(_ x: Float) -> Float {
   return y
 }
 
+// CHECK-SIL-LABEL: @frozen struct _AD__foo_bb0__PB__src_0_wrt_0 {
+// CHECK-SIL:   @_hasStorage var pullback_0: (Float) -> (Float, Float) { get set }
+// CHECK-SIL: }
+
+// CHECK-SIL-LABEL: @frozen enum _AD__foo_bb0__Pred__src_0_wrt_0 {
+// CHECK-SIL-NEXT: }
+
+// CHECK-SIL-LABEL: @frozen struct _AD__fooMethod_bb0__PB__src_0_wrt_0 {
+// CHECK-SIL:   @_hasStorage var pullback_0: (Float) -> (Float, Float) { get set }
+// CHECK-SIL: }
+
+// CHECK-SIL-LABEL: @frozen enum _AD__fooMethod_bb0__Pred__src_0_wrt_0 {
+// CHECK-SIL-NEXT: }
+
 // CHECK-SIL-LABEL: sil hidden [ossa] @fooTJfSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK-SIL: bb0([[X:%.*]] : $Float):
 // CHECK-SIL:   [[ADD_ORIG_REF:%.*]] = function_ref @add : $@convention(method) (Float, Float, @thin Float.Type) -> Float
