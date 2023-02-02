@@ -1992,12 +1992,7 @@ public:
     checkAccessControl(PGD);
   }
 
-  void visitMissingDecl(MissingDecl *missing) {
-    // FIXME: Expanded attribute lists should be type checked against
-    // the real declaration they will be attached to. Attempting to
-    // type check a missing decl should produce an error.
-    TypeChecker::checkDeclAttributes(missing);
-  }
+  void visitMissingDecl(MissingDecl *missing) {  }
 
   void visitMissingMemberDecl(MissingMemberDecl *MMD) {
     llvm_unreachable("should always be type-checked already");
