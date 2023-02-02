@@ -831,6 +831,16 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitAllocPackInst(AllocPackInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  SILLocation Loc = getOpLocation(Inst->getLoc());
+  auto *NewInst = getBuilder().createAllocPack(
+      Loc, getOpType(Inst->getType().getObjectType()));
+  recordClonedInstruction(Inst, NewInst);
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   auto CountArgs = getOpValueArray<8>(OperandValueArrayRef(Inst->
@@ -2645,6 +2655,15 @@ SILCloner<ImplClass>::visitDeallocStackInst(DeallocStackInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createDeallocStack(getOpLocation(Inst->getLoc()),
                                             getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitDeallocPackInst(DeallocPackInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createDeallocPack(getOpLocation(Inst->getLoc()),
+                                           getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

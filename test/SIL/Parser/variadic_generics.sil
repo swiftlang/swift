@@ -41,3 +41,18 @@ bb0:
   %ret = tuple ()
   return %ret : $()
 }
+
+// CHECK-LABEL: sil @test4 :
+// CHECK: [[PACK1:%.*]] = alloc_pack $Pack{Int, repeat each T}
+// CHECK: [[PACK2:%.*]] = alloc_pack $Pack{repeat each T, repeat Optional<each T>}
+// CHECK: dealloc_pack [[PACK2]] : $*Pack{repeat each T, repeat Optional<each T>}
+// CHECK: dealloc_pack [[PACK1]] : $*Pack{Int, repeat each T}
+sil @test4 : $<T...> () -> () {
+bb0:
+  %pack1 = alloc_pack $Pack{Int, repeat each T}
+  %pack2 = alloc_pack $Pack{repeat each T, repeat Optional<each T>}
+  dealloc_pack %pack2 : $*Pack{repeat each T, repeat Optional<each T>}
+  dealloc_pack %pack1 : $*Pack{Int, repeat each T}
+  %ret = tuple ()
+  return %ret : $()
+}
