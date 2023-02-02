@@ -2380,3 +2380,23 @@ func fieldSensitiveTestReinitEnumMultiBlock2() {
     }
     borrowVal(e)
 }
+
+////////////////////////////////////////////
+// Multiple Use by Same CallSite TestCase //
+////////////////////////////////////////////
+
+func sameCallSiteTestConsumeTwice(_ k: inout Klass) { // expected-error {{'k' consumed more than once}}
+    func consumeKlassTwice(_ k: __owned Klass, _ k2: __owned Klass) {}
+    consumeKlassTwice(k, k)
+    // expected-note @-1 {{consuming use here}}
+    // expected-note @-2 {{consuming use here}}
+    k = Klass()
+}
+
+func sameCallSiteConsumeAndUse(_ k: inout Klass) { // expected-error {{'k' used after consume. Lifetime extension of variable requires a copy}}
+    func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: Klass) {}
+    consumeKlassAndUseKlass(k, k)
+    // expected-note @-1 {{consuming use here}}
+    // expected-note @-2 {{non-consuming use here}}
+    k = Klass()
+}

@@ -91,13 +91,12 @@ public:
       TypeTreeLeafTypeRange destructureNeededBits,
       FieldSensitivePrunedLivenessBoundary &boundary);
 
-  void emitObjectConsumesDestructuredValueTwice(MarkMustCheckInst *markedValue,
-                                                Operand *firstConsumingUse,
-                                                Operand *secondConsumingUse);
-  void
-  emitObjectConsumesAndUsesDestructuredValue(MarkMustCheckInst *markedValue,
-                                             Operand *consumingUse,
-                                             Operand *nonConsumingUse);
+  void emitObjectInstConsumesValueTwice(MarkMustCheckInst *markedValue,
+                                        Operand *firstConsumingUse,
+                                        Operand *secondConsumingUse);
+  void emitObjectInstConsumesAndUsesValue(MarkMustCheckInst *markedValue,
+                                          Operand *consumingUse,
+                                          Operand *nonConsumingUse);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing

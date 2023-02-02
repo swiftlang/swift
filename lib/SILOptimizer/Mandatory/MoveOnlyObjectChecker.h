@@ -22,6 +22,7 @@
 
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "llvm/ADT/IntervalMap.h"
 #include "llvm/Support/Compiler.h"
@@ -34,11 +35,14 @@ namespace siloptimizer {
 struct OSSACanonicalizer {
   /// A per mark must check, vector of uses that copy propagation says need a
   /// copy and thus are not final consuming uses.
-  SmallVector<Operand *, 32> consumingUsesNeedingCopy;
+  SmallVector<SILInstruction *, 32> consumingUsesNeedingCopy;
 
   /// A per mark must check, vector of consuming uses that copy propagation says
   /// are actual last uses.
-  SmallVector<Operand *, 32> finalConsumingUses;
+  SmallVector<SILInstruction *, 32> consumingBoundaryUsers;
+
+  /// A list of non-consuming boundary uses.
+  SmallVector<SILInstruction *, 32> nonConsumingBoundaryUses;
 
   /// The actual canonicalizer that we use.
   ///
@@ -56,53 +60,45 @@ struct OSSACanonicalizer {
 
   void init(SILFunction *fn, DominanceInfo *domTree,
             InstructionDeleter &deleter) {
-    auto foundConsumingUseNeedingCopy = std::function<void(Operand *)>(
-        [&](Operand *use) { consumingUsesNeedingCopy.push_back(use); });
-    auto foundConsumingUseNotNeedingCopy = std::function<void(Operand *)>(
-        [&](Operand *use) { finalConsumingUses.push_back(use); });
-
-    canonicalizer.emplace(
-        false /*pruneDebugMode*/, !fn->shouldOptimize() /*maximizeLifetime*/,
-        nullptr /*accessBlockAnalysis*/, domTree, deleter,
-        foundConsumingUseNeedingCopy, foundConsumingUseNotNeedingCopy);
+    canonicalizer.emplace(false /*pruneDebugMode*/,
+                          !fn->shouldOptimize() /*maximizeLifetime*/,
+                          nullptr /*accessBlockAnalysis*/, domTree, deleter);
   }
 
   void clear() {
     consumingUsesNeedingCopy.clear();
-    finalConsumingUses.clear();
+    consumingBoundaryUsers.clear();
   }
 
-  bool canonicalize(SILValue value) {
-    return canonicalizer->canonicalizeValueLifetime(value);
-  }
+  bool canonicalize(SILValue value);
 
   bool foundAnyConsumingUses() const {
-    return consumingUsesNeedingCopy.size() || finalConsumingUses.size();
+    return consumingUsesNeedingCopy.size() || consumingBoundaryUsers.size();
   }
 
   bool foundConsumingUseRequiringCopy() const {
     return consumingUsesNeedingCopy.size();
   }
 
-  bool foundFinalConsumingUses() const { return finalConsumingUses.size(); }
+  bool foundFinalConsumingUses() const { return consumingBoundaryUsers.size(); }
 
   bool hasPartialApplyConsumingUse() const {
     return llvm::any_of(consumingUsesNeedingCopy,
-                        [](Operand *use) {
-                          return isa<PartialApplyInst>(use->getUser());
+                        [](SILInstruction *user) {
+                          return isa<PartialApplyInst>(user);
                         }) ||
-           llvm::any_of(finalConsumingUses, [](Operand *use) {
-             return isa<PartialApplyInst>(use->getUser());
+           llvm::any_of(consumingBoundaryUsers, [](SILInstruction *user) {
+             return isa<PartialApplyInst>(user);
            });
   }
 
   bool hasNonPartialApplyConsumingUse() const {
     return llvm::any_of(consumingUsesNeedingCopy,
-                        [](Operand *use) {
-                          return !isa<PartialApplyInst>(use->getUser());
+                        [](SILInstruction *user) {
+                          return !isa<PartialApplyInst>(user);
                         }) ||
-           llvm::any_of(finalConsumingUses, [](Operand *use) {
-             return !isa<PartialApplyInst>(use->getUser());
+           llvm::any_of(consumingBoundaryUsers, [](SILInstruction *user) {
+             return !isa<PartialApplyInst>(user);
            });
   }
 };

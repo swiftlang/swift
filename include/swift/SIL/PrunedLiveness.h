@@ -132,8 +132,10 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -540,6 +542,47 @@ public:
     if (useIter == users.end())
       return NonUser;
     return useIter->second ? LifetimeEndingUse : NonLifetimeEndingUse;
+  }
+
+  using ConstUserRange =
+      iterator_range<const std::pair<SILInstruction *, bool> *>;
+  ConstUserRange getAllUsers() const {
+    return llvm::make_range(users.begin(), users.end());
+  }
+
+  /// A namespace containing helper functors for use with various mapped
+  /// ranges. Intended to be used to hide these noise types when working in an
+  /// IDE.
+  struct LifetimeEndingUserIteratorHelpers {
+    struct MapFunctor {
+      SILInstruction *
+      operator()(const std::pair<SILInstruction *, bool> &pair) const {
+        // Strip off the const to ease use with other APIs.
+        return const_cast<SILInstruction *>(pair.first);
+      }
+    };
+
+    struct FilterFunctor {
+      bool operator()(const std::pair<SILInstruction *, bool> &pair) const {
+        return pair.second;
+      }
+    };
+
+    using MapFilterIter = llvm::mapped_iterator<
+        llvm::filter_iterator<const std::pair<SILInstruction *, bool> *,
+                              FilterFunctor>,
+        MapFunctor>;
+  };
+  using LifetimeEndingUserRange =
+      llvm::iterator_range<LifetimeEndingUserIteratorHelpers::MapFilterIter>;
+
+  /// Return a range consisting of the current set of consuming users fed into
+  /// this PrunedLiveness instance.
+  LifetimeEndingUserRange getLifetimeEndingUsers() const {
+    return map_range(
+        llvm::make_filter_range(
+            getAllUsers(), LifetimeEndingUserIteratorHelpers::FilterFunctor()),
+        LifetimeEndingUserIteratorHelpers::MapFunctor());
   }
 
   void print(llvm::raw_ostream &OS) const;

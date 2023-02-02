@@ -2417,3 +2417,17 @@ func blackHoleTestCase(_ k: __owned Klass) {
     let _ = k2 // expected-note {{consuming use here}}
     let _ = k2 // expected-note {{consuming use here}}
 }
+
+////////////////////////////////////////////
+// Multiple Use by Same CallSite TestCase //
+////////////////////////////////////////////
+
+func sameCallSiteTestConsumeTwice(_ k: __owned Klass) { // expected-error {{'k' consumed more than once}}
+    func consumeKlassTwice(_ k: __owned Klass, _ k2: __owned Klass) {}
+    consumeKlassTwice(k, k) // expected-note {{two consuming uses here}}
+}
+
+func sameCallSiteConsumeAndUse(_ k: __owned Klass) { // expected-error {{'k' consumed and used at the same time}}
+    func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: Klass) {}
+    consumeKlassAndUseKlass(k, k) // expected-note {{consuming and non-consuming uses here}}
+}

@@ -153,32 +153,30 @@ void DiagnosticEmitter::emitObjectDiagnosticsForFoundUses(
     bool ignorePartialApplyUses) const {
   auto &astContext = fn->getASTContext();
 
-  for (auto *consumingUse : getCanonicalizer().consumingUsesNeedingCopy) {
+  for (auto *consumingUser : getCanonicalizer().consumingUsesNeedingCopy) {
     // See if the consuming use is an owned moveonly_to_copyable whose only
     // user is a return. In that case, use the return loc instead. We do this
     // b/c it is illegal to put a return value location on a non-return value
     // instruction... so we have to hack around this slightly.
-    auto *user = consumingUse->getUser();
-    auto loc = user->getLoc();
-    if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
+    auto loc = consumingUser->getLoc();
+    if (auto *mtc =
+            dyn_cast<MoveOnlyWrapperToCopyableValueInst>(consumingUser)) {
       if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
         loc = ri->getLoc();
       }
     }
 
-    if (ignorePartialApplyUses &&
-        isa<PartialApplyInst>(consumingUse->getUser()))
+    if (ignorePartialApplyUses && isa<PartialApplyInst>(consumingUser))
       continue;
     diagnose(astContext, loc.getSourceLoc(),
              diag::sil_moveonlychecker_consuming_use_here);
   }
 
-  for (auto *consumingUse : getCanonicalizer().finalConsumingUses) {
+  for (auto *user : getCanonicalizer().consumingBoundaryUsers) {
     // See if the consuming use is an owned moveonly_to_copyable whose only
     // user is a return. In that case, use the return loc instead. We do this
     // b/c it is illegal to put a return value location on a non-return value
     // instruction... so we have to hack around this slightly.
-    auto *user = consumingUse->getUser();
     auto loc = user->getLoc();
     if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
       if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
@@ -186,8 +184,7 @@ void DiagnosticEmitter::emitObjectDiagnosticsForFoundUses(
       }
     }
 
-    if (ignorePartialApplyUses &&
-        isa<PartialApplyInst>(consumingUse->getUser()))
+    if (ignorePartialApplyUses && isa<PartialApplyInst>(user))
       continue;
 
     diagnose(astContext, loc.getSourceLoc(),
@@ -198,12 +195,11 @@ void DiagnosticEmitter::emitObjectDiagnosticsForFoundUses(
 void DiagnosticEmitter::emitObjectDiagnosticsForPartialApplyUses() const {
   auto &astContext = fn->getASTContext();
 
-  for (auto *consumingUse : getCanonicalizer().consumingUsesNeedingCopy) {
+  for (auto *user : getCanonicalizer().consumingUsesNeedingCopy) {
     // See if the consuming use is an owned moveonly_to_copyable whose only
     // user is a return. In that case, use the return loc instead. We do this
     // b/c it is illegal to put a return value location on a non-return value
     // instruction... so we have to hack around this slightly.
-    auto *user = consumingUse->getUser();
     auto loc = user->getLoc();
     if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
       if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
@@ -211,18 +207,17 @@ void DiagnosticEmitter::emitObjectDiagnosticsForPartialApplyUses() const {
       }
     }
 
-    if (!isa<PartialApplyInst>(consumingUse->getUser()))
+    if (!isa<PartialApplyInst>(user))
       continue;
     diagnose(astContext, loc.getSourceLoc(),
              diag::sil_moveonlychecker_consuming_closure_use_here);
   }
 
-  for (auto *consumingUse : getCanonicalizer().finalConsumingUses) {
+  for (auto *user : getCanonicalizer().consumingBoundaryUsers) {
     // See if the consuming use is an owned moveonly_to_copyable whose only
     // user is a return. In that case, use the return loc instead. We do this
     // b/c it is illegal to put a return value location on a non-return value
     // instruction... so we have to hack around this slightly.
-    auto *user = consumingUse->getUser();
     auto loc = user->getLoc();
     if (auto *mtc = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
       if (auto *ri = mtc->getSingleUserOfType<ReturnInst>()) {
@@ -230,7 +225,7 @@ void DiagnosticEmitter::emitObjectDiagnosticsForPartialApplyUses() const {
       }
     }
 
-    if (!isa<PartialApplyInst>(consumingUse->getUser()))
+    if (!isa<PartialApplyInst>(user))
       continue;
 
     diagnose(astContext, loc.getSourceLoc(),
@@ -454,14 +449,13 @@ void DiagnosticEmitter::emitObjectDestructureNeededWithinBorrowBoundary(
   registerDiagnosticEmitted(markedValue);
 }
 
-void DiagnosticEmitter::emitObjectConsumesDestructuredValueTwice(
+void DiagnosticEmitter::emitObjectInstConsumesValueTwice(
     MarkMustCheckInst *markedValue, Operand *firstUse, Operand *secondUse) {
   assert(firstUse->getUser() == secondUse->getUser());
   assert(firstUse->isConsuming());
   assert(secondUse->isConsuming());
 
-  LLVM_DEBUG(
-      llvm::dbgs() << "Emitting object consumes destructure twice error!\n");
+  LLVM_DEBUG(llvm::dbgs() << "Emitting object consumes value twice error!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
   LLVM_DEBUG(llvm::dbgs() << "    User: " << *firstUse->getUser());
   LLVM_DEBUG(llvm::dbgs() << "    First Conflicting Operand: "
@@ -480,15 +474,14 @@ void DiagnosticEmitter::emitObjectConsumesDestructuredValueTwice(
   registerDiagnosticEmitted(markedValue);
 }
 
-void DiagnosticEmitter::emitObjectConsumesAndUsesDestructuredValue(
+void DiagnosticEmitter::emitObjectInstConsumesAndUsesValue(
     MarkMustCheckInst *markedValue, Operand *consumingUse,
     Operand *nonConsumingUse) {
   assert(consumingUse->getUser() == nonConsumingUse->getUser());
   assert(consumingUse->isConsuming());
   assert(!nonConsumingUse->isConsuming());
 
-  LLVM_DEBUG(
-      llvm::dbgs() << "Emitting object consumes destructure twice error!\n");
+  LLVM_DEBUG(llvm::dbgs() << "Emitting object consumeed and used error!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
   LLVM_DEBUG(llvm::dbgs() << "    User: " << *consumingUse->getUser());
   LLVM_DEBUG(llvm::dbgs() << "    Consuming Operand: "
