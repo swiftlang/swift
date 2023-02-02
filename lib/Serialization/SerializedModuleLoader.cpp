@@ -1256,21 +1256,23 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
     M->setFailedToLoad();
   }
 
-  if (dependencyTracker && file) {
-    auto DepPath = file->getFilename();
-    // Don't record cached artifacts as dependencies.
-    if (!isCached(DepPath)) {
-      if (M->hasIncrementalInfo()) {
-        dependencyTracker->addIncrementalDependency(DepPath,
-                                                    M->getFingerprint());
-      } else {
-        dependencyTracker->addDependency(DepPath, /*isSystem=*/false);
+  if (dependencyTracker) {
+    if (file) {
+      auto DepPath = file->getFilename();
+      // Don't record cached artifacts as dependencies.
+      if (!isCached(DepPath)) {
+        if (M->hasIncrementalInfo()) {
+          dependencyTracker->addIncrementalDependency(DepPath,
+                                                      M->getFingerprint());
+        } else {
+          dependencyTracker->addDependency(DepPath, /*isSystem=*/false);
+        }
       }
     }
-  }
-
-  for (auto &path : Ctx.SearchPathOpts.getCompilerPluginLibraryPaths()) {
-    dependencyTracker->addDependency(path, /*isSystem=*/false);
+    // Collect compiler plugin dependencies.
+    for (auto &path : Ctx.SearchPathOpts.getCompilerPluginLibraryPaths()) {
+      dependencyTracker->addDependency(path, /*isSystem=*/false);
+    }
   }
 
   return M;
