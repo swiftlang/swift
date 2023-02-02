@@ -3,16 +3,20 @@
 class CopyableKlass {}
 @_moveOnly
 class MoveOnlyKlass {}
+@_moveOnly
+class MoveOnlyStruct {}
 
 class C {
     var copyable: CopyableKlass? = nil
-    var moveOnly: MoveOnlyKlass? = nil
+    var moveOnlyC: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
+    var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{move-only type 'MoveOnlyStruct' cannot be used with generics yet}}
 }
 
 @_moveOnly
 class CMoveOnly {
     var copyable: CopyableKlass? = nil
-    var moveOnly: MoveOnlyKlass? = nil
+    var moveOnlyC: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
+    var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{move-only type 'MoveOnlyStruct' cannot be used with generics yet}}
 }
 
 struct OptionalGrandField<T> { // expected-error {{generic struct 'OptionalGrandField' cannot contain a move-only type without also being move-only}}
@@ -21,7 +25,8 @@ struct OptionalGrandField<T> { // expected-error {{generic struct 'OptionalGrand
 }
 
 struct S0 {
-    var moveOnly3: OptionalGrandField<MoveOnlyKlass>
+    var moveOnly3: OptionalGrandField<MoveOnlyKlass> // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
+    var moveOnly4: OptionalGrandField<MoveOnlyStruct> // expected-error {{move-only type 'MoveOnlyStruct' cannot be used with generics yet}}
 }
 
 struct SCopyable {
@@ -30,9 +35,10 @@ struct SCopyable {
 
 struct S { // expected-error {{struct 'S' cannot contain a move-only type without also being move-only}}
     var copyable: CopyableKlass
-    var moveOnly2: MoveOnlyKlass?
-    var moveOnly: MoveOnlyKlass // expected-note {{contained move-only property 'S.moveOnly'}}
-    var moveOnly3: OptionalGrandField<MoveOnlyKlass>
+    var moveOnly2: MoveOnlyStruct? // expected-error {{move-only type 'MoveOnlyStruct' cannot be used with generics yet}}
+    var moveOnly: MoveOnlyStruct // expected-note {{contained move-only property 'S.moveOnly'}}
+    var moveOnly3: OptionalGrandField<MoveOnlyKlass> // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
+    var moveOnly3: OptionalGrandField<MoveOnlyStruct> // expected-error {{move-only type 'MoveOnlyStruct' cannot be used with generics yet}}
 }
 
 @_moveOnly
@@ -44,7 +50,7 @@ struct SMoveOnly {
 enum E { // expected-error {{enum 'E' cannot contain a move-only type without also being move-only}}
     case lhs(CopyableKlass)
     case rhs(MoveOnlyKlass) // expected-note {{contained move-only enum case 'E.rhs'}}
-    case rhs2(OptionalGrandField<MoveOnlyKlass>)
+    case rhs2(OptionalGrandField<MoveOnlyKlass>) // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
 }
 
 @_moveOnly
@@ -56,13 +62,13 @@ enum EMoveOnly {
 func foo() {
     class C2 {
         var copyable: CopyableKlass? = nil
-        var moveOnly: MoveOnlyKlass? = nil
+        var moveOnly: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
     }
 
     @_moveOnly
     class C2MoveOnly {
         var copyable: CopyableKlass? = nil
-        var moveOnly: MoveOnlyKlass? = nil
+        var moveOnly: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
     }
 
     struct S2 { // expected-error {{struct 'S2' cannot contain a move-only type without also being move-only}}
@@ -89,13 +95,13 @@ func foo() {
     {
         class C3 {
             var copyable: CopyableKlass? = nil
-            var moveOnly: MoveOnlyKlass? = nil
+            var moveOnly: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
         }
 
         @_moveOnly
         class C3MoveOnly {
             var copyable: CopyableKlass? = nil
-            var moveOnly: MoveOnlyKlass? = nil
+            var moveOnly: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
         }
 
         struct S3 { // expected-error {{struct 'S3' cannot contain a move-only type without also being move-only}}

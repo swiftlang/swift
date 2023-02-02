@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -enable-experimental-move-only -module-name Swift -enable-sil-opaque-values -parse-as-library -emit-sil -Onone %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -module-name Swift -enable-sil-opaque-values -parse-as-library -emit-sil -Onone %s | %FileCheck %s
 
 // Like opaque_values_Onone.swift but for code that needs to be compiled with 
 // -parse-stdlib.
@@ -32,10 +32,11 @@ public func type<T, Metatype>(of value: T) -> Metatype
 class X {}
 func consume(_ x : __owned X) {}
 
-func foo(@_noImplicitCopy _ x: __owned X) {
-  consume(_copy(x))
-  consume(x)
-}
+// FIXME: disabled temporarily until rdar://104898230 is resolved
+//func foo(@_noImplicitCopy _ x: __owned X) {
+//  consume(_copy(x))
+//  consume(x)
+//}
 
 // CHECK-LABEL: sil [transparent] [_semantics "lifetimemanagement.copy"] @_copy : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*T, [[IN_ADDR:%[^,]+]] : $*T):

@@ -9,7 +9,7 @@ public class CopyableKlass {}
 @_moveOnly
 public class Klass {
     var intField: Int
-    var k: Klass?
+    var k: Klass
     init()
 }
 
