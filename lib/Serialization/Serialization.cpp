@@ -3136,11 +3136,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     if (accessScope.isPublic())
       return true;
 
-    // Testable allows access to internal details.
-    if (value->getDeclContext()->getParentModule()->isTestingEnabled() &&
-        accessScope.isInternal())
-      return true;
-
     if (auto accessor = dyn_cast<AccessorDecl>(value))
       // Accessors are as safe as their storage.
       if (isDeserializationSafe(accessor->getStorage()))
@@ -3189,7 +3184,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 #endif
 
     // Private imports allow safe access to everything.
-    if (DC->getParentModule()->arePrivateImportsEnabled())
+    if (DC->getParentModule()->arePrivateImportsEnabled() ||
+        DC->getParentModule()->isTestingEnabled())
       return;
 
     // Ignore things with no access level.
