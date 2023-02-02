@@ -189,6 +189,7 @@ UID_KEYS = [
     KEY('OptimizeForIDE', 'key.optimize_for_ide'),
     KEY('RequiredBystanders', 'key.required_bystanders'),
     KEY('ReusingASTContext', 'key.reusingastcontext'),
+    KEY('VerifySolverBasedCursorInfo', 'key.verifysolverbasedcursorinfo'),
     KEY('CompletionMaxASTContextReuseCount',
         'key.completion_max_astcontext_reuse_count'),
     KEY('CompletionCheckDependencyInterval',
