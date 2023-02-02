@@ -386,6 +386,11 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
     return;
 
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
+
+  // Collect compiler plugin dependencies.
+  auto &searchPathOpts = Invocation.getSearchPathOptions();
+  for (auto &path : searchPathOpts.getCompilerPluginLibraryPaths())
+    DepTracker->addDependency(path, /*isSystem=*/false);
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
