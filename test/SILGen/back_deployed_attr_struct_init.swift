@@ -56,7 +56,7 @@ public struct TopLevelStruct<T> {
   // -- Original definition of TopLevelStruct.init(_:)
   // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructVyACyxGxcfC : $@convention(method) <T> (@in T, @thin TopLevelStruct<T>.Type) -> @out TopLevelStruct<T>
   @available(macOS 10.51, *)
-  @_backDeploy(before: macOS 10.52)
+  @backDeployed(before: macOS 10.52)
   public init(_ t: T) {
     self.t = t
   }

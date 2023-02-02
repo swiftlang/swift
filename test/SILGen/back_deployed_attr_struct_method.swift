@@ -37,7 +37,7 @@ public struct TopLevelStruct {
 
   // -- Original definition of TopLevelStruct.trivialMethod()
   // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyF : $@convention(method) (TopLevelStruct) -> ()
-  @_backDeploy(before: macOS 10.52)
+  @backDeployed(before: macOS 10.52)
   public func trivialMethod() {}
 }
 

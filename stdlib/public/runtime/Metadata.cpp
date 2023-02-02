@@ -5847,15 +5847,15 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                             reqBase, assocType);
 }
 
-RelativeWitnessTable *
-lookThroughOptionalConditionalWitnessTable(RelativeWitnessTable *wtable) {
+RelativeWitnessTable *swift::lookThroughOptionalConditionalWitnessTable(
+    const RelativeWitnessTable *wtable) {
   uintptr_t conditional_wtable = (uintptr_t)wtable;
   if (conditional_wtable & 0x1) {
     conditional_wtable = conditional_wtable & ~(uintptr_t)(0x1);
     conditional_wtable = (uintptr_t)*(void**)conditional_wtable;
   }
-  wtable = (RelativeWitnessTable*)conditional_wtable;
-  return wtable;
+  auto table = (RelativeWitnessTable*)conditional_wtable;
+  return table;
 }
 
 SWIFT_CC(swift)
