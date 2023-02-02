@@ -3902,6 +3902,8 @@ namespace {
         break;
       case GenericRequirement::Kind::Metadata:
       case GenericRequirement::Kind::WitnessTable:
+      case GenericRequirement::Kind::MetadataPack:
+      case GenericRequirement::Kind::WitnessTablePack:
         B.addNullPointer(cast<llvm::PointerType>(requirement.getType(IGM)));
         break;
       }

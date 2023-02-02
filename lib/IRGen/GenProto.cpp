@@ -3560,9 +3560,11 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
     return IGF.emitPackShapeExpression(argType);
 
   case GenericRequirement::Kind::Metadata:
+  case GenericRequirement::Kind::MetadataPack:
     return IGF.emitTypeMetadataRef(argType, request).getMetadata();
 
-  case GenericRequirement::Kind::WitnessTable: {
+  case GenericRequirement::Kind::WitnessTable:
+  case GenericRequirement::Kind::WitnessTablePack: {
     auto proto = requirement.getProtocol();
     auto conformance = subs.lookupConformance(depTy, proto);
     assert(conformance.getRequirement() == proto);
@@ -3618,6 +3620,10 @@ llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
     return IGM.TypeMetadataPtrTy;
   case GenericRequirement::Kind::WitnessTable:
     return IGM.WitnessTablePtrTy;
+  case GenericRequirement::Kind::MetadataPack:
+    return IGM.TypeMetadataPtrPtrTy;
+  case GenericRequirement::Kind::WitnessTablePack:
+    return IGM.WitnessTablePtrPtrTy;
   }
 }
 
@@ -3638,13 +3644,15 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
     break;
   }
 
-  case GenericRequirement::Kind::Metadata: {
+  case GenericRequirement::Kind::Metadata:
+  case GenericRequirement::Kind::MetadataPack: {
     setTypeMetadataName(IGF.IGM, value, type);
     IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value, metadataState);
     break;
   }
 
-  case GenericRequirement::Kind::WitnessTable: {
+  case GenericRequirement::Kind::WitnessTable:
+  case GenericRequirement::Kind::WitnessTablePack: {
     auto proto = requirement.getProtocol();
     assert(isa<ArchetypeType>(type));
     setProtocolWitnessTableName(IGF.IGM, value, type, proto);
@@ -3683,9 +3691,11 @@ namespace {
           ++numShapes;
           break;
         case GenericRequirement::Kind::Metadata:
+        case GenericRequirement::Kind::MetadataPack:
           ++numTypeMetadataPtrs;
           break;
         case GenericRequirement::Kind::WitnessTable:
+        case GenericRequirement::Kind::WitnessTablePack:
           ++numWitnessTablePtrs;
           break;
         }

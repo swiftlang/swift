@@ -15,6 +15,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace llvm {
@@ -41,10 +42,12 @@ class IRGenModule;
 /// generic signature.
 class GenericRequirement {
 public:
-  enum class Kind: uint8_t {
+  enum class Kind : uint8_t {
     Shape,
     Metadata,
-    WitnessTable
+    WitnessTable,
+    MetadataPack,
+    WitnessTablePack,
   };
 
 private:
@@ -54,6 +57,16 @@ private:
 
   GenericRequirement(Kind kind, CanType type, ProtocolDecl *proto)
     : kind(kind), type(type), proto(proto) {}
+
+  static bool isPack(CanType ty) {
+    if (auto gp = dyn_cast<GenericTypeParamType>(ty))
+      return gp->isParameterPack();
+    if (auto dm = dyn_cast<DependentMemberType>(ty))
+      if (auto gp =
+              dyn_cast<GenericTypeParamType>(dm->getBase()->getCanonicalType()))
+        return gp->isParameterPack();
+    return false;
+  }
 
 public:
   Kind getKind() const {
@@ -81,17 +94,27 @@ public:
     return kind == Kind::Metadata;
   }
 
+  static GenericRequirement forMetadata(CanType type, bool isPack) {
+    auto kind = isPack ? Kind::MetadataPack : Kind::Metadata;
+    return GenericRequirement(kind, type, nullptr);
+  }
+
   static GenericRequirement forMetadata(CanType type) {
-    return GenericRequirement(Kind::Metadata, type, nullptr);
+    return forMetadata(type, isPack(type));
   }
 
   bool isWitnessTable() const {
     return kind == Kind::WitnessTable;
   }
 
+  static GenericRequirement forWitnessTable(CanType type, ProtocolDecl *proto,
+                                            bool isPack) {
+    auto kind = isPack ? Kind::WitnessTablePack : Kind::WitnessTable;
+    return GenericRequirement(kind, type, proto);
+  }
+
   static GenericRequirement forWitnessTable(CanType type, ProtocolDecl *proto) {
-    assert(proto != nullptr);
-    return GenericRequirement(Kind::WitnessTable, type, proto);
+    return forWitnessTable(type, proto, isPack(type));
   }
 
   static llvm::Type *typeForKind(irgen::IRGenModule &IGM,
@@ -112,6 +135,12 @@ public:
     case Kind::WitnessTable:
       out << "witness_table: " << type << " : " << proto->getName();
       break;
+    case Kind::MetadataPack:
+      out << "metadata_pack: " << type;
+      break;
+    case Kind::WitnessTablePack:
+      out << "witness_table_pack: " << type << " : " << proto->getName();
+      break;
     }
   }
 };
@@ -123,10 +152,12 @@ template <> struct DenseMapInfo<swift::GenericRequirement> {
   using GenericRequirement = swift::GenericRequirement;
   using CanTypeInfo = llvm::DenseMapInfo<swift::CanType>;
   static GenericRequirement getEmptyKey() {
-    return GenericRequirement::forMetadata(CanTypeInfo::getEmptyKey());
+    return GenericRequirement::forMetadata(CanTypeInfo::getEmptyKey(),
+                                           /*isPack=*/false);
   }
   static GenericRequirement getTombstoneKey() {
-    return GenericRequirement::forMetadata(CanTypeInfo::getTombstoneKey());
+    return GenericRequirement::forMetadata(CanTypeInfo::getTombstoneKey(),
+                                           /*isPack=*/false);
   }
   static llvm::hash_code getHashValue(GenericRequirement req) {
     return hash_combine(CanTypeInfo::getHashValue(req.getTypeParameter()),
