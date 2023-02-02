@@ -296,6 +296,21 @@ DeallocStackInst *AllocStackInst::getSingleDeallocStack() const {
   return Dealloc;
 }
 
+AllocPackInst *AllocPackInst::create(SILDebugLocation loc,
+                                     SILType packType,
+                                     SILFunction &F) {
+  assert(packType.isObject());
+  assert(packType.is<SILPackType>() && "pack type must be lowered");
+  auto resultType = packType.getAddressType();
+
+  SmallVector<SILValue, 8> allOperands;
+  collectTypeDependentOperands(allOperands, F, packType);
+
+  auto size = totalSizeToAlloc<swift::Operand>(allOperands.size());
+  auto buffer = F.getModule().allocateInst(size, alignof(AllocPackInst));
+  return ::new (buffer) AllocPackInst(loc, resultType, allOperands);
+}
+
 AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
                                    SILDebugLocation Loc,
                                    SILType ObjectType,

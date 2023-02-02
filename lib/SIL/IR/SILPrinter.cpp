@@ -1397,6 +1397,9 @@ public:
     printDebugVar(AVI->getVarInfo(),
                   &AVI->getModule().getASTContext().SourceMgr);
   }
+  void visitAllocPackInst(AllocPackInst *API) {
+    *this << API->getType().getObjectType();
+  }
 
   void printAllocRefInstBase(AllocRefInstBase *ARI) {
     if (ARI->isObjC())
@@ -2372,6 +2375,9 @@ public:
     *this << getIDAndType(CUI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {
+    *this << getIDAndType(DI->getOperand());
+  }
+  void visitDeallocPackInst(DeallocPackInst *DI) {
     *this << getIDAndType(DI->getOperand());
   }
   void visitDeallocStackRefInst(DeallocStackRefInst *ESRL) {

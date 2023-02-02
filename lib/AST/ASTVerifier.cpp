@@ -232,7 +232,7 @@ class Verifier : public ASTWalker {
       ClosureDiscriminators;
   DeclContext *CanonicalTopLevelSubcontext = nullptr;
 
-  typedef DeclContext * MacroExpansionDiscriminatorKey;
+  typedef std::pair<DeclContext *, Identifier> MacroExpansionDiscriminatorKey;
   llvm::DenseMap<MacroExpansionDiscriminatorKey, SmallBitVector>
       MacroExpansionDiscriminators;
 
@@ -2378,7 +2378,10 @@ public:
 
     void verifyChecked(MacroExpansionExpr *expansion) {
       auto dc = getCanonicalDeclContext(expansion->getDeclContext());
-      MacroExpansionDiscriminatorKey key{dc};
+      MacroExpansionDiscriminatorKey key{
+        dc,
+        expansion->getMacroName().getBaseName().getIdentifier()
+      };
       auto &discriminatorSet = MacroExpansionDiscriminators[key];
       unsigned discriminator = expansion->getDiscriminator();
 
@@ -2398,7 +2401,10 @@ public:
 
     void verifyChecked(MacroExpansionDecl *expansion) {
       auto dc = getCanonicalDeclContext(expansion->getDeclContext());
-      MacroExpansionDiscriminatorKey key{dc};
+      MacroExpansionDiscriminatorKey key{
+        dc,
+        expansion->getMacro().getBaseName().getIdentifier()
+      };
       auto &discriminatorSet = MacroExpansionDiscriminators[key];
       unsigned discriminator = expansion->getDiscriminator();
 

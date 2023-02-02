@@ -1230,7 +1230,8 @@ namespace {
 } // end anonymous namespace
 
 bool SILInstruction::isAllocatingStack() const {
-  if (isa<AllocStackInst>(this))
+  if (isa<AllocStackInst>(this) ||
+      isa<AllocPackInst>(this))
     return true;
 
   if (auto *ARI = dyn_cast<AllocRefInstBase>(this)) {
@@ -1251,7 +1252,9 @@ bool SILInstruction::isAllocatingStack() const {
 }
 
 bool SILInstruction::isDeallocatingStack() const {
-  if (isa<DeallocStackInst>(this) || isa<DeallocStackRefInst>(this))
+  if (isa<DeallocStackInst>(this) ||
+      isa<DeallocStackRefInst>(this) ||
+      isa<DeallocPackInst>(this))
     return true;
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {

@@ -464,6 +464,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocStackRefInst:
+  case SILInstructionKind::DeallocPackInst:
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:
@@ -600,6 +601,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::Casting | metadataEffect(impactType) |
       metadataEffect(cast<CheckedCastBranchInst>(inst)->getTargetLoweredType());
+
+  case SILInstructionKind::AllocPackInst:
+    // Just conservatively assume this has metadata impact.
+    return RuntimeEffect::MetaData;
 
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::ProjectBoxInst:

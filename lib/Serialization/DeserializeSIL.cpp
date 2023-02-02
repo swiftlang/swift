@@ -1308,6 +1308,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         None, hasDynamicLifetime, isLexical, wasMoved);
     break;
   }
+  case SILInstructionKind::AllocPackInst: {
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultInst = Builder.createAllocStack(
+        Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    break;
+  }
   case SILInstructionKind::MetatypeInst:
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultInst = Builder.createMetatype(
@@ -1778,6 +1784,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::DeallocStackRefInst: {
     auto Ty = MF->getType(TyID);
     ResultInst = Builder.createDeallocStackRef(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
+  case SILInstructionKind::DeallocPackInst: {
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createDeallocPack(
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
     break;

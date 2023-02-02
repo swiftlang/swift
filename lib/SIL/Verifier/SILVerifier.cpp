@@ -1525,6 +1525,12 @@ public:
     // It's illegal code but the compiler should not crash on it.
   }
 
+  void checkAllocPackInst(AllocPackInst *AI) {
+    requireAddressType(SILPackType, AI->getType(),
+                       "result of alloc_pack must be an address of "
+                       "lowered pack type");
+  }
+
   void checkAllocRefBase(AllocRefInstBase *ARI) {
     requireReferenceValue(ARI, "Result of alloc_ref");
     verifyLocalArchetype(ARI, ARI->getType().getASTType());
@@ -3129,6 +3135,11 @@ public:
                  cast<PartialApplyInst>(DI->getOperand())->isOnStack()),
             "Operand of dealloc_stack must be an alloc_stack or partial_apply "
             "[stack]");
+  }
+  void checkDeallocPackInst(DeallocPackInst *DI) {
+    require(isa<SILUndef>(DI->getOperand()) ||
+            isa<AllocPackInst>(DI->getOperand()),
+            "Operand of dealloc_pack must be an alloc_pack");
   }
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand()->getType().isObject(),
