@@ -395,6 +395,18 @@ bool MoveOnlyChecker::convertBorrowExtractsToOwnedDestructures(
   if (diagnosticCount != diagnosticEmitter.getDiagnosticCount())
     return true;
 
+  // Then check if we had two consuming uses on the same instruction or a
+  // consuming/non-consuming use on the same isntruction.
+  transform.checkForErrorsOnSameInstruction();
+
+  // If we emitted any diagnostic, break out. We return true since we actually
+  // succeeded in our processing by finding the error. We only return false if
+  // we want to tell the rest of the checker that there was an internal
+  // compiler error that we need to emit a "compiler doesn't understand
+  // error".
+  if (diagnosticCount != diagnosticEmitter.getDiagnosticCount())
+    return true;
+
   // At this point, we know that all of our destructure requiring uses are on
   // the boundary of our live range. Now we need to do the rewriting.
   transform.blockToAvailableValues.emplace(transform.liveness);
