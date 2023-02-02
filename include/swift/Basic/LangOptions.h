@@ -808,6 +808,10 @@ namespace swift {
     /// instead of dropped altogether when possible.
     bool ImportForwardDeclarations = false;
 
+    /// If true, the compiler will link forward declarations in Objective-C
+    /// that represent an @objc exposed Swift definition to their definition.
+    bool ResolveObjCForwardDeclarationsOfSwiftTypes = false;
+
     /// If true ignore the swift bridged attribute.
     bool DisableSwiftBridgeAttr = false;
 

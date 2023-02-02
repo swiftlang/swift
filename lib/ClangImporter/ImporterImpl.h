@@ -448,6 +448,7 @@ public:
       CollectedDiagnostics;
 
   const bool ImportForwardDeclarations;
+  const bool ResolveObjCForwardDeclarationsOfSwiftTypes;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;

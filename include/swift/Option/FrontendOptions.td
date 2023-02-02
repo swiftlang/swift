@@ -304,6 +304,10 @@ def enable_experimental_eager_clang_module_diagnostics :
   Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
   HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
 
+def enable_resolve_objc_forward_declarations_of_swift_types :
+  Flag<["-"], "enable-resolve-objc-forward-declarations-of-swift-types">,
+  HelpText<"When encountering a forward declaration in imported Objective-C, check if it can be tried to a visible @objc exposed Swift definition">;
+
 def enable_experimental_pairwise_build_block :
   Flag<["-"], "enable-experimental-pairwise-build-block">,
   HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
