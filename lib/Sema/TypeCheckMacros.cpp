@@ -334,6 +334,9 @@ bool ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
   if (!parentDecl)
     return false;
 
+  if (isa<PatternBindingDecl>(decl))
+    return false;
+
   bool addedAttributes = false;
   parentDecl->forEachAttachedMacro(MacroRole::MemberAttribute,
       [&](CustomAttr *attr, MacroDecl *macro) {
@@ -973,13 +976,6 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   auto *dc = member->getInnermostDeclContext();
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto decl : topLevelDecls) {
-    // FIXME: We want to type check decl attributes applied to
-    // the real declaration, ideally by appending the new attributes
-    // to the result and changing TypeChecker::checkDeclAttributes
-    // to use the semantic attribute list.
-    decl->setDeclContext(dc);
-    TypeChecker::typeCheckDecl(decl);
-
     // Add the new attributes to the semantic attribute list.
     SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
                                           decl->getAttrs().end());
