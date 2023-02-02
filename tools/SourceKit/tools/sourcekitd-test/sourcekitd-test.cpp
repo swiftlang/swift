@@ -770,6 +770,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     } else {
       sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     }
+    sourcekitd_request_dictionary_set_int64(Req, KeyVerifySolverBasedCursorInfo,
+                                            true);
     addRequestOptionsDirect(Req, Opts);
     break;
   case SourceKitRequest::RangeInfo: {
