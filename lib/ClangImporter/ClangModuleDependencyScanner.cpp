@@ -121,7 +121,7 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
 /// the module dependencies cache.
 void ClangImporter::recordModuleDependencies(
     ModuleDependenciesCache &cache,
-    const FullDependenciesResult &clangDependencies) {
+    const ModuleDepsGraph &clangModuleDependencies) {
   auto &ctx = Impl.SwiftContext;
 
   // This scanner invocation's already-captured APINotes version
@@ -131,7 +131,7 @@ void ClangImporter::recordModuleDependencies(
      ctx.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString())
   };
 
-  for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
+  for (const auto &clangModuleDep : clangModuleDependencies) {
     // If we've already cached this information, we're done.
     if (cache.hasDependency(
                     clangModuleDep.ID.ModuleName,
@@ -249,11 +249,12 @@ Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
     return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleCachePath);
   };
 
-  auto clangDependencies = cache.getClangScannerTool().getFullDependencies(
-      commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
-      lookupModuleOutput, moduleName);
-  if (!clangDependencies) {
-    auto errorStr = toString(clangDependencies.takeError());
+  auto clangModuleDependencies =
+      cache.getClangScannerTool().getModuleDependencies(
+          moduleName, commandLineArgs, workingDir,
+          cache.getAlreadySeenClangModules(), lookupModuleOutput, {});
+  if (!clangModuleDependencies) {
+    auto errorStr = toString(clangModuleDependencies.takeError());
     // We ignore the "module 'foo' not found" error, the Swift dependency
     // scanner will report such an error only if all of the module loaders
     // fail as well.
@@ -265,7 +266,7 @@ Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
   }
 
   // Record module dependencies for each module we found.
-  recordModuleDependencies(cache, *clangDependencies);
+  recordModuleDependencies(cache, *clangModuleDependencies);
   return cache.findDependency(moduleName, ModuleDependencyKind::Clang);
 }
 
@@ -308,26 +309,27 @@ bool ClangImporter::addBridgingHeaderDependencies(
     return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleCachePath);
   };
 
-  auto clangDependencies = cache.getClangScannerTool().getFullDependencies(
-      commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
-      lookupModuleOutput);
-  if (!clangDependencies) {
+  auto clangModuleDependencies =
+      cache.getClangScannerTool().getTranslationUnitDependencies(
+          commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
+          lookupModuleOutput, {});
+  if (!clangModuleDependencies) {
     // FIXME: Route this to a normal diagnostic.
-    llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());
+    llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(), llvm::errs());
     return true;
   }
 
   // Record module dependencies for each module we found.
-  recordModuleDependencies(cache, *clangDependencies);
+  recordModuleDependencies(cache, clangModuleDependencies->ModuleGraph);
 
   // Record dependencies for the source files the bridging header includes.
-  for (const auto &fileDep : clangDependencies->FullDeps.FileDeps)
+  for (const auto &fileDep : clangModuleDependencies->FileDeps)
     targetModule.addBridgingSourceFile(fileDep);
 
   // ... and all module dependencies.
   llvm::StringSet<> alreadyAddedModules;
-  for (const auto &moduleDep : clangDependencies->FullDeps.ClangModuleDeps) {
-    targetModule.addBridgingModuleDependency(moduleDep.ModuleName,
+  for (const auto &moduleDep : clangModuleDependencies->ModuleGraph) {
+    targetModule.addBridgingModuleDependency(moduleDep.ID.ModuleName,
                                              alreadyAddedModules);
   }
 
