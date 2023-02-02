@@ -882,7 +882,24 @@ void swift::expandAccessors(
   // Trigger parsing of the sequence of accessor declarations. This has the
   // side effect of registering those accessor declarations with the storage
   // declaration, so there is nothing further to do.
-  (void)macroSourceFile->getTopLevelItems();
+  for (auto decl : macroSourceFile->getTopLevelItems()) {
+    auto accessor = dyn_cast_or_null<AccessorDecl>(decl.dyn_cast<Decl *>());
+    if (!accessor)
+      continue;
+
+    if (accessor->isObservingAccessor())
+      continue;
+
+    // If any non-observing accessor was added, remove the initializer if
+    // there is one.
+    if (auto var = dyn_cast<VarDecl>(storage)) {
+      if (auto binding = var->getParentPatternBinding()) {
+        unsigned index = binding->getPatternEntryIndexForVarDecl(var);
+        binding->setInit(index, nullptr);
+        break;
+      }
+    }
+  }
 }
 
 // FIXME: Almost entirely duplicated code from `expandAccessors`.

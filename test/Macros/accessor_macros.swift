@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // First check for no errors.
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir
 
 // Check that the expansion buffer are as expected.
 // RUN: %target-swift-frontend -typecheck -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -dump-macro-expansions > %t/expansions-dump.txt 2>&1
@@ -53,7 +53,7 @@ struct MyStruct {
   // CHECK-DUMP: }
 
   @myPropertyWrapper
-  var birthDate: Date?
+  var birthDate: Date? = nil
   // CHECK-DUMP: macro:birthDate@myPropertyWrapper
   // CHECK-DUMP: get {
   // CHECK-DUMP:   _birthDate.wrappedValue
