@@ -4244,7 +4244,8 @@ namespace {
 
     template <typename T, typename U>
     T *resolveSwiftDeclImpl(const U *decl, Identifier name,
-                            bool hasKnownSwiftName, ModuleDecl *overlay) {
+                            bool hasKnownSwiftName, ModuleDecl *module,
+                            bool allowObjCMismatchFallback) {
       const auto &languageVersion =
           Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
 
@@ -4276,7 +4277,7 @@ namespace {
 
       // First look at Swift types with the same name.
       SmallVector<ValueDecl *, 4> swiftDeclsByName;
-      overlay->lookupValue(name, NLKind::QualifiedLookup, swiftDeclsByName);
+      module->lookupValue(name, NLKind::QualifiedLookup, swiftDeclsByName);
       T *found = nullptr;
       for (auto result : swiftDeclsByName) {
         if (auto singleResult = dyn_cast<T>(result)) {
@@ -4298,14 +4299,7 @@ namespace {
         SmallVector<Decl *, 4> matchingTopLevelDecls;
 
         // Get decls with a matching @objc attribute
-        overlay->getTopLevelDeclsWhereAttributesMatch(
-          matchingTopLevelDecls,
-          [&name](const DeclAttributes attrs) -> bool {
-            if (auto objcAttr = attrs.getAttribute<ObjCAttr>())
-              if (auto objcName = objcAttr->getName())
-                return objcName->getSimpleName() == name;
-            return false;
-          });
+        module->lookupTopLevelDeclsByObjCName(matchingTopLevelDecls, name);
 
         // Filter by decl kind
         for (auto result : matchingTopLevelDecls) {
@@ -4317,12 +4311,12 @@ namespace {
         }
       }
 
-      if (!found) {
-        // Go back to the first list and find classes with matching Swift names
-        // *even if the ObjC name doesn't match.*
-        // This shouldn't be allowed but we need it for source compatibility;
-        // people used `@class SwiftNameOfClass` as a workaround for not
-        // having the previous loop, and it "worked".
+      if (allowObjCMismatchFallback && !found) {
+        // Go back to the first list and find classes with matching Swift
+        // names *even if the ObjC name doesn't match.* This shouldn't be
+        // allowed but we need it for source compatibility; people used
+        // `@class SwiftNameOfClass` as a workaround for not having the
+        // previous loop, and it "worked".
         for (auto result : swiftDeclsByName) {
           if (auto singleResult = dyn_cast<T>(result)) {
             if (isMatch(singleResult, /*baseNameMatches=*/true,
@@ -4346,15 +4340,36 @@ namespace {
     T *resolveSwiftDecl(const U *decl, Identifier name,
                         bool hasKnownSwiftName, ClangModuleUnit *clangModule) {
       if (auto overlay = clangModule->getOverlayModule())
-        return resolveSwiftDeclImpl<T>(decl, name, hasKnownSwiftName, overlay);
+        return resolveSwiftDeclImpl<T>(decl, name, hasKnownSwiftName, overlay,
+                                       /*allowObjCMismatchFallback*/ true);
       if (clangModule == Impl.ImportedHeaderUnit) {
         // Use an index-based loop because new owners can come in as we're
         // iterating.
         for (size_t i = 0; i < Impl.ImportedHeaderOwners.size(); ++i) {
           ModuleDecl *owner = Impl.ImportedHeaderOwners[i];
-          if (T *result = resolveSwiftDeclImpl<T>(decl, name,
-                                                  hasKnownSwiftName, owner))
+          if (T *result =
+                  resolveSwiftDeclImpl<T>(decl, name, hasKnownSwiftName, owner,
+                                          /*allowObjCMismatchFallback*/ true))
             return result;
+        }
+      }
+      if (Impl.ResolveObjCForwardDeclarationsOfSwiftTypes) {
+        if (auto mainModule = Impl.SwiftContext.MainModule) {
+          llvm::SmallVector<ValueDecl *> results;
+          llvm::SmallVector<ImportedModule> importedModules;
+
+          mainModule->getImportedModules(importedModules,
+                                         ModuleDecl::ImportFilterKind::Default);
+
+          for (auto &import : importedModules) {
+            if (import.importedModule->isNonSwiftModule())
+              continue;
+
+            if (T *result = resolveSwiftDeclImpl<T>(
+                    decl, name, hasKnownSwiftName, import.importedModule,
+                    /*allowObjCMismatchFallback*/ false))
+              return result;
+          }
         }
       }
       return nullptr;
@@ -4399,10 +4414,8 @@ namespace {
       Identifier name = importedName.getDeclName().getBaseIdentifier();
       bool hasKnownSwiftName = importedName.hasCustomName();
 
-      // FIXME: Figure out how to deal with incomplete protocols, since that
-      // notion doesn't exist in Swift.
       if (!decl->hasDefinition()) {
-        // Check if this protocol is implemented in its overlay.
+        // Check if this protocol is implemented in available Swift sources.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
           if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name,
                                                            hasKnownSwiftName,

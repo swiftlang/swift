@@ -1096,6 +1096,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);
+    Context->MainModule = MainModule;
 
     // Create and add the module's files.
     SmallVector<FileUnit *, 16> files;
@@ -1118,6 +1119,7 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
   assert(newMod->isMainModule());
   MainModule = newMod;
   Context->addLoadedModule(newMod);
+  Context->MainModule = newMod;
 }
 
 bool CompilerInstance::performParseAndResolveImportsOnly() {

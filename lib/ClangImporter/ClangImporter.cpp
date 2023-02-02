@@ -2264,6 +2264,8 @@ ClangImporter::Implementation::Implementation(
     ASTContext &ctx, DWARFImporterDelegate *dwarfImporterDelegate)
     : SwiftContext(ctx), ImportForwardDeclarations(
                              ctx.ClangImporterOpts.ImportForwardDeclarations),
+      ResolveObjCForwardDeclarationsOfSwiftTypes(
+          ctx.ClangImporterOpts.ResolveObjCForwardDeclarationsOfSwiftTypes),
       DisableSwiftBridgeAttr(ctx.ClangImporterOpts.DisableSwiftBridgeAttr),
       BridgingHeaderExplicitlyRequested(
           !ctx.ClangImporterOpts.BridgingHeader.empty()),
@@ -2271,11 +2273,9 @@ ClangImporter::Implementation::Implementation(
       EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
-      Walker(DiagnosticWalker(*this)),
-      BuffersForDiagnostics(ctx.SourceMgr),
+      Walker(DiagnosticWalker(*this)), BuffersForDiagnostics(ctx.SourceMgr),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
-      platformAvailability(ctx.LangOpts),
-      nameImporter(),
+      platformAvailability(ctx.LangOpts), nameImporter(),
       DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
       DWARFImporter(dwarfImporterDelegate) {}
 

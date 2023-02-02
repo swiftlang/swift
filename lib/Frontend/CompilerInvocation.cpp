@@ -1218,10 +1218,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   return HadError;
 }
 
-static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
-                                   ArgList &Args,
+static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
                                    DiagnosticEngine &Diags,
-                                   StringRef workingDirectory) {
+                                   StringRef workingDirectory,
+                                   const LangOptions &LangOpts,
+                                   const FrontendOptions &FrontendOpts) {
   using namespace options;
 
   if (const Arg *a = Args.getLastArg(OPT_tools_directory)) {
@@ -1278,6 +1279,11 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   }
 
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
+
+  if (Args.hasArg(
+          OPT_enable_resolve_objc_forward_declarations_of_swift_types)) {
+    Opts.ResolveObjCForwardDeclarationsOfSwiftTypes = true;
+  }
 
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.Mode = ClangImporterOptions::Modes::EmbedBitcode;
@@ -2636,7 +2642,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseClangImporterArgs(ClangImporterOpts, ParsedArgs, Diags,
-                             workingDirectory)) {
+                             workingDirectory, LangOpts, FrontendOpts)) {
     return true;
   }
 
