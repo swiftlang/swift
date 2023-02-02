@@ -1098,9 +1098,10 @@ public:
   ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
                                                       SourceLoc Loc);
 
-  /// Parse the @_backDeploy attribute.
-  bool parseBackDeployAttribute(DeclAttributes &Attributes, StringRef AttrName,
-                                SourceLoc AtLoc, SourceLoc Loc);
+  /// Parse the @backDeployed attribute.
+  bool parseBackDeployedAttribute(DeclAttributes &Attributes,
+                                  StringRef AttrName, SourceLoc AtLoc,
+                                  SourceLoc Loc);
 
   /// Parse the @_documentation attribute.
   ParserResult<DocumentationAttr> parseDocumentationAttribute(SourceLoc AtLoc,

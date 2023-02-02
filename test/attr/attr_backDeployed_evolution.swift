@@ -1,6 +1,6 @@
 //
 // At a high level, this test is designed to verify that use of declarations
-// annotated with @_backDeploy behave as expected when running a client binary
+// annotated with @backDeployed behave as expected when running a client binary
 // on an older OS that does not have the back deployed APIs. The
 // BackDeployHelper framework has a number of APIs that are available in the
 // OSes identified by the "BackDeploy 1.0" availability macro and are back

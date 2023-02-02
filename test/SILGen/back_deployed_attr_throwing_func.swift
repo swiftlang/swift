@@ -49,7 +49,7 @@
 
 // -- Original definition of throwingFunc()
 // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy12throwingFuncyyKF : $@convention(thin) () -> @error any Error
-@_backDeploy(before: macOS 10.52)
+@backDeployed(before: macOS 10.52)
 public func throwingFunc() throws {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s11back_deploy6calleryyKF : $@convention(thin) () -> @error any Error

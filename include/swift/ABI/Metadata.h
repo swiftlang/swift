@@ -1661,13 +1661,6 @@ class TargetRelativeWitnessTable {
 
 public:
   const TargetProtocolConformanceDescriptor<Runtime> *getDescription() const {
-    // "Look through" dynamically allocated witness tables.
-    uintptr_t selfValue = (uintptr_t)this;
-    if (selfValue & 0x1) {
-      selfValue = selfValue & ~((uintptr_t)0x1);
-      auto selfAddr = (TargetRelativeWitnessTable<Runtime> **)selfValue;
-      return (*selfAddr)->Description;
-    }
     return Description;
   }
 };

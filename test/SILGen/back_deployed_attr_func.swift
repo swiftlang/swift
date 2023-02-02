@@ -36,7 +36,7 @@
 
 // -- Original definition of trivialFunc()
 // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy11trivialFuncyyF : $@convention(thin) () -> ()
-@_backDeploy(before: macOS 10.52)
+@backDeployed(before: macOS 10.52)
 public func trivialFunc() {}
 
 // -- Fallback definition of isNumber(_:)
@@ -70,7 +70,7 @@ public func trivialFunc() {}
 
 // -- Original definition of isNumber(_:)
 // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy8isNumberySbSiF : $@convention(thin) (Int) -> Bool
-@_backDeploy(before: macOS 10.52)
+@backDeployed(before: macOS 10.52)
 public func isNumber(_ x: Int) -> Bool {
   return true
 }
