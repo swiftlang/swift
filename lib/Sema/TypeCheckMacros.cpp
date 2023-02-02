@@ -1073,7 +1073,9 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
     TypeChecker::typeCheckDecl(decl);
 
     // Add the new attributes to the semantic attribute list.
-    for (auto *attr : decl->getAttrs()) {
+    SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
+                                          decl->getAttrs().end());
+    for (auto *attr : attrs) {
       addedAttributes = true;
       member->getAttrs().add(attr);
     }
