@@ -165,7 +165,7 @@ static Address emitFixedSizeMetadataPackRef(IRGenFunction &IGF,
 }
 
 static llvm::Value *emitPackExpansionElementMetadata(
-    IRGenFunction &IGF, CanPackExpansionType expansionTy, llvm::Value *phi,
+    IRGenFunction &IGF, CanPackExpansionType expansionTy, llvm::Value *index,
     DynamicMetadataRequest request) {
   auto patternTy = expansionTy.getPatternType();
 
@@ -204,7 +204,7 @@ static llvm::Value *emitPackExpansionElementMetadata(
     Address fromPtr(
       IGF.Builder.CreateInBoundsGEP(patternPackAddress.getElementType(),
                                     patternPackAddress.getAddress(),
-                                    phi),
+                                    index),
       patternPackAddress.getElementType(),
       patternPackAddress.getAlignment());
     auto metadata = IGF.Builder.CreateLoad(fromPtr);
