@@ -1332,6 +1332,40 @@ bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const 
   return failure.diagnose(asNote);
 }
 
+MustBeCopyable::MustBeCopyable(ConstraintSystem &cs, Type noncopyableTy, ConstraintLocator *locator)
+    : ConstraintFix(cs, FixKind::MustBeCopyable, locator, FixBehavior::Error),
+      noncopyableTy(noncopyableTy) {}
+
+bool MustBeCopyable::diagnose(const Solution &solution, bool asNote) const {
+  NotCopyableFailure failure(solution, noncopyableTy, getLocator());
+  return failure.diagnose(asNote);
+}
+
+MustBeCopyable* MustBeCopyable::create(ConstraintSystem &cs,
+                                              Type noncopyableTy,
+                                              ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MustBeCopyable(cs, noncopyableTy, locator);
+}
+
+bool MustBeCopyable::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
+  // Only diagnose if all solutions agreed on the same errant non-copyable type.
+  Type firstNonCopyable;
+  for (const auto &solutionAndFix : commonFixes) {
+    const auto *solution = solutionAndFix.first;
+    const auto *fix = solutionAndFix.second->getAs<MustBeCopyable>();
+
+    auto otherNonCopyable = solution->simplifyType(fix->noncopyableTy);
+    if (!firstNonCopyable)
+      firstNonCopyable = otherNonCopyable;
+
+    if (firstNonCopyable->getCanonicalType() != otherNonCopyable->getCanonicalType()) {
+      return false; // fixes differed, so decline to emit a tailored diagnostic.
+    }
+  }
+
+  return diagnose(*commonFixes.front().first);
+}
+
 bool CollectionElementContextualMismatch::diagnose(const Solution &solution,
                                                    bool asNote) const {
   CollectionElementContextualFailure failure(

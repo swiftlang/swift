@@ -1823,6 +1823,15 @@ public:
   bool diagnoseAsError() override;
 };
 
+class NotCopyableFailure final : public FailureDiagnostic {
+  Type noncopyableTy;
+public:
+  NotCopyableFailure(const Solution &solution, Type noncopyableTy, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), noncopyableTy(noncopyableTy) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a contextual mismatch between expected collection element type
 /// and the one provided (e.g. source of the assignment or argument to a call)
 /// e.g.:
