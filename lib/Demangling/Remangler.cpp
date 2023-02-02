@@ -3616,9 +3616,9 @@ ManglingError
 Remangler::mangleRuntimeAttributeGenerator(Node *node,
                                            unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
-  Buffer << "fa";
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  return mangleChildNode(node, 2, depth + 1);
+  Buffer << "fa";
+  return ManglingError::Success;
 }
 
 } // anonymous namespace

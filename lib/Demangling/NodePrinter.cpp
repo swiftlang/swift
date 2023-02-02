@@ -3098,11 +3098,14 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "#_hasSymbol query for ";
     return nullptr;
   case Node::Kind::RuntimeAttributeGenerator:
-    printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                /*hasName*/ false,
-                "runtime attribute generator");
-    Printer << " for attribute = " << Node->getChild(1)->getText() << "."
-            << Node->getChild(2)->getText();
+    Printer << "runtime attribute generator of ";
+
+    print(Node->getChild(1), depth);
+
+    printEntity(Node, depth, asPrefixContext,
+                TypePrinting::NoType, /*hasName*/ false,
+                " for attribute");
+
     return nullptr;
   case Node::Kind::OpaqueReturnTypeIndex:
   case Node::Kind::OpaqueReturnTypeParent:

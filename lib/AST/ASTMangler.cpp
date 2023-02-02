@@ -3864,8 +3864,13 @@ void ASTMangler::appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
                                                        CustomAttr *attr) {
   auto *attrType = decl->getRuntimeDiscoverableAttrTypeDecl(attr);
 
-  appendEntity(decl, "vp", decl->isStatic());
+  appendContext(attrType, attrType->getAlternateModuleName());
+
+  if (auto dc = dyn_cast<DeclContext>(decl)) {
+    appendContext(dc, decl->getAlternateModuleName());
+  } else {
+    appendEntity(decl);
+  }
+
   appendOperator("fa");
-  appendContextOf(attrType);
-  appendDeclName(attrType);
 }

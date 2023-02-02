@@ -3574,7 +3574,7 @@ NodePointer Demangler::demangleFunctionEntity() {
     TypeAndMaybePrivateName,
     TypeAndIndex,
     Index,
-    ContextAndName,
+    ContextArg,
   } Args;
 
   Node::Kind Kind = Node::Kind::EmptyList;
@@ -3592,7 +3592,7 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;
     case 'a':
-      Args = ContextAndName;
+      Args = ContextArg;
       Kind = Node::Kind::RuntimeAttributeGenerator;
       break;
     case 'm': return demangleEntity(Node::Kind::Macro);
@@ -3610,7 +3610,7 @@ NodePointer Demangler::demangleFunctionEntity() {
   }
 
   NodePointer NameOrIndex = nullptr, ParamType = nullptr, LabelList = nullptr,
-              Context = nullptr, Id = nullptr;
+              Context = nullptr;
   switch (Args) {
     case None:
       break;
@@ -3626,9 +3626,8 @@ NodePointer Demangler::demangleFunctionEntity() {
     case Index:
       NameOrIndex = demangleIndexAsNode();
       break;
-    case ContextAndName:
-      Context = demangleOperator();
-      Id = demangleOperator();
+    case ContextArg:
+      Context = popNode();
       break;
   }
   NodePointer Entity = createWithChild(Kind, popContext());
@@ -3647,9 +3646,8 @@ NodePointer Demangler::demangleFunctionEntity() {
       Entity = addChild(Entity, NameOrIndex);
       Entity = addChild(Entity, ParamType);
       break;
-    case ContextAndName:
+    case ContextArg:
       Entity = addChild(Entity, Context);
-      Entity = addChild(Entity, Id);
       break;
   }
   return Entity;
