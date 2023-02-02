@@ -1149,6 +1149,7 @@ public:
   void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
+  void visitAllocPackInst(AllocPackInst *i);
   void visitAllocRefInst(AllocRefInst *i);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
@@ -1324,6 +1325,7 @@ public:
   void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocStackRefInst(DeallocStackRefInst *i);
+  void visitDeallocPackInst(DeallocPackInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
@@ -5496,6 +5498,10 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   emitDebugInfoForAllocStack(i, type, addr.getAddress());
 }
 
+void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
+  IGM.unimplemented(i->getLoc().getSourceLoc(), "alloc_pack");
+}
+
 static void
 buildTailArrays(IRGenSILFunction &IGF,
                 SmallVectorImpl<std::pair<SILType, llvm::Value *>> &TailArrays,
@@ -5593,6 +5599,10 @@ void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {
       Builder.CreateLifetimeEnd(selfValue);
     }
   }
+}
+
+void IRGenSILFunction::visitDeallocPackInst(swift::DeallocPackInst *i) {
+  IGM.unimplemented(i->getLoc().getSourceLoc(), "dealloc_pack");
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
