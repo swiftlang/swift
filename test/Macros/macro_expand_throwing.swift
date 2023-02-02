@@ -7,6 +7,9 @@
 // Make sure the diagnostic doesn't crash in SILGen
 // RUN: not %target-swift-frontend -emit-sil -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - -g
 
+// FIXME: Swift parser is not enabled on Linux CI yet.
+// REQUIRES: OS=macosx
+
 @freestanding(expression) macro myWarning(_ message: String) = #externalMacro(module: "MacroDefinition", type: "WarningMacro")
 
 func testThrownError() {
