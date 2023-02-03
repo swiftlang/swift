@@ -39,15 +39,14 @@
 #include <mutex>
 #endif
 
-#if defined(__APPLE__)
-#include <asl.h>
-#include <unistd.h>
-#endif
-
 #if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
+#endif
+
+#if __has_include(<unistd.h>)
+#include <unistd.h>
 #endif
 
 #if defined(_WIN32)
@@ -573,10 +572,10 @@ struct TaskGroupStatus {
 #if defined(_WIN32)
     #define STDERR_FILENO 2
    _write(STDERR_FILENO, message, strlen(message));
-#else
+#elif defined(STDERR_FILENO)
     write(STDERR_FILENO, message, strlen(message));
 #endif
-#if defined(__APPLE__)
+#if defined(SWIFT_STDLIB_HAS_ASL)
     asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #elif defined(__ANDROID__)
     __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
