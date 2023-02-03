@@ -6585,6 +6585,12 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (hasIteratorAPIAttr(cxxDecl) || isIterator(cxxDecl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
+  
+  if (!cxxDecl->hasUserDeclaredCopyConstructor() &&
+      !cxxDecl->hasUserDeclaredMoveConstructor() &&
+      hasPointerInSubobjects(cxxDecl)) {
+    return CxxRecordSemanticsKind::UnsafePointerMember;
+  }
 
   if (hasCopyTypeOperations(cxxDecl)) {
     return CxxRecordSemanticsKind::Owned;
@@ -6594,16 +6600,11 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::MoveOnly;
   }
 
-  if (hasPointerInSubobjects(cxxDecl)) {
-    return CxxRecordSemanticsKind::UnsafePointerMember;
-  }
-
   if (isSufficientlyTrivial(cxxDecl)) {
     return CxxRecordSemanticsKind::Trivial;
   }
 
-  // How did we get here?
-  return CxxRecordSemanticsKind::Owned;
+  llvm_unreachable("Could not classify C++ type.");
 }
 
 ValueDecl *
