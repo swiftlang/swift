@@ -65,7 +65,7 @@
 #define SWIFT_FUNCTION_PASS(Id, Tag, Description) PASS(Id, Tag, Description)
 #endif
 
-/// SWIFT_SILCOMBINE_PASS(Inst, Tag)
+/// SWIFT_SILCOMBINE_PASS(Inst)
 ///   Similar to SWIFT_FUNCTION_PASS, but defines an instruction pass which is
 ///   implemented in swift and is run by the SILCombiner.
 ///   The \p Inst argument specifies the instruction class.
