@@ -25,6 +25,7 @@
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 
@@ -704,6 +705,12 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
   } else if (isAbstractProtocolConformance()) {
     out << "AbstractConformance("
         << getAbstractProtocolConformance()->getName()
+        << ")";
+  } else if (isPackProtocolConformance()) {
+    out << "PackConformance("
+        << getPackProtocolConformance()->getType()
+        << ":"
+        << getPackProtocolConformance()->getProtocol()->getName()
         << ")";
   } else if (Value == FormalTypeMetadata) {
     out << "FormalTypeMetadata";

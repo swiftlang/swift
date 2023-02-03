@@ -59,9 +59,10 @@ private:
     ValueWitnessDiscriminatorBase = ValueWitnessBase + MaxNumValueWitnesses,
 
     FirstPayloadValue = 2048,
-    Kind_Decl = 0,
-    Kind_Conformance = 1,
-    KindMask = 0x1,
+    Kind_Decl = 0b0,
+    Kind_Conformance = 0b1,
+    Kind_PackConformance = 0b10,
+    KindMask = 0b11,
   };
 
 public:
@@ -119,10 +120,17 @@ public:
     return LocalTypeDataKind(uintptr_t(conformance) | Kind_Conformance);
   }
 
+  static LocalTypeDataKind forProtocolWitnessTablePack(PackConformance *pack) {
+    assert(pack && "pack conformance reference may not be null");
+    return LocalTypeDataKind(uintptr_t(pack) | Kind_PackConformance);
+  }
+
   static LocalTypeDataKind
   forProtocolWitnessTable(ProtocolConformanceRef conformance) {
     if (conformance.isConcrete()) {
       return forConcreteProtocolWitnessTable(conformance.getConcrete());
+    } else if (conformance.isPack()) {
+      return forProtocolWitnessTablePack(conformance.getPack());
     } else {
       return forAbstractProtocolWitnessTable(conformance.getAbstract());
     }
@@ -159,11 +167,24 @@ public:
     return reinterpret_cast<ProtocolDecl*>(Value - Kind_Decl);
   }
 
+  bool isPackProtocolConformance() const {
+    return (!isSingletonKind() &&
+            ((Value & KindMask) == Kind_PackConformance));
+  }
+
+  PackConformance *getPackProtocolConformance() const {
+    assert(isPackProtocolConformance());
+    return reinterpret_cast<PackConformance*>(Value - Kind_PackConformance);
+  }
+
   ProtocolConformanceRef getProtocolConformance() const {
     assert(!isSingletonKind());
     if ((Value & KindMask) == Kind_Decl) {
       return ProtocolConformanceRef(getAbstractProtocolConformance());
+    } else if ((Value & KindMask) == Kind_PackConformance) {
+      return ProtocolConformanceRef(getPackProtocolConformance());
     } else {
+      assert((Value & KindMask) == Kind_Conformance);
       return ProtocolConformanceRef(getConcreteProtocolConformance());
     }
   }
