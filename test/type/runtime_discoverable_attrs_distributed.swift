@@ -11,20 +11,18 @@ typealias DefaultDistributedActorSystem = LocalTestingDistributedActorSystem
 
 @runtimeMetadata
 struct FlagForAsyncFuncs {
-  init<Act>(attachedTo: (Act) async throws -> Void) {}
-  init<Act>(attachedTo: (Act, Int, inout [Int]) async throws -> Void) {}
-  init<Act>(attachedTo: (Act, Int) async -> Void) {}
+  init<Act: DistributedActor>(attachedTo: (Act) async throws -> Void) {}
+  init<Act: DistributedActor>(attachedTo: (Act, Int, [Int]) async throws -> Void) {}
+  init<Act: DistributedActor>(attachedTo: (Act, Int) async -> Void) {}
   init(attachedTo: () async -> [String]) {}
 }
 
 @ActorFlag
 distributed actor TestDistributedActor {
+  @FlagForAsyncFuncs distributed func asyncExternallyAsyncDist() {} // ok
   @FlagForAsyncFuncs distributed func asyncExternallyDist() throws {} // ok
-
   @FlagForAsyncFuncs distributed func doSomethingDist() async throws {} // ok
-
   @FlagForAsyncFuncs nonisolated func doSomethingNonisolated(_: Int) async {} // ok
-
   @FlagForAsyncFuncs distributed func doSomethingDist(_: Int, x: [Int]) async {} // ok
 }
 
