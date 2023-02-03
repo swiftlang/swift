@@ -886,6 +886,7 @@ internal func _getMainExecutor() -> Builtin.Executor
 @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
 @usableFromInline
 @preconcurrency
+@available(macOS, deprecated, message: "async main is handled directly in SILGen now")
 internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
   fatalError("Unavailable in task-to-thread concurrency model")
 }
@@ -893,6 +894,7 @@ internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> (
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @preconcurrency
+@available(*, deprecated, message: "async main is handled directly in SILGen now")
 internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
   Task.detached {
     do {

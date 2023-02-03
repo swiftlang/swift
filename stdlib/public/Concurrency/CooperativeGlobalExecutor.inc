@@ -18,6 +18,7 @@
 ///   swift_task_enqueueGlobalImpl
 ///   swift_task_enqueueGlobalWithDelayImpl
 ///   swift_task_enqueueMainExecutorImpl
+///   swift_concurrency_setMainActorExecutorImpl
 /// as well as any cooperative-executor-specific functions in the runtime.
 ///
 ///===------------------------------------------------------------------===///
@@ -227,4 +228,12 @@ swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
     if (!job) return;
     swift_job_run(job, ExecutorRef::generic());
   }
+}
+
+SWIFT_CC(swift)
+static void swift_concurrency_setMainActorExecutorImpl(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable) {
+  swift_reportError(0, "not implemented: cooperative");
 }

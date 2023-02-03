@@ -18,6 +18,8 @@
 ///   swift_task_enqueueGlobalImpl
 ///   swift_task_enqueueGlobalWithDelayImpl
 ///   swift_task_enqueueMainExecutorImpl
+///   swift_concurrency_setMainActorExecutorImpl
+///
 /// as well as any Dispatch-specific functions for the runtime.
 ///
 ///===------------------------------------------------------------------===///
@@ -109,6 +111,7 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
 /// Enqueue a Job onto a dispatch queue using dispatchEnqueueFunc.
 static void dispatchEnqueue(dispatch_queue_t queue, Job *job,
                             dispatch_qos_class_t qos, void *executorQueue) {
+  fprintf(stderr, "[%s:%d](%s) enqueue\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   job->SchedulerPrivate[Job::DispatchQueueIndex] = executorQueue;
   dispatchEnqueueFunc.load(std::memory_order_relaxed)(queue, job, qos);
 }
@@ -124,6 +127,7 @@ extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 #endif
 
 static dispatch_queue_t getGlobalQueue(JobPriority priority) {
+  fprintf(stderr, "[%s:%d](%s) get queue\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   size_t numericPriority = static_cast<size_t>(priority);
   if (numericPriority >= globalQueueCacheCount)
     swift_Concurrency_fatalError(0, "invalid job priority %#zx", numericPriority);
@@ -192,6 +196,7 @@ static dispatch_queue_t getTimerQueue(JobPriority priority) {
 
 SWIFT_CC(swift)
 static void swift_task_enqueueGlobalImpl(Job *job) {
+  fprintf(stderr, "[%s:%d](%s) global enqueue\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   assert(job && "no job provided");
 
   // We really want four things from the global execution service:
@@ -224,6 +229,23 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
   // API, but as discussed above, that is less important than avoiding
   // performance problems.
   JobPriority priority = job->getPriority();
+
+
+  if (auto executorID = mainExecutorIdentityOverride.load(std::memory_order_relaxed)) {
+    fprintf(stderr, "[%s:%d](%s) loaded executor ID\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    if (auto executorImpl = mainExecutorImplementationOverride.load(std::memory_order_relaxed)) {
+      fprintf(stderr, "[%s:%d](%s) loaded executor Impl\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      auto executor = ExecutorRef(executorID, executorImpl);
+
+      fprintf(stderr, "[%s:%d](%s) enqueue on custom executor: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, executorID);
+
+      auto wtable = executor.getSerialExecutorWitnessTable();
+      auto executorObject = executor.getIdentity();
+      auto executorType = swift_getObjectType(executorObject);
+      _swift_task_enqueueOnExecutor(job, executorObject, executorType, wtable);
+      return;
+    }
+  }
 
   auto queue = getGlobalQueue(priority);
 
@@ -327,6 +349,7 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                      long long tsec,
                                                      long long tnsec,
                                                      int clock, Job *job) {
+  fprintf(stderr, "[%s:%d](%s) enqueue with deadline\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   assert(job && "no job provided");
   auto task = cast<AsyncTask>(job);
 
@@ -369,6 +392,7 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 SWIFT_CC(swift)
 static void swift_task_enqueueMainExecutorImpl(Job *job) {
   assert(job && "no job provided");
+  fprintf(stderr, "[%s:%d](%s) enqueue job: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, job);
 
   JobPriority priority = job->getPriority();
 
@@ -383,4 +407,18 @@ void swift::swift_task_enqueueOnDispatchQueue(Job *job,
   JobPriority priority = job->getPriority();
   auto queue = reinterpret_cast<dispatch_queue_t>(_queue);
   dispatchEnqueue(queue, job, (dispatch_qos_class_t)priority, queue);
+}
+
+SWIFT_CC(swift)
+static void swift_concurrency_setMainActorExecutorImpl(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable) {
+
+  auto ref = ExecutorRef::forOrdinary(executor, wtable);
+
+  mainExecutorIdentityOverride.store(executor, std::memory_order_relaxed);
+  mainExecutorImplementationOverride.store(reinterpret_cast<uintptr_t>(wtable), std::memory_order_relaxed);
+
+  fprintf(stderr, "[%s:%d](%s) override done\n", __FILE_NAME__, __LINE__, __FUNCTION__);
 }

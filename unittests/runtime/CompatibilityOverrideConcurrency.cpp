@@ -100,6 +100,8 @@ protected:
         swift_task_enqueueGlobalWithDelay_override;
     swift_task_enqueueMainExecutor_hook =
         swift_task_enqueueMainExecutor_override;
+//    swift_concurrency_setMainActorExecutor_hook =
+//        swift_concurrency_setMainActorExecutor_override;
   }
 
   virtual void TearDown() {

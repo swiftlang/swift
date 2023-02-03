@@ -63,10 +63,11 @@ class ExecutorRef {
     WitnessTableMask = ~uintptr_t(alignof(void*) - 1)
   };
 
+public:
+
   constexpr ExecutorRef(HeapObject *identity, uintptr_t implementation)
     : Identity(identity), Implementation(implementation) {}
 
-public:
   /// A generic execution environment.  When running in a generic
   /// environment, it's presumed to be okay to switch synchronously
   /// to an actor.  As an executor request, this represents a request

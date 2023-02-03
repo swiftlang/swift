@@ -21,6 +21,7 @@
 ///   swift_task_enqueueGlobalImpl
 ///   swift_task_enqueueGlobalWithDelayImpl
 ///   swift_task_enqueueMainExecutorImpl
+///   swift_concurrency_setMainActorExecutorImpl
 ///
 ///===------------------------------------------------------------------===///
 
@@ -60,4 +61,12 @@ static void swift_task_enqueueMainExecutorImpl(Job *job) {
 
   swift_reportError(0, "operation unsupported without libdispatch: "
                        "swift_task_enqueueMainExecutor");
+}
+
+SWIFT_CC(swift)
+static void swift_concurrency_setMainActorExecutorImpl(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable) {
+  swift_reportError(0, "not implemented: non dispatch");
 }

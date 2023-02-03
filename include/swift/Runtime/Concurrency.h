@@ -729,6 +729,13 @@ void swift_task_enqueueGlobalWithDeadline(long long sec, long long nsec,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
 
+/// Override the executor of the global ``MainActor``.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_concurrency_setMainActorExecutor(
+    HeapObject * executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 
 /// Enqueue the given job on the main executor.

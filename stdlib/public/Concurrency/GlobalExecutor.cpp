@@ -54,6 +54,8 @@
 ///===----------------------------------------------------------------------===///
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "swift/ABI/Task.h"
+#include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "TaskPrivate.h"
@@ -61,6 +63,13 @@
 
 using namespace swift;
 
+// Implemented in Swift to avoid some annoying hard-coding about
+// SerialExecutor's protocol witness table.  We could inline this
+// with effort, though.
+extern "C" SWIFT_CC(swift)
+void _swift_task_enqueueOnExecutor(Job *job, HeapObject *executor,
+                                   const Metadata *selfType,
+                                   const SerialExecutorWitnessTable *wtable);
 SWIFT_CC(swift)
 void (*swift::swift_task_enqueueGlobal_hook)(
     Job *job, swift_task_enqueueGlobal_original original) = nullptr;
@@ -82,6 +91,15 @@ void (*swift::swift_task_enqueueGlobalWithDeadline_hook)(
 SWIFT_CC(swift)
 void (*swift::swift_task_enqueueMainExecutor_hook)(
     Job *job, swift_task_enqueueMainExecutor_original original) = nullptr;
+
+//SWIFT_CC(swift)
+//void (*swift::swift_concurrency_setMainActorExecutor_hook)(
+//    HeapObject * executor,
+//    const Metadata *selfType,
+//    const SerialExecutorWitnessTable *wtable) = nullptr;
+
+static std::atomic<HeapObject*> mainExecutorIdentityOverride;
+static std::atomic<uintptr_t> mainExecutorImplementationOverride;
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 #include "CooperativeGlobalExecutor.inc"
@@ -132,6 +150,18 @@ void swift::swift_task_enqueueMainExecutor(Job *job) {
                                         swift_task_enqueueMainExecutorImpl);
   else
     swift_task_enqueueMainExecutorImpl(job);
+}
+
+/*****************************************************************************/
+/****************************** MAIN EXECUTOR  *******************************/
+/*****************************************************************************/
+
+void swift::swift_concurrency_setMainActorExecutor(HeapObject *executor,
+                                                   const Metadata *selfType,
+                                                   const SerialExecutorWitnessTable *wtable) {
+  // TODO(ktoso): the _hook dance here
+  fprintf(stderr, "[%s:%d](%s) hello\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  swift_concurrency_setMainActorExecutorImpl(executor, selfType, wtable);
 }
 
 ExecutorRef swift::swift_task_getMainExecutor() {
