@@ -58,6 +58,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
 #include "clang/Lex/MacroInfo.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -395,6 +396,33 @@ void Decl::forEachAttachedMacro(MacroRole role,
 
     macroCallback(customAttr, macroDecl);
   }
+}
+
+unsigned Decl::getAttachedMacroDiscriminator(
+    MacroRole role, const CustomAttr *attr
+) const {
+  assert(isAttachedMacro(role) && "Not an attached macro role");
+
+  // Member-attribute macros are written on the enclosing declaration,
+  // but apply to the member itself. Adjust the owning declaration accordingly.
+  const Decl *owningDecl = this;
+  if (role == MacroRole::MemberAttribute) {
+    owningDecl = getDeclContext()->getAsDecl();
+  }
+
+  llvm::SmallDenseMap<Identifier, unsigned> nextDiscriminator;
+  Optional<unsigned> foundDiscriminator;
+
+  owningDecl->forEachAttachedMacro(
+    role,
+    [&](CustomAttr *foundAttr, MacroDecl *foundMacro) {
+      unsigned discriminator =
+        nextDiscriminator[foundMacro->getBaseIdentifier()]++;
+      if (attr == foundAttr)
+        foundDiscriminator = discriminator;
+    });
+
+  return *foundDiscriminator;
 }
 
 const Decl *Decl::getInnermostDeclWithAvailability() const {
