@@ -730,8 +730,18 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
 
 /// Override the executor of the global ``MainActor``.
+///
+/// Must be called at-most once, and before any
+/// Task or suspension point is encountered during the `main` function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_concurrency_setMainActorExecutor(
+    HeapObject * executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+
+/// Return true if the caller is running in a Task on the passed Executor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isOnExecutor(
     HeapObject * executor,
     const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);

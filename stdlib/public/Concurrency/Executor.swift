@@ -85,6 +85,18 @@ public struct UnownedSerialExecutor: Sendable {
 @_silgen_name("swift_concurrency_setMainActorExecutor")
 public func setMainActorExecutor<MainExecutor: SerialExecutor>(_ executor: MainExecutor)
 
+/// Checks if the current task is running on the expected ``Executor``.
+///
+/// Generally, Swift programs should be constructed such that it is statically
+/// known that a specific executor is used, e.g. by using global actors or
+/// custom executors. however, in some APIs it may be useful to provide an
+/// additional runtime check for this, especially when moving towards Swift
+/// concurrency from other runtimes which frequently use such assertions.
+/// - Parameter executor:
+@available(SwiftStdlib 5.9, *)
+@_silgen_name("swift_task_isOnExecutor")
+public func _taskIsOnExecutor<Executor: SerialExecutor>(_ executor: Executor) -> Bool
+
 // Used by the concurrency runtime
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("_swift_task_enqueueOnExecutor")

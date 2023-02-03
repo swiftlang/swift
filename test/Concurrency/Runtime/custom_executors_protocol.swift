@@ -29,7 +29,7 @@ extension WithSpecifiedExecutor {
   }
 }
 
-final class InlineExecutor: SpecifiedExecutor {
+final class InlineExecutor: SpecifiedExecutor, Swift.CustomStringConvertible {
   let name: String
 
   init(_ name: String) {
@@ -37,24 +37,21 @@ final class InlineExecutor: SpecifiedExecutor {
   }
 
   public func enqueue(_ job: UnownedJob) {
-    print("enqueue")
+    print("\(self): enqueue")
     job._runSynchronously(on: self.asUnownedSerialExecutor())
+    print("\(self): after run")
   }
 
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     return UnownedSerialExecutor(ordinary: self)
   }
-}
 
-actor OtherActor {
-  func test() {
-//    checkIfMainQueue(expectedAnswer: false)
-    print("\(Self.self) on executor")
+  var description: Swift.String {
+    "InlineExecutor(\(name))"
   }
 }
 
 actor MyActor: WithSpecifiedExecutor {
-  let other: OtherActor
 
   nonisolated let executor: SpecifiedExecutor
 
@@ -65,13 +62,12 @@ actor MyActor: WithSpecifiedExecutor {
 
   init(executor: SpecifiedExecutor) {
     self.executor = executor
-    self.other = OtherActor()
   }
 
-  func test() async {
+  func test(expectedExecutor: some SerialExecutor) {
+    precondition(_taskIsOnExecutor(expectedExecutor), "Expected to be on: \(expectedExecutor)")
     checkIfMainQueue(expectedAnswer: true)
-    print("\(Self.self) on executor")
-    await other.test()
+    print("\(Self.self): on executor \(expectedExecutor)")
   }
 }
 
@@ -80,16 +76,17 @@ actor MyActor: WithSpecifiedExecutor {
     print("begin")
     let one = InlineExecutor("one")
     let actor = MyActor(executor: one)
-    await actor.test()
-    await actor.test()
-    await actor.test()
+    await actor.test(expectedExecutor: one)
+    await actor.test(expectedExecutor: one)
+    await actor.test(expectedExecutor: one)
     print("end")
   }
 }
 
 // CHECK:      begin
-// CHECK-NEXT: InlineExecutor: enqueue
-// CHECK-NEXT: MyActor: on executor: inline-executor-one
-// CHECK-NEXT: MyActor: on executor: inline-executor-one
-// CHECK-NEXT: MyActor: on executor: inline-executor-one
+// CHECK-NEXT: InlineExecutor(one): enqueue
+// CHECK-NEXT: MyActor: on executor InlineExecutor(one)
+// CHECK-NEXT: MyActor: on executor InlineExecutor(one)
+// CHECK-NEXT: MyActor: on executor InlineExecutor(one)
+// CHECK-NEXT: InlineExecutor(one): after run
 // CHECK-NEXT: end
