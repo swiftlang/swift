@@ -138,6 +138,7 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
 
   bool findModule(ImportPath::Element moduleID,
                   SmallVectorImpl<char> *moduleInterfacePath,
+                  SmallVectorImpl<char> *moduleInterfaceSourcePath,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
@@ -145,13 +146,13 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
-                  ImportPath::Element ModuleID,
-                  const SerializedModuleBaseName &BaseName,
-                  SmallVectorImpl<char> *ModuleInterfacePath,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                  bool skipBuildingInterface, bool IsFramework) override;
+      ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
+      SmallVectorImpl<char> *ModuleInterfacePath,
+      SmallVectorImpl<char> *ModuleInterfaceSourcePath,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool skipBuildingInterface, bool IsFramework) override;
 
   bool canImportModule(ImportPath::Module named,
                        ModuleVersionInfo *versionInfo) override;
@@ -418,13 +419,13 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
   ArrayRef<std::string> PreferInterfaceForModules;
 
   std::error_code findModuleFilesInDirectory(
-     ImportPath::Element ModuleID,
-     const SerializedModuleBaseName &BaseName,
-     SmallVectorImpl<char> *ModuleInterfacePath,
-     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-     bool skipBuildingInterface, bool IsFramework) override;
+      ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
+      SmallVectorImpl<char> *ModuleInterfacePath,
+      SmallVectorImpl<char> *ModuleInterfaceSourcePath,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool skipBuildingInterface, bool IsFramework) override;
 
   bool isCached(StringRef DepPath) override;
 public:
