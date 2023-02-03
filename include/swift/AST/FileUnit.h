@@ -409,6 +409,14 @@ public:
   /// applicable.
   virtual StringRef getLoadedFilename() const { return StringRef(); }
 
+  /// Returns the path of the file for the module represented by this
+  /// \c FileUnit, or an empty string if there is none. For modules either
+  /// built by or adjacent to a module interface, returns the module
+  /// interface instead.
+  virtual StringRef getSourceFilename() const {
+    return getModuleDefiningPath();
+  }
+
   virtual StringRef getFilenameForPrivateDecl(const ValueDecl *decl) const {
     return StringRef();
   }

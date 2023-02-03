@@ -1989,11 +1989,9 @@ StringRef ModuleDecl::getModuleFilename() const {
 
 StringRef ModuleDecl::getModuleSourceFilename() const {
   for (auto F : getFiles()) {
-    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(F))
-      continue;
-    return F->getModuleDefiningPath();
+    if (auto LF = dyn_cast<LoadedFile>(F))
+      return LF->getSourceFilename();
   }
-
   return StringRef();
 }
 

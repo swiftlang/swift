@@ -24,6 +24,7 @@
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
@@ -1106,39 +1107,35 @@ bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
 /// the results.
 std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
-  ImportPath::Element ModuleID,
-  const SerializedModuleBaseName &BaseName,
-  SmallVectorImpl<char> *ModuleInterfacePath,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-  bool skipBuildingInterface, bool IsFramework) {
+    ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
+    SmallVectorImpl<char> *ModuleInterfacePath,
+    SmallVectorImpl<char> *ModuleInterfaceSourcePath,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool skipBuildingInterface, bool IsFramework) {
 
   // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.
   assert(LoadMode != ModuleLoadingMode::OnlySerialized);
 
-  llvm::SmallString<256>
-  ModPath{ BaseName.getName(file_types::TY_SwiftModuleFile) },
-  InPath{  BaseName.getName(file_types::TY_SwiftModuleInterfaceFile) },
-  PrivateInPath{BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile)};
+  std::string ModPath{BaseName.getName(file_types::TY_SwiftModuleFile)};
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
   auto &fs = *Ctx.SourceMgr.getFileSystem();
-  if (!fs.exists(InPath)) {
+  std::string InPath = BaseName.findInterfacePath(fs).getValueOr("");
+  if (InPath.empty()) {
     if (fs.exists(ModPath)) {
       LLVM_DEBUG(llvm::dbgs()
-        << "No .swiftinterface file found adjacent to module file "
-        << ModPath.str() << "\n");
+                 << "No .swiftinterface file found adjacent to module file "
+                 << ModPath << "\n");
       return std::make_error_code(std::errc::not_supported);
     }
     return std::make_error_code(std::errc::no_such_file_or_directory);
   }
 
-  // If present, use the private interface instead of the public one.
-  if (fs.exists(PrivateInPath)) {
-    InPath = PrivateInPath;
-  }
+  if (ModuleInterfaceSourcePath)
+    ModuleInterfaceSourcePath->assign(InPath.begin(), InPath.end());
 
   // If we've been told to skip building interfaces, we are done here and do
   // not need to have the module actually built. For example, if we are
@@ -1146,7 +1143,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   // the interface.
   if (skipBuildingInterface) {
     if (ModuleInterfacePath)
-      *ModuleInterfacePath = InPath;
+      ModuleInterfacePath->assign(InPath.begin(), InPath.end());
     return std::error_code();
   }
 
@@ -1170,7 +1167,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   if (ModuleBuffer) {
     *ModuleBuffer = std::move(*ModuleBufferOrErr);
     if (ModuleInterfacePath)
-      *ModuleInterfacePath = InPath;
+      ModuleInterfacePath->assign(InPath.begin(), InPath.end());
   }
 
   // Open .swiftsourceinfo file if it's present.
@@ -1888,12 +1885,13 @@ ExplicitSwiftModuleLoader::ExplicitSwiftModuleLoader(
 
 ExplicitSwiftModuleLoader::~ExplicitSwiftModuleLoader() { delete &Impl; }
 
-bool ExplicitSwiftModuleLoader::findModule(ImportPath::Element ModuleID,
-           SmallVectorImpl<char> *ModuleInterfacePath,
-           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-           std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-           std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-           bool skipBuildingInterface, bool &IsFramework, bool &IsSystemModule) {
+bool ExplicitSwiftModuleLoader::findModule(
+    ImportPath::Element ModuleID, SmallVectorImpl<char> *ModuleInterfacePath,
+    SmallVectorImpl<char> *ModuleInterfaceSourcePath,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool skipBuildingInterface, bool &IsFramework, bool &IsSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -1965,13 +1963,13 @@ bool ExplicitSwiftModuleLoader::findModule(ImportPath::Element ModuleID,
 }
 
 std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
-  ImportPath::Element ModuleID,
-  const SerializedModuleBaseName &BaseName,
-  SmallVectorImpl<char> *ModuleInterfacePath,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-  bool skipBuildingInterface, bool IsFramework) {
+    ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
+    SmallVectorImpl<char> *ModuleInterfacePath,
+    SmallVectorImpl<char> *ModuleInterfaceSourcePath,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool skipBuildingInterface, bool IsFramework) {
   llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
   return std::make_error_code(std::errc::not_supported);
 }
