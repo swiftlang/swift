@@ -566,10 +566,12 @@ bool CompilerInstance::setUpModuleLoaders() {
   bool ExplicitModuleBuild =
       Invocation.getFrontendOptions().DisableImplicitModules;
   if (ExplicitModuleBuild ||
-      !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty()) {
+      !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty() ||
+      !Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs.empty()) {
     ESML = ExplicitSwiftModuleLoader::create(
         *Context, getDependencyTracker(), MLM,
         Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+        Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
         IgnoreSourceInfoFile);
   }
 
