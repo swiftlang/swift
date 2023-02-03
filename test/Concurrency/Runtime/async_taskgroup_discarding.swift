@@ -4,10 +4,11 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
 
-// REQUIRES: rdar104982289
-
 // rdar://78109470
 // UNSUPPORTED: back_deployment_runtime
+
+// rdar://104982289
+// UNSUPPORTED: OS=windows-msvc 
 
 import _Concurrency
 
