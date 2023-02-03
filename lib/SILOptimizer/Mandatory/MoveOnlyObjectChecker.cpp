@@ -554,7 +554,14 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
     if (!diagnosticEmitter.emittedDiagnosticForValue(markedInst)) {
       if (markedInst->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
         if (auto *cvi = dyn_cast<CopyValueInst>(markedInst->getOperand())) {
-          if (auto *arg = dyn_cast<SILFunctionArgument>(cvi->getOperand())) {
+          SingleValueInstruction *i = cvi;
+          if (auto *copyToMoveOnly =
+                  dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
+                      cvi->getOperand())) {
+            i = copyToMoveOnly;
+          }
+
+          if (auto *arg = dyn_cast<SILFunctionArgument>(i->getOperand(0))) {
             if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
               for (auto *use : markedInst->getConsumingUses()) {
                 destroys.push_back(cast<DestroyValueInst>(use->getUser()));
