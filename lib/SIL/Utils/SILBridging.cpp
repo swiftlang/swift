@@ -541,6 +541,22 @@ bool SILType_isFunction(BridgedType type) {
   return castToSILType(type).is<SILFunctionType>();
 }
 
+BridgedDecl SILType_getNominal(BridgedType type) {
+  return castToSILType(type).getNominalOrBoundGenericNominal();
+}
+
+bool SILType_isOrContainsObjectiveCClass(BridgedType type) {
+  return castToSILType(type).getASTType().findIf([](Type ty) {
+    if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {
+      if (cd->isForeign() || cd->getObjectModel() == ReferenceCounting::ObjC)
+        return true;
+    }
+    if (ty->is<ProtocolCompositionType>())
+      return true;
+    return false;
+  });
+}
+
 bool SILType_isCalleeConsumedFunction(BridgedType type) {
   auto funcTy = castToSILType(type).castTo<SILFunctionType>();
   return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();

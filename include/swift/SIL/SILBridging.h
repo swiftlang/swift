@@ -197,6 +197,8 @@ typedef enum {
 
 // AST bridging
 
+typedef void * _Nonnull BridgedDecl;
+
 struct BridgedEffectInfo {
   SwiftInt argumentIndex;
   bool isDerived;
@@ -325,6 +327,8 @@ SwiftInt SILType_isStruct(BridgedType type);
 SwiftInt SILType_isTuple(BridgedType type);
 SwiftInt SILType_isEnum(BridgedType type);
 bool SILType_isFunction(BridgedType type);
+BridgedDecl SILType_getNominal(BridgedType type);
+bool SILType_isOrContainsObjectiveCClass(BridgedType type);
 bool SILType_isCalleeConsumedFunction(BridgedType type);
 SwiftInt SILType_getNumTupleElements(BridgedType type);
 BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx);
