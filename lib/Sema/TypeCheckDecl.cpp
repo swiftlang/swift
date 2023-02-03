@@ -1042,6 +1042,9 @@ bool
 NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
                                      AbstractFunctionDecl *decl) const {
   auto *dc = decl->getDeclContext();
+
+  // FIXME: This is mysterious and seems wrong. However, changing it to return
+  // false (as it seems like it should) breaks a couple Serialization tests.
   if (!isa<ClassDecl>(dc))
     return true;
 

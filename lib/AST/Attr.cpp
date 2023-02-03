@@ -398,23 +398,24 @@ const AvailableAttr *DeclAttributes::getNoAsync(const ASTContext &ctx) const {
   return bestAttr;
 }
 
-const BackDeployAttr *
-DeclAttributes::getBackDeploy(const ASTContext &ctx) const {
-  const BackDeployAttr *bestAttr = nullptr;
+const BackDeployedAttr *
+DeclAttributes::getBackDeployed(const ASTContext &ctx) const {
+  const BackDeployedAttr *bestAttr = nullptr;
 
   for (auto attr : *this) {
-    auto *backDeployAttr = dyn_cast<BackDeployAttr>(attr);
-    if (!backDeployAttr)
+    auto *backDeployedAttr = dyn_cast<BackDeployedAttr>(attr);
+    if (!backDeployedAttr)
       continue;
 
-    if (backDeployAttr->isInvalid() || !backDeployAttr->isActivePlatform(ctx))
+    if (backDeployedAttr->isInvalid() ||
+        !backDeployedAttr->isActivePlatform(ctx))
       continue;
 
     // We have an attribute that is active for the platform, but
     // is it more specific than our current best?
-    if (!bestAttr || inheritsAvailabilityFromPlatform(backDeployAttr->Platform,
-                                                      bestAttr->Platform)) {
-      bestAttr = backDeployAttr;
+    if (!bestAttr || inheritsAvailabilityFromPlatform(
+                         backDeployedAttr->Platform, bestAttr->Platform)) {
+      bestAttr = backDeployedAttr;
     }
   }
 
@@ -539,6 +540,26 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   }
   if (!forAtSpecialize)
     Printer.printNewline();
+}
+
+static void printShortFormBackDeployed(ArrayRef<const DeclAttribute *> Attrs,
+                                       ASTPrinter &Printer,
+                                       const PrintOptions &Options) {
+  assert(!Attrs.empty());
+  // TODO: Print `@backDeployed` in swiftinterfaces (rdar://104920183)
+  Printer << "@_backDeploy(before: ";
+  bool isFirst = true;
+
+  for (auto *DA : Attrs) {
+    if (!isFirst)
+      Printer << ", ";
+    auto *attr = cast<BackDeployedAttr>(DA);
+    Printer << platformString(attr->Platform) << " "
+            << attr->Version.getAsString();
+    isFirst = false;
+  }
+  Printer << ")";
+  Printer.printNewline();
 }
 
 /// The kind of a parameter in a `wrt:` differentiation parameters clause:
@@ -752,6 +773,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector shortAvailableAttributes;
   const DeclAttribute *swiftVersionAvailableAttribute = nullptr;
   const DeclAttribute *packageDescriptionVersionAvailableAttribute = nullptr;
+  AttributeVector backDeployedAttributes;
   AttributeVector longAttributes;
   AttributeVector attributes;
   AttributeVector modifiers;
@@ -789,6 +811,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     }
 
     AttributeVector &which = DA->isDeclModifier() ? modifiers :
+                             isa<BackDeployedAttr>(DA) ? backDeployedAttributes :
                              isShortAvailable(DA) ? shortAvailableAttributes :
                              DA->isLongAttribute() ? longAttributes :
                              attributes;
@@ -801,6 +824,8 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     printShortFormAvailable(packageDescriptionVersionAvailableAttribute, Printer, Options);
   if (!shortAvailableAttributes.empty())
     printShortFormAvailable(shortAvailableAttributes, Printer, Options);
+  if (!backDeployedAttributes.empty())
+    printShortFormBackDeployed(backDeployedAttributes, Printer, Options);
 
   for (auto DA : longAttributes)
     DA->print(Printer, Options, D);
@@ -1299,10 +1324,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_BackDeploy: {
+  case DAK_BackDeployed: {
+    // TODO: Print `@backDeployed` in swiftinterfaces (rdar://104920183)
     Printer.printAttrName("@_backDeploy");
     Printer << "(before: ";
-    auto Attr = cast<BackDeployAttr>(this);
+    auto Attr = cast<BackDeployedAttr>(this);
     Printer << platformString(Attr->Platform) << " " <<
       Attr->Version.getAsString();
     Printer << ")";
@@ -1477,8 +1503,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "transpose";
   case DAK_UnavailableFromAsync:
     return "_unavailableFromAsync";
-  case DAK_BackDeploy:
-    return "_backDeploy";
+  case DAK_BackDeployed:
+    return "backDeployed";
   case DAK_Expose:
     return "_expose";
   case DAK_Documentation:
@@ -1726,7 +1752,7 @@ bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 
-bool BackDeployAttr::isActivePlatform(const ASTContext &ctx) const {
+bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 

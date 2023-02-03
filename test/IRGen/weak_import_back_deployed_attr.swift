@@ -10,7 +10,7 @@
 //--- Library.swift
 
 @available(macOS 10.50, *)
-@_backDeploy(before: macOS 10.60)
+@backDeployed(before: macOS 10.60)
 public func backDeployedFunc() {}
 
 //--- Client.swift

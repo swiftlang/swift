@@ -636,3 +636,12 @@ func takeKeyPathString<T>(_ kp: KeyPath<T, String>) {
 func giveKeyPathString() {
   takeKeyPathString(\StructWithAReadableStringProperty.s)
 }
+
+// CHECK-LABEL: sil {{.*}}@$s20opaque_values_silgen29backDeployingReturningGenericyxxKlFTwb : {{.*}} <T> {{.*}} {
+// Ensure that there aren't any "normal" (in the sense of try_apply) blocks that
+// take unbound generic parameters (τ_0_0).
+// CHECK-NOT: {{bb[0-9]+}}({{%[^,]+}} : @owned $τ_0_0):
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen29backDeployingReturningGenericyxxKlFTwb'
+@available(SwiftStdlib 5.1, *)
+@backDeployed(before: SwiftStdlib 5.8)
+public func backDeployingReturningGeneric<T>(_ t: T) throws -> T { t }

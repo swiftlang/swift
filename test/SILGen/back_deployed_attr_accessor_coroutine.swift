@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-sil -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.50 -verify
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.50 | %FileCheck %s
-// RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.60 | %FileCheck %s
 
 // REQUIRES: OS=macosx
 
@@ -63,7 +62,7 @@ public struct TopLevelStruct {
 
   // -- Original definition of TopLevelStruct.property.read
   // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvr : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
-  @_backDeploy(before: macOS 10.52)
+  @backDeployed(before: macOS 10.52)
   public var property: TopLevelStruct {
     _read { yield self }
   }

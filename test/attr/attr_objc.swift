@@ -2668,10 +2668,10 @@ class issue55246 {
   // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
 }
 
-// @_backDeploy
+// @backDeployed
 
 public class BackDeployClass {
-  @_backDeploy(before: macOS 12.0)
-  @objc // expected-error {{'@objc' cannot be applied to a back deployed instance method}}
+  @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' must not be used on an '@objc' instance method}}
+  @objc
   final public func objcMethod() {}
 }

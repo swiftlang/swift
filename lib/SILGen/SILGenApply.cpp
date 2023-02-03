@@ -259,6 +259,31 @@ static void convertOwnershipConventionsGivenParamInfos(
                   });
 }
 
+static bool shouldApplyBackDeploymentThunk(ValueDecl *decl, ASTContext &ctx,
+                                           ResilienceExpansion expansion) {
+  auto backDeployBeforeVersion = decl->getBackDeployedBeforeOSVersion(ctx);
+  if (!backDeployBeforeVersion)
+    return false;
+
+  // If the context of the application is inlinable then we must always call the
+  // back deployment thunk since we can't predict the deployment targets of
+  // other modules.
+  if (expansion != ResilienceExpansion::Maximal)
+    return true;
+
+  // In resilient function bodies skip calling the back deployment thunk when
+  // the deployment target is high enough that the ABI implementation of the
+  // back deployed function is guaranteed to be available.
+  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
+  auto declAvailability =
+      AvailabilityContext(VersionRange::allGTE(*backDeployBeforeVersion));
+
+  if (deploymentAvailability.isContainedIn(declAvailability))
+    return false;
+
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                                   Callee
 //===----------------------------------------------------------------------===//
@@ -1104,6 +1129,28 @@ public:
     }
   }
 
+  SILDeclRef getDeclRefForStaticDispatchApply(DeclRefExpr *e) {
+    auto *afd = cast<AbstractFunctionDecl>(e->getDecl());
+    auto &ctx = SGF.getASTContext();
+
+    // A call to a `distributed` function may need to go through a thunk.
+    if (callSite && callSite->shouldApplyDistributedThunk()) {
+      if (auto distributedThunk = afd->getDistributedThunk())
+        return SILDeclRef(distributedThunk).asDistributed();
+    }
+
+    // A call to `@backDeployed` function may need to go through a thunk.
+    if (shouldApplyBackDeploymentThunk(afd, ctx,
+                                       SGF.F.getResilienceExpansion())) {
+      return SILDeclRef(afd).asBackDeploymentKind(
+          SILDeclRef::BackDeploymentKind::Thunk);
+    }
+
+    return SILDeclRef(afd).asForeign(
+        !isConstructorWithGeneratedAllocatorThunk(afd) &&
+        requiresForeignEntryPoint(afd));
+  }
+
   //
   // Known callees.
   //
@@ -1144,25 +1191,7 @@ public:
     }
 
     // Otherwise, we have a statically-dispatched call.
-    SILDeclRef constant = SILDeclRef(e->getDecl());
-
-    /// Some special handling may be necessary for thunks:
-    if (callSite && callSite->shouldApplyDistributedThunk()) {
-      if (auto distributedThunk = cast<AbstractFunctionDecl>(e->getDecl())->getDistributedThunk()) {
-        constant = SILDeclRef(distributedThunk).asDistributed();
-      }
-    } else if (afd->isBackDeployed()) {
-      // If we're calling a back deployed function then we need to call a
-      // thunk instead that will handle the fallback when the original
-      // function is unavailable at runtime.
-      constant =
-          constant.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
-    } else {
-      constant = constant.asForeign(
-                   !isConstructorWithGeneratedAllocatorThunk(e->getDecl())
-                   && requiresForeignEntryPoint(e->getDecl()));
-    }
-
+    SILDeclRef constant = getDeclRefForStaticDispatchApply(e);
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
     SGF.SGM.Types.setCaptureTypeExpansionContext(constant, SGF.SGM.M);
     
@@ -5886,9 +5915,11 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
   return result;
 }
 
-SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {
+SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor,
+                                            ResilienceExpansion expansion) {
   auto declRef = SILDeclRef(accessor, SILDeclRef::Kind::Func);
-  if (accessor->isBackDeployed())
+
+  if (shouldApplyBackDeploymentThunk(accessor, getASTContext(), expansion))
     return declRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
 
   return declRef.asForeign(requiresForeignEntryPoint(accessor));

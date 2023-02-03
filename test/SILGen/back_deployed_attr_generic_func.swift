@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-sil -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.50 -verify
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.50 | %FileCheck %s
-// RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.60 | %FileCheck %s
 
 // REQUIRES: OS=macosx
 
@@ -38,7 +37,7 @@
 
 // -- Original definition of genericFunc(_:)
 // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy11genericFuncyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T
-@_backDeploy(before: macOS 10.52)
+@backDeployed(before: macOS 10.52)
 public func genericFunc<T>(_ t: T) -> T {
   return t
 }
@@ -77,7 +76,7 @@ public func genericFunc<T>(_ t: T) -> T {
 
 // -- Original definition of genericFuncWithOwnedParam(_:)
 // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy25genericFuncWithOwnedParamyyxnlF : $@convention(thin) <T> (@in T) -> ()
-@_backDeploy(before: macOS 10.52)
+@backDeployed(before: macOS 10.52)
 public func genericFuncWithOwnedParam<T>(_ t: __owned T) { }
 
 struct S {}

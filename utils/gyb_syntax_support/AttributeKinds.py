@@ -669,11 +669,12 @@ DECL_ATTR_KINDS = [
                   ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIStableToRemove,
                   code=128),
 
-    DeclAttribute('_backDeploy', 'BackDeploy',
+    DeclAttribute('backDeployed', 'BackDeployed',
                   OnAbstractFunction, OnAccessor, OnSubscript, OnVar,
-                  AllowMultipleAttributes, LongAttribute, UserInaccessible,
+                  AllowMultipleAttributes, LongAttribute,
                   ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIBreakingToRemove,  # noqa: E501
                   code=129),
+    DeclAttributeAlias('_backDeploy', 'BackDeployed'),
 
     SimpleDeclAttribute('_moveOnly', 'MoveOnly',
                         OnNominalType,

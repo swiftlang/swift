@@ -2167,8 +2167,8 @@ namespace decls_block {
     BCBlob      // Message
   >;
 
-  using BackDeployDeclAttrLayout = BCRecordLayout<
-    BackDeploy_DECL_ATTR,
+  using BackDeployedDeclAttrLayout = BCRecordLayout<
+    BackDeployed_DECL_ATTR,
     BCFixed<1>,     // implicit flag
     BC_AVAIL_TUPLE, // OS version
     BCVBR<5>        // platform

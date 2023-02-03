@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-sil -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.50 -verify
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.50 | %FileCheck %s
-// RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.60 | %FileCheck %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: concurrency
@@ -44,7 +43,7 @@
 // -- Original definition of trivialFunc()
 // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy9asyncFuncyyYaF : $@convention(thin) @async () -> ()
 @available(macOS 10.51, *)
-@_backDeploy(before: macOS 10.52)
+@backDeployed(before: macOS 10.52)
 public func asyncFunc() async {
   await otherFunc()
 }

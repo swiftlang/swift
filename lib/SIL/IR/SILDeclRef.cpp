@@ -996,13 +996,15 @@ bool SILDeclRef::isDistributedThunk() const {
 bool SILDeclRef::isBackDeploymentFallback() const {
   if (backDeploymentKind != BackDeploymentKind::Fallback)
     return false;
-  return kind == Kind::Func;
+  return kind == Kind::Func || kind == Kind::Initializer ||
+         kind == Kind::Allocator;
 }
 
 bool SILDeclRef::isBackDeploymentThunk() const {
   if (backDeploymentKind != BackDeploymentKind::Thunk)
     return false;
-  return kind == Kind::Func;
+  return kind == Kind::Func || kind == Kind::Initializer ||
+         kind == Kind::Allocator;
 }
 
 /// Use the Clang importer to mangle a Clang declaration.

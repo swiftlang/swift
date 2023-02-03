@@ -156,7 +156,7 @@ public:
   IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Isolated)
   IGNORED_ATTR(Preconcurrency)
-  IGNORED_ATTR(BackDeploy)
+  IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
 #undef IGNORED_ATTR
 
@@ -331,7 +331,7 @@ public:
   void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
 
   void checkAvailableAttrs(ArrayRef<AvailableAttr *> Attrs);
-  void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
+  void checkBackDeployedAttrs(ArrayRef<BackDeployedAttr *> Attrs);
 
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
@@ -1490,10 +1490,10 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
 
   AttributeChecker Checker(D);
   // We need to check all availableAttrs, OriginallyDefinedInAttr and
-  // BackDeployAttr relative to each other, so collect them and check in
+  // BackDeployedAttr relative to each other, so collect them and check in
   // batch later.
   llvm::SmallVector<AvailableAttr *, 4> availableAttrs;
-  llvm::SmallVector<BackDeployAttr *, 4> backDeployAttrs;
+  llvm::SmallVector<BackDeployedAttr *, 4> backDeployedAttrs;
   llvm::SmallVector<OriginallyDefinedInAttr*, 4> ODIAttrs;
   for (auto attr : D->getAttrs()) {
     if (!attr->isValid()) continue;
@@ -1503,8 +1503,8 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     if (attr->canAppearOnDecl(D)) {
       if (auto *ODI = dyn_cast<OriginallyDefinedInAttr>(attr)) {
         ODIAttrs.push_back(ODI);
-      } else if (auto *BD = dyn_cast<BackDeployAttr>(attr)) {
-        backDeployAttrs.push_back(BD);
+      } else if (auto *BD = dyn_cast<BackDeployedAttr>(attr)) {
+        backDeployedAttrs.push_back(BD);
       } else {
         // check @available attribute both collectively and individually.
         if (auto *AV = dyn_cast<AvailableAttr>(attr)) {
@@ -1550,7 +1550,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
   Checker.checkAvailableAttrs(availableAttrs);
-  Checker.checkBackDeployAttrs(backDeployAttrs);
+  Checker.checkBackDeployedAttrs(backDeployedAttrs);
   Checker.checkOriginalDefinedInAttrs(ODIAttrs);
 }
 
@@ -4406,7 +4406,8 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> Attrs) {
   };
 }
 
-void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
+void AttributeChecker::checkBackDeployedAttrs(
+    ArrayRef<BackDeployedAttr *> Attrs) {
   if (Attrs.empty())
     return;
 
@@ -4425,28 +4426,52 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
                           D->getDescriptiveKind());
   }
 
-  // @objc conflicts with back deployment since it implies dynamic dispatch.
-  if (auto *OA = D->getAttrs().getAttribute<ObjCAttr>()) {
-    diagnose(OA->getLocation(), diag::attr_incompatible_with_back_deploy, OA,
-             D->getDescriptiveKind());
-  }
-
   // Only functions, methods, computed properties, and subscripts are
   // back-deployable, so D should be ValueDecl.
   auto *VD = cast<ValueDecl>(D);
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
-  auto *ActiveAttr = D->getAttrs().getBackDeploy(Ctx);
+  auto *ActiveAttr = D->getAttrs().getBackDeployed(Ctx);
 
   for (auto *Attr : Attrs) {
     // Back deployment only makes sense for public declarations.
     if (diagnoseAndRemoveAttrIfDeclIsNonPublic(Attr, /*isError=*/true))
       continue;
 
-    // Back deployment isn't compatible with dynamic dispatch.
-    if (VD->isSyntacticallyOverridable()) {
+    if (isa<DestructorDecl>(D)) {
+      diagnoseAndRemoveAttr(Attr, diag::attr_invalid_on_decl_kind, Attr,
+                            D->getDescriptiveKind());
+      continue;
+    }
+
+    if (VD->isObjC()) {
+      diagnoseAndRemoveAttr(Attr, diag::attr_incompatible_with_objc, Attr,
+                            D->getDescriptiveKind());
+      continue;
+    }
+
+    // If the decl isn't effectively final then it could be invoked via dynamic
+    // dispatch.
+    if (D->isSyntacticallyOverridable()) {
       diagnose(Attr->getLocation(), diag::attr_incompatible_with_non_final,
                Attr, D->getDescriptiveKind());
+      continue;
+    }
+
+    // Some methods declared in classes aren't syntactically overridable but
+    // still may have vtable entries, implying dynamic dispatch.
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (isa<ClassDecl>(D->getDeclContext()) && AFD->needsNewVTableEntry()) {
+        diagnose(Attr->getLocation(), diag::attr_incompatible_with_non_final,
+                 Attr, D->getDescriptiveKind());
+        continue;
+      }
+    }
+
+    // If the decl is final but overrides another decl, that also indicates it
+    // could be invoked via dynamic dispatch.
+    if (VD->getOverriddenDecl()) {
+      diagnoseAndRemoveAttr(Attr, diag::attr_incompatible_with_override, Attr);
       continue;
     }
 
@@ -4457,12 +4482,6 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
         diagnoseAndRemoveAttr(Attr, diag::attr_not_on_stored_properties, Attr);
         continue;
       }
-    }
-
-    if (isa<DestructorDecl>(D) || isa<ConstructorDecl>(D)) {
-      diagnoseAndRemoveAttr(Attr, diag::attr_invalid_on_decl_kind, Attr,
-                            D->getDescriptiveKind());
-      continue;
     }
 
     auto AtLoc = Attr->AtLoc;
