@@ -29,6 +29,7 @@ if (SWIFT_SWIFT_PARSER)
     Sources/ASTGen/Misc.swift
     Sources/ASTGen/SourceFile.swift
     Sources/ASTGen/SourceManager.swift
+    Sources/ASTGen/SourceManager+MacroExpansionContext.swift
     Sources/ASTGen/Stmts.swift
     Sources/ASTGen/Types.swift
   )
