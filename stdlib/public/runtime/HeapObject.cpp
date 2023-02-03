@@ -44,6 +44,9 @@
 # include "swift/Runtime/ObjCBridge.h"
 # include <dlfcn.h>
 #endif
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+# include <malloc_type_private.h>
+#endif
 #include "Leaks.h"
 
 using namespace swift;
@@ -115,12 +118,118 @@ static HeapObject *_swift_tryRetain_(HeapObject *object)
     return _ ## name ## _ args; \
 } while(0)
 
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+static malloc_type_summary_t
+computeMallocTypeSummary(const HeapMetadata *heapMetadata) {
+  assert(isHeapMetadataKind(heapMetadata->getKind()));
+  auto *classMetadata = heapMetadata->getClassObject();
+  auto *typeDesc = heapMetadata->getTypeContextDescriptor();
+
+  malloc_type_summary_t summary = {};
+
+  // Objc
+  if (classMetadata && classMetadata->isPureObjC()) {
+    summary.type_kind = MALLOC_TYPE_KIND_OBJC;
+    return summary;
+  }
+
+  // Runtime internal and unclassified
+  if (!typeDesc) {
+    summary.type_kind = MALLOC_TYPE_KIND_CXX;
+    return summary;
+  }
+
+  // Swift
+  summary.type_kind = MALLOC_TYPE_KIND_SWIFT;
+
+  bool isGenericData = true;
+  for (auto &field : *typeDesc->Fields.get()) {
+    if (field.isIndirectCase()) {
+      isGenericData = false;
+      if (field.isVar())
+        summary.layout_semantics.data_pointer = true;
+      else
+        summary.layout_semantics.immutable_pointer = true;
+    }
+  }
+
+  if (classMetadata->Flags & ClassFlags::UsesSwiftRefcounting) {
+    summary.layout_semantics.reference_count = true;
+  } else {
+    summary.layout_semantics.generic_data = isGenericData;
+  }
+
+  return summary;
+
+// FIXME: these are all the things we are potentially interested in
+//  typedef struct {
+// 	  bool data_pointer : 1;
+// 	  bool struct_pointer : 1;
+// 	  bool immutable_pointer : 1;
+// 	  bool anonymous_pointer : 1;
+// 	  bool reference_count : 1;
+// 	  bool resource_handle : 1;
+// 	  bool spatial_bounds : 1;
+// 	  bool tainted_data : 1;
+// 	  bool generic_data : 1;
+// 	  uint16_t unused : 7;
+// } malloc_type_layout_semantics_t;
+}
+
+struct MallocTypeCacheEntry {
+// union malloc_type_descriptor_t {
+//   struct {
+//     uint32_t hash;
+//     malloc_type_summary_t summary;
+//   };
+//   malloc_type_id_t type_id;
+// };
+  malloc_type_descriptor_t desc;
+
+  friend llvm::hash_code hash_value(const MallocTypeCacheEntry &entry) {
+    return hash_value(entry.desc.hash);
+  }
+  bool matchesKey(uint32_t key) const { return desc.hash == key; }
+};
+static ConcurrentReadableHashMap<MallocTypeCacheEntry> MallocTypes;
+
+static malloc_type_id_t getMallocTypeId(const HeapMetadata *heapMetadata) {
+  uint64_t metadataPtrBits = reinterpret_cast<uint64_t>(heapMetadata);
+  uint32_t key = (metadataPtrBits >> 32) ^ (metadataPtrBits >> 0);
+
+  {
+    auto snapshot = MallocTypes.snapshot();
+    if (auto *entry = snapshot.find(key))
+      return entry->desc.type_id;
+  }
+
+  malloc_type_descriptor_t desc = {
+    .hash = key,
+    .summary = computeMallocTypeSummary(heapMetadata)
+  };
+
+  MallocTypes.getOrInsert(
+      key, [desc](MallocTypeCacheEntry *entry, bool created) {
+        if (created)
+          entry->desc = desc;
+        return true;
+      });
+
+  return desc.type_id;
+}
+#endif // SWIFT_STDLIB_HAS_MALLOC_TYPE
+
 static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
                                        size_t requiredAlignmentMask) {
   assert(isAlignmentMask(requiredAlignmentMask));
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+  auto object = reinterpret_cast<HeapObject *>(swift_slowAllocTyped(
+      requiredSize, requiredAlignmentMask, getMallocTypeId(metadata)));
+#else
   auto object = reinterpret_cast<HeapObject *>(
       swift_slowAlloc(requiredSize, requiredAlignmentMask));
+#endif
 
   // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
   // check on the placement new allocator which we have observed on Windows,
