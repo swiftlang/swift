@@ -13,7 +13,8 @@
 // Debug info SIL testing
 // RUN: %target-swift-frontend -emit-sil -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
 
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
+// Debug info IR testing
+// RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
 
 // Execution testing
 // RUN: %target-build-swift -g -enable-experimental-feature Macros -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
@@ -31,9 +32,10 @@
 func testFileID(a: Int, b: Int) {
   // CHECK: MacroUser/macro_expand.swift
   print("Result is \(#customFileID)")
-  // CHECK-SIL: sil_scope [[MACRO_SCOPE:[0-9]+]] { loc "{{.*}}":1:1 parent @customFileID {{.*}} }
+  // CHECK-SIL: sil_scope [[MACRO_SCOPE:[0-9]+]] { loc "{{.*}}":1:1 parent @$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_ {{.*}} }
   // CHECK-SIL: sil_scope [[SRC_SCOPE:[0-9]+]] { loc "{{.*}}macro_expand.swift":[[@LINE-2]]
   // CHECK-SIL: sil_scope {{[0-9]+}} { loc "{{.*}}":1:1 parent [[MACRO_SCOPE]] inlined_at [[SRC_SCOPE]] }
+  // CHECK-IR: !DISubprogram(name: "customFileID", linkageName: "$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_"
 
 
   // CHECK: Builtin result is MacroUser/macro_expand.swift
