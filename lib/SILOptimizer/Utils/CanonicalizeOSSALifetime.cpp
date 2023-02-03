@@ -126,7 +126,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   // adjacent reborrows and phis are encapsulated within their lifetimes.
   SILPhiArgument *arg;
   if ((arg = dyn_cast<SILPhiArgument>(getCurrentDef())) && arg->isPhi()) {
-    visitAdjacentReborrowsOfPhi(arg, [&](SILPhiArgument *reborrow) {
+    visitInnerAdjacentPhis(arg, [&](SILArgument *reborrow) {
       defUseWorklist.insert(reborrow);
       return true;
     });

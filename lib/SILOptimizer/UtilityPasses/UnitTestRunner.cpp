@@ -467,15 +467,15 @@ struct ShrinkBorrowScopeTest : UnitTest {
 // Dumps:
 // - function
 // - the adjacent phis
-struct VisitAdjacentReborrowsOfPhiTest : UnitTest {
-  VisitAdjacentReborrowsOfPhiTest(UnitTestRunner *pass) : UnitTest(pass) {}
+struct VisitInnerAdjacentPhisTest : UnitTest {
+  VisitInnerAdjacentPhisTest(UnitTestRunner *pass) : UnitTest(pass) {}
   void invoke(Arguments &arguments) override {
     getFunction()->dump();
-    visitAdjacentReborrowsOfPhi(cast<SILPhiArgument>(arguments.takeValue()),
-                                [](auto *argument) -> bool {
-                                  argument->dump();
-                                  return true;
-                                });
+    visitInnerAdjacentPhis(cast<SILPhiArgument>(arguments.takeValue()),
+                           [](auto *argument) -> bool {
+                             argument->dump();
+                             return true;
+                           });
   }
 };
 
@@ -673,7 +673,8 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
 
     ADD_UNIT_TEST_SUBCLASS("ssa-liveness", SSALivenessTest)
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
-    ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi", VisitAdjacentReborrowsOfPhiTest)
+    ADD_UNIT_TEST_SUBCLASS("visit-inner-adjacent-phis",
+                           VisitInnerAdjacentPhisTest)
     /// [new_tests] Add the new mapping from string to subclass above this line.
     ///             Please sort alphabetically by name to help reduce merge
     ///             conflicts.
