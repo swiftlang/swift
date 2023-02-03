@@ -182,7 +182,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     return;
   // Don't spend time checking local declarations; this is always valid by the
   // time we get to this point.
-  if (contextAccessScope.isInternalOrLess() &&
+  if (contextAccessScope.isInContext() &&
       contextAccessScope.getDeclContext()->isLocalContext())
     return;
 
