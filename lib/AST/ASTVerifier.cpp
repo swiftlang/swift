@@ -944,12 +944,19 @@ public:
 
       if (D->hasAccess()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
-        if (!D->getASTContext().isAccessControlDisabled() &&
-            D->getFormalAccessScope().isPublic() &&
-            D->getFormalAccess() <= AccessLevel::Package) {
-          Out << "non-public decl has no formal access scope\n";
-          D->dump(Out);
-          abort();
+        if (!D->getASTContext().isAccessControlDisabled()) {
+          if (D->getFormalAccessScope().isPackage() &&
+              D->getFormalAccess() < AccessLevel::Package) {
+            Out << "non-package decl has no formal access scope\n";
+            D->dump(Out);
+            abort();
+          }
+          if (D->getFormalAccessScope().isPublic() &&
+              D->getFormalAccess() < AccessLevel::Public) {
+            Out << "non-public decl has no formal access scope\n";
+            D->dump(Out);
+            abort();
+          }
         }
         if (D->getEffectiveAccess() == AccessLevel::Private) {
           Out << "effective access should use 'fileprivate' for 'private'\n";
