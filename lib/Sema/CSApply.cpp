@@ -1087,7 +1087,7 @@ namespace {
                                 locator);
 
         auto *const calleeParamDecl = calleeParamList->get(idx);
-        if (calleeParamDecl->hasAttachedPropertyWrapper()) {
+        if (calleeParamDecl->hasExternalPropertyWrapper()) {
           // Rewrite the parameter ref to the backing wrapper initialization
           // expression.
           auto &appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];
@@ -2983,9 +2983,9 @@ namespace {
         ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
         if (auto newExpr = expandMacroExpr(dc, expr, macroRef, expandedType)) {
           auto expansion = new (ctx) MacroExpansionExpr(
-              expr->getStartLoc(), DeclNameRef(macro->getName()),
+              dc, expr->getStartLoc(), DeclNameRef(macro->getName()),
               DeclNameLoc(expr->getLoc()), SourceLoc(), { }, SourceLoc(),
-              nullptr, /*isImplicit=*/true, expandedType);
+              nullptr, MacroRole::Expression, /*isImplicit=*/true, expandedType);
           expansion->setMacroRef(macroRef);
           expansion->setRewritten(newExpr);
           cs.cacheExprTypes(expansion);
@@ -5406,7 +5406,8 @@ namespace {
       ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
       E->setMacroRef(macroRef);
 
-      if (!cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
+      if (E->getMacroRoles().contains(MacroRole::Expression) &&
+          !cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
         if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
           E->setRewritten(newExpr);
         }

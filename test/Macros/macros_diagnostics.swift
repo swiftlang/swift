@@ -3,73 +3,77 @@
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 // expected-note@-1 2{{'stringify' declared here}}
 // expected-warning@-2{{external macro implementation type}}
-@expression macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
-// expected-warning@-1{{external macro definitions are now written using #externalMacro}}{{43-68=#externalMacro(module: "MissingModule", type: "MissingType")}}
+// expected-warning@-3{{@expression has been removed in favor of @freestanding(expression)}}{{1-12=@freestanding(expression)}}
+@freestanding(expression) macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
+// expected-warning@-1{{external macro definitions are now written using #externalMacro}}{{57-82=#externalMacro(module: "MissingModule", type: "MissingType")}}
 // expected-warning@-2{{external macro implementation type}}
-@expression macro missingMacro2(_: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
+@freestanding(expression) macro missingMacro2(_: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-warning@-1{{external macro implementation type}}
 
 protocol P { }
 
-@expression macro tryToHide<T: P>(_: T) -> some P = #externalMacro(module: "BuiltinMacros", type: "Blah")
+@freestanding(expression) macro tryToHide<T: P>(_: T) -> some P = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-error@-1{{some' types are only permitted in properties, subscripts, and functions}}
 // expected-error@-2{{generic parameter 'T' could not be inferred}}
 
 internal struct X { } // expected-note{{type declared here}}
 
-@expression public macro createAnX: X = #externalMacro(module: "BuiltinMacros", type: "Blah")
+@freestanding(expression) public macro createAnX: X = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-error@-1{{macro cannot be declared public because its result type uses an internal type}}
 // expected-warning@-2{{external macro implementation type}}
 
-@expression macro m1: Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
+@freestanding(expression) macro m1: Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-warning@-1{{external macro implementation type}}
-@expression macro m1: Float = #externalMacro(module: "BuiltinMacros", type: "Blah")
-// expected-warning@-1{{external macro implementation type}}
-
-@expression macro m2: Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-note{{'m2' previously declared here}}
-// expected-warning@-1{{external macro implementation type}}
-@expression macro m2: Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-error{{invalid redeclaration of 'm2'}}
+@freestanding(expression) macro m1: Float = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-warning@-1{{external macro implementation type}}
 
-@expression macro m3(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
+@freestanding(expression) macro m2: Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-note{{'m2' previously declared here}}
 // expected-warning@-1{{external macro implementation type}}
-@expression macro m3(_: Int) -> Float = #externalMacro(module: "BuiltinMacros", type: "Blah")
+@freestanding(expression) macro m2: Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-error{{invalid redeclaration of 'm2'}}
 // expected-warning@-1{{external macro implementation type}}
 
-@expression macro m4(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-note{{'m4' previously declared here}}
+@freestanding(expression) macro m3(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-warning@-1{{external macro implementation type}}
-@expression macro m4(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-error{{invalid redeclaration of 'm4'}}
+@freestanding(expression) macro m3(_: Int) -> Float = #externalMacro(module: "BuiltinMacros", type: "Blah")
+// expected-warning@-1{{external macro implementation type}}
+
+@freestanding(expression) macro m4(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-note{{'m4' previously declared here}}
+// expected-warning@-1{{external macro implementation type}}
+@freestanding(expression) macro m4(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-error{{invalid redeclaration of 'm4'}}
 // expected-warning@-1{{external macro implementation type}}
 
 struct ZZZ {
   macro m5: Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
   // expected-error@-1{{macro 'm5' can only be declared at file scope}}
-  // expected-error@-2{{macro 'm5' must declare its applicable contexts (e.g., '@expression')}}
+  // expected-error@-2{{macro 'm5' must declare its applicable roles}}
   // expected-warning@-3{{external macro implementation type}}
 }
 
-@expression macro multiArgMacro(_: Any, second: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
+@freestanding(expression) macro multiArgMacro(_: Any, second: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-note@-1{{'multiArgMacro(_:second:)' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 
-@expression macro overloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingType")
+@freestanding(expression) macro overloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-warning@-1{{external macro implementation type}}
 
 func overloaded1(_ p: Any) { }
 
-@expression macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingType") // expected-note{{'notOverloaded1' previously declared here}}
+@freestanding(expression) macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingType") // expected-note{{'notOverloaded1' previously declared here}}
 // expected-warning@-1{{external macro implementation type}}
-@expression macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingOtherType") // expected-error{{invalid redeclaration of 'notOverloaded1'}}
+@freestanding(expression) macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingOtherType") // expected-error{{invalid redeclaration of 'notOverloaded1'}}
 // expected-warning@-1{{external macro implementation type}}
 
-@expression macro intIdentity(value: Int, _: Float) -> Int = #externalMacro(module: "MissingModule", type: "MissingType")
-// expected-note@-1{{macro 'intIdentity(value:_:)' declared here}}
+@freestanding(expression) macro intIdentity(value: Int, _: Float) -> Int = #externalMacro(module: "MissingModule", type: "MissingType")
+// expected-note@-1{{'intIdentity(value:_:)' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 
-@declaration(freestanding) macro unaryDeclMacro(_ x: String) // expected-note {{found this candidate}}
+@freestanding(declaration) macro unaryDeclMacro(_ x: String)
 // expected-error @-1 {{macro 'unaryDeclMacro' requires a definition}}
-@declaration(freestanding) macro unaryDeclMacro(_ x: String, blah: Bool) // expected-note {{found this candidate}}
+@freestanding(declaration) macro unaryDeclMacro(_ x: String, blah: Bool)
 // expected-error @-1 {{macro 'unaryDeclMacro(_:blah:)' requires a definition}}
+@freestanding(declaration) macro genericDeclMacro<T: Numeric, U: Numeric>(_ x: T, _ y: U)
+// expected-error @-1 {{macro 'genericDeclMacro' requires a definition}}
+// expected-note @-2 {{where 'U' = 'String'}}
 
 func testDiags(a: Int, b: Int) {
   // FIXME: Bad diagnostic.
@@ -90,7 +94,7 @@ func testDiags(a: Int, b: Int) {
   _ = stringify(a + b)
   // expected-error@-1{{expansion of macro 'stringify' requires leading '#'}}{{7-7=#}}
 
-  _ = #intIdentity // expected-error{{expansion of macro 'intIdentity(value:_:)' requires arguments}}{{19-19=(value: <#Int#>, <#Float#>)}}
+  _ = #intIdentity // expected-error{{missing arguments for parameters 'value', #2 in macro expansion}}{{19-19=(value: <#Int#>, <#Float#>)}}
 
   overloaded1(a) // okay, calls the function
   #overloaded1(a) // expected-error{{argument type 'Int' does not conform to expected type 'P'}}
@@ -101,7 +105,9 @@ func testDiags(a: Int, b: Int) {
 
   struct Foo {
     #unaryDeclMacro("abc", blah: false) // okay
-    #unaryDeclMacro("abc", blah: false, oh: 2) // expected-error {{no exact matches in reference to macro 'unaryDeclMacro'}}
+    #unaryDeclMacro("abc", blah: false, oh: 2) // expected-error {{extra argument 'oh' in macro expansion}}
+    #genericDeclMacro(2, 4.0) // okay
+    #genericDeclMacro(2, "not a number") // expected-error {{macro 'genericDeclMacro' requires that 'String' conform to 'Numeric'}}
   }
 }
 
@@ -114,7 +120,7 @@ func testMissing() {
   #missingMacro1("hello") // expected-error{{external macro implementation type 'MissingModule.MissingType' could not be found for macro 'missingMacro1'; the type must be public and provided via '-load-plugin-library'}}
 }
 
-@expression macro undefined() // expected-error{{macro 'undefined()' requires a definition}}
+@freestanding(expression) macro undefined() // expected-error{{macro 'undefined()' requires a definition}}
 
 func testExternalMacroOutOfPlace() {
   let _: Int = #externalMacro(module: "A", type: "B")

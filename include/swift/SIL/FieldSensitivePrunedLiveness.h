@@ -16,7 +16,9 @@
 #include "swift/AST/TypeExpansionContext.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/FrozenMultiMap.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/PrunedLiveness.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -58,6 +60,13 @@ namespace swift {
 /// ```
 /// [0, 1, 1, 0, 0]
 /// ```
+///
+/// NOTE: Our representation allows for partial initialization/reinitialization
+/// since we do not include a bit for each level of struct/tuple. The effect of
+/// this is that we cannot distinguish a single field type from its child
+/// field. This makes this type not suited for projection operations. This is a
+/// trade-off that was made to make it easy to support partial
+/// initialization/reinitialization of liveness.
 ///
 /// Linearized Representation of Enums
 /// ----------------------------------
@@ -141,28 +150,36 @@ namespace swift {
 /// we would only use a single bit in our linearized representation, just for
 /// the discriminator value.
 ///
-/// Enums and Partial Initialization
-/// --------------------------------
+/// Enums and Partial Initialization/Deinitialization
+/// -------------------------------------------------
 ///
 /// One property of our representation of structs and tuples is that a code
-/// generator can reinitialize a struct/tuple completely just by re-initializing
-/// each of its sub-types individually. This is not possible for enums in our
-/// representation since if one just took the leaf nodes for the payload, one
-/// would not update the bit for the enum case itself and any additional spare
-/// bits. Luckily for us, this is actually impossible to do in SIL since it is
-/// impossible to dynamically change the payload of an enum without destroying
-/// the original enum and its payload since that would be a verifier caught
-/// leak.
-struct SubElementNumber {
+/// generator can init/reinit/deinit a struct/tuple completely just by
+/// performing the relevant operation on each of its sub-types
+/// individually. This is not possible for enums in our representation since if
+/// one just took the leaf nodes for the payload, one would not update the bit
+/// for the enum case itself and any additional spare bits. Luckily for us, this
+/// is safe to assume since we only use this in misc address contexts and move
+/// only object contexts in Raw SIL which have the following invariants:
+///
+/// 1. SIL addresses of enum type cannot dynamically change the payload of an
+///    enum without destroying the original enum completely. So such an address
+///    can never be reinitialized by storing into the payload of an enum.
+///
+/// 2. It is illegal in SIL to unchecked_enum_data a move only type in Raw
+///    SIL. One must instead use a switch_enum which creates a new value for the
+///    destructured enum. We when writing such verifiers consider the switch to
+///    produce an entire new value rather than a derived forwarding value.
+struct SubElementOffset {
   /// Our internal sub element representation number. We force 32 bits so that
   /// our type tree span is always pointer width. This is convenient for storing
   /// it in other data structures.
   uint32_t number;
 
-  SubElementNumber(unsigned number) : number(number) {}
+  SubElementOffset(unsigned number) : number(number) {}
 
   /// Given an arbitrary projection \p projectionFromRoot from the \p
-  /// rootAddress, compute the sub element number for that \p SILValue. The sub
+  /// rootValue, compute the sub element number for that \p SILValue. The sub
   /// element number of a type T is always the index of its first leaf node
   /// descendent in the type tree.
   ///
@@ -175,7 +192,7 @@ struct SubElementNumber {
   ///
   /// \returns None if we didn't know how to compute sub-element for this
   /// projection.
-  static Optional<SubElementNumber> compute(SILValue projectionFromRoot,
+  static Optional<SubElementOffset> compute(SILValue projectionFromRoot,
                                             SILValue root) {
     assert(projectionFromRoot->getType().getCategory() ==
                root->getType().getCategory() &&
@@ -187,10 +204,15 @@ struct SubElementNumber {
 
   operator unsigned() const { return number; }
 
+  SubElementOffset &operator+=(unsigned other) {
+    number += other;
+    return *this;
+  }
+
 private:
-  static Optional<SubElementNumber>
+  static Optional<SubElementOffset>
   computeForAddress(SILValue projectionFromRoot, SILValue rootAddress);
-  static Optional<SubElementNumber> computeForValue(SILValue projectionFromRoot,
+  static Optional<SubElementOffset> computeForValue(SILValue projectionFromRoot,
                                                     SILValue rootValue);
 };
 
@@ -226,6 +248,11 @@ struct TypeSubElementCount {
                             TypeExpansionContext(*value->getFunction())) {}
 
   operator unsigned() const { return number; }
+
+  TypeSubElementCount operator-=(unsigned other) {
+    *this = TypeSubElementCount(unsigned(*this) - other);
+    return *this;
+  }
 };
 
 class FieldSensitivePrunedLiveness;
@@ -234,18 +261,18 @@ class FieldSensitivePrunedLiveness;
 /// of the type tree of a type T.
 struct TypeTreeLeafTypeRange {
   friend FieldSensitivePrunedLiveness;
-  SubElementNumber startEltOffset;
-  SubElementNumber endEltOffset;
 
-public:
+  SubElementOffset startEltOffset;
+  SubElementOffset endEltOffset;
+
   TypeTreeLeafTypeRange() : startEltOffset(0), endEltOffset(0) {}
 
-  TypeTreeLeafTypeRange(SubElementNumber start, SubElementNumber end)
+  TypeTreeLeafTypeRange(SubElementOffset start, SubElementOffset end)
       : startEltOffset(start), endEltOffset(end) {}
 
   /// The leaf type range for the entire type tree.
-  TypeTreeLeafTypeRange(SILValue rootAddress)
-      : startEltOffset(0), endEltOffset(TypeSubElementCount(rootAddress)) {}
+  TypeTreeLeafTypeRange(SILValue rootValue)
+      : startEltOffset(0), endEltOffset(TypeSubElementCount(rootValue)) {}
 
   /// The leaf type range for the entire type tree.
   TypeTreeLeafTypeRange(SILType rootType, SILFunction *fn)
@@ -257,14 +284,13 @@ public:
   ///
   /// \returns None if we are unable to understand the path in between \p
   /// projectedAddress and \p rootAddress.
-  static Optional<TypeTreeLeafTypeRange> get(SILValue projectedAddress,
-                                             SILValue rootAddress) {
-    auto startEltOffset =
-        SubElementNumber::compute(projectedAddress, rootAddress);
+  static Optional<TypeTreeLeafTypeRange> get(SILValue projectedValue,
+                                             SILValue rootValue) {
+    auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
     if (!startEltOffset)
       return None;
     return {{*startEltOffset,
-             *startEltOffset + TypeSubElementCount(projectedAddress)}};
+             *startEltOffset + TypeSubElementCount(projectedValue)}};
   }
 
   /// Given a type \p rootType and a set of needed elements specified by the bit
@@ -311,7 +337,7 @@ public:
 
   /// Is the given leaf type specified by \p singleLeafElementNumber apart of
   /// our \p range of leaf type values in the our larger type.
-  bool contains(SubElementNumber singleLeafElementNumber) const {
+  bool contains(SubElementOffset singleLeafElementNumber) const {
     return startEltOffset <= singleLeafElementNumber &&
            singleLeafElementNumber < endEltOffset;
   }
@@ -343,6 +369,12 @@ public:
   void dump() const { print(llvm::dbgs()); }
 };
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const TypeTreeLeafTypeRange &value) {
+  value.print(os);
+  return os;
+}
+
 /// This is exactly like pruned liveness except that instead of tracking a
 /// single bit of liveness, it tracks multiple bits of liveness for leaf type
 /// tree nodes of an allocation one is calculating pruned liveness for.
@@ -353,10 +385,12 @@ public:
 class FieldSensitivePrunedLiveness {
   PrunedLiveBlocks liveBlocks;
 
+public:
   struct InterestingUser {
     TypeTreeLeafTypeRange subEltSpan;
     bool isConsuming;
 
+    InterestingUser() : subEltSpan(), isConsuming(false) {}
     InterestingUser(TypeTreeLeafTypeRange subEltSpan, bool isConsuming)
         : subEltSpan(subEltSpan), isConsuming(isConsuming) {}
 
@@ -366,6 +400,7 @@ class FieldSensitivePrunedLiveness {
     }
   };
 
+private:
   /// Map all "interesting" user instructions in this def's live range to a pair
   /// consisting of the SILValue that it uses and a flag indicating whether they
   /// must end the lifetime.
@@ -418,6 +453,40 @@ public:
       iterator_range<const std::pair<SILInstruction *, InterestingUser> *>;
   UserRange getAllUsers() const {
     return llvm::make_range(users.begin(), users.end());
+  }
+
+  using LifetimeEndingUserRange = OptionalTransformRange<
+      UserRange,
+      function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
+          const std::pair<SILInstruction *, InterestingUser> &)>>;
+  LifetimeEndingUserRange getAllLifetimeEndingUses() const {
+    function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
+        const std::pair<SILInstruction *, InterestingUser> &)>
+        op;
+    op = [](const std::pair<SILInstruction *, InterestingUser> &pair)
+        -> Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>> {
+      if (pair.second.isConsuming)
+        return {{pair.first, pair.second.subEltSpan}};
+      return None;
+    };
+    return LifetimeEndingUserRange(getAllUsers(), op);
+  }
+
+  using NonLifetimeEndingUserRange = OptionalTransformRange<
+      UserRange,
+      function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
+          const std::pair<SILInstruction *, InterestingUser> &)>>;
+  NonLifetimeEndingUserRange getAllNonLifetimeEndingUses() const {
+    function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
+        const std::pair<SILInstruction *, InterestingUser> &)>
+        op;
+    op = [](const std::pair<SILInstruction *, InterestingUser> &pair)
+        -> Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>> {
+      if (!pair.second.isConsuming)
+        return {{pair.first, pair.second.subEltSpan}};
+      return None;
+    };
+    return NonLifetimeEndingUserRange(getAllUsers(), op);
   }
 
   using UserBlockRange = TransformRange<
@@ -693,7 +762,7 @@ public:
 
   bool isDef(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
     return inst == defInst.first &&
-           defInst.second->setIntersection(span).hasValue();
+           defInst.second->setIntersection(span).has_value();
   }
 
   bool isDefBlock(SILBasicBlock *block, unsigned bit) const {
@@ -764,7 +833,7 @@ public:
     if (!iter)
       return false;
     return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).hasValue();
+      return span.setIntersection(storedSpan).has_value();
     });
   }
 
@@ -789,7 +858,7 @@ public:
     if (!iter)
       return false;
     return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).hasValue();
+      return span.setIntersection(storedSpan).has_value();
     });
   }
 
@@ -798,7 +867,7 @@ public:
     if (!iter)
       return false;
     return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).hasValue();
+      return span.setIntersection(storedSpan).has_value();
     });
   }
 

@@ -486,6 +486,11 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("indirect 'inout' parameters are not supported");
 
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Inout:
+    llvm_unreachable("pack parameters are not supported");
+
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned: {
     auto paramTy = param.getSILStorageInterfaceType();

@@ -338,9 +338,13 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(SILValue value) {
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Out:
       return false;
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Pack_Inout:
       LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
       return true;
     }
@@ -570,6 +574,10 @@ void UseState::initializeLiveness(
     case swift::SILArgumentConvention::Direct_Owned:
     case swift::SILArgumentConvention::Direct_Unowned:
     case swift::SILArgumentConvention::Direct_Guaranteed:
+    case swift::SILArgumentConvention::Pack_Inout:
+    case swift::SILArgumentConvention::Pack_Guaranteed:
+    case swift::SILArgumentConvention::Pack_Owned:
+    case swift::SILArgumentConvention::Pack_Out:
       llvm_unreachable("Working with addresses");
     }
   }
@@ -859,7 +867,6 @@ struct MoveOnlyChecker {
   ConsumeInfo consumes;
 
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks,
-                  NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                   DominanceInfo *domTree)
       : fn(fn), deleter(), canonicalizer(), diagnosticEmitter() {
     deleter.setCallbacks(std::move(
@@ -868,9 +875,8 @@ struct MoveOnlyChecker {
             moveIntroducersToProcess.remove(mvi);
           instToDelete->eraseFromParent();
         })));
-    canonicalizer.init(fn, accessBlockAnalysis, domTree, deleter);
-    diagnosticEmitter.fn = fn;
-    diagnosticEmitter.canonicalizer = &canonicalizer;
+    canonicalizer.init(fn, domTree, deleter);
+    diagnosticEmitter.init(fn, &canonicalizer);
   }
 
   /// Search through the current function for candidate mark_must_check
@@ -1097,6 +1103,18 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   // emits code of this form and we need to recognize it as a copy of the
   // underlying var.
   if (auto *li = dyn_cast<LoadInst>(user)) {
+    // Before we do anything, see if this load is of a copyable field or is a
+    // trivial load. If it is, then we just treat this as a liveness requiring
+    // use.
+    if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial ||
+        !li->getType().isMoveOnly()) {
+      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      if (!leafRange)
+        return false;
+      useState.livenessUses.insert({user, *leafRange});
+      return true;
+    }
+
     if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy ||
         li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
       SWIFT_DEFER { moveChecker.canonicalizer.clear(); };
@@ -1214,6 +1232,10 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Guaranteed:
+    case SILArgumentConvention::Pack_Inout:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Out:
       break;
     }
   }
@@ -1955,13 +1977,11 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
            "Should only run on Raw SIL");
     LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Addr Checker. Visiting: "
                             << fn->getName() << '\n');
-    auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
 
-    if (MoveOnlyChecker(getFunction(), deAnalysis, accessBlockAnalysis, domTree)
-            .checkFunction()) {
+    if (MoveOnlyChecker(getFunction(), deAnalysis, domTree).checkFunction()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }

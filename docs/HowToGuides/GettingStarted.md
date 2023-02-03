@@ -243,10 +243,6 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
        --sccache --release-debuginfo --swift-disable-dead-stripping
      ```
-     > **Warning**  
-     > On Macs with Apple silicon (arm64), pass `--bootstrapping=off`.
-     > (https://github.com/apple/swift/issues/62017)
-
    - Linux:
      ```sh
      utils/build-script --release-debuginfo --skip-early-swift-driver \
@@ -257,7 +253,8 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
 
    > **Note**  
    > If you aren't planning to edit the parts of the compiler that are written
-   > in Swift, pass `--bootstrapping=off` to speed up local development.
+   > in Swift, pass `--bootstrapping=hosttools` to speed up local development.
+   > This requires a recent Xcode and/or swift toolchain to be installed.
 
    This will create a directory `swift-project/build/Ninja-RelWithDebInfoAssert`
    containing the Swift compiler and standard library and clang/LLVM build artifacts.
@@ -357,7 +354,7 @@ while retaining the option of building with Ninja on the command line.
 
 Assuming that you have already [built the toolchain via Ninja](#the-actual-build),
 several more steps are necessary to set up this environment:
-* Generate Xcode projects with `utils/build-script --release --swift-darwin-supported-archs "$(uname -m)" --xcode --clean`.
+* Generate Xcode projects with `utils/build-script --swift-darwin-supported-archs "$(uname -m)" --xcode --clean`.
   This will first build a few LLVM files that are needed to configure the
   projects.
 * Create a new Xcode workspace.
@@ -463,7 +460,7 @@ Now that you have made some changes, you will need to rebuild...
 
 To rebuild the compiler:
 ```sh
-ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m) swift-frontend
+ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m) bin/swift-frontend
 ```
 
 To rebuild everything, including the standard library:
@@ -486,12 +483,11 @@ This should print your updated version string.
 
 ## Reproducing an issue
 
-Starter bugs typically have small code examples that fit within a single file.
-You can reproduce such an issue in various ways, such as compiling it from the
-command line using `/path/to/swiftc MyFile.swift`, pasting the code into
-[Compiler Explorer][] (aka godbolt) or using an Xcode Playground.
-
-[Compiler Explorer]: https://godbolt.org
+[Good first issues](https://github.com/apple/swift/contribute) typically have
+small code examples that fit within a single file. You can reproduce such an
+issue in various ways, such as compiling it from the command line using
+`/path/to/swiftc MyFile.swift`, pasting the code into [Compiler Explorer](https://godbolt.org)
+(aka godbolt) or using an Xcode Playground.
 
 For files using frameworks from an SDK bundled with Xcode, you need the pass
 the SDK explicitly. Here are a couple of examples:

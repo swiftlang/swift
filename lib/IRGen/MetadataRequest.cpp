@@ -1422,11 +1422,15 @@ namespace {
       return emitTypeMetadataPackRef(IGF, type, request);
     }
 
-    MetadataResponse visitPackExpansionType(CanPackExpansionType type,
-                                            DynamicMetadataRequest request) {
-      llvm_unreachable("Unimplemented!");
+    MetadataResponse visitSILPackType(CanSILPackType type,
+                                      DynamicMetadataRequest request) {
+      llvm_unreachable("cannot emit metadata for a SIL pack type");
     }
 
+    MetadataResponse visitPackExpansionType(CanPackExpansionType type,
+                                            DynamicMetadataRequest request) {
+      llvm_unreachable("cannot emit metadata for a pack expansion by itself");
+    }
 
     MetadataResponse visitTupleType(CanTupleType type,
                                     DynamicMetadataRequest request) {

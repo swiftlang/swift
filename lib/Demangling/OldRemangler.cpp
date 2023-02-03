@@ -1063,6 +1063,20 @@ ManglingError Remangler::mangleMacro(Node *node, unsigned depth) {
   return mangleChildNodes(node, depth + 1);
 }
 
+ManglingError Remangler::mangleFreestandingMacroExpansion(
+    Node *node, unsigned depth) {
+  Buffer << "fMf";
+  RETURN_IF_ERROR(mangleIndex(node, depth + 1));
+  return mangleChildNodes(node, depth + 1);
+}
+
+ManglingError Remangler::mangleMacroExpansionUniqueName(
+    Node *node, unsigned depth) {
+  Buffer << "fMu";
+  RETURN_IF_ERROR(mangleIndex(node, depth + 1));
+  return mangleChildNodes(node, depth + 1);
+}
+
 ManglingError Remangler::mangleAccessor(Node *storageNode,
                                         StringRef accessorCode,
                                         EntityContext &ctx, unsigned depth) {

@@ -7,10 +7,13 @@
 // RUN: %target-swift-emit-module-interface(%t/Aliases.swiftinterface) %t/Aliases.swift -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Aliases.swiftinterface) -I %t
 
-// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesNoImport.swift -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesImplementationOnlyImport.swift -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesSPIOnlyImport.swift -I %t -experimental-spi-only-imports
-// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesWithImport.swift  -I %t
+// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesNoImport.swift -enable-library-evolution -I %t
+// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesImplementationOnlyImport.swift -enable-library-evolution -I %t
+// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesSPIOnlyImport.swift -enable-library-evolution -I %t -experimental-spi-only-imports
+// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesWithImport.swift -enable-library-evolution -I %t
+
+/// With library evolution disabled UsesAliasesNoImport.swift should compile without diagnostics.
+// RUN: %target-swift-frontend -typecheck %t/UsesAliasesNoImport.swift -I %t | %FileCheck %t/UsesAliasesNoImport.swift --check-prefix=CHECK-NON-RESILIENT --allow-empty
 
 /// The swiftinterface is broken by the missing import without the workaround.
 // RUN: %target-swift-emit-module-interface(%t/UsesAliasesNoImport.swiftinterface) %t/UsesAliasesNoImport.swift -I %t \
@@ -60,6 +63,8 @@ public typealias WrapperAlias = Wrapper
 //--- UsesAliasesNoImport.swift
 
 import Aliases
+
+// CHECK-NON-RESILIENT-NOT: was not imported by this file
 
 // expected-warning@+2 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used here because 'Original' was not imported by this file; this is an error in Swift 6}}
 // expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}

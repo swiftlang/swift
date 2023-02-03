@@ -21,6 +21,15 @@ struct Wrapper<T> {
   }
 }
 
+@propertyWrapper
+struct ImplementationDetailWrapper<T> {
+  var wrappedValue: T
+
+  init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
 func globalFunc(@Wrapper arg: Int) {
   let _: Int = arg
   let _: Projection<Int> = $arg
@@ -36,6 +45,17 @@ func testGlobalFunc(value: Int, projection: Projection<Int>) {
   let _: (Projection<Int>) -> Void = globalFunc($arg:)
 }
 
+func globalFuncWithImplementationDetailWrapper(@ImplementationDetailWrapper arg: Int) {
+  let _: Int = arg
+  let _: ImplementationDetailWrapper<Int> = _arg
+}
+
+func testGlobalFuncWithImplementationDetailWrapper(value: Int) {
+  globalFuncWithImplementationDetailWrapper(arg: value)
+
+  let _: (Int) -> Void = globalFuncWithImplementationDetailWrapper
+  let _: (Int) -> Void = globalFuncWithImplementationDetailWrapper(arg:)
+}
 
 struct S<Value> {
   func method(@Wrapper arg: Value) {
@@ -44,10 +64,20 @@ struct S<Value> {
     let _: Wrapper<Value> = _arg
   }
 
+  func methodWithImplementationDetailWrapper(@ImplementationDetailWrapper arg: Value) {
+    let _: Value = arg
+    let _: ImplementationDetailWrapper<Value> = _arg
+  }
+
   static func staticMethod(@Wrapper arg: Value) {
     let _: Value = arg
     let _: Projection<Value> = $arg
     let _: Wrapper<Value> = _arg
+  }
+
+  static func staticMethodWithImplementationDetailWrapper(@ImplementationDetailWrapper arg: Value) {
+    let _: Value = arg
+    let _: ImplementationDetailWrapper<Value> = _arg
   }
 }
 
@@ -76,6 +106,22 @@ func testMethods(instance: S<String>, Metatype: S<String>.Type,
   let _: (S) -> (Projection<String>) -> Void = Metatype.method($arg:)
 }
 
+func testMethodsWithImplementationDetailWrapper(instance: S<String>, Metatype: S<String>.Type,
+                                                @ImplementationDetailWrapper value: String) {
+  Metatype.staticMethodWithImplementationDetailWrapper(arg: value)
+
+  instance.methodWithImplementationDetailWrapper(arg: value)
+
+  let _: (String) -> Void = Metatype.staticMethodWithImplementationDetailWrapper
+  let _: (String) -> Void = Metatype.staticMethodWithImplementationDetailWrapper(arg:)
+
+  let _: (String) -> Void = instance.methodWithImplementationDetailWrapper
+  let _: (String) -> Void = instance.methodWithImplementationDetailWrapper(arg:)
+
+  let _: (S) -> (String) -> Void = Metatype.methodWithImplementationDetailWrapper
+  let _: (S) -> (String) -> Void = Metatype.methodWithImplementationDetailWrapper(arg:)
+}
+
 func testClosures() {
   typealias PropertyWrapperTuple = (Wrapper<Int>, Int, Projection<Int>)
 
@@ -85,6 +131,12 @@ func testClosures() {
 
   let _: (Projection<Int>) -> PropertyWrapperTuple = { (@Wrapper $value) in
     (_value, value, $value)
+  }
+}
+
+func testClosuresWithImplementationDetailWrapper() {
+  let _: (Int) -> (ImplementationDetailWrapper<Int>, Int) = { (@ImplementationDetailWrapper value) in
+    (_value, value)
   }
 }
 

@@ -98,7 +98,13 @@ findHashableBaseTypeImpl(const Metadata *type) {
     return nullptr;
   }
   // By this point, `type` is known to conform to `Hashable`.
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+  const auto *conformance = lookThroughOptionalConditionalWitnessTable(
+    reinterpret_cast<const RelativeWitnessTable*>(witnessTable))
+    ->getDescription();
+#else
   const auto *conformance = witnessTable->getDescription();
+#endif
   const Metadata *baseTypeThatConformsToHashable =
     findConformingSuperclass(type, conformance);
   HashableConformanceKey key{type};

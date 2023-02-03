@@ -644,6 +644,7 @@ class TestDriverArgumentParser(
     def test_implied_defaults_xcode(self):
         namespace = self.parse_default_args(['--xcode'])
         self.assertEqual(namespace.cmake_generator, 'Xcode')
+        self.assertEqual(namespace.build_variant, 'MinSizeRel')
         self.assertTrue(namespace.skip_build)
         self.assertFalse(namespace.build_early_swift_driver)
         self.assertFalse(namespace.build_early_swiftsyntax)

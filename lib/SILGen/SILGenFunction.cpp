@@ -150,6 +150,9 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
     return getMagicFunctionName(file);
   }
   case SILDeclRef::Kind::RuntimeAttributeGenerator: {
+    if (auto *var = dyn_cast<VarDecl>(ref.getDecl()))
+      return var->getName();
+
     auto *DC = dyn_cast<DeclContext>(ref.getDecl());
     return getMagicFunctionName(DC ? DC : ref.getDecl()->getDeclContext());
   }

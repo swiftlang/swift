@@ -25,6 +25,9 @@ namespace swift {
 class Parser;
 class SILModule;
 
+/// The global state of the SIL parser that the ordinary parser needs to
+/// maintain while parsing a SIL file.  Local state, like the value map of
+/// a SIL function, does not need to be kept here.
 class SILParserState : public SILParserStateBase {
 public:
   explicit SILParserState(SILModule &M) : M(M) {}

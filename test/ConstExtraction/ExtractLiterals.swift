@@ -352,9 +352,11 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:            }
 // CHECK-NEXT:          ]
 // CHECK-NEXT:        },
-// CHECK-NEXT:        "attributes": [
+// CHECK-NEXT:        "propertyWrappers": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractLiterals.Buffered",
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:            "line": 38,
 // CHECK-NEXT:            "arguments": []
 // CHECK-NEXT:          }
 // CHECK-NEXT:        ]
@@ -399,9 +401,11 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:            }
 // CHECK-NEXT:          ]
 // CHECK-NEXT:        },
-// CHECK-NEXT:        "attributes": [
+// CHECK-NEXT:        "propertyWrappers": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractLiterals.Clamping",
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:            "line": 41,
 // CHECK-NEXT:            "arguments": [
 // CHECK-NEXT:              {
 // CHECK-NEXT:                "label": "min",
@@ -460,13 +464,17 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:            }
 // CHECK-NEXT:          ]
 // CHECK-NEXT:        },
-// CHECK-NEXT:        "attributes": [
+// CHECK-NEXT:        "propertyWrappers": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractLiterals.Buffered",
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:            "line": 44,
 // CHECK-NEXT:            "arguments": []
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractLiterals.Clamping",
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:            "line": 44,
 // CHECK-NEXT:            "arguments": [
 // CHECK-NEXT:              {
 // CHECK-NEXT:                "label": "min",

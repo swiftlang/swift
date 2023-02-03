@@ -162,11 +162,11 @@ public:
   /// by user.
   virtual void completeTypeSimpleBeginning() {};
 
-  /// Complete a given type identifier after we have consumed the dot.
-  virtual void completeTypeIdentifierWithDot(DeclRefTypeRepr *TR){};
+  /// Complete a given \c type-simple after we have consumed the dot.
+  virtual void completeTypeSimpleWithDot(TypeRepr *TR){};
 
-  /// Complete a given type identifier when there is no trailing dot.
-  virtual void completeTypeIdentifierWithoutDot(DeclRefTypeRepr *TR){};
+  /// Complete a given \c type-simple when there is no trailing dot.
+  virtual void completeTypeSimpleWithoutDot(TypeRepr *TR){};
 
   /// Complete the beginning of a case statement at the top of switch stmt.
   virtual void completeCaseStmtKeyword() {};

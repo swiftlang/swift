@@ -44,6 +44,9 @@ public:
     /// The expansion of a member attribute attached macro.
     MemberAttributeMacroExpansion,
 
+    /// The expansion of an attached member macro.
+    MemberMacroExpansion,
+
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
 
@@ -347,7 +350,8 @@ public:
   llvm::SMDiagnostic GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
                                 const Twine &Msg,
                                 ArrayRef<llvm::SMRange> Ranges,
-                                ArrayRef<llvm::SMFixIt> FixIts) const;
+                                ArrayRef<llvm::SMFixIt> FixIts,
+                                bool EmitMacroExpansionFiles = false) const;
 
   /// Verifies that all buffers are still valid.
   void verifyAllBuffers() const;

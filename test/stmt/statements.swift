@@ -409,7 +409,7 @@ func matching_pattern_recursion(zs: [Int]) { // expected-note {{'zs' declared he
   }
 
   switch 42 {
-  case {
+  case { // expected-error {{expression pattern of type '() -> ()' cannot match values of type 'Int'}}
       for i in ws { // expected-error {{cannot find 'ws' in scope; did you mean 'zs'?}}
       }
     }: break

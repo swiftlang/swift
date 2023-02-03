@@ -643,5 +643,5 @@ func giveKeyPathString() {
 // CHECK-NOT: {{bb[0-9]+}}({{%[^,]+}} : @owned $τ_0_0):
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen29backDeployingReturningGenericyxxKlFTwb'
 @available(SwiftStdlib 5.1, *)
-@_backDeploy(before: SwiftStdlib 5.8)
+@backDeployed(before: SwiftStdlib 5.8)
 public func backDeployingReturningGeneric<T>(_ t: T) throws -> T { t }

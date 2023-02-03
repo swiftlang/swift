@@ -1614,7 +1614,7 @@ namespace  {
     UNINTERESTING_ATTR(NoMetadata)
     UNINTERESTING_ATTR(CompileTimeConst)
 
-    UNINTERESTING_ATTR(BackDeploy)
+    UNINTERESTING_ATTR(BackDeployed)
     UNINTERESTING_ATTR(KnownToBeLocal)
 
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
@@ -1626,9 +1626,7 @@ namespace  {
 
     UNINTERESTING_ATTR(RuntimeMetadata)
 
-    UNINTERESTING_ATTR(Expression)
-    UNINTERESTING_ATTR(Declaration)
-    UNINTERESTING_ATTR(Attached)
+    UNINTERESTING_ATTR(MacroRole)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

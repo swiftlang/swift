@@ -436,6 +436,12 @@ getParameterConvention(ImplParameterConvention conv) {
     return ParameterConvention::Direct_Unowned;
   case Demangle::ImplParameterConvention::Direct_Guaranteed:
     return ParameterConvention::Direct_Guaranteed;
+  case Demangle::ImplParameterConvention::Pack_Owned:
+    return ParameterConvention::Pack_Owned;
+  case Demangle::ImplParameterConvention::Pack_Guaranteed:
+    return ParameterConvention::Pack_Guaranteed;
+  case Demangle::ImplParameterConvention::Pack_Inout:
+    return ParameterConvention::Pack_Inout;
   }
   llvm_unreachable("covered switch");
 }
@@ -463,6 +469,8 @@ static ResultConvention getResultConvention(ImplResultConvention conv) {
     return ResultConvention::UnownedInnerPointer;
   case Demangle::ImplResultConvention::Autoreleased:
     return ResultConvention::Autoreleased;
+  case Demangle::ImplResultConvention::Pack:
+    return ResultConvention::Pack;
   }
   llvm_unreachable("covered switch");
 }

@@ -68,7 +68,7 @@ struct MemberTests {
 
 @runtimeMetadata
 struct Flag<U> {
-  init<T>(attachedTo: T, value: U) {}
+  init<T>(attachedTo: T, value: U, function: String = #function) {}
 }
 
 struct TestSelfUse {
@@ -84,8 +84,10 @@ struct TestSelfUse {
   // CHECK-NEXT: end_access [[PROP_ACCESS]] : $*Int
   // CHECK: [[PROP_VAL_COPY:%.*]] = alloc_stack $Int
   // CHECK: store [[PROP_VALUE]] to [trivial] [[PROP_VAL_COPY]] : $*Int
-  // CHECK: [[FLAG_INIT_REF:%.*]] = function_ref @$s18runtime_attributes4FlagV10attachedTo5valueACyxGqd___xtclufC
-  // CHECK-NEXT: {{.*}} = apply [[FLAG_INIT_REF]]<Int, WritableKeyPath<TestSelfUse, String>>({{.*}}, [[PROP_VAL_COPY]], {{.*}})
+  // CHECK: [[FUNC_NAME:%.*]] = string_literal utf8 "x"
+  // CHECK: [[FUNC_NAME_STR:%.*]] = apply {{.*}}([[FUNC_NAME]], {{.*}})
+  // CHECK: [[FLAG_INIT_REF:%.*]] = function_ref @$s18runtime_attributes4FlagV10attachedTo5value8functionACyxGqd___xSStclufC
+  // CHECK-NEXT: {{.*}} = apply [[FLAG_INIT_REF]]<Int, WritableKeyPath<TestSelfUse, String>>({{.*}}, [[PROP_VAL_COPY]], [[FUNC_NAME_STR]], {{.*}})
   @Flag(value: Self.answer) var x: String = ""
 
   // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes11TestSelfUseV4testyycvpfaAA4Flag : $@convention(thin) () -> @out Optional<Flag<String>>
@@ -97,7 +99,12 @@ struct TestSelfUse {
   // CHECK-NEXT: end_access [[PROP_ACCESS]] : $*String
   // CHECK: [[PROP_VAL_COPY:%.*]] = alloc_stack $String
   // CHECK: store [[PROP_VALUE]] to [init] [[PROP_VAL_COPY]] : $*String
-  // CHECK: [[FLAG_INIT_REF:%.*]] = function_ref @$s18runtime_attributes4FlagV10attachedTo5valueACyxGqd___xtclufC
-  // CHECK-NEXT: {{.*}} = apply [[FLAG_INIT_REF]]<String, (TestSelfUse) -> ()>({{.*}}, [[PROP_VAL_COPY]], {{.*}})
+  // CHECK: [[FUNC_NAME:%.*]] = string_literal utf8 "test()"
+  // CHECK: [[FUNC_NAME_STR:%.*]] = apply {{.*}}([[FUNC_NAME]], {{.*}})
+  // CHECK: [[FLAG_INIT_REF:%.*]] = function_ref @$s18runtime_attributes4FlagV10attachedTo5value8functionACyxGqd___xSStclufC
+  // CHECK-NEXT: {{.*}} = apply [[FLAG_INIT_REF]]<String, (TestSelfUse) -> ()>({{.*}}, [[PROP_VAL_COPY]], [[FUNC_NAME_STR]], {{.*}})
   @Flag(value: Self.question) func test() {}
 }
+
+// This make sure that Child is valid even though it opted-out of attribute.
+_ = Child()

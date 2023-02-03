@@ -75,7 +75,7 @@ TEST(FrozenMultiMapCustomTest, SimpleFind) {
   EXPECT_EQ(map.size(), 5u);
   {
     auto r = map.find(key1);
-    EXPECT_TRUE(r.hasValue());
+    EXPECT_TRUE(r.has_value());
     EXPECT_EQ(r->size(), 3u);
     EXPECT_EQ((*r)[0].getID(), 2u);
     EXPECT_EQ((*r)[1].getID(), 3u);
@@ -84,7 +84,7 @@ TEST(FrozenMultiMapCustomTest, SimpleFind) {
 
   {
     auto r = map.find(key2);
-    EXPECT_TRUE(r.hasValue());
+    EXPECT_TRUE(r.has_value());
     EXPECT_EQ(r->size(), 2u);
     EXPECT_EQ((*r)[0].getID(), 5u);
     EXPECT_EQ((*r)[1].getID(), 6u);

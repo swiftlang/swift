@@ -381,16 +381,16 @@ struct ErrorTypeInVarDecl10 {
 }
 
 struct ErrorTypeInVarDecl11 {
-  var v1 : protocol<FooProtocol, // expected-error {{expected identifier for type name}}
+  var v1 : protocol<FooProtocol, // expected-error {{expected type}}
   var v2 : Int
 }
 
-func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected identifier for type name}}
+func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected type}}
 func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol-constrained type}}
                                             // expected-note@-1 {{to match this opening '<'}}
                                             // expected-error@-2 {{cannot find type 'F' in scope}}
 
-func ErrorTypeInPattern3(_: protocol<F,) { } // expected-error {{expected identifier for type name}}
+func ErrorTypeInPattern3(_: protocol<F,) { } // expected-error {{expected type}}
                                              // expected-error@-1 {{cannot find type 'F' in scope}}
 
 struct ErrorTypeInVarDecl12 {
@@ -775,7 +775,7 @@ class r22240342 {
   lazy var xx: Int = {
     foo {  // expected-error {{cannot find 'foo' in scope}}
       let issueView = 42
-      issueView.delegate = 12
+      issueView.delegate = 12 // expected-error {{value of type 'Int' has no member 'delegate'}}
       
     }
     return 42

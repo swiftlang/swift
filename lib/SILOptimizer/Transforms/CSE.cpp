@@ -1069,7 +1069,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
       // In non-OSSA we don't balance CSE'd apply results which return an
       // owned value.
       if (auto ri = AI->getSingleResult()) {
-        if (ri.getValue().getConvention() != ResultConvention::Unowned)
+        if (ri.value().getConvention() != ResultConvention::Unowned)
           return false;
       }
     }

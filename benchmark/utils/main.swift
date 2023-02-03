@@ -33,6 +33,7 @@ import BitCount
 import Breadcrumbs
 import BucketSort
 import BufferFill
+import BufferFind
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
@@ -52,6 +53,7 @@ import CodableTest
 import Combos
 import CreateObjects
 import CxxSetToCollection
+import CxxStringConversion
 import CxxVectorSum
 import DataBenchmarks
 import DeadArray
@@ -220,6 +222,7 @@ register(BitCount.benchmarks)
 register(Breadcrumbs.benchmarks)
 register(BucketSort.benchmarks)
 register(BufferFill.benchmarks)
+register(BufferFind.benchmarks)
 register(ByteSwap.benchmarks)
 register(COWTree.benchmarks)
 register(COWArrayGuaranteedParameterOverhead.benchmarks)
@@ -239,6 +242,7 @@ register(Combos.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
 register(CxxSetToCollection.benchmarks)
+register(CxxStringConversion.benchmarks)
 register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)

@@ -327,7 +327,7 @@ entry(%instance : @owned $InferredEagerD2S1):
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         destroy_value [[INSTANCE]]
@@ -430,7 +430,7 @@ entry(%instance : @owned $InferredEagerD2S1):
 }
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical__type_annotation : {{.*}} {
-// CHECK:         begin_borrow [lexical]
+// CHECK:         begin_borrow
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical__type_annotation'
 sil [ossa] @caller_owned_callee_guaranteed_lexical__type_annotation : $@convention(thin) (@owned LexicalS) -> () {
 entry(%instance : @owned $LexicalS):
@@ -441,7 +441,7 @@ entry(%instance : @owned $LexicalS):
 }
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s1 : {{.*}} {
-// CHECK:         begin_borrow [lexical]
+// CHECK:         begin_borrow
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical__type_inferred_d1_s1'
 sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s1 : $@convention(thin) (@owned InferredLexicalD1S1) -> () {
 entry(%instance : @owned $InferredLexicalD1S1):
@@ -452,7 +452,7 @@ entry(%instance : @owned $InferredLexicalD1S1):
 }
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s2 : {{.*}} {
-// CHECK:         begin_borrow [lexical]
+// CHECK:         begin_borrow
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical__type_inferred_d1_s2'
 sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s2 : $@convention(thin) (@owned InferredLexicalD1S2) -> () {
 entry(%instance : @owned $InferredLexicalD1S2):
@@ -463,7 +463,7 @@ entry(%instance : @owned $InferredLexicalD1S2):
 }
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s3 : {{.*}} {
-// CHECK:         begin_borrow [lexical]
+// CHECK:         begin_borrow
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical__type_inferred_d1_s3'
 sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s3 : $@convention(thin) (@owned InferredLexicalD1S3) -> () {
 entry(%instance : @owned $InferredLexicalD1S3):
@@ -474,7 +474,7 @@ entry(%instance : @owned $InferredLexicalD1S3):
 }
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s4 : {{.*}} {
-// CHECK:         begin_borrow [lexical]
+// CHECK:         begin_borrow
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical__type_inferred_d1_s4'
 sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s4 : $@convention(thin) (@owned InferredLexicalD1S4) -> () {
 entry(%instance : @owned $InferredLexicalD1S4):
@@ -486,9 +486,9 @@ entry(%instance : @owned $InferredLexicalD1S4):
 
 // CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK-NOT:     begin_borrow [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK-NOT:     end_borrow
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_guaranteed'
 sil [ossa] @caller_guaranteed_callee_guaranteed : $@convention(thin) (@guaranteed C) -> () {
@@ -673,7 +673,7 @@ bb0(%instance : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
 // CHECK:         store [[LIFETIME_OWNED]] to [init] [[ADDR]]
@@ -714,14 +714,14 @@ bb0(%instance : @guaranteed $C):
 
 // CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK-NOT:     begin_borrow
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[INSTANCE]]
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
 // CHECK:         store [[LIFETIME_OWNED]] to [init] [[ADDR]]
 // CHECK:         destroy_addr [[ADDR]]
 // CHECK:         dealloc_stack [[ADDR]]
 // CHECK:         [[ORIGINAL_RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK-NOT:     end_borrow
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK:       bb1:
@@ -865,7 +865,7 @@ bb2(%12 : @owned $Error):
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_error_guaranteed : $@convention(thin) (@owned C) -> @error any Error {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
 // CHECK:         end_borrow [[LIFETIME]]
@@ -908,14 +908,14 @@ bb2(%12 : @owned $Error):
 
 // CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error any Error {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK-NOT:     begin_borrow
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK-NOT:     end_borrow
 // CHECK:         throw undef
 // CHECK:       [[REGULAR_BLOCK]]:
 // CHECK:         [[ORIGINAL_RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK-NOT:     end_borrow
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_error_guaranteed'

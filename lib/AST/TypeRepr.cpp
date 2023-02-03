@@ -384,17 +384,20 @@ GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
   return new (mem) GenericIdentTypeRepr(Loc, Id, GenericArgs, AngleBrackets);
 }
 
-MemberTypeRepr *
-MemberTypeRepr::create(const ASTContext &C, TypeRepr *Base,
-                       ArrayRef<IdentTypeRepr *> MemberComponents) {
+TypeRepr *MemberTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+                                 ArrayRef<IdentTypeRepr *> MemberComponents) {
+  if (MemberComponents.empty())
+    return Base;
+
   auto size = totalSizeToAlloc<IdentTypeRepr *>(MemberComponents.size());
   auto mem = C.Allocate(size, alignof(MemberTypeRepr));
   return new (mem) MemberTypeRepr(Base, MemberComponents);
 }
 
-MemberTypeRepr *MemberTypeRepr::create(const ASTContext &Ctx,
-                                       ArrayRef<IdentTypeRepr *> Components) {
-  return create(Ctx, Components.front(), Components.drop_front());
+DeclRefTypeRepr *MemberTypeRepr::create(const ASTContext &Ctx,
+                                        ArrayRef<IdentTypeRepr *> Components) {
+  return cast<DeclRefTypeRepr>(
+      create(Ctx, Components.front(), Components.drop_front()));
 }
 
 PackTypeRepr::PackTypeRepr(SourceLoc keywordLoc, SourceRange braceLocs,

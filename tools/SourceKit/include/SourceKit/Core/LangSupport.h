@@ -948,6 +948,7 @@ public:
       bool SymbolGraph, bool CancelOnSubsequentRequest,
       ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
+      bool VerifySolverBasedCursorInfo,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void

@@ -4,6 +4,8 @@ target_sources(swiftSILOptimizer PRIVATE
   AddressLowering.cpp
   CapturePromotion.cpp
   ClosureLifetimeFixup.cpp
+  ConsumeOperatorCopyableAddressesChecker.cpp
+  ConsumeOperatorCopyableValuesChecker.cpp
   PhiStorageOptimizer.cpp
   ConstantPropagation.cpp
   DebugInfoCanonicalizer.cpp
@@ -22,12 +24,12 @@ target_sources(swiftSILOptimizer PRIVATE
   LowerHopToActor.cpp
   MandatoryInlining.cpp
   MovedAsyncVarDebugInfoPropagator.cpp
-  MoveKillsCopyableAddressesChecker.cpp
-  MoveKillsCopyableValuesChecker.cpp
+  MoveOnlyAddressChecker.cpp
+  MoveOnlyBorrowToDestructureTransform.cpp
+  MoveOnlyBorrowToDestructureTransformTester.cpp
+  MoveOnlyDeinitInsertion.cpp
   MoveOnlyDiagnostics.cpp
   MoveOnlyObjectChecker.cpp
-  MoveOnlyAddressChecker.cpp
-  MoveOnlyDeinitInsertion.cpp
   NestedSemanticFunctionCheck.cpp
   OptimizeHopToExecutor.cpp
   PerformanceDiagnostics.cpp

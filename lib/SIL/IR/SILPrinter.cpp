@@ -1397,6 +1397,9 @@ public:
     printDebugVar(AVI->getVarInfo(),
                   &AVI->getModule().getASTContext().SourceMgr);
   }
+  void visitAllocPackInst(AllocPackInst *API) {
+    *this << API->getType().getObjectType();
+  }
 
   void printAllocRefInstBase(AllocRefInstBase *ARI) {
     if (ARI->isObjC())
@@ -1507,6 +1510,9 @@ public:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Inout:
       llvm_unreachable("unexpected callee convention!");
     }
     if (CI->isOnStack())
@@ -2369,6 +2375,9 @@ public:
     *this << getIDAndType(CUI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {
+    *this << getIDAndType(DI->getOperand());
+  }
+  void visitDeallocPackInst(DeallocPackInst *DI) {
     *this << getIDAndType(DI->getOperand());
   }
   void visitDeallocStackRefInst(DeallocStackRefInst *ESRL) {

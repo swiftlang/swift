@@ -45,7 +45,7 @@ if (SWIFT_SWIFT_PARSER)
     SwiftSyntax::SwiftSyntax
     SwiftSyntax::SwiftOperators
     SwiftSyntax::SwiftSyntaxBuilder
-    SwiftSyntax::_SwiftSyntaxMacros
+    SwiftSyntax::SwiftSyntaxMacros
     $<TARGET_OBJECTS:swiftASTGen>
   )
 
@@ -57,7 +57,7 @@ if (SWIFT_SWIFT_PARSER)
     SwiftSyntax::SwiftSyntax
     SwiftSyntax::SwiftOperators
     SwiftSyntax::SwiftSyntaxBuilder
-    SwiftSyntax::_SwiftSyntaxMacros
+    SwiftSyntax::SwiftSyntaxMacros
     swiftASTGen
   )
 

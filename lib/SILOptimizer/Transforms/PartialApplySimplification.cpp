@@ -164,7 +164,10 @@ static bool isSimplePartialApply(SILModule &M,
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
-      // Indirect arguments are trivially word sized.
+    case ParameterConvention::Pack_Inout:
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+      // Indirect and pack arguments are trivially word sized.
       return true;
         
     case ParameterConvention::Direct_Guaranteed:
@@ -450,12 +453,15 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
       boxFields.push_back(SILField(param.getInterfaceType(), /*mutable*/false));
       break;
     
     // Conventions where an address to the argument is captured.
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Pack_Inout:
       // Put a RawPointer in the box, which we can turn back into an address
       // in the function
       boxFields.push_back(SILField(C.TheRawPointerType, /*mutable*/false));
@@ -625,6 +631,11 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
                       /*strict*/ conv == ParameterConvention::Indirect_Inout);
           break;
         }
+        case ParameterConvention::Pack_Guaranteed:
+        case ParameterConvention::Pack_Owned:
+        case ParameterConvention::Pack_Inout:
+          llvm_unreachable("unsupported!");
+          break;
         }
       } else {
         switch (auto conv = param.getConvention()) {
@@ -666,6 +677,11 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
                       /*strict*/ conv == ParameterConvention::Indirect_Inout);
           break;
         }
+        case ParameterConvention::Pack_Guaranteed:
+        case ParameterConvention::Pack_Owned:
+        case ParameterConvention::Pack_Inout:
+          llvm_unreachable("unsupported!");
+          break;
         }
       }
       
@@ -789,7 +805,14 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
         } else {
           B.createStore(loc, p, proj, StoreOwnershipQualifier::Unqualified);
         }
+        break;
       }
+
+      case ParameterConvention::Pack_Guaranteed:
+      case ParameterConvention::Pack_Owned:
+      case ParameterConvention::Pack_Inout:
+        llvm_unreachable("unsupported!");
+        break;
       }
     }
     

@@ -1465,9 +1465,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
     if (!info.getType().isNull()) {
       out << "\n";
       out.indent(indent) << "Contextual Type: " << info.getType().getString(PO);
+      out << " at ";
+
+      auto &SM = getASTContext().SourceMgr;
       if (TypeRepr *TR = info.typeLoc.getTypeRepr()) {
-        out << " at ";
-        TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
+        TR->getSourceRange().print(out, SM, /*text*/ false);
+      } else {
+        dumpAnchor(contextualTypeEntry.first, &SM, out);
       }
     }
   }
@@ -1655,6 +1659,27 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
        !unwrappedIUO)) {
     return CheckedCastKind::Coercion;
   }
+
+  // Since move-only types currently cannot conform to protocols, nor be a class
+  // type, the subtyping hierarchy is a bit bizarre as of now:
+  //
+  //              noncopyable
+  //           structs and enums
+  //                   |
+  //       +--------- Any
+  //       |           |
+  //   AnyObject    protocol
+  //       |       existentials
+  //       |            |   \
+  //       +---------+  |    +-- structs/enums
+  //                 |  |
+  //                classes
+  //           (and their subtyping)
+  //
+  //
+  // Thus, right now, a move-only type is only a subtype of itself.
+  if (fromType->isPureMoveOnly())
+    return CheckedCastKind::Unresolved;
   
   // Check for a bridging conversion.
   // Anything bridges to AnyObject.

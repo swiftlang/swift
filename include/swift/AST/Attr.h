@@ -1716,7 +1716,7 @@ public:
   }
 
 private:
-  friend class CustomAttrDeclRequest;
+  friend class CustomAttrNominalRequest;
   void resetTypeInformation(TypeExpr *repr);
 
 private:
@@ -2219,15 +2219,12 @@ public:
 
 /// The @_backDeploy(...) attribute, used to make function declarations available
 /// for back deployment to older OSes via emission into the client binary.
-class BackDeployAttr: public DeclAttribute {
+class BackDeployedAttr : public DeclAttribute {
 public:
-  BackDeployAttr(SourceLoc AtLoc, SourceRange Range,
-                 PlatformKind Platform,
-                 const llvm::VersionTuple Version,
-                 bool Implicit)
-    : DeclAttribute(DAK_BackDeploy, AtLoc, Range, Implicit),
-      Platform(Platform),
-      Version(Version) {}
+  BackDeployedAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
+                   const llvm::VersionTuple Version, bool Implicit)
+      : DeclAttribute(DAK_BackDeployed, AtLoc, Range, Implicit),
+        Platform(Platform), Version(Version) {}
 
   /// The platform the symbol is available for back deployment on.
   const PlatformKind Platform;
@@ -2239,7 +2236,7 @@ public:
   bool isActivePlatform(const ASTContext &ctx) const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_BackDeploy;
+    return DA->getKind() == DAK_BackDeployed;
   }
 };
 
@@ -2307,69 +2304,38 @@ public:
   }
 };
 
-class DeclarationAttr final
+/// A macro role attribute, spelled with either @attached or @freestanding,
+/// which declares one of the roles that a given macro can inhabit.
+class MacroRoleAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<DeclarationAttr, MacroIntroducedDeclName> {
+      private llvm::TrailingObjects<MacroRoleAttr, MacroIntroducedDeclName> {
   friend TrailingObjects;
 
-  MacroRole role;
-  unsigned numPeerNames, numMemberNames;
-
-  DeclarationAttr(SourceLoc atLoc, SourceRange range, MacroRole role,
-                  ArrayRef<MacroIntroducedDeclName> peerNames,
-                  ArrayRef<MacroIntroducedDeclName> memberNames,
-                  bool implicit);
-
-public:
-  static DeclarationAttr *create(ASTContext &ctx, SourceLoc atLoc,
-                                 SourceRange range, MacroRole role,
-                                 ArrayRef<MacroIntroducedDeclName> peerNames,
-                                 ArrayRef<MacroIntroducedDeclName> memberNames,
-                                 bool implicit);
-
-  size_t numTrailingObjects(OverloadToken<MacroIntroducedDeclName>) const {
-    return numPeerNames + numMemberNames;
-  }
-
-  MacroRole getMacroRole() const { return role; }
-  ArrayRef<MacroIntroducedDeclName> getPeerAndMemberNames() const;
-  ArrayRef<MacroIntroducedDeclName> getPeerNames() const;
-  ArrayRef<MacroIntroducedDeclName> getMemberNames() const;
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Declaration;
-  }
-};
-
-/// The @attached attribute, which declares that a given macro can be
-/// "attached" as an attribute to declarations.
-class AttachedAttr final
-    : public DeclAttribute,
-      private llvm::TrailingObjects<AttachedAttr, MacroIntroducedDeclName> {
-  friend TrailingObjects;
-
+  MacroSyntax syntax;
   MacroRole role;
   unsigned numNames;
 
-  AttachedAttr(SourceLoc atLoc, SourceRange range, MacroRole role,
-               ArrayRef<MacroIntroducedDeclName> names,
-               bool implicit);
+  MacroRoleAttr(SourceLoc atLoc, SourceRange range, MacroSyntax syntax,
+                MacroRole role, ArrayRef<MacroIntroducedDeclName> names,
+                bool implicit);
 
 public:
-  static AttachedAttr *create(ASTContext &ctx, SourceLoc atLoc,
-                              SourceRange range, MacroRole role,
-                              ArrayRef<MacroIntroducedDeclName> names,
-                              bool implicit);
+  static MacroRoleAttr *create(ASTContext &ctx, SourceLoc atLoc,
+                               SourceRange range, MacroSyntax syntax,
+                               MacroRole role,
+                               ArrayRef<MacroIntroducedDeclName> names,
+                               bool implicit);
 
   size_t numTrailingObjects(OverloadToken<MacroIntroducedDeclName>) const {
     return numNames;
   }
 
+  MacroSyntax getMacroSyntax() const { return syntax; }
   MacroRole getMacroRole() const { return role; }
   ArrayRef<MacroIntroducedDeclName> getNames() const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Attached;
+    return DA->getKind() == DAK_MacroRole;
   }
 };
 
@@ -2450,9 +2416,9 @@ public:
   /// otherwise.
   const AvailableAttr *getNoAsync(const ASTContext &ctx) const;
 
-  /// Returns the \c @_backDeploy attribute that is active for the current
+  /// Returns the `@backDeployed` attribute that is active for the current
   /// platform.
-  const BackDeployAttr *getBackDeploy(const ASTContext &ctx) const;
+  const BackDeployedAttr *getBackDeployed(const ASTContext &ctx) const;
 
   SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,

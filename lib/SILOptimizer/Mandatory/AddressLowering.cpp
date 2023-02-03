@@ -1386,7 +1386,7 @@ void OpaqueStorageAllocation::finalizeOpaqueStorage() {
   SmallVector<SILBasicBlock *, 4> boundary;
   for (auto maybeAlloc : allocs) {
     // An allocation may be erased when coalescing block arguments.
-    if (!maybeAlloc.hasValue())
+    if (!maybeAlloc.has_value())
       continue;
 
     auto *alloc = maybeAlloc.value();
@@ -2864,6 +2864,9 @@ void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Inout:
     return;
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
@@ -3024,11 +3027,7 @@ protected:
 
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
-    case BuiltinValueKind::ResumeNonThrowingContinuationReturning: {
-      SILValue opAddr = addrMat.materializeAddress(use->get());
-      bi->setOperand(use->getOperandNumber(), opAddr);
-      break;
-    }
+    case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(use->getOperandNumber(), opAddr);

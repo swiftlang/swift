@@ -64,6 +64,7 @@ namespace swift {
   class SerializationOptions;
   class SILOptions;
   class SILModule;
+  class SILTypeResolutionContext;
   class SourceFile;
   enum class SourceFileKind;
   class SourceManager;
@@ -163,10 +164,9 @@ namespace swift {
   /// code completion).
   ///
   /// \returns A well-formed type on success, or an \c ErrorType.
-  Type performTypeResolution(TypeRepr *TyR, ASTContext &Ctx, bool isSILMode,
-                             bool isSILType,
+  Type performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
                              GenericSignature GenericSig,
-                             GenericParamList *GenericParams,
+                             SILTypeResolutionContext *SILContext,
                              DeclContext *DC, bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.

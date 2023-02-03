@@ -399,6 +399,15 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
       }
       return;
 
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Inout:
+      // Ignore packs as sources of metadata.
+      // In principle, we could recurse into non-expansion components,
+      // but what situation would we be in where we had concrete
+      // components of a pack and weren't ABI-constrained to ignore them?
+      return;
+
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
@@ -2625,7 +2634,8 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
   auto &IGM = IGF.IGM;
   if (!IGM.IRGen.Opts.UseRelativeProtocolWitnessTables) {
     auto baseWTable =
-      emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+      emitInvariantLoadOfOpaqueWitness(IGF,/*isProtocolWitness*/true, wtable,
+                                       index);
     return baseWTable;
   }
   auto &Builder = IGF.Builder;
@@ -2650,7 +2660,8 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
 
   Builder.emitBlock(isNotCondBB);
   auto baseWTable2 =
-      emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+      emitInvariantLoadOfOpaqueWitness(IGF,/*isProtocolWitness*/true, wtable,
+                                       index);
   baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
                                           IGF.IGM.WitnessTablePtrTy);
   Builder.CreateBr(endBB);
@@ -2668,7 +2679,8 @@ llvm::Value *irgen::loadConditionalConformance(IRGenFunction &IGF,
 
   auto &IGM = IGF.IGM;
   if (!IGM.IRGen.Opts.UseRelativeProtocolWitnessTables) {
-    return emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+    return emitInvariantLoadOfOpaqueWitness(IGF, /*isProtocolWitness*/true,
+                                            wtable, index);
   }
 
   auto &Builder = IGF.Builder;

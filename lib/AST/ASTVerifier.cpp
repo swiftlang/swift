@@ -232,6 +232,10 @@ class Verifier : public ASTWalker {
       ClosureDiscriminators;
   DeclContext *CanonicalTopLevelSubcontext = nullptr;
 
+  typedef std::pair<DeclContext *, Identifier> MacroExpansionDiscriminatorKey;
+  llvm::DenseMap<MacroExpansionDiscriminatorKey, SmallBitVector>
+      MacroExpansionDiscriminators;
+
   Verifier(PointerUnion<ModuleDecl *, SourceFile *> M, DeclContext *DC)
       : M(M),
         Ctx(M.is<ModuleDecl *>() ? M.get<ModuleDecl *>()->getASTContext()
@@ -2372,6 +2376,52 @@ public:
       }
     }
 
+    void verifyChecked(MacroExpansionExpr *expansion) {
+      auto dc = getCanonicalDeclContext(expansion->getDeclContext());
+      MacroExpansionDiscriminatorKey key{
+        dc,
+        expansion->getMacroName().getBaseName().getIdentifier()
+      };
+      auto &discriminatorSet = MacroExpansionDiscriminators[key];
+      unsigned discriminator = expansion->getDiscriminator();
+
+      if (discriminator >= discriminatorSet.size()) {
+        discriminatorSet.resize(discriminator+1);
+        discriminatorSet.set(discriminator);
+      } else if (discriminatorSet.test(discriminator)) {
+        Out << "a macro expansion must have a unique discriminator "
+            << "in its context\n";
+        expansion->dump(Out);
+        Out << "\n";
+        abort();
+      } else {
+        discriminatorSet.set(discriminator);
+      }
+    }
+
+    void verifyChecked(MacroExpansionDecl *expansion) {
+      auto dc = getCanonicalDeclContext(expansion->getDeclContext());
+      MacroExpansionDiscriminatorKey key{
+        dc,
+        expansion->getMacro().getBaseName().getIdentifier()
+      };
+      auto &discriminatorSet = MacroExpansionDiscriminators[key];
+      unsigned discriminator = expansion->getDiscriminator();
+
+      if (discriminator >= discriminatorSet.size()) {
+        discriminatorSet.resize(discriminator+1);
+        discriminatorSet.set(discriminator);
+      } else if (discriminatorSet.test(discriminator)) {
+        Out << "a macro expansion must have a unique discriminator "
+            << "in its context\n";
+        expansion->dump(Out);
+        Out << "\n";
+        abort();
+      } else {
+        discriminatorSet.set(discriminator);
+      }
+    }
+
     void verifyChecked(ValueDecl *VD) {
       if (VD->getInterfaceType()->hasError()) {
         Out << "checked decl cannot have error type\n";
@@ -3654,12 +3704,13 @@ public:
     void checkSourceRanges(Decl *D) {
       PrettyStackTraceDecl debugStack("verifying ranges", D);
       const auto SR = D->getSourceRange();
+
+      // We don't care about source ranges on implicitly-generated
+      // decls.
+      if (D->isImplicit())
+        return;
+
       if (!SR.isValid()) {
-        // We don't care about source ranges on implicitly-generated
-        // decls.
-        if (D->isImplicit())
-          return;
-        
         Out << "invalid source range for decl: ";
         D->print(Out);
         Out << "\n";
@@ -3691,6 +3742,18 @@ public:
         return;
       } else if (Decl *D = Parent.getAsDecl()) {
         Enclosing = D->getSourceRange();
+
+        // If the current source range is in a macro expansion buffer, its enclosing
+        // context can be in the source file where the macro expansion originated. In
+        // this case, grab the source range of the original ASTNode that was expanded.
+        if (!Ctx.SourceMgr.rangeContains(Enclosing, Current)) {
+          auto *expansionBuffer =
+              D->getModuleContext()->getSourceFileContainingLocation(Current.Start);
+          if (auto expansion = expansionBuffer->getMacroExpansion()) {
+            Current = expansion.getSourceRange();
+          }
+        }
+
         if (D->isImplicit())
           return;
         // FIXME: This is not working well for decl parents.

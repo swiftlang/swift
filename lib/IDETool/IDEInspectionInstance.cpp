@@ -452,7 +452,7 @@ void IDEInspectionInstance::performNewOperation(
   llvm::PrettyStackTraceString trace("While performing new IDE inspection");
 
   // If ArgsHash is None we shouldn't cache the compiler instance.
-  bool ShouldCacheCompilerInstance = ArgsHash.hasValue();
+  bool ShouldCacheCompilerInstance = ArgsHash.has_value();
 
   auto CI = std::make_shared<CompilerInstance>();
 
@@ -551,7 +551,7 @@ void swift::ide::IDEInspectionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
-    DiagnosticConsumer *DiagC, bool IgnoreSwiftSourceInfo,
+    DiagnosticConsumer *DiagC,
     std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<IDEInspectionInstanceResult>)>
         Callback) {
@@ -572,8 +572,6 @@ void swift::ide::IDEInspectionInstance::performOperation(
     // and we don't need to build a new AST. We are done.
     return;
   }
-
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = IgnoreSwiftSourceInfo;
 
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
@@ -630,7 +628,7 @@ void swift::ide::IDEInspectionInstance::codeComplete(
   // they're somewhat heavy operations and aren't needed for completion.
   performOperation(
       Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
-      /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
+      CancellationFlag,
       [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<CodeCompleteResult>(
             [&CompletionContext, &CancellationFlag](auto &Result,
@@ -707,7 +705,7 @@ void swift::ide::IDEInspectionInstance::typeContextInfo(
 
   performOperation(
       Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
-      /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
+      CancellationFlag,
       [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<TypeContextInfoResult>(
             [&CancellationFlag](auto &Result, auto DeliverTransformed) {
@@ -775,7 +773,7 @@ void swift::ide::IDEInspectionInstance::conformingMethodList(
 
   performOperation(
       Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
-      /*IgnoreSwiftSourceInfo=*/true, CancellationFlag,
+      CancellationFlag,
       [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<ConformingMethodListResults>(
             [&ExpectedTypeNames, &CancellationFlag](auto &Result,
@@ -841,7 +839,7 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
 
   performOperation(
       Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
-      /*IgnoreSwiftSourceInfo=*/false, CancellationFlag,
+      CancellationFlag,
       [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<CursorInfoResults>(
             [&CancellationFlag, Offset](auto &Result, auto DeliverTransformed) {

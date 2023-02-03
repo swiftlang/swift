@@ -32,6 +32,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -1992,12 +1993,7 @@ public:
     checkAccessControl(PGD);
   }
 
-  void visitMissingDecl(MissingDecl *missing) {
-    // FIXME: Expanded attribute lists should be type checked against
-    // the real declaration they will be attached to. Attempting to
-    // type check a missing decl should produce an error.
-    TypeChecker::checkDeclAttributes(missing);
-  }
+  void visitMissingDecl(MissingDecl *missing) {  }
 
   void visitMissingMemberDecl(MissingMemberDecl *MMD) {
     llvm_unreachable("should always be type-checked already");
@@ -2012,7 +2008,7 @@ public:
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
     if (!MD->getMacroRoles())
-      MD->diagnose(diag::macro_without_context, MD->getName());
+      MD->diagnose(diag::macro_without_role, MD->getName());
 
     // Check the macro definition.
     switch (auto macroDef = MD->getDefinition()) {
@@ -2049,6 +2045,9 @@ public:
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+    // Assign a discriminator.
+    (void)MED->getDiscriminator();
+
     (void)evaluateOrDefault(
         Ctx.evaluator, ExpandMacroExpansionDeclRequest{MED}, {});
   }
@@ -2181,6 +2180,21 @@ public:
     VD->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visit(accessor);
     });
+
+    // If this var decl is a no implicit copy varDecl, error if its type is a
+    // move only type. No implicit copy is redundant.
+    //
+    // NOTE: We do this here instead of TypeCheckAttr since types are not
+    // completely type checked at that point.
+    if (auto attr = VD->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
+      if (auto *nom = VD->getType()->getCanonicalType()->getNominalOrBoundGenericNominal()) {
+        if (nom->isMoveOnly()) {
+          DE.diagnose(attr->getLocation(),
+                      diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
+            .fixItRemove(attr->getRange());
+        }
+      }
+    }
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
@@ -2563,6 +2577,7 @@ public:
       }
     }
 
+    // FIXME(kavon): see if these can be integrated into other parts of Sema
     diagnoseCopyableTypeContainingMoveOnlyType(ED);
     diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(ED);
 
@@ -3357,6 +3372,8 @@ public:
       ED->diagnose(diag::moveonly_cannot_conform_to_protocol,
                    nominal->getDescriptiveKind(), nominal->getBaseName());
     }
+
+    TypeChecker::checkReflectionMetadataAttributes(ED);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
@@ -3654,6 +3671,17 @@ void TypeChecker::checkParameterList(ParameterList *params,
           DeclChecker(param->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
       });
     }
+
+    // If we have a noimplicitcopy parameter, make sure that the underlying type
+    // is not move only. It is redundant.
+    if (auto attr = param->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
+      if (auto *nom = param->getType()->getCanonicalType()->getNominalOrBoundGenericNominal()) {
+        if (nom->isMoveOnly()) {
+          param->diagnose(diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
+            .fixItRemove(attr->getRange());
+        }
+      }
+    }
   }
 
   // For source compatibility, allow duplicate internal parameter names
@@ -3674,7 +3702,7 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   auto *dc = MED->getDeclContext();
   auto foundMacros = TypeChecker::lookupMacros(
       MED->getDeclContext(), MED->getMacro(),
-      MED->getLoc(), MacroRole::FreestandingDeclaration);
+      MED->getLoc(), MacroRole::Declaration);
   if (foundMacros.empty()) {
     MED->diagnose(diag::macro_undefined, MED->getMacro().getBaseIdentifier())
         .highlight(MED->getMacroLoc().getSourceRange());
@@ -3682,9 +3710,12 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   }
   // Resolve macro candidates.
   MacroDecl *macro;
-  // Non-call declaration macros cannot be overloaded.
-  auto *args = MED->getArgs();
-  if (!args) {
+  if (auto *args = MED->getArgs()) {
+    macro = evaluateOrDefault(
+        ctx.evaluator, ResolveMacroRequest{MED, MacroRole::Declaration, dc},
+        nullptr);
+  }
+  else {
     if (foundMacros.size() > 1) {
       MED->diagnose(diag::ambiguous_decl_ref, MED->getMacro())
           .highlight(MED->getMacroLoc().getSourceRange());
@@ -3694,63 +3725,8 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
     }
     macro = foundMacros.front();
   }
-    // Call-like macros need to be resolved.
-  else {
-    using namespace constraints;
-    ConstraintSystem cs(dc, ConstraintSystemOptions());
-    // Type-check macro arguments.
-    for (auto *arg : args->getArgExprs())
-      cs.setType(arg, TypeChecker::typeCheckExpression(arg, dc));
-    auto choices = map<SmallVector<OverloadChoice, 1>>(
-        foundMacros,
-        [](MacroDecl *md) {
-          return OverloadChoice(Type(), md, FunctionRefKind::SingleApply);
-        });
-    auto locator = cs.getConstraintLocator(MED);
-    auto macroRefType = Type(cs.createTypeVariable(locator, 0));
-    cs.addOverloadSet(macroRefType, choices, dc, locator);
-    if (MED->getGenericArgsRange().isValid()) {
-      // FIXME: Deal with generic args.
-      MED->diagnose(diag::macro_unsupported);
-      return {};
-    }
-    auto getMatchingParams = [&](
-        ArgumentList *argList,
-        SmallVectorImpl<AnyFunctionType::Param> &result) {
-      for (auto arg : *argList) {
-        ParameterTypeFlags flags;
-        auto ty = cs.getType(arg.getExpr()); if (arg.isInOut()) {
-          ty = ty->getInOutObjectType();
-          flags = flags.withInOut(true);
-        }
-        if (arg.isConst()) {
-          flags = flags.withCompileTimeConst(true);
-        }
-        result.emplace_back(ty, arg.getLabel(), flags);
-      }
-    };
-    SmallVector<AnyFunctionType::Param, 8> params;
-    getMatchingParams(args, params);
-    cs.associateArgumentList(locator, args);
-    cs.addConstraint(
-        ConstraintKind::ApplicableFunction,
-        FunctionType::get(params, ctx.getVoidType()),
-        macroRefType,
-        cs.getConstraintLocator(MED, ConstraintLocator::ApplyFunction));
-    // Solve.
-    auto solution = cs.solveSingle();
-    if (!solution) {
-      MED->diagnose(diag::no_overloads_match_exactly_in_call,
-                    /*reference|call*/false, DescriptiveDeclKind::Macro,
-                    false, MED->getMacro().getBaseName())
-          .highlight(MED->getMacroLoc().getSourceRange());
-      for (auto *candidate : foundMacros)
-        candidate->diagnose(diag::found_candidate);
-      return {};
-    }
-    auto choice = solution->getOverloadChoice(locator).choice;
-    macro = cast<MacroDecl>(choice.getDecl());
-  }
+  if (!macro)
+    return {};
   MED->setMacroRef(macro);
 
   // Expand the macro.

@@ -450,3 +450,6 @@ $s4main4TestV11doSomethingyycvpfaAA4Flag ---> runtime attribute generator of mai
 $s4main4TestV11doSomethingyycvpZfaAA4Flag ---> runtime attribute generator of static main.Test.doSomething : () -> () for attribute = main.Flag
 $s4main4TestV1xSivpfaAA4Flag ---> runtime attribute generator of main.Test.x : Swift.Int for attribute = main.Flag
 $s4main4TestAaBVmvpfaAA9OtherFlag ---> runtime attribute generator of main.Test : main.Test.Type for attribute = main.OtherFlag
+$s9MacroUser13testStringify1a1bySi_SitF9stringifyfMf1_ ---> freestanding macro expansion #3 of stringify in MacroUser.testStringify(a: Swift.Int, b: Swift.Int) -> ()
+$s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0_ ---> unique name #2 of method in freestanding macro expansion #1 of bitwidthNumberedStructs in Foo3 #1 in MacroUser.testFreestandingMacroExpansion() -> ()
+@__swiftmacro_1a13testStringifyAA1bySi_SitF9stringifyfMf_  ---> freestanding macro expansion #1 of stringify in a.testStringify(a: Swift.Int, b: Swift.Int) -> ()

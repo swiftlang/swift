@@ -896,6 +896,34 @@ CustomAttr *SourceFile::getAttachedMacroAttribute() const {
   return genInfo.attachedMacroCustomAttr;
 }
 
+Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
+  if (Kind != SourceFileKind::MacroExpansion)
+    return None;
+
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  switch (genInfo.kind) {
+  case GeneratedSourceInfo::ExpressionMacroExpansion:
+    return MacroRole::Expression;
+
+  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    return MacroRole::Declaration;
+
+  case GeneratedSourceInfo::AccessorMacroExpansion:
+    return MacroRole::Accessor;
+
+  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+    return MacroRole::MemberAttribute;
+
+  case GeneratedSourceInfo::MemberMacroExpansion:
+    return MacroRole::Member;
+
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+  case GeneratedSourceInfo::PrettyPrinted:
+    return None;
+  }
+}
+
 SourceFile *SourceFile::getEnclosingSourceFile() const {
   auto macroExpansion = getMacroExpansion();
   if (!macroExpansion)
@@ -1178,6 +1206,13 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   if (!protocol->existentialConformsToSelf())
     return ProtocolConformanceRef::forInvalid();
 
+  // All existentials are Copyable.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(type, protocol, GenericSignature(), {},
+                                  BuiltinConformanceKind::Synthesized));
+  }
+
   auto layout = type->getExistentialLayout();
 
   // Due to an IRGen limitation, witness tables cannot be passed from an
@@ -1334,8 +1369,10 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     return ProtocolConformanceRef(specialized);
   }
 
-  // Tuple type are Sendable when all of their element types are Sendable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  /// For some known protocols (KPs) like Sendable and Copyable, a tuple type
+  /// conforms to the protocol KP when all of their element types conform to KP.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
 
     // Create the pieces for a generic tuple type (T1, T2, ... TN) and a
     // generic signature <T1, T2, ..., TN>.
@@ -1361,9 +1398,9 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
                                     BuiltinConformanceKind::Synthesized));
     }
 
-    // Form a generic conformance of (T1, T2, ..., TN): Sendable with signature
-    // <T1, T2, ..., TN> and conditional requirements T1: Sendable,
-    // T2: Sendable, ..., TN: Sendable.
+    // Form a generic conformance of (T1, T2, ..., TN): KP with signature
+    // <T1, T2, ..., TN> and conditional requirements T1: KP,
+    // T2: P, ..., TN: KP.
     auto genericTupleType = TupleType::get(genericElements, ctx);
     auto genericSig = GenericSignature::get(
         genericParams, conditionalRequirements);
@@ -1412,12 +1449,20 @@ static bool isSendableFunctionType(const FunctionType *functionType) {
 /// appropriate.
 static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
     Type type, const FunctionType *functionType, ProtocolDecl *protocol) {
+  ASTContext &ctx = protocol->getASTContext();
   // @Sendable function types are Sendable.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
       isSendableFunctionType(functionType)) {
-    ASTContext &ctx = protocol->getASTContext();
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+                                  BuiltinConformanceKind::Synthesized));
+  }
+
+  // Functions cannot permanently destroy a move-only var/let
+  // that they capture, so it's safe to copy functions, like classes.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(type, protocol, GenericSignature(), {},
                                   BuiltinConformanceKind::Synthesized));
   }
 
@@ -1428,8 +1473,9 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
 /// appropriate.
 static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
-  // All metatypes are Sendable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  // All metatypes are Sendable and Copyable
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     ASTContext &ctx = protocol->getASTContext();
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
@@ -1443,8 +1489,9 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
 /// appropriate.
 static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
     Type type, const BuiltinType *builtinType, ProtocolDecl *protocol) {
-  // All builtin are Sendable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  // All builtin are Sendable and Copyable
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     ASTContext &ctx = protocol->getASTContext();
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
@@ -1498,6 +1545,10 @@ LookupConformanceInModuleRequest::evaluate(
   // archetype's list of conformances, or if the archetype has a superclass
   // constraint and the superclass conforms to the protocol.
   if (auto archetype = type->getAs<ArchetypeType>()) {
+
+    // All archetypes conform to Copyable since they represent a generic.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable))
+      return ProtocolConformanceRef(protocol);
 
     // The generic signature builder drops conformance requirements that are made
     // redundant by a superclass requirement, so check for a concrete
@@ -1607,6 +1658,15 @@ LookupConformanceInModuleRequest::evaluate(
         }
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+      // Only move-only nominals are not Copyable
+      if (nominal->isMoveOnly()) {
+        return ProtocolConformanceRef::forInvalid();
+      } else {
+        // FIXME: this should probably follow the Sendable case in that
+        // we should synthesize and append a ProtocolConformance to the `conformances` list.
+       return ProtocolConformanceRef(protocol);
       }
     } else {
       // Was unable to infer the missing conformance.
@@ -1880,6 +1940,8 @@ StringRef ModuleDecl::ReverseFullNameIterator::operator*() const {
 
   auto *clangModule =
       static_cast<const clang::Module *>(current.get<const void *>());
+  if (!clangModule->isSubModule() && clangModule->Name == "std")
+    return "CxxStdlib";
   return clangModule->Name;
 }
 

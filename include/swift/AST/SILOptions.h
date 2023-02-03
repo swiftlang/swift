@@ -135,6 +135,10 @@ public:
   /// temporaries for stack protection.
   bool EnableMoveInoutStackProtection = false;
 
+  /// Enables codegen support for clang imported ptrauth qualified field
+  /// function pointers.
+  bool EnableImportPtrauthFieldFunctionPointers = false;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 

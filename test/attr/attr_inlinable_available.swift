@@ -615,12 +615,12 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
 }
 
 
-// MARK: - @_backDeploy functions
+// MARK: - @backDeployed functions
 
-// @_backDeploy acts like @inlinable.
+// @backDeployed acts like @inlinable.
 
 @available(macOS 10.10, *)
-@_backDeploy(before: macOS 999.0)
+@backDeployed(before: macOS 999.0)
 public func backDeployedToInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,

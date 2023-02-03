@@ -27,6 +27,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -131,6 +132,7 @@ namespace {
 } // namespace
 
 namespace swift {
+  /// The parser for an individual SIL function.
   class SILParser {
     friend SILParserState;
   public:
@@ -155,13 +157,20 @@ namespace swift {
     llvm::DenseMap<SILBasicBlock*,
                    Located<Identifier>> UndefinedBlocks;
 
+    /// The set of opened packs in the function, indexed by UUID.
+    /// Note that we don't currently support parsing references to
+    /// opened packs prior to their instruction, although this is
+    /// theoretically possible if basic blocks are not sorted in
+    /// dominance order.
+    SILTypeResolutionContext::OpenedPackElementsMap OpenedPackElements;
+
     /// Data structures used to perform name lookup for local values.
     llvm::StringMap<ValueBase*> LocalValues;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
     Type performTypeResolution(TypeRepr *TyR, bool IsSILType,
                                GenericSignature GenericSig,
-                               GenericParamList *GenericParams) const;
+                               GenericParamList *GenericParams);
 
     void convertRequirements(ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To,
@@ -1251,14 +1260,15 @@ static bool parseDeclSILOptional(bool *isTransparent,
 
 Type SILParser::performTypeResolution(TypeRepr *TyR, bool IsSILType,
                                       GenericSignature GenericSig,
-                                      GenericParamList *GenericParams) const {
+                                      GenericParamList *GenericParams) {
   if (!GenericSig)
     GenericSig = ContextGenericSig;
 
-  return swift::performTypeResolution(TyR, P.Context,
-                                      /*isSILMode=*/true, IsSILType,
-                                      GenericSig, GenericParams,
-                                      &P.SF);
+  SILTypeResolutionContext SILContext(IsSILType, GenericParams,
+                                      &OpenedPackElements);
+
+  return swift::performTypeResolution(TyR, P.Context, GenericSig,
+                                      &SILContext, &P.SF);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -3406,7 +3416,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     auto openedEnv = GenericEnvironment::forOpenedElement(openedElementSig,
                          uuid, shapeClass, openedSubMap);
 
-    ResultVal = B.createOpenPackElement(InstLoc, Val, openedEnv);
+    auto openInst = B.createOpenPackElement(InstLoc, Val, openedEnv);
+    ResultVal = openInst;
+
+    auto &entry = OpenedPackElements[uuid];
+    if (entry.DefinitionPoint.isValid()) {
+      P.diagnose(OpcodeLoc, diag::multiple_open_pack_element);
+      P.diagnose(entry.DefinitionPoint, diag::sil_previous_instruction);
+    } else {
+      entry.DefinitionPoint = OpcodeLoc;
+      entry.Params = openedGenerics;
+      entry.Environment = openedEnv;
+    }
     break;
   }
 
@@ -4455,6 +4476,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         setEnforcement(SILAccessEnforcement::Dynamic);
       } else if (attr == "unsafe") {
         setEnforcement(SILAccessEnforcement::Unsafe);
+      } else if (attr == "signed") {
+        setEnforcement(SILAccessEnforcement::Signed);
       } else if (attr == "init") {
         setKind(SILAccessKind::Init);
       } else if (attr == "read") {
@@ -4590,6 +4613,14 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     break;
   }
+  case SILInstructionKind::AllocPackInst: {
+    SILType Ty;
+    if (parseSILType(Ty))
+      return true;
+
+    ResultVal = B.createAllocPack(InstLoc, Ty);
+    break;
+  }
   case SILInstructionKind::AllocStackInst: {
     bool hasDynamicLifetime = false;
     bool isLexical = false;
@@ -4708,6 +4739,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createDeallocStackRef(InstLoc, Val);
+    break;
+  case SILInstructionKind::DeallocPackInst:
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDeallocPack(InstLoc, Val);
     break;
   case SILInstructionKind::DeallocRefInst: {
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
@@ -7588,12 +7624,12 @@ static bool parseSILWitnessTableEntry(
       if (TyR.isNull())
         return true;
 
+      SILTypeResolutionContext silContext(/*isSILType=*/false,
+                                          witnessParams,
+                                          /*openedPacks=*/nullptr);
       auto Ty =
           swift::performTypeResolution(TyR.get(), P.Context,
-                                       /*isSILMode=*/false,
-                                       /*isSILType=*/false,
-                                       witnessSig,
-                                       witnessParams,
+                                       witnessSig, &silContext,
                                        &P.SF);
       if (witnessSig) {
         Ty = witnessSig.getGenericEnvironment()->mapTypeIntoContext(Ty);
@@ -7653,11 +7689,12 @@ static bool parseSILWitnessTableEntry(
     if (TyR.isNull())
       return true;
 
+    SILTypeResolutionContext silContext(/*isSILType=*/false,
+                                        witnessParams,
+                                        /*openedPacks=*/nullptr);
     auto Ty =
         swift::performTypeResolution(TyR.get(), P.Context,
-                                     /*isSILMode=*/false,
-                                     /*isSILType=*/false,
-                                     witnessSig, witnessParams,
+                                     witnessSig, &silContext,
                                      &P.SF);
     if (witnessSig) {
       Ty = witnessSig.getGenericEnvironment()->mapTypeIntoContext(Ty);

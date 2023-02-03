@@ -348,7 +348,7 @@ TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
     llvm::SmallPtrSet<Type, 2> inferredTypes;
 
     while (auto binding = producer()) {
-      ASSERT_TRUE(binding.hasValue());
+      ASSERT_TRUE(binding.has_value());
       ASSERT_EQ(binding->getTypeVariable(), typeVar);
       ASSERT_TRUE(inferredTypes.insert(binding->getType()).second);
     }

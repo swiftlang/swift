@@ -363,6 +363,12 @@ protected:
     : NumPadBits,
     NumElements : 32
   );
+
+  SWIFT_INLINE_BITFIELD(MacroExpansionExpr, Expr, (16-NumExprBits)+16,
+    : 16 - NumExprBits, // Align and leave room for subclasses
+    Discriminator : 16
+  );
+
   } Bits;
 
 private:
@@ -3863,9 +3869,6 @@ public:
   /// Only valid when \c hasSingleExpressionBody() is true.
   Expr *getSingleExpressionBody() const;
 
-  /// Whether this closure has a body
-  bool hasBody() const;
-
   /// Returns the body of closures that have a body
   /// returns nullptr if the closure doesn't have a body
   BraceStmt *getBody() const;
@@ -4273,6 +4276,7 @@ class CaptureListExpr final : public Expr,
                   AbstractClosureExpr *closureBody)
     : Expr(ExprKind::CaptureList, /*Implicit=*/false, Type()),
       closureBody(closureBody) {
+    assert(closureBody);
     Bits.CaptureListExpr.NumCaptures = captureList.size();
     std::uninitialized_copy(captureList.begin(), captureList.end(),
                             getTrailingObjects<CaptureListEntry>());
@@ -6047,33 +6051,52 @@ public:
   }
 };
 
+/// An invocation of a macro expansion, spelled with `#` for freestanding
+/// macros or `@` for attached macros.
 class MacroExpansionExpr final : public Expr {
 private:
-  SourceLoc PoundLoc;
+  DeclContext *DC;
+  SourceLoc SigilLoc;
   DeclNameRef MacroName;
   DeclNameLoc MacroNameLoc;
   SourceLoc LeftAngleLoc, RightAngleLoc;
   ArrayRef<TypeRepr *> GenericArgs;
   ArgumentList *ArgList;
   Expr *Rewritten;
+  MacroRoles Roles;
 
   /// The referenced macro.
   ConcreteDeclRef macroRef;
 
 public:
-  explicit MacroExpansionExpr(SourceLoc poundLoc, DeclNameRef macroName,
+  enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
+  explicit MacroExpansionExpr(DeclContext *dc,
+                              SourceLoc sigilLoc, DeclNameRef macroName,
                               DeclNameLoc macroNameLoc,
                               SourceLoc leftAngleLoc,
                               ArrayRef<TypeRepr *> genericArgs,
                               SourceLoc rightAngleLoc,
-                              ArgumentList *argList, bool isImplicit = false,
+                              ArgumentList *argList,
+                              MacroRoles roles,
+                              bool isImplicit = false,
                               Type ty = Type())
-      : Expr(ExprKind::MacroExpansion, isImplicit, ty), PoundLoc(poundLoc),
+      : Expr(ExprKind::MacroExpansion, isImplicit, ty),
+        DC(dc), SigilLoc(sigilLoc),
         MacroName(macroName), MacroNameLoc(macroNameLoc),
         LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
         GenericArgs(genericArgs),
-        ArgList(argList),
-        Rewritten(nullptr) { }
+        Rewritten(nullptr), Roles(roles) {
+    Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
+
+    // Macro expansions always have an argument list. If one is not provided, create
+    // an implicit one.
+    if (argList) {
+      ArgList = argList;
+    } else {
+      ArgList = ArgumentList::createImplicit(dc->getASTContext(), {});
+    }
+  }
 
   DeclNameRef getMacroName() const { return MacroName; }
   DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
@@ -6090,10 +6113,33 @@ public:
   ArgumentList *getArgs() const { return ArgList; }
   void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
 
-  SourceLoc getLoc() const { return PoundLoc; }
+  MacroRoles getMacroRoles() const { return Roles; }
+
+  SourceLoc getLoc() const { return SigilLoc; }
 
   ConcreteDeclRef getMacroRef() const { return macroRef; }
   void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
+
+  DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *dc) { DC = dc; }
+
+  /// Returns a discriminator which determines this macro expansion's index
+  /// in the sequence of macro expansions within the current function.
+  unsigned getDiscriminator() const;
+
+  /// Retrieve the raw discriminator, which may not have been computed yet.
+  ///
+  /// Only use this for queries that are checking for (e.g.) reentrancy or
+  /// intentionally do not want to initiate verification.
+  unsigned getRawDiscriminator() const {
+    return Bits.MacroExpansionExpr.Discriminator;
+  }
+
+  void setDiscriminator(unsigned discriminator) {
+    assert(getRawDiscriminator() == InvalidDiscriminator);
+    assert(discriminator != InvalidDiscriminator);
+    Bits.MacroExpansionExpr.Discriminator = discriminator;
+  }
 
   SourceRange getSourceRange() const;
 

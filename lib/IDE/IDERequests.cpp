@@ -64,7 +64,8 @@ class CursorInfoResolver : public SourceEntityWalker {
   llvm::SmallVector<Expr*, 8> ExprStack;
   /// If a decl shadows another decl using shorthand syntax (`[foo]` or
   /// `if let foo {`), this maps the re-declared variable to the one that is
-  /// being shadowed.
+  /// being shadowed. Ordered from innermost to outermost shadows.
+  ///
   /// The transitive closure of shorthand shadowed decls should be reported as
   /// additional results in cursor info.
   llvm::DenseMap<ValueDecl *, ValueDecl *> ShorthandShadowedDecls;
@@ -180,17 +181,14 @@ ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
   walk(SrcFile);
 
   if (auto ValueRefInfo = dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo)) {
-    if (!ValueRefInfo->isRef()) {
-      SmallVector<ValueDecl *> ShadowedDecls;
-      // If we have a definition, add any decls that it potentially shadows
-      auto ShorthandShadowedDecl =
-          ShorthandShadowedDecls[ValueRefInfo->getValueD()];
-      while (ShorthandShadowedDecl) {
-        ShadowedDecls.push_back(ShorthandShadowedDecl);
-        ShorthandShadowedDecl = ShorthandShadowedDecls[ShorthandShadowedDecl];
-      }
-      ValueRefInfo->setShorthandShadowedDecls(ShadowedDecls);
+    SmallVector<ValueDecl *> ShadowedDecls;
+    auto ShorthandShadowedDecl =
+        ShorthandShadowedDecls[ValueRefInfo->getValueD()];
+    while (ShorthandShadowedDecl) {
+      ShadowedDecls.push_back(ShorthandShadowedDecl);
+      ShorthandShadowedDecl = ShorthandShadowedDecls[ShorthandShadowedDecl];
     }
+    ValueRefInfo->setShorthandShadowedDecls(ShadowedDecls);
   }
 
   return CursorInfo;

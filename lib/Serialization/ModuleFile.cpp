@@ -1324,3 +1324,10 @@ StringRef SerializedASTFile::getModuleDefiningPath() const {
 
   return moduleFilename;
 }
+
+StringRef SerializedASTFile::getExportedModuleName() const {
+  auto name = File.getModuleExportAsName();
+  if (!name.empty())
+    return name;
+  return FileUnit::getExportedModuleName();
+}

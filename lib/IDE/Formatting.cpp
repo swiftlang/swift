@@ -2486,7 +2486,7 @@ private:
                        SourceLoc ContextLoc = SourceLoc()) {
     AbstractClosureExpr *CE = CL->getClosureBody();
     BraceStmt *BS = CE->getBody();
-    if (!CE || !BS)
+    if (!BS)
       return None;
 
     if (ContextLoc.isValid()) {

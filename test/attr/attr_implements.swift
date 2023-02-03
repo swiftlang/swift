@@ -3,6 +3,7 @@
 
 protocol P {
   func f0() -> Int;
+  func f1() -> Int
   func f(x:Int, y:Int) -> Int;
 }
 
@@ -18,6 +19,12 @@ struct S : P, Q, Equatable {
   func g0() -> Int {
     return 10
   }
+
+  // Test that we can handle a non-identifier type that canonicalizes
+  // to a protocol.
+  @_implements((P), f1())
+  func g1() -> Int { 11 }
+
 
   // Test that it's possible to implement two different protocols with the
   // same-named requirements.

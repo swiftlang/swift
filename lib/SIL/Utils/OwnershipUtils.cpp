@@ -1131,7 +1131,7 @@ bool AddressOwnership::areUsesWithinLifetime(
   // Compute the reference value's liveness.
   SSAPrunedLiveness liveness;
   liveness.initializeDef(root);
-  SimpleLiveRangeSummary summary = liveness.computeSimple();
+  LiveRangeSummary summary = liveness.computeSimple();
   // Conservatively ignore InnerBorrowKind::Reborrowed and
   // AddressUseKind::PointerEscape and Reborrowed. The resulting liveness at
   // least covers the known uses.
@@ -1611,6 +1611,11 @@ bool ForwardingOperand::visitForwardedValues(
           return visitor(args[0]);
         });
   }
+
+  // If our terminator is function exiting, we do not have a value to visit, so
+  // just return.
+  if (ti->isFunctionExiting())
+    return true;
 
   auto *succArg = PhiOperand(use).getValue();
   return visitor(succArg);
@@ -2409,16 +2414,25 @@ void swift::visitTransitiveEndBorrows(
 ///
 /// A begin_borrow [lexical] is nested if the borrowed value's lifetime is
 /// guaranteed by another lexical scope.  That happens if:
-/// - the value is a guaranteed argument to the function
-/// - the value is itself a begin_borrow [lexical]
+/// - the non-guaranteed borrowee's value is lexical
+/// - the guaranteed borrowee's value's reference roots are lexical
+///   - for example, the borrowee is itself a begin_borrow [lexical]
 bool swift::isNestedLexicalBeginBorrow(BeginBorrowInst *bbi) {
   assert(bbi->isLexical());
   auto value = bbi->getOperand();
-  if (auto *outerBBI = dyn_cast<BeginBorrowInst>(value)) {
-    return outerBBI->isLexical();
+  if (value->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return value->isLexical();
   }
-  if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {
-    return arg->getOwnershipKind() == OwnershipKind::Guaranteed;
-  }
-  return false;
+  SmallVector<SILValue, 8> roots;
+  findGuaranteedReferenceRoots(value, /*lookThroughNestedBorrows=*/false,
+                               roots);
+  return llvm::all_of(roots, [](auto root) {
+    if (auto *outerBBI = dyn_cast<BeginBorrowInst>(root)) {
+      return outerBBI->isLexical();
+    }
+    if (auto *arg = dyn_cast<SILFunctionArgument>(root)) {
+      return arg->getOwnershipKind() == OwnershipKind::Guaranteed;
+    }
+    return false;
+  });
 }

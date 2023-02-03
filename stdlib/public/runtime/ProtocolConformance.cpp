@@ -340,8 +340,12 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     if (error)
       return nullptr;
   }
-
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+  return (const WitnessTable *)
+    swift_getWitnessTableRelative(this, type, conditionalArgs.data());
+#else
   return swift_getWitnessTable(this, type, conditionalArgs.data());
+#endif
 }
 
 namespace {

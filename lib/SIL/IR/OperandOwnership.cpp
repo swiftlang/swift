@@ -98,6 +98,7 @@ SHOULD_NEVER_VISIT_INST(AllocBox)
 SHOULD_NEVER_VISIT_INST(AllocExistentialBox)
 SHOULD_NEVER_VISIT_INST(AllocGlobal)
 SHOULD_NEVER_VISIT_INST(AllocStack)
+SHOULD_NEVER_VISIT_INST(AllocPack)
 SHOULD_NEVER_VISIT_INST(DifferentiabilityWitnessFunction)
 SHOULD_NEVER_VISIT_INST(FloatLiteral)
 SHOULD_NEVER_VISIT_INST(FunctionRef)
@@ -154,6 +155,7 @@ OPERAND_OWNERSHIP(TrivialUse, CopyAddr)
 OPERAND_OWNERSHIP(TrivialUse, ExplicitCopyAddr)
 OPERAND_OWNERSHIP(TrivialUse, MarkUnresolvedMoveAddr)
 OPERAND_OWNERSHIP(TrivialUse, DeallocStack)
+OPERAND_OWNERSHIP(TrivialUse, DeallocPack)
 OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
 OPERAND_OWNERSHIP(TrivialUse, DestroyAddr)
 OPERAND_OWNERSHIP(TrivialUse, EndAccess)
@@ -456,6 +458,7 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   switch (argConv) {
   case SILArgumentConvention::Indirect_In:
   case SILArgumentConvention::Direct_Owned:
+  case SILArgumentConvention::Pack_Owned:
     return OperandOwnership::ForwardingConsume;
 
   // A guaranteed argument is forwarded into the callee. If the call itself has
@@ -467,6 +470,9 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   // as being borrowed for the entire region of coroutine execution.
   case SILArgumentConvention::Indirect_In_Guaranteed:
   case SILArgumentConvention::Direct_Guaranteed:
+  case SILArgumentConvention::Pack_Guaranteed:
+  case SILArgumentConvention::Pack_Inout:
+  case SILArgumentConvention::Pack_Out:
     // For an apply that begins a borrow scope, its arguments are borrowed
     // throughout the caller's borrow scope.
     return hasScopeInCaller ? OperandOwnership::Borrow

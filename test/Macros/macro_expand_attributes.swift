@@ -9,7 +9,10 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@attached(memberAttributes) macro wrapAllProperties() = #externalMacro(module: "MacroDefinition", type: "WrapAllProperties")
+@attached(memberAttribute) macro wrapAllProperties() = #externalMacro(module: "MacroDefinition", type: "WrapAllProperties")
+
+@attached(memberAttribute)
+public macro wrapStoredProperties(_ attributeName: String) = #externalMacro(module: "MacroDefinition", type: "WrapStoredPropertiesMacro")
 
 @propertyWrapper
 struct Wrapper<T> {
@@ -99,3 +102,14 @@ _ = c.y
 c.x = 10
 // CHECK: writing to key-path
 c.y = 100
+
+// Use the "wrapStoredProperties" macro to deprecate all of the stored
+// properties.
+@wrapStoredProperties(#"available(*, deprecated, message: "hands off my data")"#)
+struct OldStorage {
+  var x: Int
+}
+
+// The deprecation warning below comes from the deprecation attribute
+// introduced by @wrapStoredProperties on OldStorage.
+_ = OldStorage(x: 5).x   // expected-warning{{'x' is deprecated: hands off my data}}

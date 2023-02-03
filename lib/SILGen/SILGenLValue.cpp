@@ -21,6 +21,7 @@
 #include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
+#include "ManagedValue.h"
 #include "RValue.h"
 #include "SILGen.h"
 #include "SILGenFunction.h"
@@ -853,8 +854,17 @@ namespace {
       // TODO: if the base is +1, break apart its cleanup.
       auto Res = SGF.B.createStructElementAddr(loc, base.getValue(),
                                                Field, SubstFieldType);
-      return ManagedValue::forLValue(Res);
+
+      if (!Field->getPointerAuthQualifier().isPresent() ||
+          !SGF.getOptions().EnableImportPtrauthFieldFunctionPointers) {
+        return ManagedValue::forLValue(Res);
+      }
+      auto beginAccess =
+          enterAccessScope(SGF, loc, base, Res, getTypeData(), getAccessKind(),
+                           SILAccessEnforcement::Signed, takeActorIsolation());
+      return ManagedValue::forLValue(beginAccess);
     }
+
     void dump(raw_ostream &OS, unsigned indent) const override {
       OS.indent(indent) << "StructElementComponent("
                         << Field->getName() << ")\n";
@@ -2887,7 +2897,7 @@ namespace {
     void emitUsingAccessor(AccessorKind accessorKind,
                            bool isDirect) {
       auto accessor =
-        SGF.SGM.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
+          SGF.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
 
       switch (accessorKind) {
       case AccessorKind::Set: {
@@ -3318,16 +3328,18 @@ LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,
 static SGFAccessKind getBaseAccessKindForAccessor(SILGenModule &SGM,
                                                   AccessorDecl *accessor,
                                                   CanType baseFormalType) {
-  if (accessor->isMutating()) {
+  if (accessor->isMutating())
     return SGFAccessKind::ReadWrite;
-  } else if (SGM.shouldEmitSelfAsRValue(accessor, baseFormalType)) {
-    return SGM.isNonMutatingSelfIndirect(SGM.getAccessorDeclRef(accessor))
-             ? SGFAccessKind::OwnedAddressRead
-             : SGFAccessKind::OwnedObjectRead;
+
+  auto declRef = SGM.getAccessorDeclRef(accessor, ResilienceExpansion::Minimal);
+  if (SGM.shouldEmitSelfAsRValue(accessor, baseFormalType)) {
+    return SGM.isNonMutatingSelfIndirect(declRef)
+               ? SGFAccessKind::OwnedAddressRead
+               : SGFAccessKind::OwnedObjectRead;
   } else {
-    return SGM.isNonMutatingSelfIndirect(SGM.getAccessorDeclRef(accessor))
-             ? SGFAccessKind::BorrowedAddressRead
-             : SGFAccessKind::BorrowedObjectRead;
+    return SGM.isNonMutatingSelfIndirect(declRef)
+               ? SGFAccessKind::BorrowedAddressRead
+               : SGFAccessKind::BorrowedObjectRead;
   }
 }
 
@@ -3435,7 +3447,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
       var->getOpaqueAccessor(AccessorKind::Read)) {
     bool isObjC = false;
     auto readAccessor =
-        SGF.SGM.getAccessorDeclRef(var->getOpaqueAccessor(AccessorKind::Read));
+        SGF.getAccessorDeclRef(var->getOpaqueAccessor(AccessorKind::Read));
     if (isCallToReplacedInDynamicReplacement(
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
@@ -3636,7 +3648,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
       decl->getOpaqueAccessor(AccessorKind::Read)) {
     bool isObjC = false;
     auto readAccessor =
-        SGF.SGM.getAccessorDeclRef(decl->getOpaqueAccessor(AccessorKind::Read));
+        SGF.getAccessorDeclRef(decl->getOpaqueAccessor(AccessorKind::Read));
     if (isCallToReplacedInDynamicReplacement(
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
@@ -4595,6 +4607,19 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
                      substFormalType, rvalueTL, C, IsNotTake, isBaseGuaranteed);
       } else if (isReadAccessResultOwned(src.getAccessKind()) &&
           !projection.isPlusOne(*this)) {
+
+        // Before we copy, if we have a move only wrapped value, unwrap the
+        // value using a guaranteed moveonlywrapper_to_copyable.
+        if (projection.getType().isMoveOnlyWrapped()) {
+          // We are assuming we always get a guaranteed value here.
+          assert(projection.getValue()->getOwnershipKind() ==
+                 OwnershipKind::Guaranteed);
+          // We use SILValues here to ensure we get a tight scope around our
+          // copy.
+          projection =
+              B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, projection);
+        }
+
         projection = projection.copy(*this, loc);
       }
 

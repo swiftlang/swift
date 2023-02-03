@@ -22,7 +22,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
 // CHECK-RAW: [[SELF_BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
 // CHECK-RAW: [[PB_BOX:%[0-9]+]] = project_box [[SELF_BOX_LIFETIME]]
-// CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [lexical] [[STR]]
+// CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
 // CHECK-RAW: [[COPIED_STR:%.*]] = copy_value [[BORROWED_STR]]
 // CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK-RAW: [[BORROWED_COPIED_STR:%.*]] = begin_borrow [[COPIED_STR]]

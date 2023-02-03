@@ -1821,7 +1821,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
 
         // If this is a call to a function with a closure argument and the
         // parameter is an autoclosure, let's just increment the score here
-        // so situations like bellow are not ambiguous.
+        // so situations like below are not ambiguous.
         //    func f<T>(_: () -> T) {}
         //    func f<T>(_: @autoclosure () -> T) {}
         //
@@ -3821,6 +3821,18 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     }
 
     return getTypeMatchAmbiguous();
+  }
+
+  // move-only types cannot match with any existential types.
+  if (type1->isPureMoveOnly()) {
+    // tailor error message
+    if (shouldAttemptFixes()) {
+      auto *fix = MustBeCopyable::create(*this, type1,
+                                        getConstraintLocator(locator));
+      if (!recordFix(fix))
+        return getTypeMatchSuccess();
+    }
+    return getTypeMatchFailure(locator);
   }
 
   // FIXME: Feels like a hack.
@@ -8129,6 +8141,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Solved;
       }
     }
+
+    // If this is a failure to conform to Copyable, tailor the error message.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+      auto *fix =
+          MustBeCopyable::create(*this, type, getConstraintLocator(locator));
+      if (!recordFix(fix))
+        return SolutionKind::Solved;
+    }
   }
 
   // There's nothing more we can do; fail.
@@ -11104,6 +11124,12 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
     return formUnsolved();
 
+  // Move-only types can't be involved in a bridging conversion since a bridged
+  // type assumes the ability to copy.
+  if (type1->isPureMoveOnly()) {
+    return SolutionKind::Error;
+  }
+
   Type unwrappedFromType;
   unsigned numFromOptionals;
   std::tie(unwrappedFromType, numFromOptionals) = unwrapType(type1);
@@ -13943,8 +13969,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreKeyPathContextualMismatch:
   case FixKind::NotCompileTimeConst:
   case FixKind::RenameConflictingPatternVariables:
+  case FixKind::MustBeCopyable:
   case FixKind::MacroMissingPound:
-  case FixKind::MacroMissingArguments:
   case FixKind::AllowGlobalActorMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }

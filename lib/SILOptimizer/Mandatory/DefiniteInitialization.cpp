@@ -1211,6 +1211,12 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
               case SILArgumentConvention::Indirect_Inout:
               case SILArgumentConvention::Indirect_InoutAliasable:
                 llvm_unreachable("inout arguments are not supported by $Storage.");
+
+              case SILArgumentConvention::Pack_Out:
+              case SILArgumentConvention::Pack_Owned:
+              case SILArgumentConvention::Pack_Guaranteed:
+              case SILArgumentConvention::Pack_Inout:
+                llvm_unreachable("pack arguments are not supported by $Storage.");
               }
 
               ++argIdx;

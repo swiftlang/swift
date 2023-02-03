@@ -2221,6 +2221,32 @@ public:
   DeallocStackInst *getSingleDeallocStack() const;
 };
 
+/// AllocPackInst - This represents the allocation of a value pack
+/// in stack memory.  The memory is provided uninitialized.
+class AllocPackInst final
+    : public NullaryInstructionWithTypeDependentOperandsBase<
+                  SILInstructionKind::AllocPackInst,
+                  AllocPackInst,
+                  AllocationInst> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+  AllocPackInst(SILDebugLocation loc, SILType resultType,
+                ArrayRef<SILValue> typeDependentOperands)
+    : NullaryInstructionWithTypeDependentOperandsBase(loc,
+                                                      typeDependentOperands,
+                                                      resultType) {}
+
+  static AllocPackInst *create(SILDebugLocation loc, SILType packType,
+                               SILFunction &F);
+public:
+  /// Return the allocated pack type.  The result type of the instruction
+  /// is an address of this type.
+  CanSILPackType getPackType() const {
+    return getType().castTo<SILPackType>();
+  }
+};
+
 /// The base class for AllocRefInst and AllocRefDynamicInst.
 ///
 /// The first NumTailTypes operands are counts for the tail allocated
@@ -4446,8 +4472,13 @@ enum class SILAccessEnforcement : uint8_t {
   /// behavior.
   Unsafe,
 
+  /// Access to pointers that are signed via pointer authentication mechanishm.
+  /// Such pointers should be authenticated before read and signed before a
+  /// write. Optimizer should avoid promoting such accesses to values.
+  Signed,
+
   // This enum is encoded.
-  Last = Unsafe
+  Last = Signed
 };
 StringRef getSILAccessEnforcementName(SILAccessEnforcement enforcement);
 
@@ -4520,9 +4551,9 @@ class BeginAccessInst
       : BeginAccessBase(loc, accessKind, enforcement, noNestedConflict,
         fromBuiltin, lvalue, lvalue->getType()) {
 
-    static_assert(unsigned(SILAccessKind::Last) < (1 << 2),
+    static_assert(unsigned(SILAccessKind::Last) < (1 << 3),
                   "reserve sufficient bits for serialized SIL");
-    static_assert(unsigned(SILAccessEnforcement::Last) < (1 << 2),
+    static_assert(unsigned(SILAccessEnforcement::Last) < (1 << 3),
                   "reserve sufficient bits for serialized SIL");
 
     static_assert(unsigned(SILAccessKind::Last) <
@@ -8293,6 +8324,16 @@ class DeallocStackInst :
       : UnaryInstructionBase(DebugLoc, operand) {}
 };
 
+/// DeallocPackInst - Deallocate stack memory allocated by alloc_pack.
+class DeallocPackInst :
+    public UnaryInstructionBase<SILInstructionKind::DeallocPackInst,
+                                DeallocationInst> {
+  friend SILBuilder;
+
+  DeallocPackInst(SILDebugLocation debugLoc, SILValue operand)
+      : UnaryInstructionBase(debugLoc, operand) {}
+};
+
 /// Like DeallocStackInst, but for `alloc_ref [stack]`.
 class DeallocStackRefInst
     : public UnaryInstructionBase<SILInstructionKind::DeallocStackRefInst,
@@ -10302,6 +10343,11 @@ public:
   static DestructureStructInst *
   create(const SILFunction &F, SILDebugLocation Loc, SILValue Operand,
          ValueOwnershipKind forwardingOwnershipKind);
+
+  StructDecl *getStructDecl() const {
+    return getOperand()->getType().getStructOrBoundGenericStruct();
+  }
+
   static bool classof(SILNodePointer node) {
     return node->getKind() == SILNodeKind::DestructureStructInst;
   }

@@ -27,7 +27,7 @@ forEachDependencyUntilTrue(CompilerInstance &CI,
                            llvm::function_ref<bool(StringRef)> callback) {
   // Check files in the current module. If 'excludeBufferID' is None, exclude
   // all source files.
-  if (excludeBufferID.hasValue()) {
+  if (excludeBufferID.has_value()) {
     for (FileUnit *file : CI.getMainModule()->getFiles()) {
       StringRef filename;
       if (auto SF = dyn_cast<SourceFile>(file)) {

@@ -248,7 +248,28 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
                                        ScopeCreator *scopeCreator)
     : SF(SF), scopeCreator(scopeCreator) {
   if (auto enclosingSF = SF->getEnclosingSourceFile()) {
-    SourceLoc parentLoc = SF->getMacroExpansion().getStartLoc();
+    SourceLoc parentLoc;
+    auto macroRole = SF->getFulfilledMacroRole();
+    auto expansion = SF->getMacroExpansion();
+
+    // Determine the parent source location based on the macro role.
+    switch (*macroRole) {
+    case MacroRole::Expression:
+    case MacroRole::Declaration:
+    case MacroRole::Accessor:
+    case MacroRole::MemberAttribute:
+      parentLoc = expansion.getStartLoc();
+      break;
+    case MacroRole::Member: {
+      // For synthesized member macros, take the end loc of the
+      // enclosing declaration (before the closing brace), because
+      // the macro expansion is inside this scope.
+      auto *decl = expansion.getAsDeclContext()->getAsDecl();
+      parentLoc = decl->getEndLoc();
+      break;
+    }
+    }
+
     if (auto parentScope = findStartingScopeForLookup(enclosingSF, parentLoc)) {
       parentAndWasExpanded.setPointer(const_cast<ASTScopeImpl *>(parentScope));
     }

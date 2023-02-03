@@ -78,6 +78,9 @@ bool AccessMarkerElimination::shouldPreserveAccess(
   case SILAccessEnforcement::Static:
   case SILAccessEnforcement::Unsafe:
     return false;
+  // Signed access should be preserved until IRGen
+  case SILAccessEnforcement::Signed:
+    return true;
   case SILAccessEnforcement::Unknown:
   case SILAccessEnforcement::Dynamic:
     return Mod->getOptions().EnforceExclusivityDynamic;
@@ -99,7 +102,7 @@ AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
     if (beginAccess->isFromBuiltin())
       return inst->getIterator();
 
-    // Leave dynamic accesses in place, but delete all others.
+    // Leave dynamic and signed accesses in place, but delete all others.
     if (shouldPreserveAccess(beginAccess->getEnforcement()))
       return inst->getIterator();
 

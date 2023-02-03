@@ -340,7 +340,7 @@ SWIFT_REQUEST(TypeChecker, PreCheckResultBuilderRequest,
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               evaluator::SideEffect(NominalTypeDecl *, ImplicitMemberAction),
               Uncached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ResolveAttachedMacroRequest,
+SWIFT_REQUEST(TypeChecker, ResolveMacroRequest,
               MacroDecl *(CustomAttr *, DeclContext *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,
@@ -458,6 +458,9 @@ SWIFT_REQUEST(TypeChecker, ExpandMacroExpansionDeclRequest,
 SWIFT_REQUEST(TypeChecker, ExpandMemberAttributeMacros,
               bool(Decl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeCHecker, ExpandSynthesizedMemberMacroRequest,
+              bool(Decl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeRuntimeMetadataAttrGenerator,
               Expr *(CustomAttr *, ValueDecl *),
               Cached, NoLocationInfo)
@@ -465,7 +468,7 @@ SWIFT_REQUEST(TypeChecker, SynthesizeRuntimeMetadataAttrGeneratorBody,
               BraceStmt *(CustomAttr *, ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetRuntimeDiscoverableAttributes,
-              ArrayRef<CustomAttr *>(ValueDecl *),
+              ArrayRef<CustomAttr *>(Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
               unsigned(DeclContext *),

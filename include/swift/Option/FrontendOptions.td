@@ -342,6 +342,8 @@ def debug_requirement_machine : Joined<["-"], "debug-requirement-machine=">,
 
 def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
   HelpText<"Dumps the results of each macro expansion">;
+def emit_macro_expansion_files : Separate<["-"], "emit-macro-expansion-files">,
+  HelpText<"Specify when to emit macro expansion file: 'none', 'debug', or 'diagnostics'">;
 
 def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -1111,6 +1113,13 @@ def disable_stack_protector :
 def enable_move_inout_stack_protector :
   Flag<["-"], "enable-move-inout-stack-protector">,
   HelpText<"Enable the stack protector by moving values to temporaries">;
+
+def enable_import_ptrauth_field_function_pointers :
+  Flag<["-"], "enable-import-ptrauth-field-function-pointers">,
+  HelpText<"Enable import of custom ptrauth qualified field function pointers">;
+def disable_import_ptrauth_field_function_pointers :
+  Flag<["-"], "disable-import-ptrauth-field-function-pointers">,
+  HelpText<"Disable import of custom ptrauth qualified field function pointers">;
 
 def enable_collocate_metadata_functions :
   Flag<["-"], "enable-collocate-metadata-functions">,

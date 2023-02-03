@@ -3128,10 +3128,54 @@ public:
                            evaluator::SideEffect) const;
 };
 
+class UnresolvedMacroReference {
+private:
+  llvm::PointerUnion<MacroExpansionDecl *, MacroExpansionExpr *, CustomAttr *>
+    pointer;
+
+public:
+  UnresolvedMacroReference(MacroExpansionDecl *decl) : pointer(decl) {}
+  UnresolvedMacroReference(MacroExpansionExpr *expr) : pointer(expr) {}
+  UnresolvedMacroReference(CustomAttr *attr) : pointer(attr) {}
+
+  MacroExpansionDecl *getDecl() const {
+    return pointer.dyn_cast<MacroExpansionDecl *>();
+  }
+  MacroExpansionExpr *getExpr() const {
+    return pointer.dyn_cast<MacroExpansionExpr *>();
+  }
+  CustomAttr *getAttr() const {
+    return pointer.dyn_cast<CustomAttr *>();
+  }
+  void *getOpaqueValue() const {
+    return pointer.getOpaqueValue();
+  }
+
+  SourceLoc getSigilLoc() const;
+  DeclNameRef getMacroName() const;
+  DeclNameLoc getMacroNameLoc() const;
+  SourceRange getGenericArgsRange() const;
+  ArrayRef<TypeRepr *> getGenericArgs() const;
+  ArgumentList *getArgs() const;
+
+  friend bool operator==(const UnresolvedMacroReference &lhs,
+                         const UnresolvedMacroReference &rhs) {
+    return lhs.getOpaqueValue() == rhs.getOpaqueValue();
+  }
+
+  friend llvm::hash_code hash_value(const UnresolvedMacroReference &ref) {
+    return reinterpret_cast<ptrdiff_t>(ref.pointer.getOpaqueValue());
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const UnresolvedMacroReference &ref);
+
 /// Resolve a given custom attribute to an attached macro declaration.
-class ResolveAttachedMacroRequest
-    : public SimpleRequest<ResolveAttachedMacroRequest,
-                           MacroDecl *(CustomAttr *, DeclContext *),
+class ResolveMacroRequest
+    : public SimpleRequest<ResolveMacroRequest,
+                           MacroDecl *(UnresolvedMacroReference, MacroRoles,
+                                       DeclContext *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3140,7 +3184,8 @@ private:
   friend SimpleRequest;
 
   MacroDecl *
-  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
+  evaluate(Evaluator &evaluator, UnresolvedMacroReference macroRef,
+           MacroRoles roles, DeclContext *dc) const;
 
 public:
   bool isCached() const { return true; }
@@ -3247,8 +3292,7 @@ public:
 
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
-                           Type(const TypeResolution *, TypeRepr *,
-                                GenericParamList *),
+                           Type(const TypeResolution *, TypeRepr *),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3257,12 +3301,15 @@ public:
   // Cycle handling.
   void noteCycleStep(DiagnosticEngine &diags) const;
 
+  static Type evaluate(const TypeResolution &resolution,
+                       TypeRepr *repr);
+
 private:
   friend SimpleRequest;
 
   // Evaluation.
   Type evaluate(Evaluator &evaluator, const TypeResolution *resolution,
-                TypeRepr *repr, GenericParamList *silParams) const;
+                TypeRepr *repr) const;
 };
 
 void simple_display(llvm::raw_ostream &out, const TypeResolution *resolution);
@@ -3783,23 +3830,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check whether this is a protocol that has a type wrapper attribute
-/// or one of its dependencies does.
-class UsesTypeWrapperFeature
-    : public SimpleRequest<UsesTypeWrapperFeature, bool(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 /// Find the definition of a given macro.
 class MacroDefinitionRequest
     : public SimpleRequest<MacroDefinitionRequest,
@@ -3856,6 +3886,23 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Expand synthesized member macros attached to the given declaration.
+class ExpandSynthesizedMemberMacroRequest
+    : public SimpleRequest<ExpandSynthesizedMemberMacroRequest,
+                           bool(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Resolve an external macro given its module and type name.
 class ExternalMacroDefinitionRequest
     : public SimpleRequest<ExternalMacroDefinitionRequest,
@@ -3882,7 +3929,7 @@ public:
 
 class GetRuntimeDiscoverableAttributes
     : public SimpleRequest<GetRuntimeDiscoverableAttributes,
-                           ArrayRef<CustomAttr *>(ValueDecl *),
+                           ArrayRef<CustomAttr *>(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3890,7 +3937,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<CustomAttr *> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  ArrayRef<CustomAttr *> evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }

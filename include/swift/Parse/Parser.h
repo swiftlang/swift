@@ -39,6 +39,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class IdentTypeRepr;
   class IDEInspectionCallbacks;
   class IDEInspectionCallbacksFactory;
   class DefaultArgumentInitializer;
@@ -194,6 +195,8 @@ public:
   }
 
   bool allowTopLevelCode() const;
+
+  bool isInMacroExpansion(SourceLoc loc) const;
 
   const std::vector<Token> &getSplitTokens() const { return SplitTokens; }
 
@@ -575,7 +578,8 @@ public:
       return;
 
     if (tok.getText().size() == 1 || Context.LangOpts.EnableDollarIdentifiers ||
-        isInSILMode() || L->isSwiftInterface())
+        isInSILMode() || L->isSwiftInterface() ||
+        isInMacroExpansion(tok.getLoc()))
       return;
 
     diagnose(tok.getLoc(), diag::dollar_identifier_decl,
@@ -740,6 +744,11 @@ public:
 
   /// Check whether the current token starts with '...'.
   bool startsWithEllipsis(Token Tok);
+
+  /// Check whether the current token starts with a multi-line string delimiter.
+  bool startsWithMultilineStringDelimiter(Token Tok) {
+    return Tok.getText().ltrim('#').startswith("\"\"\"");
+  }
 
   /// Returns true if token is an identifier with the given value.
   bool isIdentifier(Token Tok, StringRef value) {
@@ -1089,9 +1098,10 @@ public:
   ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
                                                       SourceLoc Loc);
 
-  /// Parse the @_backDeploy attribute.
-  bool parseBackDeployAttribute(DeclAttributes &Attributes, StringRef AttrName,
-                                SourceLoc AtLoc, SourceLoc Loc);
+  /// Parse the @backDeployed attribute.
+  bool parseBackDeployedAttribute(DeclAttributes &Attributes,
+                                  StringRef AttrName, SourceLoc AtLoc,
+                                  SourceLoc Loc);
 
   /// Parse the @_documentation attribute.
   ParserResult<DocumentationAttr> parseDocumentationAttribute(SourceLoc AtLoc,
@@ -1101,13 +1111,11 @@ public:
   bool parseDocumentationAttributeArgument(Optional<StringRef> &Metadata,
                                            Optional<AccessLevel> &Visibility);
 
-  /// Parse the @declaration attribute.
-  ParserResult<DeclarationAttr> parseDeclarationAttribute(SourceLoc AtLoc,
-                                                          SourceLoc Loc);
-
-  /// Parse the @attached attribute.
-  ParserResult<AttachedAttr> parseAttachedAttribute(SourceLoc AtLoc,
-                                                    SourceLoc Loc);
+  /// Parse the @attached or @freestanding attribute that specifies a macro
+  /// role.
+  ParserResult<MacroRoleAttr> parseMacroRoleAttribute(
+      MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc
+  );
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -1237,6 +1245,10 @@ public:
   /// the attribute list attached.
   void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items);
 
+  /// Parse the result of member macro expansion, which is a floating
+  /// member list.
+  void parseExpandedMemberList(SmallVectorImpl<ASTNode> &items);
+
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        ParseDeclOptions Flags,
@@ -1325,19 +1337,29 @@ public:
                                      SourceLoc &LAngleLoc,
                                      SourceLoc &RAngleLoc);
 
-  /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
+  /// Parses and returns the base type for a qualified declaration name,
+  /// positioning the parser at the '.' before the final declaration name. This
+  /// position is important for parsing final declaration names like '.init' via
+  /// `parseUnqualifiedDeclName`. For example, 'Foo.Bar.f' parses as 'Foo.Bar'
+  /// and the parser is positioned at '.f'. If there is no base type qualifier
+  /// (e.g. when parsing just 'f'), returns an empty parser error.
   ///
-  /// When `isParsingQualifiedDeclBaseType` is true:
-  /// - Parses and returns the base type for a qualified declaration name,
-  ///   positioning the parser at the '.' before the final declaration name.
-  //    This position is important for parsing final declaration names like
-  //    '.init' via `parseUnqualifiedDeclName`.
-  /// - For example, 'Foo.Bar.f' parses as 'Foo.Bar' and the parser is
-  ///   positioned at '.f'.
-  /// - If there is no base type qualifier (e.g. when parsing just 'f'), returns
-  ///   an empty parser error.
-  ParserResult<TypeRepr> parseTypeIdentifier(
-      bool isParsingQualifiedDeclBaseType = false);
+  /// \verbatim
+  ///   qualified-decl-name-base-type:
+  ///     identifier generic-args? ('.' identifier generic-args?)*
+  /// \endverbatim
+  ParserResult<TypeRepr> parseQualifiedDeclNameBaseType();
+
+  /// Parse an identifier type, e.g 'Foo' or 'Bar<Int>'.
+  ///
+  /// \verbatim
+  /// type-identifier: identifier generic-args?
+  /// \endverbatim
+  ParserResult<IdentTypeRepr> parseTypeIdentifier();
+
+  /// Parse a dotted type, e.g. 'Foo<X>.Y.Z', 'P.Type', '[X].Y'.
+  ParserResult<TypeRepr> parseTypeDotted(ParserResult<TypeRepr> Base);
+
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
@@ -1585,10 +1607,7 @@ public:
   /// \verbatim
   ///   simple-type-identifier: identifier generic-argument-list?
   /// \endverbatim
-  bool canParseSimpleTypeIdentifier();
-
   bool canParseTypeIdentifier();
-  bool canParseTypeIdentifierOrTypeComposition();
   bool canParseOldStyleProtocolComposition();
   bool canParseTypeTupleBody();
   bool canParseTypeAttribute();
@@ -1597,10 +1616,6 @@ public:
   bool canParseTypedPattern();
 
   /// Returns true if a qualified declaration name base type can be parsed.
-  ///
-  /// \verbatim
-  ///   qualified-decl-name-base-type: simple-type-identifier '.'
-  /// \endverbatim
   bool canParseBaseTypeForQualifiedDeclName();
 
   /// Returns true if the current token is '->' or effects specifiers followed

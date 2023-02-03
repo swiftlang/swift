@@ -80,6 +80,7 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
+  class MacroDecl;
   class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
@@ -612,13 +613,16 @@ protected:
     IsActor : 1
   );
 
-  SWIFT_INLINE_BITFIELD(
-      StructDecl, NominalTypeDecl, 1 + 1,
-      /// True if this struct has storage for fields that aren't accessible in
-      /// Swift.
-      HasUnreferenceableStorage : 1,
-      /// True if this struct is imported from C++ and does not have trivial value witness functions.
-      IsCxxNonTrivial : 1);
+  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1 + 1 + 1,
+                        /// True if this struct has storage for fields that
+                        /// aren't accessible in Swift.
+                        HasUnreferenceableStorage : 1,
+                        /// True if this struct is imported from C++ and does
+                        /// not have trivial value witness functions.
+                        IsCxxNonTrivial : 1,
+                        /// True if this struct is imported from C and has
+                        /// address diversified ptrauth qualified field.
+                        IsNonTrivialPtrAuth : 1);
 
   SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1,
     /// True if the enum has cases and at least one case has associated values.
@@ -722,6 +726,10 @@ protected:
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
     NumberOfFieldOffsetVectorEntries : 1,
     NumberOfVTableEntries : 2
+  );
+
+  SWIFT_INLINE_BITFIELD(MacroExpansionDecl, Decl, 16,
+    Discriminator : 16
   );
 
   } Bits;
@@ -851,10 +859,21 @@ public:
     return Attrs;
   }
 
+  /// Retrieve runtime discoverable attributes (if any) associated
+  /// with this declaration.
+  ArrayRef<CustomAttr *> getRuntimeDiscoverableAttrs() const;
+
   /// Returns the semantic attributes attached to this declaration,
   /// including attributes that are generated as the result of member
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
+
+  using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
+
+  /// Iterate over each attached macro with the given role, invoking the
+  /// given callback with each macro custom attribute and corresponding macro
+  /// declaration.
+  void forEachAttachedMacro(MacroRole role, MacroCallback) const;
 
   /// Returns the innermost enclosing decl with an availability annotation.
   const Decl *getInnermostDeclWithAvailability() const;
@@ -865,9 +884,9 @@ public:
   Optional<llvm::VersionTuple> getIntroducedOSVersion(PlatformKind Kind) const;
 
   /// Returns the OS version in which the decl became ABI as specified by the
-  /// @_backDeploy attribute.
+  /// @backDeployed attribute.
   Optional<llvm::VersionTuple>
-  getBackDeployBeforeOSVersion(ASTContext &Ctx) const;
+  getBackDeployedBeforeOSVersion(ASTContext &Ctx) const;
 
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
@@ -2836,9 +2855,6 @@ public:
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
 
-  /// Retrieve runtime discoverable attributes (if any) associated
-  /// with this declaration.
-  ArrayRef<CustomAttr *> getRuntimeDiscoverableAttrs() const;
   /// Retrieve a nominal type declaration backing given runtime discoverable
   /// attribute.
   ///
@@ -4254,6 +4270,14 @@ public:
   bool isCxxNonTrivial() const { return Bits.StructDecl.IsCxxNonTrivial; }
 
   void setIsCxxNonTrivial(bool v) { Bits.StructDecl.IsCxxNonTrivial = v; }
+
+  bool isNonTrivialPtrAuth() const {
+    return Bits.StructDecl.IsNonTrivialPtrAuth;
+  }
+
+  void setHasNonTrivialPtrAuth(bool v) {
+    Bits.StructDecl.IsNonTrivialPtrAuth = v;
+  }
 
   Type getTemplateInstantiationType() const { return TemplateInstantiationType; }
   void setTemplateInstantiationType(Type t) { TemplateInstantiationType = t; }
@@ -5950,6 +5974,8 @@ public:
     });
   }
 
+  clang::PointerAuthQualifier getPointerAuthQualifier() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 
@@ -6782,8 +6808,8 @@ public:
   /// \return the synthesized thunk, or null if the base of the call has
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
-  
-  /// Returns 'true' if the function has (or inherits) the @c @_backDeploy
+
+  /// Returns 'true' if the function has (or inherits) the `@backDeployed`
   /// attribute.
   bool isBackDeployed() const;
 
@@ -8444,6 +8470,8 @@ class MacroExpansionDecl : public Decl {
   ConcreteDeclRef macroRef;
 
 public:
+  enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
   MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
                      DeclNameLoc macroLoc,
                      SourceLoc leftAngleLoc,
@@ -8453,7 +8481,9 @@ public:
       : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
         Macro(macro), MacroLoc(macroLoc),
         LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-        GenericArgs(genericArgs), ArgList(args), Rewritten({}) {}
+        GenericArgs(genericArgs), ArgList(args), Rewritten({}) {
+    Bits.MacroExpansionDecl.Discriminator = InvalidDiscriminator;
+  }
 
   ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
 
@@ -8471,6 +8501,24 @@ public:
   void setRewritten(ArrayRef<Decl *> rewritten) { Rewritten = rewritten; }
   ConcreteDeclRef getMacroRef() const { return macroRef; }
   void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
+
+  /// Returns a discriminator which determines this macro expansion's index
+  /// in the sequence of macro expansions within the current function.
+  unsigned getDiscriminator() const;
+
+  /// Retrieve the raw discriminator, which may not have been computed yet.
+  ///
+  /// Only use this for queries that are checking for (e.g.) reentrancy or
+  /// intentionally do not want to initiate verification.
+  unsigned getRawDiscriminator() const {
+    return Bits.MacroExpansionDecl.Discriminator;
+  }
+
+  void setDiscriminator(unsigned discriminator) {
+    assert(getRawDiscriminator() == InvalidDiscriminator);
+    assert(discriminator != InvalidDiscriminator);
+    Bits.MacroExpansionDecl.Discriminator = discriminator;
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MacroExpansion;

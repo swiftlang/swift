@@ -442,11 +442,11 @@ class MemberTypeRepr final : public DeclRefTypeRepr,
   }
 
 public:
-  static MemberTypeRepr *create(const ASTContext &Ctx, TypeRepr *Base,
-                                ArrayRef<IdentTypeRepr *> MemberComponents);
+  static TypeRepr *create(const ASTContext &Ctx, TypeRepr *Base,
+                          ArrayRef<IdentTypeRepr *> MemberComponents);
 
-  static MemberTypeRepr *create(const ASTContext &Ctx,
-                                ArrayRef<IdentTypeRepr *> Components);
+  static DeclRefTypeRepr *create(const ASTContext &Ctx,
+                                 ArrayRef<IdentTypeRepr *> Components);
 
   TypeRepr *getBaseComponent() const { return Base; }
 
