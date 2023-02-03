@@ -39,16 +39,6 @@ public protocol RunLoopExecutor: Executor {
   func shutdown() -> Bool
 }
 
-/// Can be used to override the ``SerialExecutor`` used by the ``MainActor``.
-///
-/// This function can only be invoked at-most-once in the lifetime of a program,
-/// and it must be invoked in the program's `main` _before_ any asynchronous tasks
-/// are created. In other words, this method must be invoked before any suspension point,
-/// or ``Task`` creation in the program's `main`, and once it has been invoked, it cannot be called again.
-@available(SwiftStdlib 5.9, *)
-@_silgen_name("swift_concurrency_setMainActorExecutor")
-public func setMainActorExecutor<MainExecutor: SerialExecutor>(_ executor: MainExecutor)
-
 /// An unowned reference to a serial executor (a `SerialExecutor`
 /// value).
 ///
@@ -84,6 +74,16 @@ public struct UnownedSerialExecutor: Sendable {
     #endif
   }
 }
+
+/// Can be used to override the ``SerialExecutor`` used by the ``MainActor``.
+///
+/// This function can only be invoked at-most-once in the lifetime of a program,
+/// and it must be invoked in the program's `main` _before_ any asynchronous tasks
+/// are created. In other words, this method must be invoked before any suspension point,
+/// or ``Task`` creation in the program's `main`, and once it has been invoked, it cannot be called again.
+@available(SwiftStdlib 5.9, *)
+@_silgen_name("swift_concurrency_setMainActorExecutor")
+public func setMainActorExecutor<MainExecutor: SerialExecutor>(_ executor: MainExecutor)
 
 // Used by the concurrency runtime
 @available(SwiftStdlib 5.1, *)
