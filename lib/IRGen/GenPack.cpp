@@ -164,30 +164,9 @@ static Address emitFixedSizeMetadataPackRef(IRGenFunction &IGF,
   return pack;
 }
 
-static void emitPackExpansionType(IRGenFunction &IGF,
-                                  Address pack,
-                                  CanPackExpansionType expansionTy,
-                                  llvm::Value *dynamicIndex,
-                                  llvm::Value *dynamicLength,
-                                  DynamicMetadataRequest request) {
-  auto *prev = IGF.Builder.GetInsertBlock();
-  auto *check = IGF.createBasicBlock("pack-expansion-check");
-  auto *loop = IGF.createBasicBlock("pack-expansion-loop");
-  auto *rest = IGF.createBasicBlock("pack-expansion-rest");
-
-  IGF.Builder.CreateBr(check);
-  IGF.Builder.emitBlock(check);
-
-  // An index into the source metadata pack.
-  auto *phi = IGF.Builder.CreatePHI(IGF.IGM.SizeTy, 2);
-  phi->addIncoming(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), prev);
-
-  // If we reach the end, jump to the continuation block.
-  auto *cond = IGF.Builder.CreateICmpULT(phi, dynamicLength);
-  IGF.Builder.CreateCondBr(cond, loop, rest);
-
-  IGF.Builder.emitBlock(loop);
-
+static llvm::Value *emitPackExpansionElementMetadata(
+    IRGenFunction &IGF, CanPackExpansionType expansionTy, llvm::Value *index,
+    DynamicMetadataRequest request) {
   auto patternTy = expansionTy.getPatternType();
 
   // Find all the pack archetypes appearing in the pattern type.
@@ -225,7 +204,7 @@ static void emitPackExpansionType(IRGenFunction &IGF,
     Address fromPtr(
       IGF.Builder.CreateInBoundsGEP(patternPackAddress.getElementType(),
                                     patternPackAddress.getAddress(),
-                                    phi),
+                                    index),
       patternPackAddress.getElementType(),
       patternPackAddress.getAlignment());
     auto metadata = IGF.Builder.CreateLoad(fromPtr);
@@ -247,6 +226,34 @@ static void emitPackExpansionType(IRGenFunction &IGF,
   // Emit the element metadata.
   auto element = IGF.emitTypeMetadataRef(instantiatedPatternTy, request)
       .getMetadata();
+  return element;
+}
+
+static void emitPackExpansionType(IRGenFunction &IGF, Address pack,
+                                  CanPackExpansionType expansionTy,
+                                  llvm::Value *dynamicIndex,
+                                  llvm::Value *dynamicLength,
+                                  DynamicMetadataRequest request) {
+  auto *prev = IGF.Builder.GetInsertBlock();
+  auto *check = IGF.createBasicBlock("pack-expansion-check");
+  auto *loop = IGF.createBasicBlock("pack-expansion-loop");
+  auto *rest = IGF.createBasicBlock("pack-expansion-rest");
+
+  IGF.Builder.CreateBr(check);
+  IGF.Builder.emitBlock(check);
+
+  // An index into the source metadata pack.
+  auto *phi = IGF.Builder.CreatePHI(IGF.IGM.SizeTy, 2);
+  phi->addIncoming(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), prev);
+
+  // If we reach the end, jump to the continuation block.
+  auto *cond = IGF.Builder.CreateICmpULT(phi, dynamicLength);
+  IGF.Builder.CreateCondBr(cond, loop, rest);
+
+  IGF.Builder.emitBlock(loop);
+
+  auto *element =
+      emitPackExpansionElementMetadata(IGF, expansionTy, phi, request);
 
   // Store the element metadata into to the current destination index.
   auto *eltIndex = IGF.Builder.CreateAdd(dynamicIndex, phi);
@@ -318,22 +325,38 @@ irgen::emitTypeMetadataPack(IRGenFunction &IGF,
   return pack;
 }
 
-MetadataResponse
-irgen::emitTypeMetadataPackRef(IRGenFunction &IGF,
-                               CanPackType packType,
-                               DynamicMetadataRequest request) {
+static CanPackArchetypeType
+getForwardedPackArchetypeType(CanPackType packType) {
+  if (packType->getNumElements() != 1)
+    return CanPackArchetypeType();
+  auto uncastElement = packType.getElementType(0);
+  auto element = dyn_cast<PackExpansionType>(uncastElement);
+  if (!element)
+    return CanPackArchetypeType();
+  auto patternType = element.getPatternType();
+  auto packArchetype = dyn_cast<PackArchetypeType>(patternType);
+  return packArchetype;
+}
+
+static MetadataResponse
+tryGetLocalPackTypeMetadata(IRGenFunction &IGF, CanPackType packType,
+                            DynamicMetadataRequest request) {
   if (auto result = IGF.tryGetLocalTypeMetadata(packType, request))
     return result;
 
-  if (packType->getNumElements() == 1 &&
-      isa<PackExpansionType>(packType.getElementType(0))) {
-    if (auto packArchetypeType = dyn_cast<PackArchetypeType>(
-            cast<PackExpansionType>(packType.getElementType(0))
-                .getPatternType())) {
-      if (auto result = IGF.tryGetLocalTypeMetadata(packArchetypeType, request))
-        return result;
-    }
+  if (auto packArchetypeType = getForwardedPackArchetypeType(packType)) {
+    if (auto result = IGF.tryGetLocalTypeMetadata(packArchetypeType, request))
+      return result;
   }
+
+  return MetadataResponse();
+}
+
+MetadataResponse
+irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
+                               DynamicMetadataRequest request) {
+  if (auto result = tryGetLocalPackTypeMetadata(IGF, packType, request))
+    return result;
 
   auto pack = emitTypeMetadataPack(IGF, packType, request);
   auto *metadata = IGF.Builder.CreateConstArrayGEP(
@@ -343,6 +366,214 @@ irgen::emitTypeMetadataPackRef(IRGenFunction &IGF,
   IGF.setScopedLocalTypeMetadata(packType, response);
 
   return response;
+}
+
+llvm::Value *
+irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
+                                      llvm::Value *index,
+                                      DynamicMetadataRequest request) {
+  // If the pack has already been materialized, just gep into it.
+  if (auto pack = tryGetLocalPackTypeMetadata(IGF, packType, request)) {
+    auto *gep = IGF.Builder.CreateInBoundsGEP(IGF.IGM.TypeMetadataPtrTy,
+                                              pack.getMetadata(), index);
+    auto addr =
+        Address(gep, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment());
+    auto *metadata = IGF.Builder.CreateLoad(addr);
+    return metadata;
+  }
+
+  // Otherwise, in general, there's no already available array of metadata
+  // which can be indexed into.
+  auto *shape = IGF.emitPackShapeExpression(packType);
+
+  // If the shape and the index are both constant, the type for which metadata
+  // will be emitted is statically available.
+  auto *constantShape = dyn_cast<llvm::ConstantInt>(shape);
+  auto *constantIndex = dyn_cast<llvm::ConstantInt>(index);
+  if (constantShape && constantIndex) {
+    assert(packType->getNumElements() == constantShape->getValue());
+    auto index = constantIndex->getValue().getZExtValue();
+    assert(packType->getNumElements() > index);
+    auto ty = packType.getElementType(index);
+    auto response = IGF.emitTypeMetadataRef(ty, request);
+    auto *metadata = response.getMetadata();
+    return metadata;
+  }
+
+  // A pack consists of types and pack expansion types.  An example:
+  //   {repeat each T, Int, repeat each T, repeat each U, String},
+  // The above type has length 5.  The type "repeat each U" is at index 3.
+  //
+  // A pack _explosion_ is notionally obtained by flat-mapping the pack by the
+  // the operation of "listing elements" in pack expansion types.
+  //
+  // The explosion of the example pack looks like
+  //   {T_0, T_1, ..., Int, T_0, T_1, ..., U_0, U_1, ..., String}
+  //    ^^^^^^^^^^^^^
+  //    the runtime components of "each T"
+  //
+  // We have an index into the explosion,
+  //
+  //  {T_0, T_1, ..., Int, T_0, T_1, ..., U_0, U_1, ... String}
+  //   ------------%index------------>
+  //
+  // and we need to obtain the element in the explosion corresponding to it.
+  //
+  //  {T_0, T_1, ..., Int, T_0, T_1, ..., T_k, ..., U_0, U_1, ... String}
+  //   ------------%index---------------> ^^^
+  //
+  // Unfortunately, the explosion has not (the first check in this function)
+  // been materialized--and doing so is likely wasteful--so we can't simply
+  // index into some array.
+  //
+  // Instead, _notionally_, we will "compute"
+  // (1) the index into the _pack_ and
+  //     {repeat each T, Int, repeat each T, repeat each U, String}
+  //      ------%outer------> ^^^^^^^^^^^^^
+  // (2) the index within the elements of the pack expansion type
+  //     {T_0, T_2, ..., T_k, ...}
+  //      ----%inner---> ^^^
+  //
+  // In fact, we won't ever materialize %outer into any register.  Instead, we
+  // can just brach to materializing the metadata once we've determined which
+  // outer element's range contains %index.
+  //
+  // As for %inner, it will only be materialized in those blocks corresponding
+  // to pack expansions.
+  //
+  // Create the following control flow:
+  //
+  // +-------+      t_0 is not             t_N _is_ an
+  // |entry: |      an expansion           expansion
+  // |...    |      +----------+           +----------+    +----------+
+  // |...    |  --> |check_0:  | -> ... -> |check_N:  | -> |trap:     |
+  // |       |      | %i == %u0|           | %i < %uN |    | llvm.trap|
+  // +-------+      +----------+           +----------+    +----------+
+  //                %outer = 0             %outer = N
+  //                    |                      |
+  //                    V                      V
+  //               +----------+           +-----------------------+
+  //               |emit_1:   |           |emit_N:                |
+  //               | %inner=0 |           | %inner = %index - %lN |
+  //               | %m_1 =   |           | %m_N =                |
+  //               +----------+           +-----------------------+
+  //                    |                      |
+  //                    V                      V
+  //               +-------------------------------------------
+  //               |exit:
+  //               | %m = phi [ %m_1, %emit_1 ],
+  //               |                 ...
+  //               |          [ %m_N, %emit_N ]
+  auto *current = IGF.Builder.GetInsertBlock();
+
+  // Terminate the block that branches to continue checking or metadata emission
+  // depending on whether the index is in the pack expansion's bounds.
+  auto emitCheckBranch = [&IGF](llvm::Value *condition,
+                                llvm::BasicBlock *inBounds,
+                                llvm::BasicBlock *outOfBounds) {
+    if (condition) {
+      IGF.Builder.CreateCondBr(condition, inBounds, outOfBounds);
+    } else {
+      assert(!inBounds &&
+             "no condition to check but a metadata materialization block!?");
+      IGF.Builder.CreateBr(outOfBounds);
+    }
+  };
+
+  // The block which emission will continue in after we finish emitting metadata
+  // for this element.
+  auto *exit = IGF.createBasicBlock("pack-index-element-exit");
+  IGF.Builder.emitBlock(exit);
+  auto *metadataPhi = IGF.Builder.CreatePHI(IGF.IGM.TypeMetadataPtrTy,
+                                            packType.getElementTypes().size());
+
+  IGF.Builder.SetInsertPoint(current);
+  // The previous checkBounds' block's comparision of %index.  Use it to emit a
+  // branch to the current block or the previous block's metadata emission
+  // block.
+  llvm::Value *previousCondition = nullptr;
+  // The previous type's materializeMetadata block.  Use it as the inBounds
+  // target when branching from the previous block.
+  llvm::BasicBlock *previousInBounds = nullptr;
+  // The lower bound of indices for the current pack expansion.  Inclusive.
+  llvm::Value *lowerBound = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+  for (auto elementTy : packType.getElementTypes()) {
+    // The block within which it will be checked whether %index corresponds to
+    // an element of the pack expansion elementTy.
+    auto *checkBounds = IGF.createBasicBlock("pack-index-element-bounds");
+    // Finish emitting the previous block, either entry or check_i-1.
+    //
+    // Branch from the previous bounds-check block either to this bounds-check
+    // block or to the previous metadata-emission block.
+    emitCheckBranch(previousCondition, previousInBounds, checkBounds);
+
+    // (1) Emit check_i {{
+    IGF.Builder.emitBlock(checkBounds);
+
+    // The upper bound for the current pack expansion.  Exclusive.
+    llvm::Value *upperBound = nullptr;
+    llvm::Value *condition = nullptr;
+    if (auto expansionTy = dyn_cast<PackExpansionType>(elementTy)) {
+      auto reducedShape = expansionTy.getCountType();
+      auto *length = IGF.emitPackShapeExpression(reducedShape);
+      upperBound = IGF.Builder.CreateAdd(lowerBound, length);
+      // %index < %upperBound
+      //
+      // It's not necessary to check that %index >= %lowerBound.  Either
+      // elementTy is the first element type in packType or we branched here
+      // from some series of checkBounds blocks in each of which it was
+      // determined that %index is greater than the indices of the
+      // corresponding element type.
+      condition = IGF.Builder.CreateICmpULT(index, upperBound);
+    } else {
+      upperBound = IGF.Builder.CreateAdd(
+          lowerBound, llvm::ConstantInt::get(IGF.IGM.SizeTy, 1));
+      // %index == %lowerBound
+      condition = IGF.Builder.CreateICmpEQ(lowerBound, index);
+    }
+    // }} Finished emitting check_i, except for the terminator which will be
+    //    emitted in the next iteration once the new outOfBounds block is
+    //    available.
+
+    // (2) Emit emit_i {{
+    // The block within which the metadata corresponding to %inner will be
+    // materialized.
+    auto *materializeMetadata =
+        IGF.createBasicBlock("pack-index-element-metadata");
+    IGF.Builder.emitBlock(materializeMetadata);
+
+    llvm::Value *metadata = nullptr;
+    if (auto expansionTy = dyn_cast<PackExpansionType>(elementTy)) {
+      // Actually materialize %inner.  Then use it to get the metadata from the
+      // pack expansion at that index.
+      auto *relativeIndex = IGF.Builder.CreateSub(index, lowerBound);
+      metadata = emitPackExpansionElementMetadata(IGF, expansionTy,
+                                                  relativeIndex, request);
+    } else {
+      metadata = IGF.emitTypeMetadataRef(elementTy, request).getMetadata();
+    }
+    metadataPhi->addIncoming(metadata, materializeMetadata);
+    IGF.Builder.CreateBr(exit);
+    // }} Finished emitting emit_i.
+
+    // Switch back to emitting check_i.  The next iteration will emit its
+    // terminator.
+    IGF.Builder.SetInsertPoint(checkBounds);
+
+    // Set up the values for the next iteration.
+    previousInBounds = materializeMetadata;
+    previousCondition = condition;
+    lowerBound = upperBound;
+  }
+  auto *trap = IGF.createBasicBlock("pack-index-element-trap");
+  emitCheckBranch(previousCondition, previousInBounds, trap);
+
+  IGF.Builder.emitBlock(trap);
+  IGF.emitTrap("Variadic generic index out of bounds",
+               /*EmitUnreachable=*/true);
+
+  IGF.Builder.SetInsertPoint(exit);
+  return metadataPhi;
 }
 
 void irgen::cleanupTypeMetadataPack(IRGenFunction &IGF,

@@ -50,6 +50,11 @@ emitTypeMetadataPackRef(IRGenFunction &IGF,
                         CanPackType packType,
                         DynamicMetadataRequest request);
 
+llvm::Value *emitTypeMetadataPackElementRef(IRGenFunction &IGF,
+                                            CanPackType packType,
+                                            llvm::Value *index,
+                                            DynamicMetadataRequest request);
+
 void cleanupTypeMetadataPack(IRGenFunction &IGF,
                              StackAddress pack,
                              Optional<unsigned> elementCount);

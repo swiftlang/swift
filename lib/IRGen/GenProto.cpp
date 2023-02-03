@@ -3560,9 +3560,11 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
     return IGF.emitPackShapeExpression(argType);
 
   case GenericRequirement::Kind::Metadata:
+  case GenericRequirement::Kind::MetadataPack:
     return IGF.emitTypeMetadataRef(argType, request).getMetadata();
 
-  case GenericRequirement::Kind::WitnessTable: {
+  case GenericRequirement::Kind::WitnessTable:
+  case GenericRequirement::Kind::WitnessTablePack: {
     auto proto = requirement.getProtocol();
     auto conformance = subs.lookupConformance(depTy, proto);
     assert(conformance.getRequirement() == proto);
@@ -3600,21 +3602,28 @@ void irgen::bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
     }
 
     // Cast if necessary.
-    switch (requirements[index].getKind()) {
-    case GenericRequirement::Kind::Shape:
-      slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.SizeTy);
-      break;
-    case GenericRequirement::Kind::Metadata:
-      slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.TypeMetadataPtrTy);
-      break;
-    case GenericRequirement::Kind::WitnessTable:
-      slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.WitnessTablePtrTy);
-      break;
-    }
+    slot = IGF.Builder.CreateElementBitCast(
+        slot, requirements[index].getType(IGF.IGM));
 
     llvm::Value *value = IGF.Builder.CreateLoad(slot);
     bindGenericRequirement(IGF, requirements[index], value, metadataState,
                            getInContext);
+  }
+}
+
+llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
+                                            GenericRequirement::Kind kind) {
+  switch (kind) {
+  case GenericRequirement::Kind::Shape:
+    return IGM.SizeTy;
+  case GenericRequirement::Kind::Metadata:
+    return IGM.TypeMetadataPtrTy;
+  case GenericRequirement::Kind::WitnessTable:
+    return IGM.WitnessTablePtrTy;
+  case GenericRequirement::Kind::MetadataPack:
+    return IGM.TypeMetadataPtrPtrTy;
+  case GenericRequirement::Kind::WitnessTablePack:
+    return IGM.WitnessTablePtrPtrTy;
   }
 }
 
@@ -3626,26 +3635,26 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
   // Get the corresponding context type.
   auto type = getInContext(requirement.getTypeParameter());
 
+  assert(value->getType() == requirement.getType(IGF.IGM));
   switch (requirement.getKind()) {
   case GenericRequirement::Kind::Shape: {
     assert(isa<ArchetypeType>(type));
-    assert(value->getType() == IGF.IGM.SizeTy);
     auto kind = LocalTypeDataKind::forPackShapeExpression();
     IGF.setUnscopedLocalTypeData(type, kind, value);
     break;
   }
 
-  case GenericRequirement::Kind::Metadata: {
-    assert(value->getType() == IGF.IGM.TypeMetadataPtrTy);
+  case GenericRequirement::Kind::Metadata:
+  case GenericRequirement::Kind::MetadataPack: {
     setTypeMetadataName(IGF.IGM, value, type);
     IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value, metadataState);
     break;
   }
 
-  case GenericRequirement::Kind::WitnessTable: {
+  case GenericRequirement::Kind::WitnessTable:
+  case GenericRequirement::Kind::WitnessTablePack: {
     auto proto = requirement.getProtocol();
     assert(isa<ArchetypeType>(type));
-    assert(value->getType() == IGF.IGM.WitnessTablePtrTy);
     setProtocolWitnessTableName(IGF.IGM, value, type, proto);
     auto kind = LocalTypeDataKind::forAbstractProtocolWitnessTable(proto);
     IGF.setUnscopedLocalTypeData(type, kind, value);
@@ -3676,17 +3685,17 @@ namespace {
       enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
         if (reqs)
           reqs->push_back(reqt);
+        out.push_back(reqt.getType(IGM));
         switch (reqt.getKind()) {
         case GenericRequirement::Kind::Shape:
-          out.push_back(IGM.SizeTy);
           ++numShapes;
           break;
         case GenericRequirement::Kind::Metadata:
-          out.push_back(IGM.TypeMetadataPtrTy);
+        case GenericRequirement::Kind::MetadataPack:
           ++numTypeMetadataPtrs;
           break;
         case GenericRequirement::Kind::WitnessTable:
-          out.push_back(IGM.WitnessTablePtrTy);
+        case GenericRequirement::Kind::WitnessTablePack:
           ++numWitnessTablePtrs;
           break;
         }
