@@ -181,7 +181,7 @@ func expandFreestandingMacro(
       ) throws -> ExprSyntax {
         return try exprMacro.expansion(
           of: sourceManager.detach(
-            node, in: context,
+            node,
             foldingWith: OperatorTable.standardOperators
           ),
           in: context
@@ -201,7 +201,10 @@ func expandFreestandingMacro(
       }
       macroName = parentExpansion.macro.text
       let decls = try declMacro.expansion(
-        of: sourceManager.detach(parentExpansion, in: context),
+        of: sourceManager.detach(
+          parentExpansion,
+          foldingWith: OperatorTable.standardOperators
+        ),
         in: context
       )
       evaluatedSyntax = Syntax(CodeBlockItemListSyntax(
@@ -348,8 +351,11 @@ func expandAttachedMacro(
     switch (macro, macroRole) {
     case (let attachedMacro as AccessorMacro.Type, .Accessor):
       let accessors = try attachedMacro.expansion(
-        of: context.detach(customAttrNode),
-        providingAccessorsOf: context.detach(declarationNode),
+        of: sourceManager.detach(
+          customAttrNode,
+          foldingWith: OperatorTable.standardOperators
+        ),
+        providingAccessorsOf: sourceManager.detach(declarationNode),
         in: context
       )
 
@@ -377,11 +383,12 @@ func expandAttachedMacro(
         _ node: Node
       ) throws -> [AttributeSyntax] {
         return try attachedMacro.expansion(
-          of: context.detach(customAttrNode),
-          attachedTo: sourceManager.detach(node, in: context),
-          providingAttributesFor: sourceManager.detach(
-            declarationNode, in: context
+          of: sourceManager.detach(
+            customAttrNode,
+            foldingWith: OperatorTable.standardOperators
           ),
+          attachedTo: sourceManager.detach(node),
+          providingAttributesFor: sourceManager.detach(declarationNode),
           in: context
         )
       }
@@ -407,8 +414,11 @@ func expandAttachedMacro(
         _ node: Node
       ) throws -> [DeclSyntax] {
         return try attachedMacro.expansion(
-          of: sourceManager.detach(customAttrNode, in: context),
-          providingMembersOf: sourceManager.detach(node, in: context),
+          of: sourceManager.detach(
+            customAttrNode,
+            foldingWith: OperatorTable.standardOperators
+          ),
+          providingMembersOf: sourceManager.detach(node),
           in: context
         )
       }
