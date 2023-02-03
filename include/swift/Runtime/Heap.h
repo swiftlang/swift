@@ -32,6 +32,11 @@ namespace swift {
 SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 void *swift_slowAlloc(size_t bytes, size_t alignMask);
 
+using MallocTypeId = unsigned long long;
+
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
+void *swift_slowAllocTyped(size_t bytes, size_t alignMask, MallocTypeId typeId);
+
 // If the caller cannot promise to zero the object during destruction,
 // then call these corresponding APIs:
 SWIFT_RUNTIME_EXPORT
