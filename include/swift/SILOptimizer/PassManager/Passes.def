@@ -389,8 +389,12 @@ PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
      "Scalar Replacement of Aggregate SIL Block Arguments")
-SWIFT_FUNCTION_PASS(Simplify, "simplify",
-     "Simplify instructions via peephole optimizations")
+SWIFT_FUNCTION_PASS(Simplification, "simplification",
+    "Peephole simplifications")
+SWIFT_FUNCTION_PASS(OnoneSimplification, "onone-simplification",
+    "Peephole simplifications which runs at -Onone")
+SWIFT_FUNCTION_PASS(LateOnoneSimplification, "late-onone-simplification",
+    "Peephole simplifications which can only run late in the -Onone pipeline")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",

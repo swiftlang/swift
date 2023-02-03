@@ -13,5 +13,6 @@ swift_compiler_sources(Optimizer
   ObjCBridgingOptimization.swift
   MergeCondFails.swift
   ReleaseDevirtualizer.swift
+  SimplificationPasses.swift
   StackPromotion.swift
 )
