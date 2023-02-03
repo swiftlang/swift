@@ -3470,6 +3470,12 @@ void FindLocalVal::visitBraceStmt(BraceStmt *S, bool isTopLevelCode) {
   }
 
   for (auto elem : S->getElements()) {
+    // If we have a SingleValueStmtExpr, there may be local bindings in the
+    // wrapped statement.
+    if (auto *E = elem.dyn_cast<Expr *>()) {
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E))
+        visit(SVE->getStmt());
+    }
     if (auto *S = elem.dyn_cast<Stmt*>())
       visit(S);
   }

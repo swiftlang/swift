@@ -6265,13 +6265,17 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  case ConstraintLocator::TernaryBranch: {
+  case ConstraintLocator::TernaryBranch:
+  case ConstraintLocator::SingleValueStmtBranch: {
     recordAnyTypeVarAsPotentialHole(lhs);
     recordAnyTypeVarAsPotentialHole(rhs);
 
-    // If `if` expression has a contextual type, let's consider it a source of
-    // truth and produce a contextual mismatch instead of  per-branch failure,
-    // because it's a better pointer than potential then-to-else type mismatch.
+    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+      return true;
+
+    // If there's a contextual type, let's consider it the source of truth and
+    // produce a contextual mismatch instead of  per-branch failure, because
+    // it's a better pointer than potential then-to-else type mismatch.
     if (auto contextualType =
             getContextualType(anchor, /*forConstraint=*/false)) {
       auto purpose = getContextualTypePurpose(anchor);
@@ -6293,7 +6297,7 @@ bool ConstraintSystem::repairFailures(
     }
 
     // If there is no contextual type, this is most likely a contextual type
-    // mismatch between then/else branches of ternary operator.
+    // mismatch between the branches.
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -7421,6 +7425,29 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Single expression function with implicit `return`.
       if (auto contextualType = elt->getAs<LocatorPathElt::ContextualType>()) {
         if (contextualType->isFor(CTP_ReturnSingleExpr)) {
+          increaseScore(SK_FunctionConversion);
+          return getTypeMatchSuccess();
+        }
+      }
+
+      // We also need to propagate this conversion into the branches for single
+      // value statements.
+      //
+      // As with the previous checks, we only allow the Void conversion in
+      // an implicit single-expression closure. In the more general case, we
+      // only allow the Never conversion.
+      auto *loc = getConstraintLocator(locator);
+      if (auto branchKind = loc->isForSingleValueStmtBranch()) {
+        bool allowConversion = false;
+        switch (*branchKind) {
+        case SingleValueStmtBranchKind::Regular:
+          allowConversion = type1->isUninhabited();
+          break;
+        case SingleValueStmtBranchKind::InSingleExprClosure:
+          allowConversion = true;
+          break;
+        }
+        if (allowConversion) {
           increaseScore(SK_FunctionConversion);
           return getTypeMatchSuccess();
         }
@@ -14121,7 +14148,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       if (branchElt->forElse())
         impact = 10;
     }
-
+    using SingleValueStmtBranch = LocatorPathElt::SingleValueStmtBranch;
+    if (auto branchElt = locator->getLastElementAs<SingleValueStmtBranch>()) {
+      // Similar to a ternary, except we have N branches. Let's prefer the fix
+      // on the first branch, and discount subsequent branches by index.
+      if (branchElt->getExprBranchIndex() > 0)
+        impact = 9 + branchElt->getExprBranchIndex();
+    }
     // Increase impact of invalid conversions to `Any` and `AnyHashable`
     // associated with collection elements (i.e. for-in sequence element)
     // because it means that other side is structurally incompatible.
@@ -14543,7 +14576,8 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
 }
 
 void ConstraintSystem::addContextualConversionConstraint(
-    Expr *expr, Type conversionType, ContextualTypePurpose purpose) {
+    Expr *expr, Type conversionType, ContextualTypePurpose purpose,
+    ConstraintLocator *locator) {
   if (conversionType.isNull())
     return;
 
@@ -14596,14 +14630,13 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_WrappedProperty:
   case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
+  case CTP_SingleValueStmtBranch:
     break;
   }
 
   // Add the constraint.
-  auto *convertTypeLocator =
-      getConstraintLocator(expr, LocatorPathElt::ContextualType(purpose));
-  auto openedType = openOpaqueType(conversionType, purpose, convertTypeLocator);
-  addConstraint(constraintKind, getType(expr), openedType, convertTypeLocator,
+  auto openedType = openOpaqueType(conversionType, purpose, locator);
+  addConstraint(constraintKind, getType(expr), openedType, locator,
                 /*isFavored*/ true);
 }
 

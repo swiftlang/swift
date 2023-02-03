@@ -292,6 +292,22 @@ ASTNode BraceStmt::findAsyncNode() {
   return asyncFinder.getAsyncNode();
 }
 
+Expr *BraceStmt::getSingleExpressionElement() const {
+  if (getElements().size() != 1)
+    return nullptr;
+
+  return getElements()[0].dyn_cast<Expr *>();
+}
+
+IsSingleValueStmtResult Stmt::mayProduceSingleValue(Evaluator &eval) const {
+  return evaluateOrDefault(eval, IsSingleValueStmtRequest{this},
+                           IsSingleValueStmtResult::circularReference());
+}
+
+IsSingleValueStmtResult Stmt::mayProduceSingleValue(ASTContext &ctx) const {
+  return mayProduceSingleValue(ctx.evaluator);
+}
+
 SourceLoc ReturnStmt::getStartLoc() const {
   if (ReturnLoc.isInvalid() && Result)
     return Result->getStartLoc();
@@ -515,6 +531,39 @@ IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
            implicit) {
 }
 
+ArrayRef<Stmt *> IfStmt::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
+  assert(scratch.empty());
+  scratch.push_back(getThenStmt());
+
+  auto *elseBranch = getElseStmt();
+  while (elseBranch) {
+    if (auto *IS = dyn_cast<IfStmt>(elseBranch)) {
+      // Look through else ifs.
+      elseBranch = IS->getElseStmt();
+      scratch.push_back(IS->getThenStmt());
+      continue;
+    }
+    // An unconditional else, we're done.
+    scratch.push_back(elseBranch);
+    break;
+  }
+  return scratch;
+}
+
+bool IfStmt::isSyntacticallyExhaustive() const {
+  auto *elseBranch = getElseStmt();
+  while (elseBranch) {
+    // Look through else ifs.
+    if (auto *IS = dyn_cast<IfStmt>(elseBranch)) {
+      elseBranch = IS->getElseStmt();
+      continue;
+    }
+    // An unconditional else.
+    return true;
+  }
+  return false;
+}
+
 GuardStmt::GuardStmt(SourceLoc GuardLoc, Expr *Cond, BraceStmt *Body,
                      Optional<bool> implicit, ASTContext &Ctx)
   : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {
@@ -686,6 +735,14 @@ LabeledStmt *ContinueStmt::getTarget() const {
 
 SourceLoc swift::extractNearestSourceLoc(const Stmt *S) {
   return S->getStartLoc();
+}
+
+ArrayRef<Stmt *>
+SwitchStmt::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
+  assert(scratch.empty());
+  for (auto *CS : getCases())
+    scratch.push_back(CS->getBody());
+  return scratch;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Stmts, is

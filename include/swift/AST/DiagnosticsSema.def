@@ -1108,6 +1108,29 @@ ERROR(ternary_expr_cases_mismatch,none,
       "result values in '? :' expression have mismatching types %0 and %1",
       (Type, Type))
 
+// Statements as expressions
+ERROR(single_value_stmt_branches_mismatch,none,
+      "branches have mismatching types %0 and %1",
+      (Type, Type))
+ERROR(single_value_stmt_out_of_place,none,
+      "'%0' may only be used as expression in return, throw, or as the source "
+      "of an assignment",
+      (StmtKind))
+ERROR(single_value_stmt_must_be_unlabeled,none,
+      "'%0' cannot have a jump label when used as expression",
+      (StmtKind))
+ERROR(if_expr_must_be_syntactically_exhaustive,none,
+      "'if' must have an unconditional 'else' to be used as expression",
+      ())
+ERROR(single_value_stmt_branch_must_end_in_throw,none,
+      "non-expression branch of '%0' expression may only end with a 'throw'",
+      (StmtKind))
+ERROR(cannot_jump_in_single_value_stmt,none,
+      "cannot '%0' in '%1' when used as expression",
+      (StmtKind, StmtKind))
+ERROR(effect_marker_on_single_value_stmt,none,
+      "'%0' may not be used on '%1' expression", (StringRef, StmtKind))
+
 ERROR(did_not_call_function_value,none,
       "function value was used as a property; add () to call it",
       ())

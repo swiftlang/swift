@@ -1237,6 +1237,18 @@ void SILGenFunction::emitGeneratorFunction(
   mergeCleanupBlocks();
 }
 
+Initialization *SILGenFunction::getSingleValueStmtInit(Expr *E) {
+  if (SingleValueStmtInitStack.empty())
+    return nullptr;
+
+  // Check to see if this is an expression branch of an active
+  // SingleValueStmtExpr initialization.
+  if (!SingleValueStmtInitStack.back().Exprs.contains(E))
+    return nullptr;
+
+  return SingleValueStmtInitStack.back().Init;
+}
+
 void SILGenFunction::emitProfilerIncrement(ASTNode Node) {
   emitProfilerIncrement(ProfileCounterRef::node(Node));
 }
