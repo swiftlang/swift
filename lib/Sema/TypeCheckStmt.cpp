@@ -281,6 +281,11 @@ namespace {
         // Otherwise, it'll have been separately type-checked.
         if (!CE->isSeparatelyTypeChecked()) {
           SetLocalDiscriminators innerVisitor;
+          if (auto params = CE->getParameters()) {
+            for (auto *param : *params) {
+              innerVisitor.setLocalDiscriminator(param);
+            }
+          }
           CE->getBody()->walk(innerVisitor);
         }
 
@@ -332,16 +337,22 @@ namespace {
 
     /// Set the local discriminator for a named declaration.
     void setLocalDiscriminator(ValueDecl *valueDecl) {
-      if (valueDecl->hasLocalDiscriminator() &&
-          valueDecl->getRawLocalDiscriminator() ==
-              ValueDecl::InvalidDiscriminator) {
-        // Assign the next discriminator.
-        Identifier name = valueDecl->getBaseIdentifier();
-        auto &discriminator = DeclDiscriminators[name];
-        if (discriminator < InitialDiscriminator)
-          discriminator = InitialDiscriminator;
+      if (valueDecl->hasLocalDiscriminator()) {
+        if (valueDecl->getRawLocalDiscriminator() ==
+            ValueDecl::InvalidDiscriminator) {
+          // Assign the next discriminator.
+          Identifier name = valueDecl->getBaseIdentifier();
+          auto &discriminator = DeclDiscriminators[name];
+          if (discriminator < InitialDiscriminator)
+            discriminator = InitialDiscriminator;
 
-        valueDecl->setLocalDiscriminator(discriminator++);
+          valueDecl->setLocalDiscriminator(discriminator++);
+        } else {
+          // Assign the next discriminator.
+          Identifier name = valueDecl->getBaseIdentifier();
+          auto &discriminator = DeclDiscriminators[name];
+          discriminator = std::max(discriminator, std::max(InitialDiscriminator, valueDecl->getLocalDiscriminator() + 1));
+        }
       }
 
       // If this is a property wrapper, check for projected storage.
