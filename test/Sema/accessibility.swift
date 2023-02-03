@@ -1021,8 +1021,8 @@ public struct PublicWithInternalSettersConformPublic : PublicMutationOperations 
 }
 
 public struct PublicWithPackageSettersConformPublic : PublicMutationOperations {
-  public package(set) var size = 0 // FIXME: this should error
-  public package(set) subscript (_: Int) -> Int { // FIXME: this should error
+  public package(set) var size = 0 // FIXME: rdar://104987295 this should error
+  public package(set) subscript (_: Int) -> Int { // FIXME: rdar://104987295 this should error
     get { return 42 }
     set {}
   }
@@ -1471,7 +1471,7 @@ public class DerivedFromInternalConcreteGenericComposition : InternalConcreteGen
   public func publicReq() {}
 }
 
-// FIXME: should have expected note and error 'class cannot be declared public because its superclass is internal'
+// FIXME: rdar://104987455 should have expected note and error 'class cannot be declared public because its superclass is internal'
 internal typealias InternalConcreteGenericCompositionPkg = PackageGenericClass<Int> & PackageProto
 public class DerivedFromInternalConcreteGenericCompositionPkg : InternalConcreteGenericCompositionPkg { // expected-error {{class cannot be declared public because its superclass uses a package type as a generic parameter}}
   public func packageReq() {}
