@@ -290,6 +290,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
 
   PrintOptions Options = PrintOptions::printModuleInterface(
       Ctx.TypeCheckerOpts.PrintFullConvention);
+    Options.SkipUnavailable = false;
   ModuleTraversalOptions TraversalOptions = None; // Don't print submodules.
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
