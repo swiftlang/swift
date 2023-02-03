@@ -549,6 +549,42 @@ static void emitSymbolicInterfaceForClangModule(
   }
 }
 
+static void emitTransitiveClangSymbolicInterfacesForSwiftModuleImports(
+    ArrayRef<ImportedModule> imports, StringRef indexStorePath,
+    const clang::CompilerInstance &clangCI, DiagnosticEngine &diags) {
+  auto &fileMgr = clangCI.getFileManager();
+  for (auto &import : imports) {
+    ModuleDecl *mod = import.importedModule;
+    if (mod->isOnoneSupportModule())
+      continue; // ignore the Onone support library.
+    if (mod->isSwiftShimsModule())
+      continue;
+
+    for (auto *FU : mod->getFiles()) {
+      switch (FU->getKind()) {
+      default:
+        break;
+      case FileUnitKind::SerializedAST:
+      case FileUnitKind::DWARFModule:
+      case FileUnitKind::ClangModule: {
+        auto *LFU = cast<LoadedFile>(FU);
+        if (auto F = fileMgr.getFile(LFU->getFilename())) {
+          if (FU->getKind() == FileUnitKind::ClangModule) {
+            auto clangModUnit = cast<ClangModuleUnit>(LFU);
+            if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
+              // Emit the symbolic interface file in addition to index data.
+              emitSymbolicInterfaceForClangModule(
+                  clangModUnit, mod, clangMod, indexStorePath, clangCI, diags);
+            }
+          }
+          // FIXME: We should keep recursing here into other Swift modules.
+        }
+      }
+      }
+    }
+  }
+}
+
 static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                   StringRef indexStorePath,
                                   bool indexClangModules,
@@ -630,6 +666,16 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
             // the underlying module instead.
             if (auto *declaring = mod->getDeclaringModuleIfCrossImportOverlay())
               moduleName = declaring->getNameStr();
+
+            // Emit symbolic interface files for any re-exported Clang modules
+            // from this Swift module.
+            if (mod->getASTContext().LangOpts.EnableCXXInterop) {
+              SmallVector<ImportedModule, 4> imports;
+              mod->getImportedModules(imports,
+                                      ModuleDecl::ImportFilterKind::Exported);
+              emitTransitiveClangSymbolicInterfacesForSwiftModuleImports(
+                  imports, indexStorePath, clangCI, diags);
+            }
           }
           clang::index::writer::OpaqueModule opaqMod =
               moduleNameScratch.createString(moduleName);
