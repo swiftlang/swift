@@ -1968,11 +1968,18 @@ private:
       /// type-checked.
       DeclContext *dc;
 
+      // TODO: Fold the 3 below fields into ContextualTypeInfo
+
       /// The purpose of the contextual type.
       ContextualTypePurpose contextualPurpose;
 
       /// The type to which the expression should be converted.
       TypeLoc convertType;
+
+      /// The locator for the contextual type conversion constraint, or
+      /// \c nullptr to use the default locator which is anchored directly on
+      /// the expression.
+      ConstraintLocator *convertTypeLocator;
 
       /// When initializing a pattern from the expression, this is the
       /// pattern.
@@ -2061,14 +2068,25 @@ private:
 public:
   SolutionApplicationTarget(Expr *expr, DeclContext *dc,
                             ContextualTypePurpose contextualPurpose,
-                            Type convertType, bool isDiscarded)
+                            Type convertType,
+                            ConstraintLocator *convertTypeLocator,
+                            bool isDiscarded)
       : SolutionApplicationTarget(expr, dc, contextualPurpose,
                                   TypeLoc::withoutLoc(convertType),
-                                  isDiscarded) { }
+                                  convertTypeLocator, isDiscarded) {}
 
   SolutionApplicationTarget(Expr *expr, DeclContext *dc,
                             ContextualTypePurpose contextualPurpose,
-                            TypeLoc convertType, bool isDiscarded);
+                            Type convertType, bool isDiscarded)
+      : SolutionApplicationTarget(expr, dc, contextualPurpose, convertType,
+                                  /*convertTypeLocator*/ nullptr, isDiscarded) {
+  }
+
+  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
+                            ContextualTypePurpose contextualPurpose,
+                            TypeLoc convertType,
+                            ConstraintLocator *convertTypeLocator,
+                            bool isDiscarded);
 
   SolutionApplicationTarget(Expr *expr, DeclContext *dc, ExprPattern *pattern,
                             Type patternType)
@@ -2293,6 +2311,13 @@ public:
     if (contextualTypeIsOnlyAHint())
       return Type();
     return getExprContextualType();
+  }
+
+  /// Retrieve the conversion type locator for the expression, or \c nullptr
+  /// if it has not been set.
+  ConstraintLocator *getExprConvertTypeLocator() const {
+    assert(kind == Kind::expression);
+    return expression.convertTypeLocator;
   }
 
   /// Returns the autoclosure parameter type, or \c nullptr if the
@@ -4232,7 +4257,8 @@ public:
 
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(Expr *expr, Type conversionType,
-                                         ContextualTypePurpose purpose);
+                                         ContextualTypePurpose purpose,
+                                         ConstraintLocator *locator);
 
   /// Convenience function to pass an \c ArrayRef to \c addJoinConstraint
   Type addJoinConstraint(ConstraintLocator *locator,
@@ -5087,6 +5113,11 @@ public:
   /// \returns \c true if constraint generation failed, \c false otherwise
   LLVM_NODISCARD
   bool generateConstraints(AnyFunctionRef fn, BraceStmt *body);
+
+  /// Generate constraints for a given SingleValueStmtExpr.
+  ///
+  /// \returns \c true if constraint generation failed, \c false otherwise
+  bool generateConstraints(SingleValueStmtExpr *E);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
@@ -5985,6 +6016,22 @@ public:
                            std::function<Optional<SolutionApplicationTarget>(
                                SolutionApplicationTarget)>
                                rewriteTarget);
+
+  /// Apply the given solution to the given SingleValueStmtExpr.
+  ///
+  /// \param solution The solution to apply.
+  /// \param SVE The SingleValueStmtExpr to rewrite.
+  /// \param DC The declaration context in which transformations will be
+  /// applied.
+  /// \param rewriteTarget Function that performs a rewrite of any
+  /// solution application target within the context.
+  ///
+  /// \returns true if solution cannot be applied.
+  bool applySolutionToSingleValueStmt(
+      Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
+      std::function<
+          Optional<SolutionApplicationTarget>(SolutionApplicationTarget)>
+          rewriteTarget);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
