@@ -1312,6 +1312,16 @@ MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
 }
 
 void MemberLookupTable::addMember(Decl *member) {
+   // Peer through macro expansions.
+   if (auto *med = dyn_cast<MacroExpansionDecl>(member)) {
+     auto expanded = evaluateOrDefault(med->getASTContext().evaluator,
+                                       ExpandMacroExpansionDeclRequest{med},
+                                       nullptr);
+     for (auto *decl : expanded)
+       addMember(decl);
+     return;
+   }
+
   // Only value declarations matter.
   auto vd = dyn_cast<ValueDecl>(member);
   if (!vd)

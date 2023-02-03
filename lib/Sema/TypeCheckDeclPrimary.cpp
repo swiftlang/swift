@@ -2048,8 +2048,11 @@ public:
     // Assign a discriminator.
     (void)MED->getDiscriminator();
 
-    (void)evaluateOrDefault(
+    auto rewritten = evaluateOrDefault(
         Ctx.evaluator, ExpandMacroExpansionDeclRequest{MED}, {});
+
+    for (auto *decl : rewritten)
+      visit(decl);
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -3754,11 +3757,6 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   if (!expandFreestandingDeclarationMacro(MED, expandedTemporary))
     return {};
   auto expanded = ctx.AllocateCopy(expandedTemporary);
-  // FIXME: Handle this in name lookup instead of `addMember`.
-  // MED->setRewritten(expanded);
-  if (auto *parentDecl = MED->getDeclContext()->getAsDecl())
-    if (auto *idc = dyn_cast<IterableDeclContext>(parentDecl))
-      for (auto *decl : expanded)
-        idc->addMember(decl);
+  MED->setRewritten(expanded);
   return expanded;
 }

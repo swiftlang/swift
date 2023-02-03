@@ -214,7 +214,7 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
         """
 
         struct \(raw: prefix) {
-          func \(context.createUniqueName("method"))() { return 1 }
+          func \(context.createUniqueName("method"))() { return 0 }
           func \(context.createUniqueName("method"))() { return 1 }
         }
         """
