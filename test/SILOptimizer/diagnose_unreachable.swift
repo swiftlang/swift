@@ -518,3 +518,55 @@ func keypathWithDynamicLookup() {
   // when used in conjunction with a dynamicMemberLookup enum.
   let _ = \DynamicLookupEnum.innerEnum // no warning
 }
+
+func test_no_warnings_with_fatalError_when_wrapped_in_buildExpression() {
+  enum Either<T,U> {
+    case first(T)
+    case second(U)
+  }
+
+  @resultBuilder
+  struct MyBuilder {
+    static func buildExpression<T>(_ e: T) -> T { e }
+    static func buildBlock() -> () { }
+
+    static func buildBlock<T1>(_ t1: T1) -> T1 {
+      return t1
+    }
+
+    static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
+      return (t1, t2)
+    }
+
+    static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3) -> (T1, T2, T3) {
+      return (t1, t2, t3)
+    }
+
+    static func buildEither<T,U>(first value: T) -> Either<T, U> {
+      return .first(value)
+    }
+
+    static func buildEither<T,U>(second value: U) -> Either<T, U> {
+      return .second(value)
+    }
+  }
+
+  func test<T>(@MyBuilder _: (Int) -> T) {}
+
+  test {
+    if $0 < 0 {
+      fatalError() // ok, no warning even though fatalError() is wrapped
+    } else if $0 > 0 {
+      42
+    } else {
+      0
+    }
+  }
+
+  test {
+    switch $0 {
+    case 0: "0"
+    default: fatalError() // Ok, no warning even though fatalError() is wrapped
+    }
+  }
+}
