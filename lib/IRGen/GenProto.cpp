@@ -68,6 +68,7 @@
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
+#include "GenPack.h"
 #include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenType.h"
@@ -3250,6 +3251,9 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // conformance info for them.  However, that conformance info might be
   // more concrete than we're expecting.
   // TODO: make a best effort to devirtualize, maybe?
+  } else if (conformance.isPack()) {
+    auto pack = cast<PackType>(srcType);
+    return emitWitnessTablePackRef(IGF, pack, conformance.getPack());
   } else {
     concreteConformance = conformance.getConcrete();
   }
