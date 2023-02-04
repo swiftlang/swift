@@ -129,7 +129,8 @@ class SearchPathOptions;
 class CompilerInvocation;
 
 /// A ModuleLoader that loads explicitly built Swift modules specified via
-/// -swift-module-file or modules found in
+/// -swift-module-file or modules found in a provided
+/// -explicit-swift-module-map-file JSON input.
 class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
   explicit ExplicitSwiftModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
                                      ModuleLoadingMode loadMode,
