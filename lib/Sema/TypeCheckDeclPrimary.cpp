@@ -2732,6 +2732,12 @@ public:
       return;
 
     for (auto *prot : nomDecl->getLocalProtocols()) {
+      // Permit conformance to marker protocol Sendable.
+      if (prot->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        assert(prot->isMarkerProtocol());
+        continue;
+      }
+
       nomDecl->diagnose(diag::moveonly_cannot_conform_to_protocol_with_name,
                         nomDecl->getDescriptiveKind(),
                         nomDecl->getBaseName(), prot->getBaseName());
