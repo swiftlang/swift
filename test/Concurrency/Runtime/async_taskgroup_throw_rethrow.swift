@@ -4,6 +4,8 @@
 // REQUIRES: concurrency
 // REQUIRES: reflection
 
+// REQUIRES: rdar104762037
+
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
