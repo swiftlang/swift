@@ -1528,11 +1528,16 @@ private:
                                       File, FwdDeclLine, Flags, MangledName);
     }
 
-    case TypeKind::SILPack:
     case TypeKind::Pack:
-    case TypeKind::PackExpansion:
       llvm_unreachable("Unimplemented!");
 
+    case TypeKind::SILPack:
+    case TypeKind::PackExpansion:
+      //assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      return createPointerSizedStruct(Scope,
+                                      MangledName,
+                                      MainFile, 0, Flags, MangledName);
+      
     case TypeKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType should not show up here");
 
