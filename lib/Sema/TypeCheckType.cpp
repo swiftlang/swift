@@ -360,7 +360,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
 }
 
 /// Retrieve the identity form of the opaque type archetype type.
-static Type getIdentityOpaqueTypeArchetypeType(
+static Type getOpaqueArchetypeIdentity(
     OpaqueTypeDecl *opaqueDecl, unsigned ordinal) {
   auto outerGenericSignature = opaqueDecl->getNamingDecl()
                                    ->getInnermostDeclContext()
@@ -418,8 +418,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
     if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(getDeclContext())) {
       if (genericParam->getDepth() ==
               opaqueDecl->getOpaqueGenericParams().front()->getDepth()) {
-        return getIdentityOpaqueTypeArchetypeType(
-            opaqueDecl, genericParam->getIndex());
+        return getOpaqueArchetypeIdentity(opaqueDecl, genericParam->getIndex());
       }
     }
 
@@ -1993,6 +1992,8 @@ namespace {
     bool diagnoseMoveOnly(TypeRepr *repr, Type genericArgTy);
     
     bool diagnoseDisallowedExistential(TypeRepr *repr);
+    
+    bool diagnoseInvalidPlaceHolder(OpaqueReturnTypeRepr *repr);
 
     NeverNullType resolveOpenedExistentialArchetype(
         TypeAttributes &attrs, TypeRepr *repr,
@@ -2224,6 +2225,14 @@ bool TypeResolver::diagnoseDisallowedExistential(TypeRepr *repr) {
   }
 }
 
+bool TypeResolver::diagnoseInvalidPlaceHolder(OpaqueReturnTypeRepr *repr) {
+  if (repr->getConstraint()->isInvalid()){
+    if (isa<PlaceholderTypeRepr>(repr->getConstraint()))
+      return true;
+  }
+  return false;
+}
+
 /// Checks the given type, assuming that it appears as an argument for a
 /// generic parameter in the \c repr, to see if it is move-only.
 ///
@@ -2340,7 +2349,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
         if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
           if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr)){
             diagnoseDisallowedExistential(repr);
-            return getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal);
+            return getOpaqueArchetypeIdentity(opaqueDecl, *ordinal);
           }
         }
       }
@@ -2363,11 +2372,12 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     auto *DC = getDeclContext();
     
     bool isInExistential = diagnoseDisallowedExistential(opaqueRepr);
+    bool hasInvalidPlaceholder = diagnoseInvalidPlaceHolder(opaqueRepr);
     
     if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
       if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr)){
-        if(!isInExistential)
-          return getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal);
+        return !isInExistential ? getOpaqueArchetypeIdentity(opaqueDecl, *ordinal)
+                                : ErrorType::get(getASTContext());
       }
     }
 
@@ -2383,15 +2393,13 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
         }
       }
     }
-    
-    if (!repr->isInvalid()){
+    if (!repr->isInvalid() && !hasInvalidPlaceholder){
       // We are not inside an `OpaqueTypeDecl`, so diagnose an error.
       if (!(options & TypeResolutionFlags::SilenceErrors)) {
         diagnose(opaqueRepr->getOpaqueLoc(),
                  diag::unsupported_opaque_type);
       }
     }
-    
     // Try to resolve the constraint upper bound type as a placeholder.
     options |= TypeResolutionFlags::SilenceErrors;
     auto constraintType = resolveType(opaqueRepr->getConstraint(),
@@ -2455,9 +2463,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
         return ty;
 
     // Complain if we're allowed to and bail out with an error.
-    if (!options.contains(TypeResolutionFlags::SilenceErrors))
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       ctx.Diags.diagnose(repr->getLoc(),
                          diag::placeholder_type_not_allowed);
+    }
 
     return ErrorType::get(resolution.getASTContext());
   }
@@ -4083,7 +4092,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
       if (auto *opaqueDecl = dyn_cast<OpaqueTypeDecl>(getDeclContext())) {
         if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr)) {
           diagnoseDisallowedExistential(repr);
-          return getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal);
+          return getOpaqueArchetypeIdentity(opaqueDecl, *ordinal);
         }
       }
 
