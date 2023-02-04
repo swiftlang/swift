@@ -158,9 +158,6 @@ static Address emitFixedSizeMetadataPackRef(IRGenFunction &IGF,
     IGF.Builder.CreateStore(metadata, slot);
   }
 
-  pack = IGF.Builder.CreateConstArrayGEP(
-      pack, 0, IGF.IGM.getPointerSize());
-
   return pack;
 }
 
@@ -359,8 +356,7 @@ irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
     return result;
 
   auto pack = emitTypeMetadataPack(IGF, packType, request);
-  auto *metadata = IGF.Builder.CreateConstArrayGEP(
-      pack.getAddress(), 0, IGF.IGM.getPointerSize()).getAddress();
+  auto *metadata = pack.getAddress().getAddress();
 
   auto response = MetadataResponse::forComplete(metadata);
   IGF.setScopedLocalTypeMetadata(packType, response);
