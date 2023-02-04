@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -disable-objc-interop | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -disable-objc-interop -O | %FileCheck %s --check-prefix=OPT
 
 // REQUIRES: CPU=x86_64
 
@@ -58,7 +59,7 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: store i8** [[SRC_WITNESS]], i8*** [[DEST_WITNESS_ADDR]]
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
   // CHECK: call %swift.weak* @swift_weakInit(%swift.weak* returned [[DEST_REF_ADDR]], %swift.refcounted* [[SRC_REF]])
-  store_weak %a to [initialization] %w : $*@sil_weak CP?
+  store_weak %a to [init] %w : $*@sil_weak CP?
 
   // CHECK: [[SRC_REF:%.*]] = inttoptr {{.*}} %swift.refcounted*
   // CHECK: [[SRC_WITNESS:%.*]] = inttoptr {{.*}} i8**
@@ -81,13 +82,13 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   %c = load_weak        %w : $*@sil_weak CP?
 
   // CHECK: call { %swift.weak, i8** }* @"$s12existentials2CP_pSgXwWOb"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
-  copy_addr [take] %w to [initialization] %v : $*@sil_weak CP?
+  copy_addr [take] %w to [init] %v : $*@sil_weak CP?
 
   // CHECK: call { %swift.weak, i8** }* @"$s12existentials2CP_pSgXwWOd"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr [take] %w to                  %v : $*@sil_weak CP?
 
   // CHECK: call { %swift.weak, i8** }* @"$s12existentials2CP_pSgXwWOc"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
-  copy_addr        %w to [initialization] %v : $*@sil_weak CP?
+  copy_addr        %w to [init] %v : $*@sil_weak CP?
 
   // CHECK: call { %swift.weak, i8** }* @"$s12existentials2CP_pSgXwWOf"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr        %w to                  %v : $*@sil_weak CP?
@@ -99,3 +100,39 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
 
   return undef : $()
 }
+
+protocol Constrained<T> {
+  associatedtype T
+}
+
+sil @keep_alive : $@convention(thin)(@inout any Constrained<Int>) -> ()
+sil @constrained_protocol : $@convention(thin) (@inout any Constrained<Int>) -> () {
+entry(%arg : $*any Constrained<Int>):
+
+  %dst = alloc_stack $any Constrained<Int>
+
+  copy_addr %arg to [init] %dst : $*any Constrained<Int>
+
+  %fn = function_ref @keep_alive : $@convention(thin)(@inout any Constrained<Int>) -> ()
+  apply %fn(%dst) : $@convention(thin)(@inout any Constrained<Int>) -> ()
+
+  destroy_addr %dst : $*any Constrained<Int>
+
+  dealloc_stack  %dst : $*any Constrained<Int>
+  %t = tuple ()
+  return %t : $()
+}
+
+// Make sure we don't instantiate metadata for constrained existentials. Metadata
+// instatiation is not supported on older runtimes.
+
+// OPT: define{{.*}} void @constrained_protocol(
+// OPT: call {{.*}} @"$s12existentials11Constrained_pSi1TAaBPRts_XPWOc"
+
+// OPT: define{{.*}} @"$s12existentials11Constrained_pSi1TAaBPRts_XPWOc"
+// OPT-NOT: call {{.*}} instantiate
+// OPT-NOT: ret
+// OPT: load
+// OPT: store
+// OPT:  call
+// OPT: ret

@@ -96,6 +96,17 @@ int main() {
 // CHECK: Optional(2)
 // CHECK-NEXT: nil
   {
+    auto val = Optional<int>::some(-97);
+    takeCIntOpt(val);
+    assert((bool)val);
+    assert(val.get() == -97);
+    auto val2 = Optional<int>::none();
+    assert(!(bool)val2);
+    takeCIntOpt(val2);
+  }
+// CHECK-NEXT: Optional(-97)
+// CHECK-NEXT: nil
+  {
     auto val = createSmallStructOpt(0xFA);
     takeSmallStructOpt(val);
     assert((bool)val);

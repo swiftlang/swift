@@ -129,6 +129,16 @@
 #error Masking ISAs are incompatible with opaque ISAs
 #endif
 
+#if defined(__APPLE__) && defined(__LP64__) && __has_include(<malloc_type_private.h>) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+# include <TargetConditionals.h>
+# if TARGET_OS_IOS && !TARGET_OS_SIMULATOR
+#  define SWIFT_STDLIB_HAS_MALLOC_TYPE 1
+# endif
+#endif
+#ifndef SWIFT_STDLIB_HAS_MALLOC_TYPE
+# define SWIFT_STDLIB_HAS_MALLOC_TYPE 0
+#endif
+
 /// Which bits in the class metadata are used to distinguish Swift classes
 /// from ObjC classes?
 #ifndef SWIFT_CLASS_IS_SWIFT_MASK
@@ -167,6 +177,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 
 // Bring in visibility attribute macros
 #include "swift/shims/Visibility.h"
+
+// Temporary definitions to allow compilation on clang-15.
+#if defined(__cplusplus)
+#define SWIFT_EXTERN_C extern "C"
+#else
+#define SWIFT_EXTERN_C
+#endif
+#define SWIFT_RUNTIME_EXPORT_ATTRIBUTE SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore)
 
 // Define mappings for calling conventions.
 

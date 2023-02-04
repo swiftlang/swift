@@ -40,6 +40,7 @@ extension UnsafeMutablePointer: UnsafeCxxInputIterator {}
 extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
   public typealias Pointee = Wrapped.Pointee
 
+  @inlinable
   public var pointee: Pointee {
     if let value = self {
       return value.pointee
@@ -47,6 +48,7 @@ extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator
     fatalError("Could not dereference nullptr")
   }
 
+  @inlinable
   public func successor() -> Self {
     if let value = self {
       return value.successor()
@@ -63,9 +65,10 @@ extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator
 /// This requires the C++ sequence type to define const methods `begin()` and
 /// `end()` which return input iterators into the C++ sequence. The iterator
 /// types must conform to `UnsafeCxxInputIterator`.
-public protocol CxxSequence: Sequence {
+public protocol CxxSequence<Element>: Sequence {
+  override associatedtype Element
   associatedtype RawIterator: UnsafeCxxInputIterator
-  override associatedtype Element = RawIterator.Pointee
+    where RawIterator.Pointee == Element
   override associatedtype Iterator = CxxIterator<Self>
 
   // `begin()` and `end()` have to be mutating, otherwise calling 
@@ -123,6 +126,12 @@ public struct CxxIterator<T>: IteratorProtocol where T: CxxSequence {
 }
 
 extension CxxSequence {
+  /// Returns an iterator over the elements of this C++ container.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements in the C++
+  ///   container when each element is copied in O(1). Note that this might not
+  ///   be true for certain C++ types, e.g. those with a custom copy
+  ///   constructor that performs additional logic.
   @inlinable
   public func makeIterator() -> CxxIterator<Self> {
     return CxxIterator(sequence: self)

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -verify -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -verify -Xllvm -debug-only=differentiation %s  2>&1 | %FileCheck %s
 // REQUIRES: asserts
 
 import _Differentiation
@@ -456,7 +456,7 @@ func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) {
   nonactive = result
 }
 
-// CHECK_LABEL: [AD] Activity info for ${{.*}}31activeInoutArgMutatingMethodVaryyAA3MutVz_ADtF at (parameters=(1) results=(0))
+// CHECK-LABEL: [AD] Activity info for ${{.*}}31activeInoutArgMutatingMethodVaryyAA3MutVz_ADtF at parameter indices (1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $*Mut
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
 // CHECK: [ACTIVE]   %4 = alloc_stack $Mut, var, name "result"

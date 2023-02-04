@@ -206,7 +206,12 @@ SILValue findOwnershipReferenceRoot(SILValue ref);
 
 /// Look through all ownership forwarding instructions to find the values which
 /// were originally borrowed.
-void findGuaranteedReferenceRoots(SILValue value,
+///
+/// Note: This treats guaranteed forwarding phis like roots even though they do
+/// not introduce the borrow scope. This ensures that all roots dominate \p
+/// reference Value. But the client will need to handle forwarding phis.
+void findGuaranteedReferenceRoots(SILValue referenceValue,
+                                  bool lookThroughNestedBorrows,
                                   SmallVectorImpl<SILValue> &roots);
 
 /// Find the aggregate containing the first owned root of the
@@ -235,6 +240,21 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 /// Whether \p instruction accesses storage whose representation is unidentified
 /// such as by reading a pointer.
 bool mayAccessPointer(SILInstruction *instruction);
+
+/// Whether this instruction loads or copies a value whose storage does not
+/// increment the stored value's reference count.
+bool mayLoadWeakOrUnowned(SILInstruction* instruction);
+
+/// Conservatively, whether this instruction could involve a synchronization
+/// point like a memory barrier, lock or syscall.
+bool maySynchronizeNotConsideringSideEffects(SILInstruction* instruction);
+
+/// Conservatively, whether this instruction could be a barrier to hoisting
+/// destroys.
+///
+/// Does not consider function so effects, so every apply is treated as a
+/// barrier.
+bool mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction);
 
 } // end namespace swift
 
@@ -1111,6 +1131,8 @@ public:
     //
     // Precondition: this != subNode
     PathNode findPrefix(PathNode subNode) const;
+
+    bool isPrefixOf(PathNode other) { return node->isPrefixOf(other.node); }
 
     bool operator==(PathNode other) const { return node == other.node; }
     bool operator!=(PathNode other) const { return node != other.node; }

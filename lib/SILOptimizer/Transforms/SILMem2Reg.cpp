@@ -799,7 +799,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       }
       assert(!deinitializationPoints[blockPromotingWithin]);
       deinitializationPoints[blockPromotingWithin] = inst;
-      if (!runningVals.hasValue()) {
+      if (!runningVals.has_value()) {
         continue;
       }
       if (sbi->getSrc() != runningVals->value.stored) {
@@ -1829,7 +1829,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       if (sbi->getDest() != asi) {
         continue;
       }
-      if (!runningVals.hasValue()) {
+      if (!runningVals.has_value()) {
         continue;
       }
       if (sbi->getSrc() != runningVals->value.stored) {
@@ -1994,8 +1994,8 @@ bool MemoryToRegisters::run() {
     if (!domInfo->isReachableFromEntry(&block)) {
       continue;
     }
-    for (SILInstruction *inst : deleter.updatingReverseRange(&block)) {
-      auto *asi = dyn_cast<AllocStackInst>(inst);
+    for (SILInstruction &inst : block.reverseDeletableInstructions()) {
+      auto *asi = dyn_cast<AllocStackInst>(&inst);
       if (!asi)
         continue;
 

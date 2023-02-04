@@ -75,7 +75,7 @@ SGFContext ConditionalValue::enterBranch(SILBasicBlock *bb) {
     SGF.B.emitBlock(bb);
   }
   
-  assert(!scope.hasValue() && "already have a scope");
+  assert(!scope.has_value() && "already have a scope");
   // Start a scope for the current branch.
   scope.emplace(SGF.Cleanups, CleanupLocation(loc));
 
@@ -93,7 +93,7 @@ SGFContext ConditionalValue::enterBranch(SILBasicBlock *bb) {
 }
 
 void ConditionalValue::exitBranch(RValue &&condResult) {
-  assert(scope.hasValue() && "no current scope?!");
+  assert(scope.has_value() && "no current scope?!");
   if (tl.isAddressOnly()) {
     // Transfer the result into our buffer if it wasn't emitted in-place
     // already.

@@ -89,7 +89,7 @@ void SILPassManager_registerModulePass(llvm::StringRef name,
                                        BridgedModulePassRunFn runFn);
 void SILPassManager_registerFunctionPass(llvm::StringRef name,
                                          BridgedFunctionPassRunFn runFn);
-void SILCombine_registerInstructionPass(llvm::StringRef name,
+void SILCombine_registerInstructionPass(llvm::StringRef instClassName,
                                         BridgedInstructionPassRunFn runFn);
 
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context);
@@ -127,6 +127,18 @@ SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
                                          BridgedBasicBlock dominating,
                                          BridgedBasicBlock dominated);
 
+typedef BridgedMemoryBehavior (* _Nonnull AliasAnalysisGetMemEffectFn)(
+      BridgedPassContext context, BridgedValue, BridgedInstruction);
+typedef bool (* _Nonnull AliasAnalysisEscaping2InstFn)(
+      BridgedPassContext context, BridgedValue, BridgedInstruction);
+typedef bool (* _Nonnull AliasAnalysisEscaping2ValFn)(
+      BridgedPassContext context, BridgedValue, BridgedValue);
+
+void AliasAnalysis_register(AliasAnalysisGetMemEffectFn getMemEffectsFn,
+                            AliasAnalysisEscaping2InstFn isObjReleasedFn,
+                            AliasAnalysisEscaping2ValFn isAddrVisibleFromObjFn,
+                            AliasAnalysisEscaping2ValFn mayPointToSameAddrFn);
+
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
 BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab);
 BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
@@ -134,6 +146,10 @@ BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
 BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
                                  BridgedSlab slab);
 
+bool PassContext_tryDeleteDeadClosure(BridgedPassContext context, BridgedInstruction closure);
+
+void PassContext_notifyInvalidatedStackNesting(BridgedPassContext context);
+bool PassContext_getNeedFixStackNesting(BridgedPassContext context);
 void PassContext_fixStackNesting(BridgedPassContext context,
                                  BridgedFunction function);
 
@@ -157,6 +173,9 @@ void NodeSet_eraseInstruction(BridgedNodeSet set, BridgedInstruction inst);
 BridgedFunction NodeSet_getFunction(BridgedNodeSet set);
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
+
+void TermInst_replaceBranchTarget(BridgedInstruction term, BridgedBasicBlock from,
+                                  BridgedBasicBlock to);
 
 swift::SubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
@@ -184,6 +203,10 @@ OptionalBridgedFunction
 PassContext_loadFunction(BridgedPassContext context, llvm::StringRef name);
 
 SwiftInt SILOptions_enableStackProtection(BridgedPassContext context);
+SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context);
+bool SILOptions_enableSimplificationFor(BridgedInstruction inst);
+
+BridgedValue SILUndef_get(BridgedType type, BridgedPassContext context);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

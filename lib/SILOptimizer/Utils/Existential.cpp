@@ -27,7 +27,7 @@ using namespace swift;
 /// %5 = alloc_ref $SomeC
 /// store %5 to %4 : $*SomeC
 /// %8 = alloc_stack $SomeP
-/// copy_addr %3 to [initialization] %8 : $*SomeP
+/// copy_addr %3 to [init] %8 : $*SomeP
 /// %10 = apply %9(%3) : $@convention(thin) (@in_guaranteed SomeP)
 /// Assumptions: Insn is a direct user of GAI (e.g., copy_addr or 
 /// apply pattern shown above) and that a valid init_existential_addr 

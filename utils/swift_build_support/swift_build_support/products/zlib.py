@@ -81,18 +81,5 @@ class Zlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SKIP_INSTALL_FILES', 'YES')
         self.cmake_options.define('CMAKE_INSTALL_PREFIX', '/usr')
 
-        (platform, arch) = host_target.split('-')
-        common_c_flags = ' '.join(self.common_cross_c_flags(platform, arch))
-        self.cmake_options.define('CMAKE_C_FLAGS', common_c_flags)
-        self.cmake_options.define('CMAKE_CXX_FLAGS', common_c_flags)
-
-        if host_target.startswith("macosx") or \
-           host_target.startswith("iphone") or \
-           host_target.startswith("appletv") or \
-           host_target.startswith("watch"):
-            toolchain_file = self.generate_darwin_toolchain_file(platform, arch)
-            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
-        elif platform == "linux":
-            toolchain_file = self.generate_linux_toolchain_file(platform, arch)
-            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
+        self.generate_toolchain_file_for_darwin_or_linux(host_target)
         self.build_with_cmake(["all"], self.args.zlib_build_variant, [])

@@ -31,6 +31,8 @@
 
 namespace swift {
 
+RelativeWitnessTable *lookThroughOptionalConditionalWitnessTable(const RelativeWitnessTable *);
+
 #if !SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
 
 class MetadataAllocator : public llvm::AllocatorBase<MetadataAllocator> {
@@ -449,9 +451,15 @@ class MetadataCacheKey {
                                   const WitnessTable *bwt) {
     if (awt == bwt)
       return 0;
-
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+    auto *aDescription = lookThroughOptionalConditionalWitnessTable(
+      reinterpret_cast<const RelativeWitnessTable*>(awt))->getDescription();
+    auto *bDescription = lookThroughOptionalConditionalWitnessTable(
+      reinterpret_cast<const RelativeWitnessTable*>(bwt))->getDescription();
+#else
     auto *aDescription = awt->getDescription();
     auto *bDescription = bwt->getDescription();
+#endif
     return compareProtocolConformanceDescriptors(aDescription, bDescription);
   }
 

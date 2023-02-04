@@ -35,10 +35,12 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
 
   // Clang declarations are public and can't be assured of having a
   // unique defining location.
-  if (isa<ClangModuleUnit>(fileContext))
+  if (isa<ClangModuleUnit>(fileContext) &&
+          !D->getObjCImplementationDecl())
     return FormalLinkage::PublicNonUnique;
 
   switch (D->getEffectiveAccess()) {
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
     return FormalLinkage::PublicUnique;
@@ -288,7 +290,7 @@ bool SILModule::isTypeABIAccessible(SILType type,
 
 bool SILModule::isTypeMetadataForLayoutAccessible(SILType type) {
   if (type.is<ReferenceStorageType>() || type.is<SILFunctionType>() ||
-      type.is<AnyMetatypeType>())
+      type.is<AnyMetatypeType>() || type.is<SILPackType>())
     return false;
 
   return ::isTypeMetadataForLayoutAccessible(*this, type);

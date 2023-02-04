@@ -1,27 +1,51 @@
 @typeWrapper
-public struct Wrapper<S> {
+public struct Wrapper<W, S> {
   var underlying: S
 
-  public init(memberwise: S) {
-    print("Wrapper.init(\(memberwise))")
-    self.underlying = memberwise
+  public init(for wrappedType: W.Type, storage: S) {
+    print("Wrapper.init(for: \(wrappedType), storage: \(storage))")
+    self.underlying = storage
   }
 
-  public subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: KeyPath<S, V>) -> V {
     get {
-      print("in read-only getter")
-      return underlying[keyPath: path]
+      print("in read-only getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
     }
   }
 
-  public subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+  public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: WritableKeyPath<S, V>) -> V {
     get {
-      print("in getter")
-      return underlying[keyPath: path]
+      print("in getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
     }
     set {
       print("in setter => \(newValue)")
-      underlying[keyPath: path] = newValue
+      underlying[keyPath: storagePath] = newValue
+    }
+  }
+
+  public subscript<V>(wrappedSelf w: W,
+                      propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: KeyPath<S, V>) -> V {
+    get {
+      print("in (reference type) let getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
+    }
+  }
+
+  public subscript<V>(wrappedSelf w: W,
+                      propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: WritableKeyPath<S, V>) -> V {
+    get {
+      print("in (reference type) getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
+    }
+    set {
+      print("in (reference type) setter => \(newValue)")
+      underlying[keyPath: storagePath] = newValue
     }
   }
 }
@@ -282,7 +306,11 @@ public class UserDefinedInitWithConditionalTest<T> {
 @Wrapper
 public class ClassWithConvenienceInit<T> {
   public var a: T?
-  public var b: String
+  public var b: String = "<default-placeholder>"
+
+  public init(aWithoutB: T?) {
+    self.a = aWithoutB
+  }
 
   init(a: T?, b: String) {
     // Just to test that conditionals work properly
@@ -296,13 +324,13 @@ public class ClassWithConvenienceInit<T> {
   }
 
   public convenience init() {
-    self.init(a: nil)
+    self.init(val: nil)
     print(self.a)
     print(self.b)
   }
 
-  public convenience init(a: T?) {
-    self.init(a: a, b: "<placeholder>")
+  public convenience init(val: T?) {
+    self.init(a: val, b: "<placeholder>")
     print(self.a)
     print(self.b)
 
@@ -338,3 +366,88 @@ public struct TypeWithLetProperties<T> {
     }
   }
 }
+
+@Wrapper
+public class TypeWithDefaultedLetProperties<T> {
+  let a: T? = nil
+  let b: Int = 0
+
+  public init() {
+    print(self.a)
+    print(self.b)
+  }
+}
+
+@Wrapper
+public class TypeWithSomeDefaultedLetProperties<T> {
+  let a: T
+  let b: Int? = 0
+  @PropWrapper var c: String = "<default>"
+  @PropWrapperWithoutInit(value: [1, ""]) var d: [Any]
+
+  public init(a: T) {
+    self.a = a
+    self.c = "a"
+
+    print(self.a)
+    print(self.b)
+    print(self.c)
+  }
+}
+
+@Wrapper
+public protocol WrappedProtocol {
+  associatedtype T : RangeReplaceableCollection
+
+  var v: T { get set }
+}
+
+@propertyWrapper
+public struct PropWrapperWithDefaultInit<T> {
+  typealias Wrapped = T
+
+  public var wrappedValue: T {
+    get { value! }
+    set { value = newValue }
+  }
+
+  var value: T?
+
+  public init() {}
+
+  public init(wrappedValue: T) {
+    self.value = wrappedValue
+  }
+}
+
+@typeWrapper
+public struct WrapperWithConformance<W : WrappedTypesOnly, S> {
+  var underlying: S
+
+  public init(for wrappedType: W.Type, storage: S) {
+    print("WrapperWithConformance.init(for: \(wrappedType), storage: \(storage))")
+    self.underlying = storage
+  }
+
+  public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
+    storageKeyPath storagePath: KeyPath<S, V>) -> V {
+    get {
+      print("in read-only getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
+    }
+  }
+
+  public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
+    storageKeyPath storagePath: WritableKeyPath<S, V>) -> V {
+    get {
+      print("in getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
+    }
+    set {
+      print("in setter => \(newValue)")
+      underlying[keyPath: storagePath] = newValue
+    }
+  }
+}
+
+public protocol WrappedTypesOnly {}

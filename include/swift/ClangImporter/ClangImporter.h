@@ -194,6 +194,8 @@ public:
       IntermoduleDepTrackingMode Mode,
       std::shared_ptr<llvm::FileCollectorBase> FileCollector);
 
+  static bool isKnownCFTypeName(llvm::StringRef name);
+
   /// Append visible module names to \p names. Note that names are possibly
   /// duplicated, and not guaranteed to be ordered in any way.
   void collectVisibleTopLevelModuleNames(
@@ -220,11 +222,15 @@ public:
   /// \param path A sequence of (identifier, location) pairs that denote
   /// the dotted module name to load, e.g., AppKit.NSWindow.
   ///
+  /// \param AllowMemoryCache Affects only loading serialized Swift modules,
+  /// this parameter has no effect in the ClangImporter.
+  ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual ModuleDecl *loadModule(
                         SourceLoc importLoc,
-                        ImportPath::Module path)
+                        ImportPath::Module path,
+                        bool AllowMemoryCache = true)
                       override;
 
   /// Determine whether \c overlayDC is within an overlay module for the
@@ -268,6 +274,8 @@ public:
 
   ConcreteDeclRef getCXXFunctionTemplateSpecialization(
           SubstitutionMap subst, ValueDecl *decl) override;
+
+  FuncDecl *getCXXSynthesizedOperatorFunc(FuncDecl *decl);
 
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.
@@ -415,7 +423,7 @@ public:
       ModuleDependenciesCache &cache,
       const clang::tooling::dependencies::FullDependenciesResult &clangDependencies);
 
-  Optional<ModuleDependencies> getModuleDependencies(
+  Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) override;
 
@@ -431,7 +439,7 @@ public:
   /// \returns \c true if an error occurred, \c false otherwise
   bool addBridgingHeaderDependencies(
       StringRef moduleName,
-      ModuleDependenciesKind moduleKind,
+      ModuleDependencyKind moduleKind,
       ModuleDependenciesCache &cache);
 
   clang::TargetInfo &getTargetInfo() const override;

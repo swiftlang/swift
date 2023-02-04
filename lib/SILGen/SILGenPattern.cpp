@@ -1023,7 +1023,7 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
       emitWildcardDispatch(clauses, args, wildcardRow, innerFailure);
     } else {
       // Otherwise, specialize on the necessary column.
-      emitSpecializedDispatch(clauses, args, firstRow, column.getValue(),
+      emitSpecializedDispatch(clauses, args, firstRow, column.value(),
                               innerFailure);
     }
 
@@ -1978,7 +1978,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
         ManagedValue boxedValue =
             SGF.B.createProjectBox(loc, eltCMV.getFinalManagedValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue.getType());
-        if (eltTL->isLoadable()) {
+        if (eltTL->isLoadable() || !SGF.silConv.useLoweredAddresses()) {
           boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
           eltCMV = {boxedValue, CastConsumptionKind::BorrowAlways};
         } else {
@@ -2024,7 +2024,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     const SpecializationHandler &handleCase, const FailureHandler &outerFailure,
     ProfileCounter defaultCaseCount) {
-  // Why do we need to do this here (I just cargo culted this).
+  // Why do we need to do this here (I just cargo-culted this).
   RegularLocation loc(PatternMatchStmt, rows[0].Pattern, SGF.SGM.M);
 
   // If our source is an address that is loadable, perform a load_borrow.
@@ -2041,6 +2041,11 @@ void PatternMatchEmission::emitEnumElementDispatch(
     // be passed take_on_success if src is an address only type.
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
            "Can only have take_on_success with address only values");
+    if (src.getType().isAddressOnly(SGF.F) &&
+        src.getOwnershipKind() == OwnershipKind::Guaranteed) {
+      // If it's an opaque value with guaranteed ownership, we need to copy.
+      src = src.copy(SGF, PatternMatchStmt);
+    }
 
     // Finally perform the enum element dispatch.
     return emitEnumElementObjectDispatch(rows, src, handleCase, outerFailure,
@@ -2444,7 +2449,13 @@ void PatternMatchEmission::
 emitAddressOnlyInitialization(VarDecl *dest, SILValue value) {
   auto found = Temporaries.find(dest);
   assert(found != Temporaries.end());
-  SGF.B.createCopyAddr(dest, value, found->second, IsNotTake, IsInitialization);
+  if (SGF.useLoweredAddresses()) {
+    SGF.B.createCopyAddr(dest, value, found->second, IsNotTake,
+                         IsInitialization);
+    return;
+  }
+  auto copy = SGF.B.createCopyValue(dest, value);
+  SGF.B.createStore(dest, copy, found->second, StoreOwnershipQualifier::Init);
 }
 
 /// Emit all the shared case statements.
@@ -2706,7 +2717,7 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   }
 
   // Ok, at this point we know that we have a multiple entrance block. Grab our
-  // shared destination in preperation for branching to it.
+  // shared destination in preparation for branching to it.
   //
   // NOTE: We do not emit anything yet, since we will emit the shared block
   // later.
@@ -2793,7 +2804,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   bool hasFallthrough = false;
   for (auto caseBlock : S->getCases()) {
     // If the previous block falls through into this block or we have multiple
-    // case label itmes, create a shared case block to generate the shared
+    // case label items, create a shared case block to generate the shared
     // block.
     if (hasFallthrough || caseBlock->getCaseLabelItems().size() > 1) {
       emission.initSharedCaseBlockDest(caseBlock, hasFallthrough);
@@ -3064,7 +3075,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
     }
 
     // Ok, at this point we know that we have a multiple entrance block. Grab
-    // our shared destination in preperation for branching to it.
+    // our shared destination in preparation for branching to it.
     //
     // NOTE: We do not emit anything yet, since we will emit the shared block
     // later.
@@ -3134,7 +3145,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   SmallVector<ClauseRow, 8> clauseRows;
   clauseRows.reserve(S->getCatches().size());
   for (auto caseBlock : S->getCatches()) {
-    // If we have multiple case label itmes, create a shared case block to
+    // If we have multiple case label items, create a shared case block to
     // generate the shared block.
     if (caseBlock->getCaseLabelItems().size() > 1) {
       emission.initSharedCaseBlockDest(caseBlock, /*hasFallthrough*/ false);

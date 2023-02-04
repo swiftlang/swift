@@ -22,6 +22,15 @@ class Klass {
     func increment() { i += 1 }
 }
 
+struct Trivial {
+    var value = 5
+}
+
+struct NonTrivial {
+    var value = Klass()
+}
+
+
 ///////////
 // Tests //
 ///////////
@@ -460,4 +469,25 @@ func callPrintKlassOwnedOwnedArgThrows() throws {
     var y = Klass()
     y = Klass()
     try printKlassOwnedArgThrows(y)
+}
+
+//////////////
+// Gep Test //
+//////////////
+
+// CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy19test_nontrivial_gepyyAA7TrivialVF : $@convention(thin) (Trivial) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Trivial):
+// CHECK:   [[WRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[ARG]]
+// CHECK:   [[MV_WRAPPED:%.*]] = move_value [lexical] [[WRAPPED]]
+// CHECK:   [[MARKED:%.*]] = mark_must_check [no_implicit_copy] [[MV_WRAPPED]]
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[MARKED]]
+// CHECK:   [[EXT:%.*]] = struct_extract [[BORROW]]
+// CHECK:   [[UNWRAPPED:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[EXT]]
+// CHECK:   apply {{%.*}}([[UNWRAPPED]])
+// CHECK:   end_borrow [[BORROW]]
+// CHECK:   destroy_value [[MARKED]]
+// CHECK: } // end sil function '$s14noimplicitcopy19test_nontrivial_gepyyAA7TrivialVF'
+func test_nontrivial_gep(_ x: Trivial) {
+    @_noImplicitCopy let y = x
+    print2(y.value)
 }

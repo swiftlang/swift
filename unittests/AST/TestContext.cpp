@@ -49,7 +49,7 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
   module->addFile(*FileForLookups);
 
   if (optionals == DeclareOptionalTypes) {
-    SmallVector<Decl *, 2> optionalTypes;
+    SmallVector<ASTNode, 2> optionalTypes;
     optionalTypes.push_back(createOptionalType(
         Ctx, FileForLookups, Ctx.getIdentifier("Optional")));
     optionalTypes.push_back(createOptionalType(
@@ -57,7 +57,7 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
 
     auto result = SourceFileParsingResult{
         Ctx.AllocateCopy(optionalTypes), /*tokens*/ None,
-        /*interfaceHash*/ None, /*syntaxRoot*/ None};
+        /*interfaceHash*/ None};
 
     Ctx.evaluator.cacheOutput(ParseSourceFileRequest{FileForLookups},
                               std::move(result));

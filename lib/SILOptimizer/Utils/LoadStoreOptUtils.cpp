@@ -34,7 +34,7 @@ removeLSLocations(LSLocationValueMap &Values, LSLocationList &NextLevel) {
 void LSValue::expand(SILValue Base, SILModule *M, TypeExpansionContext context,
                      LSValueList &Vals, TypeExpansionAnalysis *TE) {
   for (const auto &P : TE->getTypeExpansion((*Base).getType(), M, context)) {
-    Vals.push_back(LSValue(Base, P.getValue()));
+    Vals.push_back(LSValue(Base, P.value()));
   }
 }
 
@@ -169,7 +169,7 @@ void LSLocation::getNextLevelLSLocations(LSLocationList &Locs, SILModule *Mod,
   Projection::getFirstLevelProjections(Ty, *Mod, context, Out);
   for (auto &X : Out) {
     ProjectionPath P((*Base).getType());
-    P.append(Path.getValue());
+    P.append(Path.value());
     P.append(X);
     Locs.push_back(LSLocation(Base, P));
   }
@@ -178,10 +178,10 @@ void LSLocation::getNextLevelLSLocations(LSLocationList &Locs, SILModule *Mod,
 void LSLocation::expand(LSLocation Base, SILModule *M,
                         TypeExpansionContext context, LSLocationList &Locs,
                         TypeExpansionAnalysis *TE) {
-  const ProjectionPath &BasePath = Base.getPath().getValue();
+  const ProjectionPath &BasePath = Base.getPath().value();
   for (const auto &P :
        TE->getTypeExpansion(Base.getType(M, context), M, context)) {
-    Locs.push_back(LSLocation(Base.getBase(), BasePath, P.getValue()));
+    Locs.push_back(LSLocation(Base.getBase(), BasePath, P.value()));
   }
 }
 

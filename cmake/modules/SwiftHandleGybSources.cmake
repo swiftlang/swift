@@ -58,7 +58,7 @@ function(handle_gyb_source_single dependency_out_var_name)
       COMMAND
           "${CMAKE_COMMAND}" -E make_directory "${dir}"
       COMMAND
-          "${CMAKE_COMMAND}" -E env PYTHONPATH=${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE} "$<TARGET_FILE:Python3::Interpreter>" "${gyb_tool}" ${SWIFT_GYB_FLAGS} ${GYB_SINGLE_FLAGS} -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
+          "${CMAKE_COMMAND}" -E env "$<TARGET_FILE:Python3::Interpreter>" "${gyb_tool}" ${SWIFT_GYB_FLAGS} ${GYB_SINGLE_FLAGS} -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
       COMMAND
           "${CMAKE_COMMAND}" -E copy_if_different "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_OUTPUT}"
       COMMAND
@@ -122,28 +122,7 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name)
       "${SWIFT_SOURCE_DIR}/utils/SwiftFloatingPointTypes.py"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakProperty.txt"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/__init__.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Child.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Classification.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/kinds.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Node.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/AttributeKinds.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/AttributeNodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/AvailabilityNodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/CommonNodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/DeclNodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/ExprNodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/GenericNodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/NodeSerializationCodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/PatternNodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/StmtNodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/TypeNodes.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Token.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Trivia.py"
-      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Traits.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/__init__.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/UIDs.py")
+      "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py")
 
   foreach (src ${${sources_var_name}})
     # On Windows (using Visual Studio), the generated project files assume that the

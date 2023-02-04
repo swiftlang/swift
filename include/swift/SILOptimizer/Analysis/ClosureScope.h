@@ -173,7 +173,7 @@ public:
 
   ArrayRef<SILFunction *> getTopDownFunctions() const {
     assert(!topDownFunctions.empty()
-           || llvm::empty(csa->getModule()->getFunctions()));
+           || csa->getModule()->getFunctions().empty());
     return topDownFunctions;
   }
 

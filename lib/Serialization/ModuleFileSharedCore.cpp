@@ -151,6 +151,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
       extendedInfo.setResilienceStrategy(ResilienceStrategy(Strategy));
       break;
+    case options_block::IS_BUILT_FROM_INTERFACE:
+      extendedInfo.setIsBuiltFromInterface(true);
+      break;
     case options_block::IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED:
       extendedInfo.setAllowModuleWithCompilerErrorsEnabled(true);
       break;
@@ -159,6 +162,12 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       break;
     case options_block::IS_CONCURRENCY_CHECKED:
       extendedInfo.setIsConcurrencyChecked(true);
+      break;
+    case options_block::MODULE_PACKAGE_NAME:
+      extendedInfo.setModulePackageName(blobData);
+      break;
+    case options_block::MODULE_EXPORT_AS_NAME:
+      extendedInfo.setExportAsName(blobData);
       break;
     default:
       // Unknown options record, possibly for use by a future version of the
@@ -307,6 +316,9 @@ static ValidationInfo validateControlBlock(
     case control_block::TARGET:
       result.targetTriple = blobData;
       break;
+    case control_block::ALLOWABLE_CLIENT_NAME:
+      result.allowableClients.push_back(blobData);
+      break;
     case control_block::SDK_NAME: {
       result.sdkName = blobData;
 
@@ -354,11 +366,9 @@ static ValidationInfo validateControlBlock(
       static const char* forcedDebugRevision =
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
 
-      bool isCompilerTagged = forcedDebugRevision ||
-        version::isCurrentCompilerTagged();
-
       StringRef moduleRevision = blobData;
-      if (isCompilerTagged) {
+      if (forcedDebugRevision ||
+          (requiresRevisionMatch && version::isCurrentCompilerTagged())) {
         StringRef compilerRevision = forcedDebugRevision ?
           forcedDebugRevision : version::getCurrentCompilerTag();
         if (moduleRevision != compilerRevision) {
@@ -395,7 +405,8 @@ static ValidationInfo validateControlBlock(
 
 static bool validateInputBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
-    SmallVectorImpl<SerializationOptions::FileDependency> &dependencies) {
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
+    SmallVectorImpl<SearchPath> *searchPaths) {
   SmallVector<StringRef, 4> dependencyDirectories;
   SmallString<256> dependencyFullPathBuffer;
 
@@ -424,33 +435,43 @@ static bool validateInputBlock(
     }
     unsigned kind = maybeKind.get();
     switch (kind) {
-    case input_block::FILE_DEPENDENCY: {
-      bool isHashBased = scratch[2] != 0;
-      bool isSDKRelative = scratch[3] != 0;
+    case input_block::FILE_DEPENDENCY:
+      if (dependencies) {
+        bool isHashBased = scratch[2] != 0;
+        bool isSDKRelative = scratch[3] != 0;
 
-      StringRef path = blobData;
-      size_t directoryIndex = scratch[4];
-      if (directoryIndex != 0) {
-        if (directoryIndex > dependencyDirectories.size())
-          return true;
-        dependencyFullPathBuffer = dependencyDirectories[directoryIndex-1];
-        llvm::sys::path::append(dependencyFullPathBuffer, blobData);
-        path = dependencyFullPathBuffer;
-      }
+        StringRef path = blobData;
+        size_t directoryIndex = scratch[4];
+        if (directoryIndex != 0) {
+          if (directoryIndex > dependencyDirectories.size())
+            return true;
+          dependencyFullPathBuffer = dependencyDirectories[directoryIndex - 1];
+          llvm::sys::path::append(dependencyFullPathBuffer, blobData);
+          path = dependencyFullPathBuffer;
+        }
 
-      if (isHashBased) {
-        dependencies.push_back(
-          SerializationOptions::FileDependency::hashBased(
-            path, isSDKRelative, scratch[0], scratch[1]));
-      } else {
-        dependencies.push_back(
-          SerializationOptions::FileDependency::modTimeBased(
-            path, isSDKRelative, scratch[0], scratch[1]));
+        if (isHashBased)
+          dependencies->push_back(
+              SerializationOptions::FileDependency::hashBased(
+                  path, isSDKRelative, scratch[0], scratch[1]));
+        else
+          dependencies->push_back(
+              SerializationOptions::FileDependency::modTimeBased(
+                  path, isSDKRelative, scratch[0], scratch[1]));
       }
       break;
-    }
     case input_block::DEPENDENCY_DIRECTORY:
-      dependencyDirectories.push_back(blobData);
+      if (dependencies)
+        dependencyDirectories.push_back(blobData);
+      break;
+    case input_block::SEARCH_PATH:
+      if (searchPaths) {
+        bool isFramework;
+        bool isSystem;
+        input_block::SearchPathLayout::readRecord(scratch, isFramework,
+                                                  isSystem);
+        searchPaths->push_back({std::string(blobData), isFramework, isSystem});
+      }
       break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
@@ -461,7 +482,6 @@ static bool validateInputBlock(
   return false;
 }
 
-
 bool serialization::isSerializedAST(StringRef data) {
   StringRef signatureStr(reinterpret_cast<const char *>(SWIFTMODULE_SIGNATURE),
                          llvm::array_lengthof(SWIFTMODULE_SIGNATURE));
@@ -471,7 +491,8 @@ bool serialization::isSerializedAST(StringRef data) {
 ValidationInfo serialization::validateSerializedAST(
     StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
     bool requiresRevisionMatch, ExtendedValidationInfo *extendedInfo,
-    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies) {
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
+    SmallVectorImpl<SearchPath> *searchPaths) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -517,7 +538,7 @@ ValidationInfo serialization::validateSerializedAST(
           extendedInfo, localObfuscator);
       if (result.status == Status::Malformed)
         return result;
-    } else if (dependencies &&
+    } else if ((dependencies || searchPaths) &&
                result.status == Status::Valid &&
                topLevelEntry.ID == INPUT_BLOCK_ID) {
       if (llvm::Error Err = cursor.EnterSubBlock(INPUT_BLOCK_ID)) {
@@ -526,7 +547,7 @@ ValidationInfo serialization::validateSerializedAST(
         result.status = Status::Malformed;
         return result;
       }
-      if (validateInputBlock(cursor, scratch, *dependencies)) {
+      if (validateInputBlock(cursor, scratch, dependencies, searchPaths)) {
         result.status = Status::Malformed;
         return result;
       }
@@ -581,12 +602,17 @@ void ModuleFileSharedCore::fatal(llvm::Error error) const {
 }
 
 void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
-  os << "module '" << Name << "' with full misc version '" << MiscVersion
-      << "'";
+  bool resilient = ResilienceStrategy(Bits.ResilienceStrategy) ==
+                   ResilienceStrategy::Resilient;
+  os << "module '" << Name
+     << "', builder version '" << MiscVersion
+     << "', built from "
+     << (Bits.IsBuiltFromInterface? "swiftinterface": "source")
+     << ", " << (resilient? "resilient": "non-resilient");
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
-    os << " (built with -experimental-allow-module-with-compiler-errors)";
+    os << ", built with -experimental-allow-module-with-compiler-errors";
   if (ModuleInputBuffer)
-    os << " at '" << ModuleInputBuffer->getBufferIdentifier() << "'";
+    os << ", loaded from '" << ModuleInputBuffer->getBufferIdentifier() << "'";
 }
 
 ModuleFileSharedCore::~ModuleFileSharedCore() { }
@@ -1312,6 +1338,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       SDKName = info.sdkName;
       CompatibilityVersion = info.compatibilityVersion;
       UserModuleVersion = info.userModuleVersion;
+      AllowableClientNames = info.allowableClients;
       Bits.ArePrivateImportsEnabled = extInfo.arePrivateImportsEnabled();
       Bits.IsSIB = extInfo.isSIB();
       Bits.IsStaticLibrary = extInfo.isStaticLibrary();
@@ -1319,11 +1346,14 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.IsTestable = extInfo.isTestable();
       Bits.ResilienceStrategy = unsigned(extInfo.getResilienceStrategy());
       Bits.IsImplicitDynamicEnabled = extInfo.isImplicitDynamicEnabled();
+      Bits.IsBuiltFromInterface = extInfo.isBuiltFromInterface();
       Bits.IsAllowModuleWithCompilerErrorsEnabled =
           extInfo.isAllowModuleWithCompilerErrorsEnabled();
       Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();
       MiscVersion = info.miscVersion;
       ModuleABIName = extInfo.getModuleABIName();
+      ModulePackageName = extInfo.getModulePackageName();
+      ModuleExportAsName = extInfo.getExportAsName();
 
       hasValidControlBlock = true;
       break;
@@ -1393,7 +1423,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           }
 
           Dependencies.push_back(
-              {blobData, spiBlob, importKind.getValue(), scoped});
+              {blobData, spiBlob, importKind.value(), scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {

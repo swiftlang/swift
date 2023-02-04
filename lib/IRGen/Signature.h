@@ -19,9 +19,9 @@
 #define SWIFT_IRGEN_SIGNATURE_H
 
 #include "MetadataSource.h"
-#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallingConv.h"
@@ -275,7 +275,7 @@ public:
   }
 
   const SignatureExpansionABIDetails &getABIDetails() {
-    assert(ABIDetails.hasValue());
+    assert(ABIDetails.has_value());
     return *ABIDetails;
   }
 };

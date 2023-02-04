@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
 #include "swift/AST/Module.h"
+#include "swift/IRGen/TBDGen.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
@@ -24,7 +25,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "swift/TBDGen/TBDGen.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 

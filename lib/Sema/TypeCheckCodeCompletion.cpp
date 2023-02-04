@@ -410,8 +410,10 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
 
   if (CS.isDebugMode()) {
     auto &log = llvm::errs();
-    log << "---Initial constraints for the given expression---\n";
-    expr->dump(log);
+    auto indent = CS.solverState ? CS.solverState->getCurrentIndent() : 0;
+    log.indent(indent)
+        << "---Initial constraints for the given expression---\n";
+    expr->dump(log, indent);
     log << "\n";
     CS.print(log);
   }
@@ -424,8 +426,9 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
   auto &solution = viable[0];
   if (CS.isDebugMode()) {
     auto &log = llvm::errs();
-    log << "---Solution---\n";
-    solution.dump(log);
+    auto indent = CS.solverState ? CS.solverState->getCurrentIndent() : 0;
+    log.indent(indent) << "---Solution---\n";
+    solution.dump(log, indent);
   }
 
   // Fill the results.
@@ -561,7 +564,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
   {
     auto range = target.getSourceRange();
     if (range.isInvalid() ||
-        !Context.SourceMgr.rangeContainsCodeCompletionLoc(range))
+        !Context.SourceMgr.rangeContainsIDEInspectionTarget(range))
       return false;
   }
 

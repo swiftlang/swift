@@ -94,7 +94,8 @@ bool SourceLoader::canImportModule(ImportPath::Module path,
 }
 
 ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
-                                     ImportPath::Module path) {
+                                     ImportPath::Module path,
+                                     bool AllowMemoryCache) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -122,7 +123,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   unsigned bufferID;
   if (auto BufID =
        Ctx.SourceMgr.getIDForBufferIdentifier(inputFile->getBufferIdentifier()))
-    bufferID = BufID.getValue();
+    bufferID = BufID.value();
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
@@ -151,7 +152,7 @@ void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
   // nothing to do here.
 }
 
-Optional<ModuleDependencies>
+Optional<const ModuleDependencyInfo*>
 SourceLoader::getModuleDependencies(StringRef moduleName,
                                     ModuleDependenciesCache &cache,
                                     InterfaceSubContextDelegate &delegate) {

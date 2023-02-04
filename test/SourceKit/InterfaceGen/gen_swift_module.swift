@@ -14,7 +14,7 @@ func f(s : inout [Int]) {
 // GROUP-EMPTY: <GROUPS>
 // GROUP-EMPTY-NEXT: <\GROUPS>
 
-// RUN: %swift -emit-module -o %t.mod/swift_mod_syn.swiftmodule %S/Inputs/swift_mod_syn.swift -parse-as-library -disable-implicit-concurrency-module-import
+// RUN: %swift -emit-module -o %t.mod/swift_mod_syn.swiftmodule %S/Inputs/swift_mod_syn.swift -parse-as-library -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
 // RUN: %sourcekitd-test -req=interface-gen-open -module swift_mod_syn -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -I %t.mod == -req=cursor -pos=4:7 %s -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  %s -I %t.mod | %FileCheck -check-prefix=SYNTHESIZED-USR1 %s
 // SYNTHESIZED-USR1: s:SMsSkRzSL7ElementSTRpzrlE4sortyyF::SYNTHESIZED::s:Sa
 

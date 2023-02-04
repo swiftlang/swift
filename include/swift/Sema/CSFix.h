@@ -93,6 +93,10 @@ enum class FixKind : uint8_t {
   /// and assume that types are equal.
   SkipSameTypeRequirement,
 
+  /// Skip same-shape generic requirement constraint,
+  /// and assume that pack types have the same shape.
+  SkipSameShapeRequirement,
+
   /// Skip superclass generic requirement constraint,
   /// and assume that types are related.
   SkipSuperclassRequirement,
@@ -411,6 +415,16 @@ enum class FixKind : uint8_t {
   /// For example `.a(let x), .b(let x)` where `x` gets bound to different
   /// types.
   RenameConflictingPatternVariables,
+
+  /// Macro without leading #.
+  MacroMissingPound,
+
+  /// Allow function type actor mismatch e.g. `@MainActor () -> Void`
+  /// vs.`@OtherActor () -> Void`
+  AllowGlobalActorMismatch,
+
+  /// Produce an error about a type that must be Copyable
+  MustBeCopyable,
 };
 
 class ConstraintFix {
@@ -583,21 +597,38 @@ private:
   }
 };
 
+class RequirementFix : public ConstraintFix {
+protected:
+  Type LHS;
+  Type RHS;
+
+  RequirementFix(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
+                 ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator), LHS(lhs), RHS(rhs) {}
+
+public:
+  std::string getName() const override = 0;
+
+  Type lhsType() const { return LHS; }
+  Type rhsType() const { return RHS; }
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
+  bool diagnose(const Solution &solution,
+                bool asNote = false) const override = 0;
+};
+
 /// Add a new conformance to the type to satisfy a requirement.
-class MissingConformance final : public ConstraintFix {
+class MissingConformance final : public RequirementFix {
   // Determines whether given protocol type comes from the context e.g.
   // assignment destination or argument comparison.
   bool IsContextual;
 
-  Type NonConformingType;
-  // This could either be a protocol or protocol composition.
-  Type ProtocolType;
-
   MissingConformance(ConstraintSystem &cs, bool isContextual, Type type,
                      Type protocolType, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddConformance, locator),
-        IsContextual(isContextual), NonConformingType(type),
-        ProtocolType(protocolType) {}
+      : RequirementFix(cs, FixKind::AddConformance, type, protocolType,
+                       locator),
+        IsContextual(isContextual) {}
 
 public:
   std::string getName() const override {
@@ -605,8 +636,6 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
                                             Type protocolType,
@@ -616,9 +645,9 @@ public:
                                            Type protocolType,
                                            ConstraintLocator *locator);
 
-  Type getNonConformingType() { return NonConformingType; }
+  Type getNonConformingType() const { return LHS; }
 
-  Type getProtocolType() { return ProtocolType; }
+  Type getProtocolType() const { return RHS; }
 
   bool isEqual(const ConstraintFix *other) const;
 
@@ -629,13 +658,11 @@ public:
 
 /// Skip same-type generic requirement constraint,
 /// and assume that types are equal.
-class SkipSameTypeRequirement final : public ConstraintFix {
-  Type LHS, RHS;
-
+class SkipSameTypeRequirement final : public RequirementFix {
   SkipSameTypeRequirement(ConstraintSystem &cs, Type lhs, Type rhs,
                           ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::SkipSameTypeRequirement, locator), LHS(lhs),
-        RHS(rhs) {}
+      : RequirementFix(cs, FixKind::SkipSameTypeRequirement, lhs, rhs,
+                       locator) {}
 
 public:
   std::string getName() const override {
@@ -643,9 +670,6 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  Type lhsType() { return LHS; }
-  Type rhsType() { return RHS; }
 
   static SkipSameTypeRequirement *create(ConstraintSystem &cs, Type lhs,
                                          Type rhs, ConstraintLocator *locator);
@@ -655,15 +679,38 @@ public:
   }
 };
 
+/// Skip a same-shape requirement between two type packs.
+///
+/// A same shape requirement can be inferred from a generic requirement,
+/// or from a pack expansion expression.
+class SkipSameShapeRequirement final : public RequirementFix {
+  SkipSameShapeRequirement(ConstraintSystem &cs, Type lhs, Type rhs,
+                           ConstraintLocator *locator)
+      : RequirementFix(cs, FixKind::SkipSameShapeRequirement, lhs, rhs,
+                       locator) {}
+
+public:
+  std::string getName() const override {
+    return "skip same-shape requirement";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static SkipSameShapeRequirement *create(ConstraintSystem &cs, Type lhs,
+                                          Type rhs, ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::SkipSameTypeRequirement;
+  }
+};
+
 /// Skip 'superclass' generic requirement constraint,
 /// and assume that types are equal.
-class SkipSuperclassRequirement final : public ConstraintFix {
-  Type LHS, RHS;
-
+class SkipSuperclassRequirement final : public RequirementFix {
   SkipSuperclassRequirement(ConstraintSystem &cs, Type lhs, Type rhs,
                             ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::SkipSuperclassRequirement, locator),
-        LHS(lhs), RHS(rhs) {}
+      : RequirementFix(cs, FixKind::SkipSuperclassRequirement, lhs, rhs,
+                       locator) {}
 
 public:
   std::string getName() const override {
@@ -818,7 +865,7 @@ class MarkGlobalActorFunction final : public ContextualMismatch {
   }
 
 public:
-  std::string getName() const override { return "add @escaping"; }
+  std::string getName() const override { return "add global actor"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
@@ -1560,7 +1607,7 @@ public:
   }
 
   bool isElementMismatch() const {
-    return Index.hasValue();
+    return Index.has_value();
   }
 
   bool coalesceAndDiagnose(const Solution &solution,
@@ -1807,6 +1854,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclNameRef name,
                                          ConstraintLocator *locator);
@@ -1976,6 +2027,27 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::NotCompileTimeConst;
+  }
+};
+
+class MustBeCopyable final : public ConstraintFix {
+  Type noncopyableTy;
+
+  MustBeCopyable(ConstraintSystem &cs, Type noncopyableTy, ConstraintLocator *locator);
+
+public:
+  std::string getName() const override { return "remove move-only from type"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
+  static MustBeCopyable *create(ConstraintSystem &cs,
+                             Type noncopyableTy,
+                             ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix const* fix) {
+    return fix->getKind() == FixKind::MustBeCopyable;
   }
 };
 
@@ -3191,6 +3263,56 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::RenameConflictingPatternVariables;
+  }
+};
+
+class MacroMissingPound final : public ConstraintFix {
+  MacroDecl *macro;
+
+  MacroMissingPound(ConstraintSystem &cs, MacroDecl *macro,
+                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::MacroMissingPound, locator),
+        macro(macro) { }
+
+public:
+  std::string getName() const override { return "macro missing pound"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static MacroMissingPound *
+  create(ConstraintSystem &cs, MacroDecl *macro,
+         ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::MacroMissingPound;
+  }
+};
+
+/// Allow mismatch between function types global actors.
+/// e.g.  `@MainActor () -> Void` vs.`@OtherActor () -> Void`
+class AllowGlobalActorMismatch final : public ContextualMismatch {
+  AllowGlobalActorMismatch(ConstraintSystem &cs, Type fromType, Type toType,
+                           ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowGlobalActorMismatch, fromType,
+                           toType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow function type actor mismatch";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowGlobalActorMismatch *create(ConstraintSystem &cs, Type fromType,
+                                          Type toType,
+                                          ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowGlobalActorMismatch;
   }
 };
 

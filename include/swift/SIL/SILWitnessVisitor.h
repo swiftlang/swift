@@ -125,7 +125,7 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
     sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
-      if (SILDeclRef::requiresNewWitnessTableEntry(accessor)) {
+      if (accessor->requiresNewWitnessTableEntry()) {
         asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
         addAutoDiffDerivativeMethodsIfRequired(accessor,
                                                SILDeclRef::Kind::Func);
@@ -134,7 +134,7 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    if (SILDeclRef::requiresNewWitnessTableEntry(cd)) {
+    if (cd->requiresNewWitnessTableEntry()) {
       asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
       addAutoDiffDerivativeMethodsIfRequired(cd, SILDeclRef::Kind::Allocator);
     }
@@ -146,7 +146,7 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    if (SILDeclRef::requiresNewWitnessTableEntry(func)) {
+    if (func->requiresNewWitnessTableEntry()) {
       asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
       addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
       addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);

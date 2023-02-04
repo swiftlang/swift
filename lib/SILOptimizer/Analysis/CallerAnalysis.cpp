@@ -134,12 +134,12 @@ bool CallerAnalysis::ApplySiteFinderVisitor::visitFunctionRefBaseInst(
 
   // Then check if we found any information at all from our result. If we
   // didn't, then mark this as escaping and bail.
-  if (!optResult.hasValue()) {
+  if (!optResult.has_value()) {
     iter.first->second.isDirectCallerSetComplete = false;
     return true;
   }
 
-  auto &result = optResult.getValue();
+  auto &result = optResult.value();
 
   // Ok. We know that we have some sort of information. Merge that information
   // into our information.
@@ -152,7 +152,7 @@ bool CallerAnalysis::ApplySiteFinderVisitor::visitFunctionRefBaseInst(
 
   if (result.partialApplySites.size()) {
     auto optMin = iter.first->second.getNumPartiallyAppliedArguments();
-    unsigned min = optMin.getValueOr(UINT_MAX);
+    unsigned min = optMin.value_or(UINT_MAX);
     for (ApplySite partialSite : result.partialApplySites) {
       min = std::min(min, partialSite.getNumArguments());
     }
@@ -484,7 +484,7 @@ void CallerAnalysis::print(llvm::raw_ostream &os) const {
       if (apply.second.hasFullApply) {
         fullAppliers.push_back(apply.first->getName());
       }
-      if (apply.second.getNumPartiallyAppliedArguments().hasValue()) {
+      if (apply.second.getNumPartiallyAppliedArguments().has_value()) {
         partialAppliers.push_back(apply.first->getName());
       }
     }

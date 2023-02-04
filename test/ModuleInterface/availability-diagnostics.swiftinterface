@@ -1,0 +1,14 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags:
+
+// RUN: %target-swift-typecheck-module-from-interface(%s) -module-name Foo
+// REQUIRES: VENDOR=apple
+
+@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+public struct S {
+  // This declaration is more available than its container but we don't want to
+  // diagnose that in a .swiftinterface since it may be the result of code
+  // synthesis and the client of the module can't do anything about it.
+  @available(macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+  public func moreAvailable()
+}

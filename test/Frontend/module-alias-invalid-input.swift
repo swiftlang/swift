@@ -5,6 +5,7 @@
 
 // RUN: not %target-swift-frontend -emit-silgen -parse-as-library %s -module-name foo -module-alias Swift=Bar 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_ALIAS1 %s
 // INVALID_MODULE_ALIAS1: error: invalid module alias "Swift"; make sure the alias differs from the module name, module ABI name, module link name, and a standard library name
+// RUN: %target-swift-frontend -emit-silgen -parse-as-library %s -module-name foo -module-alias Bar=Swift -verify
 
 // RUN: not %target-swift-frontend -emit-silgen -parse-as-library %s -module-name foo -module-alias bar=bar 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_ALIAS2 %s
 // INVALID_MODULE_ALIAS2: error: duplicate module alias; the name "bar" is already used for a module alias or an underlying name

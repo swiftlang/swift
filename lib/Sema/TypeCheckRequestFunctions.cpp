@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeLoc.h"
@@ -57,14 +58,16 @@ Type InheritedTypeRequest::evaluate(
     resolution =
         TypeResolution::forStructural(dc, context,
                                       /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr);
+                                      /*placeholderHandler*/ nullptr,
+                                      /*packElementOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
     resolution =
         TypeResolution::forInterface(dc, context,
                                      /*unboundTyOpener*/ nullptr,
-                                     /*placeholderHandler*/ nullptr);
+                                     /*placeholderHandler*/ nullptr,
+                                     /*packElementOpener*/ nullptr);
     break;
   }
 
@@ -171,11 +174,10 @@ AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
   for (auto attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
-    auto nominal = evaluateOrDefault(ctx.evaluator,
-                                     CustomAttrNominalRequest{mutableAttr, dc},
-                                     nullptr);
+    auto *nominal = evaluateOrDefault(ctx.evaluator,
+                                      CustomAttrNominalRequest{mutableAttr, dc},
+                                      nullptr);
 
-    // Ignore unresolvable custom attributes.
     if (!nominal)
       continue;
 

@@ -332,7 +332,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   dc->lookupQualified(type, name, subOptions, lookupResults);
 
   for (auto found : lookupResults)
-    builder.add(found, nullptr, nullptr, type, /*isOuter=*/false);
+    builder.add(found, nullptr, /*baseDecl=*/nullptr, type, /*isOuter=*/false);
 
   return result;
 }

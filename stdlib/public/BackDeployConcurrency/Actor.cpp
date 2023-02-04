@@ -1807,7 +1807,7 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
   // Note that this doesn't change the active task and so doesn't
   // need to either update ActiveTask or flagAsRunning/flagAsSuspended.
 
-  // If there's alreaady tracking info set up, just change the executor
+  // If there's already tracking info set up, just change the executor
   // there and tail-call the task.  We don't want these frames to
   // potentially accumulate linearly.
   if (oldTracking) {

@@ -36,7 +36,7 @@ func main() -> Int64 {
     baz_fnptr(2.89)
 
     // CHECK-DAG: !DILocalVariable(name: "barz_fnptr",{{.*}} type: ![[BARZPT:[0-9]+]]
-    // AST_DAG: !DILocalVariable(name: "barz_fnptr",{{.*}} type: ![[BARZ_T:[0-9]+]]
+    // AST-DAG: !DILocalVariable(name: "barz_fnptr",{{.*}} type: ![[BARZ_T:[0-9]+]]
     // AST-DAG: ![[BARZ_T:[0-9]+]] = !DICompositeType({{.*}}, identifier: "$sS2fs5Int64VIegyyd_D")
     // CHECK-DAG: ![[BARZPT]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} elements: ![[BARZMEMBERS:[0-9]+]]
     // CHECK-DAG: ![[BARZMEMBERS]] = !{![[BARZMEMBER:.*]], {{.*}}}

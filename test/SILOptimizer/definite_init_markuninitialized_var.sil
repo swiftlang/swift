@@ -123,8 +123,8 @@ bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %3a = mark_uninitialized [var] %3 : $<τ_0_0> { var τ_0_0 } <T>
   %4 = project_box %3a : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr [take] %1 to [initialization] %4 : $*T
-  copy_addr %4 to [initialization] %0 : $*T
+  copy_addr [take] %1 to [init] %4 : $*T
+  copy_addr %4 to [init] %0 : $*T
   destroy_value %3a : $<τ_0_0> { var τ_0_0 } <T>
   %9 = tuple ()
   return %9 : $()
@@ -136,7 +136,7 @@ bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %3a = mark_uninitialized [var] %3 : $<τ_0_0> { var τ_0_0 } <T> // expected-note {{variable defined here}}
   %4 = project_box %3a : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr %4 to [initialization] %0 : $*T   // expected-error {{variable '<unknown>' used before being initialized}}
+  copy_addr %4 to [init] %0 : $*T   // expected-error {{variable '<unknown>' used before being initialized}}
   destroy_value %3a : $<τ_0_0> { var τ_0_0 } <T>
   %9 = tuple ()
   return %9 : $()
@@ -233,15 +233,15 @@ bb0(%0 : $*T, %1 : $*T):
 
   // This should become an initialization of %4
   copy_addr %1 to %2 : $*T
-  // CHECK-NEXT: copy_addr %1 to [initialization] [[PB]] : $*T
+  // CHECK-NEXT: copy_addr %1 to [init] [[PB]] : $*T
 
   // This should stay an assignment of %4
   copy_addr [take] %1 to %2 : $*T
   // CHECK-NEXT: copy_addr [take] %1 to [[PB]] : $*T
 
   // This is a load, and shouldn't be changed.
-  copy_addr %2 to [initialization] %0 : $*T
-  // CHECK-NEXT: copy_addr [[PB]] to [initialization] %0 : $*T
+  copy_addr %2 to [init] %0 : $*T
+  // CHECK-NEXT: copy_addr [[PB]] to [init] %0 : $*T
 
   destroy_value %ba : $<τ_0_0> { var τ_0_0 } <T>
   // CHECK-NEXT: destroy_value %2
@@ -266,7 +266,7 @@ bb0:
 
   // This should become an initialization.
   store_weak %4 to %c : $*@sil_weak Optional<SomeClass>
-  // CHECK-NEXT: store_weak [[C1]] to [initialization] %1
+  // CHECK-NEXT: store_weak [[C1]] to [init] %1
 
   destroy_value %4 : $Optional<SomeClass>
   // CHECK-NEXT: destroy_value [[C1]]
@@ -445,8 +445,8 @@ entry(%a : $*C):
 
   %q = init_existential_addr %b : $*P, $C
 
-  // CHECK: copy_addr {{.*}} to [initialization] %2 : $*C
-  copy_addr %a to [initialization] %q : $*C
+  // CHECK: copy_addr {{.*}} to [init] %2 : $*C
+  copy_addr %a to [init] %q : $*C
   %u = function_ref @use : $@convention(thin) (@in P) -> ()
   %v = apply %u(%b) : $@convention(thin) (@in P) -> ()
   dealloc_stack %p : $*P

@@ -632,6 +632,14 @@ protected:
   bool attempt(const TypeVariableBinding &choice) override;
 
   bool shouldSkip(const TypeVariableBinding &choice) const override {
+    // Let's always attempt types inferred from "defaultable" constraints
+    // in diagnostic mode. This allows the solver to attempt i.e. `Any`
+    // for collection literals and produce better diagnostics for for-in
+    // statements like `for (x, y, z) in [] { ... }` when pattern type
+    // could not be inferred.
+    if (CS.shouldAttemptFixes())
+      return false;
+
     // If this is a defaultable binding and we have found solutions,
     // don't explore the default binding.
     return AnySolved && choice.isDefaultable();
@@ -699,7 +707,8 @@ public:
 
   void print(llvm::raw_ostream &Out) override {
     Out << "DisjunctionStep for ";
-    Disjunction->print(Out, &CS.getASTContext().SourceMgr);
+    Disjunction->print(Out, &CS.getASTContext().SourceMgr,
+                       CS.solverState->getCurrentIndent());
     Out << '\n';
   }
 
@@ -886,35 +895,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
         CG.addConstraint(&constraint);
     }
 
-    void applySolution(const Solution &solution) {
-      CS.applySolution(solution);
-
-      if (!CS.shouldAttemptFixes())
-        return;
-
-      // If inference succeeded, we are done.
-      auto score = solution.getFixedScore();
-      if (score.Data[SK_Fix] == 0)
-        return;
-
-      // If this conjunction represents a closure and inference
-      // has failed, let's bind all of unresolved type variables
-      // in its interface type to holes to avoid extraneous
-      // fixes produced by outer context.
-
-      auto locator = Conjunction->getLocator();
-      if (locator->directlyAt<ClosureExpr>()) {
-        auto closureTy =
-            CS.getClosureType(castToExpr<ClosureExpr>(locator->getAnchor()));
-
-        CS.simplifyType(closureTy).visit([&](Type componentTy) {
-          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
-            CS.assignFixedType(
-                typeVar, PlaceholderType::get(CS.getASTContext(), typeVar));
-          }
-        });
-      }
-    }
+    void applySolution(const Solution &solution);
   };
 
   /// Best solution solver reached so far.
@@ -956,6 +937,11 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// Note that this is what `BindingStep` is initialized with
   /// in isolated mode.
   SmallVector<Solution, 4> IsolatedSolutions;
+
+  /// If \c ConjunctionStep::attempt modified the constraint system options,
+  /// it will store the original options in this \c llvm::SaveAndRestore.
+  /// Upon \c resume, these values will be restored.
+  Optional<llvm::SaveAndRestore<ConstraintSystemOptions>> ModifiedOptions;
 
 public:
   ConjunctionStep(ConstraintSystem &cs, Constraint *conjunction,
@@ -1005,7 +991,8 @@ public:
 
   void print(llvm::raw_ostream &Out) override {
     Out << "ConjunctionStep for ";
-    Conjunction->print(Out, &CS.getASTContext().SourceMgr);
+    Conjunction->print(Out, &CS.getASTContext().SourceMgr,
+                       CS.solverState->getCurrentIndent());
     Out << '\n';
   }
 

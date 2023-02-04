@@ -23,6 +23,7 @@ set(sources
   Visibility.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
+  _SwiftRuntime.h
 
   module.modulemap
   )

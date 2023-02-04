@@ -614,14 +614,6 @@ public:
   llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
                   std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
 
-  /// Keep track of cxx function names, params etc in order to
-  /// allow for de-duping functions that differ strictly on "constness".
-  llvm::DenseMap<const clang::DeclContext *, llvm::DenseMap<llvm::StringRef,
-                 std::pair<
-                     llvm::DenseSet<clang::FunctionDecl *>,
-                     llvm::DenseSet<clang::FunctionDecl *>>>>
-      cxxMethods;
-
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
       clonedBaseMembers;
@@ -1652,6 +1644,9 @@ public:
   /// about the directly-parsed headers.
   SwiftLookupTable *findLookupTable(const clang::Module *clangModule);
 
+  /// Find the lookup table that should contain the given Clang declaration.
+  SwiftLookupTable *findLookupTable(const clang::Decl *decl);
+
   /// Visit each of the lookup tables in some deterministic order.
   ///
   /// \param fn Invoke the given visitor for each table. If the
@@ -1748,8 +1743,8 @@ public:
   void dumpSwiftLookupTables();
 
   void setSinglePCHImport(Optional<std::string> PCHFilename) {
-    if (PCHFilename.hasValue()) {
-      assert(llvm::sys::path::extension(PCHFilename.getValue())
+    if (PCHFilename.has_value()) {
+      assert(llvm::sys::path::extension(PCHFilename.value())
                  .endswith(file_types::getExtension(file_types::TY_PCH)) &&
              "Single PCH imported filename doesn't have .pch extension!");
     }
@@ -1760,7 +1755,7 @@ public:
   /// files, we can provide the PCH filename for declaration caching,
   /// especially in code completion.
   StringRef getSinglePCHImport() const {
-    if (SinglePCHImport.hasValue())
+    if (SinglePCHImport.has_value())
       return *SinglePCHImport;
     return StringRef();
   }
@@ -1945,6 +1940,15 @@ inline bool requiresCPlusPlus(const clang::Module *module) {
   return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
     return req.first == "cplusplus";
   });
+}
+
+inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  if (OperatorToken == Spelling) {                                             \
+    return "__operator" #Name;                                                 \
+  };
+#include "clang/Basic/OperatorKinds.def"
+  return "None";
 }
 
 }

@@ -615,7 +615,7 @@ bb0(%0 : $*τ_0_0):
 sil shared [noinline] @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32 {
 bb0(%0 : $*τ_0_0):
   %1 = alloc_stack $τ_0_0                        
-  copy_addr [take] %0 to [initialization] %1 : $*τ_0_0 
+  copy_addr [take] %0 to [init] %1 : $*τ_0_0 
   %3 = witness_method $τ_0_0, #PPP.foo : <Self where Self : PPP> (Self) -> () -> Int32 : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> Int32 
   %4 = apply %3<τ_0_0>(%1) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> Int32 
   dealloc_stack %1 : $*τ_0_0                     
@@ -629,7 +629,7 @@ bb0(%0 : $*τ_0_0):
 sil shared [noinline] @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 {
 bb0(%0 : $*τ_0_0):
   %1 = alloc_stack $τ_0_0                        
-  copy_addr [take] %0 to [initialization] %1 : $*τ_0_0 
+  copy_addr [take] %0 to [init] %1 : $*τ_0_0 
   %3 = witness_method $τ_0_0, #PPPP.foo : <Self where Self : PPPP> (Self) -> () -> Int32 : $@convention(witness_method: PPPP) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed τ_0_0) -> Int32 
   %4 = apply %3<τ_0_0>(%1) : $@convention(witness_method: PPPP) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed τ_0_0) -> Int32 
   dealloc_stack %1 : $*τ_0_0                     

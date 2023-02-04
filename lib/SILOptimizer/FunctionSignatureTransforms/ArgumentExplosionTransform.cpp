@@ -280,7 +280,7 @@ shouldExplode(FunctionSignatureTransformDescriptor &transformDesc,
       liveNontrivialLeafCountUpperBound > 0) {
     if (auto maybeReleases =
             epilogueReleaseMatcher.getPartiallyPostDomReleaseSet(argument)) {
-      auto releases = maybeReleases.getValue();
+      auto releases = maybeReleases.value();
       llvm::SmallPtrSet<SILInstruction *, 8> users;
       users.insert(std::begin(releases), std::end(releases));
 
@@ -393,8 +393,7 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
       auto *Argument =
           BB->insertFunctionArgument(ArgOffset, Node->getType(), OwnershipKind,
                                      BB->getArgument(OldArgIndex)->getDecl());
-      Argument->setNoImplicitCopy(AD.Arg->isNoImplicitCopy());
-      Argument->setLifetimeAnnotation(AD.Arg->getLifetimeAnnotation());
+      Argument->copyFlags(AD.Arg);
       LeafValues.push_back(Argument);
       TransformDescriptor.AIM[TotalArgIndex - 1] = AD.Index;
       ++ArgOffset;

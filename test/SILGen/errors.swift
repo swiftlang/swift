@@ -826,7 +826,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK: } // end sil function '$s6errors16supportStructure_4nameyAA6BridgeVz_SStKF'
 
 // ! peepholes its argument with getSemanticsProvidingExpr().
-// Test that that doesn't look through try!.
+// Test that doesn't look through try!.
 // rdar://21515402
 func testForcePeephole(_ f: () throws -> Int?) -> Int {
   let x = (try! f())!
@@ -996,7 +996,7 @@ func testOptionalTryNeverFailsVar() {
 // CHECK: bb0(%0 : $*T):
 // CHECK:   [[BOX:%.+]] = alloc_stack $Optional<T>
 // CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt
-// CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T
+// CHECK-NEXT:   copy_addr %0 to [init] [[BOX_DATA]] : $*T
 // CHECK-NEXT:   inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK-NEXT:   destroy_addr [[BOX]] : $*Optional<T>
 // CHECK-NEXT:   dealloc_stack [[BOX]] : $*Optional<T>
@@ -1014,7 +1014,7 @@ func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
 // CHECK-NEXT:   [[LIFETIME:%.+]] = begin_borrow [lexical] [[BOX]]
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[LIFETIME]]
 // CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt
-// CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T
+// CHECK-NEXT:   copy_addr %0 to [init] [[BOX_DATA]] : $*T
 // CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK-NEXT:   end_borrow [[LIFETIME]]
 // CHECK-NEXT:   destroy_value [[BOX]] : $<τ_0_0> { var Optional<τ_0_0> } <T>

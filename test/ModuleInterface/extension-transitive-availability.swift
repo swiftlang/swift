@@ -27,7 +27,7 @@ func foo() {
 // CHECK:      "swift": "ExtensionAvailable"
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
-// CHECK-NEXT:      "modulePath": "ExtensionAvailable.swiftmodule",
+// CHECK-NEXT:      "modulePath": "{{.*}}{{/|\\}}ExtensionAvailable-{{.*}}.swiftmodule",
 // CHECK-NEXT:      "sourceFiles": [
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "directDependencies": [

@@ -18,6 +18,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 
 #include <string.h>
+#include <inttypes.h>
 
 using namespace swift;
 
@@ -115,7 +116,7 @@ static uint32_t parse_uint32_t(const char *name,
   }
   if (n > UINT32_MAX) {
     swift::warning(RuntimeErrorFlagNone,
-                   "Warning: %s=%s out of bounds, clamping to %d.\n",
+                   "Warning: %s=%s out of bounds, clamping to %" PRIu32 ".\n",
                    name, value, UINT32_MAX);
     return UINT32_MAX;
   }

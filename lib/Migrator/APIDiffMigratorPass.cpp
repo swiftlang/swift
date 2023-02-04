@@ -92,7 +92,7 @@ private:
   }
 
   bool isUserTypeAlias(TypeRepr *T) const {
-    if (auto Ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
+    if (auto Ident = dyn_cast<IdentTypeRepr>(T)) {
       if (auto Bound = Ident->getBoundDecl()) {
         return isa<TypeAliasDecl>(Bound) &&
           !Bound->getModuleContext()->isSystemModule();
@@ -205,8 +205,8 @@ public:
     return handleParent(T, T->getGenericArgs());
   }
 
-  FoundResult visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
-    return visit(T->getComponents().back());
+  FoundResult visitMemberTypeRepr(MemberTypeRepr *T) {
+    return visit(T->getLastComponent());
   }
 
   FoundResult visitOptionalTypeRepr(OptionalTypeRepr *T) {
@@ -861,7 +861,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         }
       }
     }
-    if (!Kind.hasValue())
+    if (!Kind.has_value())
       return false;
     if (Kind) {
       insertHelperFunction(*Kind, LeftComment, RightComment, FromString,
@@ -1081,7 +1081,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         }
       }
     }
-    if (!ChangeKind.hasValue())
+    if (!ChangeKind.has_value())
       return;
     // If a function's return type has been changed from nonnull to nullable,
     // append ! to the original call expression.

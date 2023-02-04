@@ -87,6 +87,42 @@ int main() {
     // CHECK-NEXT: after some
     // CHECK-NEXT: destroy-TracksDeinit
   }
+  {
+    auto x = GenericOpt<int>::some(14);
+    takeGenericOpt(x);
+    assert(x.isSome());
+    assert(x.getSome() == 14);
+    // CHECK-NEXT: some(14)
+    auto y = GenericOpt<int>::none();
+    takeGenericOpt(y);
+    assert(y.isNone());
+    // CHECK-NEXT: none
+  }
+  {
+    auto x = GenericOpt<StructForEnum>::some(StructForEnum::init());
+    takeGenericOpt(x);
+    assert(x.isSome());
+    // CHECK-NEXT: init-TracksDeinit
+    // CHECK-NEXT: some(Generics.StructForEnum(x: Generics.TracksDeinit))
+    // CHECK-NEXT: destroy-TracksDeinit
+    auto y = GenericOpt<StructForEnum>::none();
+    assert(y.isNone());
+  }
+  {
+    auto ptr = constructTracksDeinit();
+    // CHECK-NEXT: init-TracksDeinit
+    assert(getRetainCount(ptr) == 1);
+    {
+      auto x = GenericOpt<TracksDeinit>::some(ptr);
+      assert(getRetainCount(ptr) == 2);
+      auto ptr2 = x.getSome();
+      assert(getRetainCount(ptr) == 3);
+    }
+    puts("after some");
+    assert(getRetainCount(ptr) == 1);
+    // CHECK-NEXT: after some
+    // CHECK-NEXT: destroy-TracksDeinit
+  }
   puts("EOF");
   // CHECK-NEXT: EOF
   return 0;

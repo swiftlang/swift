@@ -21,10 +21,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
-#include "swift/DependencyScan/ScanDependencies.h"
 #include "Dependencies.h"
 #include "TBD.h"
-#include "swift/Subsystems.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -34,7 +33,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Defer.h"
@@ -47,30 +45,31 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/TargetInfo.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
-#include "swift/Basic/TargetInfo.h"
 #include "swift/ConstExtract/ConstExtract.h"
-#include "swift/Option/Options.h"
-#include "swift/Frontend/Frontend.h"
+#include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/Frontend/AccumulatingDiagnosticConsumer.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/Frontend/SerializedDiagnosticConsumer.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SerializedDiagnosticConsumer.h"
+#include "swift/IRGen/TBDGen.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
-#include "swift/Option/Options.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
+#include "swift/Option/Options.h"
 #include "swift/PrintAsClang/PrintAsClang.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "swift/Syntax/Serialization/SyntaxSerialization.h"
-#include "swift/Syntax/SyntaxNodes.h"
-#include "swift/TBDGen/TBDGen.h"
+
+#include "clang/Lex/Preprocessor.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
@@ -140,18 +139,6 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
   return os;
 }
 
-/// Writes the Syntax tree to the given file
-static bool emitSyntax(const SourceFile &SF, StringRef OutputFilename) {
-  auto os = getFileOutputStream(OutputFilename, SF.getASTContext());
-  if (!os) return true;
-
-  json::Output jsonOut(*os, /*UserInfo=*/{}, /*PrettyPrint=*/false);
-  auto Root = SF.getSyntaxRoot().getRaw();
-  jsonOut << *Root;
-  *os << "\n";
-  return false;
-}
-
 /// Writes SIL out to the given file.
 static bool writeSIL(SILModule &SM, ModuleDecl *M, const SILOptions &Opts,
                      StringRef OutputFilename) {
@@ -179,17 +166,17 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 /// \returns true if there were any errors
 ///
 /// \see swift::printAsClangHeader
-static bool printAsClangHeaderIfNeeded(StringRef outputPath, ModuleDecl *M,
-                                       StringRef bridgingHeader,
-                                       const FrontendOptions &frontendOpts,
-                                       const IRGenOptions &irGenOpts) {
+static bool printAsClangHeaderIfNeeded(
+    StringRef outputPath, ModuleDecl *M, StringRef bridgingHeader,
+    const FrontendOptions &frontendOpts, const IRGenOptions &irGenOpts,
+    clang::HeaderSearch &clangHeaderSearchInfo) {
   if (outputPath.empty())
     return false;
-  return withOutputFile(M->getDiags(), outputPath,
-                        [&](raw_ostream &out) -> bool {
-                          return printAsClangHeader(out, M, bridgingHeader,
-                                                    frontendOpts, irGenOpts);
-                        });
+  return withOutputFile(
+      M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
+        return printAsClangHeader(out, M, bridgingHeader, frontendOpts,
+                                  irGenOpts, clangHeaderSearchInfo);
+      });
 }
 
 /// Prints the stable module interface for \p M to \p outputPath.
@@ -311,9 +298,9 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   C.NumPrecedenceGroups += groups.size();
 
   auto bufID = SF->getBufferID();
-  if (bufID.hasValue()) {
+  if (bufID.has_value()) {
     C.NumSourceLines +=
-      SM.getEntireTextForBuffer(bufID.getValue()).count('\n');
+      SM.getEntireTextForBuffer(bufID.value()).count('\n');
   }
 }
 
@@ -389,7 +376,7 @@ static bool precompileBridgingHeader(const CompilerInstance &Instance) {
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
     auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
-    return !PCH.hasValue();
+    return !PCH.has_value();
   }
   return clangImporter->emitBridgingPCH(
       opts.InputsAndOutputs.getFilenameOfFirstInput(),
@@ -423,6 +410,8 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   StringRef ABIPath = Instance.getPrimarySpecificPathsForAtMostOnePrimary()
                           .SupplementaryOutputs.ABIDescriptorOutputPath;
+  bool IgnoreAdjacentModules = Instance.hasASTContext() &&
+                               Instance.getASTContext().IgnoreAdjacentModules;
 
   // If an explicit interface build was requested, bypass the creation of a new
   // sub-instance from the interface which will build it in a separate thread,
@@ -444,7 +433,8 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       Invocation.getOutputFilename(), ABIPath,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
-      RequireOSSAModules_t(Invocation.getSILOptions()));
+      RequireOSSAModules_t(Invocation.getSILOptions()),
+      IgnoreAdjacentModules);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {
@@ -923,7 +913,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
       opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
     std::string BridgingHeaderPathForPrint;
     if (!opts.ImplicitObjCHeaderPath.empty()) {
-      if (opts.BridgingHeaderDirForPrint.hasValue()) {
+      if (opts.BridgingHeaderDirForPrint.has_value()) {
         // User specified preferred directory for including, use that dir.
         llvm::SmallString<32> Buffer(*opts.BridgingHeaderDirForPrint);
         llvm::sys::path::append(Buffer,
@@ -937,7 +927,10 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     hadAnyError |= printAsClangHeaderIfNeeded(
         Invocation.getClangHeaderOutputPathForAtMostOnePrimary(),
         Instance.getMainModule(), BridgingHeaderPathForPrint, opts,
-        Invocation.getIRGenOptions());
+        Invocation.getIRGenOptions(),
+        Context.getClangModuleLoader()
+            ->getClangPreprocessor()
+            .getHeaderSearchInfo());
   }
 
   // Only want the header if there's been any errors, ie. there's not much
@@ -956,7 +949,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   if (opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath()) {
     // Copy the settings from the module interface to add SPI printing.
     ModuleInterfaceOptions privOpts = Invocation.getModuleInterfaceOptions();
-    privOpts.PrintSPIs = true;
+    privOpts.PrintPrivateInterfaceContent = true;
     privOpts.ModulesToSkipInPublicInterface.clear();
 
     hadAnyError |= printModuleInterfaceIfNeeded(
@@ -1137,9 +1130,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // FIXME: This predicate matches the status quo, but there's no reason
   // indexing cannot run for actions that do not require stdlib e.g. to better
   // facilitate tests.
-  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action) &&
-      // TODO: indexing often crashes when interop is enabled (rdar://87719859).
-      !Invocation.getLangOptions().EnableCXXInterop) {
+  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action)) {
     emitIndexData(Instance);
   }
 
@@ -1342,9 +1333,6 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::DumpInterfaceHash:
     getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
     return Context.hadError();
-  case FrontendOptions::ActionType::EmitSyntax:
-    return emitSyntax(getPrimaryOrMainSourceFile(Instance),
-                      opts.InputsAndOutputs.getSingleOutputFilename());
   case FrontendOptions::ActionType::EmitImportedModules:
     return emitImportedModules(Instance.getMainModule(), opts);
 
@@ -1941,15 +1929,19 @@ createDispatchingDiagnosticConsumerIfNeeded(
 /// If no serialized diagnostics are being produced, returns null.
 static std::unique_ptr<DiagnosticConsumer>
 createSerializedDiagnosticConsumerIfNeeded(
-    const FrontendInputsAndOutputs &inputsAndOutputs) {
+    const FrontendInputsAndOutputs &inputsAndOutputs,
+    bool emitMacroExpansionFiles
+) {
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
-      [](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
+      [emitMacroExpansionFiles](
+          const InputFile &input
+      ) -> std::unique_ptr<DiagnosticConsumer> {
         auto serializedDiagnosticsPath = input.getSerializedDiagnosticsPath();
         if (serializedDiagnosticsPath.empty())
           return nullptr;
         return serialized_diagnostics::createConsumer(
-            serializedDiagnosticsPath);
+            serializedDiagnosticsPath, emitMacroExpansionFiles);
       });
 }
 
@@ -2280,7 +2272,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // See https://github.com/apple/swift/issues/45288 for details.
   std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher =
       createSerializedDiagnosticConsumerIfNeeded(
-        Invocation.getFrontendOptions().InputsAndOutputs);
+        Invocation.getFrontendOptions().InputsAndOutputs,
+        Invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
   if (SerializedConsumerDispatcher)
     Instance->addDiagnosticConsumer(SerializedConsumerDispatcher.get());
 
@@ -2297,6 +2290,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   PDC.setFormattingStyle(
       Invocation.getDiagnosticOptions().PrintedFormattingStyle);
+
+  PDC.setEmitMacroExpansionFiles(
+      Invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
 
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();

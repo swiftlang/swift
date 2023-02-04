@@ -53,6 +53,17 @@
 ///   This is only expanded if SINGLETON_TYPE is defined, and in this
 ///   case no other macros are expanded.
 
+#ifndef ALWAYS_CANONICAL_ARTIFICIAL_TYPE
+#ifdef ALWAYS_CANONICAL_TYPE
+#ifdef ARTIFICIAL_TYPE
+#error must define ALWAYS_CANONICAL_ARTIFICIAL_TYPE if also defining both ALWAYS_CANONICAL_TYPE and ARTIFICIAL_TYPE
+#endif
+#define ALWAYS_CANONICAL_ARTIFICIAL_TYPE(id, parent) ALWAYS_CANONICAL_TYPE(id, parent)
+#else
+#define ALWAYS_CANONICAL_ARTIFICIAL_TYPE(id, parent) ARTIFICIAL_TYPE(id, parent)
+#endif
+#endif
+
 #ifndef ALWAYS_CANONICAL_TYPE
 #define ALWAYS_CANONICAL_TYPE(id, parent) TYPE(id, parent)
 #endif
@@ -106,6 +117,7 @@ ABSTRACT_TYPE(Builtin, Type)
   BUILTIN_TYPE(BuiltinExecutor, BuiltinType)
   BUILTIN_TYPE(BuiltinFloat, BuiltinType)
   BUILTIN_TYPE(BuiltinJob, BuiltinType)
+  BUILTIN_TYPE(BuiltinPackIndex, BuiltinType)
   BUILTIN_TYPE(BuiltinRawPointer, BuiltinType)
   BUILTIN_TYPE(BuiltinRawUnsafeContinuation, BuiltinType)
   BUILTIN_TYPE(BuiltinNativeObject, BuiltinType)
@@ -147,7 +159,10 @@ ABSTRACT_TYPE(Substitutable, Type)
   ABSTRACT_TYPE(Archetype, SubstitutableType)
     ALWAYS_CANONICAL_TYPE(PrimaryArchetype, ArchetypeType)
     ALWAYS_CANONICAL_TYPE(OpaqueTypeArchetype, ArchetypeType)
-    ALWAYS_CANONICAL_TYPE(OpenedArchetype, ArchetypeType)
+    ABSTRACT_TYPE(LocalArchetype, ArchetypeType)
+      ALWAYS_CANONICAL_TYPE(OpenedArchetype, LocalArchetypeType)
+      ALWAYS_CANONICAL_TYPE(ElementArchetype, LocalArchetypeType)
+      TYPE_RANGE(LocalArchetype, OpenedArchetype, ElementArchetype)
     ALWAYS_CANONICAL_TYPE(PackArchetype, ArchetypeType)
     TYPE_RANGE(Archetype, PrimaryArchetype, PackArchetype)
   TYPE(GenericTypeParam, SubstitutableType)
@@ -161,6 +176,7 @@ ARTIFICIAL_TYPE(SILFunction, Type)
 ARTIFICIAL_TYPE(SILBlockStorage, Type)
 ARTIFICIAL_TYPE(SILBox, Type)
 ARTIFICIAL_TYPE(SILMoveOnlyWrapped, Type)
+ALWAYS_CANONICAL_ARTIFICIAL_TYPE(SILPack, Type)
 ARTIFICIAL_TYPE(SILToken, Type)
 TYPE(ProtocolComposition, Type)
 TYPE(ParameterizedProtocol, Type)
@@ -190,6 +206,7 @@ LAST_TYPE(Dictionary) // Sugared types are last to make isa<SugarType>() fast.
 SINGLETON_TYPE(IntegerLiteral, BuiltinIntegerLiteral)
 SINGLETON_TYPE(Job, BuiltinJob)
 SINGLETON_TYPE(Executor, BuiltinExecutor)
+SINGLETON_TYPE(PackIndex, BuiltinPackIndex)
 SINGLETON_TYPE(RawPointer, BuiltinRawPointer)
 SINGLETON_TYPE(RawUnsafeContinuation, BuiltinRawUnsafeContinuation)
 SINGLETON_TYPE(NativeObject, BuiltinNativeObject)
@@ -208,5 +225,6 @@ SINGLETON_TYPE(SILToken, SILToken)
 #undef SUGARED_TYPE
 #undef BUILTIN_TYPE
 #undef ALWAYS_CANONICAL_TYPE
+#undef ALWAYS_CANONICAL_ARTIFICIAL_TYPE
 #undef TYPE
 #undef LAST_TYPE

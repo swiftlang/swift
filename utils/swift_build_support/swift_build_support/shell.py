@@ -202,6 +202,15 @@ def symlink(source, dest, dry_run=None, echo=True):
     os.symlink(source, dest)
 
 
+def remove(path, dry_run=None, echo=True):
+    dry_run = _coerce_dry_run(dry_run)
+    if dry_run or echo:
+        _echo_command(dry_run, ['rm', path])
+    if dry_run:
+        return
+    os.remove(path)
+
+
 # Initialized later
 lock = None
 

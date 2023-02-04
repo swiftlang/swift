@@ -261,7 +261,7 @@ struct Daleth {
   // CHECK-NEXT:   [[B_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.b
   // CHECK-NEXT:   store [[B]] to [init] [[B_ADDR]]
   // CHECK-NEXT:   [[C_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.c
-  // CHECK-NEXT:   copy_addr [take] [[C]] to [initialization] [[C_ADDR]]
+  // CHECK-NEXT:   copy_addr [take] [[C]] to [init] [[C_ADDR]]
   // CHECK-NEXT:   tuple ()
   // CHECK-NEXT:   return
 }
@@ -313,10 +313,10 @@ struct Zayin {
   // CHECK-NEXT:   [[THIS_A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Zayin, #Zayin.a
   // CHECK-NEXT:   [[THIS_A0_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 0
   // CHECK-NEXT:   [[THIS_A1_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 1
-  // CHECK-NEXT:   copy_addr [take] [[A0]] to [initialization] [[THIS_A0_ADDR]]
+  // CHECK-NEXT:   copy_addr [take] [[A0]] to [init] [[THIS_A0_ADDR]]
   // CHECK-NEXT:   store [[A1]] to [trivial] [[THIS_A1_ADDR]]
   // CHECK-NEXT:   [[THIS_B_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Zayin, #Zayin.b
-  // CHECK-NEXT:   copy_addr [take] [[B]] to [initialization] [[THIS_B_ADDR]]
+  // CHECK-NEXT:   copy_addr [take] [[B]] to [init] [[THIS_B_ADDR]]
   // CHECK-NEXT:   tuple ()
   // CHECK-NEXT:   return
 }

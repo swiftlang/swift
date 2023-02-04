@@ -220,11 +220,22 @@ private:
 class OwnershipRAUWHelper {
 public:
   /// Return true if \p oldValue can be replaced with \p newValue in terms of
-  /// their value ownership. This ignores any current uses of \p oldValue. To
-  /// determine whether \p oldValue can be replaced as-is with it's existing
-  /// uses, create an instance of OwnershipRAUWHelper and check its validity.
+  /// their value ownership. This checks current uses of \p oldValue for
+  /// satisfying lexical lifetimes. To completely determine whether \p oldValue
+  /// can be replaced as-is with it's existing uses, create an instance of
+  /// OwnershipRAUWHelper and check its validity.
   static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue,
                                     ArrayRef<Operand *> oldUses);
+
+  static bool hasValidNonLexicalRAUWOwnership(SILValue oldValue,
+                                              SILValue newValue) {
+    if (oldValue->isLexical() || newValue->isLexical())
+      return false;
+
+    // Pretend that we have no uses since they are only used to check lexical
+    // lifetimes.
+    return hasValidRAUWOwnership(oldValue, newValue, {});
+  }
 
 private:
   OwnershipFixupContext *ctx;
@@ -392,6 +403,12 @@ struct LoadOperation {
     return value.get<LoadInst *>()->getOwnershipQualifier();
   }
 };
+
+/// Extend the store_borrow \p sbi's scope such that it encloses \p newUsers.
+bool extendStoreBorrow(StoreBorrowInst *sbi,
+                       SmallVectorImpl<Operand *> &newUses,
+                       DeadEndBlocks *deadEndBlocks,
+                       InstModCallbacks callbacks = InstModCallbacks());
 
 } // namespace swift
 

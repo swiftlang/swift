@@ -24,6 +24,7 @@
 #include "GenArchetype.h"
 #include "GenClass.h"
 #include "GenMeta.h"
+#include "GenPack.h"
 #include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -1135,13 +1136,7 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
 
 /// Emit a string encoding the labels in the given tuple type.
 static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
-                                            CanTupleType type,
-                                            bool useLabels) {
-  // If we were asked to ignore the labels, do so.
-  if (!useLabels) {
-    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-  }
-
+                                            CanTupleType type) {
   bool hasLabels = false;
   llvm::SmallString<128> buffer;
   for (auto &elt : type->getElements()) {
@@ -1174,21 +1169,55 @@ static llvm::Constant *emitEmptyTupleTypeMetadataRef(IRGenModule &IGM) {
       IGM.FullTypeMetadataStructTy, fullMetadata, indices);
 }
 
-using GetElementMetadataFn =
-  llvm::function_ref<MetadataResponse(CanType eltType,
-                                      DynamicMetadataRequest eltRequest)>;
+static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
+                                                        CanTupleType type,
+                                                        DynamicMetadataRequest request) {
+  SmallVector<Type, 2> types;
+  types.append(type.getElementTypes().begin(),
+               type.getElementTypes().end());
+
+  CanPackType packType = CanPackType(PackType::get(IGF.IGM.Context, types));
+
+  auto *shapeExpression = IGF.emitPackShapeExpression(packType);
+  auto addr = emitTypeMetadataPack(IGF, packType, MetadataState::Abstract);
+
+  auto *pointerToFirst = IGF.Builder.CreatePointerCast(
+      addr.getAddressPointer(), IGF.IGM.TypeMetadataPtrPtrTy);
+
+  llvm::Value *args[] = {
+    request.get(IGF),
+    shapeExpression,
+    pointerToFirst,
+    getTupleLabelsString(IGF.IGM, type),
+    llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
+  };
+
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetTupleMetadataFunctionPointer(), args);
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  call->setDoesNotThrow();
+
+  Optional<unsigned> elementCount = 0;
+  if (auto *constant = dyn_cast<llvm::ConstantInt>(shapeExpression))
+    elementCount = constant->getValue().getZExtValue();
+
+  cleanupTypeMetadataPack(IGF, addr, elementCount);
+
+  return MetadataResponse::handle(IGF, request, call);
+}
 
 static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
                                                  CanTupleType type,
-                                                 DynamicMetadataRequest request,
-                                                 bool useLabels,
-                                    GetElementMetadataFn getMetadataRecursive) {
+                                                 DynamicMetadataRequest request) {
+  if (type->containsPackExpansionType())
+    return emitDynamicTupleTypeMetadataRef(IGF, type, request);
+
   auto getElementMetadata = [&](CanType type) {
     // Just request the elements to be abstract so that we can always build
     // the metadata.
     // TODO: if we have a collector, or if this is a blocking request, maybe
     // we should build a stronger request?
-    return getMetadataRecursive(type, MetadataState::Abstract).getMetadata();
+    return IGF.emitTypeMetadataRef(type, MetadataState::Abstract).getMetadata();
   };
 
   switch (type->getNumElements()) {
@@ -1199,7 +1228,7 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
   case 1:
     // For metadata purposes, we consider a singleton tuple to be
     // isomorphic to its element type. ???
-    return getMetadataRecursive(type.getElementType(0), request);
+    return IGF.emitTypeMetadataRef(type.getElementType(0), request);
 
   case 2: {
     auto elt0Metadata = getElementMetadata(type.getElementType(0));
@@ -1208,7 +1237,7 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
     llvm::Value *args[] = {
       request.get(IGF),
       elt0Metadata, elt1Metadata,
-      getTupleLabelsString(IGF.IGM, type, useLabels),
+      getTupleLabelsString(IGF.IGM, type),
       llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
     };
 
@@ -1228,7 +1257,7 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
     llvm::Value *args[] = {
       request.get(IGF),
       elt0Metadata, elt1Metadata, elt2Metadata,
-      getTupleLabelsString(IGF.IGM, type, useLabels),
+      getTupleLabelsString(IGF.IGM, type),
       llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
     };
 
@@ -1240,50 +1269,7 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
     return MetadataResponse::handle(IGF, request, call);
   }
   default:
-    // TODO: use a caching entrypoint (with all information
-    // out-of-line) for non-dependent tuples.
-
-    llvm::Value *pointerToFirst = nullptr; // appease -Wuninitialized
-
-    auto elements = type.getElementTypes();
-    auto arrayTy = llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy,
-                                        elements.size());
-    Address buffer = IGF.createAlloca(arrayTy,IGF.IGM.getPointerAlignment(),
-                                      "tuple-elements");
-    IGF.Builder.CreateLifetimeStart(buffer,
-                                IGF.IGM.getPointerSize() * elements.size());
-    for (auto i : indices(elements)) {
-      // Find the metadata pointer for this element.
-      llvm::Value *eltMetadata = getElementMetadata(elements[i]);
-
-      // GEP to the appropriate element and store.
-      Address eltPtr = IGF.Builder.CreateStructGEP(buffer, i,
-                                                 IGF.IGM.getPointerSize());
-      IGF.Builder.CreateStore(eltMetadata, eltPtr);
-
-      // Remember the GEP to the first element.
-      if (i == 0) pointerToFirst = eltPtr.getAddress();
-    }
-
-    TupleTypeFlags flags =
-      TupleTypeFlags().withNumElements(elements.size());
-    llvm::Value *args[] = {
-      request.get(IGF),
-      llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()),
-      pointerToFirst,
-      getTupleLabelsString(IGF.IGM, type, useLabels),
-      llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
-    };
-
-    auto call = IGF.Builder.CreateCall(
-        IGF.IGM.getGetTupleMetadataFunctionPointer(), args);
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    call->setDoesNotThrow();
-
-    IGF.Builder.CreateLifetimeEnd(buffer,
-                                IGF.IGM.getPointerSize() * elements.size());
-
-    return MetadataResponse::handle(IGF, request, call);
+    return emitDynamicTupleTypeMetadataRef(IGF, type, request);
   }
 }
 
@@ -1402,6 +1388,12 @@ namespace {
     }
 
     MetadataResponse
+    visitBuiltinPackIndexType(CanBuiltinPackIndexType type,
+                              DynamicMetadataRequest request) {
+      llvm_unreachable("metadata unsupported for this builtin type");
+    }
+
+    MetadataResponse
     visitBuiltinFloatType(CanBuiltinFloatType type,
                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
@@ -1427,25 +1419,25 @@ namespace {
 
     MetadataResponse visitPackType(CanPackType type,
                                    DynamicMetadataRequest request) {
-      llvm_unreachable("Unimplemented!");
+      return emitTypeMetadataPackRef(IGF, type, request);
+    }
+
+    MetadataResponse visitSILPackType(CanSILPackType type,
+                                      DynamicMetadataRequest request) {
+      llvm_unreachable("cannot emit metadata for a SIL pack type");
     }
 
     MetadataResponse visitPackExpansionType(CanPackExpansionType type,
                                             DynamicMetadataRequest request) {
-      llvm_unreachable("Unimplemented!");
+      llvm_unreachable("cannot emit metadata for a pack expansion by itself");
     }
-
 
     MetadataResponse visitTupleType(CanTupleType type,
                                     DynamicMetadataRequest request) {
       if (auto cached = tryGetLocal(type, request))
         return cached;
 
-      auto response = emitTupleTypeMetadataRef(IGF, type, request,
-                                               /*labels*/ true,
-          [&](CanType eltType, DynamicMetadataRequest eltRequest) {
-        return IGF.emitTypeMetadataRef(eltType, eltRequest);
-      });
+      auto response = emitTupleTypeMetadataRef(IGF, type, request);
 
       return setLocal(type, response);
     }
@@ -1965,6 +1957,9 @@ namespace {
     }
     MetadataResponse visitArchetypeType(CanArchetypeType type,
                                         DynamicMetadataRequest request) {
+      if (auto packArchetypeType = dyn_cast<PackArchetypeType>(type))
+        return emitPackArchetypeMetadataRef(IGF, packArchetypeType, request);
+
       return emitArchetypeTypeMetadataRef(IGF, type, request);
     }
 
@@ -2052,6 +2047,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
   accessor->addFnAttr(llvm::Attribute::NoInline);
   // Accessor functions don't need frame pointers.
   IGM.setHasNoFramePointer(accessor);
+  IGM.setColocateMetadataSection(accessor);
 
   // This function is logically 'readnone': the caller does not need
   // to reason about any side effects or stores it might perform.
@@ -2404,16 +2400,24 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
           generateThunkFn,
           /*noinline*/ true));
     }
+    IGM.setColocateMetadataSection(thunkFn);
 
     // Call out to the helper.
+    auto getNextParam = [&]() -> llvm::Value * {
+      auto *param = params.claimNext();
+      if (param->getType()->isPointerTy())
+        return IGF.Builder.CreateBitCast(param, IGM.Int8PtrTy);
+      return IGF.Builder.CreateIntToPtr(param, IGM.Int8PtrTy);
+    };
+
     auto arg0 = numArguments >= 1
-      ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
+      ? getNextParam()
       : llvm::UndefValue::get(IGM.Int8PtrTy);
     auto arg1 = numArguments >= 2
-      ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
+      ? getNextParam()
       : llvm::UndefValue::get(IGM.Int8PtrTy);
     auto arg2 = numArguments >= 3
-      ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
+      ? getNextParam()
       : llvm::UndefValue::get(IGM.Int8PtrTy);
 
     llvm::CallInst *call;
@@ -2484,10 +2488,11 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
   auto substitutions =
       theType->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), nominal);
   for (auto requirement : requirements.getRequirements()) {
-    if (requirement.Protocol) {
+    if (requirement.isWitnessTable()) {
       continue;
     }
-    auto parameter = requirement.TypeParameter;
+    assert(requirement.isMetadata());
+    auto parameter = requirement.getTypeParameter();
     auto noncanonicalArgument = parameter.subst(substitutions);
     auto argument = noncanonicalArgument->getCanonicalType();
     if (auto *classDecl = argument->getClassOrBoundGenericClass()) {
@@ -2674,6 +2679,8 @@ irgen::getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
   llvm::Function *accessor =
     IGM.getAddrOfGenericTypeMetadataAccessFunction(
         nominal, genericArgs.Types, shouldDefine);
+  if (shouldDefine)
+    IGM.setColocateMetadataSection(accessor);
 
   // If we're not supposed to define the accessor, or if we already
   // have defined it, just return the pointer.
@@ -2859,6 +2866,8 @@ static bool canIssueIncompleteMetadataRequests(IRGenModule &IGM) {
 static MetadataResponse
 emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
                                 DynamicMetadataRequest request) {
+  assert(!isa<PackType>(type));
+
   auto &IGM = IGF.IGM;
 
   // We can only answer blocking complete metadata requests with the <=5.1
@@ -2917,6 +2926,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     IGM.setHasNoFramePointer(subIGF.CurFn);
     if (IGM.DebugInfo)
       IGM.DebugInfo->emitArtificialFunction(subIGF, subIGF.CurFn);
+    IGM.setColocateMetadataSection(subIGF.CurFn);
 
     auto params = subIGF.collectParameters();
     auto cache = params.claimNext();
@@ -3119,7 +3129,8 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   }
   
   if (type->hasArchetype() ||
-      !shouldTypeMetadataAccessUseAccessor(IGM, type)) {
+      !shouldTypeMetadataAccessUseAccessor(IGM, type) ||
+      isa<PackType>(type)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 

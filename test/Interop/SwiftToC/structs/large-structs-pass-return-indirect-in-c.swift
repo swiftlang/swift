@@ -11,7 +11,7 @@ public struct StructSeveralI64 {
 // CHECK-NEXT:   _Alignas(8) char _storage[40];
 // CHECK-NEXT: };
 
-// CHECK_NOT: swift_interop
+// CHECK-NOT: swift_interop
 
 public func returnNewStructSeveralI64(i: Int64) -> StructSeveralI64 {
     return StructSeveralI64(x1: i, x2: 0, x3: -17, x4: 12345612, x5: -0xFFFF)

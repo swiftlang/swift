@@ -16,6 +16,6 @@ import UsesImportedEnums
 // CHECK-LABEL: sil hidden @$s4main4test1eSbSo13NSRuncingModeV_tF
 func test(e: NSRuncingMode) -> Bool {
   // CHECK-NOT: return
-  // CHECK: $ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
+  // CHECK: witness_method $NSRuncingMode, #Equatable."=="
   return compareImportedEnumToSelf(e)
 }

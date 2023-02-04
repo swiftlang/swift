@@ -177,13 +177,11 @@ public:
                         const SILDebugScope *DS, bool InCoroContext = false,
                         AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
 
-  enum { NotHeapAllocated = false };
-  
   /// Create debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     bool IsLocalToUnit, bool InFixedBuffer,
+                                     bool IsLocalToUnit,
                                      Optional<SILLocation> Loc);
 
   /// Emit debug metadata for type metadata (for generic types). So meta.

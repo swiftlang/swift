@@ -85,13 +85,6 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
                                   name, packed);
 }
 
-/// A helper for creating pointer-to-struct types.
-static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
-                                                  StringRef name,
-                                  std::initializer_list<llvm::Type*> types) {
-  return createStructType(IGM, name, types)->getPointerTo(DefaultAS);
-}
-
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                  llvm::LLVMContext &LLVMContext,
                                                       const IRGenOptions &Opts,
@@ -628,6 +621,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                        {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy,
                         RelativeAddressTy, Int32Ty});
 
+  RuntimeDiscoverableAttributeTy =
+    createStructType(*this, "swift.runtime_attr",
+                     {Int32Ty, RelativeAddressTy, Int32Ty});
+
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = llvm::StructType::create(getLLVMContext(), "swift.context");
@@ -690,14 +687,28 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       *this, "swift.async_task_and_context",
       { SwiftTaskPtrTy, SwiftContextPtrTy });
 
-  ContinuationAsyncContextTy = createStructType(
-      *this, "swift.continuation_context",
-      {SwiftContextTy,       // AsyncContext header
-       SizeTy,               // flags
-       SizeTy,               // await synchronization
-       ErrorPtrTy,           // error result pointer
-       OpaquePtrTy,          // normal result address
-       SwiftExecutorTy});    // resume to executor
+  if (Context.LangOpts.isConcurrencyModelTaskToThread()) {
+    ContinuationAsyncContextTy = createStructType(
+        *this, "swift.continuation_context",
+        {SwiftContextTy,       // AsyncContext header
+         SizeTy,               // flags
+         SizeTy,               // await synchronization
+         ErrorPtrTy,           // error result pointer
+         OpaquePtrTy,          // normal result address
+         SwiftExecutorTy,      // resume to executor
+         SizeTy                // pointer to condition variable
+         });
+  } else {
+    ContinuationAsyncContextTy = createStructType(
+        *this, "swift.continuation_context",
+        {SwiftContextTy,       // AsyncContext header
+         SizeTy,               // flags
+         SizeTy,               // await synchronization
+         ErrorPtrTy,           // error result pointer
+         OpaquePtrTy,          // normal result address
+         SwiftExecutorTy       // resume to executor
+         });
+  }
   ContinuationAsyncContextPtrTy =
     ContinuationAsyncContextTy->getPointerTo(DefaultAS);
 
@@ -1183,6 +1194,12 @@ Address IRGenModule::getAddrOfObjCISAMask() {
         .to(cast<llvm::GlobalVariable>(ObjCISAMaskPtr));
   }
   return Address(ObjCISAMaskPtr, IntPtrTy, getPointerAlignment());
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfAccessibleFunctionRecord(SILFunction *accessibleFn) {
+  auto entity = LinkEntity::forAccessibleFunctionRecord(accessibleFn);
+  return getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 }
 
 ModuleDecl *IRGenModule::getSwiftModule() const {
@@ -1858,6 +1875,13 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
 }
 
 bool IRGenModule::canMakeStaticObjectsReadOnly() {
+  // Unconditionally disable this until we can fix the metadata.
+  // The trick of using the Empty array metadata for static arrays
+  // breaks Obj-C interop quite badly.
+  // rdar://101126543
+  return false;
+
+#if 0
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
@@ -1868,6 +1892,7 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
 
   return getAvailabilityContext().isContainedIn(
           Context.getImmortalRefCountSymbolsAvailability());
+#endif
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
@@ -1877,6 +1902,17 @@ void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
     PrimaryIGM = IGM;
   }
   Queue.push_back(IGM);
+}
+
+IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
+  // If we're emitting for a single module, or a single file, we always use the
+  // primary IGM.
+  if (GenModules.size() == 1)
+    return getPrimaryIGM();
+
+ IRGenModule *IGM = GenModules[SF];
+ assert(IGM);
+ return IGM;
 }
 
 IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {

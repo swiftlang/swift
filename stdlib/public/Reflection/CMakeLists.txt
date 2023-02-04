@@ -1,19 +1,14 @@
-set(swiftReflection_SOURCES
-  MetadataSource.cpp
-  TypeLowering.cpp
-  TypeRef.cpp
-  TypeRefBuilder.cpp)
+#===--- CMakeLists.txt - Reflection support library ---------------------===#
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2023 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+#===----------------------------------------------------------------------===#
 
-set(swiftReflection_C_COMPILE_FLAGS -DswiftCore_EXPORTS)
-if(SWIFT_ENABLE_REFLECTION)
-  list(APPEND swiftReflection_C_COMPILE_FLAGS -DSWIFT_ENABLE_REFLECTION)
-endif()
-
-add_swift_target_library(swiftReflection STATIC
-  ${swiftReflection_SOURCES}
-  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS} ${swiftReflection_C_COMPILE_FLAGS}
-  LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
-  INCORPORATE_OBJECT_LIBRARIES
-    swiftLLVMSupport swiftDemangling swiftDemanglingCR
-  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-  INSTALL_IN_COMPONENT dev)
+add_subdirectory(Sources/_Runtime)
+add_subdirectory(Sources/Reflection)

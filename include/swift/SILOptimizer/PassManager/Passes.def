@@ -65,17 +65,16 @@
 #define SWIFT_FUNCTION_PASS(Id, Tag, Description) PASS(Id, Tag, Description)
 #endif
 
-/// SWIFT_INSTRUCTION_PASS(Inst, Tag)
+/// SWIFT_SILCOMBINE_PASS(Inst, Tag)
 ///   Similar to SWIFT_FUNCTION_PASS, but defines an instruction pass which is
 ///   implemented in swift and is run by the SILCombiner.
-///   The \p Inst argument specifies the instruction class, and \p Tag a name
-///   for the pass.
+///   The \p Inst argument specifies the instruction class.
 ///
 ///   No further code is need on the C++ side. On the swift side an instruction
-///   pass with the same name must be registered with 'registerPass()'.
+///   pass must be registered for the instruction class with 'registerPass()'.
 ///
-#ifndef SWIFT_INSTRUCTION_PASS
-#define SWIFT_INSTRUCTION_PASS(Inst, Tag)
+#ifndef SWIFT_SILCOMBINE_PASS
+#define SWIFT_SILCOMBINE_PASS(Inst)
 #endif
 
 /// PASS_RANGE(RANGE_ID, START, END)
@@ -212,8 +211,6 @@ PASS(EarlyInliner, "early-inline",
      "Early Inlining Preserving Semantic Functions")
 PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
-PASS(EscapeAnalysisDumper, "escapes-dump",
-     "Dump Escape Analysis Results")
 SWIFT_FUNCTION_PASS(DeadEndBlockDumper, "dump-deadendblocks",
      "Tests the DeadEndBlocks utility")
 SWIFT_FUNCTION_PASS(EscapeInfoDumper, "dump-escape-info",
@@ -226,6 +223,8 @@ SWIFT_FUNCTION_PASS(ComputeEscapeEffects, "compute-escape-effects",
      "Computes function escape effects")
 SWIFT_FUNCTION_PASS(ComputeSideEffects, "compute-side-effects",
      "Computes function side effects")
+SWIFT_FUNCTION_PASS(TestInstructionIteration, "test-instruction-iteration",
+     "Tests instruction iteration")
 PASS(FlowIsolation, "flow-isolation",
      "Enforces flow-sensitive actor isolation rules")
 PASS(FunctionOrderPrinter, "function-order-printer",
@@ -315,8 +314,6 @@ SWIFT_FUNCTION_PASS(ObjCBridgingOptimization, "objc-bridging-opt",
      "Optimize ObjectiveC briging operations")
 PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
-PASS(OSSALifetimeAnalysis, "ossa-lifetime-analysis",
-     "Dump OSSA Lifetimes for Traced Values")
 PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
@@ -368,8 +365,6 @@ PASS(TempLValueOpt, "temp-lvalue-opt",
      "Remove short-lived immutable temporary l-values")
 PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
-PASS(SideEffectsDumper, "side-effects-dump",
-     "Print Side-Effect Information for all Functions")
 PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
 PASS(SILGenCleanup, "silgen-cleanup",
@@ -394,6 +389,8 @@ PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
      "Scalar Replacement of Aggregate SIL Block Arguments")
+SWIFT_FUNCTION_PASS(Simplify, "simplify",
+     "Simplify instructions via peephole optimizations")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",
@@ -443,18 +440,16 @@ PASS(MoveOnlyObjectChecker, "sil-move-only-object-checker",
      "Pass that enforces move only invariants on raw SIL for objects")
 PASS(MoveOnlyAddressChecker, "sil-move-only-address-checker",
      "Pass that enforces move only invariants on raw SIL for addresses")
-PASS(MoveKillsCopyableValuesChecker, "sil-move-kills-copyable-values-checker",
-     "Pass that checks that any copyable (non-move only) value that is passed "
-     "to _move do not have any uses later than the _move")
+PASS(ConsumeOperatorCopyableValuesChecker, "sil-consume-operator-copyable-values-checker",
+     "Pass that performs checking of the consume operator for copyable values")
 PASS(TrivialMoveOnlyTypeEliminator, "sil-trivial-move-only-type-eliminator",
      "Pass that rewrites SIL to remove move only types from values of trivial type")
 PASS(MoveOnlyTypeEliminator, "sil-move-only-type-eliminator",
      "Pass that rewrites SIL to remove move only types from all values")
 PASS(LexicalLifetimeEliminator, "sil-lexical-lifetime-eliminator",
      "Pass that removes lexical lifetime markers from borrows and alloc stack")
-PASS(MoveKillsCopyableAddressesChecker, "sil-move-kills-copyable-addresses-checker",
-     "Pass that checks that any copyable (non-move only) address that is passed "
-     "to _move do not have any uses later than the _move")
+PASS(ConsumeOperatorCopyableAddressesChecker, "sil-consume-operator-copyable-addresses-checker",
+     "Pass that performs consume operator checking for copyable addresses")
 PASS(DebugInfoCanonicalizer, "sil-onone-debuginfo-canonicalizer",
      "Canonicalize debug info at -Onone by propagating debug info into coroutine funclets")
 PASS(PartialApplySimplification, "partial-apply-simplification",
@@ -463,18 +458,24 @@ PASS(MovedAsyncVarDebugInfoPropagator, "sil-moved-async-var-dbginfo-propagator",
      "Propagate debug info from moved async vars after coroutine funclet boundaries")
 PASS(MoveOnlyDeinitInsertion, "sil-move-only-deinit-insertion",
      "After running move only checking, convert last destroy_values to deinit calls")
+PASS(MoveOnlyBorrowToDestructureTransform,
+     "sil-move-only-borrow-to-destructure",
+     "Pass that is phased ordered before move only object checking that is "
+     "used to convert borrow+projection to destructures. Once this has run, the move "
+     "only object checker runs and ensures that the destructures do not create "
+     "any move only errors with respect to non-borrow+projection uses")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
-SWIFT_INSTRUCTION_PASS(BeginCOWMutationInst, "simplify-begin_cow_mutation")
-SWIFT_INSTRUCTION_PASS(GlobalValueInst, "simplify-global_value")
-SWIFT_INSTRUCTION_PASS(StrongRetainInst, "simplify-strong_retain")
-SWIFT_INSTRUCTION_PASS(StrongReleaseInst, "simplify-strong_release")
+SWIFT_SILCOMBINE_PASS(BeginCOWMutationInst)
+SWIFT_SILCOMBINE_PASS(GlobalValueInst)
+SWIFT_SILCOMBINE_PASS(StrongRetainInst)
+SWIFT_SILCOMBINE_PASS(StrongReleaseInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS
 #undef SWIFT_FUNCTION_PASS
-#undef SWIFT_INSTRUCTION_PASS
+#undef SWIFT_SILCOMBINE_PASS
 #undef PASS
 #undef PASS_RANGE

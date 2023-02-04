@@ -784,9 +784,9 @@ entry(%0 : $EmptyType, %1: $*SomeType):
   store %0 to %5 : $*EmptyType
   %31 = function_ref @foo : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
   %32 = alloc_stack $EmptyType
-  copy_addr %5 to [initialization] %32 : $*EmptyType
+  copy_addr %5 to [init] %32 : $*EmptyType
   %34 = alloc_stack $SomeType
-  copy_addr %1 to [initialization] %34 : $*SomeType // id: %35
+  copy_addr %1 to [init] %34 : $*SomeType // id: %35
   %36 = partial_apply [callee_guaranteed] %31<EmptyType, SomeType>(%32, %34) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
   release_value %36: $@callee_guaranteed () ->()
   dealloc_stack %34 : $*SomeType
@@ -818,9 +818,9 @@ entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
   store %3 to %7 : $*FixedType
   %31 = function_ref @foo2 : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> ()
   %32 = alloc_stack $EmptyType
-  copy_addr %5 to [initialization] %32 : $*EmptyType
+  copy_addr %5 to [init] %32 : $*EmptyType
   %34 = alloc_stack $SomeType
-  copy_addr %1 to [initialization] %34 : $*SomeType // id: %35
+  copy_addr %1 to [init] %34 : $*SomeType // id: %35
   %36 = partial_apply [callee_guaranteed] %31<FixedType, EmptyType, SomeType>(%7, %32, %34) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> ()
   release_value %36: $@callee_guaranteed () ->()
   dealloc_stack %34 : $*SomeType

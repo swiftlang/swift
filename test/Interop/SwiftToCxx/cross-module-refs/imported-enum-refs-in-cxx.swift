@@ -25,7 +25,7 @@ public func inoutLargeEnum(_ s: inout LargeEnum) {
     return s = LargeEnum.B
 }
 
-// CHECK: inline void inoutLargeEnum(Enums::LargeEnum& s) noexcept {
+// CHECK: inline void inoutLargeEnum(Enums::LargeEnum& s) noexcept SWIFT_SYMBOL("s:9UsesEnums14inoutLargeEnumyy0B00dE0OzF") {
 // CHECK-NEXT: return _impl::$s9UsesEnums14inoutLargeEnumyy0B00dE0OzF(Enums::_impl::_impl_LargeEnum::getOpaquePointer(s));
 // CHECK-NEXT: }
 

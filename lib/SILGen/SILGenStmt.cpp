@@ -120,7 +120,7 @@ void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
 // merged block will be visited again to determine if it can be merged with it's
 // successor, and so on, so no edges are skipped.
 //
-// In rare cases, the predessor is merged with its earlier successor, which has
+// In rare cases, the predecessor is merged with its earlier successor, which has
 // already been visited. If the successor can also be merged, then it has
 // already happened, and there is no need to revisit the merged block.
 void SILGenFunction::mergeCleanupBlocks() {
@@ -150,7 +150,7 @@ void SILGenFunction::mergeCleanupBlocks() {
     auto beforeSucc = std::next(SILFunction::reverse_iterator(succBB));
 
     // Remember the position before the current predecessor to avoid skipping
-    // blocks or revisiting blocks unnecessarilly.
+    // blocks or revisiting blocks unnecessarily.
     auto beforePred = std::next(SILFunction::reverse_iterator(predBB));
     // Since succBB will be erased, move before it.
     if (beforePred == SILFunction::reverse_iterator(succBB))
@@ -415,7 +415,16 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       if (isa<ThrowStmt>(S))
         StmtType = ThrowStmtType;
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
-      SGF.emitIgnoredExpr(E);
+      // Check to see if we have an initialization for a SingleValueStmtExpr
+      // active, and if so, use it for this expression branch. If the expression
+      // is uninhabited, we can skip this, and let unreachability checking
+      // handle it.
+      auto *init = SGF.getSingleValueStmtInit(E);
+      if (init && !E->getType()->isStructurallyUninhabited()) {
+        SGF.emitExprInto(E, init);
+      } else {
+        SGF.emitIgnoredExpr(E);
+      }
     } else {
       auto *D = ESD.get<Decl*>();
 

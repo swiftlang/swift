@@ -52,10 +52,13 @@ reflect(object: ClassWithSingleCaseNoPayloadEnum())
 // CHECK-64:           (case name=default index=0)))
 // CHECK-64:       (case name=none index=1)))
 // CHECK-64:   (field name=e4 offset=18
-// CHECK-64:     (single_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64:     (single_payload_enum size=2 alignment=1 stride=2 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:       (case name=some index=0 offset=0
-// CHECK-64:         (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64:           (case name=default index=0)))
+// CHECK-64:         (single_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64:           (case name=some index=0 offset=0
+// CHECK-64:             (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64:               (case name=default index=0)))
+// CHECK-64:           (case name=none index=1)))
 // CHECK-64:       (case name=none index=1)))
 // CHECK-64:   (field name=marker offset=24
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1

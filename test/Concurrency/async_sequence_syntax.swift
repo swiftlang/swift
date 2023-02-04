@@ -87,3 +87,13 @@ func forAwaitWithConcreteType(_ seq: ThrowingAsyncSequence) throws { // expected
     _ = elt
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+func forTryAwaitReturningExistentialType() async throws {
+  struct S {
+    func seq() -> any AsyncSequence { fatalError() }
+  }
+
+  for try await _ in S().seq() { // Ok
+  }
+}

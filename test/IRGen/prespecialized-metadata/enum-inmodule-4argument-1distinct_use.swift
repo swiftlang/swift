@@ -84,7 +84,7 @@ func doit() {
 doit()
 
 // CHECK: ; Function Attrs: noinline nounwind
-// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, i8** %1) #{{[0-9]+}} {
+// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, i8** %1) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
 // CHECK:   [[ERASED_BUFFER:%[0-9]+]] = bitcast i8** %1 to i8*
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @swift_getCanonicalPrespecializedGenericMetadata(

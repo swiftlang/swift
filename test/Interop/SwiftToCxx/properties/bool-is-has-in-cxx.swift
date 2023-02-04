@@ -21,16 +21,16 @@ public struct IsHasProperties {
     let x1, x2, x3, x4, x5, x6: Int
 }
 
-// CHECK: class IsHasProperties
+// CHECK: class SWIFT_SYMBOL({{.*}}) IsHasProperties
 
-// CHECK: inline bool isEmpty() const;
-// CHECK-NEXT: inline bool hasFlavor() const;
-// CHECK-NEXT: inline bool isSolid() const;
-// CHECK-NEXT: inline void setIsSolid(bool value);
-// CHECK-NEXT: inline bool getFlag() const;
-// CHECK-NEXT: inline void setFlag(bool value);
-// CHECK-NEXT: inline bool getHas() const;
-// CHECK-NEXT: inline swift::Int getIsOption() const;
+// CHECK: inline bool isEmpty() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline bool hasFlavor() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline bool isSolid() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline void setIsSolid(bool value) SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline bool getFlag() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline void setFlag(bool value) SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline bool getHas() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: inline swift::Int getIsOption() const SWIFT_SYMBOL({{.*}});
 
 // CHECK: inline bool IsHasProperties::isEmpty() const {
 // CHECK-NEXT: return _impl::$s10Properties05IsHasA0V7isEmptySbvg(_getOpaquePointer());

@@ -85,6 +85,9 @@ enum ContextualTypePurpose : uint8_t {
   CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
                                ///< former 'wrappedValue' type
 
+  CTP_SingleValueStmtBranch, ///< The contextual type for a branch in a single
+                             ///< value statement expression.
+
   CTP_ExprPattern,      ///< `~=` operator application associated with expression
                         /// pattern.
 
@@ -95,6 +98,12 @@ namespace constraints {
 
 class ConstraintSystem;
 enum class ConversionRestrictionKind;
+
+/// The kind of SingleValueStmtExpr branch the locator identifies.
+enum class SingleValueStmtBranchKind {
+  Regular,
+  InSingleExprClosure
+};
 
 /// Locates a given constraint within the expression being
 /// type-checked, which may refer down into subexpressions and parts of
@@ -291,6 +300,17 @@ public:
 
   /// Determine whether this locator is for a result builder body result type.
   bool isForResultBuilderBodyResult() const;
+
+  /// Determine whether this locator is for a macro expansion.
+  bool isForMacroExpansion() const;
+
+  /// Whether this locator identifies a conjunction for the branches of a
+  /// SingleValueStmtExpr.
+  bool isForSingleValueStmtConjunction() const;
+
+  /// Whether this locator identifies a conversion for a SingleValueStmtExpr
+  /// branch, and if so, the kind of branch.
+  Optional<SingleValueStmtBranchKind> isForSingleValueStmtBranch() const;
 
   /// Determine whether this locator points directly to a given expression.
   template <typename E> bool directlyAt() const {
@@ -508,42 +528,54 @@ public: \
 /// A base class for custom path elements that store numeric values.
 template <unsigned NumValues>
 class StoredIntegerElement: public LocatorPathElt {
+  static constexpr unsigned valueWidth() {
+    switch (NumValues) {
+    default:
+      return 16;
+    case 1:
+      return 64;
+    case 2:
+      return 32;
+    }
+  }
+
+  template <unsigned Index = 0,
+            typename = typename std::enable_if<(Index < NumValues)>::type>
+  static uint64_t packValue(uint64_t value) {
+    return value << (valueWidth() * (NumValues - Index - 1));
+  }
+
+  static constexpr uint64_t valueMask =
+    valueWidth() < 64 ? (1ULL << valueWidth()) - 1 : -1ULL;
+
 public:
   template <unsigned NumNumericInputs = NumValues,
             typename = typename std::enable_if<NumNumericInputs == 1>::type>
-  StoredIntegerElement(ConstraintLocator::PathElementKind kind, unsigned value)
-    : LocatorPathElt(kind, value) {
-    assert(value == getValue<0>() && "value truncated");
-  }
+  StoredIntegerElement(ConstraintLocator::PathElementKind kind, uint64_t value)
+    : LocatorPathElt(kind, value) { }
 
   template <unsigned NumNumericInputs = NumValues,
             typename = typename std::enable_if<NumNumericInputs == 2>::type>
-  StoredIntegerElement(ConstraintLocator::PathElementKind kind, unsigned value0, unsigned value1)
-    : LocatorPathElt(kind, (value0 << 16 | value1)) {
-    assert(value0 == getValue<0>() && "value0 truncated");
-    assert(value1 == getValue<1>() && "value1 truncated");
-  }
+  StoredIntegerElement(ConstraintLocator::PathElementKind kind, uint32_t value0, uint32_t value1)
+    : LocatorPathElt(kind, packValue<0>(value0) | packValue<1>(value1)) { }
 
   template <unsigned NumNumericInputs = NumValues,
             typename = typename std::enable_if<NumNumericInputs == 3>::type>
-  StoredIntegerElement(ConstraintLocator::PathElementKind kind, unsigned value0,
-                       unsigned value1, unsigned value2)
-      : LocatorPathElt(kind, uint64_t(value0) << 32 | uint64_t(value1) << 16 | uint64_t(value2)) {
-    assert(value0 == getValue<0>() && "value0 truncated");
-    assert(value1 == getValue<1>() && "value1 truncated");
-    assert(value2 == getValue<2>() && "value2 truncated");
-  }
+  StoredIntegerElement(ConstraintLocator::PathElementKind kind,
+                       uint16_t value0, uint16_t value1, uint16_t value2)
+    : LocatorPathElt(kind,
+                     packValue<0>(value0) | packValue<1>(value1) | packValue<2>(value2)) { }
 
   /// Retrieve a value associated with the path element.
   template <unsigned Index = 0,
             typename = typename std::enable_if<(Index < NumValues)>::type>
-  unsigned getValue() const {
-    // We pack values into 16 bit components of the storage, with value0
+  uint64_t getValue() const {
+    // We pack values into equally-sized components of the storage, with value0
     // being stored in the upper bits, valueN in the lower bits. Therefore we
     // need to shift out any extra values in the lower bits.
     auto extraValues = NumValues - Index - 1;
-    auto value = getRawStorage() >> (extraValues * 16);
-    return value & 0xFFFF;
+    auto value = getRawStorage() >> (extraValues * valueWidth());
+    return value & valueMask;
   }
 };
 
@@ -568,7 +600,7 @@ public:
 
 class LocatorPathElt::ApplyArgToParam final : public StoredIntegerElement<3> {
 public:
-  ApplyArgToParam(unsigned argIdx, unsigned paramIdx, ParameterTypeFlags flags)
+  ApplyArgToParam(uint16_t argIdx, uint16_t paramIdx, ParameterTypeFlags flags)
       : StoredIntegerElement(ConstraintLocator::ApplyArgToParam, argIdx, paramIdx, flags.toRaw()) {}
 
   unsigned getArgIdx() const { return getValue<0>(); }
@@ -868,6 +900,22 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::TernaryBranch;
+  }
+};
+
+/// The branch of a SingleValueStmtExpr. Note the stored index corresponds to
+/// the expression branches, i.e it skips statement branch indices.
+class LocatorPathElt::SingleValueStmtBranch final
+    : public StoredIntegerElement<1> {
+public:
+  SingleValueStmtBranch(unsigned exprIdx)
+      : StoredIntegerElement(ConstraintLocator::SingleValueStmtBranch,
+                             exprIdx) {}
+
+  unsigned getExprBranchIndex() const { return getValue(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::SingleValueStmtBranch;
   }
 };
 

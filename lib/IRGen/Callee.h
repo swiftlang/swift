@@ -78,6 +78,10 @@ namespace irgen {
                                 llvm::Value *storageAddress,
                                 const PointerAuthEntity &entity);
 
+    static PointerAuthInfo emit(IRGenFunction &IGF,
+                                clang::PointerAuthQualifier pointerAuthQual,
+                                llvm::Value *storageAddress);
+
     static PointerAuthInfo forFunctionPointer(IRGenModule &IGM,
                                               CanSILFunctionType fnType);
 
@@ -175,6 +179,7 @@ namespace irgen {
       AsyncLetGetThrowing,
       AsyncLetFinish,
       TaskGroupWaitNext,
+      TaskGroupWaitAll,
       DistributedExecuteTarget,
     };
 
@@ -247,6 +252,7 @@ namespace irgen {
       case SpecialKind::AsyncLetGetThrowing:
       case SpecialKind::AsyncLetFinish:
       case SpecialKind::TaskGroupWaitNext:
+      case SpecialKind::TaskGroupWaitAll:
         return true;
       case SpecialKind::DistributedExecuteTarget:
         return false;
@@ -277,6 +283,7 @@ namespace irgen {
       case SpecialKind::AsyncLetGetThrowing:
       case SpecialKind::AsyncLetFinish:
       case SpecialKind::TaskGroupWaitNext:
+      case SpecialKind::TaskGroupWaitAll:
         return true;
       case SpecialKind::DistributedExecuteTarget:
         return false;
@@ -340,7 +347,7 @@ namespace irgen {
           AuthInfo(authInfo), Sig(signature), awaitSignature(awaitSignature) {
       // The function pointer should have function type.
       assert(!value->getContext().supportsTypedPointers() ||
-             value->getType()->getPointerElementType()->isFunctionTy());
+             value->getType()->getNonOpaquePointerElementType()->isFunctionTy());
       // TODO: maybe assert similarity to signature.getType()?
       if (authInfo) {
         if (kind == Kind::Function) {

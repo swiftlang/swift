@@ -533,8 +533,8 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
     /// instruction is safe only if all of its users are safe. Check this
     /// recursively.
     auto results = isTransitiveSafeUser(UseInst);
-    if (results.hasValue()) {
-      for (auto result : results.getValue()) {
+    if (results.has_value()) {
+      for (auto result : results.value()) {
         if (!std::all_of(result->use_begin(), result->use_end(),
                          [this](Operand *Op) -> bool {
                            return checkSafeArrayElementUse(Op->getUser(),
@@ -641,8 +641,8 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   // and return false if any of them are not transitive escape array element
   // uses.
   auto results = isTransitiveSafeUser(UseInst);
-  if (results.hasValue()) {
-    for (auto result : results.getValue()) {
+  if (results.has_value()) {
+    for (auto result : results.value()) {
       if (!std::all_of(result->use_begin(), result->use_end(),
                        [this](Operand *Op) -> bool {
                          return checkSafeArrayElementUse(Op->getUser(),

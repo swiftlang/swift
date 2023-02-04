@@ -161,6 +161,16 @@ func passesInOut(i: Int) {
   takesInOut(&p)
 }
 
+func takesOptional<T: P>(_ value: T?) { }
+// expected-note@-1{{required by global function 'takesOptional' where 'T' = 'any P'}}
+
+func passesToOptional(p: any P, pOpt: (any P)?) {
+  takesOptional(p) // okay
+  takesOptional(pOpt) // expected-error{{type 'any P' cannot conform to 'P'}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+}
+
+
 @available(SwiftStdlib 5.1, *)
 func testReturningOpaqueTypes(p: any P) {
   let q = p.getQ()

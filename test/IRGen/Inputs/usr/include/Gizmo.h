@@ -171,3 +171,39 @@ __attribute__((swift_name("OuterType.InnerType")))
 
 @interface FungingArray <Element: id<NSFunging>> : NSObject
 @end
+
+__attribute__((objc_non_runtime_protocol))
+@protocol NonRuntimeP
+@end
+
+@protocol RuntimeP<NonRuntimeP>
+@end
+
+@protocol P1
+@end
+@protocol P2
+@end
+@protocol P3
+@end
+
+__attribute__((objc_non_runtime_protocol))
+@protocol AnotherNonRuntimeP<P1, P2, P3>
+@end
+
+__attribute__((objc_non_runtime_protocol))
+@protocol AnotherNonRuntime2P<P1, P2>
+@end
+
+__attribute__((objc_non_runtime_protocol))
+@protocol OtherNonRuntimeP <AnotherNonRuntimeP, AnotherNonRuntime2P>
+@end
+
+@protocol Runtime2P<NonRuntimeP, OtherNonRuntimeP, P3>
+@end
+
+
+@protocol DeclarationOnly;
+
+@protocol DeclarationOnlyUser<DeclarationOnly>
+- (void) printIt;
+@end

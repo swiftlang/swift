@@ -614,7 +614,7 @@ shouldReportAccess(const AccessInfo &Info,swift::SILAccessKind Kind,
     return None;
 
   auto result = Info.conflictsWithAccess(Kind, SubPath);
-  if (ShouldAssertOnFailure && result.hasValue())
+  if (ShouldAssertOnFailure && result.has_value())
     llvm_unreachable("Standard assertion routine.");
   return result;
 }

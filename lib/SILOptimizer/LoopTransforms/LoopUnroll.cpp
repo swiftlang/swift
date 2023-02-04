@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
@@ -213,7 +214,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
     (Loop->getBlocks())[0]->getParent()->getModule().getOptions().UnrollThreshold;
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
-      if (!Loop->canDuplicate(&Inst))
+      if (!canDuplicateLoopInstruction(Loop, &Inst))
         return false;
       if (instructionInlineCost(Inst) != InlineCost::Free)
         ++Cost;
@@ -396,7 +397,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
     return false;
   }
 
-  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.getValue())) {
+  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value())) {
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
     return false;
   }

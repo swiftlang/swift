@@ -32,7 +32,7 @@ public:
     VerifyAndApplyFixes
   } VerifyMode = NoVerify;
 
-  enum FormattingStyle { LLVM, Swift };
+  enum FormattingStyle { LLVM, Swift, SwiftSyntax };
 
   /// Indicates whether to allow diagnostics for \c <unknown> locations if
   /// \c VerifyMode is not \c NoVerify.
@@ -54,6 +54,9 @@ public:
 
   /// Suppress all warnings
   bool SuppressWarnings = false;
+  
+  /// Suppress all remarks
+  bool SuppressRemarks = false;
 
   /// Treat all warnings as errors
   bool WarningsAsErrors = false;
@@ -70,6 +73,9 @@ public:
   /// descriptive style that's specific to Swift (currently experimental).
   FormattingStyle PrintedFormattingStyle = FormattingStyle::LLVM;
 
+  /// Whether to emit macro expansion buffers into separate, temporary files.
+  bool EmitMacroExpansionFiles = true;
+
   std::string DiagnosticDocumentationPath = "";
 
   std::string LocalizationCode = "";
@@ -81,6 +87,12 @@ public:
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
     // Nothing here that contributes anything significant when emitting the PCH.
+    return llvm::hash_value(0);
+  }
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Dependency Scanning hash.
+  llvm::hash_code getModuleScanningHashComponents() const {
     return llvm::hash_value(0);
   }
 };

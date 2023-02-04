@@ -55,7 +55,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK:   destroy_addr [[ADJ_X]] : $*τ_0_0.TangentVector
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
 // CHECK:   apply [[ZERO_FN]]<τ_0_0.TangentVector>([[ADJ_X]], {{.*}})
-// CHECK:   copy_addr [take] [[ADJ_X_TMP]] to [initialization] [[ADJ_X_RESULT]] : $*τ_0_0.TangentVector
+// CHECK:   copy_addr [take] [[ADJ_X_TMP]] to [init] [[ADJ_X_RESULT]] : $*τ_0_0.TangentVector
 // CHECK:   dealloc_stack [[ADJ_X_TMP]] : $*τ_0_0.TangentVector
 // CHECK:   return {{.*}} : $()
 // CHECK: }
@@ -64,13 +64,13 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK: bb0([[ADJ_SELF_RESULT:%.*]] : $*Generic<τ_0_0>.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, {{.*}} : ${{.*}}):
 // CHECK:   [[ADJ_SELF_TMP:%.*]] = alloc_stack $Generic<τ_0_0>.TangentVector
 // CHECK:   [[SEED_COPY:%.*]] = alloc_stack $τ_0_0.TangentVector
-// CHECK:   copy_addr [[SEED]] to [initialization] [[SEED_COPY]] : $*τ_0_0.TangentVector
+// CHECK:   copy_addr [[SEED]] to [init] [[SEED_COPY]] : $*τ_0_0.TangentVector
 // CHECK:   [[ADJ_X:%.*]] = struct_element_addr [[ADJ_SELF_TMP]] : $*Generic<τ_0_0>.TangentVector, #Generic.TangentVector.x
-// CHECK:   copy_addr [take] [[SEED_COPY]] to [initialization] [[ADJ_X]] : $*τ_0_0.TangentVector
+// CHECK:   copy_addr [take] [[SEED_COPY]] to [init] [[ADJ_X]] : $*τ_0_0.TangentVector
 // CHECK:   [[ADJ_Y:%.*]] = struct_element_addr [[ADJ_SELF_TMP]] : $*Generic<τ_0_0>.TangentVector, #Generic.TangentVector.y
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
 // CHECK:   apply [[ZERO_FN]]<τ_0_0.TangentVector>([[ADJ_Y]], {{.*}})
-// CHECK:   copy_addr [take] [[ADJ_SELF_TMP]] to [initialization] [[ADJ_SELF_RESULT]] : $*Generic<τ_0_0>.TangentVector
+// CHECK:   copy_addr [take] [[ADJ_SELF_TMP]] to [init] [[ADJ_SELF_RESULT]] : $*Generic<τ_0_0>.TangentVector
 // CHECK:   dealloc_stack [[SEED_COPY]] : $*τ_0_0.TangentVector
 // CHECK:   dealloc_stack [[ADJ_SELF_TMP]] : $*Generic<τ_0_0>.TangentVector
 // CHECK:   return {{.*}} : $()

@@ -55,6 +55,15 @@ public:
   };
 
 private:
+  /// The parent source file containing the coverage map.
+  /// 
+  /// NOTE: `ParentSourceFile->getFilename()` is not necessarily equivalent to
+  /// `Filename`. `Filename` could be a .swift file, and `ParentSourceFile`
+  /// could be a parsed .sil file. As such, this should only be used for
+  /// determining which object file to emit the coverage map into.
+  /// `Filename` should be used for coverage data.
+  SourceFile *ParentSourceFile;
+
   // The name of the source file where this mapping is found.
   StringRef Filename;
 
@@ -78,19 +87,28 @@ private:
   SILCoverageMap &operator=(const SILCoverageMap &) = delete;
 
   /// Private constructor. Create these using SILCoverageMap::create.
-  SILCoverageMap(uint64_t Hash);
+  SILCoverageMap(SourceFile *ParentSourceFile, uint64_t Hash);
 
 public:
   ~SILCoverageMap();
 
   static SILCoverageMap *
-  create(SILModule &M, StringRef Filename, StringRef Name,
-         StringRef PGOFuncName, uint64_t Hash,
+  create(SILModule &M, SourceFile *ParentSourceFile, StringRef Filename,
+         StringRef Name, StringRef PGOFuncName, uint64_t Hash,
          ArrayRef<MappedRegion> MappedRegions,
          ArrayRef<llvm::coverage::CounterExpression> Expressions);
 
+  /// The parent source file containing the coverage map.
+  ///
+  /// NOTE: `getParentSourceFile()->getFilename()` is not necessarily equivalent
+  /// to `getFilename()`. `getFilename()` could be a .swift file, and
+  /// `getParentSourceFile()` could be a parsed .sil file. As such, this should
+  /// only be used for determining which object file to emit the coverage map
+  /// in. `getFilename()` should be used for coverage data.
+  SourceFile *getParentSourceFile() const { return ParentSourceFile; }
+
   /// Return the name of the source file where this mapping is found.
-  StringRef getFile() const { return Filename; }
+  StringRef getFilename() const { return Filename; }
 
   /// Return the mangled name of the function this mapping covers.
   StringRef getName() const { return Name; }

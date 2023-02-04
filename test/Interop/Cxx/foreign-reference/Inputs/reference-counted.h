@@ -21,6 +21,9 @@ __attribute__((swift_attr("release:LCRelease"))) LocalCount {
   static LocalCount *create() {
     return new (malloc(sizeof(LocalCount))) LocalCount();
   }
+
+  int returns42() { return 42; }
+  int constMethod() const { return 42; }
 };
 
 }

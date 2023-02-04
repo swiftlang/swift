@@ -20,20 +20,40 @@
 
 namespace swift {
 
+/// Used to provide the kind of scope limitation in AccessScope::Value
+enum class AccessLimitKind : uint8_t { None = 0, Private, Package };
+
 /// The wrapper around the outermost DeclContext from which
 /// a particular declaration can be accessed.
 class AccessScope {
-  /// The declaration context (if not public) along with a bit saying
-  /// whether this scope is private, SPI or not.
-  /// If the declaration context is set, the bit means that the scope is
-  /// private or not. If the declaration context is null, the bit means that
-  /// this scope is SPI or not.
-  llvm::PointerIntPair<const DeclContext *, 1, bool> Value;
+  /// The declaration context along with an enum indicating the level of
+  /// scope limitation.
+  /// If the declaration context is set, and the limit kind is Private, the
+  /// access level is considered 'private'. Whether it's 'internal' or
+  /// 'fileprivate' is determined by what the declaration context casts to. If
+  /// the declaration context is null, and the limit kind is None, the access
+  /// level is considered 'public'. If the limit kind is Private, the access
+  /// level is considered SPI. If it's Package, the access level is considered
+  /// 'package'. Below is a table showing the combinations.
+  ///
+  /// AccessLimitKind       DC == nullptr               DC != nullptr
+  /// ---------------------------------------------------------------------------
+  ///  None                    public                  fileprivate or internal (check DC to tell which)
+  ///  Private               `@_spi` public                private
+  ///  Package                 package                    (unused)
+
+  llvm::PointerIntPair<const DeclContext *, 2, AccessLimitKind> Value;
 
 public:
-  AccessScope(const DeclContext *DC, bool isPrivate = false);
+  AccessScope(const DeclContext *DC,
+              AccessLimitKind limitKind = AccessLimitKind::None);
 
-  static AccessScope getPublic() { return AccessScope(nullptr, false); }
+  static AccessScope getPublic() {
+    return AccessScope(nullptr, AccessLimitKind::None);
+  }
+  static AccessScope getPackage() {
+    return AccessScope(nullptr, AccessLimitKind::Package);
+  }
 
   /// Check if private access is allowed. This is a lexical scope check in Swift
   /// 3 mode. In Swift 4 mode, declarations and extensions of the same type will
@@ -46,24 +66,64 @@ public:
   bool operator==(AccessScope RHS) const { return Value == RHS.Value; }
   bool operator!=(AccessScope RHS) const { return !(*this == RHS); }
   bool hasEqualDeclContextWith(AccessScope RHS) const {
+    if (isPublic())
+      return RHS.isPublic();
+    if (isPackage())
+      return RHS.isPackage();
     return getDeclContext() == RHS.getDeclContext();
   }
 
-  bool isPublic() const { return !Value.getPointer(); }
-  bool isPrivate() const { return Value.getPointer() && Value.getInt(); }
+  bool isPublic() const {
+    return !Value.getPointer() && Value.getInt() == AccessLimitKind::None;
+  }
+  bool isPrivate() const {
+    return Value.getPointer() && Value.getInt() == AccessLimitKind::Private;
+  }
   bool isFileScope() const;
   bool isInternal() const;
-
-  /// Returns true if this is a child scope of the specified other access scope.
-  ///
-  /// \see DeclContext::isChildContextOf
-  bool isChildOf(AccessScope AS) const {
-    if (!isPublic() && !AS.isPublic())
-      return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
-    if (isPublic() && AS.isPublic())
-      return false;
-    return AS.isPublic();
+  bool isPackage() const {
+    return !Value.getPointer() && Value.getInt() == AccessLimitKind::Package;
   }
+
+  /// Returns true if the context of this (use site) is more restrictive than
+  /// the argument context (decl site). This function does _not_ check the
+  /// restrictiveness of the access level between this and the argument. \see
+  /// AccessScope::isInContext
+  bool isChildOf(AccessScope AS) const {
+    if (isInContext()) {
+      if (AS.isInContext())
+        return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
+      else
+        return AS.isPackage() || AS.isPublic();
+    }
+    if (isPackage())
+      return AS.isPublic();
+    // If this is public, it can't be less than access level of AS
+    // so return false
+    return false;
+  }
+
+  /// Result depends on whether it's called at a use site or a decl site:
+  ///
+  /// For example,
+  ///
+  /// ```
+  /// public func foo(_ arg: bar) {} // `bar` is a `package` decl in another
+  /// module
+  /// ```
+  ///
+  /// The meaning of \c isInContext changes whether it's at the use site or the
+  /// decl site.
+  ///
+  /// The use site of \c bar, i.e. \c foo, is "in context" (decl context is
+  /// non-null), regardless of the access level of \c foo (\c public in this
+  /// case).
+  ///
+  /// The decl site of \c bar is only "in context" if the access level of the
+  /// decl is \c internal or more restrictive. The context at the decl site is\c
+  /// FileUnit if the decl is \c fileprivate or \c private; \c ModuleDecl if \c
+  /// internal, and null if \c package or \c public.
+  bool isInContext() const { return getDeclContext() != nullptr; }
 
   /// Returns the associated access level for diagnostic purposes.
   AccessLevel accessLevelForDiagnostics() const;

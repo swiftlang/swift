@@ -55,7 +55,7 @@ TEST_F(SemaTest, TestFilteringBasedOnSolutionScore) {
 
     auto best = CS.findBestSolution(solutions, /*minimize=*/true);
 
-    ASSERT_FALSE(best.hasValue());
+    ASSERT_FALSE(best.has_value());
     ASSERT_EQ(solutions.size(), 2u);
     ASSERT_EQ(solutions[0].getFixedScore(), bestScore);
     ASSERT_EQ(solutions[1].getFixedScore(), bestScore);
@@ -73,7 +73,7 @@ TEST_F(SemaTest, TestFilteringBasedOnSolutionScore) {
 
     auto best = CS.findBestSolution(solutions, /*minimize=*/true);
 
-    ASSERT_FALSE(best.hasValue());
+    ASSERT_FALSE(best.has_value());
     ASSERT_EQ(solutions.size(), 2u);
     ASSERT_EQ(solutions[0].getFixedScore(), bestScore);
     ASSERT_EQ(solutions[1].getFixedScore(), bestScore);
@@ -92,7 +92,7 @@ TEST_F(SemaTest, TestFilteringBasedOnSolutionScore) {
 
     auto best = CS.findBestSolution(solutions, /*minimize=*/true);
 
-    ASSERT_FALSE(best.hasValue());
+    ASSERT_FALSE(best.has_value());
     ASSERT_EQ(solutions.size(), 2u);
     ASSERT_EQ(solutions[0].getFixedScore(), bestScore);
     ASSERT_EQ(solutions[1].getFixedScore(), bestScore);
@@ -110,7 +110,7 @@ TEST_F(SemaTest, TestFilteringBasedOnSolutionScore) {
 
     auto best = CS.findBestSolution(solutions, /*minimize=*/true);
 
-    ASSERT_FALSE(best.hasValue());
+    ASSERT_FALSE(best.has_value());
     ASSERT_EQ(solutions.size(), 2u);
     ASSERT_EQ(solutions[0].getFixedScore(), bestScore);
     ASSERT_EQ(solutions[1].getFixedScore(), bestScore);
@@ -130,7 +130,7 @@ TEST_F(SemaTest, TestFilteringBasedOnSolutionScore) {
 
     auto best = CS.findBestSolution(solutions, /*minimize=*/true);
 
-    ASSERT_FALSE(best.hasValue());
+    ASSERT_FALSE(best.has_value());
     ASSERT_EQ(solutions.size(), 2u);
     ASSERT_EQ(solutions[0].getFixedScore(), bestScore);
     ASSERT_EQ(solutions[1].getFixedScore(), bestScore);

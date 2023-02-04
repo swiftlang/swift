@@ -275,23 +275,29 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
-  bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
-    for (const auto &Inherit: TPD->getInherited()) {
+  bool visitGenericTypeParamDecl(GenericTypeParamDecl *GTPD) {
+    for (const auto &Inherit: GTPD->getInherited()) {
       if (auto *const TyR = Inherit.getTypeRepr())
         if (doIt(TyR))
           return true;
     }
+    return false;
+  }
 
-    if (const auto ATD = dyn_cast<AssociatedTypeDecl>(TPD)) {
-      if (const auto DefaultTy = ATD->getDefaultDefinitionTypeRepr())
-        if (doIt(DefaultTy))
+  bool visitAssociatedTypeDecl(AssociatedTypeDecl *ATD) {
+    for (const auto &Inherit: ATD->getInherited()) {
+      if (auto *const TyR = Inherit.getTypeRepr())
+        if (doIt(TyR))
           return true;
+    }
+    if (const auto DefaultTy = ATD->getDefaultDefinitionTypeRepr())
+      if (doIt(DefaultTy))
+        return true;
 
-      if (auto *WhereClause = ATD->getTrailingWhereClause()) {
-        for (auto &Req: WhereClause->getRequirements()) {
-          if (doIt(Req))
-            return true;
-        }
+    if (auto *WhereClause = ATD->getTrailingWhereClause()) {
+      for (auto &Req: WhereClause->getRequirements()) {
+        if (doIt(Req))
+          return true;
       }
     }
     return false;
@@ -397,7 +403,38 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitMissingDecl(MissingDecl *missing) {
+    return false;
+  }
+
   bool visitMissingMemberDecl(MissingMemberDecl *MMD) {
+    return false;
+  }
+
+  bool visitMacroDecl(MacroDecl *MD) {
+    bool WalkGenerics = visitGenericParamListIfNeeded(MD);
+
+    if (MD->parameterList && visit(MD->parameterList))
+      return true;
+
+    if (auto resultTypeRepr = MD->resultType.getTypeRepr()) {
+      if (doIt(resultTypeRepr))
+        return true;
+    }
+
+    // Visit trailing requirements
+    if (WalkGenerics && visitTrailingRequirements(MD))
+       return true;
+
+    return false;
+  }
+
+  bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+    if (MED->getArgs() && doIt(MED->getArgs()))
+      return true;
+    for (auto *decl : MED->getRewritten())
+      if (doIt(decl))
+        return true;
     return false;
   }
 
@@ -827,6 +864,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
 
+  Expr *visitPackElementExpr(PackElementExpr *E) {
+    if (Expr *pattern = doIt(E->getPackRefExpr())) {
+      E->setPackRefExpr(pattern);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitSequenceExpr(SequenceExpr *E) {
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       if (Expr *Elt = doIt(E->getElement(i)))
@@ -1179,6 +1224,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
+  Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+    if (auto *S = doIt(E->getStmt())) {
+      E->setStmt(S);
+    } else {
+      return nullptr;
+    }
+    return E;
+  }
+
   Expr *visitOneWayExpr(OneWayExpr *E) {
     if (auto oldSubExpr = E->getSubExpr()) {
       if (auto subExpr = doIt(oldSubExpr)) {
@@ -1220,10 +1274,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitTypeJoinExpr(TypeJoinExpr *E) {
-    if (auto *newVar = dyn_cast<DeclRefExpr>(doIt(E->getVar()))) {
-      E->setVar(newVar);
-    } else {
-      return nullptr;
+    if (auto *var = E->getVar()) {
+      if (auto *newVar = dyn_cast<DeclRefExpr>(doIt(var))) {
+        E->setVar(newVar);
+      } else {
+        return nullptr;
+      }
     }
 
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
@@ -1235,6 +1291,22 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
 
+    return E;
+  }
+
+  Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
+    Expr *rewritten = nullptr;
+    if (E->getRewritten()) {
+      rewritten = doIt(E->getRewritten());
+      if (!rewritten) return nullptr;
+    }
+    ArgumentList *args = nullptr;
+    if (E->getArgs()) {
+      args = doIt(E->getArgs());
+      if (!args) return nullptr;
+    }
+    E->setRewritten(rewritten);
+    E->setArgs(args);
     return E;
   }
 
@@ -1916,8 +1988,11 @@ bool Traversal::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
   return false;
 }
 
-bool Traversal::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
-  for (auto comp : T->getComponents()) {
+bool Traversal::visitMemberTypeRepr(MemberTypeRepr *T) {
+  if (doIt(T->getBaseComponent()))
+    return true;
+
+  for (auto comp : T->getMemberComponents()) {
     if (doIt(comp))
       return true;
   }
@@ -1943,8 +2018,24 @@ bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
 bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOptionalTypeRepr *T) {
   return doIt(T->getBase());
 }
+
+bool Traversal::visitVarargTypeRepr(VarargTypeRepr *T) {
+  return doIt(T->getElementType());
+}
+
+bool Traversal::visitPackTypeRepr(PackTypeRepr *T) {
+  for (auto &elem : T->getMutableElements())
+    if (doIt(elem))
+      return true;
+  return false;
+}
+
 bool Traversal::visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
   return doIt(T->getPatternType());
+}
+
+bool Traversal::visitPackReferenceTypeRepr(PackReferenceTypeRepr *T) {
+  return doIt(T->getPackType());
 }
 
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {

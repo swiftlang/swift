@@ -42,17 +42,13 @@
 
 #else
 
-#if defined(__ELF__)
-#define SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING "swift_reflection_metadata_magic_string"
-#endif // defined(__ELF__)
-
 #include "swift/shims/Visibility.h"
 #include <cstdint>
 #include <cstddef>
 
 namespace swift {
 struct MetadataSections;
-static constexpr const uintptr_t CurrentSectionMetadataVersion = 2;
+static constexpr const uintptr_t CurrentSectionMetadataVersion = 3;
 }
 
 struct SectionInfo {

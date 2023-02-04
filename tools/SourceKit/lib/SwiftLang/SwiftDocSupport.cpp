@@ -28,7 +28,7 @@
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
-#include "swift/IDE/Refactoring.h"
+#include "swift/Refactoring/Refactoring.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Config.h"
@@ -142,18 +142,18 @@ public:
   }
 
   bool shouldContinuePre(const Decl *D, Optional<BracketOptions> Bracket) {
-    assert(Bracket.hasValue());
-    if (!Bracket.getValue().shouldOpenExtension(D) &&
+    assert(Bracket.has_value());
+    if (!Bracket.value().shouldOpenExtension(D) &&
         isa<ExtensionDecl>(D))
       return false;
     return true;
   }
 
   bool shouldContinuePost(const Decl *D, Optional<BracketOptions> Bracket) {
-    assert(Bracket.hasValue());
-    if (!Bracket.getValue().shouldCloseNominal(D) && isa<NominalTypeDecl>(D))
+    assert(Bracket.has_value());
+    if (!Bracket.value().shouldCloseNominal(D) && isa<NominalTypeDecl>(D))
       return false;
-    if (!Bracket.getValue().shouldCloseExtension(D) &&
+    if (!Bracket.value().shouldCloseExtension(D) &&
         isa<ExtensionDecl>(D))
       return false;
     return true;
@@ -508,6 +508,7 @@ static bool initDocEntityInfo(const Decl *D,
     case DeclContextKind::SerializedLocal:
     case DeclContextKind::ExtensionDecl:
     case DeclContextKind::GenericTypeDecl:
+    case DeclContextKind::MacroDecl:
       break;
 
     // We report sub-module information only for top-level decls.
@@ -1491,7 +1492,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
   unsigned BufferID = ParseCI.getInputBufferIDs().back();
   for (auto Unit : ParseCI.getMainModule()->getFiles()) {
     if (auto Current = dyn_cast<SourceFile>(Unit)) {
-      if (Current->getBufferID().getValue() == BufferID) {
+      if (Current->getBufferID().value() == BufferID) {
         SF = Current;
         break;
       }

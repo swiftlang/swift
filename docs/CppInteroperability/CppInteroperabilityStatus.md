@@ -22,8 +22,7 @@ using V = std::vector<long>;
 ```Swift
 // main.swift
 import CxxTypes
-import std.vector
-import std.algorithm
+import CxxStdlib
 
 // We can extend C++ types in Swift.
 extension V : RandomAccessCollection {
@@ -77,7 +76,7 @@ This status table describes which of the following C++ language features can be 
 | Global Variables                            | Yes    |
 | Namespaces                                  | Yes    |
 | Inline Namespaces                           | Yes, with some known issues ([#58217](https://github.com/apple/swift/issues/58217)) |
-| Exceptions                                  | No  |
+| Exceptions                                  | No. Uncaught exceptions that propagate into Swift frames are UB.  |
 | Fields                                      | Yes |
 | Member functions                            | Yes. Some value category overloads aren't imported |
 | Virtual Member Functions                    | No |
@@ -218,4 +217,4 @@ This status table describes which of the following Swift standard library APIs h
 |--------------------------------|----------------------------------------------------------|
 | `String`     | Can be used as a type in C++. APIs in extensions are not exposed to C++. Conversion between `std.string` is not yet supported   |
 | `Array<T>`   | Can be used as a type in C++. Ranged for loops are supported. Limited set of APIs in some extensions are exposed to C++. |
-| `Optional<T>`   | Can be used as a type in C++. `get` extracts the optional value and it's also implicitly castable to `bool`. Can't be constructed from C++ yet.  |
+| `Optional<T>`   | Can be used as a type in C++. Can be constructed. `get` extracts the optional value and it's also implicitly castable to `bool`.  |

@@ -38,7 +38,7 @@ extension AsyncSequence {
   ///     for await numeral in stream {
   ///         print(numeral, terminator: " ")
   ///     }
-  ///     // Prints "I II III V"
+  ///     // Prints "I II III V "
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an element
   ///   of this sequence as its parameter and returns a transformed value of the

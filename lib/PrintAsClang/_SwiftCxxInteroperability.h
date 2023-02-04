@@ -24,9 +24,35 @@
 #if defined(_WIN32)
 #include <malloc.h>
 #endif
+#if !defined(SWIFT_CALL)
+# define SWIFT_CALL __attribute__((swiftcall))
+#endif
 
 // FIXME: Use always_inline, artificial.
 #define SWIFT_INLINE_THUNK inline
+
+/// The `SWIFT_SYMBOL_MODULE` and `SWIFT_SYMBOL_MODULE_USR` macros apply
+/// `external_source_symbol` Clang attributes to C++ declarations that represent
+/// Swift declarations. This allows Clang to index them as external
+/// declarations, using the specified Swift USR values.
+#if __has_attribute(external_source_symbol)
+#define SWIFT_SYMBOL_MODULE(moduleValue)                                       \
+  __attribute__((external_source_symbol(                                       \
+      language = "Swift", defined_in = moduleValue, generated_declaration)))
+#if __has_attribute(external_source_symbol_with_usr)
+#define SWIFT_SYMBOL_MODULE_USR(moduleValue, usrValue)                         \
+  __attribute__((                                                              \
+      external_source_symbol(language = "Swift", defined_in = moduleValue,     \
+                             generated_declaration, USR = usrValue)))
+#else
+#define SWIFT_SYMBOL_MODULE_USR(moduleValue, usrValue)                         \
+  __attribute__((external_source_symbol(                                       \
+      language = "Swift", defined_in = moduleValue, generated_declaration)))
+#endif
+#else
+#define SWIFT_SYMBOL_MODULE_USR(moduleValue, usrValue)
+#define SWIFT_SYMBOL_MODULE(moduleValue)
+#endif
 
 namespace swift {
 namespace _impl {
@@ -128,6 +154,11 @@ public:
   static inline void *_Nonnull &getOpaquePointerRef(RefCountedClass &object) {
     return object._opaquePointer;
   }
+  static inline void *_Nonnull copyOpaquePointer(
+      const RefCountedClass &object) {
+    swift_retain(object._opaquePointer);
+    return object._opaquePointer;
+  }
 };
 
 } // namespace _impl
@@ -186,32 +217,6 @@ template <class T> inline void *_Nonnull getOpaquePointer(T &value) {
 }
 
 } // namespace _impl
-
-extern "C" void *_Nonnull swift_errorRetain(void *_Nonnull swiftError) noexcept;
-
-extern "C" void swift_errorRelease(void *_Nonnull swiftError) noexcept;
-
-class Error {
-public:
-  Error() {}
-  Error(void* _Nonnull swiftError) { opaqueValue = swiftError; }
-  ~Error() {
-    if (opaqueValue)
-      swift_errorRelease(opaqueValue);
-  }
-  void* _Nonnull getPointerToOpaquePointer() { return opaqueValue; }
-  Error(Error &&other) : opaqueValue(other.opaqueValue) {
-    other.opaqueValue = nullptr;
-  }
-  Error(const Error &other) {
-    if (other.opaqueValue)
-      swift_errorRetain(other.opaqueValue);
-    opaqueValue = other.opaqueValue;
-  }
-
-private:
-  void * _Nonnull opaqueValue = nullptr;
-};
 
 #pragma clang diagnostic pop
 

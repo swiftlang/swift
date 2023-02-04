@@ -129,27 +129,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
 
-  //===---
-  // Begin Ownership Optimizations
-  //
-
-  // Check noImplicitCopy and move only types for addresses.
-  P.addMoveOnlyAddressChecker();
-  // Check noImplicitCopy and move only types for objects
-  P.addMoveOnlyObjectChecker();
-  // Convert last destroy_value to deinits.
-  P.addMoveOnlyDeinitInsertion();
-  // Lower move only wrapped trivial types.
-  P.addTrivialMoveOnlyTypeEliminator();
-  // Check no uses after _move of a value in an address.
-  P.addMoveKillsCopyableAddressesChecker();
-  // No uses after _move of copyable value.
-  P.addMoveKillsCopyableValuesChecker();
-
-  //
-  // End Ownership Optimizations
-  //===---
-
   P.addAddressLowering();
 
   P.addFlowIsolation();
@@ -167,6 +146,30 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // there.
   const auto &Options = P.getOptions();
   P.addClosureLifetimeFixup();
+
+  //===---
+  // Begin Ownership Optimizations
+  //
+  // These happen after ClosureLifetimeFixup because they depend on the
+  // resolution of nonescaping closure lifetimes to correctly check the use
+  // of move-only values as captures in nonescaping closures as borrows.
+
+  // Check noImplicitCopy and move only types for addresses.
+  P.addMoveOnlyAddressChecker();
+  // Check noImplicitCopy and move only types for objects
+  P.addMoveOnlyObjectChecker();
+  // Convert last destroy_value to deinits.
+  P.addMoveOnlyDeinitInsertion();
+  // Lower move only wrapped trivial types.
+  P.addTrivialMoveOnlyTypeEliminator();
+  // Check no uses after consume operator of a value in an address.
+  P.addConsumeOperatorCopyableAddressesChecker();
+  // No uses after consume operator of copyable value.
+  P.addConsumeOperatorCopyableValuesChecker();
+
+  //
+  // End Ownership Optimizations
+  //===---
 
 #ifndef NDEBUG
   // Add a verification pass to check our work when skipping
@@ -985,6 +988,10 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Now that we have serialized, propagate debug info.
   P.addMovedAsyncVarDebugInfoPropagator();
+
+  // If we are asked to stop optimizing before lowering ownership, do so now.
+  if (P.Options.StopOptimizationBeforeLoweringOwnership)
+    return P;
 
   // Now strip any transparent functions that still have ownership.
   P.addOwnershipModelEliminator();

@@ -71,6 +71,8 @@ class Identifier;
 class InOutType;
 class OpaqueTypeDecl;
 class OpenedArchetypeType;
+class PackType;
+class PackReferenceTypeRepr;
 class PlaceholderTypeRepr;
 enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
@@ -125,8 +127,8 @@ public:
     HasTypeVariable      = 0x01,
 
     /// This type expression contains a context-dependent archetype, either a
-    /// \c PrimaryArchetypeType, \c OpenedArchetypeType, or
-    /// \c PackArchetype.
+    /// \c PrimaryArchetypeType, \c OpenedArchetypeType,
+    /// \c ElementArchetypeType, or \c PackArchetype.
     HasArchetype         = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
@@ -167,7 +169,10 @@ public:
     /// This type contains a parameterized existential type \c any P<T>.
     HasParameterizedExistential = 0x2000,
 
-    Last_Property = HasParameterizedExistential
+    /// This type contains an ElementArchetype.
+    HasElementArchetype = 0x4000,
+
+    Last_Property = HasElementArchetype
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -211,8 +216,18 @@ public:
   bool hasDependentMember() const { return Bits & HasDependentMember; }
 
   /// Does a type with these properties structurally contain an
-  /// archetype?
+  /// opened existential archetype?
   bool hasOpenedExistential() const { return Bits & HasOpenedExistential; }
+
+  /// Does a type with these properties structurally contain an
+  /// opened element archetype?
+  bool hasElementArchetype() const { return Bits & HasElementArchetype; }
+
+  /// Does a type with these properties structurally contain a local
+  /// archetype?
+  bool hasLocalArchetype() const {
+    return hasOpenedExistential() || hasElementArchetype();
+  }
 
   /// Does a type with these properties structurally contain a
   /// reference to DynamicSelf?
@@ -392,10 +407,10 @@ protected:
     ID : 32
   );
 
-  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+3+1+2+1+1,
+  SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+4+1+2+1+1,
     ExtInfoBits : NumSILExtInfoBits,
     HasClangTypeInfo : 1,
-    CalleeConvention : 3,
+    CalleeConvention : 4,
     HasErrorResult : 1,
     CoroutineKind : 2,
     HasInvocationSubs : 1,
@@ -436,7 +451,17 @@ protected:
   SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 32,
     : NumPadBits,
 
-    /// The number of elements of the tuple.
+    /// The number of elements of the pack.
+    Count : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(SILPackType, TypeBase, 1+32,
+    /// Whether elements of the pack are addresses.
+    ElementIsAddress : 1,
+
+    : NumPadBits,
+
+    /// The number of elements of the pack
     Count : 32
   );
 
@@ -577,6 +602,9 @@ public:
 
   bool isPlaceholder();
 
+  /// Returns true if this is a move-only type.
+  bool isPureMoveOnly();
+
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
 
@@ -624,6 +652,16 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
+  /// Determine whether the type involves an opened element archetype.
+  bool hasElementArchetype() const {
+    return getRecursiveProperties().hasElementArchetype();
+  }
+
+  /// Determine whether the type involves a local archetype.
+  bool hasLocalArchetype() const {
+    return getRecursiveProperties().hasLocalArchetype();
+  }
+
   bool hasParameterPack() const {
     return getRecursiveProperties().hasParameterPack();
   }
@@ -657,7 +695,7 @@ public:
 
   /// Retrieve the set of type parameter packs that occur within this type.
   void getTypeParameterPacks(
-      SmallVectorImpl<Type> &rootParameterPacks) const;
+      SmallVectorImpl<Type> &rootParameterPacks);
 
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
@@ -1286,6 +1324,18 @@ public:
   /// Error.
   bool isExistentialWithError();
 
+  /// Returns the reduced shape of the type, which represents an equivalence
+  /// class for the same-shape generic requirement:
+  ///
+  /// - The shape of a scalar type is always the empty tuple type ().
+  /// - The shape of a pack archetype is computed from the generic signature
+  ///   using same-shape requirements.
+  /// - The shape of a pack type is computed recursively from its elements.
+  ///
+  /// Two types satisfy a same-shape requirement if their reduced shapes are
+  /// equal as canonical types.
+  CanType getReducedShape();
+
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
@@ -1556,6 +1606,21 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinDefaultActorStorageType, BuiltinType)
+
+/// BuiltinPackIndexType - The type of an (untyped) index into a pack
+/// in SIL.  Essentially a UInt32 with some structural restrictions
+/// about how it can be produced that ensures SIL maintains well-typed
+/// use-def relationships around packs.
+class BuiltinPackIndexType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinPackIndexType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinPackIndex, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinPackIndex;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinPackIndexType, BuiltinType)
 
 /// BuiltinNativeObjectType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
@@ -1986,6 +2051,8 @@ public:
   /// this type references.
   ArrayRef<Type> getDirectGenericArgs() const;
 
+  PackType *getExpandedGenericArgsPack();
+
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
 
@@ -2403,6 +2470,8 @@ public:
   ArrayRef<Type> getGenericArgs() const {
     return {getTrailingObjectsPointer(), Bits.BoundGenericType.GenericArgCount};
   }
+
+  PackType *getExpandedGenericArgsPack();
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent(), getGenericArgs());
@@ -3091,15 +3160,15 @@ protected:
                   RecursiveTypeProperties properties, unsigned NumParams,
                   Optional<ExtInfo> Info)
       : TypeBase(Kind, CanTypeContext, properties), Output(Output) {
-    if (Info.hasValue()) {
+    if (Info.has_value()) {
       Bits.AnyFunctionType.HasExtInfo = true;
-      Bits.AnyFunctionType.ExtInfoBits = Info.getValue().getBits();
+      Bits.AnyFunctionType.ExtInfoBits = Info.value().getBits();
       Bits.AnyFunctionType.HasClangTypeInfo =
-          !Info.getValue().getClangTypeInfo().empty();
+          !Info.value().getClangTypeInfo().empty();
       Bits.AnyFunctionType.HasGlobalActor =
-          !Info.getValue().getGlobalActor().isNull();
+          !Info.value().getGlobalActor().isNull();
       // The use of both assert() and static_assert() is intentional.
-      assert(Bits.AnyFunctionType.ExtInfoBits == Info.getValue().getBits() &&
+      assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
       static_assert(
           ASTExtInfoBuilder::NumMaskBits == NumAFTExtInfoBits,
@@ -3687,11 +3756,6 @@ enum class ParameterConvention : uint8_t {
   Indirect_In,
 
   /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an object in memory.  The callee must treat the object as read-only
-  /// The callee may assume that the address does not alias any valid object.
-  Indirect_In_Constant,
-
-  /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an object in memory.  The callee may not modify and does not destroy
   /// the object.
   Indirect_In_Guaranteed,
@@ -3722,9 +3786,24 @@ enum class ParameterConvention : uint8_t {
   /// This argument is passed directly.  Its type is non-trivial, and the caller
   /// guarantees its validity for the entirety of the call.
   Direct_Guaranteed,
+
+  /// This argument is a value pack of mutable references to storage,
+  /// which the function is being given exclusive access to.  The elements
+  /// must be passed indirectly.
+  Pack_Inout,
+
+  /// This argument is a value pack, and ownership of the elements is being
+  /// transferred into this function.  Whether the elements are passed
+  /// indirectly is recorded in the pack type.
+  Pack_Owned,
+
+  /// This argument is a value pack, and ownership of the elements is not
+  /// being transferred into this function.  Whether the elements are passed
+  /// indirectly is recorded in the pack type.
+  Pack_Guaranteed,
 };
 // Check that the enum values fit inside Bits.SILFunctionType.
-static_assert(unsigned(ParameterConvention::Direct_Guaranteed) < (1<<3),
+static_assert(unsigned(ParameterConvention::Pack_Guaranteed) < (1<<4),
               "fits in Bits.SILFunctionType");
 
 // Does this parameter convention require indirect storage? This reflects a
@@ -3733,7 +3812,6 @@ static_assert(unsigned(ParameterConvention::Direct_Guaranteed) < (1<<3),
 inline bool isIndirectFormalParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_In_Guaranteed:
@@ -3742,6 +3820,9 @@ inline bool isIndirectFormalParameter(ParameterConvention conv) {
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Pack_Inout:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Guaranteed:
     return false;
   }
   llvm_unreachable("covered switch isn't covered?!");
@@ -3749,8 +3830,8 @@ inline bool isIndirectFormalParameter(ParameterConvention conv) {
 inline bool isConsumedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Pack_Owned:
     return true;
 
   case ParameterConvention::Indirect_Inout:
@@ -3758,6 +3839,8 @@ inline bool isConsumedParameter(ParameterConvention conv) {
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Pack_Inout:
+  case ParameterConvention::Pack_Guaranteed:
     return false;
   }
   llvm_unreachable("bad convention kind");
@@ -3770,12 +3853,34 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Pack_Guaranteed:
     return true;
 
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Pack_Inout:
+  case ParameterConvention::Pack_Owned:
+    return false;
+  }
+  llvm_unreachable("bad convention kind");
+}
+
+/// Returns true if conv indicates a pack parameter.
+inline bool isPackParameter(ParameterConvention conv) {
+  switch (conv) {
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Inout:
+  case ParameterConvention::Pack_Owned:
+    return true;
+
+  case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Owned:
     return false;
@@ -3852,6 +3957,10 @@ public:
   bool isIndirectMutating() const {
     return getConvention() == ParameterConvention::Indirect_Inout
         || getConvention() == ParameterConvention::Indirect_InoutAliasable;
+  }
+
+  bool isPack() const {
+    return isPackParameter(getConvention());
   }
 
   /// True if this parameter is consumed by the callee, either
@@ -3975,11 +4084,18 @@ enum class ResultConvention : uint8_t {
   /// The type must be a class or class existential type, and this
   /// must be the only return value.
   Autoreleased,
+
+  /// This value is a pack that is returned indirectly by passing a
+  /// pack address (which may or may not be further indirected,
+  /// depending on the pact type).  The callee is responsible for
+  /// leaving an initialized object in each element of the pack.
+  Pack,
 };
 
 // Does this result require indirect storage for the purpose of reabstraction?
 inline bool isIndirectFormalResult(ResultConvention convention) {
-  return convention == ResultConvention::Indirect;
+  return convention == ResultConvention::Indirect ||
+         convention == ResultConvention::Pack;
 }
 
 /// The differentiability of a SIL function type result.
@@ -4913,8 +5029,8 @@ public:
              kind == innerty::ABIEscapeToNoEscapeConversion;
     }
 
-    bool hasPayload() const { return payload.hasValue(); }
-    uintptr_t getPayload() const { return payload.getValue(); }
+    bool hasPayload() const { return payload.has_value(); }
+    uintptr_t getPayload() const { return payload.value(); }
     StringRef getMessage() const;
   };
 
@@ -5085,6 +5201,97 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILTokenType, Type)
+
+/// A lowered pack type which structurally carries lowered information
+/// about the pack elements.
+///
+/// A value pack is basically treated as a unique-ownership, unmovable
+/// reference-semantics aggregate in SIL: ownership of the pack as a whole
+/// is communicated with normal borrows of the pack, and packs can only
+/// be created locally and forwarded as arguments rather than being moved
+/// in any more complex way.
+class SILPackType final : public TypeBase, public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<SILPackType, CanType> {
+public:
+  /// Type structure not reflected in the pack element type list.
+  ///
+  /// In the design of this, we considered storing ownership here,
+  /// but ended up just with the one bit.
+  struct ExtInfo {
+    bool ElementIsAddress;
+
+    ExtInfo(bool elementIsAddress) : ElementIsAddress(elementIsAddress) {}
+  };
+
+private:
+  friend TrailingObjects;
+  friend class ASTContext;
+  SILPackType(const ASTContext &ctx, RecursiveTypeProperties properties,
+              ExtInfo info, ArrayRef<CanType> elements)
+      : TypeBase(TypeKind::SILPack, &ctx, properties) {
+    Bits.SILPackType.Count = elements.size();
+    Bits.SILPackType.ElementIsAddress = info.ElementIsAddress;
+    memcpy(getTrailingObjects<CanType>(), elements.data(),
+           elements.size() * sizeof(CanType));
+  }
+
+public:
+  static CanTypeWrapper<SILPackType> get(const ASTContext &ctx,
+                                         ExtInfo info,
+                                         ArrayRef<CanType> elements);
+
+  ExtInfo getExtInfo() const {
+    return { isElementAddress() };
+  }
+
+  bool isElementAddress() const {
+    return Bits.SILPackType.ElementIsAddress;
+  }
+
+  /// Retrieves the number of elements in this pack.
+  unsigned getNumElements() const { return Bits.SILPackType.Count; }
+
+  /// Retrieves the type of the elements in the pack.
+  ArrayRef<CanType> getElementTypes() const {
+    return {getTrailingObjects<CanType>(), getNumElements()};
+  }
+
+  /// Returns the type of the element at the given \p index.
+  /// This is a lowered SIL type.
+  CanType getElementType(unsigned index) const {
+    return getTrailingObjects<CanType>()[index];
+  }
+
+  SILType getSILElementType(unsigned index) const; // in SILType.h
+
+  /// Return the reduced shape of this pack.  For consistency with
+  /// general shape-handling routines, we produce an AST pack type
+  /// as the shape, not a SIL pack type.
+  CanTypeWrapper<PackType> getReducedShape() const;
+
+  bool containsPackExpansionType() const;
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getExtInfo(), getElementTypes());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ExtInfo info,
+                      ArrayRef<CanType> elements);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SILPack;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(SILPackType, Type)
+  CanType getElementType(unsigned elementNo) const {
+    return getPointer()->getElementType(elementNo);
+  }
+
+  ArrayRef<CanType> getElementTypes() const {
+    return getPointer()->getElementTypes();
+  }
+END_CAN_TYPE_WRAPPER(SILPackType, Type)
 
 /// A type with a special syntax that is always sugar for a library type. The
 /// library type may have multiple base types. For unary syntax sugar, see
@@ -5901,8 +6108,29 @@ private:
   bool isWholeModule() const { return inContextAndIsWholeModule.getInt(); }
 };
 
+/// An archetype that's only valid in a portion of a local context.
+class LocalArchetypeType : public ArchetypeType {
+protected:
+  using ArchetypeType::ArchetypeType;
+
+public:
+  LocalArchetypeType *getRoot() const {
+    return cast<LocalArchetypeType>(ArchetypeType::getRoot());
+  }
+
+  static bool classof(const TypeBase *type) {
+    return type->getKind() == TypeKind::OpenedArchetype ||
+           type->getKind() == TypeKind::ElementArchetype;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(LocalArchetypeType, ArchetypeType)
+  CanLocalArchetypeType getRoot() const {
+    return CanLocalArchetypeType(getPointer()->getRoot());
+  }
+END_CAN_TYPE_WRAPPER(LocalArchetypeType, ArchetypeType)
+
 /// An archetype that represents the dynamic type of an opened existential.
-class OpenedArchetypeType final : public ArchetypeType,
+class OpenedArchetypeType final : public LocalArchetypeType,
     private ArchetypeTrailingObjects<OpenedArchetypeType>
 {
   friend TrailingObjects;
@@ -6003,17 +6231,23 @@ private:
                       ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
                       LayoutConstraint layout);
 };
-BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, LocalArchetypeType)
   CanOpenedArchetypeType getRoot() const {
     return CanOpenedArchetypeType(getPointer()->getRoot());
   }
-END_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(OpenedArchetypeType, LocalArchetypeType)
+
+/// A wrapper around a shape type to use in ArchetypeTrailingObjects
+/// for PackArchetypeType.
+struct PackShape {
+  Type shapeType;
+};
 
 /// An archetype that represents an opaque element of a type
 /// parameter pack in context.
 class PackArchetypeType final
     : public ArchetypeType,
-      private ArchetypeTrailingObjects<PackArchetypeType> {
+      private ArchetypeTrailingObjects<PackArchetypeType, PackShape> {
   friend TrailingObjects;
   friend ArchetypeType;
 
@@ -6024,21 +6258,72 @@ public:
   /// by this routine.
   static CanTypeWrapper<PackArchetypeType>
   get(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
-      Type InterfaceType,
+      Type InterfaceType, Type ShapeType,
       SmallVectorImpl<ProtocolDecl *> &ConformsTo, Type Superclass,
       LayoutConstraint Layout);
+
+  // Returns the reduced shape type for this pack archetype.
+  CanType getReducedShape() const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PackArchetype;
   }
 
+  CanTypeWrapper<PackType> getSingletonPackType();
+
 private:
   PackArchetypeType(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
                     Type InterfaceType, ArrayRef<ProtocolDecl *> ConformsTo,
-                    Type Superclass, LayoutConstraint Layout);
+                    Type Superclass, LayoutConstraint Layout, PackShape Shape);
 };
 BEGIN_CAN_TYPE_WRAPPER(PackArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(PackArchetypeType, ArchetypeType)
+
+/// An archetype that represents the element type of a pack archetype.
+class ElementArchetypeType final : public LocalArchetypeType,
+    private ArchetypeTrailingObjects<ElementArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+  friend GenericEnvironment;
+
+  UUID ID;
+
+  /// Create a new element archetype in the given environment representing
+  /// the interface type.
+  ///
+  /// This is only invoked by the generic environment when mapping the
+  /// interface type into context.
+  static CanTypeWrapper<ElementArchetypeType>
+  getNew(GenericEnvironment *environment, Type interfaceType,
+         ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+         LayoutConstraint layout);
+
+public:
+  /// Retrieve the ID number of this opened element.
+  UUID getOpenedElementID() const;
+
+  /// Return the archetype that represents the root generic parameter of its
+  /// interface type.
+  ElementArchetypeType *getRoot() const {
+    return cast<ElementArchetypeType>(ArchetypeType::getRoot());
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ElementArchetype;
+  }
+  
+private:
+  ElementArchetypeType(const ASTContext &ctx,
+                       GenericEnvironment *environment, Type interfaceType,
+                       ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+                       LayoutConstraint layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(ElementArchetypeType, LocalArchetypeType)
+  CanElementArchetypeType getRoot() const {
+    return CanElementArchetypeType(getPointer()->getRoot());
+  }
+END_CAN_TYPE_WRAPPER(ElementArchetypeType, LocalArchetypeType)
 
 template<typename Type>
 const Type *ArchetypeType::getSubclassTrailingObjects() const {
@@ -6052,6 +6337,9 @@ const Type *ArchetypeType::getSubclassTrailingObjects() const {
     return openedTy->getTrailingObjects<Type>();
   }
   if (auto childTy = dyn_cast<PackArchetypeType>(this)) {
+    return childTy->getTrailingObjects<Type>();
+  }
+  if (auto childTy = dyn_cast<ElementArchetypeType>(this)) {
     return childTy->getTrailingObjects<Type>();
   }
   llvm_unreachable("unhandled ArchetypeType subclass?");
@@ -6404,6 +6692,10 @@ public:
   /// Creates a pack from the types in \p elements.
   static PackType *get(const ASTContext &C, ArrayRef<Type> elements);
 
+  static PackType *get(const ASTContext &C,
+                       TypeArrayView<GenericTypeParamType> params,
+                       ArrayRef<Type> args);
+
 public:
   /// Retrieves the number of elements in this pack.
   unsigned getNumElements() const { return Bits.PackType.Count; }
@@ -6421,6 +6713,8 @@ public:
   bool containsPackExpansionType() const;
 
   PackType *flattenPackTypes();
+
+  CanTypeWrapper<PackType> getReducedShape();
 
 public:
   void Profile(llvm::FoldingSetNodeID &ID) const {
@@ -6494,6 +6788,8 @@ public:
 
   PackExpansionType *expand();
 
+  CanType getReducedShape();
+
 public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getPatternType(), getCountType());
@@ -6513,6 +6809,8 @@ private:
                     const ASTContext *ctx);
 };
 BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
+  static CanPackExpansionType get(CanType pattern, CanType countType);
+
   CanType getPatternType() const {
     return CanType(getPointer()->getPatternType());
   }
@@ -6628,17 +6926,6 @@ inline bool TypeBase::isOpenedExistential() const {
 
   CanType T = getCanonicalType();
   return isa<OpenedArchetypeType>(T);
-}
-
-inline bool TypeBase::isOpenedExistentialWithError() {
-  if (!hasOpenedExistential())
-    return false;
-
-  CanType T = getCanonicalType();
-  if (auto archetype = dyn_cast<OpenedArchetypeType>(T)) {
-    return archetype->getExistentialType()->isExistentialWithError();
-  }
-  return false;
 }
 
 inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {

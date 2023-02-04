@@ -195,7 +195,7 @@ getGlibcFileMapping(ASTContext &ctx) {
   Path glibcDir;
   if (auto dir = findFirstIncludeDir(parsedIncludeArgs,
                                      {"inttypes.h", "unistd.h", "stdint.h"})) {
-    glibcDir = dir.getValue();
+    glibcDir = dir.value();
   } else {
     ctx.Diags.diagnose(SourceLoc(), diag::glibc_not_found, triple.str());
     return {};
@@ -203,7 +203,7 @@ getGlibcFileMapping(ASTContext &ctx) {
 
   Path actualModuleMapPath;
   if (auto path = getGlibcModuleMapPath(ctx.SearchPathOpts, triple))
-    actualModuleMapPath = path.getValue();
+    actualModuleMapPath = path.value();
   else
     // FIXME: Emit a warning of some kind.
     return {};
@@ -253,7 +253,7 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
   Path cxxStdlibDir;
   if (auto dir = findFirstIncludeDir(parsedStdlibArgs,
                                      {"cstdlib", "string", "vector"})) {
-    cxxStdlibDir = dir.getValue();
+    cxxStdlibDir = dir.value();
   } else {
     ctx.Diags.diagnose(SourceLoc(), diag::libstdcxx_not_found, triple.str());
     return {};
@@ -261,7 +261,7 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
 
   Path actualModuleMapPath;
   if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, triple))
-    actualModuleMapPath = path.getValue();
+    actualModuleMapPath = path.value();
   else
     return {};
 
@@ -283,7 +283,7 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
   // {sysroot}/usr/include/module.{map,modulemap}.
   Path injectedModuleMapPath;
   if (auto path = getInjectedModuleMapPath(cxxStdlibDir))
-    injectedModuleMapPath = path.getValue();
+    injectedModuleMapPath = path.value();
   else
     return {};
 

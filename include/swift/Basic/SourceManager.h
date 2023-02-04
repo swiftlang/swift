@@ -23,6 +23,64 @@
 
 namespace swift {
 
+class CustomAttr;
+class DeclContext;
+
+/// Augments a buffer that was created specifically to hold generated source
+/// code with the reasons for it being generated.
+class GeneratedSourceInfo {
+public:
+  /// The kind of generated source code.
+  enum Kind {
+    /// The expansion of a freestanding expression macro.
+    ExpressionMacroExpansion,
+
+    /// The expansion of a freestanding declaration macro.
+    FreestandingDeclMacroExpansion,
+
+    /// The expansion of an accessor attached macro.
+    AccessorMacroExpansion,
+
+    /// The expansion of a member attribute attached macro.
+    MemberAttributeMacroExpansion,
+
+    /// The expansion of an attached member macro.
+    MemberMacroExpansion,
+
+    /// A new function body that is replacing an existing function body.
+    ReplacedFunctionBody,
+
+    /// Pretty-printed declarations that have no source location.
+    PrettyPrinted,
+  } kind;
+
+  /// The source range in the enclosing buffer where this source was generated.
+  ///
+  /// This could point at a macro expansion or at the implicit location at
+  /// which source code was generated. Conceptually, one can think of the
+  /// buffer described by a \c GeneratedSource instance as replacing the
+  /// code in the \c originalSourceRange.
+  SourceRange originalSourceRange;
+
+  /// The source range in the generated-source buffer where the generated
+  /// code exists. This might be a subrange of the buffer containing the
+  /// generated source, but it will never be from a different buffer.
+  SourceRange generatedSourceRange;
+
+  /// The opaque pointer for an ASTNode for which this buffer was generated.
+  void *astNode;
+
+  /// The declaration context in which this buffer logically resides.
+  DeclContext *declContext;
+
+  /// The custom attribute for an attached macro.
+  CustomAttr *attachedMacroCustomAttr = nullptr;
+
+  /// The name of the source file on disk that was created to hold the
+  /// contents of this file for external clients.
+  StringRef onDiskBufferCopyFileName = StringRef();
+};
+
 /// This class manages and owns source buffers.
 class SourceManager {
 public:
@@ -39,8 +97,8 @@ public:
 private:
   llvm::SourceMgr LLVMSourceMgr;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
-  unsigned CodeCompletionBufferID = 0U;
-  unsigned CodeCompletionOffset;
+  unsigned IDEInspectionTargetBufferID = 0U;
+  unsigned IDEInspectionTargetOffset;
 
   /// Associates buffer identifiers to buffer IDs.
   llvm::DenseMap<StringRef, unsigned> BufIdentIDMap;
@@ -51,7 +109,10 @@ private:
   /// to speed up stats.
   mutable llvm::DenseMap<StringRef, llvm::vfs::Status> StatusCache;
 
-  /// Holds replaced ranges. Keys are orignal ranges, and values are new ranges
+  /// Holds generated source information, indexed by the buffer ID.
+  llvm::DenseMap<unsigned, GeneratedSourceInfo> GeneratedSourceInfos;
+
+  /// Holds replaced ranges. Keys are original ranges, and values are new ranges
   /// in different buffers. This is used for code completion and ASTContext
   /// reusing compilation.
   llvm::DenseMap<SourceRange, SourceRange> ReplacedRanges;
@@ -84,33 +145,36 @@ public:
     return FileSystem;
   }
 
-  void setCodeCompletionPoint(unsigned BufferID, unsigned Offset) {
+  void setIDEInspectionTarget(unsigned BufferID, unsigned Offset) {
     assert(BufferID != 0U && "Buffer should be valid");
 
-    CodeCompletionBufferID = BufferID;
-    CodeCompletionOffset = Offset;
+    IDEInspectionTargetBufferID = BufferID;
+    IDEInspectionTargetOffset = Offset;
   }
 
-  bool hasCodeCompletionBuffer() const {
-    return CodeCompletionBufferID != 0U;
+  bool hasIDEInspectionTargetBuffer() const {
+    return IDEInspectionTargetBufferID != 0U;
   }
 
-  unsigned getCodeCompletionBufferID() const {
-    return CodeCompletionBufferID;
+  unsigned getIDEInspectionTargetBufferID() const {
+    return IDEInspectionTargetBufferID;
   }
 
-  unsigned getCodeCompletionOffset() const {
-    return CodeCompletionOffset;
+  unsigned getIDEInspectionTargetOffset() const {
+    return IDEInspectionTargetOffset;
   }
 
-  SourceLoc getCodeCompletionLoc() const;
+  SourceLoc getIDEInspectionTargetLoc() const;
 
   const llvm::DenseMap<SourceRange, SourceRange> &getReplacedRanges() const {
     return ReplacedRanges;
   }
-  void setReplacedRange(SourceRange Orig, SourceRange New) {
-    ReplacedRanges[Orig] = New;
-  }
+
+  /// Set the generated source information associated with a given buffer.
+  void setGeneratedSourceInfo(unsigned bufferID, GeneratedSourceInfo);
+
+  /// Retrieve the generated source information for the given buffer.
+  Optional<GeneratedSourceInfo> getGeneratedSourceInfo(unsigned bufferID) const;
 
   /// Record the starting source location of a regex literal.
   void recordRegexLiteralStartLoc(SourceLoc loc) {
@@ -142,9 +206,9 @@ public:
   }
 
   /// Returns true if range \p R contains the code-completion location, if any.
-  bool rangeContainsCodeCompletionLoc(SourceRange R) const {
-    return CodeCompletionBufferID
-               ? rangeContainsTokenLoc(R, getCodeCompletionLoc())
+  bool rangeContainsIDEInspectionTarget(SourceRange R) const {
+    return IDEInspectionTargetBufferID
+               ? rangeContainsTokenLoc(R, getIDEInspectionTargetLoc())
                : false;
   }
 
@@ -196,11 +260,18 @@ public:
   ///
   /// \p BufferID must be a valid buffer ID.
   ///
+  /// \p ForceGeneratedSourceToDisk can be set to true to create a temporary
+  /// file on-disk for buffers containing generated source code, returning the
+  /// name of that temporary file.
+  ///
   /// This should not be used for displaying information about the \e contents
   /// of a buffer, since lines within the buffer may be marked as coming from
   /// other files using \c #sourceLocation. Use #getDisplayNameForLoc instead
   /// in that case.
-  StringRef getIdentifierForBuffer(unsigned BufferID) const;
+  StringRef getIdentifierForBuffer(
+      unsigned BufferID,
+      bool ForceGeneratedSourceToDisk = false
+  ) const;
 
   /// Returns a SourceRange covering the entire specified buffer.
   ///
@@ -232,10 +303,15 @@ public:
   /// Returns a buffer identifier suitable for display to the user containing
   /// the given source location.
   ///
+  /// \p ForceGeneratedSourceToDisk can be set to true to create a temporary
+  /// file on-disk for buffers containing generated source code, returning the
+  /// name of that temporary file.
+  ///
   /// This respects \c #sourceLocation directives and the 'use-external-names'
   /// directive in VFS overlay files. If you need an on-disk file name, use
   /// #getIdentifierForBuffer instead.
-  StringRef getDisplayNameForLoc(SourceLoc Loc) const;
+  StringRef getDisplayNameForLoc(
+      SourceLoc Loc, bool ForceGeneratedSourceToDisk = false) const;
 
   /// Returns the line and column represented by the given source location.
   ///
@@ -274,7 +350,8 @@ public:
   llvm::SMDiagnostic GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
                                 const Twine &Msg,
                                 ArrayRef<llvm::SMRange> Ranges,
-                                ArrayRef<llvm::SMFixIt> FixIts) const;
+                                ArrayRef<llvm::SMFixIt> FixIts,
+                                bool EmitMacroExpansionFiles = false) const;
 
   /// Verifies that all buffers are still valid.
   void verifyAllBuffers() const;
@@ -293,7 +370,7 @@ public:
 
   SourceLoc getLocForLineCol(unsigned BufferId, unsigned Line, unsigned Col) const {
     auto Offset = resolveFromLineCol(BufferId, Line, Col);
-    return Offset.hasValue() ? getLocForOffset(BufferId, Offset.getValue()) :
+    return Offset.has_value() ? getLocForOffset(BufferId, Offset.value()) :
                                SourceLoc();
   }
 

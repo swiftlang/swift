@@ -29,6 +29,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SILLayout.h"
@@ -164,6 +165,20 @@ bool TypeBase::isAny() {
   return constraint->isEqual(getASTContext().TheAnyType);
 }
 
+bool TypeBase::isPureMoveOnly() {
+  if (auto *nom = getNominalOrBoundGenericNominal())
+    return nom->isMoveOnly();
+
+  // if any components of the tuple are move-only, then the tuple is move-only.
+  if (auto *tupl = getCanonicalType()->getAs<TupleType>()) {
+    for (auto eltTy : tupl->getElementTypes())
+      if (eltTy->isPureMoveOnly())
+        return true;
+  }
+
+  return false;
+}
+
 bool TypeBase::isPlaceholder() {
   return is<PlaceholderType>();
 }
@@ -202,6 +217,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::PackArchetype:
+  case TypeKind::ElementArchetype:
     return cast<ArchetypeType>(type)->requiresClass();
   case TypeKind::Protocol:
     return cast<ProtocolType>(type)->requiresClass();
@@ -234,6 +250,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinJob:
   case TypeKind::BuiltinExecutor:
   case TypeKind::BuiltinDefaultActorStorage:
+  case TypeKind::BuiltinPackIndex:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:
@@ -251,6 +268,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::SILToken:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
+  case TypeKind::SILPack:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -647,6 +665,15 @@ static bool isLegalSILType(CanType type) {
     return true;
   }
 
+  // Packs must be lowered.
+  if (isa<PackType>(type)) return false;
+
+  // Pack expansions are legal if all their pattern and count types are legal.
+  if (auto packExpansionType = dyn_cast<PackExpansionType>(type)) {
+    return (isLegalSILType(packExpansionType.getPatternType()) &&
+            isLegalSILType(packExpansionType.getCountType()));
+  }
+
   // Optionals are legal if their object type is legal.
   if (auto objectType = type.getOptionalObjectType()) {
     return isLegalSILType(objectType);
@@ -669,6 +696,9 @@ static bool isLegalFormalType(CanType type) {
 
   // Function types must not be lowered.
   if (isa<SILFunctionType>(type)) return false;
+
+  // Pack types must not be lowered.
+  if (isa<SILPackType>(type)) return false;
 
   // Reference storage types are not formal types.
   if (isa<ReferenceStorageType>(type)) return false;
@@ -1103,6 +1133,19 @@ bool TypeBase::isExistentialWithError() {
   // overly expensive.
   auto layout = canTy.getExistentialLayout();
   return layout.isExistentialWithError(getASTContext());
+}
+
+bool TypeBase::isOpenedExistentialWithError() {
+  if (auto archetype = getAs<OpenedArchetypeType>()) {
+    auto errorProto = getASTContext().getErrorDecl();
+    if (!errorProto) return false;
+
+    for (auto protoDecl : archetype->getConformsTo()) {
+      if (protoDecl == errorProto || protoDecl->inheritsFrom(errorProto))
+        return true;
+    }
+  }
+  return false;
 }
 
 bool TypeBase::isStdlibType() {
@@ -3485,34 +3528,59 @@ bool ArchetypeType::isRoot() const {
 }
 
 Type ArchetypeType::getExistentialType() const {
+  auto *genericEnv = getGenericEnvironment();
+
   // Opened types hold this directly.
   if (auto *opened = dyn_cast<OpenedArchetypeType>(this)) {
     if (opened->isRoot()) {
-      return getGenericEnvironment()->getOpenedExistentialType();
+      return genericEnv->getOpenedExistentialType();
     }
   }
 
-  // Otherwise, compute it from scratch.
-  SmallVector<Type, 4> constraintTypes;
-  
-  if (auto super = getSuperclass()) {
-    constraintTypes.push_back(super);
-  }
-  for (auto proto : getConformsTo()) {
-    constraintTypes.push_back(proto->getDeclaredInterfaceType());
-  }
-  auto &ctx = const_cast<ArchetypeType*>(this)->getASTContext();
-  auto constraint = ProtocolCompositionType::get(
-     ctx, constraintTypes, requiresClass());
+  // Otherwise we compute it via a generic signature query.
+  auto interfaceType = getInterfaceType();
+  auto genericSig = genericEnv->getGenericSignature();
 
-  // If the archetype is only constrained to a class type,
-  // return the class type directly.
-  if (!constraint->isConstraintType()) {
-    assert(constraint->getClassOrBoundGenericClass());
-    return constraint;
+  auto upperBound = genericSig->getDependentUpperBounds(interfaceType);
+
+  return genericEnv->mapTypeIntoContext(upperBound);
+}
+
+bool ArchetypeType::requiresClass() const {
+  if (auto layout = getLayoutConstraint())
+    return layout->isClass();
+  return false;
+}
+
+Type ArchetypeType::getNestedType(AssociatedTypeDecl *assocType) {
+  Type interfaceType = getInterfaceType();
+  Type memberInterfaceType =
+      DependentMemberType::get(interfaceType, assocType->getName());
+  return getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
+      memberInterfaceType);
+}
+
+Type ArchetypeType::getNestedTypeByName(Identifier name) {
+  Type interfaceType = getInterfaceType();
+  Type memberInterfaceType = DependentMemberType::get(interfaceType, name);
+  auto genericSig = getGenericEnvironment()->getGenericSignature();
+  if (genericSig->isValidTypeParameter(memberInterfaceType)) {
+    return getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
+        memberInterfaceType);
   }
 
-  return ExistentialType::get(constraint);
+  return Type();
+}
+
+Identifier ArchetypeType::getName() const {
+  assert(InterfaceType);
+  if (auto depMemTy = InterfaceType->getAs<DependentMemberType>())
+    return depMemTy->getName();
+  return InterfaceType->castTo<GenericTypeParamType>()->getName();
+}
+
+std::string ArchetypeType::getFullName() const {
+  return InterfaceType.getString();
 }
 
 PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
@@ -3524,22 +3592,30 @@ PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
                   RecursiveTypeProperties::HasArchetype,
                   InterfaceType, ConformsTo, Superclass, Layout, GenericEnv)
 {
+  assert(!InterfaceType->isParameterPack());
 }
 
-OpenedArchetypeType::OpenedArchetypeType(
-    GenericEnvironment *environment, Type interfaceType,
-    ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
-    LayoutConstraint layout)
-  : ArchetypeType(TypeKind::OpenedArchetype, interfaceType->getASTContext(),
-                  RecursiveTypeProperties::HasArchetype
-                    | RecursiveTypeProperties::HasOpenedExistential,
-                  interfaceType, conformsTo, superclass, layout,
-                  environment)
-{
-}
+CanPrimaryArchetypeType
+PrimaryArchetypeType::getNew(const ASTContext &Ctx,
+                      GenericEnvironment *GenericEnv,
+                      Type InterfaceType,
+                      SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                      Type Superclass,
+                      LayoutConstraint Layout) {
+  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+  assert(GenericEnv && "missing generic environment for archetype");
 
-UUID OpenedArchetypeType::getOpenedExistentialID() const {
-  return getGenericEnvironment()->getOpenedExistentialUUID();
+  // Gather the set of protocol declarations to which this archetype conforms.
+  ProtocolType::canonicalizeProtocols(ConformsTo);
+
+  auto arena = AllocationArena::Permanent;
+  void *mem = Ctx.Allocate(
+    PrimaryArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
+          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
+      alignof(PrimaryArchetypeType), arena);
+
+  return CanPrimaryArchetypeType(::new (mem) PrimaryArchetypeType(
+      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
 OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
@@ -3552,23 +3628,14 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
                   properties, interfaceType, conformsTo, superclass, layout,
                   environment)
 {
-}
-
-PackArchetypeType::PackArchetypeType(
-    const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
-    ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
-    LayoutConstraint Layout)
-    : ArchetypeType(TypeKind::PackArchetype, Ctx,
-                    RecursiveTypeProperties::HasArchetype, InterfaceType,
-                    ConformsTo, Superclass, Layout, GenericEnv) {
-  assert(cast<GenericTypeParamType>(InterfaceType.getPointer())->isParameterPack());
+  assert(!interfaceType->isParameterPack());
 }
 
 CanType OpaqueTypeArchetypeType::getCanonicalInterfaceType(Type interfaceType) {
   auto sig = Environment->getOpaqueTypeDecl()
       ->getOpaqueInterfaceGenericSignature();
   CanType canonicalType = interfaceType->getReducedType(sig);
-  return Environment->maybeApplyOpaqueTypeSubstitutions(canonicalType)
+  return Environment->maybeApplyOuterContextSubstitutions(canonicalType)
       ->getCanonicalType();
 }
 
@@ -3728,7 +3795,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
-  if (!subs.hasValue())
+  if (!subs.has_value())
     return maybeOpaqueType;
 
   // Apply the underlying type substitutions to the interface type of the
@@ -3839,7 +3906,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   auto subs = opaqueRoot->getDecl()->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
-  if (!subs.hasValue())
+  if (!subs.has_value())
     return abstractRef;
 
   // Apply the underlying type substitutions to the interface type of the
@@ -3901,44 +3968,41 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   return substRef;
 }
 
-CanExistentialType CanExistentialType::get(CanType constraint) {
-  assert(!(constraint->isAny() || constraint->isAnyObject()) &&
-         "Any(Object) may not apppear as canonical constraint type");
-  assert(!constraint->is<ExistentialMetatypeType>() &&
-         "Existential metatype may not apppear as canonical constraint type");
-  return CanExistentialType(
-      ExistentialType::get(constraint)->castTo<ExistentialType>());
+OpenedArchetypeType::OpenedArchetypeType(
+    GenericEnvironment *environment, Type interfaceType,
+    ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+    LayoutConstraint layout)
+  : LocalArchetypeType(TypeKind::OpenedArchetype,
+                       interfaceType->getASTContext(),
+                       RecursiveTypeProperties::HasArchetype
+                         | RecursiveTypeProperties::HasOpenedExistential,
+                       interfaceType, conformsTo, superclass, layout,
+                       environment)
+{
+  assert(!interfaceType->isParameterPack());
 }
 
-CanPrimaryArchetypeType
-PrimaryArchetypeType::getNew(const ASTContext &Ctx,
-                      GenericEnvironment *GenericEnv,
-                      Type InterfaceType,
-                      SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                      Type Superclass,
-                      LayoutConstraint Layout) {
-  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
-  assert(GenericEnv && "missing generic environment for archetype");
+UUID OpenedArchetypeType::getOpenedExistentialID() const {
+  return getGenericEnvironment()->getOpenedExistentialUUID();
+}
 
-  // Gather the set of protocol declarations to which this archetype conforms.
-  ProtocolType::canonicalizeProtocols(ConformsTo);
-
-  auto arena = AllocationArena::Permanent;
-  void *mem = Ctx.Allocate(
-    PrimaryArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
-          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
-      alignof(PrimaryArchetypeType), arena);
-
-  return CanPrimaryArchetypeType(::new (mem) PrimaryArchetypeType(
-      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
+PackArchetypeType::PackArchetypeType(
+    const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
+    ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
+    LayoutConstraint Layout, PackShape Shape)
+    : ArchetypeType(TypeKind::PackArchetype, Ctx,
+                    RecursiveTypeProperties::HasArchetype, InterfaceType,
+                    ConformsTo, Superclass, Layout, GenericEnv) {
+  assert(InterfaceType->isParameterPack());
+  *getTrailingObjects<PackShape>() = Shape;
 }
 
 CanPackArchetypeType
 PackArchetypeType::get(const ASTContext &Ctx,
-                           GenericEnvironment *GenericEnv,
-                           Type InterfaceType,
-                           SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                           Type Superclass, LayoutConstraint Layout) {
+                       GenericEnvironment *GenericEnv,
+                       Type InterfaceType, Type ShapeType,
+                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                       Type Superclass, LayoutConstraint Layout) {
   assert(!Superclass || Superclass->getClassOrBoundGenericClass());
   assert(GenericEnv && "missing generic environment for archetype");
 
@@ -3948,73 +4012,63 @@ PackArchetypeType::get(const ASTContext &Ctx,
   auto arena = AllocationArena::Permanent;
   void *mem =
       Ctx.Allocate(PackArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type,
-                                                       LayoutConstraint>(
-                       ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
+                                                       LayoutConstraint, PackShape>(
+                       ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0,
+                       /*shapeSize*/1),
                    alignof(PackArchetypeType), arena);
 
   return CanPackArchetypeType(::new (mem) PackArchetypeType(
-      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
+      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout,
+      {ShapeType}));
 }
 
-bool ArchetypeType::requiresClass() const {
-  if (auto layout = getLayoutConstraint())
-    return layout->isClass();
-  return false;
+CanType PackArchetypeType::getReducedShape() const {
+  auto shapeType = getTrailingObjects<PackShape>()->shapeType;
+  return getGenericEnvironment()->mapTypeIntoContext(shapeType)->getCanonicalType();
 }
 
-namespace {
-  /// Function object that orders archetypes by name.
-  struct OrderArchetypeByName {
-    bool operator()(std::pair<Identifier, Type> X,
-                    std::pair<Identifier, Type> Y) const {
-      return X.first.str() < Y.first.str();
-    }
-
-    bool operator()(std::pair<Identifier, Type> X,
-                    Identifier Y) const {
-      return X.first.str() < Y.str();
-    }
-
-    bool operator()(Identifier X,
-                    std::pair<Identifier, Type> Y) const {
-      return X.str() < Y.first.str();
-    }
-
-    bool operator()(Identifier X, Identifier Y) const {
-      return X.str() < Y.str();
-    }
-  };
-} // end anonymous namespace
-
-Type ArchetypeType::getNestedType(AssociatedTypeDecl *assocType) {
-  Type interfaceType = getInterfaceType();
-  Type memberInterfaceType =
-      DependentMemberType::get(interfaceType, assocType->getName());
-  return getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
-      memberInterfaceType);
+ElementArchetypeType::ElementArchetypeType(
+    const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
+    ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
+    LayoutConstraint Layout)
+    : LocalArchetypeType(TypeKind::ElementArchetype, Ctx,
+                         RecursiveTypeProperties::HasArchetype |
+                         RecursiveTypeProperties::HasElementArchetype,
+                         InterfaceType,
+                         ConformsTo, Superclass, Layout, GenericEnv) {
 }
 
-Type ArchetypeType::getNestedTypeByName(Identifier name) {
-  Type interfaceType = getInterfaceType();
-  Type memberInterfaceType = DependentMemberType::get(interfaceType, name);
-  auto genericSig = getGenericEnvironment()->getGenericSignature();
-  if (genericSig->isValidTypeParameter(memberInterfaceType)) {
-    return getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
-        memberInterfaceType);
-  }
+CanTypeWrapper<ElementArchetypeType> ElementArchetypeType::getNew(
+    GenericEnvironment *environment, Type interfaceType,
+    ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+    LayoutConstraint layout) {
+  assert(!interfaceType->isParameterPack());
+  assert((!superclass || !superclass->hasArchetype())
+         && "superclass must be interface type");
+  auto arena = AllocationArena::Permanent;
+  ASTContext &ctx = interfaceType->getASTContext();
+  void *mem = ctx.Allocate(
+    ElementArchetypeType::totalSizeToAlloc<ProtocolDecl *,Type,LayoutConstraint>(
+      conformsTo.size(),
+      superclass ? 1 : 0,
+      layout ? 1 : 0),
+      alignof(ElementArchetypeType), arena);
 
-  return Type();
+  return CanElementArchetypeType(::new (mem) ElementArchetypeType(
+      ctx, environment, interfaceType, conformsTo, superclass, layout));
 }
 
-Identifier ArchetypeType::getName() const {
-  assert(InterfaceType);
-  if (auto depMemTy = InterfaceType->getAs<DependentMemberType>())
-    return depMemTy->getName();
-  return InterfaceType->castTo<GenericTypeParamType>()->getName();
+UUID ElementArchetypeType::getOpenedElementID() const {
+  return getGenericEnvironment()->getOpenedElementUUID();
 }
 
-std::string ArchetypeType::getFullName() const {
-  return InterfaceType.getString();
+CanExistentialType CanExistentialType::get(CanType constraint) {
+  assert(!(constraint->isAny() || constraint->isAnyObject()) &&
+         "Any(Object) may not apppear as canonical constraint type");
+  assert(!constraint->is<ExistentialMetatypeType>() &&
+         "Existential metatype may not apppear as canonical constraint type");
+  return CanExistentialType(
+      ExistentialType::get(constraint)->castTo<ExistentialType>());
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -4352,10 +4406,6 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
   // Retrieve the member type with the given name.
 
-  // Tuples don't have member types.
-  if (substBase->is<TupleType>())
-    return failed();
-
   // If we know the associated type, look in the witness table.
   if (assocType) {
     auto proto = assocType->getProtocol();
@@ -4364,30 +4414,37 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     if (conformance.isInvalid())
       return failed();
-    if (!conformance.isConcrete())
-      return failed();
+
+    Type witnessTy;
 
     // Retrieve the type witness.
-    auto witness =
-        conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
+    if (conformance.isPack()) {
+      auto *packConformance = conformance.getPack();
 
-    auto witnessTy = witness.getWitnessType();
-    if (!witnessTy || witnessTy->hasError())
-      return failed();
+      witnessTy = packConformance->getAssociatedType(
+          assocType->getDeclaredInterfaceType());
+    } else if (conformance.isConcrete()) {
+      auto witness =
+          conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
 
-    // This is a hacky feature allowing code completion to migrate to
-    // using Type::subst() without changing output.
-    if (options & SubstFlags::DesugarMemberTypes) {
-      if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
-        witnessTy = aliasType->getSinglyDesugaredType();
+      witnessTy = witness.getWitnessType();
+      if (!witnessTy || witnessTy->hasError())
+        return failed();
 
-      // Another hack. If the type witness is a opaque result type. They can
-      // only be referred using the name of the associated type.
-      if (witnessTy->is<OpaqueTypeArchetypeType>())
-        witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
+      // This is a hacky feature allowing code completion to migrate to
+      // using Type::subst() without changing output.
+      if (options & SubstFlags::DesugarMemberTypes) {
+        if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
+          witnessTy = aliasType->getSinglyDesugaredType();
+
+        // Another hack. If the type witness is a opaque result type. They can
+        // only be referred using the name of the associated type.
+        if (witnessTy->is<OpaqueTypeArchetypeType>())
+          witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
+      }
     }
 
-    if (witnessTy->is<ErrorType>())
+    if (!witnessTy || witnessTy->is<ErrorType>())
       return failed();
 
     return witnessTy;
@@ -4661,7 +4718,7 @@ static Type substType(Type derivedType,
     if (origArchetype->isRoot()) {
       // Root opened archetypes are not required to be substituted. Other root
       // archetypes must already have been substituted above.
-      if (isa<OpenedArchetypeType>(origArchetype)) {
+      if (isa<LocalArchetypeType>(origArchetype)) {
         return Type(type);
       } else {
         return ErrorType::get(type);
@@ -4870,7 +4927,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
       continue;
     }
 
-    // There are no subtitutions to apply if the type is still unbound,
+    // There are no substitutions to apply if the type is still unbound,
     // continue looking into the parent.
     if (auto unboundGeneric = baseTy->getAs<UnboundGenericType>()) {
       baseTy = unboundGeneric->getParent();
@@ -5111,6 +5168,7 @@ case TypeKind::Id:
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::PackArchetype:
+  case TypeKind::ElementArchetype:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
@@ -5539,6 +5597,52 @@ case TypeKind::Id:
       return *this;
 
     return PackType::get(Ptr->getASTContext(), elements)->flattenPackTypes();
+  }
+
+  case TypeKind::SILPack: {
+    auto pack = cast<SILPackType>(base);
+    bool anyChanged = false;
+    SmallVector<CanType, 4> elements;
+    unsigned Index = 0;
+    for (Type eltTy : pack->getElementTypes()) {
+      Type transformedEltTy =
+          eltTy.transformWithPosition(TypePosition::Invariant, fn);
+      if (!transformedEltTy)
+        return Type();
+
+      // If nothing has changed, just keep going.
+      if (!anyChanged &&
+          transformedEltTy.getPointer() == eltTy.getPointer()) {
+        ++Index;
+        continue;
+      }
+
+      // If this is the first change we've seen, copy all of the previous
+      // elements.
+      if (!anyChanged) {
+        // Copy all of the previous elements.
+        elements.append(pack->getElementTypes().begin(),
+                        pack->getElementTypes().begin() + Index);
+        anyChanged = true;
+      }
+
+      auto transformedEltCanTy = transformedEltTy->getCanonicalType();
+
+      // Flatten immediately.
+      if (auto transformedEltPack =
+            dyn_cast<SILPackType>(transformedEltCanTy)) {
+        auto elementElements = transformedEltPack->getElementTypes();
+        elements.append(elementElements.begin(), elementElements.end());
+      } else {
+        assert(!isa<PackType>(transformedEltCanTy));
+        elements.push_back(transformedEltCanTy);
+      }
+    }
+
+    if (!anyChanged)
+      return *this;
+
+    return SILPackType::get(Ptr->getASTContext(), pack->getExtInfo(), elements);
   }
 
   case TypeKind::PackExpansion: {
@@ -5999,7 +6103,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
-  case TypeKind::PackArchetype: {
+  case TypeKind::PackArchetype:
+  case TypeKind::ElementArchetype: {
     auto archetype = cast<ArchetypeType>(type);
     auto layout = archetype->getLayoutConstraint();
     (void)layout;
@@ -6042,6 +6147,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinJob:
   case TypeKind::BuiltinExecutor:
   case TypeKind::BuiltinDefaultActorStorage:
+  case TypeKind::BuiltinPackIndex:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:
@@ -6061,6 +6167,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::DependentMember:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
+  case TypeKind::SILPack:
   case TypeKind::BuiltinTuple:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:

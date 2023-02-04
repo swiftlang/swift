@@ -118,7 +118,7 @@ func test_unowned_let_capture(_ aC : C) {
 }
 
 // CHECK-LABEL: sil private [ossa] @$s7unowned05test_A12_let_captureyyAA1CCFSiyXEfU_ : $@convention(thin) (@guaranteed @sil_unowned C) -> Int {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $@sil_unowned C):
+// CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $@sil_unowned C):
 // CHECK-NEXT:   debug_value %0 : $@sil_unowned C, let, name "bC", argno 1
 // CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = strong_copy_unowned_value [[ARG]] : $@sil_unowned C
 // CHECK-NEXT:   [[FUN:%.*]] = class_method [[UNOWNED_ARG]] : $C, #C.f : (C) -> () -> Int, $@convention(method) (@guaranteed C) -> Int
@@ -138,9 +138,9 @@ class TestUnownedMember {
 
 // CHECK-LABEL: sil hidden [ossa] @$s7unowned17TestUnownedMemberC5invalAcA1CC_tcfc :
 // CHECK: bb0([[ARG1:%.*]] : @owned $C, [[SELF_PARAM:%.*]] : @owned $TestUnownedMember):
-// CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [lexical] [[ARG1]]
 // CHECK:   [[SELF:%.*]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $TestUnownedMember
 // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK:   [[FIELDPTR:%.*]] = ref_element_addr [[BORROWED_SELF]] : $TestUnownedMember, #TestUnownedMember.member
 // CHECK:   [[INVAL:%.*]] = ref_to_unowned [[ARG1_COPY]] : $C to $@sil_unowned C

@@ -46,13 +46,13 @@ class ClangImporterOptions;
 class ClassDecl;
 class FileUnit;
 class ModuleDecl;
-class ModuleDependencies;
+class ModuleDependencyInfo;
 class ModuleDependenciesCache;
 class NominalTypeDecl;
 class SourceFile;
 class TypeDecl;
 class CompilerInstance;
-enum class ModuleDependenciesKind : int8_t;
+enum class ModuleDependencyKind : int8_t;
 
 enum class KnownProtocolKind : uint8_t;
 
@@ -173,6 +173,7 @@ struct InterfaceSubContextDelegate {
                                                    StringRef interfacePath,
                                                    StringRef outputPath,
                                                    SourceLoc diagLoc,
+                                                   bool silenceErrors,
     llvm::function_ref<std::error_code(SubCompilerInstanceInfo&)> action) = 0;
 
   virtual ~InterfaceSubContextDelegate() = default;
@@ -213,7 +214,7 @@ public:
 
   public:
     /// Returns true if the version has a valid source kind.
-    bool isValid() const { return SourceKind.hasValue(); }
+    bool isValid() const { return SourceKind.has_value(); }
 
     /// Returns the version, which may be empty if a version was not present or
     /// was unparsable.
@@ -222,7 +223,7 @@ public:
     /// Returns the kind of source of the module version. Do not call if
     /// \c isValid() returns false.
     ModuleVersionSourceKind getSourceKind() const {
-      return SourceKind.getValue();
+      return SourceKind.value();
     }
 
     void setVersion(llvm::VersionTuple version, ModuleVersionSourceKind kind) {
@@ -249,10 +250,14 @@ public:
   /// \param path A sequence of (identifier, location) pairs that denote
   /// the dotted module name to load, e.g., AppKit.NSWindow.
   ///
+  /// \param AllowMemoryCache Enables preserving the loaded module in the
+  /// in-memory cache for the next loading attempt.
+  ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual
-  ModuleDecl *loadModule(SourceLoc importLoc, ImportPath::Module path) = 0;
+  ModuleDecl *loadModule(SourceLoc importLoc, ImportPath::Module path,
+                         bool AllowMemoryCache = true) = 0;
 
   /// Load extensions to the given nominal type.
   ///
@@ -316,7 +321,7 @@ public:
 
   /// Retrieve the dependencies for the given, named module, or \c None
   /// if no such module exists.
-  virtual Optional<ModuleDependencies> getModuleDependencies(
+  virtual Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate) = 0;

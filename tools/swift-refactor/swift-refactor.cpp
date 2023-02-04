@@ -14,7 +14,7 @@
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/Refactoring.h"
+#include "swift/Refactoring/Refactoring.h"
 #include "swift/IDE/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -204,8 +204,8 @@ std::vector<RefactorLoc> getLocsByLabelOrPosition(StringRef LabelOrLineCol,
 
   if (LabelOrLineCol.contains(':')) {
     auto LineCol = parseLineCol(LabelOrLineCol);
-    if (LineCol.hasValue()) {
-      LocResults.push_back({LineCol.getValue().first,LineCol.getValue().second,
+    if (LineCol.has_value()) {
+      LocResults.push_back({LineCol.value().first,LineCol.value().second,
         NameUsage::Unknown});
     } else {
       llvm::errs() << "cannot parse position pair.";
@@ -311,7 +311,6 @@ int main(int argc, char *argv[]) {
   Invocation.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().CollectParsedToken = true;
-  Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
 
   if (options::EnableExperimentalConcurrency)
@@ -354,7 +353,7 @@ int main(int argc, char *argv[]) {
   assert(SF && "no source file?");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  unsigned BufferID = SF->getBufferID().getValue();
+  unsigned BufferID = SF->getBufferID().value();
   std::string Buffer = SM.getRangeForBuffer(BufferID).str().str();
 
   auto Start = getLocsByLabelOrPosition(options::LineColumnPair, Buffer);

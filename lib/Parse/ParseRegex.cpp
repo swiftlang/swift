@@ -15,10 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/BridgingUtils.h"
-#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/Parser.h"
-#include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Syntax/SyntaxKind.h"
 
 // Regex parser delivered via Swift modules.
 #include "swift/Parse/RegexParserBridging.h"
@@ -28,14 +25,10 @@ void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn) {
 }
 
 using namespace swift;
-using namespace swift::syntax;
 
 ParserResult<Expr> Parser::parseExprRegexLiteral() {
   assert(Tok.is(tok::regex_literal));
   assert(regexLiteralParsingFn);
-
-  SyntaxParsingContext LocalContext(SyntaxContext,
-                                    SyntaxKind::RegexLiteralExpr);
 
   auto regexText = Tok.getText();
 

@@ -9,43 +9,38 @@ import Cxx
 
 var CxxCollectionTestSuite = TestSuite("CxxCollection")
 
-// === SimpleCollectionNoSubscript ===
-
-extension SimpleCollectionNoSubscript.iterator : UnsafeCxxRandomAccessIterator {
-  public typealias Distance = difference_type
-}
-extension SimpleCollectionNoSubscript : CxxRandomAccessCollection {
-}
-
 CxxCollectionTestSuite.test("SimpleCollectionNoSubscript as Swift.Collection") {
   let c = SimpleCollectionNoSubscript()
   expectEqual(c.first, 1)
   expectEqual(c.last, 5)
-}
 
-// === SimpleCollectionReadOnly ===
-
-extension SimpleCollectionReadOnly.iterator : UnsafeCxxRandomAccessIterator {
-  public typealias Distance = difference_type
-}
-extension SimpleCollectionReadOnly : CxxRandomAccessCollection {
+  // This subscript is a default implementation added in CxxRandomAccessCollection.
+  expectEqual(c[0], 1)
+  expectEqual(c[1], 2)
+  expectEqual(c[4], 5)
 }
 
 CxxCollectionTestSuite.test("SimpleCollectionReadOnly as Swift.Collection") {
   let c = SimpleCollectionReadOnly()
   expectEqual(c.first, 1)
   expectEqual(c.last, 5)
-}
 
-// === SimpleArrayWrapper ===
-
-extension SimpleArrayWrapper : CxxRandomAccessCollection {
+  let slice = c[1..<3]
+  expectEqual(slice.first, 2)
+  expectEqual(slice.last, 3)
 }
 
 CxxCollectionTestSuite.test("SimpleArrayWrapper as Swift.Collection") {
   let c = SimpleArrayWrapper()
   expectEqual(c.first, 10)
   expectEqual(c.last, 50)
+
+  let reduced = c.reduce(0, +)
+  expectEqual(reduced, 150)
+
+  let mapped = c.map { $0 + 1 }
+  expectEqual(mapped.first, 11)
+  expectEqual(mapped.last, 51)
 }
 
 runAllTests()

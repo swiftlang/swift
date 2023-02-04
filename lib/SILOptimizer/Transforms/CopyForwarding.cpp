@@ -26,7 +26,7 @@
 // Useless copies of address-only types look like this:
 //
 // %copy = alloc_stack $T
-// copy_addr %arg to [initialization] %copy : $*T
+// copy_addr %arg to [init] %copy : $*T
 // %ret = apply %callee<T>(%copy) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 // dealloc_stack %copy : $*T
 // destroy_addr %arg : $*T
@@ -927,7 +927,7 @@ static DeallocStackInst *getSingleDealloc(AllocStackInst *ASI) {
 /// %copy = alloc_stack $T
 /// ...
 /// CurrentBlock:
-/// copy_addr %arg to [initialization] %copy : $*T
+/// copy_addr %arg to [init] %copy : $*T
 /// ...
 /// %ret = apply %callee<T>(%copy) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 /// \endcode
@@ -1252,7 +1252,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
 ///   %2 = alloc_stack $T
 /// ... // arbitrary control flow, but no other uses of %0
 /// bbN:
-///   copy_addr [take] %2 to [initialization] %0 : $*T
+///   copy_addr [take] %2 to [init] %0 : $*T
 ///   ... // no writes
 ///   return
 static bool canNRVO(CopyAddrInst *CopyInst) {
@@ -1264,7 +1264,7 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
   //   bb0(%in : $*T, %out : $T):
   //     %local = alloc_stack $T
   //     store %in to %local : $*T
-  //     copy_addr %local to [initialization] %out : $*T
+  //     copy_addr %local to [init] %out : $*T
   if (!CopyInst->isTakeOfSrc())
     return false;
 
@@ -1350,7 +1350,7 @@ class CopyForwardingPass : public SILFunctionTransform
     //   %ref = load %objaddr : $*AnyObject
     //   %alloc2 = alloc_stack $ObjWrapper
     //   # The in-memory reference is destroyed before retaining the loaded ref.
-    //   copy_addr [take] %alloc1 to [initialization] %alloc2 : $*ObjWrapper
+    //   copy_addr [take] %alloc1 to [init] %alloc2 : $*ObjWrapper
     //   retain_value %ref : $AnyObject
     //   destroy_addr %alloc2 : $*ObjWrapper
     if (!getFunction()->hasOwnership())

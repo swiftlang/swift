@@ -79,6 +79,7 @@ static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
 // Allow unit tests to gradually migrate toward -allow-critical-edges=false.
 static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
                                               llvm::cl::init(true));
+extern llvm::cl::opt<bool> SILPrintDebugInfo;
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -92,7 +93,7 @@ static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
   if (!isa<PrimaryArchetypeType>(A) && !isa<PackArchetypeType>(A))
     return true;
-  if (isa<OpenedArchetypeType>(A))
+  if (isa<LocalArchetypeType>(A))
     return true;
   if (isa<OpaqueTypeArchetypeType>(A))
     return true;
@@ -449,6 +450,7 @@ struct ImmutableAddressUseVerifier {
   bool isConsumingOrMutatingArgumentConvention(SILArgumentConvention conv) {
     switch (conv) {
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Pack_Guaranteed:
       return false;
 
     case SILArgumentConvention::Indirect_InoutAliasable:
@@ -461,9 +463,11 @@ struct ImmutableAddressUseVerifier {
       // TODO: Remove this in favor of using Inout and In_Guaranteed.
       return false;
 
+    case SILArgumentConvention::Pack_Out:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_Inout:
       return true;
 
@@ -932,6 +936,13 @@ public:
     }
   }
 
+  template <class T>
+  T *requireValueKind(SILValue value, const Twine &what) {
+    auto match = dyn_cast<T>(value);
+    _require(match != nullptr, what, [=] { llvm::dbgs() << value; });
+    return match;
+  }
+
   static unsigned numInstsInFunction(const SILFunction &F) {
     unsigned numInsts = 0;
     for (auto &BB : F) {
@@ -985,6 +996,24 @@ public:
     return InstNumbers[a] < InstNumbers[b];
   }
 
+  // FIXME: For sanity, address-type phis should be prohibited at all SIL
+  // stages. However, the optimizer currently breaks the invariant in three
+  // places:
+  // 1. Normal Simplify CFG during conditional branch simplification
+  //    (sneaky jump threading).
+  // 2. Simplify CFG via Jump Threading.
+  // 3. Loop Rotation.
+  //
+  // BasicBlockCloner::canCloneInstruction and sinkAddressProjections is
+  // designed to avoid this issue, we just need to make sure all passes use it
+  // correctly.
+  //
+  // Minimally, we must prevent address-type phis as long as access markers are
+  // preserved. A goal is to preserve access markers in OSSA.
+  bool prohibitAddressPhis() {
+    return F.hasOwnership();
+  }
+
   void visitSILPhiArgument(SILPhiArgument *arg) {
     // Verify that the `isPhiArgument` property is sound:
     // - Phi arguments come from branches.
@@ -1008,7 +1037,7 @@ public:
                 "All phi argument inputs must be from branches.");
       }
     }
-    if (arg->isPhi()) {
+    if (arg->isPhi() && prohibitAddressPhis()) {
       // As a property of well-formed SIL, we disallow address-type
       // phis. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
@@ -1409,6 +1438,9 @@ public:
     if (auto *baResult = isaResultOf<BeginApplyInst>(value))
       return baResult->isBeginApplyToken();
 
+    if (isa<OpenPackElementInst>(value))
+      return true;
+
     // Add more token cases here as they arise.
 
     return false;
@@ -1454,13 +1486,13 @@ public:
       require(isArchetypeValidInFunction(A, F),
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
-      if (auto OpenedA = getOpenedArchetypeOf(A)) {
+      if (auto localA = getLocalArchetypeOf(A)) {
         auto *openingInst =
-            F->getModule().getRootOpenedArchetypeDefInst(OpenedA.getRoot(), F);
+            F->getModule().getRootLocalArchetypeDefInst(localA.getRoot(), F);
         require(I == nullptr || openingInst == I ||
                     properlyDominates(openingInst, I),
-                "Use of an opened archetype should be dominated by a "
-                "definition of this root opened archetype");
+                "Use of a local archetype should be dominated by a "
+                "definition of this root local archetype");
       }
     });
   }
@@ -1481,7 +1513,7 @@ public:
     require(AI->getType().isAddress(),
             "result of alloc_stack must be an address type");
 
-    verifyOpenedArchetype(AI, AI->getElementType().getASTType());
+    verifyLocalArchetype(AI, AI->getElementType().getASTType());
 
     require(!AI->isVarInfoInvalidated() || !bool(AI->getVarInfo()),
             "AllocStack Var Info should be None if invalidated");
@@ -1493,9 +1525,15 @@ public:
     // It's illegal code but the compiler should not crash on it.
   }
 
+  void checkAllocPackInst(AllocPackInst *AI) {
+    requireAddressType(SILPackType, AI->getType(),
+                       "result of alloc_pack must be an address of "
+                       "lowered pack type");
+  }
+
   void checkAllocRefBase(AllocRefInstBase *ARI) {
     requireReferenceValue(ARI, "Result of alloc_ref");
-    verifyOpenedArchetype(ARI, ARI->getType().getASTType());
+    verifyLocalArchetype(ARI, ARI->getType().getASTType());
     auto Types = ARI->getTailAllocatedTypes();
     auto Counts = ARI->getTailAllocatedCounts();
     unsigned NumTypes = Types.size();
@@ -1503,7 +1541,7 @@ public:
     require(NumTypes == 0 || !ARI->isObjC(),
             "Can't tail allocate with ObjC class");
     for (unsigned Idx = 0; Idx < NumTypes; ++Idx) {
-      verifyOpenedArchetype(ARI, Types[Idx].getASTType());
+      verifyLocalArchetype(ARI, Types[Idx].getASTType());
       require(Counts[Idx].get()->getType().is<BuiltinIntegerType>(),
               "count needs integer type");
     }
@@ -1574,31 +1612,31 @@ public:
     return fnTy->substGenericArgs(F.getModule(), subs, F.getTypeExpansionContext());
   }
 
-  /// Check that for each opened archetype or dynamic self type in substitutions
-  /// or the calle type, there is a type dependent operand.
+  /// Check that for each local archetype or dynamic self type in substitutions
+  /// or the called type, there is a type dependent operand.
   void checkApplyTypeDependentArguments(ApplySite AS) {
     SILInstruction *AI = AS.getInstruction();
 
-    llvm::DenseSet<OpenedArchetypeType *> FoundRootOpenedArchetypes;
+    llvm::DenseSet<LocalArchetypeType *> FoundRootLocalArchetypes;
     unsigned hasDynamicSelf = 0;
 
-    // Function to collect opened archetypes in FoundOpenedArchetypes and set
-    // hasDynamicSelf.
+    // Function to collect local archetypes in FoundRootLocalArchetypes
+    // and set hasDynamicSelf.
     auto HandleType = [&](CanType Ty) {
-      if (const auto A = dyn_cast<OpenedArchetypeType>(Ty)) {
+      if (const auto A = dyn_cast<LocalArchetypeType>(Ty)) {
         require(isArchetypeValidInFunction(A, AI->getFunction()),
                 "Archetype to be substituted must be valid in function.");
 
         const auto root = A.getRoot();
 
-        // Collect all root opened archetypes used in the substitutions list.
-        FoundRootOpenedArchetypes.insert(root);
+        // Collect all root local archetypes used in the substitutions list.
+        FoundRootLocalArchetypes.insert(root);
         // Also check that they are properly tracked inside the current
         // function.
-        auto *openingInst = F.getModule().getRootOpenedArchetypeDefInst(
+        auto *openingInst = F.getModule().getRootLocalArchetypeDefInst(
             root, AI->getFunction());
         require(openingInst == AI || properlyDominates(openingInst, AI),
-                "Use of an opened archetype should be dominated by a "
+                "Use of a local archetype should be dominated by a "
                 "definition of this root opened archetype");
       }
       if (Ty->hasDynamicSelfType()) {
@@ -1606,15 +1644,15 @@ public:
       }
     };
 
-    // Search for opened archetypes and dynamic self.
+    // Search for local archetypes and dynamic self.
     for (auto Replacement : AS.getSubstitutionMap().getReplacementTypes()) {
       Replacement->getCanonicalType().visit(HandleType);
     }
     AS.getSubstCalleeType().visit(HandleType);
 
-    require(FoundRootOpenedArchetypes.size() + hasDynamicSelf ==
+    require(FoundRootLocalArchetypes.size() + hasDynamicSelf ==
                 AI->getTypeDependentOperands().size(),
-            "Number of opened archetypes and dynamic self in the substitutions "
+            "Number of local archetypes and dynamic self in the substitutions "
             "list should match the number of type dependent operands");
 
     for (auto &Op : AI->getTypeDependentOperands()) {
@@ -1627,14 +1665,21 @@ public:
         require((ValueBase *)V == AI->getFunction()->getDynamicSelfMetadata(),
                 "wrong self metadata operand");
       } else {
-        require(isa<SingleValueInstruction>(V),
-                "opened archetype operand should refer to a SIL instruction");
-        auto Archetype =
-            cast<SingleValueInstruction>(V)->getDefinedOpenedArchetype();
-        require(Archetype,
-                "opened archetype operand should define an opened archetype");
-        require(FoundRootOpenedArchetypes.count(Archetype),
-                "opened archetype operand does not correspond to any opened "
+        auto DI = V->getDefiningInstruction();
+        require(DI,
+                "local archetype operand should refer to a SIL instruction");
+        bool definesFoundArchetype = false;
+        bool definesAnyArchetype = false;
+        DI->forEachDefinedLocalArchetype(
+            [&](CanLocalArchetypeType archetype, SILValue dependency) {
+          definesAnyArchetype = true;
+          if (FoundRootLocalArchetypes.count(archetype))
+            definesFoundArchetype = true;
+        });
+        require(definesAnyArchetype,
+                "local archetype operand should define a local archetype");
+        require(definesFoundArchetype,
+                "local archetype operand does not correspond to any local "
                 "archetype from the substitutions list");
       }
     }
@@ -2224,6 +2269,10 @@ public:
     require(
         F.hasOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
+    if (EBI->getOperand()->getType().isAddress()) {
+      require(isa<StoreBorrowInst>(EBI->getOperand()),
+              "end_borrow of an address not produced by store_borrow");
+    }
   }
 
   void checkEndLifetimeInst(EndLifetimeInst *I) {
@@ -2427,6 +2476,8 @@ public:
   }
 
   void checkStoreBorrowInst(StoreBorrowInst *SI) {
+    // A store_borrow must be to an alloc_stack.  That alloc_stack can only be
+    // used by store_borrows (and dealloc_stacks).
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
     require(!fnConv.useLoweredAddresses()
@@ -2434,15 +2485,12 @@ public:
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
-    require(isa<AllocStackInst>(SI->getDest()),
-            "store_borrow destination should be alloc_stack");
-    requireSameType(SI->getDest()->getType().getObjectType(),
-                    SI->getSrc()->getType(),
-                    "Store operand type and dest type mismatch");
-
     // Note: This is the current implementation and the design is not final.
     require(isa<AllocStackInst>(SI->getDest()),
             "store_borrow destination can only be an alloc_stack");
+    requireSameType(SI->getDest()->getType().getObjectType(),
+                    SI->getSrc()->getType(),
+                    "Store operand type and dest type mismatch");
 
     SSAPrunedLiveness scopedAddressLiveness;
     ScopedAddressValue scopedAddress(SI);
@@ -3033,7 +3081,7 @@ public:
     auto MetaTy = MI->getType().castTo<MetatypeType>();
     require(MetaTy->hasRepresentation(),
             "metatype instruction must have a metatype representation");
-    verifyOpenedArchetype(MI, MetaTy.getInstanceType());
+    verifyLocalArchetype(MI, MetaTy.getInstanceType());
   }
   void checkValueMetatypeInst(ValueMetatypeInst *MI) {
     require(MI->getType().is<MetatypeType>(),
@@ -3088,6 +3136,11 @@ public:
             "Operand of dealloc_stack must be an alloc_stack or partial_apply "
             "[stack]");
   }
+  void checkDeallocPackInst(DeallocPackInst *DI) {
+    require(isa<SILUndef>(DI->getOperand()) ||
+            isa<AllocPackInst>(DI->getOperand()),
+            "Operand of dealloc_pack must be an alloc_pack");
+  }
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand()->getType().isObject(),
             "Operand of dealloc_ref must be object");
@@ -3121,7 +3174,7 @@ public:
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
     for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields())) {
-      verifyOpenedArchetype(AI, getSILBoxFieldLoweredType(
+      verifyLocalArchetype(AI, getSILBoxFieldLoweredType(
                                     F.getTypeExpansionContext(), AI->getBoxType(),
                                     F.getModule().Types, field));
     }
@@ -3233,6 +3286,10 @@ public:
                 EI->getForwardingOwnershipKind() == OwnershipKind::Guaranteed,
             "invalid forwarding ownership kind on tuple_extract instruction");
 
+    require(!EI->getStructDecl()->isNonTrivialPtrAuth(),
+            "Imported structs with ptrauth qualified fields should not be "
+            "promoted to a value");
+
     if (EI->getModule().getStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
@@ -3280,6 +3337,14 @@ public:
     require(EI->getField()->getDeclContext() == sd,
             "struct_element_addr field is not a member of the struct");
 
+    if (EI->getStructDecl()->isNonTrivialPtrAuth()) {
+      for (auto *use : EI->getUses()) {
+        auto *bai = dyn_cast<BeginAccessInst>(use->getUser());
+        require(bai && bai->getEnforcement() == SILAccessEnforcement::Signed,
+                "Access to ptrauth qualified fields should be scoped with "
+                "begin_access [signed]/end_access");
+      }
+    }
     if (EI->getModule().getStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
@@ -3304,7 +3369,8 @@ public:
                              F.getResilienceExpansion()),
             "cannot access storage of resilient class");
 
-    require(EI->getField()->getDeclContext() == cd,
+    require(EI->getField()->getDeclContext() ==
+                cd->getImplementationContext()->getAsGenericContext(),
             "ref_element_addr field must be a member of the class");
 
     if (EI->getModule().getStage() != SILStage::Lowered) {
@@ -3418,10 +3484,10 @@ public:
             "requirement Self parameter must conform to called protocol");
 
     auto lookupType = AMI->getLookupType();
-    if (getOpenedArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) {
+    if (getLocalArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) {
       require(AMI->getTypeDependentOperands().size() == 1,
               "Must have a type dependent operand for the opened archetype");
-      verifyOpenedArchetype(AMI, lookupType);
+      verifyLocalArchetype(AMI, lookupType);
     } else {
       require(AMI->getTypeDependentOperands().empty(),
               "Should not have an operand for the opened existential");
@@ -3644,7 +3710,7 @@ public:
       require(isa<ArchetypeType>(operandInstanceType) ||
               operandInstanceType->isObjCExistentialType(),
               "operand type must be an archetype or self-conforming existential");
-      verifyOpenedArchetype(OMI, OMI->getType().getASTType());
+      verifyLocalArchetype(OMI, OMI->getType().getASTType());
     }
 
     // TODO: We should enforce that ObjC methods are dispatched on ObjC
@@ -3702,7 +3768,7 @@ public:
     auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype,
         "open_existential_addr result must be an opened existential archetype");
-    require(OEI->getModule().getRootOpenedArchetypeDefInst(
+    require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_addr should be registered in "
             "SILFunction");
@@ -3736,7 +3802,7 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_ref result must be an opened existential archetype");
-    require(OEI->getModule().getRootOpenedArchetypeDefInst(
+    require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_ref should be registered in "
             "SILFunction");
@@ -3759,7 +3825,7 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box result must be an opened existential archetype");
-    require(OEI->getModule().getRootOpenedArchetypeDefInst(
+    require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_box should be registered in "
             "SILFunction");
@@ -3782,7 +3848,7 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box_value result not an opened existential archetype");
-    require(OEI->getModule().getRootOpenedArchetypeDefInst(
+    require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_box_value should be "
             "registered in SILFunction");
@@ -3829,7 +3895,7 @@ public:
     require(archetype, "open_existential_metatype result must be an opened "
                        "existential metatype");
     require(
-        I->getModule().getRootOpenedArchetypeDefInst(archetype,
+        I->getModule().getRootLocalArchetypeDefInst(archetype,
                                                      I->getFunction()) == I,
         "Archetype opened by open_existential_metatype should be registered in "
         "SILFunction");
@@ -3849,7 +3915,7 @@ public:
     auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype, "open_existential_value result must be an opened "
                        "existential archetype");
-    require(OEI->getModule().getRootOpenedArchetypeDefInst(
+    require(OEI->getModule().getRootLocalArchetypeDefInst(
                 archetype, OEI->getFunction()) == OEI,
             "Archetype opened by open_existential should be registered in "
             "SILFunction");
@@ -3868,7 +3934,7 @@ public:
     checkExistentialProtocolConformances(exType.getASTType(),
                                          AEBI->getFormalConcreteType(),
                                          AEBI->getConformances());
-    verifyOpenedArchetype(AEBI, AEBI->getFormalConcreteType());
+    verifyLocalArchetype(AEBI, AEBI->getFormalConcreteType());
   }
 
   void checkInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
@@ -3901,7 +3967,7 @@ public:
     checkExistentialProtocolConformances(exType.getASTType(),
                                          AEI->getFormalConcreteType(),
                                          AEI->getConformances());
-    verifyOpenedArchetype(AEI, AEI->getFormalConcreteType());
+    verifyLocalArchetype(AEI, AEI->getFormalConcreteType());
   }
 
   void checkInitExistentialValueInst(InitExistentialValueInst *IEI) {
@@ -3929,7 +3995,7 @@ public:
     checkExistentialProtocolConformances(exType.getASTType(),
                                          IEI->getFormalConcreteType(),
                                          IEI->getConformances());
-    verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
+    verifyLocalArchetype(IEI, IEI->getFormalConcreteType());
   }
 
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
@@ -3961,7 +4027,7 @@ public:
     checkExistentialProtocolConformances(exType.getASTType(),
                                          IEI->getFormalConcreteType(),
                                          IEI->getConformances());
-    verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
+    verifyLocalArchetype(IEI, IEI->getFormalConcreteType());
   }
 
   void checkDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
@@ -4027,7 +4093,7 @@ public:
     checkExistentialProtocolConformances(resultInstanceType,
                                          operandInstanceType,
                                          I->getConformances());
-    verifyOpenedArchetype(I, MetaTy.getInstanceType());
+    verifyLocalArchetype(I, MetaTy.getInstanceType());
   }
 
   void checkExistentialProtocolConformances(CanType resultType,
@@ -4110,7 +4176,7 @@ public:
     verifyCheckedCast(/*exact*/ false,
                       CI->getOperand()->getType(),
                       CI->getType());
-    verifyOpenedArchetype(CI, CI->getType().getASTType());
+    verifyLocalArchetype(CI, CI->getType().getASTType());
   }
 
   // Make sure that opcodes handled by isRCIdentityPreservingCast cannot cast
@@ -4122,17 +4188,17 @@ public:
             "Unexpected trivial-to-reference conversion: ");
   }
 
-  /// Verify if a given type is or contains an opened archetype or dynamic self.
+  /// Verify if a given type is or contains a local archetype or dynamic self.
   /// If this is the case, verify that the provided instruction has a type
   /// dependent operand for it.
-  void verifyOpenedArchetype(SILInstruction *I, CanType Ty) {
+  void verifyLocalArchetype(SILInstruction *I, CanType Ty) {
     if (!Ty)
       return;
     // Check the type and all of its contained types.
     Ty.visit([&](CanType t) {
       SILValue Def;
-      if (const auto archetypeTy = dyn_cast<OpenedArchetypeType>(t)) {
-        Def = I->getModule().getRootOpenedArchetypeDefInst(
+      if (const auto archetypeTy = dyn_cast<LocalArchetypeType>(t)) {
+        Def = I->getModule().getRootLocalArchetypeDefInst(
             archetypeTy.getRoot(), I->getFunction());
         require(Def, "Root opened archetype should be registered in SILModule");
       } else if (t->hasDynamicSelfType()) {
@@ -4159,7 +4225,7 @@ public:
     verifyCheckedCast(CBI->isExact(),
                       CBI->getSourceLoweredType(),
                       CBI->getTargetLoweredType());
-    verifyOpenedArchetype(CBI, CBI->getTargetFormalType());
+    verifyLocalArchetype(CBI, CBI->getTargetFormalType());
 
     require(CBI->getSuccessBB()->args_size() == 1,
             "success dest of checked_cast_br must take one argument");
@@ -4358,7 +4424,7 @@ public:
   }
   
   void checkUncheckedRefCastInst(UncheckedRefCastInst *AI) {
-    verifyOpenedArchetype(AI, AI->getType().getASTType());
+    verifyLocalArchetype(AI, AI->getType().getASTType());
     require(AI->getOperand()->getType().isObject(),
             "unchecked_ref_cast operand must be a value");
     require(AI->getType().isObject(),
@@ -4382,7 +4448,7 @@ public:
   }
   
   void checkUncheckedAddrCastInst(UncheckedAddrCastInst *AI) {
-    verifyOpenedArchetype(AI, AI->getType().getASTType());
+    verifyLocalArchetype(AI, AI->getType().getASTType());
 
     require(AI->getOperand()->getType().isAddress(),
             "unchecked_addr_cast operand must be an address");
@@ -4391,7 +4457,7 @@ public:
   }
   
   void checkUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *BI) {
-    verifyOpenedArchetype(BI, BI->getType().getASTType());
+    verifyLocalArchetype(BI, BI->getType().getASTType());
     require(BI->getOperand()->getType().isObject(),
             "unchecked_trivial_bit_cast must operate on a value");
     require(BI->getType().isObject(),
@@ -4401,7 +4467,7 @@ public:
   }
 
   void checkUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *BI) {
-    verifyOpenedArchetype(BI, BI->getType().getASTType());
+    verifyLocalArchetype(BI, BI->getType().getASTType());
     require(BI->getOperand()->getType().isObject(),
             "unchecked_bitwise_cast must operate on a value");
     require(BI->getType().isObject(),
@@ -4418,7 +4484,7 @@ public:
   }
 
   void checkRawPointerToRefInst(RawPointerToRefInst *AI) {
-    verifyOpenedArchetype(AI, AI->getType().getASTType());
+    verifyLocalArchetype(AI, AI->getType().getASTType());
     require(AI->getType()
               .getASTType()->isBridgeableObjectType()
             || AI->getType().getASTType()->isEqual(
@@ -4445,7 +4511,7 @@ public:
   }
   
   void checkBridgeObjectToRefInst(BridgeObjectToRefInst *RI) {
-    verifyOpenedArchetype(RI, RI->getType().getASTType());
+    verifyLocalArchetype(RI, RI->getType().getASTType());
     requireSameType(RI->getConverted()->getType(),
                     SILType::getBridgeObjectType(F.getASTContext()),
                     "bridge_object_to_ref must take a BridgeObject");
@@ -4880,17 +4946,6 @@ public:
   }
 
   void checkBranchInst(BranchInst *BI) {
-    for (auto arg : BI->getArgs()) {
-      auto *borrow = dyn_cast<BeginBorrowInst>(arg);
-      if (!borrow) {
-        continue;
-      }
-      auto op = borrow->getOperand();
-      if (op->getOwnershipKind() != OwnershipKind::Guaranteed) {
-        continue;
-      }
-      assert(!isGuaranteedForwarding(op));
-    }
     require(BI->getArgs().size() == BI->getDestBB()->args_size(),
             "branch has wrong number of arguments for dest bb");
     require(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
@@ -5374,6 +5429,64 @@ public:
     }
   }
 
+  void verifySameShape(CanPackType left, CanPackType right) {
+    verifySameShape(left, right, 0, right->getNumElements());
+  }
+  void verifySameShape(CanPackType left, CanPackType right,
+                       unsigned rightBegin, unsigned rightEnd) {
+    assert(rightBegin <= rightEnd && rightEnd <= right->getNumElements());
+    require(left->getNumElements() == rightEnd - rightBegin,
+            "packs must agree in length");
+    for (unsigned i = 0, e = left->getNumElements(); i != e; ++i) {
+      auto leftComponent = left.getElementType(i);
+      auto rightComponent = right.getElementType(rightBegin + i);
+      auto leftExpansion = dyn_cast<PackExpansionType>(leftComponent);
+      auto rightExpansion = dyn_cast<PackExpansionType>(rightComponent);
+      if (leftExpansion && rightExpansion) {
+        require(leftExpansion.getCountType()->getReducedShape() ==
+                rightExpansion.getCountType()->getReducedShape(),
+                "packs must have same shape: corresponding expansion "
+                "components must expand packs of same shape");
+      } else {
+        require(!leftExpansion && !rightExpansion,
+                "packs must have same shape: must agree in whether "
+                "corresponding components are expansions");
+      }
+    }
+  }
+
+  void checkPackPackIndexInst(PackPackIndexInst *i) {
+    auto innerIndex = requireValueKind<AnyPackIndexInst>(i->getOperand(),
+                                          "component pack index operand");
+    if (!innerIndex) return;
+
+    auto packType = i->getIndexedPackType();
+    require(i->getComponentStartIndex() < packType->getNumElements(),
+            "component index must be in bounds for indexed pack type");
+    verifySameShape(innerIndex->getIndexedPackType(), packType,
+                    i->getComponentStartIndex(), i->getComponentEndIndex());
+  }
+
+  void checkScalarPackIndexInst(ScalarPackIndexInst *i) {
+    auto packType = i->getIndexedPackType();
+    require(i->getComponentIndex() < packType->getNumElements(),
+            "component index must be in bounds for indexed pack type");
+    require(!isa<PackExpansionType>(
+               packType.getElementType(i->getComponentIndex())),
+            "component index must correspond to scalar component of "
+            "indexed pack type");
+  }
+
+  void checkOpenPackElementInst(OpenPackElementInst *i) {
+    requireObjectType(BuiltinPackIndexType, i->getOperand()->getType(),
+                      "pack index operand");
+    auto index = requireValueKind<AnyPackIndexInst>(i->getOperand(),
+            "pack index operand must be one of the pack_index instructions");
+    if (!index) return;
+
+    verifySameShape(index->getIndexedPackType(), i->getOpenedShapeClass());
+  }
+
   // This verifies that the entry block of a SIL function doesn't have
   // any predecessors and also verifies the entry point arguments.
   void verifyEntryBlock(SILBasicBlock *entry) {
@@ -5447,13 +5560,17 @@ public:
                          if (!bbarg->getType().isAddress())
                            return true;
                          switch (paramInfo.getConvention()) {
-                         default:
+                         case ParameterConvention::Direct_Unowned:
+                         case ParameterConvention::Direct_Guaranteed:
+                         case ParameterConvention::Direct_Owned:
                            return false;
                          case ParameterConvention::Indirect_In:
-                         case ParameterConvention::Indirect_In_Constant:
                          case ParameterConvention::Indirect_Inout:
                          case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_In_Guaranteed:
+                         case ParameterConvention::Pack_Owned:
+                         case ParameterConvention::Pack_Guaranteed:
+                         case ParameterConvention::Pack_Inout:
                            return true;
                          }
                        }),
@@ -5793,6 +5910,7 @@ public:
       return;
 
     const SILDebugScope *LastSeenScope = nullptr;
+    SILInstruction *LastSeenScopeInst = nullptr;
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
         continue;
@@ -5803,9 +5921,15 @@ public:
       // map and go on.
       auto *DS = SI.getDebugScope();
       assert(DS && "Each instruction should have a debug scope");
+
+      // We don't support this verification on inlined call sites yet.
+      if (DS->InlinedCallSite)
+        continue;
+
       if (!AlreadySeenScopes.count(DS)) {
         AlreadySeenScopes.insert(DS);
         LastSeenScope = DS;
+        LastSeenScopeInst = &SI;
         continue;
       }
 
@@ -5813,14 +5937,12 @@ public:
       // the scope is an ancestor of the scope we're currently leaving.
       auto isAncestorScope = [](const SILDebugScope *Cur,
                                 const SILDebugScope *Previous) {
+        assert(Cur && "null current scope queried");
+        assert(Previous && "null previous scope queried");
         const SILDebugScope *Tmp = Previous;
-        assert(Tmp && "scope can't be null");
         while (Tmp) {
-          PointerUnion<const SILDebugScope *, SILFunction *> Parent =
-              Tmp->Parent;
+          auto Parent = Tmp->Parent;
           auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>();
-          if (!ParentScope)
-            break;
           if (ParentScope == Cur)
             return true;
           Tmp = ParentScope;
@@ -5830,13 +5952,28 @@ public:
 
       if (isAncestorScope(DS, LastSeenScope)) {
         LastSeenScope = DS;
+        LastSeenScopeInst = &SI;
         continue;
       }
       if (DS != LastSeenScope) {
-        LLVM_DEBUG(llvm::dbgs() << "Broken instruction!\n"; SI.dump());
-        LLVM_DEBUG(llvm::dbgs() << "Please report a bug on bugs.swift.org\n");
-        LLVM_DEBUG(llvm::dbgs() <<
-          "Pass -Xllvm -verify-di-holes=false to disable the verification\n");
+        llvm::errs() << "Broken instruction!\n"; 
+        SI.dump();
+#ifndef NDEBUG
+        llvm::errs() << "in scope\n";
+        DS->print(SI.getFunction()->getModule());
+#endif
+        llvm::errs() << "Previous, non-contiguous scope set by";
+        LastSeenScopeInst->dump();
+#ifndef NDEBUG
+        llvm::errs() << "in scope\n";
+        LastSeenScope->print(SI.getFunction()->getModule());
+#endif
+        llvm::errs() << "Please report a bug on bugs.swift.org\n";
+        llvm::errs() <<
+          "Pass -Xllvm -verify-di-holes=false to disable the verification\n";
+        // Turn on debug info printing so that the log actually shows the bad
+        // scopes.
+        SILPrintDebugInfo.setValue(true);
         require(
             DS == LastSeenScope,
             "Basic block contains a non-contiguous lexical scope at -Onone");

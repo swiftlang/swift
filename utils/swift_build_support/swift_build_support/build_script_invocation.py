@@ -50,8 +50,6 @@ class BuildScriptInvocation(object):
             source_root=SWIFT_SOURCE_ROOT,
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
-        self.build_libparser_only = args.build_libparser_only
-
         clear_log_time()
 
     @property
@@ -106,7 +104,6 @@ class BuildScriptInvocation(object):
             "--darwin-deployment-version-watchos=%s" % (
                 args.darwin_deployment_version_watchos),
             "--cmake", toolchain.cmake,
-            "--cmark-build-type", args.cmark_build_variant,
             "--llvm-build-type", args.llvm_build_variant,
             "--swift-build-type", args.swift_build_variant,
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
@@ -178,6 +175,11 @@ class BuildScriptInvocation(object):
                     "--{}-cmake-options={}".format(
                         product_name, ' '.join(cmake_opts))
                 ]
+
+        if args.build_toolchain_only:
+            impl_args += [
+                "--build-toolchain-only=1"
+            ]
 
         if args.build_stdlib_deployment_targets:
             impl_args += [
@@ -258,7 +260,6 @@ class BuildScriptInvocation(object):
         # if we are going to build them and install_all is set, we also install
         # them.
         conditional_subproject_configs = [
-            (args.build_cmark, "cmark"),
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
             (args.build_foundation, "foundation"),
@@ -298,7 +299,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-swift"]
         if not args.test:
             impl_args += [
-                "--skip-test-cmark",
                 "--skip-test-lldb",
                 "--skip-test-llbuild",
                 "--skip-test-xctest",
@@ -320,8 +320,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--only-executable-test"]
         if not args.benchmark:
             impl_args += ["--skip-test-benchmarks"]
-        if args.build_libparser_only:
-            impl_args += ["--build-libparser-only"]
         if args.android:
             impl_args += [
                 "--android-arch", args.android_arch,
@@ -538,7 +536,7 @@ class BuildScriptInvocation(object):
                 "SWIFT_TEST_TARGETS": " ".join(
                     config.swift_test_run_targets),
                 "SWIFT_FLAGS": config.swift_flags,
-                "SWIFT_TARGET_CMAKE_OPTIONS": config.cmake_options,
+                "SWIFT_TARGET_CMAKE_OPTIONS": " ".join(config.cmake_options),
             }
 
         return options
@@ -575,6 +573,12 @@ class BuildScriptInvocation(object):
         builder.add_product(products.CMark,
                             is_enabled=self.args.build_cmark)
 
+        # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
+        # Swift still needs a few LLVM targets like tblgen to be built for it to be
+        # configured. Instead, handle this in the product for now.
+        builder.add_product(products.LLVM,
+                            is_enabled=True)
+
         builder.add_product(products.LibXML2,
                             is_enabled=self.args.build_libxml2)
 
@@ -592,11 +596,6 @@ class BuildScriptInvocation(object):
         # test, install like a normal build-script product.
         builder.begin_impl_pipeline(should_run_epilogue_operations=False)
 
-        # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
-        # Swift still needs a few LLVM targets like tblgen to be built for it to be
-        # configured. Instead, handle this in build-script-impl for now.
-        builder.add_impl_product(products.LLVM,
-                                 is_enabled=True)
         builder.add_impl_product(products.LibCXX,
                                  is_enabled=self.args.build_libcxx)
         builder.add_impl_product(products.LibICU,

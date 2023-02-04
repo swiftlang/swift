@@ -13,7 +13,7 @@ func getInt() -> Int { return zero }
 // CHECK:   [[Y:%.*]] = alloc_box ${ var Builtin.Int64 }
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
-// CHECK:   copy_addr [[READ]] to [initialization] [[PBY]] : $*Builtin.Int64
+// CHECK:   copy_addr [[READ]] to [init] [[PBY]] : $*Builtin.Int64
 func init_var_from_lvalue(x: Int) {
   var x = x
   var y = x

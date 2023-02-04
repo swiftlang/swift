@@ -2,6 +2,8 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
 // RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
 
+// REQUIRES: swift_in_compiler
+
 sil_stage canonical
 
 import Builtin
@@ -400,24 +402,26 @@ struct Int {
 }
 
 sil @guaranteed_call : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> () {
+[%0: noescape **]
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = tuple ()
   return %1 : $()
 }
 
 sil @guaranteed_box_throwing_use : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> @error any Error {
+[%0: noescape **]
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = tuple ()
   return %1 : $()
 }
 
-// CHECK_LABEL: sil hidden [noinline] @$test_guaranteed_call :
+// CHECK-LABEL: sil hidden [noinline] @$test_guaranteed_call :
 // CHECK: bb1{{.*}}:
 // CHECK-NOT: strong_retain
 // CHECK: apply
 // CHECK-NOT: strong_release
 // CHECK: bb2:
-// CHECK_LABEL: } // end sil function '$test_guaranteed_call'
+// CHECK-LABEL: } // end sil function '$test_guaranteed_call'
 sil hidden [noinline] @$test_guaranteed_call : $@convention(thin) () -> () {
 bb0:
   %box = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
@@ -582,8 +586,9 @@ bb0(%0 : $RetainUser, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
 // CHECK-LABEL: sil @remove_retain_release_over_no_release_func
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
-sil @remove_retain_release_over_no_release_func : $@convention(thin) (Cls) -> () {
-bb0(%0 : $Cls):
+sil @remove_retain_release_over_no_release_func : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Cls
   %1 = function_ref @no_release_func : $@convention(thin) (Cls) -> ()
   strong_retain %0 : $Cls
   apply %1 (%0) : $@convention(thin) (Cls) -> ()
@@ -689,6 +694,8 @@ bb0(%0 : $Cls, %1 : $Cls):
 }
 
 sil @use_container : $@convention(thin) (@guaranteed Container) -> () {
+[%0: noescape **]
+[global: ]  
 bb0(%0 : $Container):
   %1 = ref_element_addr %0 : $Container, #Container.c
   %2 = load %1 : $*Cls
@@ -697,6 +704,7 @@ bb0(%0 : $Container):
 }
 
 sil @release_container : $@convention(thin) (Container) -> () {
+[%0: noescape **]
 bb0(%0 : $Container):
   strong_release %0 : $Container
   %r = tuple()
@@ -704,6 +712,8 @@ bb0(%0 : $Container):
 }
 
 sil @no_release_func : $@convention(thin) (Cls) -> () {
+[%0: noescape **]
+[global: ]  
 bb0(%0 : $Cls):
   %r = tuple()
   return %r : $()
@@ -2172,10 +2182,10 @@ bb2(%4 : $Error):
   throw %4 : $Error
 }
 
-// CHECK_LABEL: sil hidden [noinline] @$try_apply_test_3 :
+// CHECK-LABEL: sil hidden [noinline] @$try_apply_test_3 :
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
-// CHECK_LABEL: } // end sil function '$try_apply_test_3'
+// CHECK-LABEL: } // end sil function '$try_apply_test_3'
 sil hidden [noinline] @$try_apply_test_3 : $@convention(thin) () -> @error any Error {
 bb0:
   %box = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>

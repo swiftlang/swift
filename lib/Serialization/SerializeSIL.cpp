@@ -518,6 +518,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(),
       (unsigned)F.isDistributed(),
+      (unsigned)F.isRuntimeAccessible(),
       FnID, replacedFunctionID, usedAdHocWitnessFunctionID,
       genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
@@ -646,6 +647,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
     if (auto *SFA = dyn_cast<SILFunctionArgument>(SA)) {
       packedMetadata |= unsigned(SFA->isNoImplicitCopy()) << 16; // 1 bit
       packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 17; // 2 bits
+      packedMetadata |= unsigned(SFA->isClosureCapture()) << 19;      // 1 bit
     }
     // Used: 19 bits. Free: 13.
     //
@@ -1081,6 +1083,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
     break;
   }
+  case SILInstructionKind::AllocPackInst: {
+    const AllocPackInst *API = cast<AllocPackInst>(&SI);
+    writeOneTypeLayout(API->getKind(), 0, API->getPackType());
+    break;
+  }
   case SILInstructionKind::ProjectBoxInst: {
     auto PBI = cast<ProjectBoxInst>(&SI);
     
@@ -1480,6 +1487,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::SetDeallocatingInst:
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocStackRefInst:
+  case SILInstructionKind::DeallocPackInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
@@ -1756,6 +1764,35 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                          ? 0 : 1;
     writeOneTypeOneOperandLayout(open.getKind(), attrs, open.getType(),
                                  open.getOperand());
+    break;
+  }
+  case SILInstructionKind::DynamicPackIndexInst: {
+    auto &dpii = cast<DynamicPackIndexInst>(SI);
+    writeOneTypeOneOperandLayout(dpii.getKind(), 0,
+                                 dpii.getIndexedPackType(),
+                                 dpii.getOperand());
+    break;
+  }
+  case SILInstructionKind::PackPackIndexInst: {
+    auto &ppii = cast<PackPackIndexInst>(SI);
+    writeOneTypeOneOperandLayout(ppii.getKind(),
+                                 ppii.getComponentStartIndex(),
+                                 ppii.getIndexedPackType(),
+                                 ppii.getOperand());
+    break;
+  }
+  case SILInstructionKind::ScalarPackIndexInst: {
+    auto &spii = cast<ScalarPackIndexInst>(SI);
+    writeOneTypeLayout(spii.getKind(),
+                       spii.getComponentIndex(),
+                       spii.getIndexedPackType());
+    break;
+  }
+  case SILInstructionKind::OpenPackElementInst: {
+    auto &opei = cast<OpenPackElementInst>(SI);
+    auto envRef =
+      S.addGenericEnvironmentRef(opei.getOpenedGenericEnvironment());
+    writeOneOperandLayout(SI.getKind(), envRef, opei.getIndexOperand());
     break;
   }
   case SILInstructionKind::GetAsyncContinuationAddrInst: {
@@ -2489,6 +2526,23 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addUniquedStringRef(mangledKey));
     break;
   }
+  case SILInstructionKind::HasSymbolInst: {
+    auto *hsi = cast<HasSymbolInst>(&SI);
+    auto *decl = hsi->getDecl();
+    // Although the instruction doesn't have them as members, we need to
+    // ensure that any SILFunctions that are technically referenced by the
+    // instruction get serialized.
+    SmallVector<SILFunction *, 4> fns;
+    hsi->getReferencedFunctions(fns);
+    SmallVector<IdentifierID, 4> functionRefs;
+    for (auto fn : fns) {
+      functionRefs.push_back(addSILFunctionRef(fn));
+    }
+    SILInstHasSymbolLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstHasSymbolLayout::Code],
+        S.addDeclRef(decl), functionRefs);
+    break;
+  }
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {
@@ -2927,6 +2981,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
   registerSILAbbr<SILInstLinearFunctionExtractLayout>();
   registerSILAbbr<SILInstIncrementProfilerCounterLayout>();
+  registerSILAbbr<SILInstHasSymbolLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();

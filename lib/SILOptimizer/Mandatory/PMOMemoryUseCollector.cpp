@@ -386,11 +386,13 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Pack_Owned:
+      case ParameterConvention::Pack_Guaranteed:
+      case ParameterConvention::Pack_Inout:
         llvm_unreachable("address value passed to indirect parameter");
 
       // If this is an in-parameter, it is like a load.
       case ParameterConvention::Indirect_In:
-      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
         Uses.emplace_back(User, PMOUseKind::IndirectIn);
         continue;

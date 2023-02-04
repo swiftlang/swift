@@ -422,6 +422,9 @@ TypeChecker::typeCheckTarget(SolutionApplicationTarget &target,
   if (options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))
     csOptions |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
+  if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
+    csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
+
   ConstraintSystem cs(dc, csOptions);
 
   if (auto *expr = target.getAsExpr()) {
@@ -732,6 +735,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   cs.applySolution(solution);
 
   if (auto result = cs.applySolution(solution, defaultExprTarget)) {
+    // Perform syntactic diagnostics on the type-checked target.
+    performSyntacticDiagnosticsForTarget(*result, /*isExprStmt=*/false);
     defaultValue = result->getAsExpr();
     return defaultValue->getType();
   }
@@ -996,17 +1001,12 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
         return found->second;
 
       if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
-        // We leave opaque types and their nested associated types alone here.
-        // They're globally available.
-        if (isa<OpaqueTypeArchetypeType>(archetypeType))
-          return origType;
-
         auto root = archetypeType->getRoot();
         // For other nested types, fail here so the default logic in subst()
         // for nested types applies.
         if (root != archetypeType)
           return Type();
-        
+
         auto locator = cs.getConstraintLocator({});
         auto replacement = cs.createTypeVariable(locator,
                                                  TVO_CanBindToNoEscape);
@@ -1031,7 +1031,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       types[origType] = replacement;
       return replacement;
     },
-    MakeAbstractConformanceForGenericType());
+    MakeAbstractConformanceForGenericType(),
+    SubstFlags::SubstituteOpaqueArchetypes);
 }
 
 bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
@@ -1273,20 +1274,19 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
   }
 }
 
-void Solution::dump() const {
-  dump(llvm::errs());
-}
+void Solution::dump() const { dump(llvm::errs(), 0); }
 
-void Solution::dump(raw_ostream &out) const {
+void Solution::dump(raw_ostream &out, unsigned indent) const {
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
 
   SourceManager *sm = &getConstraintSystem().getASTContext().SourceMgr;
 
-  out << "Fixed score:";
+  out.indent(indent) << "Fixed score:";
   FixedScore.print(out);
 
-  out << "\nType variables:\n";
+  out << "\n";
+  out.indent(indent) << "Type variables:\n";
   std::vector<std::pair<TypeVariableType *, Type>> bindings(
       typeBindings.begin(), typeBindings.end());
   llvm::sort(bindings, [](const std::pair<TypeVariableType *, Type> &lhs,
@@ -1295,7 +1295,7 @@ void Solution::dump(raw_ostream &out) const {
   });
   for (auto binding : bindings) {
     auto &typeVar = binding.first;
-    out.indent(2);
+    out.indent(indent + 2);
     Type(typeVar).print(out, PO);
     out << " as ";
     binding.second.print(out, PO);
@@ -1307,11 +1307,12 @@ void Solution::dump(raw_ostream &out) const {
   }
 
   if (!overloadChoices.empty()) {
-    out << "\nOverload choices:";
+    out << "\n";
+    out.indent(indent) << "Overload choices:";
     for (auto ovl : overloadChoices) {
       if (ovl.first) {
         out << "\n";
-        out.indent(2);
+        out.indent(indent + 2);
         ovl.first->dump(sm, out);
       }
 
@@ -1323,18 +1324,18 @@ void Solution::dump(raw_ostream &out) const {
 
 
   if (!ConstraintRestrictions.empty()) {
-    out << "\nConstraint restrictions:\n";
+    out.indent(indent) << "Constraint restrictions:\n";
     for (auto &restriction : ConstraintRestrictions) {
-      out.indent(2) << restriction.first.first
-                    << " to " << restriction.first.second
-                    << " is " << getName(restriction.second) << "\n";
+      out.indent(indent + 2)
+          << restriction.first.first << " to " << restriction.first.second
+          << " is " << getName(restriction.second) << "\n";
     }
   }
 
   if (!argumentMatchingChoices.empty()) {
-    out << "\nTrailing closure matching:\n";
+    out.indent(indent) << "Trailing closure matching:\n";
     for (auto &argumentMatching : argumentMatchingChoices) {
-      out.indent(2);
+      out.indent(indent + 2);
       argumentMatching.first->dump(sm, out);
       switch (argumentMatching.second.trailingClosureMatching) {
       case TrailingClosureMatching::Forward:
@@ -1348,18 +1349,18 @@ void Solution::dump(raw_ostream &out) const {
   }
 
   if (!DisjunctionChoices.empty()) {
-    out << "\nDisjunction choices:\n";
+    out.indent(indent) << "Disjunction choices:\n";
     for (auto &choice : DisjunctionChoices) {
-      out.indent(2);
+      out.indent(indent + 2);
       choice.first->dump(sm, out);
       out << " is #" << choice.second << "\n";
     }
   }
 
   if (!OpenedTypes.empty()) {
-    out << "\nOpened types:\n";
+    out.indent(indent) << "Opened types:\n";
     for (const auto &opened : OpenedTypes) {
-      out.indent(2);
+      out.indent(indent + 2);
       opened.first->dump(sm, out);
       out << " opens ";
       llvm::interleave(
@@ -1391,9 +1392,9 @@ void Solution::dump(raw_ostream &out) const {
   }
 
   if (!OpenedExistentialTypes.empty()) {
-    out << "\nOpened existential types:\n";
+    out.indent(indent) << "Opened existential types:\n";
     for (const auto &openedExistential : OpenedExistentialTypes) {
-      out.indent(2);
+      out.indent(indent + 2);
       openedExistential.first->dump(sm, out);
       out << " opens to " << openedExistential.second->getString(PO);
       out << "\n";
@@ -1401,18 +1402,19 @@ void Solution::dump(raw_ostream &out) const {
   }
 
   if (!DefaultedConstraints.empty()) {
-    out << "\nDefaulted constraints: ";
+    out.indent(indent) << "Defaulted constraints: ";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
       locator->dump(sm, out);
     }, [&] {
       out << ", ";
     });
+    out << "\n";
   }
 
   if (!Fixes.empty()) {
-    out << "\nFixes:\n";
+    out.indent(indent) << "Fixes:\n";
     for (auto *fix : Fixes) {
-      out.indent(2);
+      out.indent(indent + 2);
       fix->print(out);
       out << "\n";
     }
@@ -1444,7 +1446,8 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
     return Type();
   };
 
-  E->dump(out, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent);
+  E->dump(out, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent,
+          solverState ? solverState->getCurrentIndent() : 0);
   out << "\n";
 }
 
@@ -1453,21 +1456,28 @@ void ConstraintSystem::print(raw_ostream &out) const {
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
 
-  out << "Score:";
+  auto indent = solverState ? solverState->getCurrentIndent() : 0;
+  out.indent(indent) << "Score:";
   CurrentScore.print(out);
 
   for (const auto &contextualTypeEntry : contextualTypes) {
     auto info = contextualTypeEntry.second.first;
     if (!info.getType().isNull()) {
-      out << "\nContextual Type: " << info.getType().getString(PO);
+      out << "\n";
+      out.indent(indent) << "Contextual Type: " << info.getType().getString(PO);
+      out << " at ";
+
+      auto &SM = getASTContext().SourceMgr;
       if (TypeRepr *TR = info.typeLoc.getTypeRepr()) {
-        out << " at ";
-        TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
+        TR->getSourceRange().print(out, SM, /*text*/ false);
+      } else {
+        dumpAnchor(contextualTypeEntry.first, &SM, out);
       }
     }
   }
 
-  out << "\nType Variables:\n";
+  out << "\n";
+  out.indent(indent) << "Type Variables:\n";
   std::vector<TypeVariableType *> typeVariables(getTypeVariables().begin(),
                                                 getTypeVariables().end());
   llvm::sort(typeVariables,
@@ -1475,7 +1485,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
                return lhs->getID() < rhs->getID();
              });
   for (auto tv : typeVariables) {
-    out.indent(2);
+    out.indent(indent + 2);
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
@@ -1500,34 +1510,34 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!ActiveConstraints.empty()) {
-    out << "\nActive Constraints:\n";
+    out.indent(indent) << "Active Constraints:\n";
     for (auto &constraint : ActiveConstraints) {
-      out.indent(2);
+      out.indent(indent + 2);
       constraint.print(out, &getASTContext().SourceMgr);
       out << "\n";
     }
   }
 
   if (!InactiveConstraints.empty()) {
-    out << "\nInactive Constraints:\n";
-     for (auto &constraint : InactiveConstraints) {
-       out.indent(2);
-       constraint.print(out, &getASTContext().SourceMgr);
-       out << "\n";
-     }
+    out.indent(indent) << "Inactive Constraints:\n";
+    for (auto &constraint : InactiveConstraints) {
+      out.indent(indent + 2);
+      constraint.print(out, &getASTContext().SourceMgr);
+      out << "\n";
+    }
   }
 
   if (solverState && solverState->hasRetiredConstraints()) {
-    out << "\nRetired Constraints:\n";
+    out.indent(indent) << "Retired Constraints:\n";
     solverState->forEachRetired([&](Constraint &constraint) {
-      out.indent(2);
+      out.indent(indent + 2);
       constraint.print(out, &getASTContext().SourceMgr);
       out << "\n";
     });
   }
 
   if (!ResolvedOverloads.empty()) {
-    out << "\nResolved overloads:\n";
+    out.indent(indent) << "Resolved overloads:\n";
 
     // Otherwise, report the resolved overloads.
     for (auto elt : ResolvedOverloads) {
@@ -1570,18 +1580,18 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!DisjunctionChoices.empty()) {
-    out << "\nDisjunction choices:\n";
+    out.indent(indent) << "Disjunction choices:\n";
     for (auto &choice : DisjunctionChoices) {
-      out.indent(2);
+      out.indent(indent + 2);
       choice.first->dump(&getASTContext().SourceMgr, out);
       out << " is #" << choice.second << "\n";
     }
   }
 
   if (!OpenedTypes.empty()) {
-    out << "\nOpened types:\n";
+    out.indent(indent) << "Opened types:\n";
     for (const auto &opened : OpenedTypes) {
-      out.indent(2);
+      out.indent(indent + 2);
       opened.first->dump(&getASTContext().SourceMgr, out);
       out << " opens ";
       llvm::interleave(
@@ -1601,9 +1611,9 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!OpenedExistentialTypes.empty()) {
-    out << "\nOpened existential types:\n";
+    out.indent(indent) << "Opened existential types:\n";
     for (const auto &openedExistential : OpenedExistentialTypes) {
-      out.indent(2);
+      out.indent(indent + 2);
       openedExistential.first->dump(&getASTContext().SourceMgr, out);
       out << " opens to " << openedExistential.second->getString(PO);
       out << "\n";
@@ -1611,7 +1621,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!DefaultedConstraints.empty()) {
-    out << "\nDefaulted constraints:\n";
+    out.indent(indent) << "Defaulted constraints:\n";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
       locator->dump(&getASTContext().SourceMgr, out);
     }, [&] {
@@ -1621,16 +1631,16 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (failedConstraint) {
-    out << "\nFailed constraint:\n";
-    out.indent(2);
-    failedConstraint->print(out, &getASTContext().SourceMgr);
+    out.indent(indent) << "Failed constraint:\n";
+    failedConstraint->print(out.indent(indent + 2), &getASTContext().SourceMgr,
+                            indent + 2);
     out << "\n";
   }
 
   if (!Fixes.empty()) {
-    out << "\nFixes:\n";
+    out.indent(indent) << "Fixes:\n";
     for (auto *fix : Fixes) {
-      out.indent(2);
+      out.indent(indent + 2);
       fix->print(out);
       out << "\n";
     }
@@ -1649,6 +1659,27 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
        !unwrappedIUO)) {
     return CheckedCastKind::Coercion;
   }
+
+  // Since move-only types currently cannot conform to protocols, nor be a class
+  // type, the subtyping hierarchy is a bit bizarre as of now:
+  //
+  //              noncopyable
+  //           structs and enums
+  //                   |
+  //       +--------- Any
+  //       |           |
+  //   AnyObject    protocol
+  //       |       existentials
+  //       |            |   \
+  //       +---------+  |    +-- structs/enums
+  //                 |  |
+  //                classes
+  //           (and their subtyping)
+  //
+  //
+  // Thus, right now, a move-only type is only a subtype of itself.
+  if (fromType->isPureMoveOnly())
+    return CheckedCastKind::Unresolved;
   
   // Check for a bridging conversion.
   // Anything bridges to AnyObject.

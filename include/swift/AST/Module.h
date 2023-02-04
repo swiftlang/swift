@@ -75,13 +75,9 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
-  class SyntaxParsingCache;
   class ASTScope;
   class SourceLookupCache;
 
-  namespace syntax {
-  class SourceFileSyntax;
-}
 namespace ast_scope {
 class ASTSourceFileScope;
 }
@@ -106,7 +102,8 @@ enum class SourceFileKind {
   Library,  ///< A normal .swift file.
   Main,     ///< A .swift file that can have top-level code.
   SIL,      ///< Came from a .sil file.
-  Interface ///< Came from a .swiftinterface file, representing another module.
+  Interface, ///< Came from a .swiftinterface file, representing another module.
+  MacroExpansion, ///< Came from a macro expansion.
 };
 
 /// Contains information about where a particular path is used in
@@ -158,6 +155,10 @@ enum class ResilienceStrategy : unsigned {
 
 class OverlayFile;
 
+/// A mapping used to find the source file that contains a particular source
+/// location.
+class ModuleSourceFileLocationMap;
+
 /// The minimum unit of compilation.
 ///
 /// A module is made up of several file-units, which are all part of the same
@@ -171,6 +172,12 @@ class ModuleDecl
 
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
+
+  /// The name of the package this module belongs to
+  mutable Identifier PackageName;
+
+  /// Module name to use when referenced in clients module interfaces.
+  mutable Identifier ExportAsName;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -228,6 +235,13 @@ private:
   DebuggerClient *DebugClient = nullptr;
 
   SmallVector<FileUnit *, 2> Files;
+
+  /// Mapping used to find the source file associated with a given source
+  /// location.
+  ModuleSourceFileLocationMap *sourceFileLocationMap = nullptr;
+
+  /// The set of auxiliary source files build as part of this module.
+  SmallVector<SourceFile *, 2> AuxiliaryFiles;
 
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
@@ -328,6 +342,13 @@ public:
   /// SynthesizedFileUnit instead.
   void addFile(FileUnit &newFile);
 
+  /// Add an auxiliary source file, introduced as part of the translation.
+  void addAuxiliaryFile(SourceFile &sourceFile);
+
+  /// Produces the source file that contains the given source location, or
+  /// \c nullptr if the source location isn't in this module.
+  SourceFile *getSourceFileContainingLocation(SourceLoc loc);
+
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
   /// strings, diagnosing any conflicts.
   ///
@@ -385,6 +406,20 @@ public:
     ModuleABIName = name;
   }
 
+  /// Get the package name of the module
+  Identifier getPackageName() const { return PackageName; }
+
+  /// Set the name of the package this module belongs to
+  void setPackageName(Identifier name) {
+    PackageName = name;
+  }
+
+  Identifier getExportAsName() const { return ExportAsName; }
+
+  void setExportAsName(Identifier name) {
+    ExportAsName = name;
+  }
+
   /// Retrieve the actual module name of an alias used for this module (if any).
   ///
   /// For example, if '-module-alias Foo=Bar' is passed in when building the main module,
@@ -403,7 +438,19 @@ public:
     return UserModuleVersion;
   }
 
+  void addAllowableClientName(Identifier name) {
+    allowableClientNames.push_back(name);
+  }
+  ArrayRef<Identifier> getAllowableClientNames() const {
+    return allowableClientNames;
+  }
+  bool allowImportedBy(ModuleDecl *importer) const;
 private:
+
+  /// An array of module names that are allowed to import this one.
+  /// Any module can import this one if empty.
+  std::vector<Identifier> allowableClientNames;
+
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
   Optional<std::pair<ModuleDecl *, Identifier>> declaringModuleAndBystander;
@@ -413,6 +460,9 @@ private:
   /// along with the name of the required bystander module. Used by tooling to
   /// present overlays as if they were part of their underlying module.
   std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
+
+  /// Update the source-file location map to make it current.
+  void updateSourceFileLocationMap();
 
 public:
   ///  If this is a traditional (non-cross-import) overlay, get its underlying
@@ -542,6 +592,15 @@ public:
   }
   void setIsSystemModule(bool flag = true) {
     Bits.ModuleDecl.IsSystemModule = flag;
+  }
+
+  /// Returns true if the module was rebuilt from a module interface instead
+  /// of being built from the full source.
+  bool isBuiltFromInterface() const {
+    return Bits.ModuleDecl.IsBuiltFromInterface;
+  }
+  void setIsBuiltFromInterface(bool flag = true) {
+    Bits.ModuleDecl.IsBuiltFromInterface = flag;
   }
 
   /// Returns true if this module is a non-Swift module that was imported into
@@ -809,6 +868,21 @@ public:
   /// string if this is not applicable.
   StringRef getModuleFilename() const;
 
+  /// Get the path to the file defining this module, what we consider the
+  /// source of truth about the module. Usually a swiftinterface file for a
+  /// resilient module, a swiftmodule for a non-resilient module, or the
+  /// modulemap for a clang module. Returns an empty string if not applicable.
+  StringRef getModuleSourceFilename() const;
+
+  /// Get the path to the file loaded by the compiler. Usually the binary
+  /// swiftmodule file or a pcm in the cache. Returns an empty string if not
+  /// applicable.
+  StringRef getModuleLoadedFilename() const;
+
+  /// \returns true if this module is defined under the SDK path.
+  /// If no SDK path is defined, this always returns false.
+  bool isSDKModule() const;
+
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 
@@ -845,6 +919,10 @@ public:
 
   /// Returns the associated clang module if one exists.
   const clang::Module *findUnderlyingClangModule() const;
+
+  /// Does this module or the underlying clang module defines export_as with
+  /// a value corresponding to the \p other module?
+  bool isExportedAs(const ModuleDecl *other) const;
 
   /// Returns a generator with the components of this module's full,
   /// hierarchical name.

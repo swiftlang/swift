@@ -536,17 +536,37 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleExtendedExistentialTypeShapeSymbol(
                      genSig, existentialType, isUnique);
   }
+
+  case Kind::RuntimeDiscoverableAttributeRecord: {
+    auto *attr = cast<NominalTypeDecl>(getDecl());
+    return mangler.mangleRuntimeAccessibleAttributeRecord(attr);
+  }
   }
   llvm_unreachable("bad entity kind!");
 }
 
-SILDeclRef LinkEntity::getSILDeclRef() const {
-  assert(getKind() == Kind::DistributedThunkAsyncFunctionPointer ||
-         getKind() == Kind::AsyncFunctionPointerAST);
+SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
+  switch (getKind()) {
+  case Kind::DispatchThunk:
+  case Kind::MethodDescriptor:
+    return SILDeclRef::Kind::Func;
+  case Kind::DispatchThunkInitializer:
+  case Kind::MethodDescriptorInitializer:
+    return SILDeclRef::Kind::Initializer;
+  case Kind::MethodDescriptorAllocator:
+  case Kind::DispatchThunkAllocator:
+    return SILDeclRef::Kind::Allocator;
+  case Kind::DistributedThunkAsyncFunctionPointer:
+  case Kind::AsyncFunctionPointerAST:
+    return static_cast<SILDeclRef::Kind>(
+        reinterpret_cast<uintptr_t>(SecondaryPointer));
+  default:
+    llvm_unreachable("unhandled kind");
+  }
+}
 
-  return SILDeclRef(const_cast<ValueDecl *>(getDecl()),
-             static_cast<SILDeclRef::Kind>(
-                 reinterpret_cast<uintptr_t>(SecondaryPointer)));
+SILDeclRef LinkEntity::getSILDeclRef() const {
+  return SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
 }
 
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
@@ -703,7 +723,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     auto linkage = getDeclLinkage(varDecl);
 
     // Classes with resilient storage don't expose field offset symbols.
-    if (cast<ClassDecl>(varDecl->getDeclContext())->isResilient()) {
+    auto implContext = varDecl->getDeclContext()->getImplementedObjCContext();
+    if (cast<ClassDecl>(implContext)->isResilient()) {
       assert(linkage != FormalLinkage::PublicNonUnique &&
             "Cannot have a resilient class with non-unique linkage");
 
@@ -860,11 +881,16 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::PublicExternal;
   case Kind::PartialApplyForwarder:
   case Kind::DistributedAccessor:
-  case Kind::AccessibleFunctionRecord:
     return SILLinkage::Private;
+  case Kind::AccessibleFunctionRecord:
+    return getSILFunction()->isDistributed() ? SILLinkage::Private
+                                             : SILLinkage::Shared;
   case Kind::ExtendedExistentialTypeShape:
     return (isExtendedExistentialTypeShapeShared()
               ? SILLinkage::Shared : SILLinkage::Private);
+  case Kind::RuntimeDiscoverableAttributeRecord:
+    return SILLinkage::Private;
+
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -959,6 +985,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord:
   case Kind::ExtendedExistentialTypeShape:
+  case Kind::RuntimeDiscoverableAttributeRecord:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -1049,9 +1076,11 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::MethodDescriptorDerivative:
     return IGM.MethodDescriptorStructTy;
   case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::OpaqueTypeDescriptorAccessorKey:
     return IGM.DynamicReplacementKeyTy;
   case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
   case Kind::OpaqueTypeDescriptorAccessorVar:
     return IGM.DynamicReplacementLinkEntryTy;
   case Kind::ObjCMetadataUpdateFunction:
@@ -1084,6 +1113,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     return IGM.AccessibleFunctionRecordTy;
   case Kind::ExtendedExistentialTypeShape:
     return IGM.RelativeAddressTy;
+  case Kind::RuntimeDiscoverableAttributeRecord:
+    return IGM.RuntimeDiscoverableAttributeTy;
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -1116,6 +1147,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::OpaqueTypeDescriptorRecord:
   case Kind::AccessibleFunctionRecord:
   case Kind::ExtendedExistentialTypeShape:
+  case Kind::RuntimeDiscoverableAttributeRecord:
     return Alignment(4);
   case Kind::AsyncFunctionPointer:
   case Kind::DispatchThunkAsyncFunctionPointer:
@@ -1124,6 +1156,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
   case Kind::DistributedAccessorAsyncPointer:
   case Kind::KnownAsyncFunctionPointer:
+  case Kind::AsyncFunctionPointerAST:
   case Kind::ObjCClassRef:
   case Kind::ObjCClass:
   case Kind::TypeMetadataLazyCacheVariable:
@@ -1141,7 +1174,9 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::SwiftMetaclassStub:
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
   case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
   case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::ObjCResilientClassStub:
@@ -1277,6 +1312,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::DifferentiabilityWitness:
   case Kind::AccessibleFunctionRecord:
   case Kind::ExtendedExistentialTypeShape:
+  case Kind::RuntimeDiscoverableAttributeRecord:
     return false;
 
   case Kind::AsyncFunctionPointer:
@@ -1421,8 +1457,11 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
 
   case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord: {
-    auto *funcDC = getSILFunction()->getDeclContext();
-    return funcDC->getParentModule();
+    return getSILFunction()->getParentModule();
+  }
+
+  case Kind::RuntimeDiscoverableAttributeRecord: {
+    return nullptr;
   }
   }
   llvm_unreachable("invalid decl kind");

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -75,7 +75,7 @@ static bool isBarrier(SILInstruction *inst) {
     // Whitelist the safe builtin categories. Builtins should generally be
     // treated conservatively, because introducing a new builtin does not
     // require updating all passes to be aware of it.
-    switch (kind.getValue()) {
+    switch (kind.value()) {
     case BuiltinValueKind::None:
       llvm_unreachable("Builtin must has a non-empty kind.");
 
@@ -129,6 +129,9 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::SToSCheckedTrunc:
     case BuiltinValueKind::UToUCheckedTrunc:
     case BuiltinValueKind::IntToFPWithOverflow:
+    case BuiltinValueKind::BitWidth:
+    case BuiltinValueKind::IsNegative:
+    case BuiltinValueKind::WordAtIndex:
     case BuiltinValueKind::ZeroInitializer:
     case BuiltinValueKind::Once:
     case BuiltinValueKind::OnceWithContext:
@@ -147,6 +150,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::EndAsyncLet:
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
+    case BuiltinValueKind::CreateTaskGroupWithFlags:
     case BuiltinValueKind::DestroyTaskGroup:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::StackDealloc:
@@ -193,6 +197,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::ResumeThrowingContinuationThrowing:
     case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
     case BuiltinValueKind::AutoDiffAllocateSubcontext:
+    case BuiltinValueKind::AddressOfBorrowOpaque:
+    case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
       return true;
     }
   }

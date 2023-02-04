@@ -80,6 +80,16 @@ SILInstruction *ValueBase::getDefiningInstruction() {
   return nullptr;
 }
 
+SILInstruction *ValueBase::getDefiningInstructionOrTerminator() {
+  if (auto *inst = dyn_cast<SingleValueInstruction>(this))
+    return inst;
+  if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
+    return result->getParent();
+  if (auto *result = SILArgument::isTerminatorResult(this))
+    return result->getSingleTerminator();
+  return nullptr;
+}
+
 SILInstruction *ValueBase::getDefiningInsertionPoint() {
   if (auto *inst = getDefiningInstruction())
     return inst;
@@ -106,11 +116,8 @@ ValueBase::getDefiningInstructionResult() {
 }
 
 bool ValueBase::isLexical() const {
-  if (auto *argument = dyn_cast<SILFunctionArgument>(this)) {
-    // TODO: Recognize guaranteed arguments as lexical too.
-    return argument->getOwnershipKind() == OwnershipKind::Owned &&
-           argument->getLifetime().isLexical();
-  }
+  if (auto *argument = dyn_cast<SILFunctionArgument>(this))
+    return argument->getLifetime().isLexical();
   if (auto *bbi = dyn_cast<BeginBorrowInst>(this))
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
@@ -215,7 +222,6 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
 
   switch (Convention) {
   case SILArgumentConvention::Indirect_In:
-  case SILArgumentConvention::Indirect_In_Constant:
     value = moduleConventions.useLoweredAddresses() ? OwnershipKind::None
                                                     : OwnershipKind::Owned;
     break;
@@ -226,6 +232,10 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
   case SILArgumentConvention::Indirect_Out:
+  case SILArgumentConvention::Pack_Inout:
+  case SILArgumentConvention::Pack_Out:
+  case SILArgumentConvention::Pack_Owned:
+  case SILArgumentConvention::Pack_Guaranteed:
     value = OwnershipKind::None;
     return;
   case SILArgumentConvention::Direct_Owned:
@@ -257,9 +267,9 @@ ValueOwnershipKind::ValueOwnershipKind(StringRef S)
                     .Case("guaranteed", OwnershipKind::Guaranteed)
                     .Case("none", OwnershipKind::None)
                     .Default(None);
-  if (!Result.hasValue())
+  if (!Result.has_value())
     llvm_unreachable("Invalid string representation of ValueOwnershipKind");
-  value = Result.getValue();
+  value = Result.value();
 }
 
 ValueOwnershipKind
@@ -432,8 +442,6 @@ StringRef OperandOwnership::asString() const {
     return "interior-pointer";
   case OperandOwnership::GuaranteedForwarding:
     return "guaranteed-forwarding";
-  case OperandOwnership::GuaranteedForwardingPhi:
-    return "guaranteed-forwarding-phi";
   case OperandOwnership::EndBorrow:
     return "end-borrow";
   case OperandOwnership::Reborrow:

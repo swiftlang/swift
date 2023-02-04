@@ -50,6 +50,7 @@ namespace swift {
 /// this is the task of the type visitor invoking it.
 /// \returns The found opened archetype or empty type otherwise.
 CanOpenedArchetypeType getOpenedArchetypeOf(CanType Ty);
+CanLocalArchetypeType getLocalArchetypeOf(CanType Ty);
 
 /// How an existential type container is represented.
 enum class ExistentialRepresentation {
@@ -494,6 +495,8 @@ public:
   SILType getFieldType(VarDecl *field, SILModule &M,
                        TypeExpansionContext context) const;
 
+  SILType getFieldType(VarDecl *field, SILFunction *fn) const;
+
   /// Given that this is an enum type, return the lowered type of the
   /// data for the given element.  Applies substitutions as necessary.
   /// The result will have the same value category as the base type.
@@ -622,6 +625,10 @@ public:
   /// wrapped type.
   bool isMoveOnly() const;
 
+  /// Is this a type that is a first class move only type. This returns false
+  /// for a move only wrapped type.
+  bool isPureMoveOnly() const;
+
   /// Returns true if and only if this type is a first class move only
   /// type. NOTE: Returns false if the type is a move only wrapped type.
   bool isMoveOnlyType() const;
@@ -730,6 +737,9 @@ public:
   /// Get the SIL token type.
   static SILType getSILTokenType(const ASTContext &C);
 
+  /// Get the type for pack indexes.
+  static SILType getPackIndexType(const ASTContext &C);
+
   /// Return '()'
   static SILType getEmptyTupleType(const ASTContext &C);
 
@@ -787,6 +797,13 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
 
 inline SILType SILBlockStorageType::getCaptureAddressType() const {
   return SILType::getPrimitiveAddressType(getCaptureType());
+}
+
+inline SILType SILPackType::getSILElementType(unsigned index) const {
+  return SILType::getPrimitiveType(getElementType(index),
+                                   isElementAddress()
+                                     ? SILValueCategory::Address
+                                     : SILValueCategory::Object);
 }
 
 /// The hash of a SILType is the hash of its opaque value.

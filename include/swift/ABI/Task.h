@@ -25,6 +25,8 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/VoucherShims.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Threading/ConditionVariable.h"
+#include "swift/Threading/Mutex.h"
 #include "bitset"
 #include "queue" // TODO: remove and replace with our own mpsc
 
@@ -710,6 +712,16 @@ public:
   /// The executor that should be resumed to.
   /// Public ABI.
   ExecutorRef ResumeToExecutor;
+
+#if defined(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  /// In a task-to-thread model, instead of voluntarily descheduling the task
+  /// from the thread, we will block the thread (and therefore task).
+  /// This condition variable is lazily allocated on the stack only if the
+  /// continuation has not been resumed by the point of await. The mutex in the
+  /// condition variable is therefore not really protecting any state as all
+  /// coordination is done via the AwaitSynchronization atomic
+  ConditionVariable *Cond;
+#endif
 
   void setErrorResult(SwiftError *error) {
     ErrorResult = error;

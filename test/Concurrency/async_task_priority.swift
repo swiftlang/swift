@@ -13,6 +13,9 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
 
+// rdar://101077408 – Temporarily disable on watchOS simulator
+// UNSUPPORTED: DARWIN_SIMULATOR=watchos
+
 import Darwin
 @preconcurrency import Dispatch
 import StdlibUnittest

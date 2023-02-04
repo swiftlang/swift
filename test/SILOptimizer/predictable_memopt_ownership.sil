@@ -270,7 +270,7 @@ bb0(%0 : $Int):
   store %0 to [trivial] %1 : $*Int
   %2 = alloc_stack $Int
 
-  copy_addr %1 to [initialization] %2 : $*Int
+  copy_addr %1 to [init] %2 : $*Int
 
   %3 = load [trivial] %2 : $*Int
 
@@ -288,7 +288,7 @@ bb0(%0 : $Bool):
   %1 = alloc_stack $Bool
   store %0 to [trivial] %1 : $*Bool
   %3 = alloc_stack $Bool
-  copy_addr %1 to [initialization] %3 : $*Bool
+  copy_addr %1 to [init] %3 : $*Bool
   %5 = load [trivial] %3 : $*Bool
   copy_addr %3 to %1 : $*Bool
   %12 = load [trivial] %1 : $*Bool
@@ -433,7 +433,7 @@ bb0(%0 : @owned $Optional<AnyObject>):
   %2 = alloc_stack $Optional<AnyObject>
   store %0 to [init] %2 : $*Optional<AnyObject>
 // CHECK-NOT: copy_addr
-  copy_addr %2 to [initialization] %1 : $*Optional<AnyObject>
+  copy_addr %2 to [init] %1 : $*Optional<AnyObject>
   destroy_addr %2 : $*Optional<AnyObject>
   dealloc_stack %2 : $*Optional<AnyObject>
   destroy_addr %1 : $*Optional<AnyObject>
@@ -451,7 +451,7 @@ bb0(%0 : @owned $Optional<AnyObject>):
   %2 = alloc_stack $Optional<AnyObject>
   store %0 to [init] %1 : $*Optional<AnyObject>
 // CHECK-NOT: copy_addr
-  copy_addr %1 to [initialization] %2 : $*Optional<AnyObject>
+  copy_addr %1 to [init] %2 : $*Optional<AnyObject>
   destroy_addr %2 : $*Optional<AnyObject>
   dealloc_stack %2 : $*Optional<AnyObject>
   destroy_addr %1 : $*Optional<AnyObject>
@@ -1226,7 +1226,7 @@ bb1:
 
 bb2:
   %n = alloc_stack $Builtin.NativeObject
-  copy_addr [take] %1 to [initialization] %n : $*Builtin.NativeObject
+  copy_addr [take] %1 to [init] %n : $*Builtin.NativeObject
   %2 = load [take] %n : $*Builtin.NativeObject
   %3 = unchecked_ref_cast %2 : $Builtin.NativeObject to $Builtin.NativeObject
   %func = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject

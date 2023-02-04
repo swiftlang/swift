@@ -64,9 +64,9 @@ static void fixupMetadataSectionBaseAddress(swift::MetadataSections *sections) {
   if (fixupNeeded) {
     // We need to fix up the base address. We'll need a known-good address in
     // the same image: `sections` itself will work nicely.
-    swift::SymbolInfo symbolInfo;
-    if (lookupSymbol(sections, &symbolInfo) && symbolInfo.baseAddress) {
-        sections->baseAddress.store(symbolInfo.baseAddress,
+    auto symbolInfo = SymbolInfo::lookup(sections);
+    if (symbolInfo.has_value() && symbolInfo->getBaseAddress()) {
+        sections->baseAddress.store(symbolInfo->getBaseAddress(),
                                     std::memory_order_relaxed);
     }
   }
@@ -190,10 +190,9 @@ const swift::MetadataSections *swift_getMetadataSection(size_t index) {
 SWIFT_RUNTIME_EXPORT
 const char *
 swift_getMetadataSectionName(const swift::MetadataSections *section) {
-  swift::SymbolInfo info;
-  if (lookupSymbol(section, &info)) {
-    if (info.fileName) {
-      return info.fileName;
+  if (auto info = swift::SymbolInfo::lookup(section)) {
+    if (info->getFilename()) {
+      return info->getFilename();
     }
   }
   return "";
@@ -203,9 +202,8 @@ SWIFT_RUNTIME_EXPORT
 void swift_getMetadataSectionBaseAddress(const swift::MetadataSections *section,
                                          void const **out_actual,
                                          void const **out_expected) {
-  swift::SymbolInfo info;
-  if (lookupSymbol(section, &info)) {
-    *out_actual = info.baseAddress;
+  if (auto info = swift::SymbolInfo::lookup(section)) {
+    *out_actual = info->getBaseAddress();
   } else {
     *out_actual = nullptr;
   }

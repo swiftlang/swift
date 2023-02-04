@@ -7,4 +7,5 @@ target_link_libraries(swift-refactor
                       PRIVATE
                         swiftDriver
                         swiftFrontend
-                        swiftIDE)
+                        swiftIDE
+                        swiftRefactoring)

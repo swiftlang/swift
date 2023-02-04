@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
+#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTWalker.h"
@@ -215,8 +216,12 @@ bool Expr::printConstExprValue(llvm::raw_ostream *OS,
   }
   case ExprKind::IntegerLiteral:
   case ExprKind::FloatLiteral:  {
-    auto digits = cast<NumberLiteralExpr>(E)->getDigitsText();
+    const auto *NE = cast<NumberLiteralExpr>(E);
+    auto digits = NE->getDigitsText();
     assert(!digits.empty());
+    if (NE->getMinusLoc().isValid()) {
+      print("-");
+    }
     print(digits);
     return true;
   }
@@ -331,6 +336,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(MagicIdentifierLiteral);
   NO_REFERENCE(DiscardAssignment);
   NO_REFERENCE(LazyInitializer);
+  NO_REFERENCE(SingleValueStmt);
 
   SIMPLE_REFERENCE(DeclRef, getDeclRef);
   SIMPLE_REFERENCE(SuperRef, getSelf);
@@ -366,6 +372,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
   PASS_THROUGH_REFERENCE(Await, getSubExpr);
   PASS_THROUGH_REFERENCE(Move, getSubExpr);
+  PASS_THROUGH_REFERENCE(Borrow, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
@@ -390,6 +397,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
 
   NO_REFERENCE(VarargExpansion);
   NO_REFERENCE(PackExpansion);
+  NO_REFERENCE(PackElement);
   NO_REFERENCE(DynamicType);
 
   PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
@@ -462,6 +470,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
   NO_REFERENCE(TypeJoin);
+  SIMPLE_REFERENCE(MacroExpansion, getMacroRef);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -661,6 +670,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::MagicIdentifierLiteral:
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
+  case ExprKind::SingleValueStmt:
     return true;
 
   case ExprKind::ObjectLiteral:
@@ -723,6 +733,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
 
   case ExprKind::Await:
   case ExprKind::Move:
+  case ExprKind::Borrow:
   case ExprKind::Try:
   case ExprKind::ForceTry:
   case ExprKind::OptionalTry:
@@ -745,6 +756,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::MakeTemporarilyEscapable:
   case ExprKind::VarargExpansion:
   case ExprKind::PackExpansion:
+  case ExprKind::PackElement:
     return false;
 
   case ExprKind::Call:
@@ -814,6 +826,9 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
 
   case ExprKind::Tap:
     return true;
+
+  case ExprKind::MacroExpansion:
+    return true;
   }
 
   llvm_unreachable("Unhandled ExprKind in switch.");
@@ -828,6 +843,8 @@ ArgumentList *Expr::getArgs() const {
     return DSE->getArgs();
   if (auto *OLE = dyn_cast<ObjectLiteralExpr>(this))
     return OLE->getArgs();
+  if (auto *ME = dyn_cast<MacroExpansionExpr>(this))
+    return ME->getArgs();
   return nullptr;
 }
 
@@ -902,6 +919,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Paren:
   case ExprKind::Await:
   case ExprKind::Move:
+  case ExprKind::Borrow:
   case ExprKind::UnresolvedMemberChainResult:
   case ExprKind::Try:
   case ExprKind::ForceTry:
@@ -917,6 +935,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::InOut:
   case ExprKind::VarargExpansion:
   case ExprKind::PackExpansion:
+  case ExprKind::PackElement:
   case ExprKind::DynamicType:
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
@@ -979,7 +998,9 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::KeyPathDot:
   case ExprKind::OneWay:
   case ExprKind::Tap:
+  case ExprKind::SingleValueStmt:
   case ExprKind::TypeJoin:
+  case ExprKind::MacroExpansion:
     return false;
   }
 
@@ -1022,11 +1043,11 @@ StringRef LiteralExpr::getLiteralKindDescription() const {
   llvm_unreachable("Unhandled literal");
 }
 
-IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value) {
+IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value, SourceLoc loc) {
   llvm::SmallString<8> Scratch;
   llvm::APInt(sizeof(unsigned)*8, value).toString(Scratch, 10, /*signed*/ false);
   auto Text = C.AllocateCopy(StringRef(Scratch));
-  return new (C) IntegerLiteralExpr(Text, SourceLoc(), /*implicit*/ true);
+  return new (C) IntegerLiteralExpr(Text, loc, /*implicit*/ true);
 }
 
 APInt IntegerLiteralExpr::getRawValue() const {
@@ -1176,7 +1197,7 @@ ObjectLiteralExpr::create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind,
 StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
   switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return #Name;
-#include "swift/Syntax/TokenKinds.def"    
+#include "swift/AST/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
 }
@@ -1184,7 +1205,7 @@ StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
 StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
   switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;
-#include "swift/Syntax/TokenKinds.def"    
+#include "swift/AST/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
 }
@@ -1233,11 +1254,52 @@ VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, 
 }
 
 PackExpansionExpr *
-PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
-                          SourceLoc dotsLoc, bool implicit,
-                          Type type) {
-  return new (ctx) PackExpansionExpr(patternExpr, dotsLoc,
+PackExpansionExpr::create(ASTContext &ctx, SourceLoc repeatLoc,
+                          Expr *patternExpr, GenericEnvironment *environment,
+                          bool implicit, Type type) {
+  return new (ctx) PackExpansionExpr(repeatLoc, patternExpr, environment,
                                      implicit, type);
+}
+
+void PackExpansionExpr::getExpandedPacks(SmallVectorImpl<ASTNode> &packs) {
+  struct PackCollector : public ASTWalker {
+    llvm::SmallVector<ASTNode, 2> packs;
+
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // Don't walk into nested pack expansions
+      if (isa<PackExpansionExpr>(E)) {
+        return Action::SkipChildren(E);
+      }
+
+      if (isa<PackElementExpr>(E)) {
+        packs.push_back(E);
+      }
+
+      return Action::Continue(E);
+    }
+
+    virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      // Don't walk into nested pack expansions
+      if (isa<PackExpansionTypeRepr>(T)) {
+        return Action::SkipChildren();
+      }
+
+      if (isa<PackReferenceTypeRepr>(T)) {
+        packs.push_back(T);
+      }
+
+      return Action::Continue();
+    }
+  } packCollector;
+
+  getPatternExpr()->walk(packCollector);
+  packs.append(packCollector.packs.begin(), packCollector.packs.end());
+}
+
+PackElementExpr *
+PackElementExpr::create(ASTContext &ctx, SourceLoc eachLoc, Expr *packRefExpr,
+                        bool implicit, Type type) {
+  return new (ctx) PackElementExpr(eachLoc, packRefExpr, implicit, type);
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
@@ -1498,6 +1560,15 @@ static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
     return getCalledValue(E2, skipFunctionConversions);
 
   return nullptr;
+}
+
+OpaqueValueExpr *OpaqueValueExpr::createImplicit(ASTContext &ctx, Type Ty,
+                                                 bool isPlaceholder,
+                                                 AllocationArena arena) {
+  auto *mem =
+      ctx.Allocate(sizeof(OpaqueValueExpr), alignof(OpaqueValueExpr), arena);
+  return new (mem) OpaqueValueExpr(
+      /*Range=*/SourceRange(), Ty, isPlaceholder);
 }
 
 PropertyWrapperValuePlaceholderExpr *
@@ -1832,6 +1903,27 @@ ActorIsolation ClosureActorIsolation::getActorIsolation() const {
   }
 }
 
+unsigned AbstractClosureExpr::getDiscriminator() const {
+  auto raw = getRawDiscriminator();
+  if (raw != InvalidDiscriminator)
+    return raw;
+
+  evaluateOrDefault(
+      getASTContext().evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
+
+  // Ill-formed code might not be able to assign discriminators, so assign
+  // a new one now.
+  if (getRawDiscriminator() == InvalidDiscriminator &&
+      getASTContext().Diags.hadAnyError()) {
+    const_cast<AbstractClosureExpr *>(this)->
+        Bits.AbstractClosureExpr.Discriminator =
+          getASTContext().NextAutoClosureDiscriminator++;
+  }
+
+  assert(getRawDiscriminator() != InvalidDiscriminator);
+  return getRawDiscriminator();
+}
+
 void AbstractClosureExpr::setParameterList(ParameterList *P) {
   parameterList = P;
   // Change the DeclContext of any parameters to be this closure.
@@ -1839,19 +1931,7 @@ void AbstractClosureExpr::setParameterList(ParameterList *P) {
     P->setDeclContextOfParamDecls(this);
 }
 
-bool AbstractClosureExpr::hasBody() const {
-  switch (getKind()) {
-    case ExprKind::Closure:
-    case ExprKind::AutoClosure:
-      return true;
-    default:
-      return false;
-  }
-}
-
 BraceStmt * AbstractClosureExpr::getBody() const {
-  if (!hasBody())
-    return nullptr;
   if (const AutoClosureExpr *autocls = dyn_cast<AutoClosureExpr>(this))
     return autocls->getBody();
   if (const ClosureExpr *cls = dyn_cast<ClosureExpr>(this))
@@ -1945,15 +2025,19 @@ swift::_getRef__AbstractClosureExpr_getActorIsolation() {
 
 #define FORWARD_SOURCE_LOCS_TO(CLASS, NODE) \
   SourceRange CLASS::getSourceRange() const {     \
+    if (!NODE) { return SourceRange(); }          \
     return (NODE)->getSourceRange();              \
   }                                               \
   SourceLoc CLASS::getStartLoc() const {          \
+    if (!NODE) { return SourceLoc(); }            \
     return (NODE)->getStartLoc();                 \
   }                                               \
   SourceLoc CLASS::getEndLoc() const {            \
+    if (!NODE) { return SourceLoc(); }            \
     return (NODE)->getEndLoc();                   \
   }                                               \
   SourceLoc CLASS::getLoc() const {               \
+    if (!NODE) { return SourceLoc(); }            \
     return (NODE)->getStartLoc();                 \
   }
 
@@ -2126,62 +2210,52 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
   assert(ParentNameLoc.isValid());
   assert(NameLoc.isValid());
 
-  // Create a new list of components.
-  SmallVector<ComponentIdentTypeRepr *, 2> Components;
-
-  // The first component is the parent type.
+  // The base component is the parent type.
   auto *ParentComp = new (C) SimpleIdentTypeRepr(ParentNameLoc,
                                                  Parent->createNameRef());
   ParentComp->setValue(Parent, nullptr);
-  Components.push_back(ParentComp);
 
-  // The second component is the member we just found.
-  auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc,
-                                              Decl->createNameRef());
-  NewComp->setValue(Decl, nullptr);
-  Components.push_back(NewComp);
+  // The member component is the member we just found.
+  auto *MemberComp =
+      new (C) SimpleIdentTypeRepr(NameLoc, Decl->createNameRef());
+  MemberComp->setValue(Decl, nullptr);
 
-  auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
-  return new (C) TypeExpr(NewTypeRepr);
+  auto *TR = MemberTypeRepr::create(C, ParentComp, {MemberComp});
+  return new (C) TypeExpr(TR);
 }
 
-TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
-                                        DeclNameLoc NameLoc,
-                                        TypeDecl *Decl) {
+TypeExpr *TypeExpr::createForMemberDecl(DeclRefTypeRepr *ParentTR,
+                                        DeclNameLoc NameLoc, TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
 
   // Create a new list of components.
-  SmallVector<ComponentIdentTypeRepr *, 2> Components;
-  for (auto *Component : ParentTR->getComponentRange())
-    Components.push_back(Component);
-
-  assert(!Components.empty());
+  SmallVector<IdentTypeRepr *, 2> Components;
+  if (auto *MemberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
+    auto MemberComps = MemberTR->getMemberComponents();
+    Components.append(MemberComps.begin(), MemberComps.end());
+  }
 
   // Add a new component for the member we just found.
   auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc, Decl->createNameRef());
   NewComp->setValue(Decl, nullptr);
   Components.push_back(NewComp);
 
-  auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
-  return new (C) TypeExpr(NewTypeRepr);
+  auto *TR =
+      MemberTypeRepr::create(C, ParentTR->getBaseComponent(), Components);
+  return new (C) TypeExpr(TR);
 }
 
-TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
-                                             ArrayRef<TypeRepr*> Args,
+TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
+                                             ArrayRef<TypeRepr *> Args,
                                              SourceRange AngleLocs,
                                              ASTContext &C) {
-  // Create a new list of components.
-  SmallVector<ComponentIdentTypeRepr *, 2> components;
-  for (auto *component : ParentTR->getComponentRange()) {
-    components.push_back(component);
-  }
+  auto *lastComp = ParentTR->getLastComponent();
 
-  auto *last = components.back();
-  components.pop_back();
+  if (!isa<SimpleIdentTypeRepr>(lastComp) || !lastComp->getBoundDecl())
+    return nullptr;
 
-  if (isa<SimpleIdentTypeRepr>(last) &&
-      last->getBoundDecl()) {
-    if (isa<TypeAliasDecl>(last->getBoundDecl())) {
+  if (isa<TypeAliasDecl>(lastComp->getBoundDecl())) {
+    if (auto *memberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
       // If any of our parent types are unbound, bail out and let
       // the constraint solver can infer generic parameters for them.
       //
@@ -2194,28 +2268,50 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
       //
       // FIXME: Once we can model generic typealiases properly, rip
       // this out.
-      for (auto *component : components) {
-        auto *componentDecl = dyn_cast_or_null<GenericTypeDecl>(
-          component->getBoundDecl());
+      auto isUnboundGenericComponent = [](IdentTypeRepr *ITR) -> bool {
+        if (isa<SimpleIdentTypeRepr>(ITR)) {
+          auto *decl = dyn_cast_or_null<GenericTypeDecl>(ITR->getBoundDecl());
+          if (decl && decl->isGeneric())
+            return true;
+        }
 
-        if (isa<SimpleIdentTypeRepr>(component) &&
-            componentDecl &&
-            componentDecl->isGeneric())
+        return false;
+      };
+
+      for (auto *comp : memberTR->getMemberComponents().drop_back()) {
+        if (isUnboundGenericComponent(comp))
+          return nullptr;
+      }
+
+      if (auto *identBase =
+              dyn_cast<IdentTypeRepr>(memberTR->getBaseComponent())) {
+        if (isUnboundGenericComponent(identBase))
           return nullptr;
       }
     }
-
-    auto *genericComp = GenericIdentTypeRepr::create(C,
-      last->getNameLoc(), last->getNameRef(),
-      Args, AngleLocs);
-    genericComp->setValue(last->getBoundDecl(), last->getDeclContext());
-    components.push_back(genericComp);
-
-    auto *genericRepr = IdentTypeRepr::create(C, components);
-    return new (C) TypeExpr(genericRepr);
   }
 
-  return nullptr;
+  auto *genericComp = GenericIdentTypeRepr::create(
+      C, lastComp->getNameLoc(), lastComp->getNameRef(), Args, AngleLocs);
+  genericComp->setValue(lastComp->getBoundDecl(), lastComp->getDeclContext());
+
+  TypeRepr *TR = nullptr;
+  if (auto *memberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
+    auto oldMemberComps = memberTR->getMemberComponents().drop_back();
+
+    // Create a new list of member components, replacing the last one with the
+    // new specialized one.
+    SmallVector<IdentTypeRepr *, 2> newMemberComps;
+    newMemberComps.append(oldMemberComps.begin(), oldMemberComps.end());
+    newMemberComps.push_back(genericComp);
+
+    TR =
+        MemberTypeRepr::create(C, memberTR->getBaseComponent(), newMemberComps);
+  } else {
+    TR = genericComp;
+  }
+
+  return new (C) TypeExpr(TR);
 }
 
 // Create an implicit TypeExpr, with location information even though it
@@ -2376,6 +2472,119 @@ KeyPathExpr::Component::Component(
     ? nullptr : indexHashables.data();
 }
 
+SingleValueStmtExpr *SingleValueStmtExpr::create(ASTContext &ctx, Stmt *S,
+                                                 DeclContext *DC) {
+  return new (ctx) SingleValueStmtExpr(S, DC);
+}
+
+SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
+    ASTContext &ctx, Stmt *S, DeclContext *DC, bool mustBeExpr) {
+  auto *SVE = create(ctx, S, DC);
+
+  // Attempt to wrap any branches that can be wrapped.
+  SmallVector<Stmt *, 4> scratch;
+  for (auto *branch : SVE->getBranches(scratch)) {
+    auto *BS = dyn_cast<BraceStmt>(branch);
+    if (!BS)
+      continue;
+
+    auto elts = BS->getElements();
+    if (elts.size() != 1)
+      continue;
+
+    auto *S = elts.front().dyn_cast<Stmt *>();
+    if (!S)
+      continue;
+
+    if (mustBeExpr) {
+      // If this must be an expression, we can eagerly wrap any exhaustive if
+      // and switch branch.
+      if (auto *IS = dyn_cast<IfStmt>(S)) {
+        if (!IS->isSyntacticallyExhaustive())
+          continue;
+      } else if (!isa<SwitchStmt>(S)) {
+        continue;
+      }
+    } else {
+      // Otherwise do the semantic checking to verify that we can wrap the
+      // branch.
+      if (!S->mayProduceSingleValue(ctx))
+        continue;
+    }
+    BS->setLastElement(
+        SingleValueStmtExpr::createWithWrappedBranches(ctx, S, DC, mustBeExpr));
+  }
+  return SVE;
+}
+
+SingleValueStmtExpr *
+SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(Expr *E) {
+  while (true) {
+    // Look through implicit conversions.
+    if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+      E = ICE->getSubExpr();
+      continue;
+    }
+    // Look through coercions.
+    if (auto *CE = dyn_cast<CoerceExpr>(E)) {
+      E = CE->getSubExpr();
+      continue;
+    }
+    // Look through try/await (this is invalid, but we'll error on it in
+    // effect checking).
+    if (auto *TE = dyn_cast<AnyTryExpr>(E)) {
+      E = TE->getSubExpr();
+      continue;
+    }
+    if (auto *AE = dyn_cast<AwaitExpr>(E)) {
+      E = AE->getSubExpr();
+      continue;
+    }
+    break;
+  }
+  return dyn_cast<SingleValueStmtExpr>(E);
+}
+
+SourceRange SingleValueStmtExpr::getSourceRange() const {
+  return S->getSourceRange();
+}
+
+SingleValueStmtExpr::Kind SingleValueStmtExpr::getStmtKind() const {
+  switch (getStmt()->getKind()) {
+  case StmtKind::If:
+    return Kind::If;
+  case StmtKind::Switch:
+    return Kind::Switch;
+  default:
+    llvm_unreachable("Unhandled kind!");
+  }
+}
+
+ArrayRef<Stmt *>
+SingleValueStmtExpr::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
+  switch (getStmtKind()) {
+  case Kind::If:
+    return cast<IfStmt>(getStmt())->getBranches(scratch);
+  case Kind::Switch:
+    return cast<SwitchStmt>(getStmt())->getBranches(scratch);
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
+ArrayRef<Expr *> SingleValueStmtExpr::getSingleExprBranches(
+    SmallVectorImpl<Expr *> &scratch) const {
+  assert(scratch.empty());
+  SmallVector<Stmt *, 4> stmtScratch;
+  for (auto *branch : getBranches(stmtScratch)) {
+    auto *BS = dyn_cast<BraceStmt>(branch);
+    if (!BS)
+      continue;
+    if (auto *E = BS->getSingleExpressionElement())
+      scratch.push_back(E);
+  }
+  return scratch;
+}
+
 void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx, 
     llvm::function_ref<void(bool, CallExpr *)> callback) {
   auto appendingExpr = getAppendingExpr();
@@ -2435,9 +2644,19 @@ RegexLiteralExpr::createParsed(ASTContext &ctx, SourceLoc loc,
                                     /*implicit*/ false);
 }
 
-TypeJoinExpr::TypeJoinExpr(DeclRefExpr *varRef, ArrayRef<Expr *> elements)
-  : Expr(ExprKind::TypeJoin, /*implicit=*/true, Type()), Var(varRef) {
-  assert(Var);
+TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
+                           ArrayRef<Expr *> elements, SingleValueStmtExpr *SVE)
+    : Expr(ExprKind::TypeJoin, /*implicit=*/true, Type()), Var(nullptr),
+      SVE(SVE) {
+
+  if (auto *varRef = result.dyn_cast<DeclRefExpr *>()) {
+    assert(varRef);
+    Var = varRef;
+  } else {
+    auto joinType = Type(result.get<TypeBase *>());
+    assert(joinType && "expected non-null type");
+    setType(joinType);
+  }
 
   Bits.TypeJoinExpr.NumElements = elements.size();
   // Copy elements.
@@ -2445,11 +2664,49 @@ TypeJoinExpr::TypeJoinExpr(DeclRefExpr *varRef, ArrayRef<Expr *> elements)
                           getTrailingObjects<Expr *>());
 }
 
-TypeJoinExpr *TypeJoinExpr::create(ASTContext &ctx, DeclRefExpr *var,
-                                   ArrayRef<Expr *> elements) {
+TypeJoinExpr *TypeJoinExpr::createImpl(
+    ASTContext &ctx, llvm::PointerUnion<DeclRefExpr *, TypeBase *> varOrType,
+    ArrayRef<Expr *> elements, AllocationArena arena,
+    SingleValueStmtExpr *SVE) {
   size_t size = totalSizeToAlloc<Expr *>(elements.size());
-  void *mem = ctx.Allocate(size, alignof(TypeJoinExpr));
-  return new (mem) TypeJoinExpr(var, elements);
+  void *mem = ctx.Allocate(size, alignof(TypeJoinExpr), arena);
+  return new (mem) TypeJoinExpr(varOrType, elements, SVE);
+}
+
+TypeJoinExpr *
+TypeJoinExpr::forBranchesOfSingleValueStmtExpr(ASTContext &ctx, Type joinType,
+                                               SingleValueStmtExpr *SVE,
+                                               AllocationArena arena) {
+  return createImpl(ctx, joinType.getPointer(), /*elements*/ {}, arena, SVE);
+}
+
+SourceRange MacroExpansionExpr::getSourceRange() const {
+  SourceLoc endLoc;
+  if (ArgList && !ArgList->isImplicit())
+    endLoc = ArgList->getEndLoc();
+  else if (RightAngleLoc.isValid())
+    endLoc = RightAngleLoc;
+  else
+    endLoc = MacroNameLoc.getEndLoc();
+
+  return SourceRange(SigilLoc, endLoc);
+}
+
+unsigned MacroExpansionExpr::getDiscriminator() const {
+  if (getRawDiscriminator() != InvalidDiscriminator)
+    return getRawDiscriminator();
+
+  auto mutableThis = const_cast<MacroExpansionExpr *>(this);
+  auto dc = getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  auto discriminatorContext =
+      MacroDiscriminatorContext::getParentOf(mutableThis);
+  mutableThis->setDiscriminator(
+      ctx.getNextMacroDiscriminator(
+          discriminatorContext, getMacroName().getBaseName()));
+
+  assert(getRawDiscriminator() != InvalidDiscriminator);
+  return getRawDiscriminator();
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {

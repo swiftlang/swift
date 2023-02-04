@@ -29,38 +29,15 @@
 #include <memory>
 #include <type_traits>
 
-namespace swift {
-
-/// This is a platform independent version of Dl_info from dlfcn.h
-#if defined(__cplusplus)
-
-template <typename T>
-struct null_deleter {
-  void operator()(T *) const {}
-  void operator()(typename std::remove_cv<T>::type *value) const {}
-};
-
-template <typename T>
-struct free_deleter {
-  void operator()(T *value) const {
-    free(const_cast<typename std::remove_cv<T>::type *>(value));
-  }
-  void operator()(typename std::remove_cv<T>::type *value) const {
-    free(value);
-  }
-};
-
-struct SymbolInfo {
-  const char *fileName;
-  void *baseAddress;
 #if defined(_WIN32)
-  std::unique_ptr<const char, free_deleter<const char>> symbolName;
-#else
-  std::unique_ptr<const char, null_deleter<const char>> symbolName;
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
 #endif
-  void *symbolAddress;
-};
-#endif
+
+#include "SymbolInfo.h"
+
+namespace swift {
 
 /// Load the metadata from the image necessary to find protocols by name.
 void initializeProtocolLookup();
@@ -105,67 +82,6 @@ void addImageAccessibleFunctionsBlockCallback(const void *baseAddress,
 void addImageAccessibleFunctionsBlockCallbackUnsafe(const void *baseAddress,
                                                     const void *start,
                                                     uintptr_t size);
-
-int lookupSymbol(const void *address, SymbolInfo *info);
-
-#if defined(_WIN32)
-/// Configure the environment to allow calling into the Debug Help library.
-///
-/// \param body A function to invoke. This function attempts to first initialize
-///   the Debug Help library. The result of that operation is passed to this
-///   function.
-/// \param context A caller-supplied value to pass to \a body.
-///
-/// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
-/// calls into it from the Swift runtime and stdlib should route through this
-/// function.
-SWIFT_RUNTIME_STDLIB_SPI
-void _swift_withWin32DbgHelpLibrary(
-  void (* body)(bool isInitialized, void *context), void *context);
-
-/// Configure the environment to allow calling into the Debug Help library.
-///
-/// \param body A function to invoke. This function attempts to first initialize
-///   the Debug Help library. The result of that operation is passed to this
-///   function.
-///
-/// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
-/// calls into it from the Swift runtime and stdlib should route through this
-/// function.
-static inline void _swift_withWin32DbgHelpLibrary(
-  const std::function<void(bool /*isInitialized*/)> &body) {
-  _swift_withWin32DbgHelpLibrary([](bool isInitialized, void *context) {
-    auto bodyp = reinterpret_cast<std::function<void(bool)> *>(context);
-    (* bodyp)(isInitialized);
-  }, const_cast<void *>(reinterpret_cast<const void *>(&body)));
-}
-
-/// Configure the environment to allow calling into the Debug Help library.
-///
-/// \param body A function to invoke. This function attempts to first initialize
-///   the Debug Help library. The result of that operation is passed to this
-///   function.
-///
-/// \returns Whatever is returned from \a body.
-///
-/// On Windows, the Debug Help library (DbgHelp.lib) is not thread-safe. All
-/// calls into it from the Swift runtime and stdlib should route through this
-/// function.
-template <
-  typename F,
-  typename R = typename std::result_of_t<F&(bool /*isInitialized*/)>,
-  typename = typename std::enable_if_t<!std::is_same<void, R>::value>
->
-static inline R _swift_withWin32DbgHelpLibrary(const F& body) {
-  R result;
-
-  _swift_withWin32DbgHelpLibrary([&body, &result] (bool isInitialized) {
-    result = body(isInitialized);
-  });
-
-  return result;
-}
-#endif
 
 } // end namespace swift
 

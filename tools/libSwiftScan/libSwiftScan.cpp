@@ -27,12 +27,6 @@ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t)
 
 //=== Private Cleanup Functions -------------------------------------------===//
 
-/// Free the given string.
-void swiftscan_string_dispose(swiftscan_string_ref_t string) {
-  if (string.data)
-    free(const_cast<void *>(string.data));
-}
-
 void swiftscan_dependency_info_details_dispose(
     swiftscan_module_details_t details) {
   swiftscan_module_details_s *details_impl = details;
@@ -311,6 +305,11 @@ swiftscan_swift_binary_detail_get_module_source_info_path(
   return details->swift_binary_details.module_source_info_path;
 }
 
+bool swiftscan_swift_binary_detail_get_is_framework(
+    swiftscan_module_details_t details) {
+  return details->swift_binary_details.is_framework;
+}
+
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 
 swiftscan_string_ref_t
@@ -441,6 +440,11 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation) {
 
 //=== Public Cleanup Functions --------------------------------------------===//
 
+void swiftscan_string_dispose(swiftscan_string_ref_t string) {
+  if (string.data)
+    free(const_cast<void *>(string.data));
+}
+
 void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
   for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
     swiftscan_string_dispose(set->strings[SI]);
@@ -503,12 +507,18 @@ static void addFrontendFlagOption(llvm::opt::OptTable &table,
 
 swiftscan_string_ref_t
 swiftscan_compiler_target_info_query(swiftscan_scan_invocation_t invocation) {
+  return swiftscan_compiler_target_info_query_v2(invocation, nullptr);
+}
+
+swiftscan_string_ref_t
+swiftscan_compiler_target_info_query_v2(swiftscan_scan_invocation_t invocation,
+                                        const char *main_executable_path) {
   int argc = invocation->argv->count;
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
     Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
 
-  auto TargetInfo = getTargetInfo(Compilation);
+  auto TargetInfo = swift::dependencies::getTargetInfo(Compilation, main_executable_path);
   if (TargetInfo.getError())
     return swift::c_string_utils::create_null();
   return TargetInfo.get();

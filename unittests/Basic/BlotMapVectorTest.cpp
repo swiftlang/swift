@@ -632,9 +632,9 @@ TEST(BlotMapVectorCustomTest, FindAsTest) {
 
   // Normal lookup tests
   EXPECT_EQ(1u, map.count(1));
-  EXPECT_EQ(1u, map.find(0)->getValue().second);
-  EXPECT_EQ(2u, map.find(1)->getValue().second);
-  EXPECT_EQ(3u, map.find(2)->getValue().second);
+  EXPECT_EQ(1u, map.find(0)->value().second);
+  EXPECT_EQ(2u, map.find(1)->value().second);
+  EXPECT_EQ(3u, map.find(2)->value().second);
   EXPECT_TRUE(map.find(3) == map.end());
 }
 

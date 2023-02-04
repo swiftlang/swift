@@ -8,6 +8,11 @@ public func genericFunc<T: P>(_ t: T) {}
 
 public protocol P {
   func requirement()
+  func requirementWithDefaultImpl()
+}
+
+extension P {
+  public func requirementWithDefaultImpl() {}
 }
 
 public struct S {

@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -wmo -stack-protection -enable-sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=MODULE
 // RUN: %target-sil-opt -function-stack-protection -enable-sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=FUNCTION
+// RUN: %target-sil-opt -wmo -stack-protection -enable-move-inout-stack-protector -enable-sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=MOVE
 
 // REQUIRES: swift_in_compiler
 
@@ -57,8 +58,7 @@ bb0:
   return %r : $()
 }
 // CHECK-LABEL: sil [stack_protection] @function_local_stack_obj
-// MODULE-NOT:    copy_addr
-// FUNCTION:      copy_addr
+// CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function 'function_local_stack_obj'
 sil @function_local_stack_obj : $@convention(thin) () -> () {
 bb0:
@@ -72,11 +72,9 @@ bb0:
   return %r : $()
 }
 
-// MODULE-LABEL:   sil @function_local_obj
-// FUNCTION-LABEL: sil [stack_protection] @function_local_obj
-// MODULE-NOT:       copy_addr
-// FUNCTION:         copy_addr
-// CHECK:          } // end sil function 'function_local_obj'
+// CHECK-LABEL: sil @function_local_obj
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'function_local_obj'
 sil @function_local_obj : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref $C
@@ -89,13 +87,17 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: sil [stack_protection] @inout_with_unknown_callers1
-// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] %0 to [initialization] [[T]] : $*Int64
-// CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] %0 : $*Int64
-// CHECK:         dealloc_stack [[T]] : $*Int64
-// CHECK:       } // end sil function 'inout_with_unknown_callers1'
+// MOVE-LABEL:   sil [stack_protection] @inout_with_unknown_callers1
+// MODULE-LABEL: sil @inout_with_unknown_callers1
+// MOVE:           [[T:%[0-9]+]] = alloc_stack $Int64
+// MOVE:           copy_addr [take] %0 to [init] [[T]] : $*Int64
+// MOVE:           address_to_pointer [stack_protection] [[T]]
+// MOVE:           copy_addr [take] [[T]] to [init] %0 : $*Int64
+// MOVE:           dealloc_stack [[T]] : $*Int64
+// MODULE-NOT:     alloc_stack
+// MODULE-NOT:     copy_addr
+// CHECK-MODULE:   address_to_pointer [stack_protection] %0
+// CHECK:        } // end sil function 'inout_with_unknown_callers1'
 sil @inout_with_unknown_callers1 : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
   %1 = address_to_pointer [stack_protection] %0 : $*Int64 to $Builtin.RawPointer
@@ -114,14 +116,18 @@ bb0(%0 : $*Int64):
   return %r : $()
 }
 
-// CHECK-LABEL: sil [stack_protection] @inout_with_modify_access
-// CHECK:         [[A:%[0-9]+]] = begin_access [modify] [dynamic] %0 : $*Int64
-// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int64
-// CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int64
-// CHECK:         dealloc_stack [[T]] : $*Int64
-// CHECK:       } // end sil function 'inout_with_modify_access'
+// MOVE-LABEL:   sil [stack_protection] @inout_with_modify_access
+// MODULE-LABEL: sil @inout_with_modify_access
+// MOVE:           [[A:%[0-9]+]] = begin_access [modify] [dynamic] %0 : $*Int64
+// MOVE:           [[T:%[0-9]+]] = alloc_stack $Int64
+// MOVE:           copy_addr [take] [[A]] to [init] [[T]] : $*Int64
+// MOVE:           address_to_pointer [stack_protection] [[T]]
+// MOVE:           copy_addr [take] [[T]] to [init] [[A]] : $*Int64
+// MOVE:           dealloc_stack [[T]] : $*Int64
+// MODULE-NOT:     alloc_stack
+// MODULE-NOT:     copy_addr
+// CHECK-MODULE:   address_to_pointer [stack_protection] %0
+// CHECK:        } // end sil function 'inout_with_modify_access'
 sil @inout_with_modify_access : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
   %1 = begin_access [modify] [dynamic] %0 : $*Int64
@@ -145,16 +151,19 @@ bb0(%0 : $*Int64):
   return %r : $()
 }
 
-// CHECK-LABEL: sil [stack_protection] @inout_with_unknown_callers2
-// CHECK:         [[T:%[0-9]+]] = alloc_stack $S
-// CHECK:         copy_addr [take] %0 to [initialization] [[T]] : $*S
-// CHECK:         [[A:%[0-9]+]] = struct_element_addr [[T]] : $*S, #S.a
-// CHECK:         address_to_pointer [stack_protection] [[A]]
-// CHECK:         [[B:%[0-9]+]] = struct_element_addr [[T]] : $*S, #S.b
-// CHECK:         address_to_pointer [stack_protection] [[B]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] %0 : $*S
-// CHECK:         dealloc_stack [[T]] : $*S
-// CHECK:       } // end sil function 'inout_with_unknown_callers2'
+// MOVE-LABEL:   sil [stack_protection] @inout_with_unknown_callers2
+// MODULE-LABEL: sil @inout_with_unknown_callers2
+// MOVE:           [[T:%[0-9]+]] = alloc_stack $S
+// MOVE:           copy_addr [take] %0 to [init] [[T]] : $*S
+// MOVE:           [[A:%[0-9]+]] = struct_element_addr [[T]] : $*S, #S.a
+// MOVE:           address_to_pointer [stack_protection] [[A]]
+// MOVE:           [[B:%[0-9]+]] = struct_element_addr [[T]] : $*S, #S.b
+// MOVE:           address_to_pointer [stack_protection] [[B]]
+// MOVE:           copy_addr [take] [[T]] to [init] %0 : $*S
+// MOVE:           dealloc_stack [[T]] : $*S
+// MODULE-NOT:     alloc_stack
+// MODULE-NOT:     copy_addr
+// CHECK:        } // end sil function 'inout_with_unknown_callers2'
 sil @inout_with_unknown_callers2 : $@convention(thin) (@inout S) -> () {
 bb0(%0 : $*S):
   %1 = struct_element_addr %0 : $*S, #S.a
@@ -165,16 +174,19 @@ bb0(%0 : $*S):
   return %r : $()
 }
 
-// CHECK-LABEL: sil [stack_protection] @object_with_unknown_callers1
-// CHECK:         [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
-// CHECK:         [[A:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
-// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int64
-// CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int64
-// CHECK:         dealloc_stack [[T]] : $*Int64
-// CHECK:         end_access [[A]] : $*Int64
-// CHECK:       } // end sil function 'object_with_unknown_callers1'
+// MOVE-LABEL:   sil [stack_protection] @object_with_unknown_callers1
+// MODULE-LABEL: sil @object_with_unknown_callers1
+// MOVE:           [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
+// MOVE:           [[A:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
+// MOVE:           [[T:%[0-9]+]] = alloc_stack $Int64
+// MOVE:           copy_addr [take] [[A]] to [init] [[T]] : $*Int64
+// MOVE:           address_to_pointer [stack_protection] [[T]]
+// MOVE:           copy_addr [take] [[T]] to [init] [[A]] : $*Int64
+// MOVE:           dealloc_stack [[T]] : $*Int64
+// MOVE:           end_access [[A]] : $*Int64
+// MODULE-NOT:     alloc_stack
+// MODULE-NOT:     copy_addr
+// CHECK:        } // end sil function 'object_with_unknown_callers1'
 sil @object_with_unknown_callers1 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
@@ -185,17 +197,20 @@ bb0(%0 : $C):
   return %r : $()
 }
 
-// CHECK-LABEL: sil [stack_protection] @object_with_unknown_callers2
-// CHECK:         [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
-// CHECK:         [[A:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
-// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int64
-// CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int64
-// CHECK:         dealloc_stack [[T]] : $*Int64
-// CHECK:         end_access [[A]] : $*Int64
-// CHECK:       } // end sil function 'object_with_unknown_callers2'
+// MOVE-LABEL:   sil [stack_protection] @object_with_unknown_callers2
+// MODULE-LABEL: sil @object_with_unknown_callers2
+// MOVE:           [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
+// MOVE:           [[A:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
+// MOVE:           [[T:%[0-9]+]] = alloc_stack $Int64
+// MOVE:           copy_addr [take] [[A]] to [init] [[T]] : $*Int64
+// MOVE:           address_to_pointer [stack_protection] [[T]]
+// MOVE:           address_to_pointer [stack_protection] [[T]]
+// MOVE:           copy_addr [take] [[T]] to [init] [[A]] : $*Int64
+// MOVE:           dealloc_stack [[T]] : $*Int64
+// MOVE:           end_access [[A]] : $*Int64
+// MODULE-NOT:     alloc_stack
+// MODULE-NOT:     copy_addr
+// CHECK:        } // end sil function 'object_with_unknown_callers2'
 sil @object_with_unknown_callers2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
@@ -207,24 +222,27 @@ bb0(%0 : $C):
   return %r : $()
 }
 
-// CHECK-LABEL: sil [stack_protection] @object_with_unknown_callers3
-// CHECK:         [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
-// CHECK:         [[AI:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
-// CHECK:         [[TI:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] [[AI]] to [initialization] [[TI]] : $*Int64
-// CHECK:         address_to_pointer [stack_protection] [[TI]]
-// CHECK:         [[J:%[0-9]+]] = ref_element_addr %0 : $C, #C.j
-// CHECK:         [[AJ:%[0-9]+]] = begin_access [modify] [static] [[J]] : $*Int64
-// CHECK:         [[TJ:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] [[AJ]] to [initialization] [[TJ]] : $*Int64
-// CHECK:         copy_addr [take] [[TI]] to [initialization] [[AI]] : $*Int64
-// CHECK:         end_access [[AI]] : $*Int64
-// CHECK:         address_to_pointer [stack_protection] [[TJ]]
-// CHECK:         copy_addr [take] [[TJ]] to [initialization] [[AJ]] : $*Int64
-// CHECK:         dealloc_stack [[TJ]] : $*Int64
-// CHECK:         dealloc_stack [[TI]] : $*Int64
-// CHECK:         end_access [[AJ]] : $*Int64
-// CHECK:       } // end sil function 'object_with_unknown_callers3'
+// MOVE-LABEL:   sil [stack_protection] @object_with_unknown_callers3
+// MODULE-LABEL: sil @object_with_unknown_callers3
+// MOVE:           [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
+// MOVE:           [[AI:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
+// MOVE:           [[TI:%[0-9]+]] = alloc_stack $Int64
+// MOVE:           copy_addr [take] [[AI]] to [init] [[TI]] : $*Int64
+// MOVE:           address_to_pointer [stack_protection] [[TI]]
+// MOVE:           [[J:%[0-9]+]] = ref_element_addr %0 : $C, #C.j
+// MOVE:           [[AJ:%[0-9]+]] = begin_access [modify] [static] [[J]] : $*Int64
+// MOVE:           [[TJ:%[0-9]+]] = alloc_stack $Int64
+// MOVE:           copy_addr [take] [[AJ]] to [init] [[TJ]] : $*Int64
+// MOVE:           copy_addr [take] [[TI]] to [init] [[AI]] : $*Int64
+// MOVE:           end_access [[AI]] : $*Int64
+// MOVE:           address_to_pointer [stack_protection] [[TJ]]
+// MOVE:           copy_addr [take] [[TJ]] to [init] [[AJ]] : $*Int64
+// MOVE:           dealloc_stack [[TJ]] : $*Int64
+// MOVE:           dealloc_stack [[TI]] : $*Int64
+// MOVE:           end_access [[AJ]] : $*Int64
+// MODULE-NOT:     alloc_stack
+// MODULE-NOT:     copy_addr
+// CHECK:        } // end sil function 'object_with_unknown_callers3'
 sil @object_with_unknown_callers3 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
@@ -257,11 +275,9 @@ bb0(%0 : $C):
   return %r : $()
 }
 
-// MODULE-LABEL:   sil hidden @known_callers_inout
-// FUNCTION-LABEL: sil hidden [stack_protection] @known_callers_inout
-// MODULE-NOT:       copy_addr
-// FUNCTION:         copy_addr
-// CHECK:          } // end sil function 'known_callers_inout'
+// CHECK-LABEL:  sil hidden @known_callers_inout
+// CHECK-NOT:      copy_addr
+// CHECK:        } // end sil function 'known_callers_inout'
 sil hidden @known_callers_inout : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
   %2 = integer_literal $Builtin.Int64, 2
@@ -315,10 +331,12 @@ bb3:
   return %4 : $()
 }
 
-// CHECK-LABEL: sil hidden [stack_protection] @unknown_callers
-// CHECK:         copy_addr
-// CHECK:         copy_addr
-// CHECK:       } // end sil function 'unknown_callers'
+// MOVE-LABEL:   sil hidden [stack_protection] @unknown_callers
+// MODULE-LABEL: sil hidden @unknown_callers
+// MOVE:           copy_addr
+// MOVE:           copy_addr
+// MODULE-NOT:     copy_addr
+// CHECK:        } // end sil function 'unknown_callers'
 sil hidden @unknown_callers : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
   %2 = integer_literal $Builtin.Int64, 2
@@ -341,11 +359,36 @@ bb0(%0 : $*Int64):
   return %4 : $()
 }
 
-// MODULE-LABEL:   sil hidden @known_callers_obj1
-// FUNCTION-LABEL: sil hidden [stack_protection] @known_callers_obj1
-// MODULE-NOT:       copy_addr
-// FUNCTION:         copy_addr
-// CHECK:          } // end sil function 'known_callers_obj1'
+// MOVE-LABEL:   sil [stack_protection] @partially_known_callers
+// MODULE-LABEL: sil @partially_known_callers
+// MOVE:           copy_addr
+// MOVE:           copy_addr
+// MODULE-NOT:     copy_addr
+// CHECK:        } // end sil function 'partially_known_callers'
+sil @partially_known_callers : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %1 = address_to_pointer [stack_protection] %0 : $*Int64 to $Builtin.RawPointer
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// MOVE-LABEL:   sil @call_partially_known_callers
+// MODULE-LABEL: sil [stack_protection] @call_partially_known_callers
+// CHECK-NOT:      copy_addr
+// CHECK:        } // end sil function 'call_partially_known_callers'
+sil @call_partially_known_callers : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int64
+  %1 = function_ref @partially_known_callers : $@convention(thin) (@inout Int64) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout Int64) -> ()
+  dealloc_stack %0 : $*Int64
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL:   sil hidden @known_callers_obj1
+// CHECK-NOT:       copy_addr
+// CHECK:         } // end sil function 'known_callers_obj1'
 sil hidden @known_callers_obj1 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
@@ -390,11 +433,13 @@ bb3(%5 : $C):
   return %r : $()
 }
 
-// CHECK-LABEL: sil hidden [stack_protection] @known_callers_obj2
-// CHECK:         alloc_stack
-// CHECK:         copy_addr
-// CHECK:         copy_addr
-// CHECK:       } // end sil function 'known_callers_obj2'
+// MOVE-LABEL:   sil hidden [stack_protection] @known_callers_obj2
+// MODULE-LABEL: sil hidden @known_callers_obj2
+// MOVE:           alloc_stack
+// MOVE:           copy_addr
+// MOVE:           copy_addr
+// MODULE-NOT:     copy_addr
+// CHECK:        } // end sil function 'known_callers_obj2'
 sil hidden @known_callers_obj2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
@@ -428,11 +473,9 @@ bb3(%5 : $C):
   return %r : $()
 }
 
-// MODULE-LABEL:   sil private @closure_with_inout_capture
-// FUNCTION-LABEL: sil private [stack_protection] @closure_with_inout_capture
-// MODULE-NOT:       copy_addr
-// FUNCTION:         copy_addr
-// CHECK:          } // end sil function 'closure_with_inout_capture'
+// CHECK-LABEL:   sil private @closure_with_inout_capture
+// CHECK-NOT:       copy_addr
+// CHECK:         } // end sil function 'closure_with_inout_capture'
 sil private @closure_with_inout_capture : $@convention(thin) (@inout_aliasable Int64) -> () {
 bb0(%0 : $*Int64):
   %1 = address_to_pointer [stack_protection] %0 : $*Int64 to $Builtin.RawPointer
@@ -464,11 +507,13 @@ bb0:
   return %12 : $()
 }
 
-// CHECK-LABEL: sil private [stack_protection] @closure_with_inout_arg
-// CHECK:         alloc_stack
-// CHECK:         copy_addr
-// CHECK:         copy_addr
-// CHECK:       } // end sil function 'closure_with_inout_arg'
+// MOVE-LABEL:   sil private [stack_protection] @closure_with_inout_arg
+// MODULE-LABEL: sil private @closure_with_inout_arg
+// MOVE:           alloc_stack
+// MOVE:           copy_addr
+// MOVE:           copy_addr
+// MODULE-NOT:     copy_addr
+// CHECK:        } // end sil function 'closure_with_inout_arg'
 sil private @closure_with_inout_arg : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
   %1 = address_to_pointer [stack_protection] %0 : $*Int64 to $Builtin.RawPointer

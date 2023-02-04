@@ -3,8 +3,6 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/Conformances.swiftmodule -enable-library-evolution -emit-sil -o %t/Conformances.sil -enable-objc-interop -disable-objc-attr-requires-foundation-module %s
-// RUN: %FileCheck -check-prefix CHECK-MODULE %s < %t/Conformances.sil
-// RUN: %FileCheck -check-prefix NEGATIVE-MODULE %s < %t/Conformances.sil
 // RUN: %target-swift-frontend -enable-objc-interop -emit-sil -I %t %S/Inputs/ConformancesUser.swift -O | %FileCheck %s
 
 public protocol MyProto {
@@ -41,11 +39,11 @@ public struct FullStructImpl: MyProto {
 public struct OpaqueStructImpl: MyProto {}
 
 // CHECK-LABEL: sil @$s16ConformancesUser10testOpaqueSiyF
-// CHECK: function_ref @$s12Conformances7MyProtoPxycfC
+// CHECK: witness_method $OpaqueStructImpl, #MyProto.init!allocator
 // Note the default implementation is filled in here.
-// CHECK: function_ref @$s12Conformances7MyProtoPAAE6methodyyF
-// CHECK: function_ref @$s12Conformances7MyProtoP4propSivs
-// CHECK: function_ref @$s12Conformances7MyProtoPyS2icig
+// CHECK: witness_method $OpaqueStructImpl, #MyProto.method
+// CHECK: witness_method $OpaqueStructImpl, #MyProto.prop!setter
+// CHECK: witness_method $OpaqueStructImpl, #MyProto.subscript!getter
 // CHECK: end sil function '$s16ConformancesUser10testOpaqueSiyF'
 
 

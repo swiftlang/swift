@@ -36,7 +36,13 @@ TEST_F(ScanTest, TestTargetInfoQuery) {
   for (auto &str : CommandStrArr)
     Compilation.push_back(str.c_str());
 
-  auto targetInfo = getTargetInfo(Compilation);
+  SmallString<128> pathRoot("base");
+  SmallString<128> compilerPath(pathRoot);
+  llvm::sys::path::append(compilerPath, "foo", "bar", "bin", "swift-frontend");
+  SmallString<128> relativeLibPath(pathRoot);
+  llvm::sys::path::append(relativeLibPath, "foo", "bar", "lib", "swift");;
+
+  auto targetInfo = swift::dependencies::getTargetInfo(Compilation, compilerPath.c_str());
   if (targetInfo.getError()) {
     llvm::errs() << "For compilation: ";
     for (auto &str : Compilation)
@@ -47,4 +53,15 @@ TEST_F(ScanTest, TestTargetInfoQuery) {
   auto targetInfoStr = std::string(swift::c_string_utils::get_C_string(targetInfo.get()));
   EXPECT_NE(targetInfoStr.find("\"triple\": \"x86_64-apple-macosx12.0\""), std::string::npos);
   EXPECT_NE(targetInfoStr.find("\"librariesRequireRPath\": false"), std::string::npos);
+
+  std::string expectedRuntimeResourcePath = "\"runtimeResourcePath\": \"" + relativeLibPath.str().str() + "\"";
+  // On windows, need to normalize the path back to "\\" separators
+  size_t start_pos = 0;
+  while((start_pos = expectedRuntimeResourcePath.find("\\", start_pos)) != std::string::npos) {
+    expectedRuntimeResourcePath.replace(start_pos, 1, "\\\\");
+    start_pos += 2;
+  }
+  llvm::dbgs() << "Expected Runtime Resource Path: \n" << expectedRuntimeResourcePath << "\n";
+  llvm::dbgs() << "Result Target Info: \n" << targetInfoStr << "\n";
+  EXPECT_NE(targetInfoStr.find(expectedRuntimeResourcePath.c_str()), std::string::npos);
 }

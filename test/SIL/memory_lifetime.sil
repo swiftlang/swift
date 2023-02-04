@@ -89,7 +89,7 @@ bb2(%4 : @owned $Error):
 sil [ossa] @test_alloc_stack_simple : $@convention(thin) (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
   %2 = alloc_stack $T
-  copy_addr %0 to [initialization] %2 : $*T
+  copy_addr %0 to [init] %2 : $*T
   br bb1
 
 bb1:
@@ -102,17 +102,17 @@ bb1:
 sil [ossa] @test_alloc_stack_nested : $@convention(thin) (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
   %1 = alloc_stack $T
-  copy_addr %0 to [initialization] %1 : $*T
+  copy_addr %0 to [init] %1 : $*T
   %2 = alloc_stack $T
-  copy_addr %0 to [initialization] %2 : $*T
+  copy_addr %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   cond_br undef, bb1, bb2
 bb1:
   %3 = alloc_stack $T
   %4 = alloc_stack $T
-  copy_addr %0 to [initialization] %3 : $*T
-  copy_addr %0 to [initialization] %4 : $*T
+  copy_addr %0 to [init] %3 : $*T
+  copy_addr %0 to [init] %4 : $*T
   destroy_addr %3 : $*T
   destroy_addr %4 : $*T
   dealloc_stack %4 : $*T
@@ -169,23 +169,23 @@ sil [ossa] @test_many_locations_in_block : $@convention(thin) <A, B, C, D, E, G,
 bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $*I, %9 : $*A, %10 : $*B, %11 : $*C, %12 : $*D, %13 : $*E, %14 : $*G, %15 : $*H, %16 : $*I):
   %18 = alloc_stack $(A, B, C, D, E, G, H, I), let, name "a", argno 1
   %19 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 0
-  copy_addr %9 to [initialization] %19 : $*A
+  copy_addr %9 to [init] %19 : $*A
   %21 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 1
-  copy_addr %10 to [initialization] %21 : $*B
+  copy_addr %10 to [init] %21 : $*B
   %23 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 2
-  copy_addr %11 to [initialization] %23 : $*C
+  copy_addr %11 to [init] %23 : $*C
   %25 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 3
-  copy_addr %12 to [initialization] %25 : $*D
+  copy_addr %12 to [init] %25 : $*D
   %27 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 4
-  copy_addr %13 to [initialization] %27 : $*E
+  copy_addr %13 to [init] %27 : $*E
   %29 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 5
-  copy_addr %14 to [initialization] %29 : $*G
+  copy_addr %14 to [init] %29 : $*G
   %31 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 6
-  copy_addr %15 to [initialization] %31 : $*H
+  copy_addr %15 to [init] %31 : $*H
   %33 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr %16 to [initialization] %33 : $*I
+  copy_addr %16 to [init] %33 : $*I
   %41 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %41 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %41 : $*(A, B, C, D, E, G, H, I)
   %43 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 0
   %44 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 1
   %45 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 2
@@ -194,9 +194,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %48 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 5
   %49 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 6
   %50 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %43 to [initialization] %0 : $*A
+  copy_addr [take] %43 to [init] %0 : $*A
   %52 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %52 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %52 : $*(A, B, C, D, E, G, H, I)
   %54 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 0
   %55 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 1
   %56 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 2
@@ -205,9 +205,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %59 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 5
   %60 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 6
   %61 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %55 to [initialization] %1 : $*B
+  copy_addr [take] %55 to [init] %1 : $*B
   %63 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %63 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %63 : $*(A, B, C, D, E, G, H, I)
   %65 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 0
   %66 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 1
   %67 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 2
@@ -216,9 +216,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %70 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 5
   %71 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 6
   %72 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %67 to [initialization] %2 : $*C
+  copy_addr [take] %67 to [init] %2 : $*C
   %74 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %74 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %74 : $*(A, B, C, D, E, G, H, I)
   %76 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 0
   %77 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 1
   %78 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 2
@@ -227,9 +227,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %81 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 5
   %82 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 6
   %83 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %79 to [initialization] %3 : $*D
+  copy_addr [take] %79 to [init] %3 : $*D
   %85 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %85 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %85 : $*(A, B, C, D, E, G, H, I)
   %87 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 0
   %88 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 1
   %89 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 2
@@ -238,9 +238,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %92 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 5
   %93 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 6
   %94 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %91 to [initialization] %4 : $*E
+  copy_addr [take] %91 to [init] %4 : $*E
   %96 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %96 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %96 : $*(A, B, C, D, E, G, H, I)
   %98 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 0
   %99 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 1
   %100 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 2
@@ -249,9 +249,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %103 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 5
   %104 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 6
   %105 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %103 to [initialization] %5 : $*G
+  copy_addr [take] %103 to [init] %5 : $*G
   %107 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %107 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %107 : $*(A, B, C, D, E, G, H, I)
   %109 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 0
   %110 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 1
   %111 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 2
@@ -260,9 +260,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %114 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 5
   %115 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 6
   %116 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %115 to [initialization] %6 : $*H
+  copy_addr [take] %115 to [init] %6 : $*H
   %118 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %118 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %118 : $*(A, B, C, D, E, G, H, I)
   %120 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 0
   %121 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 1
   %122 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 2
@@ -271,7 +271,7 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %125 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 5
   %126 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 6
   %127 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %127 to [initialization] %7 : $*I
+  copy_addr [take] %127 to [init] %7 : $*I
   destroy_addr %126 : $*H
   destroy_addr %125 : $*G
   destroy_addr %124 : $*E
@@ -442,7 +442,7 @@ bb1:
 
 bb2:
   %5 = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
-  copy_addr %1 to [initialization] %5 : $*T
+  copy_addr %1 to [init] %5 : $*T
   inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt
   br bb3
 
@@ -587,10 +587,10 @@ sil [ossa] @test_existentials : $@convention(thin) <U: P> (@in_guaranteed U) -> 
 bb0(%0 : $*U):
   %s = alloc_stack $P
   %i = init_existential_addr %s : $*P, $U
-  copy_addr %0 to [initialization] %i : $*U
+  copy_addr %0 to [init] %i : $*U
   %o = open_existential_addr immutable_access %s : $*P to $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
   %s2 = alloc_stack $@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
-  copy_addr %o to [initialization] %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
+  copy_addr %o to [init] %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
   destroy_addr %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
   dealloc_stack %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
   destroy_addr %s : $*P
@@ -603,10 +603,10 @@ sil [ossa] @test_init_two_existentials : $@convention(thin) <U: P, V: P> (@in_gu
 bb0(%0 : $*U, %1 : $*V):
   %s = alloc_stack $P
   %t = init_existential_addr %s : $*P, $U
-  copy_addr %0 to [initialization] %t : $*U
+  copy_addr %0 to [init] %t : $*U
   destroy_addr %s : $*P
   %v = init_existential_addr %s : $*P, $V
-  copy_addr %1 to [initialization] %v : $*V
+  copy_addr %1 to [init] %v : $*V
   destroy_addr %s : $*P
   dealloc_stack %s : $*P
   %5 = tuple ()
@@ -683,3 +683,46 @@ bb3:
   return %14 : $()
 }
 
+sil [ossa] @begin_apply_in_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in U
+  destroy_addr %instance : $*Inner
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @begin_apply_in_constant_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_constant U
+  destroy_addr %instance : $*Inner
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @begin_apply_in_guaranteed_no_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_inout_destroy: memory is not initialized, but should be
+sil [ossa] @begin_apply_inout_no_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout U
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_inout_aliasable_destroy: memory is not initialized, but should be
+sil [ossa] @begin_apply_inout_aliasable_no_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout_aliasable U
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}

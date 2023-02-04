@@ -289,9 +289,13 @@ public:
 private:
   friend class TypeConverter;
 
-  /// The SIL type of values with this Swift type.
-  SILType LoweredType;
+  virtual void setLoweredAddresses() const {}
 
+protected:
+  /// The SIL type of values with this Swift type.
+  mutable SILType LoweredType;
+
+private:
   RecursiveProperties Properties;
 
   /// The resilience expansion for this type lowering.
@@ -778,6 +782,9 @@ class TypeConverter {
   void removeNullEntry(const TypeKey &k);
 #endif
 
+  /// True if SIL conventions force address-only to be passed by address.
+  bool LoweredAddresses;
+
   CanGenericSignature CurGenericSignature;
 
   /// Stack of types currently being lowered as part of an aggregate.
@@ -824,7 +831,7 @@ public:
   ModuleDecl &M;
   ASTContext &Context;
 
-  TypeConverter(ModuleDecl &m);
+  TypeConverter(ModuleDecl &m, bool loweredAddresses = true);
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
@@ -1218,6 +1225,9 @@ public:
   
   void setCaptureTypeExpansionContext(SILDeclRef constant,
                                       SILModule &M);
+
+  void setLoweredAddresses();
+
 private:
   CanType computeLoweredRValueType(TypeExpansionContext context,
                                    AbstractionPattern origType,

@@ -154,6 +154,7 @@ void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
         updateNewChildWithParentAndGroupState(task, parentStatus, NULL);
         return true;
       });
+  (void)addedRecord;
   assert(addedRecord);
 }
 

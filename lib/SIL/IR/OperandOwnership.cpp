@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,9 +26,6 @@ bool swift::checkOperandOwnershipInvariants(const Operand *operand,
   if (opOwnership == OperandOwnership::Borrow) {
     // Must be a valid BorrowingOperand.
     return bool(BorrowingOperand(const_cast<Operand *>(operand)));
-  }
-  if (opOwnership == OperandOwnership::GuaranteedForwarding) {
-    return canOpcodeForwardGuaranteedValues(const_cast<Operand *>(operand));
   }
   return true;
 }
@@ -101,6 +98,7 @@ SHOULD_NEVER_VISIT_INST(AllocBox)
 SHOULD_NEVER_VISIT_INST(AllocExistentialBox)
 SHOULD_NEVER_VISIT_INST(AllocGlobal)
 SHOULD_NEVER_VISIT_INST(AllocStack)
+SHOULD_NEVER_VISIT_INST(AllocPack)
 SHOULD_NEVER_VISIT_INST(DifferentiabilityWitnessFunction)
 SHOULD_NEVER_VISIT_INST(FloatLiteral)
 SHOULD_NEVER_VISIT_INST(FunctionRef)
@@ -109,6 +107,7 @@ SHOULD_NEVER_VISIT_INST(PreviousDynamicFunctionRef)
 SHOULD_NEVER_VISIT_INST(GlobalAddr)
 SHOULD_NEVER_VISIT_INST(GlobalValue)
 SHOULD_NEVER_VISIT_INST(BaseAddrForOffset)
+SHOULD_NEVER_VISIT_INST(HasSymbol)
 SHOULD_NEVER_VISIT_INST(IntegerLiteral)
 SHOULD_NEVER_VISIT_INST(Metatype)
 SHOULD_NEVER_VISIT_INST(ObjCProtocol)
@@ -124,6 +123,7 @@ SHOULD_NEVER_VISIT_INST(StrongRelease)
 SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
 SHOULD_NEVER_VISIT_INST(IncrementProfilerCounter)
 SHOULD_NEVER_VISIT_INST(TestSpecification)
+SHOULD_NEVER_VISIT_INST(ScalarPackIndex)
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
@@ -155,6 +155,7 @@ OPERAND_OWNERSHIP(TrivialUse, CopyAddr)
 OPERAND_OWNERSHIP(TrivialUse, ExplicitCopyAddr)
 OPERAND_OWNERSHIP(TrivialUse, MarkUnresolvedMoveAddr)
 OPERAND_OWNERSHIP(TrivialUse, DeallocStack)
+OPERAND_OWNERSHIP(TrivialUse, DeallocPack)
 OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
 OPERAND_OWNERSHIP(TrivialUse, DestroyAddr)
 OPERAND_OWNERSHIP(TrivialUse, EndAccess)
@@ -176,10 +177,13 @@ OPERAND_OWNERSHIP(TrivialUse, ObjCMetatypeToObject)
 OPERAND_OWNERSHIP(TrivialUse, ObjCToThickMetatype)
 OPERAND_OWNERSHIP(TrivialUse, OpenExistentialAddr)
 OPERAND_OWNERSHIP(TrivialUse, OpenExistentialMetatype)
+OPERAND_OWNERSHIP(TrivialUse, OpenPackElement)
 OPERAND_OWNERSHIP(TrivialUse, PointerToAddress)
 OPERAND_OWNERSHIP(TrivialUse, ProjectBlockStorage)
 OPERAND_OWNERSHIP(TrivialUse, RawPointerToRef)
 OPERAND_OWNERSHIP(TrivialUse, SelectEnumAddr)
+// select_value is only supported for integer types currently.
+OPERAND_OWNERSHIP(TrivialUse, SelectValue)
 OPERAND_OWNERSHIP(TrivialUse, StructElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchValue)
@@ -191,6 +195,8 @@ OPERAND_OWNERSHIP(TrivialUse, UncheckedAddrCast)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedRefCastAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedTakeEnumDataAddr)
 OPERAND_OWNERSHIP(TrivialUse, UnconditionalCheckedCastAddr)
+OPERAND_OWNERSHIP(TrivialUse, DynamicPackIndex)
+OPERAND_OWNERSHIP(TrivialUse, PackPackIndex)
 
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).
@@ -422,30 +428,13 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
     /*allowUnowned*/true);
 }
 
-OperandOwnership
-OperandOwnershipClassifier::visitSelectValueInst(SelectValueInst *i) {
-  if (getValue() == i->getDefaultResult())
-    return OperandOwnership::GuaranteedForwarding;
-
-  for (unsigned idx = 0, endIdx = i->getNumCases(); idx < endIdx; ++idx) {
-    SILValue casevalue;
-    SILValue result;
-    std::tie(casevalue, result) = i->getCase(idx);
-
-    if (getValue() == casevalue) {
-      return OperandOwnership::GuaranteedForwarding;
-    }
-  }
-  return OperandOwnership::TrivialUse;
-}
-
 OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
   ValueOwnershipKind destBlockArgOwnershipKind =
       bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
 
   if (destBlockArgOwnershipKind == OwnershipKind::Guaranteed) {
-    return isGuaranteedForwardingPhi(getValue())
-               ? OperandOwnership::GuaranteedForwardingPhi
+    return isGuaranteedForwarding(getValue())
+               ? OperandOwnership::GuaranteedForwarding
                : OperandOwnership::Reborrow;
   }
   return destBlockArgOwnershipKind.getForwardingOperandOwnership(
@@ -469,6 +458,7 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   switch (argConv) {
   case SILArgumentConvention::Indirect_In:
   case SILArgumentConvention::Direct_Owned:
+  case SILArgumentConvention::Pack_Owned:
     return OperandOwnership::ForwardingConsume;
 
   // A guaranteed argument is forwarded into the callee. If the call itself has
@@ -478,9 +468,11 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   // borrow scope in the caller. In contrast, a begin_apply /does/ have an
   // explicit borrow scope in the caller so we must treat arguments passed to it
   // as being borrowed for the entire region of coroutine execution.
-  case SILArgumentConvention::Indirect_In_Constant:
   case SILArgumentConvention::Indirect_In_Guaranteed:
   case SILArgumentConvention::Direct_Guaranteed:
+  case SILArgumentConvention::Pack_Guaranteed:
+  case SILArgumentConvention::Pack_Inout:
+  case SILArgumentConvention::Pack_Out:
     // For an apply that begins a borrow scope, its arguments are borrowed
     // throughout the caller's borrow scope.
     return hasScopeInCaller ? OperandOwnership::Borrow
@@ -678,6 +670,8 @@ struct OperandOwnershipBuiltinClassifier
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ErrorInMain)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UnexpectedError)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, WillThrow)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AddressOfBorrowOpaque)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UnprotectedAddressOfBorrowOpaque)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AShr)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericAShr)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Add)
@@ -754,6 +748,9 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ICMP_ULE)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ICMP_ULT)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InsertElement)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntToFPWithOverflow)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, BitWidth)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IsNegative)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, WordAtIndex)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntToPtr)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IsOptionalType)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IsPOD)
@@ -821,12 +818,20 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
-BUILTIN_OPERAND_OWNERSHIP(UnownedInstantaneousUse, Copy)
+OperandOwnership OperandOwnershipBuiltinClassifier::visitCopy(BuiltinInst *bi,
+                                                              StringRef) {
+  if (bi->getFunction()->getConventions().useLoweredAddresses()) {
+    return OperandOwnership::UnownedInstantaneousUse;
+  } else {
+    return OperandOwnership::DestroyingConsume;
+  }
+}
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLetWithLocalBuffer)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLetLifetime)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroupWithFlags)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
 
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)

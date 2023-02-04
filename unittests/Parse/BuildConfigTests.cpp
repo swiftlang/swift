@@ -22,25 +22,25 @@ Optional<version::Version> V(const char *VersionString) {
 
 TEST_F(CompilerVersionTest, VersionComparison) {
   auto currentVersion = version::getCurrentCompilerVersion();
-  EXPECT_GE(CV("700").getValue(), CV("602").getValue());
-  EXPECT_GE(CV("700.*").getValue(), CV("700.*").getValue());
-  EXPECT_GE(CV("700.*.1").getValue(), CV("700.*.0").getValue());
-  EXPECT_GE(CV("700.*.23").getValue(), CV("700.*.21").getValue());
-  EXPECT_GE(CV("700.*.1.1.0").getValue(), CV("700.*.1.1").getValue());
+  EXPECT_GE(CV("700").value(), CV("602").value());
+  EXPECT_GE(CV("700.*").value(), CV("700.*").value());
+  EXPECT_GE(CV("700.*.1").value(), CV("700.*.0").value());
+  EXPECT_GE(CV("700.*.23").value(), CV("700.*.21").value());
+  EXPECT_GE(CV("700.*.1.1.0").value(), CV("700.*.1.1").value());
   EXPECT_GE(currentVersion, currentVersion);
-  EXPECT_GE(currentVersion, CV("9223371.*.999.999.999").getValue());
+  EXPECT_GE(currentVersion, CV("9223371.*.999.999.999").value());
 }
 
 TEST_F(VersionTest, VersionComparison) {
   auto currentVersion = version::Version::getCurrentLanguageVersion();
-  EXPECT_GE(V("3").getValue(), V("2").getValue());
-  EXPECT_GE(V("2.0").getValue(), V("2.0").getValue());
-  EXPECT_GE(V("2.1").getValue(), V("2.0").getValue());
-  EXPECT_GE(V("3.1").getValue(), V("3.0.1").getValue());
-  EXPECT_GE(V("2.0").getValue(), V("2").getValue());
+  EXPECT_GE(V("3").value(), V("2").value());
+  EXPECT_GE(V("2.0").value(), V("2.0").value());
+  EXPECT_GE(V("2.1").value(), V("2.0").value());
+  EXPECT_GE(V("3.1").value(), V("3.0.1").value());
+  EXPECT_GE(V("2.0").value(), V("2").value());
   EXPECT_GE(currentVersion, currentVersion);
-  EXPECT_GE(currentVersion, V("1.0").getValue());
-  EXPECT_GE(currentVersion, V("2").getValue());
+  EXPECT_GE(currentVersion, V("1.0").value());
+  EXPECT_GE(currentVersion, V("2").value());
   EXPECT_FALSE(V("2.n").hasValue());
   EXPECT_FALSE(V("").hasValue());
   EXPECT_FALSE(V("\"2.0\"").hasValue());
@@ -53,23 +53,23 @@ TEST_F(VersionTest, VersionComparison) {
 }
 
 TEST_F(CompilerVersionUnpackingTest, VersionComparison) {
-  EXPECT_EQ(CV("700").getValue(), V("0.700").getValue());
-  EXPECT_EQ(CV("700.*").getValue(), V("0.700").getValue());
-  EXPECT_EQ(CV("700.*.1").getValue(), V("0.700.1").getValue());
-  EXPECT_EQ(CV("700.*.23").getValue(), V("0.700.23").getValue());
-  EXPECT_EQ(CV("700.*.1.1").getValue(), V("0.700.1.1").getValue());
+  EXPECT_EQ(CV("700").value(), V("0.700").value());
+  EXPECT_EQ(CV("700.*").value(), V("0.700").value());
+  EXPECT_EQ(CV("700.*.1").value(), V("0.700.1").value());
+  EXPECT_EQ(CV("700.*.23").value(), V("0.700.23").value());
+  EXPECT_EQ(CV("700.*.1.1").value(), V("0.700.1.1").value());
 
-  EXPECT_EQ(CV("1300").getValue(), V("1.300").getValue());
-  EXPECT_EQ(CV("1300.*").getValue(), V("1.300").getValue());
-  EXPECT_EQ(CV("1300.*.1").getValue(), V("1.300.1").getValue());
-  EXPECT_EQ(CV("1300.*.23").getValue(), V("1.300.23").getValue());
-  EXPECT_EQ(CV("1300.*.1.1").getValue(), V("1.300.1.1").getValue());
+  EXPECT_EQ(CV("1300").value(), V("1.300").value());
+  EXPECT_EQ(CV("1300.*").value(), V("1.300").value());
+  EXPECT_EQ(CV("1300.*.1").value(), V("1.300.1").value());
+  EXPECT_EQ(CV("1300.*.23").value(), V("1.300.23").value());
+  EXPECT_EQ(CV("1300.*.1.1").value(), V("1.300.1.1").value());
 
-  EXPECT_EQ(CV("5007").getValue(), V("5.7").getValue());
-  EXPECT_EQ(CV("5007.*").getValue(), V("5.7").getValue());
-  EXPECT_EQ(CV("5007.*.1").getValue(), V("5.7.1").getValue());
-  EXPECT_EQ(CV("5007.*.23").getValue(), V("5.7.23").getValue());
-  EXPECT_EQ(CV("5007.*.1.1").getValue(), V("5.7.1.1").getValue());
+  EXPECT_EQ(CV("5007").value(), V("5.7").value());
+  EXPECT_EQ(CV("5007.*").value(), V("5.7").value());
+  EXPECT_EQ(CV("5007.*.1").value(), V("5.7.1").value());
+  EXPECT_EQ(CV("5007.*.23").value(), V("5.7.23").value());
+  EXPECT_EQ(CV("5007.*.1.1").value(), V("5.7.1.1").value());
 
   // Since this test was added during 5.7, we expect all of these comparisons to
   // be GE, either because we are comparing to the empty version or because we

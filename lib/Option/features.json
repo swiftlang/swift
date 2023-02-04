@@ -26,6 +26,9 @@
     },
     {
       "name": "emit-const-value-sidecar"
+    },
+    {
+      "name": "emit-extension-block-symbols"
     }
   ]
 }

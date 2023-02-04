@@ -50,6 +50,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/StackList.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -69,50 +70,58 @@ struct BorrowedValue;
 // TODO: encapsulate in a ForwardingInstruction abstraction
 //===----------------------------------------------------------------------===//
 
-/// Is the opcode that produces \p value capable of forwarding guaranteed
+/// Is the opcode that produces \p value capable of forwarding inner guaranteed
 /// values?
 ///
 /// This may be true even if the current instance of the instruction is not a
 /// GuaranteedForwarding. If true, then the operation may be trivially rewritten
 /// with Guaranteed ownership.
-bool canOpcodeForwardGuaranteedValues(SILValue value);
+bool canOpcodeForwardInnerGuaranteedValues(SILValue value);
 
-/// Is the opcode that consumes \p use capable of forwarding guaranteed values?
+/// Is the opcode that consumes \p use capable of forwarding inner guaranteed
+/// values?
 ///
 /// This may be true even if \p use is not a GuaranteedForwarding. If true, then
 /// the operation may be trivially rewritten with Guaranteed ownership.
-bool canOpcodeForwardGuaranteedValues(Operand *use);
+bool canOpcodeForwardInnerGuaranteedValues(Operand *use);
 
 // This is the use-def equivalent of use->getOperandOwnership() ==
 // OperandOwnership::GuaranteedForwarding.
 inline bool isGuaranteedForwarding(SILValue value) {
-  assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
-  return canOpcodeForwardGuaranteedValues(value);
-}
-
-/// Returns true if it is a forwarding phi
-inline bool isGuaranteedForwardingPhi(SILValue value) {
   if (value->getOwnershipKind() != OwnershipKind::Guaranteed) {
     return false;
   }
-  if (isa<BeginBorrowInst>(value) || isa<LoadBorrowInst>(value)) {
-    return false;
-  }
-  auto *phi = dyn_cast<SILPhiArgument>(value);
-  if (!phi || !phi->isPhi()) {
+  // NOTE: canOpcodeForwardInnerGuaranteedValues returns true for transformation
+  // terminator results.
+  if (canOpcodeForwardInnerGuaranteedValues(value) ||
+      isa<SILFunctionArgument>(value)) {
     return true;
   }
-  bool isGuaranteedForwardingPhi = true;
-  phi->visitTransitiveIncomingPhiOperands(
-      [&](auto *phi, auto *operand) -> bool {
-        if (isa<BeginBorrowInst>(operand->get()) ||
-            isa<LoadBorrowInst>(operand->get())) {
-          isGuaranteedForwardingPhi = false;
-          return false;
-        }
-        return true;
-      });
-
+  // If not a phi, return false
+  auto *phi = dyn_cast<SILPhiArgument>(value);
+  if (!phi || !phi->isPhi()) {
+    return false;
+  }
+  // For a phi, if we find GuaranteedForwarding phi operand on any incoming
+  // path, we return true. Additional verification is added to ensure
+  // GuaranteedForwarding phi operands are found on zero or all paths in the
+  // OwnershipVerifier.
+  bool isGuaranteedForwardingPhi = false;
+  phi->visitTransitiveIncomingPhiOperands([&](auto *, auto *op) -> bool {
+    auto opValue = op->get();
+    assert(opValue->getOwnershipKind().isCompatibleWith(
+        OwnershipKind::Guaranteed));
+    if (canOpcodeForwardInnerGuaranteedValues(opValue) ||
+        isa<SILFunctionArgument>(opValue)) {
+      isGuaranteedForwardingPhi = true;
+      return false;
+    }
+    auto *phi = dyn_cast<SILPhiArgument>(opValue);
+    if (!phi || !phi->isPhi()) {
+      return false;
+    }
+    return true;
+  });
   return isGuaranteedForwardingPhi;
 }
 
@@ -525,6 +534,9 @@ public:
                        [](SILBasicBlock *block) {
                          return !isa<BranchInst>(block->getTerminator());
                        })) {
+        return Kind::Invalid;
+      }
+      if (isGuaranteedForwarding(value)) {
         return Kind::Invalid;
       }
       return Kind::Phi;
@@ -1288,6 +1300,18 @@ void visitExtendedGuaranteedForwardingPhiBaseValuePairs(
     BorrowedValue borrow, function_ref<void(SILPhiArgument *, SILValue)>
                               visitGuaranteedForwardingPhiBaseValuePair);
 
+/// If \p value is a guaranteed non-phi value forwarded from it's instruction's
+/// operands, visit each forwarded operand.
+///
+/// Returns true if \p visitOperand was called (for convenience).
+///
+/// Precondition: \p value is not a phi. The client must handle phis first by
+/// checking if they are reborrows (using BorrowedValue). Reborrows have no
+/// forwarded operands. Guaranteed forwarding need to be handled by recursing
+/// through the phi operands.
+bool visitForwardedGuaranteedOperands(
+  SILValue value, function_ref<void(Operand *)> visitOperand);
+
 /// Visit the phis in the same block as \p phi which are reborrows of a borrow
 /// of one of the values reaching \p phi.
 ///
@@ -1295,6 +1319,24 @@ void visitExtendedGuaranteedForwardingPhiBaseValuePairs(
 /// returns true.
 bool visitAdjacentReborrowsOfPhi(SILPhiArgument *phi,
                                  function_ref<bool(SILPhiArgument *)> visitor);
+
+/// Visit each definition of a scope that immediately encloses a guaranteed
+/// value. The guaranteed value effectively keeps these scopes alive.
+///
+/// This means something different depepending on whether \p value is itself a
+/// borrow introducer vs. a forwarded guaranteed value. If \p value is an
+/// introducer, then this discovers the enclosing borrow scope and visits all
+/// introducers of that scope. If \p value is a forwarded value, then this
+/// visits the introducers of the current borrow scope.
+bool visitEnclosingDefs(SILValue value, function_ref<bool(SILValue)> visitor);
+
+/// Visit the values that introduce the borrow scopes that includes \p
+/// value. If value is owned, or introduces a borrow scope, then this only
+/// visits \p value.
+///
+/// Returns false if the visitor returned false and exited early.
+bool visitBorrowIntroducers(SILValue value,
+                            function_ref<bool(SILValue)> visitor);
 
 /// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
 /// its reborrows.

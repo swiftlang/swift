@@ -213,6 +213,7 @@ cmake ^
   -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES ^
+  -D SWIFT_ENABLE_EXPERIMENTAL_REFLECTION=YES ^
 
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR="%SourceRoot%\swift" ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR="%SourceRoot%\cmark" ^
@@ -220,7 +221,7 @@ cmake ^
   -D PYTHON_EXECUTABLE=%PYTHON_HOME%\python.exe ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE="%SourceRoot%\swift-corelibs-libdispatch" ^
   -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE="%SourceRoot%\swift-syntax" ^
-  -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%SourceRoot%\swift-experimental-string-processing ^
+  -D SWIFT_PATH_TO_STRING_PROCESSING_SOURCE=%SourceRoot%\swift-experimental-string-processing ^
 
   -G Ninja ^
   -S llvm-project\llvm || (exit /b)
@@ -248,12 +249,13 @@ cmake ^
   -D SWIFT_NATIVE_SWIFT_TOOLS_PATH=%BuildRoot%\1\bin ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=%SourceRoot%\swift-corelibs-libdispatch ^
   -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE="%SourceRoot%\swift-syntax" ^
-  -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%SourceRoot%\swift-experimental-string-processing ^
+  -D SWIFT_PATH_TO_STRING_PROCESSING_SOURCE=%SourceRoot%\swift-experimental-string-processing ^
 
   -D SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES ^
+  -D SWIFT_ENABLE_EXPERIMENTAL_REFLECTION=YES ^
 
   -G Ninja ^
   -S %SourceRoot%\swift || (exit /b)
@@ -450,6 +452,7 @@ cmake --build %BuildRoot%\9 --target install || (exit /b)
 cmake ^
   -B %BuildRoot%\10 ^
 
+  -D BUILD_SHARED_LIBS=NO ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy /DYAML_DECLARE_EXPORT /DWIN32" ^
@@ -508,6 +511,7 @@ cmake --build %BuildRoot%\11 --target install || (exit /b)
 cmake ^
   -B %BuildRoot%\12 ^
 
+  -D BUILD_SHARED_LIBS=NO ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=cl ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
@@ -587,7 +591,7 @@ cmake --build %BuildRoot%\14 --target install || (exit /b)
 cmake ^
   -B %BuildRoot%\15 ^
 
-  -D BUILD_SHARED_LIBS=YES ^
+  -D BUILD_SHARED_LIBS=NO ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^

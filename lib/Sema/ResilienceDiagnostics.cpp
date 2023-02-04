@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file implements diagnostics for fragile functions, like those with
-// @inlinable, @_alwaysEmitIntoClient, or @_backDeploy.
+// @inlinable, @_alwaysEmitIntoClient, or @backDeployed.
 //
 //===----------------------------------------------------------------------===//
 
@@ -121,10 +121,19 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   if (originKind == DisallowedOriginKind::None)
     return false;
 
-  auto definingModule = D->getModuleContext();
-  ASTContext &ctx = definingModule->getASTContext();
-  auto fragileKind = where.getFragileFunctionKind();
+  auto exportingModule = where.getDeclContext()->getParentModule();
+  ASTContext &ctx = exportingModule->getASTContext();
 
+  // As an exception, if the import of the module that defines the desugared
+  // decl is just missing (as opposed to imported explicitly with reduced
+  // visibility) then we should only diagnose if we're building a resilient
+  // module.
+  if (originKind == DisallowedOriginKind::MissingImport &&
+      !exportingModule->isResilient())
+    return false;
+
+  auto definingModule = D->getModuleContext();
+  auto fragileKind = where.getFragileFunctionKind();
   if (fragileKind.kind == FragileFunctionKind::None) {
     auto reason = where.getExportabilityReason();
     ctx.Diags
@@ -245,7 +254,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
   ASTContext &ctx = M->getASTContext();
 
   auto reason = where.getExportabilityReason();
-  if (!reason.hasValue())
+  if (!reason.has_value())
     reason = ExportabilityReason::General;
 
   ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,

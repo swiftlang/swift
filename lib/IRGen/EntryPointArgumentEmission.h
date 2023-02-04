@@ -18,7 +18,7 @@ class Value;
 
 namespace swift {
 
-struct GenericRequirement;
+class GenericRequirement;
 class SILArgument;
 
 namespace irgen {

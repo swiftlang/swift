@@ -21,6 +21,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Parse/Token.h"
 
 using namespace swift;
 
@@ -131,6 +132,16 @@ void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
 
 void ASTNode::dump() const {
   dump(llvm::errs());
+}
+
+StringRef swift::getTokenText(tok kind) {
+  switch(kind) {
+#define KEYWORD(KW) case tok::kw_##KW: return #KW;
+#define POUND_KEYWORD(KW) case tok::pound_##KW: return "#"#KW;
+#define PUNCTUATOR(PUN, TEXT) case tok::PUN: return TEXT;
+#include "swift/AST/TokenKinds.def"
+  default: return StringRef();
+  }
 }
 
 #define FUNC(T)                                                               \

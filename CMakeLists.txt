@@ -116,7 +116,7 @@ endif()
 if(SWIFT_HOST_VARIANT_ARCH)
   set(SWIFT_HOST_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 else()
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
     set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
   elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
     if(SWIFT_HOST_VARIANT_SDK_default STREQUAL OSX)
@@ -268,7 +268,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.8")
+set(SWIFT_VERSION "5.9")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -460,6 +460,7 @@ set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX "10.9")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_IOS "7.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_TVOS "9.0")
 set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_WATCHOS "2.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_MACCATALYST "13.1")
 
 #
 # User-configurable debugging options.
@@ -564,6 +565,10 @@ option(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
   "Enable experimental string processing"
   FALSE)
 
+option(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION
+  "Enable build of the Swift reflection module"
+  FALSE)
+
 option(SWIFT_ENABLE_DISPATCH
   "Enable use of libdispatch"
   TRUE)
@@ -571,13 +576,6 @@ option(SWIFT_ENABLE_DISPATCH
 option(SWIFT_ENABLE_GLOBAL_ISEL_ARM64
   "Enable global isel on arm64"
   FALSE)
-
-cmake_dependent_option(SWIFT_BUILD_SYNTAXPARSERLIB
-  "Build the Swift Syntax Parser library" TRUE
-  "SWIFT_ENABLE_DISPATCH" FALSE)
-cmake_dependent_option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  "Only build the Swift Syntax Parser library" FALSE
-  "SWIFT_BUILD_SYNTAXPARSERLIB" FALSE)
 
 cmake_dependent_option(SWIFT_BUILD_SOURCEKIT
   "Build SourceKit" TRUE
@@ -591,6 +589,13 @@ option(SWIFT_THREADING_PACKAGE
    single package name, or a semicolon separated sequence of sdk:package pairs.
    Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
    or the empty string for the SDK default.")
+
+option(SWIFT_ENABLE_MACCATALYST
+  "Build the Standard Library and overlays with MacCatalyst support"
+  FALSE)
+
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "14.5" CACHE STRING
+  "Minimum deployment target version for macCatalyst")
 
 #
 # End of user-configurable options.
@@ -637,13 +642,13 @@ set(SWIFT_BUILD_HOST_DISPATCH FALSE)
 if(SWIFT_ENABLE_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
   # Only build libdispatch for the host if the host tools are being built and
   # specifically if these two libraries that depend on it are built.
-  if(SWIFT_INCLUDE_TOOLS AND (SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT))
+  if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SOURCEKIT)
     set(SWIFT_BUILD_HOST_DISPATCH TRUE)
   endif()
 
   if(SWIFT_BUILD_HOST_DISPATCH OR SWIFT_CONCURRENCY_USES_DISPATCH)
     if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
-      message(SEND_ERROR "SyntaxParserLib, SourceKit, and concurrency require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+      message(SEND_ERROR "SourceKit and concurrency require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
     endif()
   endif()
 endif()
@@ -1109,6 +1114,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
   message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
   message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
+  message(STATUS "Reflection Support:                 ${SWIFT_ENABLE_EXPERIMENTAL_REFLECTION}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
@@ -1178,7 +1184,7 @@ endif()
 # declares the swift-stdlib-* set of targets. These targets will then
 # implicitly depend on any targets declared with IS_STDLIB.
 #
-# https://bugs.swift.org/browse/SR-5975
+# https://github.com/apple/swift/issues/48534
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
@@ -1195,8 +1201,8 @@ else()
     add_subdirectory(stdlib/public/BackDeployConcurrency)
   endif()
 
-  # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
-  # ensure we build that when building tools.
+  # Some tools (e.g. swift-reflection-dump) rely on a host swiftRemoteInspection,
+  # so ensure we build that when building tools.
   if(SWIFT_INCLUDE_TOOLS)
     add_subdirectory(stdlib/public/SwiftShims/swift/shims)
   endif()
@@ -1218,7 +1224,7 @@ if(SWIFT_INCLUDE_TOOLS)
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.
-  # https://bugs.swift.org/browse/SR-5975
+  # https://github.com/apple/swift/issues/48534
   add_subdirectory(tools)
 
   # Localization targets are configured in a way that assume the swift

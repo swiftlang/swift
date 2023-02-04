@@ -53,17 +53,7 @@ Adding this attribute to a type leads to remarks being emitted for all methods.
 
 ## `@_backDeploy(before: ...)`
 
-Causes the body of a function to be emitted into the module interface to be
-available for emission into clients with deployment targets lower than the
-ABI availability of the function. When the client's deployment target is
-before the function's ABI availability, the compiler replaces calls to that
-function with a call to a thunk that checks at runtime whether the original
-library function is available. If the original is available then it is
-called. Otherwise, the fallback copy of the function that was emitted into the
-client is called instead.
-
-For more details, see the [pitch thread](https://forums.swift.org/t/pitch-function-back-deployment/55769/)
-in the forums.
+The spelling of `@backDeployed(before:)` prior to the acceptance of [SE-0376](https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md).
 
 ## `@_borrowed`
 
@@ -535,6 +525,15 @@ initializers from its superclass. This implies that all designated initializers
 overridden. This attribute is often printed alongside
 `@_hasMissingDesignatedInitializers` in this case.
 
+## `@inline(__always)`
+
+Forces the function to be inlined.
+
+If it's not possible to always inline the function, e.g. if it's a self-
+recursive function, the attribute is ignored.
+
+This attribute has no effect in debug builds.
+
 ## `@_noEagerMove`
 
 When applied to a value, indicates that the value's lifetime is lexical, that
@@ -676,7 +675,80 @@ be added to a given type, while `@_nonSendable` indicates that an unavailable
 `(_assumed)` after it, in which case `@Sendable` "beats" it.
 `@_nonSendable(_assumed)` is intended to be used when mass-marking whole regions
 of a header as non-`Sendable` so that you can make spot exceptions with
-`@Sendable`.   
+`@Sendable`.
+
+## `@_objcImplementation(CategoryName)`
+
+Declares an extension that defines an implementation for the Objective-C
+category `CategoryName` on the class in question, or for the main `@interface`
+if the argument list is omitted.
+
+This attribute is used to write fully Objective-C-compatible implementations in
+Swift. Normal Objective-C interop allows Objective-C clients to use instances of
+the subclass, but not to subclass them, and uses a generated header that is not
+meant to be read by humans. `@_objcImplementation`, on the other hand, creates
+classes that are virtually indistinguishable from classes implemented in native 
+Objective-C: they do not have a Swift vtable or any other Swift-specific
+metadata, Swift does not use any special knowledge of the class's "Swiftiness" 
+when using the class so ObjC runtime calls work correctly and they can even be 
+subclassed by Objective-C code, and you write a header for the class by hand 
+that looks exactly like an equivalent ObjC class. Clients should not notice if 
+you replace a native Objective-C `@implementation Foo (Bar)` with a Swift 
+`@_objcImplementation(Bar) extension Foo`.
+
+You create a class with this feature very differently from normal ObjC interop:
+
+1. Hand-write headers that declare the class's Objective-C interface, just as
+   you would for a native Objective-C class. Since you're handwriting these
+   headers, you can write them just as you would for an Objective-C class:
+   splitting them across multiple files, grouping related declarations together,
+   adding comments, declaring Swift behavior using C attributes or API notes,
+   etc.
+   
+2. Import your headers into Swift using a bridging header or umbrella header so
+   Swift can see them.
+
+3. Implement your class using a mixture of `@implementation` declarations in
+   `.m` files and `@_objcImplementation extension`s in `.swift` files. Each
+   `@interface` should have exactly one corresponding implementation; don't try
+   to implement some members of a single `@interface` in ObjC and others in
+   Swift.
+
+   * To implement the main `@interface` of a class in Swift, use
+     `@_objcImplementation extension ClassName`.
+     
+   * To implement a category in Swift, use
+     `@_objcImplementation(CategoryName) extension ClassName`.
+     
+The members of an `@_objcImplementation` extension should fall into one of
+three categories:
+   
+* **Swift-only members** include any member marked `final`. These are not
+  `@objc` or `dynamic` and are only callable from Swift. Use these for
+  Swift-only APIs, random helper methods, etc. 
+    
+* **ObjC helper members** include any non-`final` member marked `fileprivate`
+  or `private`. These are implicitly `@objc dynamic`. Use these for action
+  methods, selector-based callbacks, and other situations where you need a
+  helper method to be accessible from an Objective-C message.
+  
+* **Member implementations** include any other non-`final` member. These are
+  implicitly `@objc dynamic` and must match a member declared in the
+  Objective-C header. Use these to implement the APIs declared in your
+  headers. Swift will emit an error if these don't match your headers.
+
+Notes:
+
+* We don't currently plan to support ObjC generics.
+
+* Eventually, we want the main `@_objcImplementation` extension to be able to
+  declare stored properties that aren't in the interface. We also want
+  `final` stored properties to be allowed to be resilent Swift types, but
+  it's not clear how to achieve that without boxing them in `__SwiftValue`
+  (which we might do as a stopgap).
+     
+* We should think about ObjC "direct" members, but that would probably
+  require a way to spell this in Swift. 
 
 ## `@_objc_non_lazy_realization`
 
@@ -785,7 +857,7 @@ For more details, see the
 
 Forces generation of a specialized implementation for a generic declaration.
 
-See [Generics.rst](/docs/Generics.rst) for more details.
+See [Generics.rst](/docs/archive/Generics.rst) for more details.
 
 ## `@_specializeExtension`
 

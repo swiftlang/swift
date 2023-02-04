@@ -326,7 +326,7 @@ public:
     auto completeList = iter->second.getFullyPostDomReleases();
     if (!completeList)
       return {};
-    return completeList.getValue();
+    return completeList.value();
   }
 
   Optional<ArrayRef<SILInstruction *>>

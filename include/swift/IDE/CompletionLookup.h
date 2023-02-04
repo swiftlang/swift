@@ -26,9 +26,9 @@
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/PossibleParamInfo.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
-#include "swift/Syntax/SyntaxKind.h"
 
 namespace swift {
 namespace ide {
@@ -42,6 +42,9 @@ bool DefaultFilter(ValueDecl *VD, DeclVisibilityKind Kind,
 
 bool KeyPathFilter(ValueDecl *decl, DeclVisibilityKind,
                    DynamicLookupInfo dynamicLookupInfo);
+
+bool MacroFilter(ValueDecl *decl, DeclVisibilityKind,
+                 DynamicLookupInfo dynamicLookupInfo);
 
 /// Returns \c true only if the completion is happening for top-level
 /// declrarations. i.e.:
@@ -134,6 +137,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool IsUnwrappedOptional = false;
   SourceLoc DotLoc;
   bool NeedLeadingDot = false;
+  bool NeedLeadingMacroPound = false;
 
   bool NeedOptionalUnwrap = false;
   unsigned NumBytesToEraseForOptionalUnwrap = 0;
@@ -184,41 +188,50 @@ public:
     const ModuleDecl *TheModule;
     bool OnlyTypes;
     bool OnlyPrecedenceGroups;
+    bool OnlyMacros;
     bool NeedLeadingDot;
+    bool NeedPound;
     bool IncludeModuleQualifier;
 
     static RequestedResultsTy fromModule(const ModuleDecl *TheModule) {
-      return {TheModule, false, false, false, true};
+      return {TheModule, false, false, false, false, false, true};
     }
 
     RequestedResultsTy onlyTypes() const {
-      return {TheModule, true, false, NeedLeadingDot, IncludeModuleQualifier};
+      return {TheModule, true, false, false, NeedLeadingDot, false,
+              IncludeModuleQualifier};
     }
 
     RequestedResultsTy onlyPrecedenceGroups() const {
       assert(!OnlyTypes && "onlyTypes() already includes precedence groups");
-      return {TheModule, false, true, false, true};
+      return {TheModule, false, true, false, false, false, true};
+    }
+
+    RequestedResultsTy onlyMacros(bool needPound) const {
+      return {TheModule, false, false, true, false, needPound, false};
     }
 
     RequestedResultsTy needLeadingDot(bool NeedDot) const {
-      return {TheModule, OnlyTypes, OnlyPrecedenceGroups, NeedDot,
-              IncludeModuleQualifier};
+      return {TheModule, OnlyTypes, OnlyPrecedenceGroups, OnlyMacros, NeedDot,
+              NeedPound, IncludeModuleQualifier};
     }
 
     RequestedResultsTy withModuleQualifier(bool IncludeModule) const {
-      return {TheModule, OnlyTypes, OnlyPrecedenceGroups, NeedLeadingDot,
-              IncludeModule};
+      return {TheModule, OnlyTypes, OnlyPrecedenceGroups, OnlyMacros,
+              NeedLeadingDot, NeedPound, IncludeModule};
     }
 
     static RequestedResultsTy toplevelResults() {
-      return {nullptr, false, false, false, true};
+      return {nullptr, false, false, false, false, true, true};
     }
 
     friend bool operator==(const RequestedResultsTy &LHS,
                            const RequestedResultsTy &RHS) {
       return LHS.TheModule == RHS.TheModule && LHS.OnlyTypes == RHS.OnlyTypes &&
              LHS.OnlyPrecedenceGroups == RHS.OnlyPrecedenceGroups &&
+             LHS.OnlyMacros == RHS.OnlyMacros &&
              LHS.NeedLeadingDot == RHS.NeedLeadingDot &&
+             LHS.NeedPound == RHS.NeedPound &&
              LHS.IncludeModuleQualifier == RHS.IncludeModuleQualifier;
     }
   };
@@ -450,6 +463,7 @@ public:
   void addEnumElementRef(const EnumElementDecl *EED, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo,
                          bool HasTypeContext);
+  void addMacroExpansion(const MacroDecl *MD, DeclVisibilityKind Reason);
 
   void addKeyword(
       StringRef Name, Type TypeAnnotation = Type(),
@@ -497,6 +511,9 @@ public:
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override;
+
+  void onLookupNominalTypeMembers(NominalTypeDecl *NTD,
+                                  DeclVisibilityKind Reason) override;
 
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo);
@@ -548,6 +565,8 @@ public:
 
   void addObjCPoundKeywordCompletions(bool needPound);
 
+  void getMacroCompletions(bool needPound);
+
   struct FilteredDeclConsumer : public swift::VisibleDeclConsumer {
     swift::VisibleDeclConsumer &Consumer;
     DeclFilter Filter;
@@ -597,7 +616,8 @@ public:
 
   void collectPrecedenceGroups();
 
-  void getPrecedenceGroupCompletions(syntax::SyntaxKind SK);
+  void getPrecedenceGroupCompletions(
+      IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK);
 
   void getPoundAvailablePlatformCompletions();
 
@@ -609,7 +629,7 @@ public:
   void getTypeCompletionsInDeclContext(SourceLoc Loc,
                                        bool ModuleQualifier = true);
 
-  void getToplevelCompletions(bool OnlyTypes);
+  void getToplevelCompletions(bool OnlyTypes, bool OnlyMacros);
 
   void lookupExternalModuleDecls(const ModuleDecl *TheModule,
                                  ArrayRef<std::string> AccessPath,
@@ -629,17 +649,17 @@ template <>
 struct DenseMapInfo<RequestedResultsTy> {
   static inline RequestedResultsTy getEmptyKey() {
     return {DenseMapInfo<swift::ModuleDecl *>::getEmptyKey(), false, false,
-            false, false};
+            false, false, false, false};
   }
   static inline RequestedResultsTy getTombstoneKey() {
     return {DenseMapInfo<swift::ModuleDecl *>::getTombstoneKey(), false, false,
-            false, false};
+            false, false, false, false};
   }
   static unsigned getHashValue(const RequestedResultsTy &Val) {
     return hash_combine(
         DenseMapInfo<swift::ModuleDecl *>::getHashValue(Val.TheModule),
-        Val.OnlyTypes, Val.OnlyPrecedenceGroups, Val.NeedLeadingDot,
-        Val.IncludeModuleQualifier);
+        Val.OnlyTypes, Val.OnlyPrecedenceGroups, Val.OnlyMacros,
+        Val.NeedLeadingDot, Val.NeedPound, Val.IncludeModuleQualifier);
   }
   static bool isEqual(const RequestedResultsTy &LHS,
                       const RequestedResultsTy &RHS) {

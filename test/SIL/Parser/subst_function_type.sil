@@ -18,6 +18,6 @@ entry(%0 : $@callee_guaranteed @substituted <C, D> (@in C, @in D) -> () for <X, 
 
 sil @test_substituted_generic : $@convention(thin) <X, Y> @substituted <Z> (@in Z) -> (@out Z) for <(X, Y)> {
 entry(%0 : $*(X, Y), %1 : $*(X, Y)):
-  copy_addr [take] %1 to [initialization] %0 : $*(X,Y)
+  copy_addr [take] %1 to [init] %0 : $*(X,Y)
   return undef : $()
 }

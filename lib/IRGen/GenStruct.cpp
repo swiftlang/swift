@@ -83,7 +83,6 @@ static clang::CXXDestructorDecl *getCXXDestructor(SILType type) {
     return nullptr;
   return cxxRecordDecl->getDestructor();
 }
-
 namespace {
   class StructFieldInfo : public RecordField<StructFieldInfo> {
   public:
@@ -364,7 +363,7 @@ namespace {
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (!areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
@@ -415,9 +414,100 @@ namespace {
     }
   };
 
-  class AddressOnlyClangRecordTypeInfo final
-      : public StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
-                                  ClangFieldInfo> {
+  class AddressOnlyPointerAuthRecordTypeInfo final
+      : public StructTypeInfoBase<AddressOnlyPointerAuthRecordTypeInfo,
+                                  FixedTypeInfo, ClangFieldInfo> {
+    const clang::RecordDecl *clangDecl;
+
+    void emitCopyWithCopyFunction(IRGenFunction &IGF, SILType T, Address src,
+                                  Address dst) const {
+      auto *copyFunction =
+          clang::CodeGen::getNonTrivialCStructCopyAssignmentOperator(
+              IGF.IGM.getClangCGM(), dst.getAlignment(), src.getAlignment(),
+              /*isVolatile*/ false,
+              clang::QualType(clangDecl->getTypeForDecl(), 0));
+      auto *dstValue = dst.getAddress();
+      auto *srcValue = src.getAddress();
+      if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
+        dstValue = IGF.coerceValue(
+            dst.getAddress(), copyFunction->getFunctionType()->getParamType(0),
+            IGF.IGM.DataLayout);
+        srcValue = IGF.coerceValue(
+            src.getAddress(), copyFunction->getFunctionType()->getParamType(1),
+            IGF.IGM.DataLayout);
+      }
+      IGF.Builder.CreateCall(copyFunction->getFunctionType(), copyFunction,
+                             {dstValue, srcValue});
+    }
+
+  public:
+    AddressOnlyPointerAuthRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                         llvm::Type *storageType, Size size,
+                                         Alignment align,
+                                         const clang::RecordDecl *clangDecl)
+        : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
+                             fields, storageType, size,
+                             // We can't assume any spare bits in a C++ type
+                             // with user-defined special member functions.
+                             SpareBitVector(llvm::Optional<APInt>{
+                                 llvm::APInt(size.getValueInBits(), 0)}),
+                             align, IsNotPOD, IsNotBitwiseTakable, IsFixedSize),
+          clangDecl(clangDecl) {
+      (void)clangDecl;
+    }
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      if (!IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+      }
+      assert(false && "Implement proper type layout info in the future");
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address addr, SILType T,
+                              bool isOutlined) const override {
+      llvm_unreachable("Address-only C++ types must be created by C++ special "
+                       "member functions.");
+    }
+
+    void initializeWithCopy(IRGenFunction &IGF, Address dst, Address src,
+                            SILType T, bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address dst, Address src, SILType T,
+                        bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address dst, Address src,
+                            SILType T, bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+      destroy(IGF, src, T, isOutlined);
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dst, Address src, SILType T,
+                        bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+      destroy(IGF, src, T, isOutlined);
+    }
+
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return None;
+    }
+    MemberAccessStrategy
+    getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
+                                   const ClangFieldInfo &field) const {
+      llvm_unreachable("non-fixed field in Clang type?");
+    }
+  };
+
+  class AddressOnlyCXXClangRecordTypeInfo final
+      : public StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo,
+                                  FixedTypeInfo, ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
 
     const clang::CXXConstructorDecl *findCopyConstructor() const {
@@ -490,10 +580,10 @@ namespace {
     }
 
   public:
-    AddressOnlyClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
-                                   llvm::Type *storageType, Size size,
-                                   Alignment align,
-                                   const clang::RecordDecl *clangDecl)
+    AddressOnlyCXXClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                      llvm::Type *storageType, Size size,
+                                      Alignment align,
+                                      const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
                              fields, storageType, size,
                              // We can't assume any spare bits in a C++ type
@@ -513,7 +603,7 @@ namespace {
       if (!destructor || destructor->isTrivial()) {
         // If we didn't find a destructor to call, bail out to the parent
         // implementation.
-        StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+        StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
                            ClangFieldInfo>::destroy(IGF, address, T,
                                                     isOutlined);
         return;
@@ -560,7 +650,7 @@ namespace {
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts || getCXXDestructor(T) ||
           !areFieldsABIAccessible()) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
       std::vector<TypeLayoutEntry *> fields;
@@ -595,7 +685,7 @@ namespace {
                                     destAddr.getAddress());
         return;
       }
-      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+      StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
                          ClangFieldInfo>::initializeWithCopy(IGF, destAddr,
                                                              srcAddr, T,
                                                              isOutlined);
@@ -609,10 +699,9 @@ namespace {
                                     destAddr.getAddress());
         return;
       }
-      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
-                         ClangFieldInfo>::assignWithCopy(IGF, destAddr,
-                                                         srcAddr, T,
-                                                         isOutlined);
+      StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::assignWithCopy(IGF, destAddr, srcAddr,
+                                                         T, isOutlined);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
@@ -625,9 +714,8 @@ namespace {
         return;
       }
 
-      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
-                         ClangFieldInfo>::initializeWithTake(IGF, dest,
-                                                             src, T,
+      StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::initializeWithTake(IGF, dest, src, T,
                                                              isOutlined);
     }
 
@@ -641,9 +729,8 @@ namespace {
         return;
       }
 
-      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
-                         ClangFieldInfo>::assignWithTake(IGF, dest,
-                                                         src, T,
+      StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::assignWithTake(IGF, dest, src, T,
                                                          isOutlined);
     }
 
@@ -686,7 +773,7 @@ namespace {
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
       if (!areFieldsABIAccessible()) {
@@ -748,7 +835,7 @@ namespace {
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
       if (!areFieldsABIAccessible()) {
@@ -1045,7 +1132,11 @@ public:
   const TypeInfo *createTypeInfo(llvm::StructType *llvmType) {
     llvmType->setBody(LLVMFields, /*packed*/ true);
     if (SwiftType.getStructOrBoundGenericStruct()->isCxxNonTrivial()) {
-      return AddressOnlyClangRecordTypeInfo::create(
+      return AddressOnlyCXXClangRecordTypeInfo::create(
+          FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
+    }
+    if (SwiftType.getStructOrBoundGenericStruct()->isNonTrivialPtrAuth()) {
+      return AddressOnlyPointerAuthRecordTypeInfo::create(
           FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
     }
     return LoadableClangRecordTypeInfo::create(
@@ -1265,8 +1356,8 @@ private:
     case StructTypeInfoKind::LoadableClangRecordTypeInfo:                      \
       return structTI.as<LoadableClangRecordTypeInfo>().op(IGF, __VA_ARGS__);  \
     case StructTypeInfoKind::AddressOnlyClangRecordTypeInfo:                   \
-      return structTI.as<AddressOnlyClangRecordTypeInfo>().op(IGF,             \
-                                                              __VA_ARGS__);    \
+      return structTI.as<AddressOnlyCXXClangRecordTypeInfo>().op(IGF,          \
+                                                                 __VA_ARGS__); \
     case StructTypeInfoKind::LoadableStructTypeInfo:                           \
       return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__);       \
     case StructTypeInfoKind::FixedStructTypeInfo:                              \

@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-variadic-generics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
+
+// REQUIRES: asserts
 
 let t1: (_: Int) = (_: 3)
 let t2: (x: Int) = (x: 3)

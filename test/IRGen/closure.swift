@@ -69,7 +69,7 @@ func no_capture_descriptor(_ c: C, _ d: C, _ e: C, _ f: C, _ g: C) {
 // CHECK-LABEL: define hidden swiftcc { i8*, %swift.refcounted* } @"$s7closure9letEscape1fyycyyXE_tF"(i8* %0, %swift.opaque* %1)
 // CHECK: call zeroext i1 @swift_isEscapingClosureAtFileLocation(%swift.refcounted* {{.*}}, i8* getelementptr inbounds ({{.*}} [[FILENAME]]
 // OPT-LABEL: define hidden swiftcc { i8*, %swift.refcounted* } @"$s7closure9letEscape1fyycyyXE_tF"(i8* %0, %swift.opaque* %1)
-// OPT: call zeroext i1 @swift_isEscapingClosureAtFileLocation(%swift.refcounted* {{.*}}, i8* getelementptr inbounds ({{.*}} [[FILENAME]]
+// OPT: call zeroext i1 @swift_isEscapingClosureAtFileLocation(%swift.refcounted* {{.*}}, i8* {{(nonnull )?}}getelementptr inbounds ({{.*}} [[FILENAME]]
 func letEscape(f: () -> ()) -> () -> () {
   return withoutActuallyEscaping(f) { return $0 }
 }

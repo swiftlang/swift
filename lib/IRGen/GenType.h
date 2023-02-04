@@ -142,6 +142,7 @@ private:
                                           Size size, Alignment align);
   const FixedTypeInfo *createImmovable(llvm::Type *T,
                                        Size size, Alignment align);
+  const TypeInfo *createOpaqueImmovable(llvm::Type *T, Alignment minAlign);
 
   void addForwardDecl(TypeBase *key);
 
@@ -168,6 +169,7 @@ private:
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertParameterizedProtocolType(ParameterizedProtocolType *T);
   const TypeInfo *convertExistentialType(ExistentialType *T);
+  const TypeInfo *convertPackType(SILPackType *T);
   const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();

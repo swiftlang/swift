@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// REQUIRES: reflection
 // UNSUPPORTED: back_deployment_runtime
 
 import _Concurrency

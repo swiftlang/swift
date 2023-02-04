@@ -32,7 +32,7 @@ public let benchmarks = [
 
 @inline(never)
 public func run_ReadAccessor(_ N: Int) {
-  for i in 0...N {
+  for _ in 0...N {
     for j in 0..<100 {
       let row = vec![j];
       for k in 0..<1_000 {

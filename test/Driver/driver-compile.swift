@@ -45,10 +45,11 @@
 
 // RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %S/../Inputs/empty.swift -module-name main -driver-filelist-threshold=0 2>&1 | %FileCheck -check-prefix=FILELIST %s
 
-// RUN: %empty-directory(%t)/DISTINCTIVE-PATH/usr/bin/
+// RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/bin/)
+// RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/lib/)
 // RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t/DISTINCTIVE-PATH/usr/bin/swiftc)
 // RUN: ln -s "swiftc" %t/DISTINCTIVE-PATH/usr/bin/swift-update
-// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -driver-print-jobs -c -update-code -target x86_64-apple-macosx10.9 %s 2>&1 > %t.upd.txt
+// RUN: %host-library-env %t/DISTINCTIVE-PATH/usr/bin/swiftc -driver-print-jobs -c -update-code -target x86_64-apple-macosx10.9 %s 2>&1 > %t.upd.txt
 // RUN: %FileCheck -check-prefix UPDATE-CODE %s < %t.upd.txt
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
@@ -65,7 +66,7 @@
 
 // swift-frontend cannot be copied to another location with bootstrapping because
 // it will not find the libswiftCore library with its relative RPATH.
-// UNSUPPORTED: bootstrapping_mode
+// UNSUPPORTED: swift_in_compiler
 
 // CHECK: bin{{/|\\\\}}swift
 // CHECK: Driver{{/|\\\\}}driver-compile.swift

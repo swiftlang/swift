@@ -54,7 +54,11 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    if (!IGM.getOptions().ForceStructTypeLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
+                                                      ScalarKind::POD);
   }
 
   static Size getSecondElementOffset(IRGenModule &IGM) {
@@ -267,7 +271,8 @@ void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
 }
 
 llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
-                                        SubstitutionMap subs) {
+                                        SubstitutionMap subs,
+                                        llvm::Value *groupFlags) {
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskGroup);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskGroup));
   auto group = IGF.Builder.CreateBitCast(address.getAddress(),
@@ -278,9 +283,14 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
   auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
   auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
 
-  auto *call =
-      IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
-                             {group, resultTypeMetadata});
+  llvm::CallInst *call;
+  if (groupFlags) {
+    call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeWithFlagsFunctionPointer(),
+                                  {groupFlags, group, resultTypeMetadata});
+  } else {
+    call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
+                                  {group, resultTypeMetadata});
+  }
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 

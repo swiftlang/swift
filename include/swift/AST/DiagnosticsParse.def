@@ -196,11 +196,12 @@ ERROR(lex_conflict_marker_in_file,none,
 // MARK: Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
-NOTE(note_in_decl_extension,none,
-     "in %select{declaration|extension}0 of %1", (bool, DeclNameRef))
+NOTE(note_in_decl_of,none,
+     "in declaration of %0", (DeclNameRef))
+NOTE(note_in_extension_of,none,
+     "in extension of %0", (TypeRepr *))
 ERROR(line_directive_style_deprecated,none,
-        "#line directive was renamed to #sourceLocation",
-        ())
+      "#line directive was renamed to #sourceLocation", ())
 
 ERROR(declaration_same_line_without_semi,none,
       "consecutive declarations on a line must be separated by ';'", ())
@@ -672,6 +673,11 @@ ERROR(sil_moveonlytocopyable_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
 ERROR(sil_moveonlytocopyable_requires_attribute,none,
       "moveonlywrapper_to_copyable requires either a [guaranteed] or [owned] attribute", ())
+ERROR(expected_generic_signature,none,
+      "expected a generic signature", ())
+ERROR(sil_expected_uuid,none,
+      "expected a UUID string literal", ())
+NOTE(sil_previous_instruction,none, "previous instruction", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -889,6 +895,10 @@ ERROR(deprecated_protocol_composition_single,none,
 ERROR(deprecated_any_composition,none,
       "'protocol<>' syntax has been removed; use 'Any' instead", ())
 
+// Pack Types
+ERROR(expected_rbrace_pack_type_list,none,
+      "expected '}' at end of pack type list", ())
+
 // SIL box Types
 ERROR(sil_box_expected_var_or_let,none,
       "expected 'var' or 'let' to introduce SIL box field type", ())
@@ -1033,10 +1043,6 @@ ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
 ERROR(labeled_block_needs_do,none,
       "labeled block needs 'do'", ())
-
-ERROR(snake_case_deprecated,none,
-      "%0 has been replaced with %1 in Swift 3",
-      (StringRef, StringRef))
 
 // Assignment statement
 ERROR(expected_expr_assignment,none,
@@ -1333,9 +1339,6 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
 // Object literal expressions
 ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
       "expected argument list in object literal", ())
-ERROR(legacy_object_literal,none,
-      "'%select{|[}0#%1(...)%select{|#]}0' has been renamed to '#%2(...)'",
-      (bool, StringRef, StringRef))
 
 // Unknown pound expression.
 ERROR(unknown_pound_expr,none,
@@ -1352,6 +1355,10 @@ ERROR(expected_expr_after_try, none,
       "expected expression after 'try'", ())
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
+ERROR(expected_expr_after_move, none,
+      "expected expression after '_move'", ())
+ERROR(expected_expr_after_borrow, none,
+      "expected expression after '_borrow'", ())
 
 // Cast expressions
 ERROR(expected_type_after_is,none,
@@ -1586,11 +1593,11 @@ ERROR(originally_defined_in_need_nonempty_module_name,none,
 
 // backDeploy
 ERROR(attr_back_deploy_expected_before_label,none,
-      "expected 'before:' in '@_backDeploy' attribute", ())
+      "expected 'before:' in '@backDeployed' attribute", ())
 ERROR(attr_back_deploy_expected_colon_after_before,none,
-      "expected ':' after 'before' in '@_backDeploy' attribute", ())
+      "expected ':' after 'before' in '@backDeployed' attribute", ())
 ERROR(attr_back_deploy_missing_rparen,none,
-      "expected ')' in '@_backDeploy' argument list", ())
+      "expected ')' in '@backDeployed' argument list", ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,
@@ -1649,6 +1656,14 @@ ERROR(opened_attribute_id_value,none,
       "known id for 'opened' attribute must be a UUID string", ())
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
+
+// pack_element
+ERROR(pack_element_attribute_expected_lparen,none,
+      "expected '(' after 'pack_element' attribute", ())
+ERROR(pack_element_attribute_expected_rparen,none,
+      "expected ')' after id value for 'pack_element' attribute", ())
+ERROR(multiple_open_pack_element,none,
+      "multiple 'open_pack_element' instructions with same UUID", ())
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,
@@ -1969,12 +1984,6 @@ ERROR(associatedtype_cannot_be_variadic,none,
       "associated types cannot be variadic", ())
 
 //------------------------------------------------------------------------------
-// MARK: Consistency diagnostics
-//------------------------------------------------------------------------------
-ERROR(new_parser_failure, none,
-      "new parser has failed consistency checking; please see errors above", ())
-
-//------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unknown_syntax_entity, PointsToFirstBadToken,
@@ -1997,6 +2006,67 @@ ERROR(expected_multiple_closures_block_rbrace,none,
 
 ERROR(foreign_diagnostic,none,
       "%0", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: macros
+//------------------------------------------------------------------------------
+ERROR(expected_macro_value_type,PointsToFirstBadToken,
+      "expected macro value type following ':'", ())
+ERROR(no_default_arg_macro,none,
+      "default arguments are not allowed in macros", ())
+ERROR(expected_lparen_macro,PointsToFirstBadToken,
+      "expected '(' for macro parameters or ':' for a value-like macro", ())
+ERROR(expected_type_macro_result,PointsToFirstBadToken,
+      "expected macro result type", ())
+ERROR(macro_decl_expected_macro_definition,PointsToFirstBadToken,
+      "expected macro definition following '=''", ())
+
+ERROR(macro_expansion_expr_expected_macro_identifier,PointsToFirstBadToken,
+      "expected a macro identifier for a pound literal expression", ())
+ERROR(macro_expansion_decl_expected_macro_identifier,PointsToFirstBadToken,
+      "expected a macro identifier for a pound literal declaration", ())
+
+ERROR(declaration_attr_expected_kind,PointsToFirstBadToken,
+      "expected a declaration macro kind ('freestanding' or 'attached')", ())
+
+ERROR(macro_role_attr_expected_kind,PointsToFirstBadToken,
+      "expected %select{a freestanding|an attached}0 macro role such as "
+      "%select{'expression'|'accessor'}0", (bool))
+ERROR(macro_role_syntax_mismatch,PointsToFirstBadToken,
+      "expected %select{a freestanding|an attached}0 macro cannot have "
+      "the %1 role", (bool, Identifier))
+ERROR(macro_attribute_unknown_label,PointsToFirstBadToken,
+      "@%select{freestanding|attached}0 has no argument with label %1",
+      (bool, Identifier))
+ERROR(macro_attribute_duplicate_label,PointsToFirstBadToken,
+      "@%select{freestanding|attached}0 already has an argument with "
+      "label %1", (bool, Identifier))
+ERROR(macro_attribute_missing_label,PointsToFirstBadToken,
+      "@%select{freestanding|attached}0 argument is missing label '%1'",
+      (bool, StringRef))
+ERROR(macro_attribute_unknown_name_kind,PointsToFirstBadToken,
+      "unknown introduced name kind %0", (Identifier))
+ERROR(macro_attribute_unknown_argument_form,PointsToFirstBadToken,
+      "introduced name argument should be an identifier", ())
+ERROR(macro_attribute_introduced_name_requires_argument,PointsToFirstBadToken,
+      "introduced name kind %0 requires a single argument '(name)'", (Identifier))
+ERROR(macro_attribute_introduced_name_requires_no_argument,PointsToFirstBadToken,
+      "introduced name kind %0 must not have an argument", (Identifier))
+WARNING(macro_expression_attribute_removed,PointsToFirstBadToken,
+      "@expression has been removed in favor of @freestanding(expression)", ())
+
+ERROR(unexpected_attribute_expansion,PointsToFirstBadToken,
+      "unexpected token '%0' in expanded attribute list'",
+      (StringRef))
+ERROR(unexpected_member_expansion,PointsToFirstBadToken,
+      "unexpected token '%0' in expanded member list'",
+      (StringRef))
+
+ERROR(parser_round_trip_error,none,
+      "source file did not round-trip through the new Swift parser", ())
+ERROR(parser_new_parser_errors,none,
+      "new Swift parser generated errors for code that C++ parser accepted",
+       ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

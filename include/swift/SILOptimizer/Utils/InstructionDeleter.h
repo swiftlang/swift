@@ -97,7 +97,6 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstModCallbacks.h"
-#include "swift/SILOptimizer/Utils/UpdatingInstructionIterator.h"
 
 namespace swift {
 
@@ -116,28 +115,19 @@ class InstructionDeleter {
   /// instruction's operands. This has to be deterministic.
   SmallSetVector<SILInstruction *, 8> deadInstructions;
 
-  UpdatingInstructionIteratorRegistry iteratorRegistry;
+  /// Callbacks used when adding/deleting instructions.
+  InstModCallbacks callbacks;
 
 public:
-  InstructionDeleter() : deadInstructions(), iteratorRegistry() {}
+  InstructionDeleter() : deadInstructions() {}
 
-  InstructionDeleter(InstModCallbacks &&chainedCallbacks)
-    : deadInstructions(), iteratorRegistry(std::move(chainedCallbacks)) {}
+  InstructionDeleter(InstModCallbacks &&callbacks)
+    : deadInstructions(), callbacks(std::move(callbacks)) {}
 
-  UpdatingInstructionIteratorRegistry &getIteratorRegistry() {
-    return iteratorRegistry;
-  }
+  InstModCallbacks &getCallbacks() { return callbacks; }
 
-  InstModCallbacks &getCallbacks() { return iteratorRegistry.getCallbacks(); }
-
-  llvm::iterator_range<UpdatingInstructionIterator>
-  updatingRange(SILBasicBlock *bb) {
-    return iteratorRegistry.makeIteratorRange(bb);
-  }
-
-  llvm::iterator_range<UpdatingReverseInstructionIterator>
-  updatingReverseRange(SILBasicBlock *bb) {
-    return iteratorRegistry.makeReverseIteratorRange(bb);
+  void setCallbacks(const InstModCallbacks &newCallbacks) {
+    callbacks = newCallbacks;
   }
 
   bool hadCallbackInvocation() const {

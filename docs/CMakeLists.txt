@@ -10,7 +10,6 @@ SET(SWIFT_SPHINX_PAPER_SIZE "letter"
   CACHE STRING "Paper size for generated documentation")
 
 SET(SPHINX_ARGS
-  -W
   -D latex_elements.papersize=${SWIFT_SPHINX_PAPER_SIZE}
   -d ${CMAKE_BINARY_DIR}/doctrees)
 

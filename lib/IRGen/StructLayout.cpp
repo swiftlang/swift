@@ -170,9 +170,9 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
                                  baseAddr.getAddress()->getName() + suffix);
 
   case Kind::NonFixed: {
-    assert(offsets.hasValue());
+    assert(offsets.has_value());
     llvm::Value *offset =
-      offsets.getValue()->getOffsetForIndex(IGF, getNonFixedElementIndex());
+      offsets.value()->getOffsetForIndex(IGF, getNonFixedElementIndex());
     return IGF.emitByteOffsetGEP(baseAddr.getAddress(), offset, getType(),
                                  baseAddr.getAddress()->getName() + suffix);
   }

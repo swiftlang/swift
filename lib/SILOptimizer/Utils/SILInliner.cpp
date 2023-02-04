@@ -162,8 +162,21 @@ public:
       auto calleeYields = yield->getYieldedValues();
       auto callerYields = BeginApply->getYieldedValues();
       assert(calleeYields.size() == callerYields.size());
+      SmallVector<BeginBorrowInst *, 2> guaranteedYields;
       for (auto i : indices(calleeYields)) {
         auto remappedYield = getMappedValue(calleeYields[i]);
+        // When owned values are yielded @guaranteed, the mapped value must be
+        // borrowed and the result be substituted in place of the originally
+        // yielded value.  Otherwise, there could be uses of the original value
+        // which require an @guaranteed operand into which we'd be attempting to
+        // substitute an @owned operand.
+        if (calleeYields[i]->getOwnershipKind() == OwnershipKind::Owned &&
+            !yield->getOperandRef(i).isConsuming() &&
+            Builder->getFunction().hasOwnership()) {
+          auto *bbi = Builder->createBeginBorrow(Loc, remappedYield);
+          guaranteedYields.push_back(bbi);
+          remappedYield = bbi;
+        }
         callerYields[i]->replaceAllUsesWith(remappedYield);
       }
       Builder->createBranch(Loc, returnToBB);
@@ -172,11 +185,17 @@ public:
       if (EndApply) {
         SavedInsertionPointRAII savedIP(*Builder, EndApplyBB);
         auto resumeBB = remapBlock(yield->getResumeBB());
+        for (auto *bbi : guaranteedYields) {
+          Builder->createEndBorrow(EndApply->getLoc(), bbi);
+        }
         Builder->createBranch(EndApply->getLoc(), resumeBB);
       }
       if (AbortApply) {
         SavedInsertionPointRAII savedIP(*Builder, AbortApplyBB);
         auto unwindBB = remapBlock(yield->getUnwindBB());
+        for (auto *bbi : guaranteedYields) {
+          Builder->createEndBorrow(EndApply->getLoc(), bbi);
+        }
         Builder->createBranch(AbortApply->getLoc(), unwindBB);
       }
       return true;
@@ -266,7 +285,7 @@ class SILInlineCloner
   /// This location wraps the call site AST node that is being inlined.
   /// Alternatively, it can be the SIL file location of the call site (in case
   /// of SIL-to-SIL transformations).
-  Optional<SILLocation> Loc;
+  SILLocation Loc;
   const SILDebugScope *CallSiteScope = nullptr;
   llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
       InlinedScopeCache;
@@ -286,8 +305,8 @@ public:
   void cloneInline(ArrayRef<SILValue> AppliedArgs);
 
 protected:
-  SILValue borrowFunctionArgument(SILValue callArg, FullApplySite AI,
-                                  unsigned index);
+  SILValue borrowFunctionArgument(SILValue callArg, unsigned index);
+  SILValue moveFunctionArgument(SILValue callArg, unsigned index);
 
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitHopToExecutorInst(HopToExecutorInst *Inst);
@@ -319,9 +338,7 @@ protected:
       return InLoc;
     // Inlined location wraps the call site that is being inlined, regardless
     // of the input location.
-    return Loc.hasValue()
-               ? Loc.getValue()
-               : MandatoryInlinedLocation();
+    return Loc;
   }
 
   const SILDebugScope *remapScope(const SILDebugScope *DS) {
@@ -368,6 +385,16 @@ SILInliner::inlineFullApply(FullApplySite apply,
                                 appliedArgs);
 }
 
+static SILLocation selectLoc(bool mandatory, SILLocation orig) {
+  // Compute the SILLocation which should be used by all the inlined
+  // instructions.
+  if (mandatory)
+    return MandatoryInlinedLocation(orig);
+  else {
+    return InlinedLocation(orig);
+  }
+}
+
 SILInlineCloner::SILInlineCloner(
     SILFunction *calleeFunction, FullApplySite apply,
     SILOptFunctionBuilder &funcBuilder, InlineKind inlineKind,
@@ -376,7 +403,8 @@ SILInlineCloner::SILInlineCloner(
     : SuperTy(*apply.getFunction(), *calleeFunction, applySubs,
               /*DT=*/nullptr, /*Inlining=*/true),
       FuncBuilder(funcBuilder), IKind(inlineKind), Apply(apply),
-      deleter(deleter) {
+      deleter(deleter),
+      Loc(selectLoc(inlineKind == InlineKind::MandatoryInline, apply.getLoc())) {
 
   SILFunction &F = getBuilder().getFunction();
   assert(apply.getFunction() && apply.getFunction() == &F
@@ -388,15 +416,6 @@ SILInlineCloner::SILInlineCloner(
           || IKind == InlineKind::PerformanceInline)
          && "Cannot inline Objective-C methods or C functions in mandatory "
             "inlining");
-
-  // Compute the SILLocation which should be used by all the inlined
-  // instructions.
-  if (IKind == InlineKind::PerformanceInline)
-    Loc = InlinedLocation(apply.getLoc());
-  else {
-    assert(IKind == InlineKind::MandatoryInline && "Unknown InlineKind.");
-    Loc = MandatoryInlinedLocation(apply.getLoc());
-  }
 
   auto applyScope = apply.getDebugScope();
   // FIXME: Turn this into an assertion instead.
@@ -417,7 +436,7 @@ SILInlineCloner::SILInlineCloner(
   assert(CallSiteScope->getParentFunction() == &F);
 
   // Set up the coroutine-specific inliner if applicable.
-  BeginApply = BeginApplySite::get(apply, Loc.getValue(), &getBuilder());
+  BeginApply = BeginApplySite::get(apply, Loc, &getBuilder());
 }
 
 // Clone the entire callee function into the caller function at the apply site.
@@ -467,9 +486,13 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
       } else {
         // Insert begin/end borrow for guaranteed arguments.
         if (paramInfo.isGuaranteed()) {
-          if (SILValue newValue = borrowFunctionArgument(callArg, Apply, idx)) {
+          if (SILValue newValue = borrowFunctionArgument(callArg, idx)) {
             callArg = newValue;
             borrowedArgs[idx] = true;
+          }
+        } else if (paramInfo.isConsumed()) {
+          if (SILValue newValue = moveFunctionArgument(callArg, idx)) {
+            callArg = newValue;
           }
         }
       }
@@ -612,34 +635,98 @@ void SILInlineCloner::postFixUp(SILFunction *calleeFunction) {
   deleter.forceDelete(Apply.getInstruction());
 }
 
-SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
-                                                 FullApplySite AI,
-                                                 unsigned index) {
-  auto &mod = Apply.getFunction()->getModule();
-  auto enableLexicalLifetimes =
-      mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
-  auto argOwnershipRequiresBorrow = [&]() {
-    auto kind = callArg->getOwnershipKind();
-    if (enableLexicalLifetimes) {
-      // At this point, we know that the function argument is @guaranteed.
-      // If the value passed as that parameter has ownership, always add a
-      // lexical borrow scope to ensure that the value stays alive for the
-      // duration of the inlined callee.
-      return kind != OwnershipKind::None;
-    }
-    return kind == OwnershipKind::Owned;
-  };
-  if (!AI.getFunction()->hasOwnership() || !argOwnershipRequiresBorrow()) {
-    return SILValue();
+namespace {
+
+enum class Scope : uint8_t {
+  None,
+  Bare,
+  Lexical,
+};
+Scope scopeForArgument(Scope nonlexicalScope, SILValue callArg, unsigned index,
+                       SILFunction *caller, SILFunction *callee) {
+  if (!caller->hasOwnership()) {
+    // The function isn't in OSSA.  Borrows/moves are not meaningful.
+    return Scope::None;
   }
 
-  SILFunctionArgument *argument = cast<SILFunctionArgument>(
-      getCalleeFunction()->getEntryBlock()->getArgument(index));
+  auto &mod = caller->getModule();
+  auto enableLexicalLifetimes =
+      mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
+  SILFunctionArgument *argument =
+      cast<SILFunctionArgument>(callee->getEntryBlock()->getArgument(index));
+  if (!enableLexicalLifetimes) {
+    // Lexical lifetimes are disabled.  Use the non-lexical scope:
+    // - for borrows, do an ownership conversion.
+    // - for moves, do nothing.
+    return nonlexicalScope;
+  }
+  if (!argument->getLifetime().isLexical()) {
+    // The same applies if lexical lifetimes are enabled but the function
+    // argument is not lexical.  There is no lexical lifetime to maintain.  Use
+    // the non-lexical scope.
+    return nonlexicalScope;
+  }
+  // Lexical lifetimes are enabled and the function argument is lexical.
+  // During inlining, we need to ensure that the lifetime is maintained.
+  if (callArg->isLexical()) {
+    // The caller's value is already lexical.  It will maintain the lifetime of
+    // the argument.  Just do an ownership conversion if needed.
+    return nonlexicalScope;
+  }
+  // Lexical lifetimes are enabled, the function argument's lifetime is
+  // lexical, but the caller's value is not lexical.  Extra care is required to
+  // maintain the function argument's lifetime.  We need to add a lexical
+  // scope.
+  return Scope::Lexical;
+}
 
-  SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
-  auto isLexical =
-      enableLexicalLifetimes && argument->getLifetime().isLexical();
-  return beginBuilder.createBeginBorrow(AI.getLoc(), callArg, isLexical);
+} // anonymous namespace
+
+SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
+                                                 unsigned index) {
+  // The "minimal" borrow scope:  Guaranteed values are valid operands to some
+  // instructions that owned values are not.  If the caller's value is owned,
+  // it must be converted (via a "bare" begin_borrow) to a guaranteed value so
+  // that it can be used in place of the original guaranteed value in the
+  // instructions that are being inlined.
+  auto scopeForOwnership = callArg->getOwnershipKind() == OwnershipKind::Owned
+                               ? Scope::Bare
+                               : Scope::None;
+  auto scope = scopeForArgument(scopeForOwnership, callArg, index,
+                                Apply.getFunction(), getCalleeFunction());
+  bool isLexical;
+  switch (scope) {
+  case Scope::None:
+    return SILValue();
+  case Scope::Bare:
+    isLexical = false;
+    break;
+  case Scope::Lexical:
+    isLexical = true;
+    break;
+  }
+  SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
+  return beginBuilder.createBeginBorrow(Apply.getLoc(), callArg, isLexical);
+}
+
+SILValue SILInlineCloner::moveFunctionArgument(SILValue callArg,
+                                               unsigned index) {
+  auto scope = scopeForArgument(Scope::None, callArg, index,
+                                Apply.getFunction(), getCalleeFunction());
+  bool isLexical;
+  switch (scope) {
+  case Scope::None:
+    return SILValue();
+  case Scope::Bare:
+    assert(false && "Non-lexical move produced during inlining!?");
+    isLexical = false;
+    break;
+  case Scope::Lexical:
+    isLexical = true;
+    break;
+  }
+  SILBuilderWithScope beginBuilder(Apply.getInstruction(), getBuilder());
+  return beginBuilder.createMoveValue(Apply.getLoc(), callArg, isLexical);
 }
 
 void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {
@@ -751,6 +838,7 @@ static InlineCost getEnforcementCost(SILAccessEnforcement enforcement) {
     return InlineCost::Expensive;
   case SILAccessEnforcement::Static:
   case SILAccessEnforcement::Unsafe:
+  case SILAccessEnforcement::Signed:
     return InlineCost::Free;
   }
   llvm_unreachable("bad enforcement");
@@ -789,6 +877,15 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::ProjectBlockStorageInst:
+    return InlineCost::Free;
+
+  // dynamic_pack_index is free.  The other pack-indexing instructions
+  // are just adds of values that should be trivially dynamically
+  // available; that's cheap enough to still consider free under the
+  // same principle as typed GEPs.
+  case SILInstructionKind::DynamicPackIndexInst:
+  case SILInstructionKind::PackPackIndexInst:
+  case SILInstructionKind::ScalarPackIndexInst:
     return InlineCost::Free;
 
   // Aggregates are exploded at the IR level; these are effectively no-ops.
@@ -895,6 +992,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
@@ -922,6 +1020,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocPackInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
   case SILInstructionKind::DestroyAddrInst:
@@ -953,6 +1052,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::OpenExistentialValueInst:
+  case SILInstructionKind::OpenPackElementInst:
   case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::ExistentialMetatypeInst:
   case SILInstructionKind::RefElementAddrInst:
@@ -989,6 +1089,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AwaitAsyncContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
+  case SILInstructionKind::HasSymbolInst:
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \

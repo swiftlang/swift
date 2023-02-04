@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: freestanding
 
+// rdar://101938326
+// UNSUPPORTED: freestanding
+
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
@@ -97,11 +100,9 @@ func runTest(numCounters: Int, numWorkers: Int) {
 @available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() {
-    // Useful for debugging: specify counter/worker/iteration counts
-    let args = CommandLine.arguments
-    let numCounters = args.count >= 2 ? Int(args[1])! : 10
-    iterations = args.count >= 4 ? Int(args[3])! : 1000
-    let workers = args.count >= 3 ? Int(args[2])! : 100
+    let numCounters = 10
+    iterations = 1000
+    let workers = 100
     print("counters: \(counters), workers: \(workers), iterations: \(iterations)")
     runTest(numCounters: numCounters, numWorkers: workers)
   }

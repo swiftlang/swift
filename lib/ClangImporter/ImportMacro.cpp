@@ -439,7 +439,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       auto builtinType = builtinTypeForToken(tokenI[1],
                                              impl.getClangASTContext());
       if (builtinType) {
-        castType = builtinType.getValue();
+        castType = builtinType.value();
       } else {
         // TODO(https://github.com/apple/swift/issues/57735): Add diagnosis.
         return nullptr;

@@ -983,3 +983,51 @@ func testOverloadGenericVarFn() {
   S<((String) -> Void)?>().foo?("")
   S<((String) -> Void)?>().foo!("")
 }
+
+do {
+  func foo<T, U>(_: T, _: U) where T: Sequence, U: Sequence, T.Element == U.Element {}
+  // expected-note@-1 {{required by local function 'foo' where 'T' = 'Set<Int>.Type'}}
+  // expected-note@-2 {{required by local function 'foo' where 'U' = 'Array<String>.Type'}}
+  // expected-note@-3 {{where 'T.Element' = 'Set<Int>.Type.Element', 'U.Element' = 'Array<String>.Type.Element'}}
+
+  foo(Set<Int>, Array<String>)
+  // expected-error@-1 {{type 'Set<Int>.Type' cannot conform to 'Sequence'}}
+  // expected-error@-2 {{type 'Array<String>.Type' cannot conform to 'Sequence'}}
+  // expected-error@-3 {{local function 'foo' requires the types 'Set<Int>.Type.Element' and 'Array<String>.Type.Element' be equivalent}}
+  // expected-note@-4 2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+}
+
+// https://github.com/apple/swift/issues/56173
+protocol P_56173 {
+  associatedtype Element
+}
+protocol Q_56173 {
+  associatedtype Element
+}
+
+func test_requirement_failures_in_ambiguous_context() {
+  struct A : P_56173 {
+    typealias Element = String
+  }
+  struct B : Q_56173 {
+    typealias Element = Int
+  }
+
+  func f1<T: Equatable>(_: T, _: T) {} // expected-note {{where 'T' = 'A'}}
+
+  f1(A(), B()) // expected-error {{local function 'f1' requires that 'A' conform to 'Equatable'}}
+
+  func f2<T: P_56173, U: P_56173>(_: T, _: U) {}
+  // expected-note@-1 {{candidate requires that 'B' conform to 'P_56173' (requirement specified as 'U' : 'P_56173')}}
+  func f2<T: Q_56173, U: Q_56173>(_: T, _: U) {}
+  // expected-note@-1 {{candidate requires that 'A' conform to 'Q_56173' (requirement specified as 'T' : 'Q_56173')}}
+
+  f2(A(), B()) // expected-error {{no exact matches in call to local function 'f2'}}
+
+  func f3<T: P_56173>(_: T) where T.Element == Int {}
+  // expected-note@-1 {{candidate requires that the types 'A.Element' (aka 'String') and 'Int' be equivalent (requirement specified as 'T.Element' == 'Int')}}
+  func f3<U: Q_56173>(_: U) where U.Element == String {}
+  // expected-note@-1 {{candidate requires that 'A' conform to 'Q_56173' (requirement specified as 'U' : 'Q_56173')}}
+
+  f3(A()) // expected-error {{no exact matches in call to local function 'f3'}}
+}

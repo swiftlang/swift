@@ -39,11 +39,13 @@ namespace swift {
 // Set to 1 to enable helpful debug spew to stderr
 // If this is enabled, tests with `swift_task_debug_log` requirement can run.
 #if 0
+#define SWIFT_TASK_DEBUG_LOG_ENABLED 1
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
   fprintf(stderr, "[%#lx] [%s:%d](%s) " fmt "\n",                              \
           (unsigned long)Thread::current().platformThreadId(), __FILE__,       \
           __LINE__, __FUNCTION__, __VA_ARGS__)
 #else
+#define SWIFT_TASK_DEBUG_LOG_ENABLED 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
 #endif
 
@@ -81,6 +83,19 @@ void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 AsyncTask *_swift_task_clearCurrent();
 /// Set the active task reference for the current thread.
 AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
+
+/// Cancel all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is either called from the
+/// owning task of the task group or while holding the owning task's
+/// status record lock.
+void _swift_taskGroup_cancelAllChildren(TaskGroup *group);
+
+/// Remove the given task from the given task group.
+///
+/// This is an internal API; clients outside of the TaskGroup implementation
+/// should generally use a higher-level function.
+void _swift_taskGroup_detachChild(TaskGroup *group, AsyncTask *child);
 
 /// release() establishes a happens-before relation with a preceding acquire()
 /// on the same address.
@@ -120,6 +135,12 @@ namespace {
 ///
 ///   @_silgen_name("swift_taskGroup_wait_next_throwing")
 ///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+///
+///   @_silgen_name("swift_taskGroup_waitAll")
+///   func _taskGroupWaitAll<T>(
+///     group: Builtin.RawPointer,
+///     bodyError: Swift.Error?
+///   ) async throws -> T?
 ///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
@@ -275,7 +296,7 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
   // ActiveTaskStatusWithoutEscalation in
-  // include/swift/Reflection/RuntimeInternals.h. Any changes to the layout here
+  // include/swift/RemoteInspection/RuntimeInternals.h. Any changes to the layout here
   // must also be made there.
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
   uint32_t Flags;

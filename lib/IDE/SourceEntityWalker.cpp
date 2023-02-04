@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
@@ -26,6 +25,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "clang/Basic/Module.h"
+#include "swift/IDE/SourceEntityWalker.h"
+#include "swift/IDE/Utils.h"
 
 using namespace swift;
 
@@ -93,19 +94,6 @@ private:
   bool passCallArgNames(Expr *Fn, ArgumentList *ArgList);
 
   bool shouldIgnore(Decl *D);
-
-  ValueDecl *extractDecl(Expr *Fn) const {
-    Fn = Fn->getSemanticsProvidingExpr();
-    if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
-      return DRE->getDecl();
-    if (auto ApplyE = dyn_cast<ApplyExpr>(Fn))
-      return extractDecl(ApplyE->getFn());
-    if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn)) {
-      if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
-        return extractDecl(Unwrapped);
-    }
-    return nullptr;
-  }
 };
 
 } // end anonymous namespace
@@ -590,6 +578,29 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return Action::Stop();
     // We already visited the children.
     return doSkipChildren();
+  } else if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
+    // The macro itself.
+    auto macroRef = ME->getMacroRef();
+    auto macroDecl = macroRef.getDecl();
+    if (macroDecl) {
+      auto macroRefType =
+          macroDecl->getInterfaceType().subst(macroRef.getSubstitutions());
+      if (!passReference(
+              macroDecl, macroRefType, ME->getMacroNameLoc(),
+              ReferenceMetaData(SemaReferenceKind::DeclRef, None)))
+        return Action::Stop();
+    }
+
+    // Walk the arguments, since they were written directly by the user.
+    if (auto argList = ME->getArgs()) {
+      if (!argList->walk(*this))
+        return Action::Stop();
+    }
+
+    // Do not walk into ME->getRewritten() because it's not what the user wrote.
+
+    // Already walked the children.
+    return doSkipChildren();
   }
 
   return Action::Continue(E);
@@ -610,7 +621,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   if (!Continue)
     return Action::Stop();
 
-  if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
+  if (auto IdT = dyn_cast<IdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
       if (auto *ModD = dyn_cast<ModuleDecl>(VD)) {
         auto ident = IdT->getNameRef().getBaseIdentifier();
@@ -779,7 +790,11 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
     if (!CtorRefs.empty() && BaseNameLoc.isValid()) {
       Expr *Fn = CtorRefs.back()->getFn();
       if (Fn->getLoc() == BaseNameLoc) {
-        D = extractDecl(Fn);
+        D = ide::getReferencedDecl(Fn).second.getDecl();
+        if (D == nullptr) {
+          assert(false && "Unhandled constructor reference");
+          return true;
+        }
         CtorTyRef = TD;
       }
     }
@@ -792,12 +807,6 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
         ExtDecl = ExtDecls.back();
       }
     }
-  }
-
-  if (D == nullptr) {
-    // FIXME: When does this happen?
-    assert(false && "unhandled reference");
-    return true;
   }
 
   CharSourceRange CharRange =
@@ -818,7 +827,7 @@ bool SemaAnnotator::passReference(ModuleEntity Mod,
 }
 
 bool SemaAnnotator::passCallArgNames(Expr *Fn, ArgumentList *ArgList) {
-  ValueDecl *D = extractDecl(Fn);
+  ValueDecl *D = ide::getReferencedDecl(Fn).second.getDecl();
   if (!D)
     return true; // continue.
 

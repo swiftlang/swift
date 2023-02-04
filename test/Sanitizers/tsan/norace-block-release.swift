@@ -4,6 +4,9 @@
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
 
+// rdar://101876380
+// UNSUPPORTED: OS=ios
+
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
 // don't support TSan.
 // UNSUPPORTED: remote_run

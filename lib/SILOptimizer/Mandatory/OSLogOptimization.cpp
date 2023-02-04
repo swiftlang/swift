@@ -436,7 +436,7 @@ static Optional<SymbolicValue> collectConstants(FoldState &foldState) {
     // diagnosed and reported. If so, abort evaluation. Otherwise, continue
     // evaluation if possible as this error could be due to an instruction that
     // doesn't affect the OSLogMessage value.
-    if (errorInfo && detectAndDiagnoseErrors(errorInfo.getValue(), currInst)) {
+    if (errorInfo && detectAndDiagnoseErrors(errorInfo.value(), currInst)) {
       return errorInfo;
     }
 
@@ -448,7 +448,7 @@ static Optional<SymbolicValue> collectConstants(FoldState &foldState) {
     }
 
     // Set the next instruction to continue evaluation from.
-    currI = nextI.getValue();
+    currI = nextI.value();
 
     // If the instruction results are foldable and if we found a constant value
     // for the results, record it.
@@ -458,7 +458,7 @@ static Optional<SymbolicValue> collectConstants(FoldState &foldState) {
 
       Optional<SymbolicValue> constantVal =
           constantEvaluator.lookupConstValue(instructionResult);
-      if (constantVal.hasValue()) {
+      if (constantVal.has_value()) {
         foldState.addConstantSILValue(instructionResult);
       }
     }
@@ -751,7 +751,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
         SILType operandType = captureOperand->getType();
         SILType captureType = operandType.subst(module, callSubstMap);
         SILValue captureSILVal = emitCodeForSymbolicValue(
-            captureSymVal.getValue(), captureType.getASTType(), builder, loc,
+            captureSymVal.value(), captureType.getASTType(), builder, loc,
             stringInfo);
         capturedSILVals.push_back(captureSILVal);
       }
@@ -935,7 +935,7 @@ static void substituteConstants(FoldState &foldState) {
 
   for (SILValue constantSILValue : foldState.getConstantSILValues()) {
     SymbolicValue constantSymbolicVal =
-        evaluator.lookupConstValue(constantSILValue).getValue();
+        evaluator.lookupConstValue(constantSILValue).value();
     // Make sure that the symbolic value tracked in the foldState is a constant.
     // In the case of ArraySymbolicValue, the array storage could be a non-constant
     // if some instruction in the array initialization sequence was not evaluated
@@ -1114,8 +1114,7 @@ static bool hasOnlyStoreUses(SingleValueInstruction *addressInst) {
       if (numWritableArguments > 1)
         return false;
       SILArgumentConvention convention = applySite.getArgumentConvention(*use);
-      if (convention == SILArgumentConvention::Indirect_In_Guaranteed ||
-          convention == SILArgumentConvention::Indirect_In_Constant ||
+      if (convention == SILArgumentConvention::Indirect_In ||
           convention == SILArgumentConvention::Indirect_In_Guaranteed) {
         if (numWritableArguments > 0)
           return false;

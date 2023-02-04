@@ -23,6 +23,12 @@ namespace {
 using TSanFunc = void(void *);
 } // anonymous namespace
 
+// Note: We can't use a proper interface to get the `__tsan_acquire` and
+// `__tsan_release` from the public/Concurrency/ThreadSanitizer.cpp.
+// Unfortunately, we can't do this because there is no interface in the runtimes
+// we are backdeploying to. So we're stuck using this lazy dlsym game.
+// Number of times I've tried to fix this: 3
+
 void swift::_swift_tsan_acquire(void *addr) {
   const auto backdeploy_tsan_acquire =
     reinterpret_cast<TSanFunc *>(SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT, "__tsan_acquire")));

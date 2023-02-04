@@ -26,11 +26,13 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -1192,10 +1194,6 @@ void LazyConformanceLoader::anchor() {}
 /// Lookup table used to store members of a nominal type (and its extensions)
 /// for fast retrieval.
 class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
-  /// The last extension that was included within the member lookup table's
-  /// results.
-  ExtensionDecl *LastExtensionIncluded = nullptr;
-
   /// The type of the internal lookup table.
   typedef llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
     LookupTable;
@@ -1211,9 +1209,6 @@ class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
 public:
   /// Create a new member lookup table.
   explicit MemberLookupTable(ASTContext &ctx);
-
-  /// Update a lookup table with members from newly-added extensions.
-  void updateLookupTable(NominalTypeDecl *nominal);
 
   /// Add the given member to the lookup table.
   void addMember(Decl *members);
@@ -1250,12 +1245,6 @@ public:
   }
 
   void dump(llvm::raw_ostream &os) const {
-    os << "LastExtensionIncluded:\n";
-    if (LastExtensionIncluded)
-      LastExtensionIncluded->printContext(os, 2);
-    else
-      os << "  nullptr\n";
-
     os << "Lookup:\n  ";
     for (auto &pair : Lookup) {
       pair.getFirst().print(os);
@@ -1357,30 +1346,18 @@ void MemberLookupTable::addMembers(DeclRange members) {
   }
 }
 
-void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
-  // If the last extension we included is the same as the last known extension,
-  // we're already up-to-date.
-  if (LastExtensionIncluded == nominal->LastExtension)
+void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
+  if (!LookupTable.getInt())
     return;
 
-  // Add members from each of the extensions that we have not yet visited.
-  for (auto next = LastExtensionIncluded
-                     ? LastExtensionIncluded->NextExtension.getPointer()
-                     : nominal->FirstExtension;
-       next;
-       (LastExtensionIncluded = next,next = next->NextExtension.getPointer())) {
-    addMembers(next->getMembers());
-  }
-}
-
-void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
-  if (!LookupTable) return;
+  auto *table = LookupTable.getPointer();
+  assert(table);
 
   if (ext->hasLazyMembers()) {
-    LookupTable->addMembers(ext->getCurrentMembersWithoutLoading());
-    LookupTable->clearLazilyCompleteCache();
+    table->addMembers(ext->getCurrentMembersWithoutLoading());
+    table->clearLazilyCompleteCache();
   } else {
-    LookupTable->addMembers(ext->getMembers());
+    table->addMembers(ext->getMembers());
   }
 }
 
@@ -1388,11 +1365,13 @@ void NominalTypeDecl::addedMember(Decl *member) {
   // If we have a lookup table, add the new member to it. If not, we'll pick up
   // this member when we first create the table.
   auto *vd = dyn_cast<ValueDecl>(member);
-  auto *lookup = LookupTable;
-  if (!vd || !lookup)
+  if (!vd || !LookupTable.getInt())
     return;
 
-  lookup->addMember(vd);
+  auto *table = LookupTable.getPointer();
+  assert(table);
+
+  table->addMember(vd);
 }
 
 void ExtensionDecl::addedMember(Decl *member) {
@@ -1406,9 +1385,7 @@ void ExtensionDecl::addedMember(Decl *member) {
 }
 
 void NominalTypeDecl::addMemberToLookupTable(Decl *member) {
-  prepareLookupTable();
-
-  LookupTable->addMember(member);
+  getLookupTable()->addMember(member);
 }
 
 // For lack of anywhere more sensible to put it, here's a diagram of the pieces
@@ -1506,37 +1483,52 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
   }
 }
 
-void NominalTypeDecl::prepareLookupTable() {
-  // If we have already allocated the lookup table, then there's nothing further
-  // to do.
-  if (LookupTable) {
-    return;
+MemberLookupTable *NominalTypeDecl::getLookupTable() {
+  if (!LookupTable.getPointer()) {
+    auto &ctx = getASTContext();
+    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
   }
 
-  // Otherwise start the first fill.
-  auto &ctx = getASTContext();
-  LookupTable = new (ctx) MemberLookupTable(ctx);
-
-  if (hasLazyMembers()) {
-    assert(!hasUnparsedMembers());
-    LookupTable->addMembers(getCurrentMembersWithoutLoading());
-  } else {
-    LookupTable->addMembers(getMembers());
-  }
+  return LookupTable.getPointer();
 }
 
-void NominalTypeDecl::addLoadedExtensions() {
+void NominalTypeDecl::prepareLookupTable() {
+  // If we have already prepared the lookup table, then there's nothing further
+  // to do.
+  if (LookupTable.getInt())
+    return;
+
+  auto *table = getLookupTable();
+
+  // Otherwise start the first fill.
+  if (hasLazyMembers()) {
+    assert(!hasUnparsedMembers());
+    table->addMembers(getCurrentMembersWithoutLoading());
+  } else {
+    table->addMembers(getMembers());
+  }
+
+  // Note: this calls prepareExtensions()
   for (auto e : getExtensions()) {
     // If we can lazy-load this extension, only take the members we've loaded
     // so far.
+    //
+    // FIXME: This should be 'e->hasLazyMembers()' but that crashes` because
+    // some imported extensions don't have a Clang node, and only support
+    // LazyMemberLoader::loadAllMembers() and not
+    // LazyMemberLoader::loadNamedMembers().
     if (e->wasDeserialized() || e->hasClangNode()) {
-      LookupTable->addMembers(e->getCurrentMembersWithoutLoading());
+      table->addMembers(e->getCurrentMembersWithoutLoading());
       continue;
     }
 
     // Else, load all the members into the table.
-    LookupTable->addMembers(e->getMembers());
+    table->addMembers(e->getMembers());
   }
+
+  // Any extensions added after this point will add their members to the
+  // lookup table.
+  LookupTable.setInt(true);
 }
 
 static TinyPtrVector<ValueDecl *>
@@ -1592,12 +1584,12 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   decl->prepareLookupTable();
 
-  // If we're allowed to load extensions, call addLoadedExtensions to ensure we
-  // properly invalidate the lazily-complete cache for any extensions brought in
-  // by modules loaded after-the-fact. This can happen with the LLDB REPL.
-  decl->addLoadedExtensions();
+  // Call prepareExtensions() to ensure we properly invalidate the
+  // lazily-complete cache for any extensions brought in by modules
+  // loaded after-the-fact. This can happen with the LLDB REPL.
+  decl->prepareExtensions();
 
-  auto &Table = *decl->LookupTable;
+  auto &Table = *decl->getLookupTable();
   if (!useNamedLazyMemberLoading) {
     // Make sure we have the complete list of members (in this nominal and in
     // all extensions).
@@ -1606,7 +1598,6 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     for (auto E : decl->getExtensions())
       (void)E->getMembers();
 
-    Table.updateLookupTable(decl);
   } else if (!Table.isLazilyComplete(name.getBaseName())) {
     DeclBaseName baseName(name.getBaseName());
 
@@ -1701,11 +1692,24 @@ NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
+static bool inObjCImplExtension(AbstractFunctionDecl *newDecl) {
+  if (auto ext = dyn_cast<ExtensionDecl>(newDecl->getDeclContext()))
+    return ext->isObjCImplementation();
+  return false;
+}
+
 /// If there is an apparent conflict between \p newDecl and one of the methods
 /// in \p vec, should we diagnose it?
 static bool
 shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
+  // Conflicts between member implementations and their interfaces, or
+  // inherited inits and their overrides in @_objcImpl extensions, are spurious.
+  if (newDecl->isObjCMemberImplementation()
+      || (isa<ConstructorDecl>(newDecl) && inObjCImplExtension(newDecl)
+          && newDecl->getAttrs().hasAttribute<OverrideAttr>()))
+    return false;
+
   // Are all conflicting methods imported from ObjC and in our ObjC half or a
   // bridging header? Some code bases implement ObjC methods in Swift even
   // though it's not exactly supported.
@@ -2137,11 +2141,6 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
   using namespace namelookup;
   QualifiedLookupResult decls;
 
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  // Avoid calling `clang::ObjCMethodDecl::isDirectMethod()`.
-  return decls;
-#endif
-
   // Type-only lookup won't find anything on AnyObject.
   if (options & NL_OnlyTypes)
     return decls;
@@ -2259,12 +2258,15 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       if (typealias->getName().is("AnyObject")) {
         // TypeRepr version: Builtin.AnyObject
         if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
-          if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
-            auto components = compound->getComponents();
-            if (components.size() == 2 &&
-                components[0]->getNameRef().isSimpleName("Builtin") &&
-                components[1]->getNameRef().isSimpleName("AnyObject")) {
-              anyObject = true;
+          if (auto memberTR = dyn_cast<MemberTypeRepr>(typeRepr)) {
+            if (auto identBase =
+                    dyn_cast<IdentTypeRepr>(memberTR->getBaseComponent())) {
+              auto memberComps = memberTR->getMemberComponents();
+              if (memberComps.size() == 1 &&
+                  identBase->getNameRef().isSimpleName("Builtin") &&
+                  memberComps.front()->getNameRef().isSimpleName("AnyObject")) {
+                anyObject = true;
+              }
             }
           }
         }
@@ -2287,7 +2289,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
     }
 
     // Make sure we didn't miss some interesting kind of type declaration.
-    assert(isa<AbstractTypeParamDecl>(typeDecl));
+    assert(isa<GenericTypeParamDecl>(typeDecl) ||
+           isa<AssociatedTypeDecl>(typeDecl));
   }
 
   return nominalDecls;
@@ -2422,31 +2425,39 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
 
 /// Determine the types directly referenced by the given identifier type.
 static DirectlyReferencedTypeDecls
-directReferencesForIdentTypeRepr(Evaluator &evaluator,
-                                 ASTContext &ctx, IdentTypeRepr *ident,
-                                 DeclContext *dc, bool allowUsableFromInline) {
+directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
+                                   DeclRefTypeRepr *repr, DeclContext *dc,
+                                   bool allowUsableFromInline) {
   DirectlyReferencedTypeDecls current;
 
-  for (const auto &component : ident->getComponentRange()) {
+  auto *baseComp = repr->getBaseComponent();
+  if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
+    // If we already set a declaration, use it.
+    if (auto *typeDecl = identBase->getBoundDecl()) {
+      current = {1, typeDecl};
+    } else {
+      // For the base component, perform unqualified name lookup.
+      current = directReferencesForUnqualifiedTypeLookup(
+          identBase->getNameRef(), identBase->getLoc(), dc,
+          LookupOuterResults::Excluded, allowUsableFromInline);
+    }
+  } else {
+    current = directReferencesForTypeRepr(evaluator, ctx, baseComp, dc,
+                                          allowUsableFromInline);
+  }
+
+  auto *memberTR = dyn_cast<MemberTypeRepr>(repr);
+  if (!memberTR)
+    return current;
+
+  // If we didn't find anything, fail now.
+  if (current.empty())
+    return current;
+
+  for (const auto &component : memberTR->getMemberComponents()) {
     // If we already set a declaration, use it.
     if (auto typeDecl = component->getBoundDecl()) {
       current = {1, typeDecl};
-      continue;
-    }
-
-    // For the first component, perform unqualified name lookup.
-    if (current.empty()) {
-      current =
-        directReferencesForUnqualifiedTypeLookup(component->getNameRef(),
-                                                 component->getLoc(),
-                                                 dc,
-                                                 LookupOuterResults::Excluded,
-                                                 allowUsableFromInline);
-
-      // If we didn't find anything, fail now.
-      if (current.empty())
-        return current;
-
       continue;
     }
 
@@ -2491,12 +2502,12 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return result;
   }
 
-  case TypeReprKind::CompoundIdent:
+  case TypeReprKind::Member:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::SimpleIdent:
-    return directReferencesForIdentTypeRepr(evaluator, ctx,
-                                            cast<IdentTypeRepr>(typeRepr), dc,
-                                            allowUsableFromInline);
+    return directReferencesForDeclRefTypeRepr(evaluator, ctx,
+                                              cast<DeclRefTypeRepr>(typeRepr),
+                                              dc, allowUsableFromInline);
 
   case TypeReprKind::Dictionary:
     return { 1, ctx.getDictionaryDecl()};
@@ -2511,10 +2522,24 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return { };
   }
 
+  case TypeReprKind::Vararg: {
+    auto packExpansionRepr = cast<VarargTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       packExpansionRepr->getElementType(), dc,
+                                       allowUsableFromInline);
+  }
+
   case TypeReprKind::PackExpansion: {
     auto packExpansionRepr = cast<PackExpansionTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
                                        packExpansionRepr->getPatternType(), dc,
+                                       allowUsableFromInline);
+  }
+
+  case TypeReprKind::PackReference: {
+    auto packReferenceRepr = cast<PackReferenceTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       packReferenceRepr->getPackType(), dc,
                                        allowUsableFromInline);
   }
 
@@ -2529,6 +2554,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
+  case TypeReprKind::Pack:
     return { };
 
   case TypeReprKind::OpaqueReturn:
@@ -2709,6 +2735,20 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   return PD->getASTContext().AllocateCopy(result);
 }
 
+ArrayRef<ValueDecl *>
+ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *PD) const {
+  SmallVector<ValueDecl *, 4> requirements;
+
+  for (auto *member : PD->getABIMembers()) {
+    auto *VD = dyn_cast<ValueDecl>(member);
+    if (VD && VD->isProtocolRequirement())
+      requirements.push_back(VD);
+  }
+
+  return PD->getASTContext().AllocateCopy(requirements);
+}
+
 NominalTypeDecl *
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                                  ExtensionDecl *ext) const {
@@ -2794,7 +2834,7 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
     PreWalkAction walkToTypeReprPre(TypeRepr *repr) override {
 
       // Don't allow variadic opaque parameter or return types.
-      if (isa<PackExpansionTypeRepr>(repr))
+      if (isa<PackExpansionTypeRepr>(repr) || isa<VarargTypeRepr>(repr))
         return Action::SkipChildren();
 
       if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)) {
@@ -2821,9 +2861,9 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
         if (!Reprs.empty() && isa<ExistentialTypeRepr>(Reprs.front())){
           Reprs.clear();
         }
-      } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)) {
-        if (identRepr->isProtocol(dc))
-          Reprs.push_back(identRepr);
+      } else if (auto declRefTR = dyn_cast<DeclRefTypeRepr>(repr)) {
+        if (declRefTR->isProtocol(dc))
+          Reprs.push_back(declRefTR);
       }
       return Action::Continue();
     }
@@ -3001,9 +3041,41 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
+void swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc,
+                                   llvm::TinyPtrVector<ValueDecl *> &macros) {
+  auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
+  if (!identTypeRepr)
+    return;
+
+  // Look for macros at module scope. They can only occur at module scope, and
+  // we need to be sure not to trigger name lookup into type contexts along
+  // the way.
+  auto moduleScopeDC = dc->getModuleScopeContext();
+  ASTContext &ctx = moduleScopeDC->getASTContext();
+  UnqualifiedLookupDescriptor descriptor(
+      identTypeRepr->getNameRef(), moduleScopeDC
+  );
+  auto lookup = evaluateOrDefault(
+      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+  for (const auto &result : lookup.allResults()) {
+    // Only keep attached macros, which can be spelled as custom attributes.
+    if (auto macro = dyn_cast<MacroDecl>(result.getValueDecl()))
+      if (isAttachedMacro(macro->getMacroRoles()))
+        macros.push_back(macro);
+  }
+}
+
 NominalTypeDecl *
 CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                    CustomAttr *attr, DeclContext *dc) const {
+  // Look for names at module scope, so we don't trigger name lookup for
+  // nested scopes. At this point, we're looking to see whether there are
+  // any suitable macros.
+  llvm::TinyPtrVector<ValueDecl *> macros;
+  findMacroForCustomAttr(attr, dc, macros);
+  if (!macros.empty())
+    return nullptr;
+
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();
   DirectlyReferencedTypeDecls decls;
@@ -3051,13 +3123,11 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                assocType->getDescriptiveKind(),
                                assocType->getName());
 
-            ComponentIdentTypeRepr *components[2] = {
-              new (ctx) SimpleIdentTypeRepr(identTypeRepr->getNameLoc(),
-                                            DeclNameRef(moduleName)),
-              identTypeRepr
-            };
+            auto *baseComp = new (ctx) SimpleIdentTypeRepr(
+                identTypeRepr->getNameLoc(), DeclNameRef(moduleName));
 
-            auto *newTE = new (ctx) TypeExpr(IdentTypeRepr::create(ctx, components));
+            auto *newTE = new (ctx) TypeExpr(
+                MemberTypeRepr::create(ctx, baseComp, {identTypeRepr}));
             attr->resetTypeInformation(newTE);
             return nominal;
           }
@@ -3302,8 +3372,13 @@ void FindLocalVal::checkGenericParams(GenericParamList *Params) {
   if (!Params)
     return;
 
-  for (auto P : *Params)
+  for (auto P : *Params) {
+    if (P->isOpaqueType()) {
+      // Generic param for 'some' parameter type is not "visible".
+      continue;
+    }
     checkValueDecl(P, DeclVisibilityKind::GenericParameter);
+  }
 }
 
 void FindLocalVal::checkSourceFile(const SourceFile &SF) {
@@ -3395,6 +3470,12 @@ void FindLocalVal::visitBraceStmt(BraceStmt *S, bool isTopLevelCode) {
   }
 
   for (auto elem : S->getElements()) {
+    // If we have a SingleValueStmtExpr, there may be local bindings in the
+    // wrapped statement.
+    if (auto *E = elem.dyn_cast<Expr *>()) {
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E))
+        visit(SVE->getStmt());
+    }
     if (auto *S = elem.dyn_cast<Stmt*>())
       visit(S);
   }

@@ -21,6 +21,7 @@
 #include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
+#include "ManagedValue.h"
 #include "RValue.h"
 #include "SILGen.h"
 #include "SILGenFunction.h"
@@ -30,6 +31,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/SIL/Consumption.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -467,6 +469,15 @@ InOutConversionScope::~InOutConversionScope() {
 void PathComponent::_anchor() {}
 void PhysicalPathComponent::_anchor() {}
 
+void PhysicalPathComponent::set(SILGenFunction &SGF, SILLocation loc,
+                                ArgumentSource &&value, ManagedValue base) && {
+  auto finalDestAddr = std::move(*this).project(SGF, loc, base);
+  assert(finalDestAddr.getType().isAddress());
+
+  auto srcRValue = std::move(value).getAsRValue(SGF).ensurePlusOne(SGF, loc);
+  std::move(srcRValue).assignInto(SGF, loc, finalDestAddr.getValue());
+}
+
 void PathComponent::dump() const {
   dump(llvm::errs());
 }
@@ -843,8 +854,17 @@ namespace {
       // TODO: if the base is +1, break apart its cleanup.
       auto Res = SGF.B.createStructElementAddr(loc, base.getValue(),
                                                Field, SubstFieldType);
-      return ManagedValue::forLValue(Res);
+
+      if (!Field->getPointerAuthQualifier().isPresent() ||
+          !SGF.getOptions().EnableImportPtrauthFieldFunctionPointers) {
+        return ManagedValue::forLValue(Res);
+      }
+      auto beginAccess =
+          enterAccessScope(SGF, loc, base, Res, getTypeData(), getAccessKind(),
+                           SILAccessEnforcement::Signed, takeActorIsolation());
+      return ManagedValue::forLValue(beginAccess);
     }
+
     void dump(raw_ostream &OS, unsigned indent) const override {
       OS.indent(indent) << "StructElementComponent("
                         << Field->getName() << ")\n";
@@ -1609,7 +1629,7 @@ namespace {
 
         // First, we need to find index of the current field in `_storage.
         auto fieldIdx = getTupleFieldIndex(localVar, field->getName());
-        assert(fieldIdx.hasValue());
+        assert(fieldIdx.has_value());
 
         // Load `_storage.<name>`
         auto localVarRef =
@@ -1647,7 +1667,7 @@ namespace {
                               SGF.FunctionDC)) {
         // This is wrapped property. Instead of emitting a setter, emit an
         // assign_by_wrapper with the allocating initializer function and the
-        // setter function as arguments. DefiniteInitializtion will then decide
+        // setter function as arguments. DefiniteInitialization will then decide
         // between the two functions, depending if it's an initialization or a
         // re-assignment.
         //
@@ -1679,7 +1699,7 @@ namespace {
           // First, we need to find index of the backing storage field in
           // `_storage`.
           auto fieldIdx = getTupleFieldIndex(localVar, backingVar->getName());
-          assert(fieldIdx.hasValue());
+          assert(fieldIdx.has_value());
 
           // Load `_storage.<name>`
           auto localVarRef =
@@ -1861,7 +1881,7 @@ namespace {
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
-      OS.indent(indent) << "MaterializeToTemporaryComponent";
+      OS.indent(indent) << "MaterializeToTemporaryComponent\n";
     }
 
   private:
@@ -1894,6 +1914,10 @@ namespace {
                                       getSubstFormalType(),
                                       /*actorIsolation=*/None);
         }
+      }
+      
+      if (lv.getTypeOfRValue() != getTypeOfRValue()) {
+        lv.addOrigToSubstComponent(getTypeOfRValue());
       }
 
       return lv;
@@ -2108,12 +2132,16 @@ makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
   bool isBorrowed = base.isPlusZeroRValueOrTrivial()
     && !base.getType().isTrivial(SGF.F);
   if (!base.getType().isAddress() || isBorrowed) {
-    auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
-    if (isBorrowed)
-      base.copyInto(SGF, loc, tmp);
-    else
-      base.forwardInto(SGF, loc, tmp);
-    return SGF.emitManagedBufferWithCleanup(tmp);
+    if (SGF.useLoweredAddresses()) {
+      auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
+      if (isBorrowed)
+        base.copyInto(SGF, loc, tmp);
+      else
+        base.forwardInto(SGF, loc, tmp);
+      return SGF.emitManagedBufferWithCleanup(tmp);
+    } else {
+      return base.copy(SGF, loc);
+    }
   }
 
   return base;
@@ -2869,7 +2897,7 @@ namespace {
     void emitUsingAccessor(AccessorKind accessorKind,
                            bool isDirect) {
       auto accessor =
-        SGF.SGM.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
+          SGF.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
 
       switch (accessorKind) {
       case AccessorKind::Set: {
@@ -3300,16 +3328,18 @@ LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,
 static SGFAccessKind getBaseAccessKindForAccessor(SILGenModule &SGM,
                                                   AccessorDecl *accessor,
                                                   CanType baseFormalType) {
-  if (accessor->isMutating()) {
+  if (accessor->isMutating())
     return SGFAccessKind::ReadWrite;
-  } else if (SGM.shouldEmitSelfAsRValue(accessor, baseFormalType)) {
-    return SGM.isNonMutatingSelfIndirect(SGM.getAccessorDeclRef(accessor))
-             ? SGFAccessKind::OwnedAddressRead
-             : SGFAccessKind::OwnedObjectRead;
+
+  auto declRef = SGM.getAccessorDeclRef(accessor, ResilienceExpansion::Minimal);
+  if (SGM.shouldEmitSelfAsRValue(accessor, baseFormalType)) {
+    return SGM.isNonMutatingSelfIndirect(declRef)
+               ? SGFAccessKind::OwnedAddressRead
+               : SGFAccessKind::OwnedObjectRead;
   } else {
-    return SGM.isNonMutatingSelfIndirect(SGM.getAccessorDeclRef(accessor))
-             ? SGFAccessKind::BorrowedAddressRead
-             : SGFAccessKind::BorrowedObjectRead;
+    return SGM.isNonMutatingSelfIndirect(declRef)
+               ? SGFAccessKind::BorrowedAddressRead
+               : SGFAccessKind::BorrowedObjectRead;
   }
 }
 
@@ -3417,7 +3447,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
       var->getOpaqueAccessor(AccessorKind::Read)) {
     bool isObjC = false;
     auto readAccessor =
-        SGF.SGM.getAccessorDeclRef(var->getOpaqueAccessor(AccessorKind::Read));
+        SGF.getAccessorDeclRef(var->getOpaqueAccessor(AccessorKind::Read));
     if (isCallToReplacedInDynamicReplacement(
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
@@ -3490,6 +3520,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
                                BaseFormalType, typeData, varStorageType,
                                ArgListForDiagnostics, std::move(Indices),
                                IsOnSelfParameter);
+    
   }
 
   void emitUsingCoroutineAccessor(SILDeclRef accessor, bool isDirect,
@@ -3617,7 +3648,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
       decl->getOpaqueAccessor(AccessorKind::Read)) {
     bool isObjC = false;
     auto readAccessor =
-        SGF.SGM.getAccessorDeclRef(decl->getOpaqueAccessor(AccessorKind::Read));
+        SGF.getAccessorDeclRef(decl->getOpaqueAccessor(AccessorKind::Read));
     if (isCallToReplacedInDynamicReplacement(
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
@@ -3905,11 +3936,21 @@ LValue SILGenLValue::visitMoveExpr(MoveExpr *e, SGFAccessKind accessKind,
 
   ManagedValue addr = SGF.emitAddressOfLValue(e, std::move(baseLV));
 
-  // Now create the temporary and
+  // Now create the temporary and move our value into there.
   auto temp =
       SGF.emitFormalAccessTemporary(e, SGF.F.getTypeLowering(addr.getType()));
   auto toAddr = temp->getAddressForInPlaceInitialization(SGF, e);
-  SGF.B.createMarkUnresolvedMoveAddr(e, addr.getValue(), toAddr);
+
+  // If we have a move only type, we use a copy_addr that will be handled by the
+  // address move only checker. If we have a copyable type, we need to use a
+  // mark_unresolved_move_addr to ensure that the move operator checker performs
+  // the relevant checking.
+  if (addr.getType().isMoveOnly()) {
+    SGF.B.createCopyAddr(e, addr.getValue(), toAddr, IsNotTake,
+                         IsInitialization);
+  } else {
+    SGF.B.createMarkUnresolvedMoveAddr(e, addr.getValue(), toAddr);
+  }
   temp->finishInitialization(SGF);
 
   // Now return the temporary in a value component.
@@ -4566,6 +4607,19 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
                      substFormalType, rvalueTL, C, IsNotTake, isBaseGuaranteed);
       } else if (isReadAccessResultOwned(src.getAccessKind()) &&
           !projection.isPlusOne(*this)) {
+
+        // Before we copy, if we have a move only wrapped value, unwrap the
+        // value using a guaranteed moveonlywrapper_to_copyable.
+        if (projection.getType().isMoveOnlyWrapped()) {
+          // We are assuming we always get a guaranteed value here.
+          assert(projection.getValue()->getOwnershipKind() ==
+                 OwnershipKind::Guaranteed);
+          // We use SILValues here to ensure we get a tight scope around our
+          // copy.
+          projection =
+              B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, projection);
+        }
+
         projection = projection.copy(*this, loc);
       }
 
@@ -4899,12 +4953,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   
   // Write to the tail component.
   if (component.isPhysical()) {
-    auto finalDestAddr =
-      std::move(component).project(*this, loc, destAddr);
-    assert(finalDestAddr.getType().isAddress());
-
-    auto value = std::move(src).getAsRValue(*this).ensurePlusOne(*this, loc);
-    std::move(value).assignInto(*this, loc, finalDestAddr.getValue());
+    std::move(component.asPhysical()).set(*this, loc, std::move(src), destAddr);
   } else {
     std::move(component.asLogical()).set(*this, loc, std::move(src), destAddr);
   }

@@ -31,7 +31,7 @@ bb0(%0 : $*Self):
   // function_ref protocol_extensions.P1.extP1a <A : protocol_extensions.P1>(protocol_extensions.P1.Self)() -> ()
   %2 = function_ref @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> () // user: %5
   %3 = alloc_stack $Self                          // users: %4, %5, %6
-  copy_addr %0 to [initialization] %3 : $*Self  // id: %4
+  copy_addr %0 to [init] %3 : $*Self  // id: %4
   // CHECK: call swiftcc void @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_
   %5 = apply %2<Self>(%3) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> ()
   dealloc_stack %3 : $*Self      // id: %6

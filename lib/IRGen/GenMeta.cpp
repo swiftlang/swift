@@ -206,6 +206,7 @@ static void emitMetadataCompletionFunction(IRGenModule &IGM,
   f->setAttributes(IGM.constructInitialAttributes());
   f->setDoesNotThrow();
   IGM.setHasNoFramePointer(f);
+  IGM.setColocateMetadataSection(f);
 
   IRGenFunction IGF(IGM, f);
 
@@ -2262,7 +2263,7 @@ namespace {
                substitutionSet) {
         auto getInt32Constant =
             [&](Optional<unsigned> value) -> llvm::ConstantInt * {
-          return llvm::ConstantInt::get(IGM.Int32Ty, value.getValueOr(0));
+          return llvm::ConstantInt::get(IGM.Int32Ty, value.value_or(0));
         };
 
         auto symbol = getSymbol();
@@ -2969,6 +2970,7 @@ namespace {
       f->setAttributes(IGM.constructInitialAttributes());
       f->setDoesNotThrow();
       IGM.setHasNoFramePointer(f);
+      IGM.setColocateMetadataSection(f);
 
       IRGenFunction IGF(IGM, f);
 
@@ -3441,6 +3443,8 @@ namespace {
         MetadataLayout(IGM.getClassMetadataLayout(theClass)) {}
 
   public:
+    const ClassLayout &getFieldLayout() const { return FieldLayout; }
+
     SILType getLoweredType() {
       return IGM.getLoweredType(Target->getDeclaredTypeInContext());
     }
@@ -3452,7 +3456,12 @@ namespace {
 
     ClassFlags getClassFlags() { return ::getClassFlags(Target); }
 
-    void addClassFlags() { B.addInt32((uint32_t)asImpl().getClassFlags()); }
+    void addClassFlags() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
+      B.addInt32((uint32_t)asImpl().getClassFlags());
+    }
 
     void noteResilientSuperclass() {}
 
@@ -3486,6 +3495,9 @@ namespace {
     }
 
     void addValueWitnessTable() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       B.add(asImpl().getValueWitnessTable(false).getValue());
     }
 
@@ -3576,6 +3588,9 @@ namespace {
     }
 
     void addDestructorFunction() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       if (auto ptr = getAddrOfDestructorFunction(IGM, Target)) {
         B.addSignedPointer(*ptr,
                            IGM.getOptions().PointerAuth.HeapDestructors,
@@ -3588,6 +3603,9 @@ namespace {
     }
 
     void addIVarDestroyer() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       auto dtorFunc = IGM.getAddrOfIVarInitDestroy(Target,
                                                    /*isDestroyer=*/ true,
                                                    /*isForeign=*/ false,
@@ -3610,6 +3628,9 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       B.addSignedPointer(asImpl().getNominalTypeDescriptor(),
                          IGM.getOptions().PointerAuth.TypeDescriptors,
                          PointerAuthEntity::Special::TypeDescriptor);
@@ -3624,6 +3645,9 @@ namespace {
     }
 
     void addInstanceAddressPoint() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       // Right now, we never allocate fields before the address point.
       B.addInt32(0);
     }
@@ -3633,6 +3657,9 @@ namespace {
     const ClassLayout &getFieldLayout() { return FieldLayout; }
 
     void addInstanceSize() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       if (asImpl().hasFixedLayout()) {
         B.addInt32(asImpl().getFieldLayout().getSize().getValue());
       } else {
@@ -3642,6 +3669,9 @@ namespace {
     }
     
     void addInstanceAlignMask() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       if (asImpl().hasFixedLayout()) {
         B.addInt16(asImpl().getFieldLayout().getAlignMask().getValue());
       } else {
@@ -3651,15 +3681,24 @@ namespace {
     }
 
     void addRuntimeReservedBits() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       B.addInt16(0);
     }
 
     void addClassSize() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       auto size = MetadataLayout.getSize();
       B.addInt32(size.FullSize.getValue());
     }
 
     void addClassAddressPoint() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       // FIXME: Wrong
       auto size = MetadataLayout.getSize();
       B.addInt32(size.AddressPoint.getValue());
@@ -3691,13 +3730,16 @@ namespace {
       // Derive the RO-data.
       llvm::Constant *data = asImpl().getROData();
 
-      // Set a low bit to indicate this class has Swift metadata.
-      auto bit = llvm::ConstantInt::get(
-          IGM.IntPtrTy, asImpl().getClassDataPointerHasSwiftMetadataBits());
+      if (!asImpl().getFieldLayout().hasObjCImplementation()) {
+        // Set a low bit to indicate this class has Swift metadata.
+        auto bit = llvm::ConstantInt::get(
+            IGM.IntPtrTy, asImpl().getClassDataPointerHasSwiftMetadataBits());
 
-      // Emit data + bit.
-      data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
-      data = llvm::ConstantExpr::getAdd(data, bit);
+        // Emit data + bit.
+        data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
+        data = llvm::ConstantExpr::getAdd(data, bit);
+      }
+
       B.add(data);
     }
 
@@ -3797,6 +3839,9 @@ namespace {
       : super(IGM, theClass, builder, fieldLayout) {}
 
     void addFieldOffset(VarDecl *var) {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       addFixedFieldOffset(IGM, B, var, [](DeclContext *dc) {
         return dc->getDeclaredTypeInContext();
       });
@@ -3806,13 +3851,8 @@ namespace {
       llvm_unreachable("Fixed class metadata cannot have missing members");
     }
 
-    void addGenericArgument(GenericRequirement requirement,
-                            ClassDecl *forClass) {
-      llvm_unreachable("Fixed class metadata cannot have generic parameters");
-    }
-
-    void addGenericWitnessTable(GenericRequirement requirement,
-                                ClassDecl *forClass) {
+    void addGenericRequirement(GenericRequirement requirement,
+                               ClassDecl *forClass) {
       llvm_unreachable("Fixed class metadata cannot have generic requirements");
     }
   };
@@ -3833,12 +3873,18 @@ namespace {
       : super(IGM, theClass, builder, fieldLayout) {}
 
     void addFieldOffset(VarDecl *var) {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       // Field offsets are either copied from the superclass or calculated
       // at runtime.
       B.addInt(IGM.SizeTy, 0);
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       for (unsigned i = 0,
                     e = placeholder->getNumberOfFieldOffsetVectorEntries();
            i < e; ++i) {
@@ -3848,16 +3894,19 @@ namespace {
       }
     }
 
-    void addGenericArgument(GenericRequirement requirement,
-                            ClassDecl *forClass) {
-      // Filled in at runtime.
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
-    }
-
-    void addGenericWitnessTable(GenericRequirement requirement,
-                                ClassDecl *forClass) {
-      // Filled in at runtime.
-      B.addNullPointer(IGM.WitnessTablePtrTy);
+    void addGenericRequirement(GenericRequirement requirement,
+                               ClassDecl *forClass) {
+      switch (requirement.getKind()) {
+      case GenericRequirement::Kind::Shape:
+        B.addInt(cast<llvm::IntegerType>(requirement.getType(IGM)), 0);
+        break;
+      case GenericRequirement::Kind::Metadata:
+      case GenericRequirement::Kind::WitnessTable:
+      case GenericRequirement::Kind::MetadataPack:
+      case GenericRequirement::Kind::WitnessTablePack:
+        B.addNullPointer(cast<llvm::PointerType>(requirement.getType(IGM)));
+        break;
+      }
     }
   };
 
@@ -3876,6 +3925,8 @@ namespace {
       : IGM(IGM), Target(theClass), B(builder), FieldLayout(fieldLayout) {}
 
     llvm::Constant *emitNominalTypeDescriptor() {
+      if (FieldLayout.hasObjCImplementation())
+        return nullptr;
       return ClassContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
     }
 
@@ -3897,11 +3948,17 @@ namespace {
     }
 
     void addDestructorFunction() {
+      if (FieldLayout.hasObjCImplementation())
+        return;
+
       auto function = getAddrOfDestructorFunction(IGM, Target);
       B.addCompactFunctionReferenceOrNull(function ? *function : nullptr);
     }
 
     void addIVarDestroyer() {
+      if (FieldLayout.hasObjCImplementation())
+        return;
+
       auto function = IGM.getAddrOfIVarInitDestroy(Target,
                                                    /*isDestroyer=*/ true,
                                                    /*isForeign=*/ false,
@@ -3910,6 +3967,9 @@ namespace {
     }
 
     void addClassFlags() {
+      if (FieldLayout.hasObjCImplementation())
+        return;
+
       B.addInt32((uint32_t) getClassFlags(Target));
     }
 
@@ -3968,6 +4028,11 @@ namespace {
     }
 
     void layoutHeader() {
+      // @_objcImplementation on true (non-ObjC) generic classes doesn't make
+      // much sense, and we haven't updated this builder to handle it.
+      assert(!FieldLayout.hasObjCImplementation()
+             && "@_objcImplementation class with generic metadata?");
+
       super::layoutHeader();
 
       // RelativePointer<HeapObjectDestroyer> Destroy;
@@ -4182,21 +4247,24 @@ namespace {
       return emitValueWitnessTable(relativeReference);
     }
 
-    void addGenericArgument(GenericRequirement requirement) {
-      auto t = requirement.TypeParameter.subst(genericSubstitutions());
-      ConstantReference ref = IGM.getAddrOfTypeMetadata(
-          CanType(t), SymbolReferenceKind::Relative_Direct);
-      this->B.add(ref.getDirectValue());
-    }
+    void addGenericRequirement(GenericRequirement requirement) {
+      if (requirement.isMetadata()) {
+        auto t = requirement.getTypeParameter().subst(genericSubstitutions());
+        ConstantReference ref = IGM.getAddrOfTypeMetadata(
+            CanType(t), SymbolReferenceKind::Relative_Direct);
+        this->B.add(ref.getDirectValue());
+        return;
+      }
 
-    void addGenericWitnessTable(GenericRequirement requirement) {
+      assert(requirement.isWitnessTable());
       auto conformance = genericSubstitutions().lookupConformance(
-          requirement.TypeParameter->getCanonicalType(), requirement.Protocol);
+          requirement.getTypeParameter()->getCanonicalType(),
+          requirement.getProtocol());
       ProtocolConformance *concreteConformance = conformance.getConcrete();
 
       llvm::Constant *addr;
 
-      Type argument = requirement.TypeParameter.subst(genericSubstitutions());
+      Type argument = requirement.getTypeParameter().subst(genericSubstitutions());
       auto argumentNominal = argument->getAnyNominal();
       if (argumentNominal && argumentNominal->isGenericContext()) {
         // TODO: Statically specialize the witness table pattern for t's
@@ -4266,14 +4334,9 @@ namespace {
                                            const ClassLayout &fieldLayout)
         : super(IGM, type, decl, B, fieldLayout), FieldLayout(fieldLayout) {}
 
-    void addGenericArgument(GenericRequirement requirement,
-                            ClassDecl *theClass) {
-      super::addGenericArgument(requirement);
-    }
-
-    void addGenericWitnessTable(GenericRequirement requirement,
-                                ClassDecl *theClass) {
-      super::addGenericWitnessTable(requirement);
+    void addGenericRequirement(GenericRequirement requirement,
+                               ClassDecl *theClass) {
+      super::addGenericRequirement(requirement);
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
@@ -4282,6 +4345,9 @@ namespace {
     }
 
     void addFieldOffset(VarDecl *var) {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       addFixedFieldOffset(IGM, B, var, [&](DeclContext *dc) {
         return dc->mapTypeIntoContext(type);
       });
@@ -4332,6 +4398,10 @@ namespace {
 static void emitObjCClassSymbol(IRGenModule &IGM, ClassDecl *classDecl,
                                 llvm::Constant *metadata,
                                 llvm::Type *metadataTy) {
+  if (classDecl->getObjCImplementationDecl())
+    // Should already have this symbol.
+    return;
+
   auto entity = LinkEntity::forObjCClass(classDecl);
   LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
 
@@ -4725,11 +4795,7 @@ namespace {
       B.addAlignmentPadding(super::IGM.getPointerAlignment());
     }
 
-    void addGenericArgument(GenericRequirement requirement) {
-      llvm_unreachable("Concrete type metadata cannot have generic parameters");
-    }
-
-    void addGenericWitnessTable(GenericRequirement requirement) {
+    void addGenericRequirement(GenericRequirement requirement) {
       llvm_unreachable("Concrete type metadata cannot have generic requirements");
     }
 
@@ -5094,11 +5160,7 @@ namespace {
                          PointerAuthEntity::Special::TypeDescriptor);
     }
 
-    void addGenericArgument(GenericRequirement requirement) {
-      llvm_unreachable("Concrete type metadata cannot have generic parameters");
-    }
-
-    void addGenericWitnessTable(GenericRequirement requirement) {
+    void addGenericRequirement(GenericRequirement requirement) {
       llvm_unreachable("Concrete type metadata cannot have generic requirements");
     }
 
@@ -5812,13 +5874,18 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::DistributedTargetInvocationEncoder:
   case KnownProtocolKind::DistributedTargetInvocationDecoder:
   case KnownProtocolKind::DistributedTargetInvocationResultHandler:
+  case KnownProtocolKind::CxxConvertibleToCollection:
+  case KnownProtocolKind::CxxRandomAccessCollection:
+  case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
   case KnownProtocolKind::UnsafeCxxInputIterator:
+  case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:
   case KnownProtocolKind::GlobalActor:
+  case KnownProtocolKind::Copyable:
     return SpecialProtocol::None;
   }
 

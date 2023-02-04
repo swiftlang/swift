@@ -552,6 +552,7 @@ void ABIDependencyEvaluator::printABIExportMap(llvm::raw_ostream &os) const {
 // FIXME: Use the VFS instead of handling paths directly. We are particularly
 // sloppy about handling relative paths in the dependency tracker.
 static void computeSwiftModuleTraceInfo(
+    ASTContext &ctx,
     const SmallPtrSetImpl<ModuleDecl *> &abiDependencies,
     const llvm::DenseMap<StringRef, ModuleDecl *> &pathToModuleDecl,
     const DependencyTracker &depTracker, StringRef prebuiltCachePath,
@@ -569,6 +570,8 @@ static void computeSwiftModuleTraceInfo(
   SmallVector<std::string, 16> dependencies{deps.begin(), deps.end()};
   auto incrDeps = depTracker.getIncrementalDependencyPaths();
   dependencies.append(incrDeps.begin(), incrDeps.end());
+  auto sharedLibraryExtRegex =
+      llvm::Regex("dylib|so|dll", llvm::Regex::IgnoreCase);
   for (const auto &depPath : dependencies) {
 
     // Decide if this is a swiftmodule based on the extension of the raw
@@ -580,8 +583,10 @@ static void computeSwiftModuleTraceInfo(
     auto isSwiftmodule = moduleFileType == file_types::TY_SwiftModuleFile;
     auto isSwiftinterface =
         moduleFileType == file_types::TY_SwiftModuleInterfaceFile;
+    auto isSharedLibrary =
+        sharedLibraryExtRegex.match(llvm::sys::path::extension(depPath));
 
-    if (!(isSwiftmodule || isSwiftinterface))
+    if (!(isSwiftmodule || isSwiftinterface || isSharedLibrary))
       continue;
 
     auto dep = pathToModuleDecl.find(depPath);
@@ -629,13 +634,40 @@ static void computeSwiftModuleTraceInfo(
     // filename available.
     if (isSwiftinterface) {
       // FIXME: Use PrettyStackTrace instead.
-      SmallVector<char, 0> errMsg;
-      llvm::raw_svector_ostream err(errMsg);
-      err << "Unexpected path for swiftinterface file:\n" << depPath << "\n";
-      err << "The module <-> path mapping we have is:\n";
+      llvm::errs() << "WARNING: unexpected path for swiftinterface file:\n"
+                   << depPath << "\n"
+                   << "The module <-> path mapping we have is:\n";
       for (auto &m : pathToModuleDecl)
-        err << m.second->getName() << " <-> " << m.first << '\n';
-      llvm::report_fatal_error(errMsg);
+        llvm::errs() << m.second->getName() << " <-> " << m.first << '\n';
+      continue;
+    }
+
+    // If we found a shared library, it must be a compiler plugin dependency.
+    if (isSharedLibrary) {
+      // Infer the module name by dropping the library prefix and extension.
+      // e.g "/path/to/lib/libPlugin.dylib" -> "Plugin"
+      auto moduleName = llvm::sys::path::stem(depPath);
+      #if !defined(_WIN32)
+      moduleName.consume_front("lib");
+      #endif
+
+      StringRef realDepPath =
+          fs::real_path(depPath, buffer, /*expand_tile*/ true)
+              ? StringRef(depPath)
+              : buffer.str();
+
+      traceInfo.push_back(
+          {/*Name=*/
+           ctx.getIdentifier(moduleName),
+           /*Path=*/
+           realDepPath.str(),
+           /*IsImportedDirectly=*/
+           false,
+           /*SupportsLibraryEvolution=*/
+           false});
+      buffer.clear();
+
+      continue;
     }
 
     // Skip cached modules in the prebuilt cache. We will add the corresponding
@@ -710,8 +742,11 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
   for (const auto &module : ctxt.getLoadedModules()) {
     ModuleDecl *loadedDecl = module.second;
-    if (!loadedDecl)
-      llvm::report_fatal_error("Expected loaded modules to be non-null.");
+    if (!loadedDecl) {
+      llvm::errs() << "WARNING: Unable to load module '" << module.first
+                   << ".\n";
+      continue;
+    }
     if (loadedDecl == mainModule)
       continue;
     if (loadedDecl->getModuleFilename().empty()) {
@@ -729,8 +764,9 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   }
 
   std::vector<SwiftModuleTraceInfo> swiftModules;
-  computeSwiftModuleTraceInfo(abiDependencies, pathToModuleDecl, *depTracker,
-                              opts.PrebuiltModuleCachePath, swiftModules);
+  computeSwiftModuleTraceInfo(ctxt, abiDependencies, pathToModuleDecl,
+                              *depTracker, opts.PrebuiltModuleCachePath,
+                              swiftModules);
 
   LoadedModuleTraceFormat trace = {
       /*version=*/LoadedModuleTraceFormat::CurrentVersion,

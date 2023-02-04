@@ -65,8 +65,8 @@ static Identifier getVarNameForCoding(VarDecl *var,
   if (auto originalVar = var->getOriginalWrappedProperty())
     identifier = originalVar->getName();
 
-  if (identifier.empty() && paramIndex.hasValue())
-    return C.getIdentifier("_" + std::to_string(paramIndex.getValue()));
+  if (identifier.empty() && paramIndex.has_value())
+    return C.getIdentifier("_" + std::to_string(paramIndex.value()));
 
   return identifier;
 }
@@ -702,8 +702,8 @@ static ThrowStmt *createThrowCodingErrorStmt(ASTContext &C, Expr *containerExpr,
   auto *contextInitCallExpr = CallExpr::createImplicit(C, contextInitCall,
                                                        initArgList);
   llvm::SmallVector<Expr *, 2> arguments;
-  if (argument.hasValue()) {
-    arguments.push_back(argument.getValue());
+  if (argument.has_value()) {
+    arguments.push_back(argument.value());
   }
   arguments.push_back(contextInitCallExpr);
 

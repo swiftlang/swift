@@ -24,10 +24,11 @@
 using namespace swift;
 
 size_t GenericEnvironment::numTrailingObjects(
-    OverloadToken<OpaqueTypeDecl *>) const {
+    OverloadToken<OpaqueEnvironmentData>) const {
   switch (getKind()) {
   case Kind::Primary:
   case Kind::OpenedExistential:
+  case Kind::OpenedElement:
     return 0;
 
   case Kind::Opaque:
@@ -36,25 +37,27 @@ size_t GenericEnvironment::numTrailingObjects(
 }
 
 size_t GenericEnvironment::numTrailingObjects(
-    OverloadToken<SubstitutionMap>) const {
+    OverloadToken<OpenedExistentialEnvironmentData>) const {
   switch (getKind()) {
   case Kind::Primary:
-  case Kind::OpenedExistential:
+  case Kind::Opaque:
+  case Kind::OpenedElement:
     return 0;
 
-  case Kind::Opaque:
+  case Kind::OpenedExistential:
     return 1;
   }
 }
 
 size_t GenericEnvironment::numTrailingObjects(
-    OverloadToken<OpenedGenericEnvironmentData>) const {
+    OverloadToken<OpenedElementEnvironmentData>) const {
   switch (getKind()) {
   case Kind::Primary:
   case Kind::Opaque:
+  case Kind::OpenedExistential:
     return 0;
 
-  case Kind::OpenedExistential:
+  case Kind::OpenedElement:
     return 1;
   }
 }
@@ -86,28 +89,90 @@ GenericEnvironment::getGenericParams() const {
 
 OpaqueTypeDecl *GenericEnvironment::getOpaqueTypeDecl() const {
   assert(getKind() == Kind::Opaque);
-  return *getTrailingObjects<OpaqueTypeDecl *>();
+  return getTrailingObjects<OpaqueEnvironmentData>()->decl;
 }
 
 SubstitutionMap GenericEnvironment::getOpaqueSubstitutions() const {
   assert(getKind() == Kind::Opaque);
-  return *getTrailingObjects<SubstitutionMap>();
+  return getTrailingObjects<OpaqueEnvironmentData>()->subMap;
+}
+
+SubstitutionMap
+GenericEnvironment::getPackElementContextSubstitutions() const {
+  assert(getKind() == Kind::OpenedElement);
+  auto environmentData = getTrailingObjects<OpenedElementEnvironmentData>();
+  return environmentData->outerSubstitutions;
+}
+
+CanType GenericEnvironment::getOpenedElementShapeClass() const {
+  assert(getKind() == Kind::OpenedElement);
+  auto environmentData = getTrailingObjects<OpenedElementEnvironmentData>();
+  return environmentData->shapeClass;
 }
 
 Type GenericEnvironment::getOpenedExistentialType() const {
   assert(getKind() == Kind::OpenedExistential);
-  return getTrailingObjects<OpenedGenericEnvironmentData>()->existential;
+  return getTrailingObjects<OpenedExistentialEnvironmentData>()->existential;
 }
 
 UUID GenericEnvironment::getOpenedExistentialUUID() const {
   assert(getKind() == Kind::OpenedExistential);
-  return getTrailingObjects<OpenedGenericEnvironmentData>()->uuid;
+  return getTrailingObjects<OpenedExistentialEnvironmentData>()->uuid;
 }
 
 GenericSignature
 GenericEnvironment::getOpenedExistentialParentSignature() const {
   assert(getKind() == Kind::OpenedExistential);
-  return getTrailingObjects<OpenedGenericEnvironmentData>()->parentSig;
+  return getTrailingObjects<OpenedExistentialEnvironmentData>()->parentSig;
+}
+
+UUID GenericEnvironment::getOpenedElementUUID() const {
+  assert(getKind() == Kind::OpenedElement);
+  return getTrailingObjects<OpenedElementEnvironmentData>()->uuid;
+}
+
+void GenericEnvironment::forEachPackElementArchetype(
+          llvm::function_ref<void(ElementArchetypeType *)> function) const {
+  auto packElements = getGenericSignature().getInnermostGenericParams();
+  for (auto eltInterfaceType: packElements) {
+    auto *elementArchetype =
+      mapTypeIntoContext(eltInterfaceType)->castTo<ElementArchetypeType>();
+    function(elementArchetype);
+  }
+}
+
+void GenericEnvironment::forEachPackElementBinding(
+    PackElementBindingCallback function) const {
+  auto sig = getGenericSignature();
+  auto shapeClass = getOpenedElementShapeClass();
+  auto packElements = sig.getInnermostGenericParams();
+  auto packElementDepth = packElements.front()->getDepth();
+  auto elementIt = packElements.begin();
+
+  // Each parameter pack in the outer generic parameters has
+  // a corresponding pack element parameter at the innermost
+  // depth.
+  for (auto *genericParam : getGenericParams()) {
+    if (genericParam->getDepth() == packElementDepth)
+      break;
+
+    if (!genericParam->isParameterPack())
+      continue;
+
+    // Only include opened element parameters for packs in the given
+    // shape equivalence class.
+    if (!sig->haveSameShape(genericParam, shapeClass->mapTypeOutOfContext()))
+      continue;
+
+    assert(elementIt != packElements.end());
+    auto *elementArchetype =
+        mapTypeIntoContext(*elementIt++)->castTo<ElementArchetypeType>();
+    auto *packSubstitution =
+        maybeApplyOuterContextSubstitutions(genericParam)->castTo<PackType>();
+    function(elementArchetype, packSubstitution);
+  }
+
+  assert(elementIt == packElements.end());
 }
 
 GenericEnvironment::GenericEnvironment(GenericSignature signature)
@@ -123,8 +188,8 @@ GenericEnvironment::GenericEnvironment(
     Type existential, GenericSignature parentSig, UUID uuid)
   : SignatureAndKind(signature, Kind::OpenedExistential)
 {
-  new (getTrailingObjects<OpenedGenericEnvironmentData>())
-    OpenedGenericEnvironmentData{ existential, parentSig, uuid };
+  new (getTrailingObjects<OpenedExistentialEnvironmentData>())
+    OpenedExistentialEnvironmentData{ existential, parentSig, uuid };
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -135,8 +200,21 @@ GenericEnvironment::GenericEnvironment(
       GenericSignature signature, OpaqueTypeDecl *opaque, SubstitutionMap subs)
   : SignatureAndKind(signature, Kind::Opaque)
 {
-  *getTrailingObjects<OpaqueTypeDecl *>() = opaque;
-  new (getTrailingObjects<SubstitutionMap>()) SubstitutionMap(subs);
+  new (getTrailingObjects<OpaqueEnvironmentData>())
+    OpaqueEnvironmentData{opaque, subs};
+
+  // Clear out the memory that holds the context types.
+  std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
+                          Type());
+}
+
+GenericEnvironment::GenericEnvironment(GenericSignature signature,
+                                       UUID uuid, CanType shapeClass,
+                                       SubstitutionMap outerSubs)
+  : SignatureAndKind(signature, Kind::OpenedElement)
+{
+  new (getTrailingObjects<OpenedElementEnvironmentData>())
+    OpenedElementEnvironmentData{uuid, shapeClass, outerSubs};
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -214,11 +292,20 @@ struct SubstituteOuterFromSubstitutionMap {
 
 }
 
-Type GenericEnvironment::maybeApplyOpaqueTypeSubstitutions(Type type) const {
+Type
+GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
   switch (getKind()) {
   case Kind::Primary:
   case Kind::OpenedExistential:
     return type;
+
+  case Kind::OpenedElement: {
+    auto packElements = getGenericSignature().getInnermostGenericParams();
+    auto elementDepth = packElements.front()->getDepth();
+    SubstituteOuterFromSubstitutionMap replacer{
+        getPackElementContextSubstitutions(), elementDepth};
+    return type.subst(replacer, replacer);
+  }
 
   case Kind::Opaque: {
     // Substitute outer generic parameters of an opaque archetype environment.
@@ -297,8 +384,9 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
       } else {
         return type;
       }
+    case Kind::OpenedElement:
     case Kind::Opaque:
-      return maybeApplyOpaqueTypeSubstitutions(type);
+      return maybeApplyOuterContextSubstitutions(type);
     }
   };
 
@@ -340,62 +428,82 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   Type result;
 
   auto rootGP = requirements.anchor->getRootGenericParam();
-  if (rootGP->isParameterPack()) {
-    assert(getKind() == Kind::Primary);
-    result = PackArchetypeType::get(ctx, this, requirements.anchor,
-                                    requirements.protos, superclass,
-                                    requirements.layout);
-  } else {
-    switch (getKind()) {
-    case Kind::Primary:
+  switch (getKind()) {
+  case Kind::Primary:
+    if (rootGP->isParameterPack()) {
+      result = PackArchetypeType::get(ctx, this, requirements.anchor,
+                                      requirements.packShape,
+                                      requirements.protos, superclass,
+                                      requirements.layout);
+    } else {
       result = PrimaryArchetypeType::getNew(ctx, this, requirements.anchor,
                                             requirements.protos, superclass,
                                             requirements.layout);
+    }
+
+    break;
+
+  case Kind::Opaque: {
+    assert(!rootGP->isParameterPack());
+
+    // If the anchor type isn't rooted in a generic parameter that
+    // represents an opaque declaration, then apply the outer substitutions.
+    // It would be incorrect to build an opaque type archetype here.
+    unsigned opaqueDepth =
+        getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
+    if (rootGP->getDepth() < opaqueDepth) {
+      result = maybeApplyOuterContextSubstitutions(requirements.anchor);
       break;
+    }
 
-    case Kind::OpenedExistential: {
-      // FIXME: The existential layout's protocols might differ from the
-      // canonicalized set of protocols determined by the generic signature.
-      // Before NestedArchetypeType was removed, we used the former when
-      // building a root OpenedArchetypeType, and the latter when building
-      // nested archetypes.
-      // For compatibility, continue using the existential layout's version when
-      // the interface type is a generic parameter. We should align these at
-      // some point.
-      if (depType->is<GenericTypeParamType>()) {
-        auto layout = getOpenedExistentialType()->getExistentialLayout();
-        SmallVector<ProtocolDecl *, 2> protos;
-        for (auto proto : layout.getProtocols())
-          protos.push_back(proto);
-
-        result = OpenedArchetypeType::getNew(this, requirements.anchor, protos,
-                                             superclass, requirements.layout);
-      } else {
-        result = OpenedArchetypeType::getNew(this, requirements.anchor,
+    result = OpaqueTypeArchetypeType::getNew(this, requirements.anchor,
                                              requirements.protos, superclass,
                                              requirements.layout);
-      }
+    break;
+  }
 
+  case Kind::OpenedExistential: {
+    assert(!rootGP->isParameterPack());
+
+    // FIXME: The existential layout's protocols might differ from the
+    // canonicalized set of protocols determined by the generic signature.
+    // Before NestedArchetypeType was removed, we used the former when
+    // building a root OpenedArchetypeType, and the latter when building
+    // nested archetypes.
+    // For compatibility, continue using the existential layout's version when
+    // the interface type is a generic parameter. We should align these at
+    // some point.
+    if (depType->is<GenericTypeParamType>()) {
+      auto layout = getOpenedExistentialType()->getExistentialLayout();
+      SmallVector<ProtocolDecl *, 2> protos;
+      for (auto proto : layout.getProtocols())
+        protos.push_back(proto);
+
+      result = OpenedArchetypeType::getNew(this, requirements.anchor, protos,
+                                           superclass, requirements.layout);
+    } else {
+      result = OpenedArchetypeType::getNew(this, requirements.anchor,
+                                           requirements.protos, superclass,
+                                           requirements.layout);
+    }
+
+    break;
+  }
+
+  case Kind::OpenedElement: {
+    auto packElements = getGenericSignature().getInnermostGenericParams();
+    auto elementDepth = packElements.front()->getDepth();
+
+    if (rootGP->getDepth() < elementDepth) {
+      result = maybeApplyOuterContextSubstitutions(requirements.anchor);
       break;
     }
 
-    case Kind::Opaque: {
-      // If the anchor type isn't rooted in a generic parameter that
-      // represents an opaque declaration, then apply the outer substitutions.
-      // It would be incorrect to build an opaque type archetype here.
-      unsigned opaqueDepth =
-          getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
-      if (rootGP->getDepth() < opaqueDepth) {
-        result = maybeApplyOpaqueTypeSubstitutions(requirements.anchor);
-        break;
-      }
-
-      result = OpaqueTypeArchetypeType::getNew(this, requirements.anchor,
-                                               requirements.protos, superclass,
-                                               requirements.layout);
-      break;
-    }
-    }
+    result = ElementArchetypeType::getNew(this, requirements.anchor,
+                                          requirements.protos, superclass,
+                                          requirements.layout);
+    break;
+  }
   }
 
   if (genericParam)
@@ -439,10 +547,10 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
 Type GenericEnvironment::mapTypeIntoContext(
                                 Type type,
                                 LookupConformanceFn lookupConformance) const {
-  assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
+  assert((!type->hasArchetype() || type->hasLocalArchetype()) &&
          "already have a contextual type");
 
-  type = maybeApplyOpaqueTypeSubstitutions(type);
+  type = maybeApplyOuterContextSubstitutions(type);
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
                            SubstFlags::AllowLoweredTypes);
@@ -464,6 +572,104 @@ Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
   if (!result)
     return ErrorType::get(type);
   return result;
+}
+
+Type
+GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
+  assert(getKind() == Kind::OpenedElement);
+  assert(!type->hasArchetype());
+
+  auto sig = getGenericSignature();
+  auto shapeClass = getOpenedElementShapeClass();
+  QueryInterfaceTypeSubstitutions substitutions(this);
+
+  llvm::SmallDenseMap<GenericParamKey,
+                      GenericTypeParamType *> elementParamForPack;
+  auto packElements = sig.getInnermostGenericParams();
+  auto elementDepth = packElements.front()->getDepth();
+
+  for (auto *genericParam : sig.getGenericParams()) {
+    if (genericParam->getDepth() == elementDepth)
+      break;
+
+    if (!genericParam->isParameterPack())
+      continue;
+
+    if (!sig->haveSameShape(genericParam, shapeClass->mapTypeOutOfContext()))
+      continue;
+
+    auto elementIndex = elementParamForPack.size();
+    elementParamForPack[{genericParam}] = packElements[elementIndex];
+  }
+
+  // Map the interface type to the element type by stripping
+  // away the isParameterPack bit before mapping type parameters
+  // to archetypes.
+  return type.subst([&](SubstitutableType *type) {
+    auto *genericParam = type->getAs<GenericTypeParamType>();
+    if (!genericParam)
+      return Type();
+
+    if (auto *elementParam = elementParamForPack[{genericParam}])
+      return substitutions(elementParam);
+
+    return substitutions(genericParam);
+  }, LookUpConformanceInSignature(sig.getPointer()));
+}
+
+Type
+GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
+  assert(getKind() == Kind::Primary);
+
+  // We need to pass in an archetype to get the shape class from its
+  // generic environment.
+  assert(type->hasElementArchetype());
+
+  ElementArchetypeType *element = nullptr;
+  type.visit([&](Type type) {
+    auto archetype = type->getAs<ElementArchetypeType>();
+    if (!element && archetype)
+      element = archetype;
+  });
+
+  auto sig = getGenericSignature();
+  auto *elementEnv = element->getGenericEnvironment();
+  auto shapeClass = elementEnv->getOpenedElementShapeClass();
+  QueryInterfaceTypeSubstitutions substitutions(this);
+
+  type = type->mapTypeOutOfContext();
+
+  llvm::SmallDenseMap<GenericParamKey, GenericTypeParamType *>
+      packParamForElement;
+  auto elementDepth =
+      sig.getInnermostGenericParams().front()->getDepth() + 1;
+
+  for (auto *genericParam : sig.getGenericParams()) {
+    if (!genericParam->isParameterPack())
+      continue;
+
+    if (!sig->haveSameShape(genericParam, shapeClass->mapTypeOutOfContext()))
+      continue;
+
+    GenericParamKey elementKey(/*isParameterPack*/false,
+                               /*depth*/elementDepth,
+                               /*index*/packParamForElement.size());
+    packParamForElement[elementKey] = genericParam;
+  }
+
+  // Map element archetypes to the pack archetypes by converting
+  // element types to interface types and adding the isParameterPack
+  // bit. Then, map type parameters to archetypes.
+  return type.subst([&](SubstitutableType *type) {
+    auto *genericParam = type->getAs<GenericTypeParamType>();
+    if (!genericParam)
+      return Type();
+
+    if (auto *packParam = packParamForElement[{genericParam}])
+      return substitutions(packParam);
+
+    return substitutions(genericParam);
+  }, LookUpConformanceInSignature(sig.getPointer()));
 }
 
 SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {

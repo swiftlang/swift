@@ -153,7 +153,7 @@ bb0(%0 : $A):
   %1 = alloc_stack $Any
   %2 = ref_element_addr %0 : $A, #A.exProperty
   %3 = begin_access [dynamic] [read] %2 : $*Any
-  copy_addr %2 to [initialization] %1 : $*Any
+  copy_addr %2 to [init] %1 : $*Any
   end_access %3 : $*Any
   destroy_addr %1 : $*Any
   dealloc_stack %1 : $*Any
@@ -169,7 +169,7 @@ bb0(%0 : $A):
   %2 = ref_element_addr %0 : $A, #A.property
   // CHECK: call void @swift_beginAccess(i8* %{{.*}}, [[BUFFER]]* %{{.*}}, [[SIZE]] 0, i8* null)
   %3 = begin_access [read] [dynamic] [no_nested_conflict] %2 : $*Int64
-  copy_addr %3 to [initialization] %1 : $*Int64
+  copy_addr %3 to [init] %1 : $*Int64
   // CHECK-NOT: end_access
   end_access %3 : $*Int64
   %9 = alloc_stack $Builtin.UnsafeValueBuffer

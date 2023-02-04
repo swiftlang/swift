@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s  -verify-syntax-tree -disable-availability-checking
+// RUN: %target-swift-frontend -typecheck -verify %s -disable-availability-checking
 
 // REQUIRES: concurrency
 
@@ -179,6 +179,13 @@ func testAsyncLet() async throws {
     try mightThrow()
   } catch let e where e.number == x { // expected-error{{async let 'x' cannot be referenced in a catch guard expression}}
   } catch {
+  }
+
+  defer {
+    async let deferX: Int = await getInt() // expected-error {{'async let' cannot be used on declarations in a defer body}}
+    _ = await deferX // expected-error {{async let 'deferX' cannot be referenced in a defer body}}
+    async let _: Int = await getInt() // expected-error {{'async let' cannot be used on declarations in a defer body}}
+    async let _ = await getInt() // expected-error {{'async let' cannot be used on declarations in a defer body}}
   }
 
   async let x1 = getIntUnsafely() // okay, try is implicit here

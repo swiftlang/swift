@@ -117,14 +117,14 @@ class TypeAccessScopeDiagnoser : private ASTWalker {
   AccessScope accessScope;
   const DeclContext *useDC;
   bool treatUsableFromInlineAsPublic;
-  const ComponentIdentTypeRepr *offendingType = nullptr;
+  const IdentTypeRepr *offendingType = nullptr;
 
   PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
-    auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
-    if (!CITR)
+    auto ITR = dyn_cast<IdentTypeRepr>(TR);
+    if (!ITR)
       return Action::Continue();
 
-    const ValueDecl *VD = CITR->getBoundDecl();
+    const ValueDecl *VD = ITR->getBoundDecl();
     if (!VD)
       return Action::Continue();
 
@@ -132,7 +132,7 @@ class TypeAccessScopeDiagnoser : private ASTWalker {
         != accessScope)
       return Action::Continue();
 
-    offendingType = CITR;
+    offendingType = ITR;
     return Action::Stop();
   }
 
@@ -182,7 +182,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     return;
   // Don't spend time checking local declarations; this is always valid by the
   // time we get to this point.
-  if (!contextAccessScope.isPublic() &&
+  if (contextAccessScope.isInContext() &&
       contextAccessScope.getDeclContext()->isLocalContext())
     return;
 
@@ -195,7 +195,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     // Note: This means that the type itself is invalid for this particular
     // context, because it references declarations from two incompatible scopes.
     // In this case we should have diagnosed the bad reference already.
-    if (!typeAccessScope.hasValue())
+    if (!typeAccessScope.has_value())
       return;
     problematicAccessScope = *typeAccessScope;
   }
@@ -213,7 +213,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     Optional<AccessScope> typeReprAccessScope =
         TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
                                                checkUsableFromInline);
-    if (!typeReprAccessScope.hasValue())
+    if (!typeReprAccessScope.has_value())
       return;
 
     if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
@@ -295,8 +295,8 @@ static void highlightOffendingType(InFlightDiagnostic &diag,
   diag.highlight(complainRepr->getSourceRange());
   diag.flush();
 
-  if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
-    const ValueDecl *VD = CITR->getBoundDecl();
+  if (auto ITR = dyn_cast<IdentTypeRepr>(complainRepr)) {
+    const ValueDecl *VD = ITR->getBoundDecl();
     VD->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
   }
 }
@@ -476,7 +476,9 @@ public:
   UNREACHABLE(PoundDiagnostic, "does not have access control")
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
+  UNREACHABLE(Missing, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
+  UNREACHABLE(MacroExpansion, "does not have access control")
 
   UNREACHABLE(BuiltinTuple, "BuiltinTupleDecl should not show up here")
 
@@ -1054,6 +1056,62 @@ public:
           });
     }
   }
+
+  void visitMacroDecl(MacroDecl *MD) {
+    checkGenericParamAccess(MD, MD);
+
+    auto minAccessScope = AccessScope::getPublic();
+    const TypeRepr *complainRepr = nullptr;
+    auto downgradeToWarning = DowngradeToWarning::No;
+    bool problemIsResult = false;
+
+    if (MD->parameterList) {
+      for (auto *P : *MD->parameterList) {
+        checkTypeAccess(
+            P->getInterfaceType(), P->getTypeRepr(), MD, /*mayBeInferred*/ false,
+            [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
+                DowngradeToWarning downgradeDiag) {
+              if (typeAccessScope.isChildOf(minAccessScope) ||
+                  (!complainRepr &&
+                   typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+                minAccessScope = typeAccessScope;
+                complainRepr = thisComplainRepr;
+                downgradeToWarning = downgradeDiag;
+              }
+            });
+      }
+    }
+
+    checkTypeAccess(MD->getResultInterfaceType(), MD->resultType.getTypeRepr(),
+                    MD, /*mayBeInferred*/false,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *thisComplainRepr,
+                        DowngradeToWarning downgradeDiag) {
+      if (typeAccessScope.isChildOf(minAccessScope) ||
+          (!complainRepr &&
+           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+        minAccessScope = typeAccessScope;
+        complainRepr = thisComplainRepr;
+        downgradeToWarning = downgradeDiag;
+        problemIsResult = true;
+      }
+    });
+
+    if (!minAccessScope.isPublic()) {
+      auto minAccess = minAccessScope.accessLevelForDiagnostics();
+      bool isExplicit =
+        MD->getAttrs().hasAttribute<AccessControlAttr>();
+      auto diagID = diag::macro_type_access;
+      if (downgradeToWarning == DowngradeToWarning::Yes)
+        diagID = diag::macro_type_access_warn;
+      auto macroDeclAccess = isExplicit
+        ? MD->getFormalAccess()
+        : minAccessScope.requiredAccessForDiagnostics();
+      auto diag = MD->diagnose(diagID, isExplicit, macroDeclAccess,
+                               minAccess, problemIsResult);
+      highlightOffendingType(diag, complainRepr);
+    }
+  }
 };
 
 class UsableFromInlineChecker : public AccessControlCheckerBase,
@@ -1100,7 +1158,9 @@ public:
 
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
+  UNREACHABLE(Missing, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
+  UNREACHABLE(MacroExpansion, "does not have access control")
   UNREACHABLE(BuiltinTuple, "BuiltinTupleDecl should not show up here")
 #undef UNREACHABLE
 
@@ -1114,6 +1174,7 @@ public:
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType) // Handled by the Var or Subscript.
+  UNINTERESTING(Macro)
 
   /// If \p VD's layout is exposed by a @frozen struct or class, return said
   /// struct or class.
@@ -1615,7 +1676,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
       // Decls with @_spi_available aren't hidden entirely from public interfaces,
       // thus public interfaces may still refer them. Be forgiving here so public
       // interfaces can compile.
-      if (where.getUnavailablePlatformKind().hasValue())
+      if (where.getUnavailablePlatformKind().has_value())
         return DisallowedOriginKind::None;
       // We should only diagnose SPI_AVAILABLE usage when the library level is API.
       // Using SPI_AVAILABLE symbols in private frameworks or executable targets
@@ -1705,10 +1766,12 @@ public:
   UNREACHABLE(Import, "not applicable")
   UNREACHABLE(TopLevelCode, "not applicable")
   UNREACHABLE(Module, "not applicable")
+  UNREACHABLE(Missing, "not applicable")
 
   UNREACHABLE(Param, "handled by the enclosing declaration")
   UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")
   UNREACHABLE(MissingMember, "handled by the enclosing declaration")
+  UNREACHABLE(MacroExpansion, "handled by the enclosing declaration")
 #undef UNREACHABLE
 
 #define UNINTERESTING(KIND) \
@@ -1827,15 +1890,17 @@ public:
     DeclAvailabilityFlags flags =
         DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
 
-    // As a concession to source compatibility for API libraries, downgrade
-    // diagnostics about inheritance from a less available type when the
-    // following conditions are met:
-    // 1. The inherited type is only potentially unavailable before the
-    //    deployment target.
-    // 2. The inheriting type is `@usableFromInline`.
-    if (nominal->getAttrs().hasAttribute<UsableFromInlineAttr>())
+    // Allow the `AnyColorBox` class in SwiftUI to inherit from a less available
+    // super class as a one-off source compatibility exception. Availability
+    // checking generally doesn't support a more available class deriving from
+    // a less available base class in a library evolution enabled module, even
+    // when the base class is available at the deployment target, but this
+    // declaration slipped in when the compiler wasn't able to diagnose it and
+    // can't be changed.
+    if (nominal->getName().is("AnyColorBox") &&
+        nominal->getModuleContext()->getName().is("SwiftUI"))
       flags |= DeclAvailabilityFlag::
-          WarnForPotentialUnavailabilityBeforeDeploymentTarget;
+          AllowPotentiallyUnavailableAtOrBelowDeploymentTarget;
 
     llvm::for_each(nominal->getInherited(), [&](TypeLoc inherited) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
@@ -1898,6 +1963,17 @@ public:
       return;
     for (auto &P : *EED->getParameterList())
       checkType(P->getInterfaceType(), P->getTypeRepr(), EED);
+  }
+
+  void visitMacroDecl(MacroDecl *MD) {
+    checkGenericParams(MD, MD);
+
+    if (MD->parameterList) {
+      for (auto P : *MD->parameterList) {
+        checkType(P->getInterfaceType(), P->getTypeRepr(), MD);
+      }
+    }
+    checkType(MD->getResultInterfaceType(), MD->resultType.getTypeRepr(), MD);
   }
 
   void checkConstrainedExtensionRequirements(ExtensionDecl *ED,
@@ -2022,11 +2098,15 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
   case AccessLevel::FilePrivate: {
     const DeclContext *DC = ED->getModuleScopeContext();
     bool isPrivate = (userSpecifiedAccess == AccessLevel::Private);
-    desiredAccessScope = AccessScope(DC, isPrivate);
+    desiredAccessScope = AccessScope(DC, isPrivate ? AccessLimitKind::Private
+                                                   : AccessLimitKind::None);
     break;
   }
   case AccessLevel::Internal:
     desiredAccessScope = AccessScope(ED->getModuleContext());
+    break;
+  case AccessLevel::Package:
+    desiredAccessScope = AccessScope::getPackage();
     break;
   case AccessLevel::Public:
   case AccessLevel::Open:

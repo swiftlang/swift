@@ -33,20 +33,25 @@ namespace swift {
       Identifier moduleName;
 
       /// Scan the given interface file to determine dependencies.
-      llvm::ErrorOr<ModuleDependencies> scanInterfaceFile(
+      llvm::ErrorOr<ModuleDependencyInfo> scanInterfaceFile(
           Twine moduleInterfacePath, bool isFramework);
 
       InterfaceSubContextDelegate &astDelegate;
-    public:
-      Optional<ModuleDependencies> dependencies;
 
-      ModuleDependencyScanner(
-          ASTContext &ctx, ModuleLoadingMode LoadMode, Identifier moduleName,
-          InterfaceSubContextDelegate &astDelegate,
-          ScannerKind kind = MDS_plain)
+      /// Location where pre-built moduels are to be built into.
+      std::string moduleCachePath;
+    public:
+      Optional<ModuleDependencyInfo> dependencies;
+
+      ModuleDependencyScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
+                              Identifier moduleName,
+                              InterfaceSubContextDelegate &astDelegate,
+                              ScannerKind kind = MDS_plain)
           : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                        /*IgnoreSwiftSourceInfoFile=*/true),
-            kind(kind), moduleName(moduleName), astDelegate(astDelegate) {}
+            kind(kind), moduleName(moduleName), astDelegate(astDelegate),
+            moduleCachePath(getModuleCachePathFromClang(
+                ctx.getClangModuleLoader()->getClangInstance())) {}
 
       std::error_code findModuleFilesInDirectory(
           ImportPath::Element ModuleID,

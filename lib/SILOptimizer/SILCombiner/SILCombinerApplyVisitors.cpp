@@ -343,8 +343,11 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
 
   KeyPathPattern *pattern = kp->getPattern();
   SubstitutionMap patternSubs = kp->getSubstitutions();
-  CanType rootTy = pattern->getRootType().subst(patternSubs)->getCanonicalType();
-  CanType parentTy = rootTy;
+  SILFunction *f = AI->getFunction();
+  SILType rootTy = f->getLoweredType(Lowering::AbstractionPattern::getOpaque(),
+      pattern->getRootType().subst(patternSubs)->getCanonicalType());
+
+  SILType parentTy = rootTy;
   
   // First check if _storedInlineOffset would return an offset or nil. Basically
   // only stored struct and tuple elements produce an offset. Everything else
@@ -381,14 +384,15 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       hasOffset = false;
       break;
     }
-    parentTy = component.getComponentType();
+    parentTy = f->getLoweredType(Lowering::AbstractionPattern::getOpaque(),
+                                 component.getComponentType());
   }
 
   SILLocation loc = AI->getLoc();
   SILValue result;
 
   if (hasOffset) {
-    SILType rootAddrTy = SILType::getPrimitiveAddressType(rootTy);
+    SILType rootAddrTy = rootTy.getAddressType();
     SILValue rootAddr = Builder.createBaseAddrForOffset(loc, rootAddrTy);
 
     auto projector = KeyPathProjector::create(kp, rootAddr, loc, Builder);
@@ -668,8 +672,8 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
       auto Arg = FAS.getArgument(i);
       switch (PI.getConvention()) {
         case ParameterConvention::Indirect_In:
-        case ParameterConvention::Indirect_In_Constant:
         case ParameterConvention::Direct_Owned:
+        case ParameterConvention::Pack_Owned:
           Builder.emitDestroyOperation(FAS.getLoc(), Arg);
           break;
         case ParameterConvention::Indirect_In_Guaranteed:
@@ -677,6 +681,8 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
         case ParameterConvention::Indirect_InoutAliasable:
         case ParameterConvention::Direct_Unowned:
         case ParameterConvention::Direct_Guaranteed:
+        case ParameterConvention::Pack_Guaranteed:
+        case ParameterConvention::Pack_Inout:
           break;
       }
     }
@@ -855,9 +861,9 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
 
     auto OptionalCOEI =
         buildConcreteOpenedExistentialInfo(Apply.getArgumentOperands()[ArgIdx]);
-    if (!OptionalCOEI.hasValue())
+    if (!OptionalCOEI.has_value())
       continue;
-    auto COEI = OptionalCOEI.getValue();
+    auto COEI = OptionalCOEI.value();
     assert(COEI.isValid());
     COEIs.try_emplace(ArgIdx, COEI);
   }

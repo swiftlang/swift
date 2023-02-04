@@ -2,11 +2,11 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name BasicExtension -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name BasicExtension -I %t -pretty-print -output-dir %t
+// RUN: %target-swift-symbolgraph-extract -module-name BasicExtension -I %t -pretty-print -output-dir %t -omit-extension-block-symbols
 // RUN: %FileCheck %s --input-file %t/BasicExtension@Swift.symbols.json --check-prefixes ALL,EXTRACT,EBSOff,EBSOff_EXTRACT
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -module-name BasicExtension -emit-module -emit-module-path %t/ -emit-symbol-graph -emit-symbol-graph-dir %t
+// RUN: %target-build-swift %s -module-name BasicExtension -emit-module -emit-module-path %t/ -emit-symbol-graph -emit-symbol-graph-dir %t -omit-extension-block-symbols
 // RUN: %FileCheck %s --input-file %t/BasicExtension@Swift.symbols.json --check-prefixes ALL,BUILD,EBSOff,EBSOff_BUILD
 
 

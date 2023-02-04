@@ -126,7 +126,7 @@ class ModuleWriter {
   ModuleDecl &M;
 
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
-  llvm::DenseSet<const NominalTypeDecl *> seenClangTypes;
+  llvm::DenseSet<const clang::Type *> seenClangTypes;
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
   PrimitiveTypeMapping typeMapping;
@@ -276,8 +276,18 @@ public:
     });
   }
 
-  void emitReferencedClangTypeMetadata(const NominalTypeDecl *typeDecl) {
-    auto it = seenClangTypes.insert(typeDecl);
+  void emitReferencedClangTypeMetadata(const TypeDecl *typeDecl) {
+    if (!isa<clang::TypeDecl>(typeDecl->getClangDecl()))
+      return;
+    // Get the underlying clang type from a type alias decl or record decl.
+    auto clangType =
+        clang::QualType(
+            cast<clang::TypeDecl>(typeDecl->getClangDecl())->getTypeForDecl(),
+            0)
+            .getCanonicalType();
+    if (!isa<clang::RecordType>(clangType.getTypePtr()))
+      return;
+    auto it = seenClangTypes.insert(clangType.getTypePtr());
     if (it.second)
       ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
   }
@@ -295,6 +305,9 @@ public:
           forwardDeclareCxxValueTypeIfNeeded(NTD);
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
           emitReferencedClangTypeMetadata(NTD);
+      } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
+        if (TAD->hasClangNode())
+          emitReferencedClangTypeMetadata(TAD);
       }
       return;
     }
@@ -314,8 +327,10 @@ public:
       return;
     } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
       forwardDeclare(ED);
-    } else if (isa<AbstractTypeParamDecl>(TD)) {
-      llvm_unreachable("should not see type params here");
+    } else if (isa<GenericTypeParamDecl>(TD)) {
+      llvm_unreachable("should not see generic parameters here");
+    } else if (isa<AssociatedTypeDecl>(TD)) {
+      llvm_unreachable("should not see associated types here");
     } else if (isa<StructDecl>(TD) &&
                TD->getModuleContext()->isStdlibModule()) {
       // stdlib has some @_cdecl functions with structs.
@@ -561,7 +576,8 @@ public:
 
     SmallVector<ProtocolConformance *, 1> conformances;
     auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
-    if (ED->lookupConformance(errorTypeProto, conformances)) {
+    if (outputLangMode != OutputLanguageMode::Cxx
+        && ED->lookupConformance(errorTypeProto, conformances)) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
                                        ED->getAllElements().end(),
                                        [](const EnumElementDecl *elem) {
@@ -595,6 +611,25 @@ public:
       return true;
     });
     decls.erase(newEnd, decls.end());
+
+    if (M.isStdlibModule()) {
+      llvm::SmallVector<Decl *, 2> nestedAdds;
+      for (const auto *d : decls) {
+        auto *ext = dyn_cast<ExtensionDecl>(d);
+        if (!ext ||
+            ext->getExtendedNominal() != M.getASTContext().getStringDecl())
+          continue;
+        for (auto *m : ext->getMembers()) {
+          if (auto *sd = dyn_cast<StructDecl>(m)) {
+            if (sd->getBaseIdentifier().str() == "UTF8View" ||
+                sd->getBaseIdentifier().str() == "Index") {
+              nestedAdds.push_back(sd);
+            }
+          }
+        }
+      }
+      decls.append(nestedAdds);
+    }
 
     // REVERSE sort the decls, since we are going to copy them onto a stack.
     llvm::array_pod_sort(decls.begin(), decls.end(),
@@ -753,6 +788,14 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   llvm::raw_string_ostream prologueOS{modulePrologueBuf};
   EmittedClangHeaderDependencyInfo info;
 
+  // Define the `SWIFT_SYMBOL` macro.
+  os << "#ifdef SWIFT_SYMBOL\n";
+  os << "#undef SWIFT_SYMBOL\n";
+  os << "#endif\n";
+  os << "#define SWIFT_SYMBOL(usrValue) SWIFT_SYMBOL_MODULE_USR(\"";
+  ClangSyntaxPrinter(os).printBaseName(&M);
+  os << "\", usrValue)\n";
+
   // FIXME: Use getRequiredAccess once @expose is supported.
   ModuleWriter writer(moduleOS, prologueOS, info.imports, M, interopContext,
                       AccessLevel::Public, requiresExposedAttribute,
@@ -760,9 +803,17 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   writer.write();
   info.dependsOnStandardLibrary = writer.isStdlibRequired();
   if (M.isStdlibModule()) {
+    // Embed additional STL includes.
+    os << "#ifndef SWIFT_CXX_INTEROP_HIDE_STL_OVERLAY\n";
+    os << "#include <string>\n";
+    os << "#endif\n";
+    os << "#include <new>\n";
     // Embed an overlay for the standard library.
     ClangSyntaxPrinter(moduleOS).printIncludeForShimHeader(
         "_SwiftStdlibCxxOverlay.h");
+    // Ignore typos in Swift stdlib doc comments.
+    os << "#pragma clang diagnostic push\n";
+    os << "#pragma clang diagnostic ignored \"-Wdocumentation\"\n";
   }
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
@@ -780,6 +831,8 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
     M.ValueDecl::getName().print(os);
+    os << " __attribute__((swift_private))";
+    ClangSyntaxPrinter(os).printSymbolUSRAttribute(&M);
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
     os << "extern \"C\" {\n";
@@ -797,6 +850,12 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   // Construct a C++ namespace for the module.
   ClangSyntaxPrinter(os).printNamespace(
       [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
-      [&](raw_ostream &os) { os << moduleOS.str(); });
+      [&](raw_ostream &os) { os << moduleOS.str(); },
+      ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
+
+  if (M.isStdlibModule()) {
+    os << "#pragma clang diagnostic pop\n";
+  }
+  os << "#undef SWIFT_SYMBOL\n";
   return info;
 }

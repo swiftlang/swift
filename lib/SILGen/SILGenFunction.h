@@ -310,6 +310,20 @@ public:
   
   std::vector<BreakContinueDest> BreakContinueDestStack;
   std::vector<PatternMatchContext*> SwitchStack;
+
+  /// Information for a parent SingleValueStmtExpr initialization.
+  struct SingleValueStmtInitialization {
+    /// The target expressions to be used for initialization.
+    SmallPtrSet<Expr *, 4> Exprs;
+    Initialization *Init;
+
+    SingleValueStmtInitialization(Initialization *init) : Init(init) {}
+  };
+
+  /// A stack of active SingleValueStmtExpr initializations that may be
+  /// initialized by the branches of a statement.
+  std::vector<SingleValueStmtInitialization> SingleValueStmtInitStack;
+
   /// Keep track of our current nested scope.
   ///
   /// The boolean tracks whether this is a binding scope, which should be
@@ -598,37 +612,24 @@ public:
   /// \param isBindingScope If true, this is a scope for the bindings introduced
   /// by a let expression. This scope ends when the next innermost BraceStmt
   /// ends.
-  void enterDebugScope(SILLocation Loc, bool isBindingScope = false) {
-    auto *Parent = DebugScopeStack.size() ? DebugScopeStack.back().getPointer()
-                                          : F.getDebugScope();
-    auto *DS = Parent;
-    // Don't nest a scope for Loc under Parent unless it's actually different.
-    if (RegularLocation(DS->getLoc()) != RegularLocation(Loc))
-      DS = new (SGM.M) SILDebugScope(RegularLocation(Loc), &getFunction(), DS);
-    DebugScopeStack.emplace_back(DS, isBindingScope);
-    B.setCurrentDebugScope(DS);
-  }
+  void enterDebugScope(SILLocation Loc, bool isBindingScope = false,
+                       Optional<SILLocation> MacroExpansion = {},
+                       StringRef MacroName = {},
+                       Optional<SILLocation> MacroLoc = {});
 
   /// Return to the previous debug scope.
-  void leaveDebugScope() {
-    // Pop any 'guard' scopes first.
-    while (DebugScopeStack.back().getInt())
-      DebugScopeStack.pop_back();
-
-    // Pop the scope we're leaving now.
-    DebugScopeStack.pop_back();
-    if (DebugScopeStack.size())
-      B.setCurrentDebugScope(DebugScopeStack.back().getPointer());
-    // Don't reset the debug scope after leaving the outermost scope,
-    // because the debugger is not expecting the function epilogue to
-    // be in a different scope.
-  }
+  void leaveDebugScope();
 
   std::unique_ptr<Initialization>
   prepareIndirectResultInit(AbstractionPattern origResultType,
                             CanType formalResultType,
                             SmallVectorImpl<SILValue> &directResultsBuffer,
                             SmallVectorImpl<CleanupHandle> &cleanups);
+
+  /// Check to see if an initalization for a SingleValueStmtExpr is active, and
+  /// if the provided expression is for one of its branches. If so, returns the
+  /// initialization to use for the expression. Otherwise returns \c nullptr.
+  Initialization *getSingleValueStmtInit(Expr *E);
 
   //===--------------------------------------------------------------------===//
   // Entry points for codegen
@@ -755,6 +756,12 @@ public:
   /// Generate a nullary function that returns the value of the given variable's
   /// expression initializer.
   void emitGeneratorFunction(SILDeclRef function, VarDecl *var);
+
+  /// Generate a nullary function that has the given result interface type and
+  /// body.
+  void emitGeneratorFunction(SILDeclRef function, Type resultInterfaceType,
+                             BraceStmt *body,
+                             Optional<AbstractionPattern> pattern = None);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
@@ -1054,7 +1061,9 @@ public:
 
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
-  SILValue emitSelfDecl(VarDecl *selfDecl);
+  ///
+  /// This is intended to only be used for destructors.
+  SILValue emitSelfDeclForDestructor(VarDecl *selfDecl);
 
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
@@ -2368,6 +2377,11 @@ public:
 
   /// Get the _Pointer protocol used for pointer argument operations.
   ProtocolDecl *getPointerProtocol();
+
+  /// Returns the SILDeclRef to use for references to the given accessor.
+  SILDeclRef getAccessorDeclRef(AccessorDecl *accessor) {
+    return SGM.getAccessorDeclRef(accessor, F.getResilienceExpansion());
+  }
 };
 
 

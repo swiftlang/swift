@@ -209,7 +209,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[X_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
-// CHECK-NEXT:    copy_addr [take] [[X_BOX]] to [initialization] [[X_ADDR]]
+// CHECK-NEXT:    copy_addr [take] [[X_BOX]] to [init] [[X_ADDR]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    dealloc_stack [[X_BOX]]
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
@@ -231,7 +231,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[X_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
-// CHECK-NEXT:    copy_addr [take] [[X_BOX]] to [initialization] [[X_ADDR]]
+// CHECK-NEXT:    copy_addr [take] [[X_BOX]] to [init] [[X_ADDR]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    dealloc_stack [[X_BOX]]
 // CHECK-NEXT:    [[Y_BOX:%.*]] = alloc_stack $T
@@ -240,7 +240,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[Y_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    [[Y_ADDR:%.*]] = struct_element_addr [[WRITE]]
-// CHECK-NEXT:    copy_addr [take] [[Y_BOX]] to [initialization] [[Y_ADDR]]
+// CHECK-NEXT:    copy_addr [take] [[Y_BOX]] to [init] [[Y_ADDR]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    dealloc_stack [[Y_BOX]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]

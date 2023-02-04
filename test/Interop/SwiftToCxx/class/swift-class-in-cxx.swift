@@ -21,16 +21,16 @@ public final class ClassWithIntField {
   }
 }
 
-// CHECK: namespace Class {
+// CHECK: namespace Class __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Class") {
 
 // CHECK: SWIFT_EXTERN void * _Nonnull $s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughClassWithIntField(_:)
 // CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s5Class06returnA12WithIntFieldAA0acdE0CyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // returnClassWithIntField()
 // CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA12WithIntFieldyyAA0acdE0CF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntField(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(void * _Nonnull * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntFieldInout(_:)
 
-// CHECK: namespace Class {
+// CHECK: namespace Class __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Class") {
 
-// CHECK: class ClassWithIntField;
+// CHECK: class SWIFT_SYMBOL("s:5Class0A12WithIntFieldC") ClassWithIntField;
 // CHECK-NEXT: } // end namespace
 
 // CHECK: namespace
@@ -43,7 +43,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: } // namespace swift
 
 // CHECK: namespace
-// CHECK-SAME: Class {
+// CHECK-SAME: Class __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Class") {
 
 // CHECK: namespace
 // CHECK-SAME: _impl {
@@ -55,7 +55,7 @@ public final class ClassWithIntField {
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
 // CHECK-EMPTY:
-// CHECK-NEXT: class ClassWithIntField final : public swift::_impl::RefCountedClass {
+// CHECK-NEXT: class SWIFT_SYMBOL("s:5Class0A12WithIntFieldC") ClassWithIntField final : public swift::_impl::RefCountedClass {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   using RefCountedClass::RefCountedClass;
 // CHECK-NEXT:   using RefCountedClass::operator=;
@@ -92,15 +92,15 @@ public final class ClassWithIntField {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace Class {
+// CHECK-NEXT: namespace Class __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Class") {
 
-// CHECK: inline ClassWithIntField passThroughClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline ClassWithIntField passThroughClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class011passThroughA12WithIntFieldyAA0adeF0CADF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 public final class register { }
 
-// CHECK: class register_ final : public swift::_impl::RefCountedClass {
+// CHECK: class SWIFT_SYMBOL("s:5Class8registerC") register_ final : public swift::_impl::RefCountedClass {
 
 public func returnClassWithIntField() -> ClassWithIntField {
   return ClassWithIntField()
@@ -121,14 +121,14 @@ public func takeClassWithIntFieldInout(_ x: inout ClassWithIntField) {
   x.field = -11
 }
 
-// CHECK: inline ClassWithIntField returnClassWithIntField() noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK: inline ClassWithIntField returnClassWithIntField() noexcept SWIFT_SYMBOL("s:5Class06returnA12WithIntFieldAA0acdE0CyF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class06returnA12WithIntFieldAA0acdE0CyF());
 // CHECK-NEXT: }
 
-// CHECK: inline void takeClassWithIntField(const ClassWithIntField& x) noexcept {
+// CHECK: inline void takeClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class04takeA12WithIntFieldyyAA0acdE0CF") {
 // CHECK-NEXT:  return _impl::$s5Class04takeA12WithIntFieldyyAA0acdE0CF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x));
 // CHECK-NEXT: }
 
-// CHECK: inline void takeClassWithIntFieldInout(ClassWithIntField& x) noexcept {
+// CHECK: inline void takeClassWithIntFieldInout(ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF") {
 // CHECK-NEXT:    return _impl::$s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(&::swift::_impl::_impl_RefCountedClass::getOpaquePointerRef(x));
 // CHECK-NEXT:  }

@@ -512,7 +512,7 @@ class CrashableBase {
 class GenericCrashable<T> : CrashableBase, Crashable {}
 
 // rdar://problem/35297911: allow witness with a noescape parameter to
-// match a requirement with an escaping paameter.
+// match a requirement with an escaping parameter.
 protocol EscapingReq {
   func f(_: @escaping (Int) -> Int)
 }

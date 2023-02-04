@@ -19,8 +19,8 @@ extension Array {
     }
 }
 
-// CHECK class TypeAfterArray;
-// CHECK: class Array final {
-// CHECK:        swift::Int getX() const;
-// CHECK-NEXT:   inline void setX(swift::Int value);
-// CHECK-NEXT:   TypeAfterArray getVal() const;
+// CHECK class SWIFT_SYMBOL("s:7Structs14TypeAfterArrayV") TypeAfterArray;
+// CHECK: class SWIFT_SYMBOL("s:7Structs5ArrayV") Array final {
+// CHECK:        swift::Int getX() const SWIFT_SYMBOL("s:7Structs5ArrayV1xSivp");
+// CHECK-NEXT:   inline void setX(swift::Int value) SWIFT_SYMBOL("s:7Structs5ArrayV1xSivp");
+// CHECK-NEXT:   TypeAfterArray getVal() const SWIFT_SYMBOL("s:7Structs5ArrayV3valAA09TypeAfterB0Vvp");

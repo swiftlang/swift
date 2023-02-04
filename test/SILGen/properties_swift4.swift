@@ -104,7 +104,7 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "other"
       // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var DidSetWillSetTests }, 0
       // CHECK-NEXT: [[READ_SELF:%.*]] = begin_access [read] [unknown] %0 : $*DidSetWillSetTests
-      // CHECK-NEXT: copy_addr [[READ_SELF]] to [initialization] [[BOXADDR]] : $*DidSetWillSetTests
+      // CHECK-NEXT: copy_addr [[READ_SELF]] to [init] [[BOXADDR]] : $*DidSetWillSetTests
       // CHECK-NEXT: end_access [[READ_SELF]] : $*DidSetWillSetTests
 
       other.a = zero

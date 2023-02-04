@@ -39,7 +39,7 @@ public:
     case swift::tok::X: return #X; break;
 #define POUND(X, Y) \
     case swift::tok::pound_##X: return "pound_" #X; break;
-  #include "swift/Syntax/TokenKinds.def"
+  #include "swift/AST/TokenKinds.def"
 
   #define OTHER(X) \
   case swift::tok::X: return #X; break;
@@ -84,8 +84,8 @@ public:
   std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
     swift::ParserUnit PU(SM, SourceFileKind::Main, BufID, LangOpts,
                          TypeCheckerOptions(), SILOptions(), "unknown");
-    SmallVector<Decl *, 8> decls;
-    PU.getParser().parseTopLevel(decls);
+    SmallVector<ASTNode, 8> items;
+    PU.getParser().parseTopLevelItems(items);
     return PU.getParser().getSplitTokens();
   }
   

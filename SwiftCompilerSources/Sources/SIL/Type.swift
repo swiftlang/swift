@@ -32,6 +32,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return SILType_isReferenceCounted(bridged, function.bridged) != 0
   }
 
+  public var hasArchetype: Bool { SILType_hasArchetype(bridged) }
+
   public var isNominal: Bool { SILType_isNominal(bridged) != 0 }
   public var isClass: Bool { SILType_isClass(bridged) != 0 }
   public var isStruct: Bool { SILType_isStruct(bridged) != 0 }

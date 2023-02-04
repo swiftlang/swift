@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SIL/LoopInfo.h"
 
 using namespace swift;
 
@@ -146,67 +147,8 @@ bool swift::canCloneTerminator(TermInst *termInst) {
   return true;
 }
 
-/// Given a terminator result, either from the original or the cloned block,
-/// update OSSA for any phis created for the result during edge splitting.
-void BasicBlockCloner::updateOSSATerminatorResult(SILPhiArgument *termResult) {
-  assert(termResult->isTerminatorResult() && "precondition");
-
-  // If the terminator result is used by a phi, then it is invalid OSSA
-  // which was created by edge splitting.
-  for (Operand *termUse : termResult->getUses()) {
-    if (auto phiOper = PhiOperand(termUse)) {
-      createBorrowScopeForPhiOperands(phiOper.getValue());
-    }
-  }
-}
-
-// Cloning does not invalidate ownership lifetime. When it clones values, it
-// also either clones the consumes, or creates the necessary phis that consume
-// the new values on all paths.  However, cloning may create new phis of
-// inner guaranteed values. Since phis are reborrows, they are only allowed to
-// use BorrowedValues. Therefore, we must create nested borrow scopes for any
-// new phis whose arguments aren't BorrowedValues. Note that other newly created
-// phis are themselves BorrowedValues, so only one level of nested borrow is
-// needed per value, per new phi that the value reaches.
-void BasicBlockCloner::updateOSSAAfterCloning() {
+void BasicBlockCloner::updateSSAAfterCloning() {
   SmallVector<SILPhiArgument *, 4> updateSSAPhis;
-  if (!origBB->getParent()->hasOwnership()) {
-    updateSSAAfterCloning(updateSSAPhis);
-    return;
-  }
-
-  // If the original basic block has terminator results, then all phis in the
-  // exit blocks are new phis that used to be terminator results.
-  //
-  // Create nested borrow scopes for terminator results that were converted to
-  // phis during edge splitting. This is simpler to check before SSA update.
-  //
-  // This assumes that the phis introduced by update-SSA below cannot be users
-  // of the phis that were created in exitBBs during block cloning. Otherwise
-  // borrowPhiArguments would handle them twice.
-  auto *termInst = origBB->getTerminator();
-  // FIXME: cond_br args should not exist in OSSA
-  if (!isa<BranchInst>(termInst) && !isa<CondBranchInst>(termInst)) {
-    // Update all of the terminator results.
-    for (auto *succBB : origBB->getSuccessorBlocks()) {
-      for (SILArgument *termResult : succBB->getArguments()) {
-        updateOSSATerminatorResult(cast<SILPhiArgument>(termResult));
-      }
-    }
-  }
-
-  // Update SSA form before calling OSSA update utilities to maintain a layering
-  // of SIL invariants.
-  updateSSAAfterCloning(updateSSAPhis);
-
-  // Create nested borrow scopes for phis created during SSA update.
-  for (auto *phi : updateSSAPhis) {
-    createBorrowScopeForPhiOperands(phi);
-  }
-}
-
-void BasicBlockCloner::updateSSAAfterCloning(
-    SmallVectorImpl<SILPhiArgument *> &newPhis) {
   // All instructions should have been checked by canCloneInstruction. But we
   // still need to check the arguments.
   for (auto arg : origBB->getArguments()) {
@@ -217,7 +159,7 @@ void BasicBlockCloner::updateSSAAfterCloning(
   if (!needsSSAUpdate)
     return;
 
-  SILSSAUpdater ssaUpdater(&newPhis);
+  SILSSAUpdater ssaUpdater(&updateSSAPhis);
   for (auto availValPair : availVals) {
     auto inst = availValPair.first;
     if (inst->use_empty())

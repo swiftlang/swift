@@ -72,18 +72,6 @@ public func spiAvailableFunc() {}
 // CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "unavailable": true
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       "name": "_OBJC_CLASS_$__TtC8MyModule8MyClass2",
-// CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:       "linkage": "exported"
-// CHECK-NEXT:     },
-// CHECK-NEXT:     {
-// CHECK-NEXT:       "name": "_OBJC_METACLASS_$__TtC8MyModule8MyClass2",
-// CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:       "linkage": "exported"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "interfaces": [
@@ -242,30 +230,6 @@ public func spiAvailableFunc() {}
 // CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
 // CHECK-SPI-NEXT:       "linkage": "exported",
 // CHECK-SPI-NEXT:       "introduced": "10.10"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_OBJC_CLASS_$__TtC8MyModule7MyClass",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_OBJC_CLASS_$__TtC8MyModule8MyClass2",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_OBJC_METACLASS_$__TtC8MyModule7MyClass",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_OBJC_METACLASS_$__TtC8MyModule8MyClass2",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-NEXT:       "linkage": "exported"
 // CHECK-SPI-NEXT:     },
 // CHECK-SPI-NEXT:     {
 // CHECK-SPI-NEXT:       "name": "_main",

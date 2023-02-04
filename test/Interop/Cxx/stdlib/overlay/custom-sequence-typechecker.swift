@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
 
+// REQUIRES: rdar102364960
+
 import CustomSequence
 
 func checkIntSequence<S>(_ seq: S) where S: Sequence, S.Element == Int32 {

@@ -21,7 +21,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Confusables.h"
 #include "swift/Parse/RegexParserBridging.h"
-#include "swift/Syntax/Trivia.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -40,7 +39,6 @@ void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
 }
 
 using namespace swift;
-using namespace swift::syntax;
 
 // clang::isAsciiIdentifierStart and clang::isAsciiIdentifierContinue are
 // deliberately not in this list as a reminder that they are using C rules for
@@ -179,12 +177,12 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
 Lexer::Lexer(const PrincipalTag &, const LangOptions &LangOpts,
              const SourceManager &SourceMgr, unsigned BufferID,
              DiagnosticEngine *Diags, LexerMode LexMode,
-             HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
-             TriviaRetentionMode TriviaRetention)
+             HashbangMode HashbangAllowed,
+             CommentRetentionMode RetainComments)
     : LangOpts(LangOpts), SourceMgr(SourceMgr), BufferID(BufferID),
       LexMode(LexMode),
       IsHashbangAllowed(HashbangAllowed == HashbangMode::Allowed),
-      RetainComments(RetainComments), TriviaRetention(TriviaRetention) {
+      RetainComments(RetainComments) {
   if (Diags)
     DiagQueue.emplace(*Diags, /*emitOnDestruction*/ false);
 }
@@ -209,10 +207,15 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   ContentStart = BufferStart + BOMLength;
 
   // Initialize code completion.
-  if (BufferID == SourceMgr.getCodeCompletionBufferID()) {
-    const char *Ptr = BufferStart + SourceMgr.getCodeCompletionOffset();
-    if (Ptr >= BufferStart && Ptr <= BufferEnd)
+  if (BufferID == SourceMgr.getIDEInspectionTargetBufferID()) {
+    const char *Ptr = BufferStart + SourceMgr.getIDEInspectionTargetOffset();
+    // If the pointer points to a null byte, it's the null byte that was
+    // inserted to mark the code completion token. If the IDE inspection offset
+    // points to a normal character, no code completion token should be
+    // inserted.
+    if (Ptr >= BufferStart && Ptr <= BufferEnd && *Ptr == '\0') {
       CodeCompletionPtr = Ptr;
+    }
   }
 
   ArtificialEOF = BufferStart + EndOffset;
@@ -227,10 +230,10 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
 
 Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
              unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
-             HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
-             TriviaRetentionMode TriviaRetention)
+             HashbangMode HashbangAllowed,
+             CommentRetentionMode RetainComments)
     : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, LexMode,
-            HashbangAllowed, RetainComments, TriviaRetention) {
+            HashbangAllowed, RetainComments) {
   unsigned EndOffset = SourceMgr.getRangeForBuffer(BufferID).getByteLength();
   initialize(/*Offset=*/0, EndOffset);
 }
@@ -238,10 +241,9 @@ Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
 Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
              unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
              HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
-             TriviaRetentionMode TriviaRetention, unsigned Offset,
-             unsigned EndOffset)
+             unsigned Offset, unsigned EndOffset)
     : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, LexMode,
-            HashbangAllowed, RetainComments, TriviaRetention) {
+            HashbangAllowed, RetainComments) {
   initialize(Offset, EndOffset);
 }
 
@@ -253,7 +255,7 @@ Lexer::Lexer(const Lexer &Parent, State BeginState, State EndState,
             Parent.IsHashbangAllowed
                 ? HashbangMode::Allowed
                 : HashbangMode::Disallowed,
-            Parent.RetainComments, Parent.TriviaRetention) {
+            Parent.RetainComments) {
   assert(BufferID == SourceMgr.findBufferContainingLoc(BeginState.Loc) &&
          "state for the wrong buffer");
   assert(BufferID == SourceMgr.findBufferContainingLoc(EndState.Loc) &&
@@ -277,8 +279,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
          "location from the wrong buffer");
 
   Lexer L(LangOpts, SourceMgr, BufferID, getUnderlyingDiags(), LexMode,
-          HashbangMode::Allowed, CommentRetentionMode::None,
-          TriviaRetentionMode::WithoutTrivia);
+          HashbangMode::Allowed, CommentRetentionMode::None);
   L.restoreState(State(Loc));
   return L.peekNextToken();
 }
@@ -301,13 +302,6 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   }
 
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
-
-  if (TriviaRetention == TriviaRetentionMode::WithTrivia && Kind != tok::eof) {
-    TrailingTrivia = lexTrivia(/*IsForTrailingTrivia=*/true, CurPtr);
-  } else {
-    TrailingTrivia = StringRef();
-  }
-
   NextToken.setToken(Kind, TokenText, CommentLength);
 }
 
@@ -654,12 +648,12 @@ bool Lexer::isOperator(StringRef string) {
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
 #define SIL_KEYWORD(kw)
 #define KEYWORD(kw) if (Str == #kw) return tok::kw_##kw;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
 
   // SIL keywords are only active in SIL mode.
   if (InSILMode) {
 #define SIL_KEYWORD(kw) if (Str == #kw) return tok::kw_##kw;
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
   }
   return tok::identifier;
 }
@@ -696,7 +690,7 @@ void Lexer::lexHash() {
   tok Kind = llvm::StringSwitch<tok>(StringRef(CurPtr, tmpPtr-CurPtr))
 #define POUND_KEYWORD(id) \
   .Case(#id, tok::pound_##id)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
   .Default(tok::pound);
 
   // If we didn't find a match, then just return tok::pound.  This is highly
@@ -2615,7 +2609,7 @@ void Lexer::lexImpl() {
     NextToken.setAtStartOfLine(false);
   }
 
-  LeadingTrivia = lexTrivia(/*IsForTrailingTrivia=*/false, LeadingTriviaStart);
+  lexTrivia(/*IsForTrailingTrivia=*/false, LeadingTriviaStart);
 
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
@@ -2955,7 +2949,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
 
   Lexer L(FakeLangOptions, SM, BufferID, nullptr, LexerMode::Swift,
           HashbangMode::Allowed, CommentRetentionMode::None,
-          TriviaRetentionMode::WithoutTrivia, BufferStart, BufferEnd);
+          BufferStart, BufferEnd);
 
   // Lex tokens until we find the token that contains the source location.
   Token Tok;
@@ -3143,138 +3137,6 @@ bool tryAdvanceToEndOfConflictMarker(const char *&CurPtr,
 
   // No end of conflict marker found.
   return false;
-}
-
-ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
-  const char *CurPtr = TriviaStr.begin();
-  const char *BufferEnd = TriviaStr.end();
-
-  ParsedTrivia Pieces;
-
-  while (CurPtr < BufferEnd) {
-    // Iterate through the trivia and lex them into pieces. In the switch
-    // statement in this loop we can
-    //  - 'continue' if we have successfully lexed a trivia piece to continue
-    //    with the next piece. In this case CurPtr points to the next character
-    //    to be lexed (which is not part of the lexed trivia).
-    //  - 'break' to perform the default handling defined towards the bottom of
-    //    the loop.
-
-    const char *TriviaStart = CurPtr;
-
-    switch (*CurPtr++) {
-    case '\n':
-      Pieces.appendOrSquash(TriviaKind::Newline, 1);
-      continue;
-    case '\r':
-      if (CurPtr < BufferEnd && CurPtr[0] == '\n') {
-        Pieces.appendOrSquash(TriviaKind::CarriageReturnLineFeed, 2);
-        ++CurPtr;
-        continue;
-      } else {
-        Pieces.appendOrSquash(TriviaKind::CarriageReturn, 1);
-        continue;
-      }
-    case ' ':
-      Pieces.appendOrSquash(TriviaKind::Space, 1);
-      continue;
-    case '\t':
-      Pieces.appendOrSquash(TriviaKind::Tab, 1);
-      continue;
-    case '\v':
-      Pieces.appendOrSquash(TriviaKind::VerticalTab, 1);
-      continue;
-    case '\f':
-      Pieces.appendOrSquash(TriviaKind::Formfeed, 1);
-      continue;
-    case '/':
-      if (CurPtr < BufferEnd && CurPtr[0] == '/') {
-        // '// ...' comment.
-        bool isDocComment = CurPtr[1] == '/';
-        advanceToEndOfLine(CurPtr, BufferEnd);
-        size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(isDocComment ? TriviaKind::DocLineComment
-                                      : TriviaKind::LineComment,
-                         Length);
-        continue;
-      } else if (CurPtr < BufferEnd && CurPtr[0] == '*') {
-        // '/* ... */' comment.
-        bool isDocComment = CurPtr[1] == '*';
-        skipToEndOfSlashStarComment(CurPtr, BufferEnd);
-        size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(isDocComment ? TriviaKind::DocBlockComment
-                                      : TriviaKind::BlockComment,
-                         Length);
-        continue;
-      }
-      break;
-    case '#':
-      if (CurPtr < BufferEnd && CurPtr[0] == '!') {
-        // Hashbang '#!/path/to/swift'.
-        advanceToEndOfLine(CurPtr, BufferEnd);
-        size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(TriviaKind::Shebang, Length);
-        continue;
-      }
-      break;
-    case '<':
-    case '>':
-      if (tryAdvanceToEndOfConflictMarker(CurPtr, BufferEnd)) {
-        // Conflict marker.
-        size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(TriviaKind::UnexpectedText, Length);
-        continue;
-      }
-      break;
-    case '\xEF':
-      if ((CurPtr + 1) < BufferEnd && CurPtr[0] == '\xBB' && CurPtr[1] == '\xBF') {
-        // BOM marker.
-        CurPtr = CurPtr + 2;
-        size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(TriviaKind::UnexpectedText, Length);
-        continue;
-      }
-      break;
-    case 0: {
-      size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaKind::UnexpectedText, Length);
-      continue;
-    }
-    default:
-      break;
-    }
-
-    // Default handling for anything that didn't 'continue' in the above switch
-    // statement.
-
-    for (; CurPtr < BufferEnd; ++CurPtr) {
-      bool HasFoundNextTriviaStart = false;
-      switch (*CurPtr) {
-      case '\n':
-      case '\r':
-      case ' ':
-      case '\t':
-      case '\v':
-      case '\f':
-      case '/':
-      case 0:
-        HasFoundNextTriviaStart = true;
-        break;
-      }
-      if (HasFoundNextTriviaStart) {
-        break;
-      }
-    }
-
-    size_t Length = CurPtr - TriviaStart;
-    Pieces.push_back(TriviaKind::UnexpectedText, Length);
-    continue;
-  }
-
-  assert(Pieces.getLength() == TriviaStr.size() &&
-         "Not all characters in the source string have been used in trivia "
-         "pieces");
-  return Pieces;
 }
 
 ArrayRef<Token> swift::

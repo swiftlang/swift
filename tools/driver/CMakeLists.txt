@@ -1,5 +1,15 @@
 # The swift-frontend tool
 
+
+# Add additional libraries to which we need to link when the Swift Swift
+# parser is built in.
+function(add_swift_parser_link_libraries target)
+  if(SWIFT_SWIFT_PARSER)
+    target_link_libraries(${target}
+                          PRIVATE swiftCore)
+  endif()
+endfunction()
+
 if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
 
   # Bootstrapping - level 0
@@ -17,11 +27,7 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
                           swiftDriverTool
                           swiftCompilerStub)
 
-  if(SWIFT_SWIFT_PARSER)
-    target_link_libraries(swift-frontend-bootstrapping0
-                          PRIVATE
-                            swiftCore)
-  endif()
+  add_swift_parser_link_libraries(swift-frontend-bootstrapping0)
 
   swift_create_post_build_symlink(swift-frontend-bootstrapping0
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
@@ -42,11 +48,7 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
                           swiftDriverTool
                           swiftCompilerModules-bootstrapping1)
 
-  if(SWIFT_SWIFT_PARSER)
-    target_link_libraries(swift-frontend-bootstrapping1
-                          PRIVATE
-                            swiftCore)
-  endif()
+  add_swift_parser_link_libraries(swift-frontend-bootstrapping1)
 
   swift_create_post_build_symlink(swift-frontend-bootstrapping1
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
@@ -64,11 +66,7 @@ target_link_libraries(swift-frontend
                         swiftDriverTool
                         swiftCompilerModules)
 
-if(SWIFT_SWIFT_PARSER)
-  target_link_libraries(swift-frontend
-                        PRIVATE
-                          swiftCore)
-endif()
+add_swift_parser_link_libraries(swift-frontend)
 
 _add_swift_runtime_link_flags(swift-frontend "../../lib" "")
 

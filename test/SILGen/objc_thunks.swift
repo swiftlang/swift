@@ -163,7 +163,7 @@ class Hoozit : Gizmo {
 
   // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6HoozitC15typicalPropertySo5GizmoCvs
   // CHECK: bb0([[ARG0:%.*]] : @owned $Gizmo, [[ARG1:%.*]] : @guaranteed $Hoozit):
-  // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [lexical] [[ARG0]]
+  // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
   // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[BORROWED_ARG0]]
   // CHECK:   [[ADDR:%.*]] = ref_element_addr [[ARG1]] : {{.*}}, #Hoozit.typicalProperty
   // CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*Gizmo
@@ -211,7 +211,7 @@ class Hoozit : Gizmo {
 
   // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6HoozitC12copyPropertySo5GizmoCvs
   // CHECK: bb0([[ARG1:%.*]] : @owned $Gizmo, [[SELF:%.*]] : @guaranteed $Hoozit):
-  // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [lexical] [[ARG1]]
+  // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
   // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
   // CHECK:   [[ADDR:%.*]] = ref_element_addr [[SELF]] : {{.*}}, #Hoozit.copyProperty
   // CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*Gizmo
@@ -486,7 +486,7 @@ extension Hoozit {
 // Calling objc methods of subclass should go through native entry points
 func useHoozit(_ h: Hoozit) {
 // sil [ossa] @$s11objc_thunks9useHoozit1hyAA0D0C_tF
-  // In the class decl, overrides importd method, 'dynamic' was inferred
+  // In the class decl, overrides imported method, 'dynamic' was inferred
   h.fork()
   // CHECK: objc_method {{%.*}} : {{.*}}, #Hoozit.fork!foreign
 

@@ -36,7 +36,7 @@ bb1:
 
 bb2:
   %19 = unchecked_take_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
-  copy_addr [take] %19 to [initialization] %2 : $*CustomStringConvertible
+  copy_addr [take] %19 to [init] %2 : $*CustomStringConvertible
   br bb1
 }
 
@@ -72,7 +72,7 @@ bb2:
 
 bb3:
   %19 = unchecked_take_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
-  copy_addr [take] %19 to [initialization] %2 : $*CustomStringConvertible
+  copy_addr [take] %19 to [init] %2 : $*CustomStringConvertible
   br bb1
 }
 

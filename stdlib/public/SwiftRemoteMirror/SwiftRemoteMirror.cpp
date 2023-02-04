@@ -23,8 +23,8 @@ SWIFT_REMOTE_MIRROR_LINKAGE uint32_t swift_reflection_libraryVersion = 3;
 }
 
 #include "swift/Demangling/Demangler.h"
-#include "swift/Reflection/ReflectionContext.h"
-#include "swift/Reflection/TypeLowering.h"
+#include "swift/RemoteInspection/ReflectionContext.h"
+#include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/Basic/Unreachable.h"
 
@@ -278,7 +278,7 @@ int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart) {
   auto Context = ContextRef->nativeContext;
-  return Context->addImage(RemoteAddress(imageStart)).hasValue();
+  return Context->addImage(RemoteAddress(imageStart)).has_value();
 }
 
 int
@@ -637,7 +637,7 @@ int swift_reflection_projectExistentialAndUnwrapClass(SwiftReflectionContextRef 
   auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
   auto Pair = Context->projectExistentialAndUnwrapClass(
       RemoteExistentialAddress, *ExistentialTR);
-  if (!Pair.hasValue())
+  if (!Pair.has_value())
     return false;
   *InstanceTypeRef = reinterpret_cast<swift_typeref_t>(std::get<const TypeRef *>(*Pair));
   *StartOfInstanceData = std::get<RemoteAddress>(*Pair).getAddressData();

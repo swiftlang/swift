@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -parse-stdlib -disable-availability-checking -verify-syntax-tree
+// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -parse-stdlib -disable-availability-checking
 
 import Swift
 
@@ -137,4 +137,18 @@ func useGeneric<T>(_ x: T) {
     @_noImplicitCopy let y = x
     let z = y
     print(z)
+}
+
+@_moveOnly
+struct MoveOnly {
+    var k = Klass()
+}
+
+func useMoveOnly(@_noImplicitCopy _ x: MoveOnly) -> MoveOnly { // expected-error {{'@_noImplicitCopy' has no effect when applied to a move only type}}
+    return x
+}
+
+func useMoveOnly2(_ x: MoveOnly) {
+    @_noImplicitCopy let y = x // expected-error {{'@_noImplicitCopy' has no effect when applied to a move only type}}
+    let _ = y
 }

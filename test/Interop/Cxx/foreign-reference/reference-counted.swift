@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify)
 //
 // REQUIRES: executable_test
 // TODO: This should work without ObjC interop in the future rdar://97497120
@@ -19,6 +19,9 @@ func localTest() {
     var x = NS.LocalCount.create()
     expectEqual(x.value, 6) // This is 6 because of "var x" "x.value" * 2 and "(x, x, x)".
 
+    expectEqual(x.returns42(), 42)
+    expectEqual(x.constMethod(), 42)
+
     let t = (x, x, x)
     expectEqual(x.value, 5)
 }
@@ -27,6 +30,14 @@ ReferenceCountedTestSuite.test("Local") {
     expectNotEqual(finalLocalRefCount, 0)
     localTest()
     expectEqual(finalLocalRefCount, 0)
+}
+
+var globalOptional: NS.LocalCount? = nil
+
+ReferenceCountedTestSuite.test("Global optional holding local ref count") {
+    expectEqual(finalLocalRefCount, 0)
+    globalOptional = NS.LocalCount.create()
+    expectEqual(finalLocalRefCount, 1)
 }
 
 @inline(never)

@@ -196,6 +196,26 @@ public:
                            ArrayRef<ProtocolDecl *> result) const;
 };
 
+class ProtocolRequirementsRequest
+    : public SimpleRequest<ProtocolRequirementsRequest,
+                           ArrayRef<ValueDecl *>(ProtocolDecl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ValueDecl *> evaluate(Evaluator &, ProtocolDecl *) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  Optional<ArrayRef<ValueDecl *>> getCachedResult() const;
+  void cacheResult(ArrayRef<ValueDecl *> value) const;
+};
+
 /// Requests whether or not this class has designated initializers that are
 /// not public or @usableFromInline.
 class HasMissingDesignatedInitializersRequest :
@@ -303,8 +323,8 @@ private:
                                        ExtensionDecl *ext) const;
 };
 
-/// Request the nominal type declaration to which the given custom attribute
-/// refers.
+/// Request the nominal type declaration to which the given custom
+/// attribute refers.
 class CustomAttrNominalRequest :
     public SimpleRequest<CustomAttrNominalRequest,
                          NominalTypeDecl *(CustomAttr *, DeclContext *),

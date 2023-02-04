@@ -77,10 +77,13 @@ class ClassWithStaticDecls {
 //===--- Recovery for missing controlling expression in statements.
 
 func missingControllingExprInIf() {
-  if // expected-error {{expected expression, var, or let in 'if' condition}}
+  if
 
   if { // expected-error {{missing condition in 'if' statement}}
-  }
+  } // expected-error {{expected '{' after 'if' condition}}
+  // expected-error@-2 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  // expected-error@-3 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
+  // expected-error@-4 {{'if' must have an unconditional 'else' to be used as expression}}
 
   if // expected-error {{missing condition in 'if' statement}}
   {
@@ -234,10 +237,10 @@ func missingControllingExprInForEach() {
 }
 
 func missingControllingExprInSwitch() {
-  switch // expected-error {{expected expression in 'switch' statement}}
+  switch
 
-  switch { // expected-error {{expected expression in 'switch' statement}} expected-error {{'switch' statement body must have at least one 'case' or 'default' block}}
-  }
+  switch { // expected-error {{expected expression in 'switch' statement}} expected-error {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
+  } // expected-error {{expected '{' after 'switch' subject expression}}
 
   switch // expected-error {{expected expression in 'switch' statement}} expected-error {{'switch' statement body must have at least one 'case' or 'default' block}}
   {
@@ -381,16 +384,16 @@ struct ErrorTypeInVarDecl10 {
 }
 
 struct ErrorTypeInVarDecl11 {
-  var v1 : protocol<FooProtocol, // expected-error {{expected identifier for type name}}
+  var v1 : protocol<FooProtocol, // expected-error {{expected type}}
   var v2 : Int
 }
 
-func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected identifier for type name}}
+func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected type}}
 func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol-constrained type}}
                                             // expected-note@-1 {{to match this opening '<'}}
                                             // expected-error@-2 {{cannot find type 'F' in scope}}
 
-func ErrorTypeInPattern3(_: protocol<F,) { } // expected-error {{expected identifier for type name}}
+func ErrorTypeInPattern3(_: protocol<F,) { } // expected-error {{expected type}}
                                              // expected-error@-1 {{cannot find type 'F' in scope}}
 
 struct ErrorTypeInVarDecl12 {
@@ -674,6 +677,8 @@ case let (jeb):
 struct Foo19605164 {
 func a(s: S[{{g) -> Int {} // expected-note {{to match this opening '['}}
 }}} // expected-error {{expected ']' in array type}}
+// expected-error@-2{{consecutive statements on a line must be separated by ';'}}
+// expected-error@-3{{expected expression}}
 #endif
   
 // rdar://19605567
@@ -773,7 +778,7 @@ class r22240342 {
   lazy var xx: Int = {
     foo {  // expected-error {{cannot find 'foo' in scope}}
       let issueView = 42
-      issueView.delegate = 12
+      issueView.delegate = 12 // expected-error {{value of type 'Int' has no member 'delegate'}}
       
     }
     return 42
@@ -872,3 +877,10 @@ func testSkipToFindOpenBrace1() {
 func testSkipToFindOpenBrace2() {
   do { if true {} else false } // expected-error {{expected '{' or 'if' after 'else'}}
 }
+
+struct Outer {
+  struct Inner<T> {}
+}
+extension Outer.Inner<Never> { // expected-note {{in extension of 'Outer.Inner<Never>'}}
+  @someAttr
+} // expected-error {{expected declaration}}

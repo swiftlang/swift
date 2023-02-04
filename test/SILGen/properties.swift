@@ -298,7 +298,7 @@ func logical_local_get(_ x: Int) -> Int {
   return prop
 }
 // CHECK-: sil private [[PROP_GET_CLOSURE]]
-// CHECK: bb0(%{{[0-9]+}} : $Int):
+// CHECK: bb0(%{{[0-9]+}} : @closureCapture $Int):
 
 func logical_generic_local_get<T>(_ x: Int, _: T) {
   var prop1: Int {
@@ -335,7 +335,7 @@ func logical_local_captured_get(_ x: Int) -> Int {
   // CHECK: apply [[FUNC_REF]](%0)
 }
 // CHECK: sil private [ossa] @$s10properties26logical_local_captured_get{{.*}}vg
-// CHECK: bb0(%{{[0-9]+}} : $Int):
+// CHECK: bb0(%{{[0-9]+}} : @closureCapture $Int):
 
 func inout_arg(_ x: inout Int) {}
 
@@ -760,8 +760,8 @@ struct AddressOnlyReadOnlySubscript {
 
 // CHECK-LABEL: sil hidden [ossa] @$s10properties015addressOnlyReadC24SubscriptFromMutableBase
 // CHECK:         [[BASE:%.*]] = alloc_box ${ var AddressOnlyReadOnlySubscript }
-// CHECK:         copy_addr [[BASE:%.*]] to [initialization] [[COPY:%.*]] :
-// CHECK:         copy_addr [[COPY:%.*]] to [initialization] [[COPY2:%.*]] :
+// CHECK:         copy_addr [[BASE:%.*]] to [init] [[COPY:%.*]] :
+// CHECK:         copy_addr [[COPY:%.*]] to [init] [[COPY2:%.*]] :
 // CHECK:         [[GETTER:%.*]] = function_ref @$s10properties015AddressOnlyReadC9SubscriptV{{[_0-9a-zA-Z]*}}ig
 // CHECK:         apply [[GETTER]]({{%.*}}, [[COPY2]])
 func addressOnlyReadOnlySubscriptFromMutableBase(_ x: Int) {
@@ -828,10 +828,10 @@ protocol NonmutatingProtocol {
 
 // CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*any NonmutatingProtocol to $*@opened("{{.*}}", any NonmutatingProtocol) Self
 // CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened("{{.*}}", any NonmutatingProtocol) Self
-// CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [initialization] [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
+// CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [init] [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
 // CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
 // CHECK-NEXT:   [[C_FIELD_BORROW:%.*]] = alloc_stack
-// CHECK-NEXT:   copy_addr [[C_FIELD_COPY]] to [initialization] [[C_FIELD_BORROW]]
+// CHECK-NEXT:   copy_addr [[C_FIELD_COPY]] to [init] [[C_FIELD_BORROW]]
 // CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}", any NonmutatingProtocol) Self, #NonmutatingProtocol.x!getter : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}", any NonmutatingProtocol) Self>([[C_FIELD_BORROW]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BORROW]]

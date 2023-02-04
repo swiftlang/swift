@@ -33,7 +33,7 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 bb1:
   %2 = alloc_stack $T
-  copy_addr [take] %0 to [initialization] %2 : $*T
+  copy_addr [take] %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   br bb3
@@ -68,7 +68,7 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 bb1:
   %2 = alloc_stack $T
-  copy_addr [take] %0 to [initialization] %2 : $*T
+  copy_addr [take] %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   br bb3
@@ -103,7 +103,7 @@ bb0(%0 : $*Generic<T>, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 bb1:
   %2 = alloc_stack $Generic<T>
-  copy_addr [take] %0 to [initialization] %2 : $*Generic<T>
+  copy_addr [take] %0 to [init] %2 : $*Generic<T>
   destroy_addr %2 : $*Generic<T>
   dealloc_stack %2 : $*Generic<T>
   br bb3
@@ -137,7 +137,7 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
 bb1:
   %3 = alloc_stack $T
   %4 = alloc_stack $T
-  copy_addr [take] %0 to [initialization] %3 : $*T
+  copy_addr [take] %0 to [init] %3 : $*T
   destroy_addr %3 : $*T
   dealloc_stack %4: $*T
   dealloc_stack %3 : $*T
@@ -167,7 +167,7 @@ bb0(%0 : $*P, %1: $Builtin.Int1):
 bb1:
   %2 = open_existential_addr mutable_access %0 : $*P to $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
   %3 = alloc_stack $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
-	copy_addr [take] %2 to [initialization] %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
+	copy_addr [take] %2 to [init] %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
   destroy_addr %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
   dealloc_stack %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
   br bb3
@@ -194,7 +194,7 @@ bb0(%0 : $*P, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 bb1:
   %2 = alloc_stack $P
-	copy_addr [take] %0 to [initialization] %2 : $*P
+	copy_addr [take] %0 to [init] %2 : $*P
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   br bb3
@@ -220,7 +220,7 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 bb1:
   %2 = alloc_stack $T
-  copy_addr [take] %0 to [initialization] %2 : $*T
+  copy_addr [take] %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   br bb3
 bb2:
@@ -245,7 +245,7 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
   cond_br %8, bb1, bb2
 bb1:
   %2 = alloc_stack $T
-  copy_addr [take] %0 to [initialization] %2 : $*T
+  copy_addr [take] %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   br bb3
@@ -257,3 +257,26 @@ bb3:
   return %3 : $()
 }
 
+// CHECK-LABEL: sil @dont_hoist_with_has_symbol_checks
+// CHECK-NOT: alloc_stack
+// CHECK:     cond_br
+// CHECK:   bb1:
+// CHECK:     alloc_stack
+// CHECK: } // end sil function 'dont_hoist_with_has_symbol_checks'
+sil @dont_hoist_with_has_symbol_checks : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  %5 = has_symbol #FixedSize.init
+  cond_br %5, bb1, bb2
+bb1:
+  %2 = alloc_stack $T
+  copy_addr [take] %0 to [init] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  br bb3
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+bb3:
+  %3 = tuple ()
+  return %3 : $()
+}

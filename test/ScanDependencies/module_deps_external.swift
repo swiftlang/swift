@@ -44,24 +44,14 @@ import SomeExternalModule
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-NEXT: "swift": "F"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swiftPlaceholder": "SomeExternalModule"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "Swift"
-// CHECK-NEXT: }
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "SwiftOnoneSupport"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "_Concurrency"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "_StringProcessing"
-// CHECK-NEXT: }
-// CHECK-NEXT: ],
+// CHECK-DAG: "swift": "F"
+// CHECK-DAG: "swiftPlaceholder": "SomeExternalModule"
+// CHECK-DAG: "swift": "Swift"
+// CHECK-DAG: "swift": "SwiftOnoneSupport"
+// CHECK-DAG: "swift": "_Concurrency"
+// CHECK-DAG: "swift": "_StringProcessing"
+// CHECK-DAG: "clang": "_SwiftConcurrencyShims"
+// CHECK: ],
 
 // CHECK:      "extraPcmArgs": [
 // CHECK-NEXT:    "-Xcc",
@@ -82,21 +72,21 @@ import SomeExternalModule
 // CHECK-NEXT: ]
 
 /// --------Swift external module SomeExternalModule
-// CHECK-LABEL: "modulePath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftmodule",
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}SomeExternalModule.swiftmodule",
 // CHECK-NEXT: "details": {
 // CHECK-NEXT: "swiftPlaceholder": {
 // CHECK-NEXT: "moduleDocPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftdoc",
 // CHECK-NEXT: "moduleSourceInfoPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftsourceinfo"
 
 /// --------Swift module Swift
-// CHECK-LABEL: "modulePath": "Swift.swiftmodule",
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
 // CHECK-NEXT: "clang": "SwiftShims"
 
 /// --------Clang module SwiftShims
-// CHECK-LABEL: "modulePath": "SwiftShims.pcm",
+// CHECK-LABEL: "modulePath": "{{.*}}/SwiftShims-{{.*}}.pcm",
 
 // Check make-style dependencies
 // CHECK-MAKE-DEPS: module_deps_external.swift

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# utils/build-tooling-libs - Helper tool for building the SwiftSyntax parser
-# and SwiftStaticMirror libraries -*- python -*-
+# utils/build-tooling-libs - Helper tool for building the SwiftStaticMirror
+# library -*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,8 +10,8 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-# This is a utility for building only the syntax parser and swift static-mirror
-# libraries as fast as possible by only building the necessary dependency libraries
+# This is a utility for building only the swift static-mirror
+# library as fast as possible by only building the necessary dependency libraries
 # and nothing extraneous. To achieve this it does a single unified CMake configuration for
 # llvm/clang/swift and builds only the required CMake targets for the two libraries.
 # This mechanism is fundamentally different from build-script, which builds llvm/clang
@@ -19,9 +19,6 @@
 #
 # Even though this bypasses build-script, it does share some underlying helper
 # utilities from the python infrastructure.
-#
-# This utility also provides capability to gather profile data and build the parser
-# library with PGO optimization enabled.
 
 import copy
 import multiprocessing
@@ -41,9 +38,7 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 isDarwin = platform.system() == "Darwin"
 isSwiftContainedInLLVMProject = os.path.exists(os.path.join(SWIFT_SOURCE_ROOT, "llvm"))
 
-syntaxParserLibTarget = "tools/swift/tools/libSwiftSyntaxParser/install"
 staticMirrorLibTarget = "tools/swift/tools/libStaticMirror/install"
-syntaxParserTesterTarget = "swift-syntax-parser-test"
 
 class Builder(object):
     def __init__(
@@ -54,8 +49,6 @@ class Builder(object):
         self.build_release = args.release
         self.enable_assertions = not args.no_assertions
         self.lto_type = args.lto_type
-        self.pgo_type = args.pgo_type
-        self.profile_input = args.profile_input
         self.profile_data = profile_data
         self.dry_run = args.dry_run
         self.jobs = args.build_jobs
@@ -63,7 +56,6 @@ class Builder(object):
         self.build_dir = args.build_dir
         self.install_destdir = args.install_destdir
         self.install_prefix = args.install_prefix
-        self.version = args.version
         self.host = host
         self.arch = arch
         self.native_build_dir = native_build_dir
@@ -227,18 +219,11 @@ class Builder(object):
             cmake_args += ["-DLLVM_ENABLE_LTO=" + self.lto_type.upper()]
         if self.install_prefix:
             cmake_args += ["-DCMAKE_INSTALL_PREFIX:PATH=" + self.install_prefix]
-        if self.version:
-            cmake_args += ["-DSWIFT_LIBPARSER_VER:STRING=" + self.version]
         cmake_args += [
             "-DLLVM_ENABLE_PROJECTS=clang",
             "-DLLVM_EXTERNAL_PROJECTS=swift",
             '-DLLVM_EXTERNAL_SWIFT_SOURCE_DIR=' + 
             os.path.join(SWIFT_SOURCE_ROOT, 'swift'),
-        ]
-        cmake_args += [
-            "-DSWIFT_BUILD_SYNTAXPARSERLIB=TRUE",
-            "-DSWIFT_BUILD_ONLY_SYNTAXPARSERLIB=TRUE",
-            "-DSWIFT_BUILD_SYNTAXPARSERTEST=TRUE",
         ]
         cmake_args += ["-DSWIFT_BUILD_PERF_TESTSUITE=NO", "-DSWIFT_INCLUDE_DOCS=NO"]
         cmake_args += [
@@ -268,7 +253,7 @@ class Builder(object):
         ]
         cmake_args += [
             "-DBOOTSTRAPPING_MODE=HOSTTOOLS",
-            "-DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=" +
+            "-DSWIFT_PATH_TO_STRING_PROCESSING_SOURCE=" +
             os.path.join(SWIFT_SOURCE_ROOT,
                          "swift-experimental-string-processing"),
             "-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE=" +
@@ -305,34 +290,8 @@ class Builder(object):
         if self.install_destdir:
             env = {"DESTDIR": self.install_destdir}
         self.build_targets(
-            self.build_dir, [syntaxParserLibTarget,
-                             staticMirrorLibTarget], env=env
+            self.build_dir, [staticMirrorLibTarget], env=env
         )
-
-    def get_profile_data(self, profile_dir):
-        shell.makedirs(profile_dir, dry_run=self.dry_run)
-        instrumentation = "IR" if self.pgo_type == "ir" else "Frontend"
-        with shell.pushd(profile_dir, dry_run=self.dry_run):
-            self.configure(enable_debuginfo=False, instrumentation=instrumentation)
-            self.build_targets(profile_dir, [syntaxParserTesterTarget])
-            # Delete existing profile data that were generated during building from
-            # running tablegen.
-            shell.rmtree("profiles", dry_run=self.dry_run)
-            self.call(
-                [
-                    os.path.join("bin", syntaxParserTesterTarget),
-                    self.profile_input,
-                    "-time",
-                ]
-            )
-            self.call(
-                [
-                    self.toolchain.llvm_profdata,
-                    "merge",
-                    "-output=profdata.prof",
-                    "profiles",
-                ]
-            )
 
     def run(self):
         shell.makedirs(self.build_dir, dry_run=self.dry_run)
@@ -340,7 +299,7 @@ class Builder(object):
         with shell.pushd(self.build_dir, dry_run=self.dry_run):
             self.configure(enable_debuginfo=True, profile_data=self.profile_data)
 
-        self.build_targets(self.build_dir, [syntaxParserTesterTarget, staticMirrorLibTarget])
+        self.build_targets(self.build_dir, [staticMirrorLibTarget])
 
         if self.install_destdir:
             self.install()
@@ -366,7 +325,7 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""
-Builds Swift Syntax Parser and Swift Static Mirror libraries.
+Builds Swift Static Mirror library.
 
 Example invocations:
 
@@ -394,9 +353,6 @@ Example invocations:
     default_host = "macosx" if isDarwin else "linux"
     default_architectures = platform.machine()
 
-    default_profile_input = os.path.join(
-        SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "profile-input.swift"
-    )
     default_jobs = multiprocessing.cpu_count()
     default_build_dir = os.path.join(SWIFT_BUILD_ROOT, "tooling-libs")
     default_install_prefix = (
@@ -415,23 +371,6 @@ Example invocations:
         help="use lto optimization."
         "Options: thin, full. If no optional arg is provided, full is "
         "chosen by default",
-    )
-    option(
-        "--pgo",
-        store("pgo_type"),
-        choices=["frontend", "ir"],
-        const="ir",
-        metavar="PGO_TYPE",
-        help="use pgo optimization."
-        "Options: frontend, ir. If no optional arg is provided, ir is "
-        "chosen by default",
-    )
-    option(
-        "--profile-input",
-        store_path,
-        default=default_profile_input,
-        help="the source file to use for PGO profiling input (default = %s)"
-        % default_profile_input,
     )
     option("--no-assertions", store_true, help="disable assertions")
     option(
@@ -496,7 +435,6 @@ Example invocations:
         default=default_install_prefix,
         help="the install prefix to use (default = %s)" % default_install_prefix,
     )
-    option("--version", store, help="version string to use for the parser library")
     option(
         "--ninja-path",
         store_path,
@@ -561,12 +499,6 @@ Example invocations:
             native_build_dir = tmpargs.build_dir
             dst_dirs.append(tmpargs.install_destdir)
 
-            if tmpargs.pgo_type:
-                profile_dir = os.path.join(objroot, platform.machine() + "-profiling")
-                builder = Builder(toolchain, tmpargs, tmpargs.host, arch)
-                builder.get_profile_data(profile_dir)
-                profile_data = os.path.join(profile_dir, "profdata.prof")
-
             builder = Builder(
                 toolchain, tmpargs, tmpargs.host, arch, profile_data=profile_data
             )
@@ -574,24 +506,15 @@ Example invocations:
 
         else:
             tmpargs = copy.copy(args)
-            if tmpargs.pgo_type:
-                # Build for the machine and get profile data.
-                native_build_dir = os.path.join(
-                    objroot, platform.machine() + "-profiling"
-                )
-                builder = Builder(toolchain, tmpargs, "macosx", platform.machine())
-                builder.get_profile_data(native_build_dir)
-                profile_data = os.path.join(native_build_dir, "profdata.prof")
-            else:
-                # Build the tablegen binaries so we can use them for the cross-compile
-                # build.
-                native_build_dir = os.path.join(objroot, platform.machine() + "-tblgen")
-                tmpargs.lto_type = None
-                builder = Builder(toolchain, tmpargs, "macosx", platform.machine())
-                shell.makedirs(native_build_dir, dry_run=tmpargs.dry_run)
-                with shell.pushd(native_build_dir, dry_run=tmpargs.dry_run):
-                    builder.configure(enable_debuginfo=False)
-                    builder.build_targets(native_build_dir, ["llvm-tblgen", "clang-tblgen"])
+            # Build the tablegen binaries so we can use them for the cross-compile
+            # build.
+            native_build_dir = os.path.join(objroot, platform.machine() + "-tblgen")
+            tmpargs.lto_type = None
+            builder = Builder(toolchain, tmpargs, "macosx", platform.machine())
+            shell.makedirs(native_build_dir, dry_run=tmpargs.dry_run)
+            with shell.pushd(native_build_dir, dry_run=tmpargs.dry_run):
+                builder.configure(enable_debuginfo=False)
+                builder.build_targets(native_build_dir, ["llvm-tblgen", "clang-tblgen"])
 
         for arch in architectures:
             args.build_dir = os.path.join(objroot, arch, "obj")

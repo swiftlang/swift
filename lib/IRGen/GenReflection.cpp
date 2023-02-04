@@ -23,8 +23,8 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Platform.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/Reflection/MetadataSourceBuilder.h"
-#include "swift/Reflection/Records.h"
+#include "swift/RemoteInspection/MetadataSourceBuilder.h"
+#include "swift/RemoteInspection/Records.h"
 #include "swift/SIL/SILModule.h"
 
 #include "ConstantBuilder.h"
@@ -368,9 +368,6 @@ IRGenModule::getLoweredTypeRef(SILType loweredType,
   auto substTy =
     substOpaqueTypesWithUnderlyingTypes(loweredType, genericSig);
   auto type = substTy.getASTType();
-  if (substTy.hasArchetype())
-    type = type->mapTypeOutOfContext()->getCanonicalType();
-
   return getTypeRefImpl(*this, type, genericSig, role);
 }
 
@@ -1178,10 +1175,12 @@ public:
     auto &Bindings = Layout.getBindings();
     for (unsigned i = 0; i < Bindings.size(); ++i) {
       // Skip protocol requirements (FIXME: for now?)
-      if (Bindings[i].Protocol != nullptr)
+      if (Bindings[i].isWitnessTable())
         continue;
 
-      if (Bindings[i].TypeParameter->hasOpenedExistential())
+      assert(Bindings[i].isMetadata());
+
+      if (Bindings[i].getTypeParameter()->hasOpenedExistential())
         return true;
     }
 
@@ -1222,11 +1221,13 @@ public:
     auto &Bindings = Layout.getBindings();
     for (unsigned i = 0; i < Bindings.size(); ++i) {
       // Skip protocol requirements (FIXME: for now?)
-      if (Bindings[i].Protocol != nullptr)
+      if (Bindings[i].isWitnessTable())
         continue;
 
+      assert(Bindings[i].isMetadata());
+
       auto Source = SourceBuilder.createClosureBinding(i);
-      auto BindingType = Bindings[i].TypeParameter;
+      auto BindingType = Bindings[i].getTypeParameter();
       auto InterfaceType = BindingType->mapTypeOutOfContext();
       SourceMap.push_back({InterfaceType->getCanonicalType(), Source});
     }
@@ -1324,7 +1325,7 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addLoweredTypeRef(CaptureType, sig);
+      addLoweredTypeRef(CaptureType.mapTypeOutOfContext(), sig);
     }
 
     // Add the pairs that make up the generic param -> metadata source map
@@ -1556,6 +1557,11 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   if (auto *SD = dyn_cast<StructDecl>(D)) {
     if (SD->hasClangNode())
       needsOpaqueDescriptor = true;
+  }
+
+  if (auto *CD = dyn_cast<ClassDecl>(D)) {
+    if (CD->getObjCImplementationDecl())
+      needsFieldDescriptor = false;
   }
 
   // If the type has custom @_alignment, emit a fixed record with the

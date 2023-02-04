@@ -8,8 +8,11 @@ public class C<T>
     // CHECK: define {{.*}} @"$s17EagerTypeMetadata1CC1cyyxF"
     // CHECK: %T = load %swift.type*, %swift.type**
     // CHECK-SAME: !dbg ![[LOC:[0-9]+]], !invariant.load
-    // CHECK: ![[LOC]] = !DILocation(line: 0,
     var x = [i]
   }
 }
+// CHECK: !DIDerivedType(tag: DW_TAG_typedef, name: "T",
+// CHECK-SAME:           baseType: ![[PTRTY:[0-9]+]]
+// CHECK: ![[PTRTY]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "$sBpD", baseType: null, size: {{64|32}})
+// CHECK: ![[LOC]] = !DILocation(line: 0,
 

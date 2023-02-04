@@ -3,105 +3,159 @@
 // REQUIRES: asserts
 
 @typeWrapper
-struct ConcreteTypeWrapper { // expected-error {{type wrapper has to declare a single generic parameter for underlying storage type}}
-  init(memberwise: Int) {}
+struct ConcreteTypeWrapper { // expected-error {{type wrapper has to declare two generic parameters: wrapped and storage types}}
+  init(storage: Int) {}
 }
 
 @typeWrapper
-struct EmptyTypeWrapper<S> { // expected-error {{type wrapper type 'EmptyTypeWrapper' does not contain a required initializer - init(memberwise:)}}
+struct EmptyTypeWrapper<W, S> { // expected-error {{type wrapper type 'EmptyTypeWrapper' does not contain a required initializer - init(for:storage:)}}
 }
 
 @typeWrapper
-struct NoMemberwiseInit<S> {
-  // expected-error@-1 {{type wrapper type 'NoMemberwiseInit' does not contain a required initializer - init(memberwise:)}}
+struct NoMemberwiseInit<W, S> {
+  // expected-error@-1 {{type wrapper type 'NoMemberwiseInit' does not contain a required initializer - init(for:storage:)}}
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
   }
 }
 
 @typeWrapper
-struct FailableInit<S> {
-  init?(memberwise: S) { // expected-error {{type wrapper initializer 'init(memberwise:)' cannot be failable}}
+struct FailableInit<W, S> {
+  init?(for: W.Type, storage: S) { // expected-error {{type wrapper initializer 'init(for:storage:)' cannot be failable}}
   }
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
   }
 }
 
-// Okay because there is a valid `init(memberwise:)` overload.
+// Okay because there is a valid `init(for:storage:)` overload.
 @typeWrapper
-struct FailableAndValidInit<S> {
+struct FailableAndValidInit<W, S> {
   // expected-error@-1 {{type wrapper type 'FailableAndValidInit' does not contain a required writable subscript}}
-  // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
+  // expected-note@-2 {{do you want to add a stub?}} {{36-36=\nsubscript<Value>(propertyKeyPath propPath: KeyPath<<#WrappedType#>, Value>, storageKeyPath storagePath: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
 
-  init(memberwise: S) {
+  init(for: W.Type, storage: S) {
   }
 
-  init?(memberwise: S) where S == Int {
+  init?(for: W.Type, storage: S) where S == Int {
   }
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
   }
 }
 
 @typeWrapper
-public struct InaccessibleInit<S> {
-  fileprivate init(memberwise: S) {
-    // expected-error@-1 {{fileprivate initializer 'init(memberwise:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
+public struct InaccessibleInit<W, S> {
+  fileprivate init(for: W.Type, storage: S) {
+    // expected-error@-1 {{fileprivate initializer 'init(for:storage:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
   }
 
-  private init?(memberwise: S) where S: AnyObject {
-    // expected-error@-1 {{private initializer 'init(memberwise:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
-    // expected-error@-2 {{type wrapper initializer 'init(memberwise:)' cannot be failable}}
+  private init?(for: W.Type, storage: S) where S: AnyObject {
+    // expected-error@-1 {{private initializer 'init(for:storage:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
+    // expected-error@-2 {{type wrapper initializer 'init(for:storage:)' cannot be failable}}
   }
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
   }
 }
 
 @typeWrapper
-struct NoSubscripts<S> {
-  // expected-error@-1 {{type wrapper type 'NoSubscripts' does not contain a required subscript - subscript(storedKeyPath:)}}
-  init(memberwise: S) {}
+struct NoSubscripts<W, S> {
+  // expected-error@-1 {{type wrapper type 'NoSubscripts' does not contain a required subscript - subscript(propertyKeyPath:storageKeyPath:)}}
+  init(for: W.Type, storage: S) {}
 }
 
 @typeWrapper
-struct InaccessibleOrInvalidSubscripts<S> {
-  init(memberwise: S) {}
+struct InaccessibleOrInvalidSubscripts<W, S> {
+  init(for: W.Type, storage: S) {}
 
-  fileprivate subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
-    // expected-error@-1 {{fileprivate subscript 'subscript(storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
+  fileprivate subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
+    // expected-error@-1 {{fileprivate subscript 'subscript(propertyKeyPath:storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
     get { fatalError() }
   }
 
-  private subscript<V>(storageKeyPath path: KeyPath<S, V>) -> [V] {
-    // expected-error@-1 {{private subscript 'subscript(storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
+  private subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> [V] {
+    // expected-error@-1 {{private subscript 'subscript(propertyKeyPath:storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
     get { fatalError() }
   }
 
-  private subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> [V] {
-    // expected-error@-1 {{private subscript 'subscript(storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
+  private subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> [V] {
+    // expected-error@-1 {{private subscript 'subscript(propertyKeyPath:storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
     get { fatalError() }
   }
 
-  subscript(storageKeyPath path: Int) -> Bool { // expected-error {{type wrapper subscript expects a key path parameter type (got: 'Int')}}
+  subscript(propertyKeyPath _: KeyPath<W, Bool>, storageKeyPath path: Int) -> Bool { // expected-error {{type wrapper subscript parameter 'storageKeyPath' expects a key path (got: 'Int')}}
+    get { true }
+  }
+
+  subscript(propertyKeyPath _: Int.Type, storageKeyPath path: KeyPath<S, Bool>) -> Bool {
+    // expected-error@-1 {{type wrapper subscript parameter 'propertyKeyPath' expects a key path (got: 'Int.Type')}}
     get { true }
   }
 }
 
 @typeWrapper
-struct NoopWrapper<S> {
-  init(memberwise: S) {}
+struct OverloadedCtorWrapper<W, S> {
+  init(for: W.Type, storage: S) {} // expected-error {{cannot overload type wrapper initializer 'init(for:storage:)'}}
+  init(for: W.Type, storage: Int) {}
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> [V] { get { fatalError() } }
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> [V] {
+    get { fatalError() }
+    set { }
+  }
+}
+
+do {
+  @typeWrapper
+  struct InvalidInit1<W, S> {
+    init(for: Int, storage: S) {} // expected-error {{first parameter of type wrapper initializer should be wrapped type - 'W.Type'}}
+  }
+
+  @typeWrapper
+  struct InvalidInit2<W, S> {
+    init(for: W, storage: S) {} // expected-error {{first parameter of type wrapper initializer should be wrapped type - 'W.Type'}}
+  }
+
+  @typeWrapper
+  struct InvalidInit3<W, S> {
+    init(for: Int.Type, storage: S) {} // expected-error {{first parameter of type wrapper initializer should be wrapped type - 'W.Type'}}
+  }
+
+  @typeWrapper
+  struct InvalidInit4<W, S> {
+    init(for: W.Type, storage: Int) {} // expected-error {{second parameter of type wrapper initializer should be storage type - 'S'}}
+  }
+
+  @typeWrapper
+  struct InvalidInit5<W, S> {
+    init(for: W.Type, storage: UnknownType) {} // expected-error {{second parameter of type wrapper initializer should be storage type - 'S'}}
+    // expected-error@-1 {{cannot find type 'UnknownType' in scope}}
+  }
+
+  @typeWrapper
+  struct InvalidInit6<W, S> {
+    init(for: UnknownType.Type, storage: S) {} // expected-error {{first parameter of type wrapper initializer should be wrapped type - 'W.Type'}}
+    // expected-error@-1 {{cannot find type 'UnknownType' in scope}}
+  }
+}
+
+@typeWrapper
+struct NoopWrapper<W, S> {
+  // expected-note@-1 {{arguments to generic parameter 'W' ('Test1' and 'Test2') are expected to be equal}}
+  // expected-note@-2 {{arguments to generic parameter 'S' ('Test1.$Storage' and 'Test2.$Storage') are expected to be equal}}
+
+  init(for: W.Type, storage: S) {}
+
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
   }
 
-  subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V {
     get { fatalError() }
     set { }
   }
@@ -118,8 +172,8 @@ class GenericA<K: Hashable, V> {
   var data: [K: V]
 }
 
-@NoopWrapper // expected-error {{type wrapper attribute 'NoopWrapper' can only be applied to a class, struct}}
-protocol P {
+@NoopWrapper
+protocol P { // Ok
 }
 
 @NoopWrapper // expected-error {{type wrapper attribute 'NoopWrapper' can only be applied to a class, struct}}
@@ -137,14 +191,14 @@ func testWrappedTypeAccessChecking() {
 
 struct Parent {
   @typeWrapper
-  struct Wrapper<S> {
-    init(memberwise: S) {}
+  struct Wrapper<W, S> {
+    init(for: W.Type, storage: S) {}
 
-    subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
       get { fatalError() }
     }
 
-    subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V {
       get { fatalError() }
       set { }
     }
@@ -397,13 +451,15 @@ func testDeclarationsWithUnmanagedProperties() {
   _ = OnlyLazyLetAndComputed(name: "Arthur Dent") // Ok
 }
 
+/* (!) FIXME: It's not possible to form a key path to an actor isolated property (rdar://84445219)
+ *
 func testActors() async {
   @NoopWrapper
   actor Person {
     var name: String
-    // expected-note@-1 {{mutation of this property is only permitted within the actor}}
+    note@-1 {{mutation of this property is only permitted within the actor}}
     var age: Int
-    // expected-note@-1 {{mutation of this property is only permitted within the actor}}
+    ote@-1 {{mutation of this property is only permitted within the actor}}
   }
 
   let person = Person(name: "Arthur Dent", age: 30)
@@ -411,9 +467,12 @@ func testActors() async {
   _ = await person.name
   _ = await person.age
 
-  person.name = "NoName" // expected-error {{actor-isolated property 'name' can not be mutated from a non-isolated context}}
-  person.age = 0 // expected-error {{actor-isolated property 'age' can not be mutated from a non-isolated context}}
+  person.name = "NoName"
+  error@-1 {{actor-isolated property 'name' can not be mutated from a non-isolated context}}
+  person.age = 0
+  error@-1 {{actor-isolated property 'age' can not be mutated from a non-isolated context}}
 }
+*/
 
 func testIgnoredAttr() {
   @NoopWrapper
@@ -456,26 +515,26 @@ func testIgnoredAttr() {
 
 func testMissingReadOnlyAndWritableSubscriptsAreDiagnosed() {
   @typeWrapper
-  struct MissingReadOnly<S> {
+  struct MissingReadOnly<W, S> {
     // expected-error@-1 {{type wrapper type 'MissingReadOnly' does not contain a required ready-only subscript}}
-    // expected-note@-2 {{do you want to add a stub?}} {{30-30=\nsubscript<Value>(storageKeyPath path: KeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} \}}}
+    // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(propertyKeyPath propPath: KeyPath<<#WrappedType#>, Value>, storageKeyPath storagePath: KeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} \}}}
 
-    init(memberwise: S) {}
+    init(for: W.Type, storage: S) {}
 
-    subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V {
       get { fatalError() }
       set { }
     }
   }
 
   @typeWrapper
-  struct MissingWritable<S> {
+  struct MissingWritable<W, S> {
     // expected-error@-1 {{type wrapper type 'MissingWritable' does not contain a required writable subscript}}
-    // expected-note@-2 {{do you want to add a stub?}} {{30-30=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
+    // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(propertyKeyPath propPath: KeyPath<<#WrappedType#>, Value>, storageKeyPath storagePath: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
 
-    init(memberwise: S) {}
+    init(for: W.Type, storage: S) {}
 
-    subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
       get { fatalError() }
     }
   }
@@ -502,4 +561,129 @@ func testIncorrectUsesOfImmutableProperties() {
   let test = Test(x: X(storage: [1, 2, 3]))
   test.x = X(storage: [0]) // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
   test.x?.storage.append(0) // Ok
+}
+
+func testWrappedSelfInReferenceOnlySubscript() {
+  @typeWrapper
+  struct WrappedSelfTests<W, S> {
+    init(for: W.Type, storage: S) {}
+
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
+      get { fatalError() }
+      set { }
+    }
+
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V {
+      get { fatalError() }
+      set { }
+    }
+
+    subscript<V>(wrappedSelf w: W, propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V { // Ok
+      get { fatalError() }
+      set { }
+    }
+
+    subscript<V>(wrappedSelf w: W, propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V { // Ok
+      get { fatalError() }
+    }
+
+    subscript<V>(wrappedSelf w: Int, propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V { // expected-error {{type wrapper subscript parameter 'wrappedSelf' expects type 'W' (got: 'Int')}}
+      get { fatalError() }
+    }
+
+    subscript<V>(wrappedSelf w: Int, propertyKeyPath _: String, storageKeyPath path: [Int]) -> V {
+      // expected-error@-1 {{type wrapper subscript parameter 'wrappedSelf' expects type 'W' (got: 'Int')}}
+      // expected-error@-2 {{subscript parameter 'propertyKeyPath' expects a key path (got: 'String')}}
+      // expected-error@-3 {{type wrapper subscript parameter 'storageKeyPath' expects a key path (got: '[Int]'}}
+      get { fatalError() }
+    }
+  }
+}
+
+// rdar://99884355 - Missing argument for parameter 'name'
+do {
+  struct Use {
+    var product = Product(name: "<no name>")
+  }
+
+  @NoopWrapper
+  struct Product {
+    var name: String
+  }
+}
+
+do {
+  @NoopWrapper
+  struct Test1 {
+    var a: Int
+    var b: [String]
+  }
+
+  let wrapper = NoopWrapper(for: Test1.self, storage: Test1.$Storage(a: 42, b: [""]))
+  _ = Test1(storageWrapper: wrapper) // Ok
+
+  @NoopWrapper
+  struct Test2 {
+  }
+
+  _ = Test2(storageWrapper: NoopWrapper(for: Test2.self, storage: Test2.$Storage())) // Ok
+  _ = Test2(storageWrapper: wrapper)
+  // expected-error@-1 {{cannot convert value of type 'NoopWrapper<Test1, Test1.$Storage>' to expected argument type 'NoopWrapper<Test2, Test2.$Storage>'}}
+
+  @NoopWrapper
+  struct Test3 { // expected-note {{'init(a:b:)' declared here}}
+    var a: Int
+    @typeWrapperIgnored var b: String
+  }
+
+  // @typeWrapperIgnored suppresses `storageWrapper:` initializer
+  _ = Test3(storageWrapper: NoopWrapper(for: Test3.self, storage: Test3.$Storage(a: 42)))
+  // expected-error@-1 {{missing arguments for parameters 'a', 'b' in call}}
+  // expected-error@-2 {{extra argument 'storageWrapper' in call}}
+}
+
+func test_multiple_wrapper_attributes() {
+  @Parent.Wrapper @NoopWrapper
+  // expected-note@-1 {{'Wrapper' declared here}}
+  // expected-note@-2 {{'NoopWrapper' declared here}}
+  struct Test1 {} // expected-error {{struct 'Test1' cannot use more than one type wrapper}}
+
+  @Parent.Wrapper @NoopWrapper
+  // expected-note@-1 {{'Wrapper' declared here}}
+  // expected-note@-2 {{'NoopWrapper' declared here}}
+  class Test2 {} // expected-error {{class 'Test2' cannot use more than one type wrapper}}
+}
+
+@NoopWrapper
+protocol WrappedProto {
+}
+
+do {
+  // @NoopWrapper is inferred from `WrappedProto`
+  struct InferenceFromProto : WrappedProto { // Ok
+    var x: Int
+
+    func test() {
+      _ = $storage // Ok (to make sure that NoopWrapper is indeed inferred)
+    }
+  }
+
+  @Parent.Wrapper // expected-note {{'Wrapper' declared here}}
+  struct ClashBetweenDirectAndInferred : WrappedProto {
+    // expected-error@-1 {{struct 'ClashBetweenDirectAndInferred' cannot use more than one type wrapper}}
+    // expected-note@-2 {{type wrapper 'NoopWrapper' inferred from protocol 'WrappedProto'}}
+    // expected-error@-3 {{type 'ClashBetweenDirectAndInferred' does not conform to protocol 'WrappedProto'}}
+  }
+
+  @NoopWrapper
+  final class NoClashDueToSameWrapper : WrappedProto { // Ok
+    var v: [Int?]
+
+    func test() {
+      let storage: NoopWrapper<NoClashDueToSameWrapper, $Storage> = $storage
+      _ = storage[propertyKeyPath: \.v, storageKeyPath: \$Storage.v]
+    }
+  }
+
+
 }

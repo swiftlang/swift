@@ -219,7 +219,7 @@ bb0(%0 : @owned $Optional<Klass>):
 // CHECK-NOT: integer_literal
 // CHECK-NOT: builtin "assumeAlignment"
 // CHECK: [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*T
-// CHECK: copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK: copy_addr [[PTR]] to [init] %0 : $*T
 // CHECK-LABEL: } // end sil function 'test_zero_alignment'
 sil @test_zero_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
 bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
@@ -229,7 +229,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
   %6 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %5 : $Builtin.Word) : $Builtin.RawPointer
   debug_value %6 : $Builtin.RawPointer, let, name "alignedPointer"
   %8 = pointer_to_address %6 : $Builtin.RawPointer to [align=1] $*T
-  copy_addr %8 to [initialization] %0 : $*T
+  copy_addr %8 to [init] %0 : $*T
   %10 = tuple ()
   return %10 : $()
 }
@@ -248,7 +248,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
 // CHECK-NOT: integer_literal
 // CHECK-NOT: builtin "assumeAlignment"
 // CHECK:     [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to [align=8] $*T
-// CHECK:     copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK:     copy_addr [[PTR]] to [init] %0 : $*T
 // CHECK-LABEL: } // end sil function 'test_nonzero_alignment'
 sil @test_nonzero_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
 bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
@@ -258,7 +258,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
   %6 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %5 : $Builtin.Word) : $Builtin.RawPointer
   debug_value %6 : $Builtin.RawPointer, let, name "alignedPointer"
   %8 = pointer_to_address %6 : $Builtin.RawPointer to [align=1] $*T
-  copy_addr %8 to [initialization] %0 : $*T
+  copy_addr %8 to [init] %0 : $*T
   %10 = tuple ()
   return %10 : $()
 }
@@ -278,7 +278,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
 // CHECK-NOT: builtin "alignOf"
 // CHECK-NOT: builtin "assumeAlignment"
 // CHECK:     [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*T
-// CHECK:     copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK:     copy_addr [[PTR]] to [init] %0 : $*T
 // CHECK-LABEL: } // end sil function 'test_dynamic_alignment'
 sil @test_dynamic_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
 bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
@@ -293,7 +293,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
   %11 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %10 : $Builtin.Word) : $Builtin.RawPointer
   debug_value %11 : $Builtin.RawPointer, let, name "alignedPointer"
   %13 = pointer_to_address %11 : $Builtin.RawPointer to [align=1] $*T
-  copy_addr %13 to [initialization] %0 : $*T
+  copy_addr %13 to [init] %0 : $*T
   %15 = tuple ()
   return %15 : $()
 }
@@ -313,7 +313,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
 // CHECK-NOT: builtin "alignOf"
 // CHECK-NOT: builtin "assumeAlignment"
 // CHECK:     [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*T
-// CHECK:     copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK:     copy_addr [[PTR]] to [init] %0 : $*T
 // CHECK-LABEL: } // end sil function 'test_dynamic_alignment32'
 sil @test_dynamic_alignment32 : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
 bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
@@ -328,7 +328,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
   %11 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %10 : $Builtin.Word) : $Builtin.RawPointer
   debug_value %11 : $Builtin.RawPointer, let, name "alignedPointer"
   %13 = pointer_to_address %11 : $Builtin.RawPointer to [align=1] $*T
-  copy_addr %13 to [initialization] %0 : $*T
+  copy_addr %13 to [init] %0 : $*T
   %15 = tuple ()
   return %15 : $()
 }

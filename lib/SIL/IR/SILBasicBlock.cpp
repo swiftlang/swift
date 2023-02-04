@@ -91,10 +91,6 @@ void SILBasicBlock::push_front(SILInstruction *I) {
   InstList.push_front(I);
 }
 
-void SILBasicBlock::remove(SILInstruction *I) {
-  InstList.remove(I);
-}
-
 void SILBasicBlock::eraseAllInstructions(SILModule &module) {
   while (!empty()) {
     erase(&*begin(), module);
@@ -107,9 +103,24 @@ void SILBasicBlock::erase(SILInstruction *I) {
 }
 
 void SILBasicBlock::erase(SILInstruction *I, SILModule &module) {
+  assert(!I->isDeleted() && "double delete of instruction");
   module.willDeleteInstruction(I);
   InstList.remove(I);
+  I->asSILNode()->markAsDeleted();
   module.scheduleForDeletion(I);
+}
+
+void SILBasicBlock::moveInstruction(SILInstruction *inst,
+                                    SILInstruction *beforeInst) {
+  if (inst == beforeInst)
+    return;
+  inst->getParent()->InstList.remove(inst);
+  beforeInst->getParent()->insert(beforeInst->getIterator(), inst);
+}
+
+void SILBasicBlock::moveInstructionToFront(SILInstruction *inst) {
+  inst->getParent()->InstList.remove(inst);
+  push_front(inst);
 }
 
 /// This method unlinks 'self' from the containing SILFunction and deletes it.
@@ -125,8 +136,7 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
     for (auto *FuncArg : Other->getSILFunctionArguments()) {
       auto *NewArg =
           createFunctionArgument(FuncArg->getType(), FuncArg->getDecl());
-      NewArg->setNoImplicitCopy(FuncArg->isNoImplicitCopy());
-      NewArg->setLifetimeAnnotation(FuncArg->getLifetimeAnnotation());
+      NewArg->copyFlags(FuncArg);
     }
     return;
   }
@@ -180,6 +190,7 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
 
   SILFunctionArgument *NewArg = new (M) SILFunctionArgument(Ty, Kind, D);
   NewArg->setParent(this);
+  ArgumentList[i]->parentBlock = nullptr;
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
   // here.
@@ -203,6 +214,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
 
   SILPhiArgument *NewArg = new (M) SILPhiArgument(Ty, Kind, D);
   NewArg->setParent(this);
+  ArgumentList[i]->parentBlock = nullptr;
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
   // here.
@@ -257,9 +269,17 @@ SILPhiArgument *SILBasicBlock::insertPhiArgument(unsigned AtArgPos, SILType Ty,
   return arg;
 }
 
+void SILBasicBlock::dropAllArguments() {
+  for (SILArgument *arg : ArgumentList) {
+    arg->parentBlock = nullptr;
+  }
+  ArgumentList.clear();
+}
+
 void SILBasicBlock::eraseArgument(int Index) {
   assert(getArgument(Index)->use_empty() &&
          "Erasing block argument that has uses!");
+  ArgumentList[Index]->parentBlock = nullptr;
   ArgumentList.erase(ArgumentList.begin() + Index);
 }
 

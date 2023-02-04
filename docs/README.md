@@ -215,7 +215,7 @@ documentation, please create a thread on the Swift forums under the
 
 ### Coding
 
-- [AccessControlInStdlib.rst](/docs/AccessControlInStdlib.rst):
+- [AccessControlInStdlib.md](/docs/AccessControlInStdlib.md):
   Describes the policy for access control modifiers and related naming
   conventions in the stdlib.
   <!-- NOTE: Outdated -->
@@ -275,7 +275,7 @@ You can see the status of different proposals at
 - [CallingConvention.rst](/docs/ABI/CallingConvention.rst):
   This whitepaper discusses the Swift calling convention (high-level semantics;
   ownership transfer; physical representation; function signature lowering).
-- [ErrorHandlingRationale.rst](/docs/ErrorHandlingRationale.rst):
+- [ErrorHandlingRationale.md](/docs/ErrorHandlingRationale.md):
   Surveys error-handling in a variety of languages, and describes the rationale
   behind the design of error handling in Swift.
 - [WeakReferences.md](/docs/WeakReferences.md):
@@ -290,10 +290,10 @@ documentation, primarily [The Swift Programming Language][] (TSPL).
 They are preserved mostly for historical interest.
 
 - [AccessControl.md](/docs/AccessControl.md)
-- [Arrays.rst](/docs/Arrays.rst)
+- [Arrays.md](/docs/Arrays.md)
   <!-- Has additional notes on bridging that may be of general interest? -->
-- [Generics.rst](/docs/Generics.rst)
-- [ErrorHandling.rst](/docs/ErrorHandling.rst)
+- [Generics.rst](/docs/archive/Generics.rst)
+- [ErrorHandling.md](/docs/ErrorHandling.md)
 - [StringDesign.rst](/docs/StringDesign.rst)
 - [TextFormatting.rst](/docs/TextFormatting.rst)
 
@@ -353,7 +353,7 @@ provide greater clarity to contributors wanting to add new documentation.
 
 ### Archive
 
-- [FailableInitializers.rst](/docs/FailableInitializers.rst):
+- [FailableInitializers.md](/docs/FailableInitializers.md):
   Superseded by documentation in [The Swift Programming Language][].
 - [InitializerProblems.rst](/docs/InitializerProblems.rst):
   Describes some complexities around initialization in Swift.

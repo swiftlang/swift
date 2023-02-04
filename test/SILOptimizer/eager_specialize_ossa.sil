@@ -269,7 +269,7 @@ bb0(%0 : $*T, %1 : $*G<T>, %2 : $*T.Elt):
 sil [_specialize where T == ContainerKlass] [ossa] @$s16eager_specialize30getGenericContainer_guaranteed_1exAA1GVyxG_3EltQztAA03HasF0RzAA02AnF0AHRQlF : $@convention(thin) <T where T : HasElt, T.Elt : AnElt> (@in_guaranteed G<T>, @in_guaranteed T.Elt) -> @out T {
 bb0(%0 : $*T, %1 : $*G<T>, %2 : $*T.Elt):
   %a = alloc_stack $*T.Elt
-  copy_addr %2 to [initialization] %a : $*T.Elt
+  copy_addr %2 to [init] %a : $*T.Elt
   // function_ref G.getContainer(A.Elt) -> A
   %5 = function_ref @$s16eager_specialize1GV12getContaineryx3EltQzF : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @in_guaranteed G<τ_0_0>) -> @out τ_0_0
   %6 = apply %5<T>(%0, %a, %1) : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @in_guaranteed G<τ_0_0>) -> @out τ_0_0
@@ -314,7 +314,7 @@ bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   // function_ref static != infix<A where ...> (A, A) -> Bool
   %5 = function_ref @$ss2neoiySbx_xts9EquatableRzlFZ : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
   %6 = alloc_stack $T
-  copy_addr %2 to [initialization] %6 : $*T
+  copy_addr %2 to [init] %6 : $*T
   %8 = witness_method $T, #_ExpressibleByBuiltinIntegerLiteral.init!allocator : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.IntLiteral, @thick τ_0_0.Type) -> @out τ_0_0
   %9 = metatype $@thick T.Type
   %10 = integer_literal $Builtin.IntLiteral, 0
@@ -527,7 +527,7 @@ bb0(%0 : $*T):
 // copyValueAndReturn<A> (A, s : inout A) -> A
 sil [noinline] [_specialize where S : _Trivial(32)] [_specialize where S : _Trivial(64)] [ossa] @$s16eager_specialize18copyValueAndReturn_1sxx_xztlF : $@convention(thin) <S> (@in S, @inout S) -> @out S {
 bb0(%0 : $*S, %1 : $*S, %2 : $*S):
-  copy_addr %2 to [initialization] %0 : $*S
+  copy_addr %2 to [init] %0 : $*S
   destroy_addr %1 : $*S
   %7 = tuple ()
   return %7 : $()
@@ -538,7 +538,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 // specialized copyValueAndReturn<A>(A, s : inout A) -> A
 // CHECK-LABEL: sil shared [noinline] [ossa] @$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze31_lIetilr_Tp5 : $@convention(thin) <S where S : _Trivial(32)> (@in S, @inout S) -> @out S
 // CHECK: bb0(%0 : $*S, %1 : $*S, %2 : $*S):
-// CHECK:  copy_addr %2 to [initialization] %0 : $*S
+// CHECK:  copy_addr %2 to [init] %0 : $*S
 // CHECK:  destroy_addr %1 : $*S
 // CHECK:  %{{.*}} = tuple ()
 // CHECK:  return %{{.*}} : $()
@@ -548,7 +548,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 // specialized copyValueAndReturn<A>(A, s : inout A) -> A
 // CHECK-LABEL: sil shared [noinline] [ossa] @$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze63_lIetilr_Tp5 : $@convention(thin) <S where S : _Trivial(64)> (@in S, @inout S) -> @out S
 // CHECK: bb0(%0 : $*S, %1 : $*S, %2 : $*S):
-// CHECK:  copy_addr %2 to [initialization] %0 : $*S
+// CHECK:  copy_addr %2 to [init] %0 : $*S
 // CHECK:  destroy_addr %1 : $*S
 // CHECK:  %5 = tuple ()
 // CHECK:  return %5 : $()
@@ -580,7 +580,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 
 // None of the constraint checks was successful, perform a generic copy.
 // CHECK: bb6:
-// CHECK:  copy_addr %2 to [initialization] %0 : $*S
+// CHECK:  copy_addr %2 to [init] %0 : $*S
 // CHECK:  destroy_addr %1 : $*S
 // CHECK:  br bb7
 
@@ -630,7 +630,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 // copyValueAndReturn2<A> (A, s : inout A) -> A
 sil [noinline] [_specialize where S : _Trivial] [ossa] @$s16eager_specialize19copyValueAndReturn2_1sxx_xztlF : $@convention(thin) <S> (@in S, @inout S) -> @out S {
 bb0(%0 : $*S, %1 : $*S, %2 : $*S):
-  copy_addr %2 to [initialization] %0 : $*S
+  copy_addr %2 to [init] %0 : $*S
   destroy_addr %1 : $*S
   %7 = tuple ()
   return %7 : $()
@@ -640,7 +640,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 // specialized copyValueAndReturn2<A> (A, s : inout A) -> A
 // CHECK-LABEL: sil shared [noinline] [ossa] @$s16eager_specialize19copyValueAndReturn2_1sxx_xztlFxxxRlzTlIetilr_Tp5 : $@convention(thin) <S where S : _Trivial> (@in S, @inout S) -> @out S
 // CHECK: bb0(%0 : $*S, %1 : $*S, %2 : $*S):
-// CHECK:  copy_addr %2 to [initialization] %0 : $*S
+// CHECK:  copy_addr %2 to [init] %0 : $*S
 // CHECK:  destroy_addr %1 : $*S
 // CHECK:  %5 = tuple ()
 // CHECK:  return %5 : $()
@@ -656,7 +656,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 
 // None of the constraint checks was successful, perform a generic copy.
 // CHECK: bb2:
-// CHECK:  copy_addr %2 to [initialization] %0 : $*S
+// CHECK:  copy_addr %2 to [init] %0 : $*S
 // CHECK:  destroy_addr %1 : $*S
 // CHECK:  br bb3
 
@@ -684,7 +684,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 // copyValueAndReturn3<A> (A, s : inout A) -> A
 sil [noinline] [_specialize where S : _RefCountedObject] [ossa] @$s16eager_specialize19copyValueAndReturn3_1sxx_xztlF : $@convention(thin) <S> (@in S, @inout S) -> @out S {
 bb0(%0 : $*S, %1 : $*S, %2 : $*S):
-  copy_addr %2 to [initialization] %0 : $*S
+  copy_addr %2 to [init] %0 : $*S
   destroy_addr %1 : $*S
   %7 = tuple ()
   return %7 : $()
@@ -695,7 +695,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 // specialized copyValueAndReturn3<A> (A, s : inout A) -> A
 // CHECK-LABEL: sil shared [noinline] [ossa] @$s16eager_specialize19copyValueAndReturn3_1sxx_xztlFxxxRlzRlIetilr_Tp5 : $@convention(thin) <S where S : _RefCountedObject> (@in S, @inout S) -> @out S
 // CHECK: bb0(%0 : $*S, %1 : $*S, %2 : $*S):
-// CHECK:   copy_addr %2 to [initialization] %0 : $*S
+// CHECK:   copy_addr %2 to [init] %0 : $*S
 // CHECK:   destroy_addr %1 : $*S
 // CHECK:   %{{.*}} = tuple ()
 // CHECK:   return %{{.*}} : $()
@@ -715,7 +715,7 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 // CHECK:   cond_br %{{.*}}, bb5, bb8
 
 // CHECK: bb3:
-// CHECK:   copy_addr %2 to [initialization] %0 : $*S
+// CHECK:   copy_addr %2 to [init] %0 : $*S
 // CHECK:   destroy_addr %1 : $*S
 // CHECK:   br bb4
 

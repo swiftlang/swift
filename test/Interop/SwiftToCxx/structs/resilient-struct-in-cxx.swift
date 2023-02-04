@@ -27,12 +27,12 @@ public struct FirstSmallStruct {
     }
 }
 
-// CHECK: class FirstSmallStruct;
+// CHECK: class SWIFT_SYMBOL("s:7Structs16FirstSmallStructV") FirstSmallStruct;
 
 // CHECK: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
 
-// CHECK: class FirstSmallStruct final {
+// CHECK: class SWIFT_SYMBOL("s:7Structs16FirstSmallStructV") FirstSmallStruct final {
 // CHECK-NEXT: public:
 // CHECK: inline FirstSmallStruct(const FirstSmallStruct &other) {
 // CHECK-NEXT:   auto metadata = _impl::$s7Structs16FirstSmallStructVMa(0);
@@ -92,12 +92,12 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace Structs {
+// CHECK-NEXT: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
 
 @frozen public struct FrozenStruct {
     private let storedInt: Int32
 }
-// CHECK: class FrozenStruct final {
+// CHECK: class SWIFT_SYMBOL("s:7Structs12FrozenStructV") FrozenStruct final {
 // CHECK:        alignas(4) char _storage[4];
 // CHECK-NEXT:   friend class _impl::_impl_FrozenStruct;
 // CHECK-NEXT: };
@@ -115,7 +115,7 @@ public struct LargeStruct {
     }
 }
 
-// CHECK: class LargeStruct final {
+// CHECK: class SWIFT_SYMBOL("s:7Structs11LargeStructV") LargeStruct final {
 // CHECK-NEXT: public:
 // CHECK: inline LargeStruct(const LargeStruct &other) {
 // CHECK-NEXT:   auto metadata = _impl::$s7Structs11LargeStructVMa(0);
@@ -196,23 +196,23 @@ public func mutateSmall(_ x: inout FirstSmallStruct) {
 #endif
 }
 
-// CHECK:      inline LargeStruct createLargeStruct(swift::Int x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK:      inline LargeStruct createLargeStruct(swift::Int x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s7Structs17createLargeStructyAA0cD0VSiF(result, x);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
-// CHECK:      inline StructWithRefCountStoredProp createStructWithRefCountStoredProp() noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK:      inline StructWithRefCountStoredProp createStructWithRefCountStoredProp() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s7Structs34createStructWithRefCountStoredPropAA0cdefgH0VyF(result);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
-// CHECK:      inline void mutateSmall(FirstSmallStruct& x) noexcept {
+// CHECK:      inline void mutateSmall(FirstSmallStruct& x) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT:   return _impl::$s7Structs11mutateSmallyyAA05FirstC6StructVzF(_impl::_impl_FirstSmallStruct::getOpaquePointer(x));
 // CHECK-NEXT: }
 
-// CHECK:      inline void printSmallAndLarge(const FirstSmallStruct& x, const LargeStruct& y) noexcept {
+// CHECK:      inline void printSmallAndLarge(const FirstSmallStruct& x, const LargeStruct& y) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT:   return _impl::$s7Structs18printSmallAndLargeyyAA05FirstC6StructV_AA0eG0VtF(_impl::_impl_FirstSmallStruct::getOpaquePointer(x), _impl::_impl_LargeStruct::getOpaquePointer(y));
 // CHECK-NEXT: }
 

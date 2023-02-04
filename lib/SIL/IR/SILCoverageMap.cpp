@@ -24,12 +24,13 @@ using namespace swift;
 using llvm::coverage::CounterExpression;
 
 SILCoverageMap *
-SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
+SILCoverageMap::create(SILModule &M, SourceFile *ParentSourceFile,
+                       StringRef Filename, StringRef Name,
                        StringRef PGOFuncName, uint64_t Hash,
                        ArrayRef<MappedRegion> MappedRegions,
                        ArrayRef<CounterExpression> Expressions) {
   auto *Buf = M.allocate<SILCoverageMap>(1);
-  SILCoverageMap *CM = ::new (Buf) SILCoverageMap(Hash);
+  SILCoverageMap *CM = ::new (Buf) SILCoverageMap(ParentSourceFile, Hash);
 
   // Store a copy of the names so that we own the lifetime.
   CM->Filename = M.allocateCopy(Filename);
@@ -50,7 +51,8 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
   return CM;
 }
 
-SILCoverageMap::SILCoverageMap(uint64_t Hash) : Hash(Hash) {}
+SILCoverageMap::SILCoverageMap(SourceFile *ParentSourceFile, uint64_t Hash)
+  : ParentSourceFile(ParentSourceFile), Hash(Hash) {}
 
 SILCoverageMap::~SILCoverageMap() {}
 

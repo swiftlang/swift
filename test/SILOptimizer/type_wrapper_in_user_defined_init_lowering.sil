@@ -6,11 +6,11 @@ import Builtin
 import Swift
 import SwiftShims
 
-@typeWrapper class MyWrapper<S> {
+@typeWrapper class MyWrapper<W, S> {
   @_hasStorage var underlying: S { get set }
-  init(memberwise s: S)
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V { get }
-  subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V { get set }
+  init(for: W.Type, storage s: S)
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V { get }
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V { get set }
   deinit
 }
 
@@ -45,10 +45,10 @@ bb0(%0 : $*T, %1 : $*Test1<T>):
 // CHECK: store [[ARG_0:%.*]] to [trivial] [[A_REF]] : $*Int
 //
 // CHECK: [[T:%.*]] = alloc_stack $T
-// CHECK: copy_addr [[ARG_1:%.*]] to [initialization] [[T]] : $*T
+// CHECK: copy_addr [[ARG_1:%.*]] to [init] [[T]] : $*T
 // CHECK: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Int, b: T), 1
 // CHECK-NOT: {{.*}} = assign_by_wrapper {{.*}}
-// CHECK: copy_addr [take] [[T]] to [initialization] [[B_REF]] : $*T
+// CHECK: copy_addr [take] [[T]] to [init] [[B_REF]] : $*T
 sil hidden [ossa] @$s4main5Test1V1a1bACyxGSi_xtcfC : $@convention(method) <T> (Int, @in T, @thin Test1<T>.Type) -> @owned Test1<T> {
 bb0(%0 : $Int, %1 : $*T, %2 : $@thin Test1<T>.Type):
   %3 = alloc_box $<τ_0_0> { var Test1<τ_0_0> } <T>, var, name "self"
@@ -64,17 +64,17 @@ bb0(%0 : $Int, %1 : $*T, %2 : $@thin Test1<T>.Type):
   // function_ref Test1.a.setter
   %15 = function_ref @$s4main5Test1V1aSivs : $@convention(method) <τ_0_0> (Int, @inout Test1<τ_0_0>) -> ()
   %16 = partial_apply [callee_guaranteed] %15<T>(%13) : $@convention(method) <τ_0_0> (Int, @inout Test1<τ_0_0>) -> ()
-  assign_by_wrapper origin type_wrapper, %0 : $Int to [initialization] %14 : $*Int, set %16 : $@callee_guaranteed (Int) -> ()
+  assign_by_wrapper origin type_wrapper, %0 : $Int to [init] %14 : $*Int, set %16 : $@callee_guaranteed (Int) -> ()
   end_access %13 : $*Test1<T>
   destroy_value %16 : $@callee_guaranteed (Int) -> ()
   %20 = alloc_stack $T
-  copy_addr %1 to [initialization] %20 : $*T
+  copy_addr %1 to [init] %20 : $*T
   %22 = begin_access [modify] [unknown] %6 : $*Test1<T>
   %23 = tuple_element_addr %12 : $*(a: Int, b: T), 1
   // function_ref Test1.b.setter
   %24 = function_ref @$s4main5Test1V1bxvs : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Test1<τ_0_0>) -> ()
   %25 = partial_apply [callee_guaranteed] %24<T>(%22) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Test1<τ_0_0>) -> ()
-  assign_by_wrapper origin type_wrapper, %20 : $*T to [initialization] %23 : $*T, set %25 : $@callee_guaranteed (@in T) -> ()
+  assign_by_wrapper origin type_wrapper, %20 : $*T to [init] %23 : $*T, set %25 : $@callee_guaranteed (@in T) -> ()
   end_access %22 : $*Test1<T>
   destroy_value %25 : $@callee_guaranteed (@in T) -> ()
   dealloc_stack %20 : $*T
@@ -97,19 +97,19 @@ bb0(%0 : $Int, %1 : $*T, %2 : $@thin Test1<T>.Type):
 // CHECK: store [[ARG_0:%.*]] to [trivial] [[A_REF]] : $*Int
 //
 // CHECK: [[T:%.*]] = alloc_stack $T
-// CHECK-NEXT: copy_addr [[ARG_1:%.*]] to [initialization] [[T]] : $*T
+// CHECK-NEXT: copy_addr [[ARG_1:%.*]] to [init] [[T]] : $*T
 // CHECK: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Int, b: T), 1
 // CHECK-NOT: {{.*}} = assign_by_wrapper {{.*}}
-// CHECK: copy_addr [take] [[T]] to [initialization] [[B_REF]] : $*T
+// CHECK: copy_addr [take] [[T]] to [init] [[B_REF]] : $*T
 //
 // CHECK: [[OTHER_T:%.*]] = alloc_stack $T
-// CHECK-NEXT: copy_addr [[ARG_2:%.*]] to [initialization] %19 : $*T
+// CHECK-NEXT: copy_addr [[ARG_2:%.*]] to [init] %19 : $*T
 // CHECK: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Int, b: T), 1
 // CHECK-NOT: {{.*}} = assign_by_wrapper {{.*}}
 // CHECK: copy_addr [take] [[OTHER_T]] to [[B_REF]] : $*T
 //
 // CHECK: [[T:%.*]] = alloc_stack $T
-// copy_addr [[ARG_1]] to [initialization] [[T]] : $*T
+// copy_addr [[ARG_1]] to [init] [[T]] : $*T
 // CHECK: [[B_SETTER:%.*]] = function_ref @$s4main5Test1V1bxvs : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Test1<τ_0_0>) -> ()
 // CHECK-NEXT: [[PARTIALY_APPLIED_SETTER:%.*]] = partial_apply [callee_guaranteed] [[B_SETTER]]<T>({{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Test1<τ_0_0>) -> ()
 // CHECK-NOT: {{.*}} = assign_by_wrapper {{.*}}
@@ -129,22 +129,22 @@ bb0(%0 : $Int, %1 : $*T, %2 : $*T, %3 : $@thin Test1<T>.Type):
   // function_ref Test1.a.setter
   %17 = function_ref @$s4main5Test1V1aSivs : $@convention(method) <τ_0_0> (Int, @inout Test1<τ_0_0>) -> ()
   %18 = partial_apply [callee_guaranteed] %17<T>(%15) : $@convention(method) <τ_0_0> (Int, @inout Test1<τ_0_0>) -> ()
-  assign_by_wrapper origin type_wrapper, %0 : $Int to [initialization] %16 : $*Int, set %18 : $@callee_guaranteed (Int) -> ()
+  assign_by_wrapper origin type_wrapper, %0 : $Int to [init] %16 : $*Int, set %18 : $@callee_guaranteed (Int) -> ()
   end_access %15 : $*Test1<T>
   destroy_value %18 : $@callee_guaranteed (Int) -> ()
   %22 = alloc_stack $T
-  copy_addr %1 to [initialization] %22 : $*T
+  copy_addr %1 to [init] %22 : $*T
   %24 = begin_access [modify] [unknown] %7 : $*Test1<T>
   %25 = tuple_element_addr %14 : $*(a: Int, b: T), 1
   // function_ref Test1.b.setter
   %26 = function_ref @$s4main5Test1V1bxvs : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Test1<τ_0_0>) -> ()
   %27 = partial_apply [callee_guaranteed] %26<T>(%24) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Test1<τ_0_0>) -> ()
-  assign_by_wrapper origin type_wrapper, %22 : $*T to [initialization] %25 : $*T, set %27 : $@callee_guaranteed (@in T) -> ()
+  assign_by_wrapper origin type_wrapper, %22 : $*T to [init] %25 : $*T, set %27 : $@callee_guaranteed (@in T) -> ()
   end_access %24 : $*Test1<T>
   destroy_value %27 : $@callee_guaranteed (@in T) -> ()
   dealloc_stack %22 : $*T
   %32 = alloc_stack $T
-  copy_addr %2 to [initialization] %32 : $*T
+  copy_addr %2 to [init] %32 : $*T
   %34 = begin_access [modify] [unknown] %7 : $*Test1<T>
   %35 = tuple_element_addr %14 : $*(a: Int, b: T), 1
   // function_ref Test1.b.setter
@@ -155,7 +155,7 @@ bb0(%0 : $Int, %1 : $*T, %2 : $*T, %3 : $@thin Test1<T>.Type):
   destroy_value %37 : $@callee_guaranteed (@in T) -> ()
   dealloc_stack %32 : $*T
   %42 = alloc_stack $T
-  copy_addr %1 to [initialization] %42 : $*T
+  copy_addr %1 to [init] %42 : $*T
   %44 = begin_access [modify] [unknown] %7 : $*Test1<T>
   %45 = tuple_element_addr %14 : $*(a: Int, b: T), 1
   // function_ref Test1.b.setter

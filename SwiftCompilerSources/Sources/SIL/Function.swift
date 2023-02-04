@@ -42,8 +42,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     SILFunction_firstBlock(bridged).block!
   }
 
-  public var blocks : List<BasicBlock> {
-    return List(first: SILFunction_firstBlock(bridged).block)
+  public var blocks : BasicBlockList {
+    BasicBlockList(first: SILFunction_firstBlock(bridged).block)
   }
 
   public var arguments: LazyMapSequence<ArgumentArray, FunctionArgument> {
@@ -51,8 +51,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   }
 
   /// All instructions of all blocks.
-  public var instructions: LazySequence<FlattenSequence<LazyMapSequence<List<BasicBlock>, List<Instruction>>>> {
+  public var instructions: LazySequence<FlattenSequence<LazyMapSequence<BasicBlockList, InstructionList>>> {
     blocks.lazy.flatMap { $0.instructions }
+  }
+
+  public var reversedInstructions: LazySequence<FlattenSequence<LazyMapSequence<ReverseBasicBlockList, ReverseInstructionList>>>  {
+    blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
   }
 
   /// The number of indirect result arguments.
@@ -120,6 +124,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       SILFunction_hasSemanticsAttr(bridged, llvm.StringRef(buffer.baseAddress!, buffer.count)) != 0
     }
   }
+
+  /// True if the callee function is annotated with @_semantics("programtermination_point").
+  /// This means that the function terminates the program.
+  public var isProgramTerminationPoint: Bool { hasSemanticsAttribute("programtermination_point") }
 
   /// Kinds of effect attributes which can be defined for a Swift function.
   public enum EffectAttribute {
@@ -353,4 +361,44 @@ public extension SideEffects.GlobalEffects {
     case (true, true): return MayReadWriteBehavior
     }
   }
+}
+
+public struct BasicBlockList : CollectionLikeSequence, IteratorProtocol {
+  private var currentBlock: BasicBlock?
+
+  public init(first: BasicBlock?) { currentBlock = first }
+
+  public mutating func next() -> BasicBlock? {
+    if let block = currentBlock {
+      currentBlock = block.next
+      return block
+    }
+    return nil
+  }
+
+  public var first: BasicBlock? { currentBlock }
+
+  public func reversed() -> ReverseBasicBlockList {
+    if let block = currentBlock {
+      let lastBlock = SILFunction_lastBlock(block.parentFunction.bridged).block
+      return ReverseBasicBlockList(first: lastBlock)
+    }
+    return ReverseBasicBlockList(first: nil)
+  }
+}
+
+public struct ReverseBasicBlockList : CollectionLikeSequence, IteratorProtocol {
+  private var currentBlock: BasicBlock?
+
+  public init(first: BasicBlock?) { currentBlock = first }
+
+  public mutating func next() -> BasicBlock? {
+    if let block = currentBlock {
+      currentBlock = block.previous
+      return block
+    }
+    return nil
+  }
+
+  public var first: BasicBlock? { currentBlock }
 }

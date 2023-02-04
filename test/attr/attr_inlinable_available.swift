@@ -55,7 +55,7 @@ public struct AtInliningTarget {
 }
 
 @available(macOS 10.14.5, *)
-public struct BetweenTargets {
+public struct BetweenTargets { // expected-note {{enclosing scope requires availability of macOS 10.14.5 or newer}}
   @usableFromInline internal init() {}
 }
 
@@ -615,12 +615,12 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
 }
 
 
-// MARK: - @_backDeploy functions
+// MARK: - @backDeployed functions
 
-// @_backDeploy acts like @inlinable.
+// @backDeployed acts like @inlinable.
 
 @available(macOS 10.10, *)
-@_backDeploy(before: macOS 999.0)
+@backDeployed(before: macOS 999.0)
 public func backDeployedToInliningTarget(
   _: NoAvailable,
   _: BeforeInliningTarget,
@@ -1102,7 +1102,7 @@ extension BetweenTargets {
 }
 
 extension BetweenTargets {
-  @available(macOS 10.10, *)
+  @available(macOS 10.10, *) // expected-warning {{instance method cannot be more available than enclosing scope}}
   func excessivelyAvailableInternalFuncInExtension() {}
 }
 
@@ -1369,10 +1369,8 @@ public enum NoAvailableEnumWithClasses {
   public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {} // expected-error {{'AtDeploymentTargetClass' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
   public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in macOS 11 or newer}} expected-note 2 {{add @available attribute to enclosing class}}
   
-  // As a special case, downgrade the less available superclasses diagnostic for
-  // `@usableFromInline` classes.
   @usableFromInline
-  class UFIInheritsBetweenTargets: BetweenTargetsClass {} // expected-warning {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
+  class UFIInheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
 }
 
 @_spi(Private)

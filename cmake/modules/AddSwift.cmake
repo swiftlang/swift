@@ -8,7 +8,7 @@ include(SwiftCXXUtils)
 function(_swift_gyb_target_sources target scope)
   file(GLOB GYB_UNICODE_DATA ${SWIFT_SOURCE_DIR}/utils/UnicodeData/*)
   file(GLOB GYB_STDLIB_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py)
-  file(GLOB GYB_SYNTAX_SUPPORT ${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/*.py)
+  file(GLOB GYB_SYNTAX_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/*.py)
   file(GLOB GYB_SOURCEKIT_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/*.py)
   set(GYB_SOURCES
     ${SWIFT_SOURCE_DIR}/utils/gyb
@@ -26,7 +26,7 @@ function(_swift_gyb_target_sources target scope)
 
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
-        ${CMAKE_COMMAND} -E env PYTHONPATH=${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE} $<TARGET_FILE:Python3::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
+        ${CMAKE_COMMAND} -E env $<TARGET_FILE:Python3::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
       COMMAND
         ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
@@ -527,7 +527,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
     set_property(TARGET ${target} APPEND_STRING PROPERTY
                  LINK_FLAGS " -lobjc ")
 
-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD")
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(${ASRLF_BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
       # At build time and run time, link against the swift libraries in the
@@ -569,7 +569,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
 
   if(SWIFT_SWIFT_PARSER)
     # Make sure we can find the early SwiftSyntax libraries.
-    target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib")
+    target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
 
     # For the "end step" of bootstrapping configurations on Darwin, need to be
     # able to fall back to the SDK directory for libswiftCore et al.
@@ -909,6 +909,20 @@ function(add_swift_host_tool executable)
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>">
         )
     endif()
+  endif()
+
+  if(SWIFT_SWIFT_PARSER)
+    set(extra_relative_rpath "")
+    if(NOT ${ASHT_BOOTSTRAPPING} STREQUAL "")
+      if (${executable} MATCHES "-bootstrapping")
+        set(extra_relative_rpath "../")
+      endif()
+    endif()
+
+    set_property(
+      TARGET ${executable}
+      APPEND PROPERTY INSTALL_RPATH
+        "@executable_path/../${extra_relative_rpath}lib/swift/host")
   endif()
 
   if(ASHT_THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)

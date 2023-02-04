@@ -25,6 +25,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -668,7 +669,7 @@ extendOverBorrowScopeAndConsume(SILValue ownedValue) {
           if (!ownedVal) {
             ownedVal = createCopyAtEdge(reborrowedOper);
           }
-          BranchInst *branch = PhiOperand(reborrowedOper).getBranch();
+          TermInst *branch = PhiOperand(reborrowedOper).getBranch();
           branch->getOperandRef(ownedPhi.argIndex).set(ownedVal);
           return true;
         });
@@ -1464,8 +1465,13 @@ OwnershipRAUWHelper::perform(SILValue replacementValue) {
   // Make sure to always clear our context after we transform.
   SWIFT_DEFER { ctx->clear(); };
 
-  auto *svi = dyn_cast<SingleValueInstruction>(oldValue);
-  return replaceAllUsesAndErase(svi, replacementValue, ctx->callbacks);
+  if (auto *svi = dyn_cast<SingleValueInstruction>(oldValue))
+    return replaceAllUsesAndErase(svi, replacementValue, ctx->callbacks);
+
+  // The caller must rewrite the terminator after RAUW.
+  auto *term = cast<SILPhiArgument>(oldValue)->getTerminatorForResult();
+  auto nextII = term->getParent()->end();
+  return replaceAllUses(oldValue, replacementValue, nextII, ctx->callbacks);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1842,4 +1848,71 @@ bool swift::createBorrowScopeForPhiOperands(SILPhiArgument *newPhi) {
       return false;
   }
   return GuaranteedPhiBorrowFixup().createExtendedNestedBorrowScope(newPhi);
+}
+
+bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
+                              SmallVectorImpl<Operand *> &newUses,
+                              DeadEndBlocks *deadEndBlocks,
+                              InstModCallbacks callbacks) {
+  ScopedAddressValue scopedAddress(sbi);
+
+  SmallVector<SILBasicBlock *, 4> discoveredBlocks;
+  SSAPrunedLiveness storeBorrowLiveness(&discoveredBlocks);
+
+  // FIXME: if OSSA lifetimes are complete, then we don't need transitive
+  // liveness here.
+  AddressUseKind useKind =
+      scopedAddress.computeTransitiveLiveness(storeBorrowLiveness);
+
+  // If all new uses are within store_borrow boundary, no need for extension.
+  if (storeBorrowLiveness.areUsesWithinBoundary(newUses, deadEndBlocks)) {
+    return true;
+  }
+
+  if (useKind != AddressUseKind::NonEscaping) {
+    return false;
+  }
+
+  // store_borrow extension is possible only when there are no other
+  // store_borrows to the same destination within the store_borrow's lifetime
+  // built from newUsers.
+  if (hasOtherStoreBorrowsInLifetime(sbi, &storeBorrowLiveness,
+                                     deadEndBlocks)) {
+    return false;
+  }
+
+  InstModCallbacks tempCallbacks = callbacks;
+  InstructionDeleter deleter(std::move(tempCallbacks));
+  GuaranteedOwnershipExtension borrowExtension(deleter, *deadEndBlocks,
+                                               sbi->getFunction());
+  auto status = borrowExtension.checkBorrowExtension(
+      BorrowedValue(sbi->getSrc()), newUses);
+  if (status == GuaranteedOwnershipExtension::Invalid) {
+    return false;
+  }
+
+  borrowExtension.transform(status);
+
+  SmallVector<Operand *, 4> endBorrowUses;
+  // Collect old scope-ending instructions.
+  scopedAddress.visitScopeEndingUses([&](Operand *op) {
+    endBorrowUses.push_back(op);
+    return true;
+  });
+
+  for (auto *use : newUses) {
+    // Update newUsers as non-lifetime ending.
+    storeBorrowLiveness.updateForUse(use->getUser(),
+                                     /* lifetimeEnding */ false);
+  }
+
+  // Add new scope-ending instructions.
+  scopedAddress.endScopeAtLivenessBoundary(&storeBorrowLiveness);
+
+  // Remove old scope-ending instructions.
+  for (auto *endBorrowUse : endBorrowUses) {
+    callbacks.deleteInst(endBorrowUse->getUser());
+  }
+
+  return true;
 }

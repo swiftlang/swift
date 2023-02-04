@@ -103,11 +103,11 @@ public:
     // If we have a modify, check if our value is /ever/ written to. If it is
     // never actually written to, then we convert to a load_borrow.
     auto result = ctx.addressToExhaustiveWriteListCache.get(access);
-    if (!result.hasValue()) {
+    if (!result.has_value()) {
       return answer(true);
     }
 
-    if (result.getValue().empty()) {
+    if (result.value().empty()) {
       return answer(false);
     }
 
@@ -126,7 +126,7 @@ public:
     if (!arg->isIndirectResult() &&
         arg->getKnownParameterInfo().isIndirectMutating()) {
       auto wellBehavedWrites = ctx.addressToExhaustiveWriteListCache.get(arg);
-      if (!wellBehavedWrites.hasValue()) {
+      if (!wellBehavedWrites.has_value()) {
         return answer(true);
       }
 

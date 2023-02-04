@@ -45,7 +45,8 @@ typedef struct MetadataSectionRange {
 ///
 /// \warning If you change the size of this structure by adding fields, it is an
 ///   ABI-breaking change on platforms that use it. Make sure to increment
-///   \c CurrentSectionMetadataVersion if you do.
+///   \c CurrentSectionMetadataVersion if you do. To minimize impact, always add
+///   new fields to the \em end of the structure.
 struct MetadataSections {
   __swift_uintptr_t version;
 
@@ -53,8 +54,8 @@ struct MetadataSections {
   /// reported when the section was registered with the Swift runtime.
   ///
   /// The value of this field is equivalent to the value of
-  /// \c SymbolInfo::baseAddress as returned from \c lookupSymbol() for a symbol
-  /// in the image that contains these sections.
+  /// \c SymbolInfo::baseAddress as returned from \c SymbolInfo::lookup() for a
+  /// symbol in the image that contains these sections.
   ///
   /// For Mach-O images, set this field to \c __dso_handle (i.e. the Mach header
   /// for the image.) For ELF images, set it to \c __dso_handle (the runtime
@@ -96,6 +97,7 @@ struct MetadataSections {
   MetadataSectionRange swift5_capture;
   MetadataSectionRange swift5_mpenum;
   MetadataSectionRange swift5_accessible_functions;
+  MetadataSectionRange swift5_runtime_attributes;
 };
 
 #ifdef __cplusplus

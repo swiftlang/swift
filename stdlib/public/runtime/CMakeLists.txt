@@ -54,6 +54,7 @@ set(swift_runtime_sources
     ImageInspectionCOFF.cpp
     ImageInspectionStatic.cpp
     ImageInspectionWasm.cpp
+    SymbolInfo.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
     Metadata.cpp
@@ -68,7 +69,8 @@ set(swift_runtime_sources
     SwiftDtoa.cpp
     SwiftTLSContext.cpp
     ThreadingError.cpp
-    AccessibleFunction.cpp)
+    AccessibleFunction.cpp
+    Win32.cpp)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES

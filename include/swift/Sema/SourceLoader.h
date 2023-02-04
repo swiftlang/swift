@@ -73,7 +73,8 @@ public:
   /// returns NULL.
   virtual ModuleDecl *
   loadModule(SourceLoc importLoc,
-             ImportPath::Module path) override;
+             ImportPath::Module path,
+             bool AllowMemoryCache) override;
 
   /// Load extensions to the given nominal type.
   ///
@@ -95,7 +96,7 @@ public:
     // Parsing populates the Objective-C method tables.
   }
 
-  Optional<ModuleDependencies>
+  Optional<const ModuleDependencyInfo*>
   getModuleDependencies(StringRef moduleName, ModuleDependenciesCache &cache,
                         InterfaceSubContextDelegate &delegate) override;
 };

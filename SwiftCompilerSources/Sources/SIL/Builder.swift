@@ -24,6 +24,7 @@ public struct Builder {
   let insertAt: InsertionPoint
   let location: Location
   private let passContext: BridgedPassContext
+  private let notifyNewInstruction: (Instruction) -> ()
 
   private var bridged: BridgedBuilder {
     switch insertAt {
@@ -38,153 +39,145 @@ public struct Builder {
     }
   }
 
-  private func notifyInstructionsChanged() {
+  private func notifyNew<I: Instruction>(_ instruction: I) -> I {
     PassContext_notifyChanges(passContext, instructionsChanged)
-  }
-
-  private func notifyCallsChanged() {
-    PassContext_notifyChanges(passContext, callsChanged)
-  }
-
-  private func notifyBranchesChanged() {
-    PassContext_notifyChanges(passContext, branchesChanged)
+    if instruction is FullApplySite {
+      PassContext_notifyChanges(passContext, callsChanged)
+    }
+    if instruction is TermInst {
+      PassContext_notifyChanges(passContext, branchesChanged)
+    }
+    notifyNewInstruction(instruction)
+    return instruction
   }
 
   public init(insertAt: InsertionPoint, location: Location,
-              passContext: BridgedPassContext) {
+              _ notifyNewInstruction: @escaping (Instruction) -> (),
+              _ passContext: BridgedPassContext) {
     self.insertAt = insertAt
     self.location = location;
+    self.notifyNewInstruction = notifyNewInstruction
     self.passContext = passContext
   }
 
   public func createBuiltinBinaryFunction(name: String,
       operandType: Type, resultType: Type, arguments: [Value]) -> BuiltinInst {
-    notifyInstructionsChanged()
     return arguments.withBridgedValues { valuesRef in
       return name._withStringRef { nameStr in
         let bi = SILBuilder_createBuiltinBinaryFunction(
           bridged, nameStr, operandType.bridged, resultType.bridged, valuesRef)
-        return bi.getAs(BuiltinInst.self)
+        return notifyNew(bi.getAs(BuiltinInst.self))
       }
     }
   }
 
   public func createCondFail(condition: Value, message: String) -> CondFailInst {
-    notifyInstructionsChanged()
     return message._withStringRef { messageStr in
       let cf = SILBuilder_createCondFail(bridged, condition.bridged, messageStr)
-      return cf.getAs(CondFailInst.self)
+      return notifyNew(cf.getAs(CondFailInst.self))
     }
   }
 
   public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
-    notifyInstructionsChanged()
     let literal = SILBuilder_createIntegerLiteral(bridged, type.bridged, value)
-    return literal.getAs(IntegerLiteralInst.self)
+    return notifyNew(literal.getAs(IntegerLiteralInst.self))
   }
 
   public func createAllocStack(_ type: Type, hasDynamicLifetime: Bool = false,
                                isLexical: Bool = false, wasMoved: Bool = false) -> AllocStackInst {
-    notifyInstructionsChanged()
     let dr = SILBuilder_createAllocStack(bridged, type.bridged, hasDynamicLifetime ? 1 : 0,
                                          isLexical ? 1 : 0, wasMoved ? 1 : 0)
-    return dr.getAs(AllocStackInst.self)
+    return notifyNew(dr.getAs(AllocStackInst.self))
   }
 
   @discardableResult
   public func createDeallocStack(_ operand: Value) -> DeallocStackInst {
-    notifyInstructionsChanged()
     let dr = SILBuilder_createDeallocStack(bridged, operand.bridged)
-    return dr.getAs(DeallocStackInst.self)
+    return notifyNew(dr.getAs(DeallocStackInst.self))
   }
 
   @discardableResult
   public func createDeallocStackRef(_ operand: Value) -> DeallocStackRefInst {
-    notifyInstructionsChanged()
     let dr = SILBuilder_createDeallocStackRef(bridged, operand.bridged)
-    return dr.getAs(DeallocStackRefInst.self)
+    return notifyNew(dr.getAs(DeallocStackRefInst.self))
   }
 
   public func createUncheckedRefCast(object: Value, type: Type) -> UncheckedRefCastInst {
-    notifyInstructionsChanged()
     let object = SILBuilder_createUncheckedRefCast(bridged, object.bridged, type.bridged)
-    return object.getAs(UncheckedRefCastInst.self)
+    return notifyNew(object.getAs(UncheckedRefCastInst.self))
   }
 
   @discardableResult
   public func createSetDeallocating(operand: Value, isAtomic: Bool) -> SetDeallocatingInst {
-    notifyInstructionsChanged()
     let setDeallocating = SILBuilder_createSetDeallocating(bridged, operand.bridged, isAtomic)
-    return setDeallocating.getAs(SetDeallocatingInst.self)
+    return notifyNew(setDeallocating.getAs(SetDeallocatingInst.self))
   }
 
   public func createFunctionRef(_ function: Function) -> FunctionRefInst {
-    notifyInstructionsChanged()
     let functionRef = SILBuilder_createFunctionRef(bridged, function.bridged)
-    return functionRef.getAs(FunctionRefInst.self)
+    return notifyNew(functionRef.getAs(FunctionRefInst.self))
   }
 
   public func createCopyValue(operand: Value) -> CopyValueInst {
-    notifyInstructionsChanged()
-    return SILBuilder_createCopyValue(bridged, operand.bridged).getAs(CopyValueInst.self)
+    return notifyNew(SILBuilder_createCopyValue(bridged, operand.bridged).getAs(CopyValueInst.self))
   }
 
   @discardableResult
   public func createCopyAddr(from fromAddr: Value, to toAddr: Value,
                              takeSource: Bool = false, initializeDest: Bool = false) -> CopyAddrInst {
-    notifyInstructionsChanged()
-    return SILBuilder_createCopyAddr(bridged, fromAddr.bridged, toAddr.bridged,
-                                     takeSource ? 1 : 0, initializeDest ? 1 : 0).getAs(CopyAddrInst.self)
+    return notifyNew(SILBuilder_createCopyAddr(bridged, fromAddr.bridged, toAddr.bridged,
+                                     takeSource ? 1 : 0, initializeDest ? 1 : 0).getAs(CopyAddrInst.self))
   }
 
   @discardableResult
   public func createDestroyValue(operand: Value) -> DestroyValueInst {
-    notifyInstructionsChanged()
-    return SILBuilder_createDestroyValue(bridged, operand.bridged).getAs(DestroyValueInst.self)
+    return notifyNew(SILBuilder_createDestroyValue(bridged, operand.bridged).getAs(DestroyValueInst.self))
   }
 
   @discardableResult
   public func createApply(
     function: Value,
     _ substitutionMap: SubstitutionMap,
-    arguments: [Value]
+    arguments: [Value],
+    isNonThrowing: Bool = false,
+    isNonAsync: Bool = false,
+    specializationInfo: ApplyInst.SpecializationInfo = nil
   ) -> ApplyInst {
-    notifyInstructionsChanged()
-    notifyCallsChanged()
-
     let apply = arguments.withBridgedValues { valuesRef in
-      SILBuilder_createApply(bridged, function.bridged, substitutionMap.bridged, valuesRef)
+      SILBuilder_createApply(bridged, function.bridged, substitutionMap.bridged, valuesRef,
+                             isNonThrowing, isNonAsync, specializationInfo)
     }
-    return apply.getAs(ApplyInst.self)
+    return notifyNew(apply.getAs(ApplyInst.self))
   }
   
   public func createUncheckedEnumData(enum enumVal: Value,
                                       caseIndex: Int,
                                       resultType: Type) -> UncheckedEnumDataInst {
-    notifyInstructionsChanged()
     let ued = SILBuilder_createUncheckedEnumData(bridged, enumVal.bridged, caseIndex, resultType.bridged)
-    return ued.getAs(UncheckedEnumDataInst.self)
+    return notifyNew(ued.getAs(UncheckedEnumDataInst.self))
   }
   @discardableResult
   public func createSwitchEnum(enum enumVal: Value,
                                cases: [(Int, BasicBlock)],
                                defaultBlock: BasicBlock? = nil) -> SwitchEnumInst {
-    notifyInstructionsChanged()
-    notifyBranchesChanged()
     let se = cases.withUnsafeBufferPointer { caseBuffer in
       SILBuilder_createSwitchEnumInst(
         bridged, enumVal.bridged, defaultBlock.bridged, caseBuffer.baseAddress, caseBuffer.count)
     }
-    return se.getAs(SwitchEnumInst.self)
+    return notifyNew(se.getAs(SwitchEnumInst.self))
   }
   
   @discardableResult
   public func createBranch(to destBlock: BasicBlock, arguments: [Value] = []) -> BranchInst {
-    notifyInstructionsChanged()
-    notifyBranchesChanged()
     return arguments.withBridgedValues { valuesRef in
       let bi = SILBuilder_createBranch(bridged, destBlock.bridged, valuesRef)
-      return bi.getAs(BranchInst.self)
+      return notifyNew(bi.getAs(BranchInst.self))
     }
+  }
+
+  @discardableResult
+  public func createUnreachable() -> UnreachableInst {
+    let ui = SILBuilder_createUnreachable(bridged)
+    return notifyNew(ui.getAs(UnreachableInst.self))
   }
 }

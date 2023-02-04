@@ -22,16 +22,16 @@ public struct StructI8AndU32AndI16 {
 }
 
 // CHECK:      struct Structs_StructI8AndU32AndI16 {
-// CHECK_NEXT:   _Alignas(4) char _storage[10];
-// CHECK_NEXT: };
+// CHECK-NEXT:   _Alignas(4) char _storage[10];
+// CHECK-NEXT: };
 
 // CHECK:      struct Structs_StructOneI16AndOneStruct {
-// CHECK_NEXT:   _Alignas(4) char _storage[12];
-// CHECK_NEXT: };
+// CHECK-NEXT:   _Alignas(4) char _storage[12];
+// CHECK-NEXT: };
 
 // CHECK:      struct Structs_StructTwoI32 {
-// CHECK_NEXT:   _Alignas(4) char _storage[8];
-// CHECK_NEXT: };
+// CHECK-NEXT:   _Alignas(4) char _storage[8];
+// CHECK-NEXT: };
 
 public func returnNewStructTwoI32(_ x: Int32) -> StructTwoI32 { return StructTwoI32(x: x, y: x * 2) }
 

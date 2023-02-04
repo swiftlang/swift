@@ -128,6 +128,14 @@ extension Function {
     default:
       break
     }
+    if isProgramTerminationPoint {
+      // We can ignore any memory writes in a program termination point, because it's not relevant
+      // for the caller. But we need to consider memory reads, otherwise preceeding memory writes
+      // would be eliminated by dead-store-elimination in the caller. E.g. String initialization
+      // for error strings which are printed by the program termination point.
+      // Regarding ownership: a program termination point must not touch any reference counted objects.
+      return SideEffects.GlobalEffects(memory: SideEffects.Memory(read: true))
+    }
     var result = SideEffects.GlobalEffects.worstEffects
     switch effectAttribute {
     case .none:
@@ -156,15 +164,10 @@ extension Function {
 public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
   public var arguments: [ArgumentEffect]
 
-  public func canEscape(argumentIndex: Int, path: SmallProjectionPath, analyzeAddresses: Bool) -> Bool {
+  public func canEscape(argumentIndex: Int, path: SmallProjectionPath) -> Bool {
     return !arguments.contains(where: {
       if case .notEscaping = $0.kind, $0.argumentIndex == argumentIndex {
-
-        // Any address of a class property of an object, which is passed to the function, cannot
-        // escape the function. Whereas a value stored in such a property could escape.
-        let p = (analyzeAddresses ? path.popLastClassAndValuesFromTail() : path)
-
-        if p.matches(pattern: $0.pathPattern) {
+        if path.matches(pattern: $0.pathPattern) {
           return true
         }
       }
@@ -483,7 +486,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
         result.ownership = SideEffects.Ownership()
       }
       switch convention {
-      case .indirectIn, .indirectInConstant:
+      case .indirectIn:
         result.memory.write = false
       case .indirectInGuaranteed:
         result.memory.write = false

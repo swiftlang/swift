@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SIL
 import OptimizerBridging
 
 struct Options {
@@ -17,5 +18,13 @@ struct Options {
 
   var enableStackProtection: Bool {
     SILOptions_enableStackProtection(_bridged) != 0
+  }
+
+  var enableMoveInoutStackProtection: Bool {
+    SILOptions_enableMoveInoutStackProtection(_bridged) != 0
+  }
+
+  func enableSimplification(for inst: Instruction) -> Bool {
+    SILOptions_enableSimplificationFor(inst.bridged)
   }
 }

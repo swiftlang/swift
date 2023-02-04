@@ -135,6 +135,10 @@ struct OwnershipModelEliminatorVisitor
   bool visitExplicitCopyValueInst(ExplicitCopyValueInst *cvi);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
   bool visitLoadBorrowInst(LoadBorrowInst *lbi);
+  bool visitMoveValueInst(MoveValueInst *mvi) {
+    eraseInstructionAndRAUW(mvi, mvi->getOperand());
+    return true;
+  }
   bool visitBeginBorrowInst(BeginBorrowInst *bbi) {
     eraseInstructionAndRAUW(bbi, bbi->getOperand());
     return true;
@@ -545,7 +549,7 @@ static bool stripOwnership(SILFunction &func) {
   // have arguments on the default result of checked_cast_br).
   while (!visitor.instructionsToSimplify.empty()) {
     auto value = visitor.instructionsToSimplify.pop_back_val();
-    if (!value.hasValue())
+    if (!value.has_value())
       continue;
     auto callbacks =
         InstModCallbacks().onDelete([&](SILInstruction *instToErase) {

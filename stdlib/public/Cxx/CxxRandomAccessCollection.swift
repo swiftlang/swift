@@ -28,9 +28,14 @@ extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
 
 extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
 
-public protocol CxxRandomAccessCollection: CxxSequence, RandomAccessCollection {
+public protocol CxxRandomAccessCollection<Element>: CxxSequence, RandomAccessCollection {
+  override associatedtype Element
   override associatedtype RawIterator: UnsafeCxxRandomAccessIterator
-  override associatedtype Element = RawIterator.Pointee
+    where RawIterator.Pointee == Element
+  override associatedtype Iterator = CxxIterator<Self>
+  override associatedtype Index = Int
+  override associatedtype Indices = Range<Int>
+  override associatedtype SubSequence = Slice<Self>
 
   /// Do not implement this function manually in Swift.
   func __beginUnsafe() -> RawIterator
@@ -63,7 +68,7 @@ extension CxxRandomAccessCollection {
       // Not using CxxIterator here to avoid making a copy of the collection.
       var rawIterator = __beginUnsafe()
       rawIterator += RawIterator.Distance(index)
-      yield rawIterator.pointee as! Element
+      yield rawIterator.pointee
     }
   }
 }

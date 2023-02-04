@@ -27,7 +27,7 @@
 // CHECK-PCM-NEXT:      "clang": "F"
 // CHECK-PCM-NEXT:    },
 // CHECK-PCM-NEXT:    {
-// CHECK-PCM-NEXT:      "modulePath": "F.pcm",
+// CHECK-PCM-NEXT:      "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.pcm",
 // CHECK-PCM: "-I
 
 // CHECK-SWIFT: {
@@ -37,4 +37,4 @@
 // CHECK-SWIFT-NEXT:      "swift": "F"
 // CHECK-SWIFT-NEXT:    },
 // CHECK-SWIFT-NEXT:    {
-// CHECK-SWIFT-NEXT:      "modulePath": "F.swiftmodule",
+// CHECK-SWIFT-NEXT:      "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",

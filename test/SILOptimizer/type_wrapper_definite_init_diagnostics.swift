@@ -3,16 +3,18 @@
 // REQUIRES: asserts
 
 @typeWrapper
-struct Wrapper<S> {
+struct Wrapper<W, S> {
   var underlying: S
 
-  init(memberwise: S) { self.underlying = memberwise }
+  init(for: W.Type, storage: S) { self.underlying = storage }
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>,
+               storageKeyPath path: KeyPath<S, V>) -> V {
     get { underlying[keyPath: path] }
   }
 
-  subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>,
+               storageKeyPath path: WritableKeyPath<S, V>) -> V {
     get { underlying[keyPath: path] }
     set { underlying[keyPath: path] = newValue }
   }
@@ -43,7 +45,7 @@ do {
     }
   }
 
-  // FIXME: Diagnostics should mention `self.b` or `self.a` and not `self.$_storage`
+  // FIXME: Diagnostics should mention `self.b` or `self.a` and not `self.$storage`
 
   @Wrapper
   struct ImmutableTest3 {
@@ -57,7 +59,7 @@ do {
 
     init(a: Int = 42) {
       self.a = a
-      print(self.a) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$_storage' not initialized}}
+      print(self.a) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$storage' not initialized}}
       self.b = ""
     }
 
@@ -74,18 +76,33 @@ do {
       if let b = otherB {
         self.b = b
       }
-    } // expected-error {{return from initializer without initializing all stored properties}} expected-note {{'self.$_storage' not initialized}}
+    } // expected-error {{return from initializer without initializing all stored properties}} expected-note {{'self.$storage' not initialized}}
 
     init(optB: String? = nil) {
       if let optB {
         self.b = optB
-        print(self.b) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$_storage' not initialized}}
+        print(self.b) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$storage' not initialized}}
       } else {
         self.b = ""
-        print(self.b) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$_storage' not initialized}}
+        print(self.b) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$storage' not initialized}}
       }
 
       self.a = 0
+    }
+  }
+
+  @Wrapper
+  struct ImmutableReassignmentTest {
+    let x: Int = 42
+
+    init(x: Int) {
+      self.x = x // expected-error {{immutable value 'self.x' may only be initialized once}}
+    }
+
+    init(optX: Int?) {
+      if let x = optX {
+        self.x = x // expected-error {{immutable value 'self.x' may only be initialized once}}
+      }
     }
   }
 }

@@ -218,7 +218,6 @@ public:
                        const llvm::Twine &name = "");
   Address createAlloca(llvm::Type *ty, llvm::Value *arraySize, Alignment align,
                        const llvm::Twine &name = "");
-  Address createFixedSizeBufferAlloca(const llvm::Twine &name);
 
   StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
   StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
@@ -348,6 +347,11 @@ public:
   FunctionPointer emitValueWitnessFunctionRef(SILType type,
                                               llvm::Value *&metadataSlot,
                                               ValueWitness index);
+
+  llvm::Value *optionallyLoadFromConditionalProtocolWitnessTable(
+    llvm::Value *wtable);
+
+  llvm::Value *emitPackShapeExpression(CanType type);
 
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);

@@ -67,13 +67,13 @@ sil @sil_combine_partial_apply_callee : $@convention(thin) (@in S1, @in S2, @in_
 //
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 // CHECK: [[IN_ADDRESS_1:%.*]] = alloc_stack $S1
-// CHECK: copy_addr [take] [[IN_ADDRESS]] to [initialization] [[IN_ADDRESS_1]]
+// CHECK: copy_addr [take] [[IN_ADDRESS]] to [init] [[IN_ADDRESS_1]]
 // CHECK: [[IN_ARG_1:%.*]] = alloc_stack $S2
-// CHECK: copy_addr [take] [[IN_ARG]] to [initialization] [[IN_ARG_1]]
+// CHECK: copy_addr [take] [[IN_ARG]] to [init] [[IN_ARG_1]]
 // CHECK: [[INGUARANTEED_ADDRESS_1:%.*]] = alloc_stack $S3
-// CHECK: copy_addr [take] [[INGUARANTEED_ADDRESS]] to [initialization] [[INGUARANTEED_ADDRESS_1]]
+// CHECK: copy_addr [take] [[INGUARANTEED_ADDRESS]] to [init] [[INGUARANTEED_ADDRESS_1]]
 // CHECK: [[INGUARANTEED_ARG_1:%.*]] = alloc_stack $S4
-// CHECK: copy_addr [take] [[INGUARANTEED_ARG]] to [initialization] [[INGUARANTEED_ARG_1]]
+// CHECK: copy_addr [take] [[INGUARANTEED_ARG]] to [init] [[INGUARANTEED_ARG_1]]
 //
 // Then make sure that the destroys are placed after the destroy_value of the
 // partial_apply (which is after this apply)...
@@ -149,11 +149,11 @@ sil [ossa] @sil_combine_partial_apply_callee_2 : $@convention(thin) (@in S1) -> 
 //
 // CHECK: bb1:
 // CHECK:   [[ORIGINAL_ALLOC_STACK:%.*]] = alloc_stack $S1
-// CHECK-NEXT: copy_addr [take] [[ARG]] to [initialization] [[ORIGINAL_ALLOC_STACK]]
+// CHECK-NEXT: copy_addr [take] [[ARG]] to [init] [[ORIGINAL_ALLOC_STACK]]
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 // CHECK-NEXT: [[NEW_ALLOC_STACK:%.*]] = alloc_stack $S1
-// CHECK-NEXT: copy_addr [take] [[ORIGINAL_ALLOC_STACK]] to [initialization] [[NEW_ALLOC_STACK]]
+// CHECK-NEXT: copy_addr [take] [[ORIGINAL_ALLOC_STACK]] to [init] [[NEW_ALLOC_STACK]]
 // CHECK-NEXT: apply [[UNKNOWN_FUNC]]()
 // CHECK-NEXT: apply
 // CHECK-NEXT: cond_br undef, bb2, bb3
@@ -187,7 +187,7 @@ bb0(%s1 : $*S1):
 
 bb1:
   %0 = alloc_stack $S1
-  copy_addr [take] %s1 to [initialization] %0 : $*S1
+  copy_addr [take] %s1 to [init] %0 : $*S1
   apply %3() : $@convention(thin) () -> ()
   %1 = function_ref @sil_combine_partial_apply_callee_2 : $@convention(thin) (@in S1) -> ()
   apply %3() : $@convention(thin) () -> ()
@@ -222,7 +222,7 @@ sil [ossa] @try_apply_func : $@convention(thin) () -> (Builtin.Int32, @error Err
 // CHECK: bb0([[ARG:%.*]] : $*S1):
 // CHECK: bb1:
 // CHECK-NEXT: [[ORIGINAL_ALLOC_STACK:%.*]] = alloc_stack $S1
-// CHECK-NEXT: copy_addr [take] [[ARG]] to [initialization] [[ORIGINAL_ALLOC_STACK]]
+// CHECK-NEXT: copy_addr [take] [[ARG]] to [init] [[ORIGINAL_ALLOC_STACK]]
 // CHECK-NEXT: [[NEW_ALLOC_STACK:%.*]] = alloc_stack $S1
 // CHECK: bb2:
 // CHECK-NEXT: destroy_addr [[NEW_ALLOC_STACK]]
@@ -245,7 +245,7 @@ bb0(%0a : $*S1):
 
 bb1:
   %0 = alloc_stack $S1
-  copy_addr [take] %0a to [initialization] %0 : $*S1
+  copy_addr [take] %0a to [init] %0 : $*S1
   %1 = function_ref @sil_combine_partial_apply_callee_2 : $@convention(thin) (@in S1) -> ()
   %2 = partial_apply %1(%0) : $@convention(thin) (@in S1) -> ()
   dealloc_stack %0 : $*S1
@@ -280,11 +280,11 @@ bb6(%5 : $Error):
 sil [ossa] @sil_combine_dead_partial_apply_with_opened_existential : $@convention(thin) (@in SwiftP) -> ((), @error Error) {
 bb0(%arg : $*SwiftP):
   %0b = alloc_stack $SwiftP
-  copy_addr [take] %arg to [initialization] %0b : $*SwiftP
+  copy_addr [take] %arg to [init] %0b : $*SwiftP
   %1 = open_existential_addr mutable_access %0b : $*SwiftP to $*@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
   %2 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self, #SwiftP.foo, %1 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
   %0c = alloc_stack $@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
-  copy_addr %1 to [initialization] %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
+  copy_addr %1 to [init] %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
   %3 = partial_apply %2<@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self>(%0c) : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
   dealloc_stack %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
   destroy_value %3 : $@callee_owned () -> ()
@@ -297,10 +297,10 @@ bb0(%arg : $*SwiftP):
 // CHECK-LABEL: sil [ossa] @test_generic_partial_apply_apply_in :
 // CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [take] [[ARG1]] to [initialization] [[STACK]]
+// CHECK:   copy_addr [take] [[ARG1]] to [init] [[STACK]]
 // CHECK: bb1:
 // CHECK:   [[STACK3:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[STACK]] to [initialization] [[STACK3]]
+// CHECK:   copy_addr [[STACK]] to [init] [[STACK3]]
 // CHECK:   apply {{%.*}}<T, T>([[ARG0]], [[STACK3]])
 // CHECK:   dealloc_stack [[STACK3]]
 // CHECK: bb2:
@@ -327,7 +327,7 @@ bb2:
 // CHECK-LABEL: sil [ossa] @test_generic_partial_apply_apply_inguaranteed : $@convention(thin) <T> (@in T, @in T) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
 // CHECK:   [[STACK:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [take] [[ARG1]] to [initialization] [[STACK]]
+// CHECK:   copy_addr [take] [[ARG1]] to [init] [[STACK]]
 // CHECK:   apply {{%.*}}<T, T>([[ARG0]], [[STACK]])
 // CHECK:   destroy_addr [[STACK]]
 // CHECK:   destroy_addr [[ARG0]]
@@ -347,9 +347,9 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK:   [[EX:%.*]] = open_existential_addr
 // CHECK:   [[METHOD:%.*]] = witness_method
 // CHECK:   [[STACK1:%.*]] = alloc_stack $@opened
-// CHECK:   copy_addr [[EX]] to [initialization] [[STACK1]]
+// CHECK:   copy_addr [[EX]] to [init] [[STACK1]]
 // CHECK:   [[STACK2:%.*]] = alloc_stack $@opened
-// CHECK:   copy_addr [take] [[STACK1]] to [initialization] [[STACK2]]
+// CHECK:   copy_addr [take] [[STACK1]] to [init] [[STACK2]]
 // CHECK:   apply [[METHOD]]<@opened{{.*}}>([[STACK2]])
 // CHECK:   destroy_addr [[STACK2]]
 // CHECK:   dealloc_stack [[STACK2]]
@@ -360,7 +360,7 @@ bb0(%0 : $*SwiftP):
   %1 = open_existential_addr immutable_access %0 : $*SwiftP to $*@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
   %2 = witness_method $@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self, #SwiftP.foo, %1 : $*@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
   %0c = alloc_stack $@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
-  copy_addr %1 to [initialization] %0c : $*@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
+  copy_addr %1 to [init] %0c : $*@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
   %3 = partial_apply %2<@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self>(%0c) : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
   dealloc_stack %0c : $*@opened("4305E696-5685-11E5-9393-B8E856428C60", SwiftP) Self
   %4 = apply %3() : $@callee_owned () -> ()
@@ -390,11 +390,11 @@ bb0(%0 : $*MutatingProto, %1 : $MStruct):
   %4 = init_existential_addr %2 : $*MutatingProto, $MStruct
   store %1 to [trivial] %4 : $*MStruct
   %9 = alloc_stack $MutatingProto
-  copy_addr %2 to [initialization] %9 : $*MutatingProto
+  copy_addr %2 to [init] %9 : $*MutatingProto
   %11 = open_existential_addr mutable_access %9 : $*MutatingProto to $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83", MutatingProto) Self
   %12 = witness_method $@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83", MutatingProto) Self, #MutatingProto.mutatingMethod : <Self where Self : MutatingProto> (inout Self) -> () -> (), %11 : $*@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83", MutatingProto) Self : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
   %13 = apply %12<@opened("FC5F3CFA-A7A4-11E7-911F-685B35C48C83", MutatingProto) Self>(%11) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
-  copy_addr [take] %9 to [initialization] %0 : $*MutatingProto
+  copy_addr [take] %9 to [init] %0 : $*MutatingProto
   dealloc_stack %9 : $*MutatingProto
   destroy_addr %2 : $*MutatingProto
   dealloc_stack %2 : $*MutatingProto
@@ -407,12 +407,12 @@ sil [ossa] @dont_replace_copied_self_in_mutating_method_call2 : $@convention(thi
 bb0(%0 : $*MutatingProto, %1 : $@thick MutatingProto.Type, %2 : $*MutatingProto):
   %openType = open_existential_metatype %1 : $@thick MutatingProto.Type to $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self).Type
   %alloc2 = alloc_stack $MutatingProto
-  copy_addr %2 to [initialization] %alloc2 : $*MutatingProto
+  copy_addr %2 to [init] %alloc2 : $*MutatingProto
   %oeaddr = open_existential_addr mutable_access %alloc2 : $*MutatingProto to $*@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self
   %witmethod = witness_method $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self, #MutatingProto.mutatingMethod : <Self where Self : MutatingProto> (inout Self) -> () -> (), %openType : $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self).Type : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
   // CHECK: apply {{%.*}}<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F", any MutatingProto) Self>({{%.*}}) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> () // type-defs
   %apply = apply %witmethod<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self>(%oeaddr) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
-  copy_addr [take] %alloc2 to [initialization] %0 : $*MutatingProto
+  copy_addr [take] %alloc2 to [init] %0 : $*MutatingProto
   dealloc_stack %alloc2 : $*MutatingProto
   %27 = tuple ()
   return %27 : $()
@@ -591,7 +591,7 @@ bb0:
 
 sil shared [ossa] [transparent] [thunk] @genericClosure : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
-  copy_addr [take] %1 to [initialization] %0 : $*T
+  copy_addr [take] %1 to [init] %0 : $*T
   %12 = tuple ()
   return %12 : $()
 }
@@ -860,14 +860,14 @@ sil [ossa] @closure_with_guaranteed_args : $@convention(method) (@guaranteed CC1
 // CHECK-LABEL: sil [ossa] @test_apply_of_partial_apply_in : $@convention(thin) (@in CC1) -> () {
 // CHECK:   [[FUNC:%.*]] = function_ref
 // CHECK:   [[STACK1:%.*]] = alloc_stack $CC1
-// CHECK:   copy_addr [take] %0 to [initialization] [[STACK1]]
+// CHECK:   copy_addr [take] %0 to [init] [[STACK1]]
 // CHECK:   cond_br undef, bb1, bb2
 // CHECK: bb1:
 // CHECK:   destroy_addr [[STACK1]]
 // CHECK:   dealloc_stack [[STACK1]]
 // CHECK: bb2:
 // CHECK:   [[STACK2:%.*]] = alloc_stack $CC1
-// CHECK:   copy_addr [[STACK1]] to [initialization] [[STACK2]]
+// CHECK:   copy_addr [[STACK1]] to [init] [[STACK2]]
 // CHECK:   apply [[FUNC]]([[STACK2]])
 // CHECK:   dealloc_stack [[STACK2]]
 // CHECK:   destroy_addr [[STACK1]]
@@ -896,9 +896,9 @@ bb3:
 // CHECK-LABEL: sil [ossa] @test_apply_of_partial_apply_inguaranteed : $@convention(thin) (@in CC1) -> () {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK:   [[STACK1:%.*]] = alloc_stack $CC1
-// CHECK:   copy_addr [take] [[ARG]] to [initialization] [[STACK1]]
+// CHECK:   copy_addr [take] [[ARG]] to [init] [[STACK1]]
 // CHECK:   [[STACK2:%.*]] = alloc_stack $CC1
-// CHECK:   copy_addr [take] [[STACK1]] to [initialization] [[STACK2]]
+// CHECK:   copy_addr [take] [[STACK1]] to [init] [[STACK2]]
 // CHECK:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
@@ -919,7 +919,7 @@ sil [ossa] @test_apply_of_partial_apply_inguaranteed : $@convention(thin) (@in C
 bb0(%0 : $*CC1):
   %1 = function_ref @closure_with_inguaranteed_args : $@convention(method) (@in_guaranteed CC1) -> ()
   %2 = alloc_stack $CC1
-  copy_addr [take] %0 to [initialization] %2 : $*CC1
+  copy_addr [take] %0 to [init] %2 : $*CC1
   %3 = partial_apply %1(%2) : $@convention(method) (@in_guaranteed CC1) -> ()
   cond_br undef, bb1, bb2
 
@@ -1017,7 +1017,7 @@ bb3:
 // CHECK-NEXT:  [[S1:%[0-9]+]] = alloc_stack $Int
 // CHECK:       store %0 to [trivial] [[S1]]
 // CHECK:       [[S2:%[0-9]+]] = alloc_stack $Int
-// CHECK:       copy_addr [[S1]] to [initialization] [[S2]]
+// CHECK:       copy_addr [[S1]] to [init] [[S2]]
 // CHECK:       apply {{.*}}(%1, [[S2]])
 // CHECK:       destroy_addr [[S2]] : $*Int
 // CHECK:       dealloc_stack [[S2]] : $*Int
@@ -1056,7 +1056,7 @@ bb2:
 // CHECK-NEXT:  [[S1:%[0-9]+]] = alloc_stack $Klass
 // CHECK:       store %0 to [init] [[S1]]
 // CHECK:       [[S2:%[0-9]+]] = alloc_stack $Klass
-// CHECK:       copy_addr [take] [[S1]] to [initialization] [[S2]]
+// CHECK:       copy_addr [take] [[S1]] to [init] [[S2]]
 // CHECK:       apply {{.*}}(%1, [[S2]])
 // CHECK:       destroy_addr [[S2]] : $*Klass
 // CHECK:       dealloc_stack [[S2]] : $*Klass
@@ -1152,3 +1152,22 @@ bb3:
   %rv = tuple()
   return %rv : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_copy_and_borrow_of_closure
+// CHECK-NOT: partial_apply
+// CHECK-LABEL: } // end sil function 'test_copy_and_borrow_of_closure'
+sil [ossa] @test_copy_and_borrow_of_closure : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %3 = function_ref @closure2 : $@convention(thin) (Int) -> ()
+  %5 = partial_apply %3(%0) : $@convention(thin) (Int) -> ()
+  %6 = begin_borrow [lexical] %5 : $@callee_owned () -> ()
+  %7 = copy_value %6 : $@callee_owned () -> ()
+  apply %7() : $@callee_owned () -> ()
+  end_borrow %6 : $@callee_owned () -> ()
+  destroy_value %5 : $@callee_owned () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @closure2 : $@convention(thin) (Int) -> ()
+

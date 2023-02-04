@@ -647,7 +647,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
     return evaluateOrDefault(
         protocol->getASTContext().evaluator,
-        DefaultTypeRequest{knownProtocolKindIfAny.getValue(), dc}, nullptr);
+        DefaultTypeRequest{knownProtocolKindIfAny.value(), dc}, nullptr);
   }
   return Type();
 }

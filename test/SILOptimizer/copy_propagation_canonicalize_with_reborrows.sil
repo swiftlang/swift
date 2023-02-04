@@ -149,7 +149,8 @@ sil [ossa] @nohoist_destroy_over_reborrow_loop : $@convention(thin) () -> () {
 entry:
   %none1 = enum $FakeOptional<X>, #FakeOptional.none!enumelt
   %none2 = enum $FakeOptional<X>, #FakeOptional.none!enumelt
-  br head(%none2 : $FakeOptional<X>, %none1 : $FakeOptional<X>)
+  %none_borrow_2 = begin_borrow %none2 : $FakeOptional<X>
+  br head(%none_borrow_2 : $FakeOptional<X>, %none1 : $FakeOptional<X>)
 
 head(%reborrow : @guaranteed $FakeOptional<X>, %value : @owned $FakeOptional<X>):
   cond_br undef, body, exit
@@ -270,3 +271,82 @@ exit:
   return %retval : $()
 }
 
+// The owned phi %5 has an inner adjacent phi %4, so its end_borrow is
+// considered a use of the owned lifetime. The end_borrow/destroy
+// maintain their position.
+//
+// CHECK-LABEL: sil [ossa] @reborrow_adjacent_to_ownedphi : $@convention(thin) (@owned X) -> () {
+// CHECK:   end_borrow
+// CHECK:   destroy_value
+sil [ossa] @reborrow_adjacent_to_ownedphi : $@convention(thin) (@owned X) -> () {
+bb0(%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  br bb1(%1 : $X, %0 : $X)
+
+bb1(%4 : @guaranteed $X, %5 : @owned $X):
+  end_borrow %4 : $X
+  destroy_value %5 : $X
+  %23 = tuple ()
+  return %23 : $()
+}
+
+// The owned phi %5 has an inner adjacent phi %4, so its reborrow use,
+// %6 is considered a use of the owned value. Since %5 is also
+// consumed by an owned phi in bb2, the owned lifetime extends no further.
+//
+// Lifetime analysis is successful; the copy/destroy in bb1 are removed. The
+// end_borrow/destroy maintain their position.
+//
+// CHECK-LABEL: sil [ossa] @reborrow_adjacent_to_consume : $@convention(thin) (@owned X) -> () {
+// CHECK: bb1(%{{.*}} : @guaranteed $X, %{{.*}} : @owned $X):
+// CHECK-NEXT:   br bb2
+// CHECK: bb2(%{{.*}} : @guaranteed $X, %{{.*}} : @owned $X):
+// CHECK-NEXT:   end_borrow
+// CHECK-NEXT:   destroy_value
+sil [ossa] @reborrow_adjacent_to_consume : $@convention(thin) (@owned X) -> () {
+bb0(%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  br bb1(%1 : $X, %0 : $X)
+
+bb1(%4 : @guaranteed $X, %5 : @owned $X):
+  %copy = copy_value %5 : $X
+  destroy_value %copy : $X
+  br bb2(%4 : $X, %5 : $X)
+
+bb2(%6 : @guaranteed $X, %7 : @owned $X):
+  end_borrow %6 : $X
+  destroy_value %7 : $X
+  %23 = tuple ()
+  return %23 : $()
+}
+
+// The owned phi %5 has an inner adjacent phi %4, so its reborrow use,
+// %6 is considered a use of the owned value. Since %5 is not consumed
+// by an owned phi in bb2, the owned lifetime extends to the uses of
+// the second reborrow, %6. The copy/destroy in bb2 are removed. The
+// end_borrow/destroy maintain their position.
+//
+// Lifetime analysis is successful; the copy/destroy in bb2 are removed.
+//
+// CHECK-LABEL: sil [ossa] @reborrow_no_adjacent_consume : $@convention(thin) (@owned X) -> () {
+// CHECK: bb1(%{{.*}} : @guaranteed $X, %{{.*}} : @owned $X):
+// CHECK-NEXT:   br bb2
+// CHECK: bb2(%{{.*}} : @guaranteed $X):
+// CHECK-NEXT:   end_borrow
+// CHECK-NEXT:   destroy_value
+sil [ossa] @reborrow_no_adjacent_consume : $@convention(thin) (@owned X) -> () {
+bb0(%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  br bb1(%1 : $X, %0 : $X)
+
+bb1(%4 : @guaranteed $X, %5 : @owned $X):
+  br bb2(%4 : $X)
+
+bb2(%6 : @guaranteed $X):
+  %copy = copy_value %5 : $X
+  destroy_value %copy : $X
+  end_borrow %6 : $X
+  destroy_value %5 : $X
+  %23 = tuple ()
+  return %23 : $()
+}

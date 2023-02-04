@@ -35,7 +35,7 @@ bb0(%0 : $*Complex<RealType>, %1 : $*Complex<RealType>, %2 : $Bool, %3 : $@thin 
   debug_value %3 : $@thin Complex<RealType>.Type, let, name "self", argno 3
   %7 = alloc_stack $RealType, let, name "θ"
   %8 = alloc_stack $Complex<RealType>
-  copy_addr %1 to [initialization] %8 : $*Complex<RealType>
+  copy_addr %1 to [init] %8 : $*Complex<RealType>
   %10 = function_ref @callee : $@convention(method) <τ_0_0 where τ_0_0 : FloatingPoint> (@in_guaranteed Complex<τ_0_0>) -> @out τ_0_0
   %11 = apply %10<RealType>(%7, %8) : $@convention(method) <τ_0_0 where τ_0_0 : FloatingPoint> (@in_guaranteed Complex<τ_0_0>) -> @out τ_0_0
   destroy_addr %8 : $*Complex<RealType>
@@ -51,19 +51,19 @@ bb1:
   %20 = witness_method $RealType, #FloatingPoint.infinity!getter : <Self where Self : FloatingPoint> (Self.Type) -> () -> Self : $@convention(witness_method: FloatingPoint) <τ_0_0 where τ_0_0 : FloatingPoint> (@thick τ_0_0.Type) -> @out τ_0_0
   %21 = apply %20<RealType>(%19, %18) : $@convention(witness_method: FloatingPoint) <τ_0_0 where τ_0_0 : FloatingPoint> (@thick τ_0_0.Type) -> @out τ_0_0
   %22 = alloc_stack $RealType
-  copy_addr [take] %7 to [initialization] %22 : $*RealType
+  copy_addr [take] %7 to [init] %22 : $*RealType
   %24 = alloc_stack $Complex<RealType>
   %25 = alloc_stack $RealType
-  copy_addr [take] %19 to [initialization] %25 : $*RealType
+  copy_addr [take] %19 to [init] %25 : $*RealType
   %27 = struct_element_addr %24 : $*Complex<RealType>, #Complex.x
-  copy_addr [take] %25 to [initialization] %27 : $*RealType
+  copy_addr [take] %25 to [init] %27 : $*RealType
   dealloc_stack %25 : $*RealType
   %30 = alloc_stack $RealType
-  copy_addr [take] %22 to [initialization] %30 : $*RealType
+  copy_addr [take] %22 to [init] %30 : $*RealType
   %32 = struct_element_addr %24 : $*Complex<RealType>, #Complex.y
-  copy_addr [take] %30 to [initialization] %32 : $*RealType
+  copy_addr [take] %30 to [init] %32 : $*RealType
   dealloc_stack %30 : $*RealType
-  copy_addr %24 to [initialization] %0 : $*Complex<RealType>
+  copy_addr %24 to [init] %0 : $*Complex<RealType>
   destroy_addr %24 : $*Complex<RealType>
   dealloc_stack %24 : $*Complex<RealType>
   %38 = tuple ()
@@ -78,19 +78,19 @@ bb2:
   %45 = witness_method $RealType, #FloatingPoint.infinity!getter : <Self where Self : FloatingPoint> (Self.Type) -> () -> Self : $@convention(witness_method: FloatingPoint) <τ_0_0 where τ_0_0 : FloatingPoint> (@thick τ_0_0.Type) -> @out τ_0_0
   %46 = apply %45<RealType>(%44, %43) : $@convention(witness_method: FloatingPoint) <τ_0_0 where τ_0_0 : FloatingPoint> (@thick τ_0_0.Type) -> @out τ_0_0
   %47 = alloc_stack $RealType
-  copy_addr [take] %7 to [initialization] %47 : $*RealType
+  copy_addr [take] %7 to [init] %47 : $*RealType
   %49 = alloc_stack $Complex<RealType>
   %50 = alloc_stack $RealType
-  copy_addr [take] %44 to [initialization] %50 : $*RealType
+  copy_addr [take] %44 to [init] %50 : $*RealType
   %52 = struct_element_addr %49 : $*Complex<RealType>, #Complex.x
-  copy_addr [take] %50 to [initialization] %52 : $*RealType
+  copy_addr [take] %50 to [init] %52 : $*RealType
   dealloc_stack %50 : $*RealType
   %55 = alloc_stack $RealType
-  copy_addr [take] %47 to [initialization] %55 : $*RealType
+  copy_addr [take] %47 to [init] %55 : $*RealType
   %57 = struct_element_addr %49 : $*Complex<RealType>, #Complex.y
-  copy_addr [take] %55 to [initialization] %57 : $*RealType
+  copy_addr [take] %55 to [init] %57 : $*RealType
   dealloc_stack %55 : $*RealType
-  copy_addr %49 to [initialization] %0 : $*Complex<RealType>
+  copy_addr %49 to [init] %0 : $*Complex<RealType>
   destroy_addr %49 : $*Complex<RealType>
   dealloc_stack %49 : $*Complex<RealType>
   %63 = tuple ()

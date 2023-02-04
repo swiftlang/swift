@@ -296,7 +296,7 @@ func archetype_member_ref<T : Runcible>(_ x: T) {
   x.free_method()
   // CHECK:      [[READ:%.*]] = begin_access [read] [unknown] [[X:%.*]]
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
-  // CHECK-NEXT: copy_addr [[READ]] to [initialization] [[TEMP]]
+  // CHECK-NEXT: copy_addr [[READ]] to [init] [[TEMP]]
   // CHECK-NEXT: end_access [[READ]]
   // CHECK-NEXT: witness_method $T, #Runcible.free_method :
   // CHECK-NEXT: apply
@@ -635,7 +635,7 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 // CHECK-NEXT: [[S_READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: [[KP:%[0-9]+]] = upcast [[KP_TEMP]]
 // CHECK-NEXT: [[S_TEMP:%[0-9]+]] = alloc_stack $NonTrivialStruct
-// CHECK-NEXT: copy_addr [[S_READ]] to [initialization] [[S_TEMP]]
+// CHECK-NEXT: copy_addr [[S_READ]] to [init] [[S_TEMP]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @swift_getAtKeyPath :
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int

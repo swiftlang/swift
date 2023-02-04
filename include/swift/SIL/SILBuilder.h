@@ -263,7 +263,10 @@ public:
   bool hasValidInsertionPoint() const { return BB != nullptr; }
   SILBasicBlock *getInsertionBB() const { return BB; }
   SILBasicBlock::iterator getInsertionPoint() const { return InsertPt; }
-  SILLocation getInsertionPointLoc() const { return InsertPt->getLoc(); }
+  SILLocation getInsertionPointLoc() const {
+    assert(!insertingAtEndOfBlock());
+    return InsertPt->getLoc();
+  }
 
   /// insertingAtEndOfBlock - Return true if the insertion point is at the end
   /// of the current basic block.  False if we're inserting before an existing
@@ -404,6 +407,11 @@ public:
         getSILDebugLocation(Loc), elementType, getFunction(),
         substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, isLexical,
         wasMoved));
+  }
+
+  AllocPackInst *createAllocPack(SILLocation loc, SILType packType) {
+    return insert(AllocPackInst::create(getSILDebugLocation(loc), packType,
+                                        getFunction()));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
@@ -745,6 +753,7 @@ public:
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
                                      bool isLexical = false) {
+    assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
                       BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical));
@@ -831,12 +840,8 @@ public:
   }
 
   EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
-    if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
-      if (auto *ti = arg->getSingleTerminator()) {
-        assert(!ti->isTransformationTerminator() &&
-               "Transforming terminators do not have end_borrow");
-      }
-    }
+    assert(!SILArgument::isTerminatorResult(borrowedValue) &&
+               "terminator results do not have end_borrow");
     return insert(new (getModule())
                       EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
   }
@@ -1936,6 +1941,40 @@ public:
         getSILDebugLocation(Loc), Existential));
   }
 
+  DynamicPackIndexInst *
+  createDynamicPackIndex(SILLocation loc, SILValue indexValue,
+                         CanPackType indexedPackType) {
+    return insert(DynamicPackIndexInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              indexValue, indexedPackType));
+  }
+
+  PackPackIndexInst *
+  createPackPackIndex(SILLocation loc, unsigned sliceStartIndex,
+                      SILValue indexWithinSlice,
+                      CanPackType indexedPackType) {
+    return insert(PackPackIndexInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              sliceStartIndex, indexWithinSlice,
+                              indexedPackType));
+  }
+
+  ScalarPackIndexInst *
+  createScalarPackIndex(SILLocation loc, unsigned componentIndex,
+                        CanPackType indexedPackType) {
+    return insert(ScalarPackIndexInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              componentIndex, indexedPackType));
+  }
+
+  OpenPackElementInst *
+  createOpenPackElement(SILLocation loc, SILValue packIndex,
+                        GenericEnvironment *openedElementEnvironment) {
+    return insert(OpenPackElementInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              packIndex, openedElementEnvironment));
+  }
+
   ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,
                                                      SILValue Storage) {
     auto CaptureTy = Storage->getType()
@@ -2073,6 +2112,10 @@ public:
   DeallocStackInst *createDeallocStack(SILLocation Loc, SILValue operand) {
     return insert(new (getModule())
                       DeallocStackInst(getSILDebugLocation(Loc), operand));
+  }
+  DeallocPackInst *createDeallocPack(SILLocation loc, SILValue operand) {
+    return insert(new (getModule())
+                      DeallocPackInst(getSILDebugLocation(loc), operand));
   }
   DeallocStackRefInst *createDeallocStackRef(SILLocation Loc,
                                                      SILValue operand) {
@@ -2625,7 +2668,7 @@ public:
       IndexSubset *ResultIndices, SILValue OriginalFunction,
       Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
     SILValue jvpAndVJPArray[2];
-    if (JVPAndVJPFunctions.hasValue()) {
+    if (JVPAndVJPFunctions.has_value()) {
       jvpAndVJPArray[0] = JVPAndVJPFunctions->first;
       jvpAndVJPArray[1] = JVPAndVJPFunctions->second;
     }
@@ -2635,7 +2678,7 @@ public:
         JVPAndVJPFunctions,
         hasOwnership()
             ? DifferentiableFunctionInst::getMergedOwnershipKind(
-                  OriginalFunction, JVPAndVJPFunctions.hasValue()
+                  OriginalFunction, JVPAndVJPFunctions.has_value()
                                         ? ArrayRef<SILValue>(jvpAndVJPArray, 2)
                                         : ArrayRef<SILValue>())
             : ValueOwnershipKind(OwnershipKind::None));
@@ -2726,6 +2769,14 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
+  // Weak linking support
+  //===--------------------------------------------------------------------===//
+  HasSymbolInst *createHasSymbol(SILLocation Loc, ValueDecl *Decl) {
+    return insert(new (getModule()) HasSymbolInst(
+        getModule(), getSILDebugLocation(Loc), Decl));
+  }
+
+  //===--------------------------------------------------------------------===//
   // Private Helper Methods
   //===--------------------------------------------------------------------===//
 
@@ -2797,7 +2848,7 @@ private:
   }
 };
 
-/// An wrapper on top of SILBuilder's constructor that automatically sets the
+/// A wrapper on top of SILBuilder's constructor that automatically sets the
 /// current SILDebugScope based on the specified insertion point. This is useful
 /// for situations where a single SIL instruction is lowered into a sequence of
 /// SIL instructions.

@@ -161,6 +161,22 @@ public:
   ~DebugScope() { SGF.leaveDebugScope(); }
 };
 
+/// A scope that represents a Macro expansion.
+class LLVM_LIBRARY_VISIBILITY MacroScope {
+  SILGenFunction &SGF;
+
+public:
+  explicit MacroScope(SILGenFunction &SGF, CleanupLocation loc,
+                      SILLocation MacroExpansion, StringRef MacroName,
+                      SILLocation MacroNameLoc)
+      : SGF(SGF) {
+    SGF.enterDebugScope(loc, false, MacroExpansion, MacroName, MacroNameLoc);
+  }
+
+  ~MacroScope() { SGF.leaveDebugScope(); }
+};
+
+
 } // end namespace Lowering
 } // end namespace swift
 

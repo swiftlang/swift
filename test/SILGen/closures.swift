@@ -53,7 +53,7 @@ func read_only_capture(_ x: Int) -> Int {
 // CHECK:   } // end sil function '$s8closures17read_only_captureyS2iF'
 
 // CHECK: sil private [ossa] @[[CAP_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : @guaranteed ${ var Int }):
+// CHECK: bb0([[XBOX:%[0-9]+]] : @closureCapture @guaranteed ${ var Int }):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[XADDR]] : $*Int
 // CHECK: [[X:%[0-9]+]] = load [trivial] [[ACCESS]]
@@ -71,7 +71,7 @@ func write_to_capture(_ x: Int) -> Int {
   // CHECK:   [[X2BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[X2BOX_PB:%.*]] = project_box [[X2BOX]]
   // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[XBOX_PB]] : $*Int
-  // CHECK:   copy_addr [[ACCESS]] to [initialization] [[X2BOX_PB]]
+  // CHECK:   copy_addr [[ACCESS]] to [init] [[X2BOX_PB]]
   // CHECK:   [[X2LIFETIME:%[0-9]+]] = begin_borrow [[X2BOX]]
   // CHECK:   mark_function_escape [[X2BOX_PB]]
   var x2 = x
@@ -93,7 +93,7 @@ func write_to_capture(_ x: Int) -> Int {
 // CHECK:  } // end sil function '$s8closures16write_to_captureyS2iF'
 
 // CHECK: sil private [ossa] @[[SCRIB_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : @guaranteed ${ var Int }):
+// CHECK: bb0([[XBOX:%[0-9]+]] : @closureCapture @guaranteed ${ var Int }):
 // CHECK:   [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[XADDR]] : $*Int
 // CHECK:   assign {{%[0-9]+}} to [[ACCESS]]
@@ -140,10 +140,10 @@ func capture_local_func(_ x: Int) -> () -> () -> Int {
 // CHECK: } // end sil function '$s8closures18capture_local_funcySiycycSiF'
 
 // CHECK: sil private [ossa] @[[ALEPH_NAME:\$s8closures18capture_local_funcySiycycSiF5alephL_SiyF]] : $@convention(thin) (@guaranteed { var Int }) -> Int {
-// CHECK: bb0([[XBOX:%[0-9]+]] : @guaranteed ${ var Int }):
+// CHECK: bb0([[XBOX:%[0-9]+]] : @closureCapture @guaranteed ${ var Int }):
 
 // CHECK: sil private [ossa] @[[BETH_NAME]] : $@convention(thin) (@guaranteed { var Int }) -> @owned @callee_guaranteed () -> Int {
-// CHECK: bb0([[XBOX:%[0-9]+]] : @guaranteed ${ var Int }):
+// CHECK: bb0([[XBOX:%[0-9]+]] : @closureCapture @guaranteed ${ var Int }):
 // CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]]
 // CHECK:   [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME]] : $@convention(thin) (@guaranteed { var Int }) -> Int
 // CHECK:   [[XBOX_COPY:%.*]] = copy_value [[XBOX]]
@@ -170,7 +170,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
   // CHECK: return [[RET]]
 }
 // CHECK: sil private [ossa] @[[CLOSURE_NAME]]
-// CHECK: bb0([[XADDR:%[0-9]+]] : $*Int):
+// CHECK: bb0([[XADDR:%[0-9]+]] : @closureCapture $*Int):
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[XADDR]] : $*Int
 // CHECK: [[X:%[0-9]+]] = load [trivial] [[ACCESS]]
 // CHECK: return [[X]]
@@ -192,7 +192,7 @@ func small_closure_capture(_ x: Int) -> Int {
   // CHECK: return [[RET]]
 }
 // CHECK: sil private [ossa] @[[CLOSURE_NAME]]
-// CHECK: bb0([[XADDR:%[0-9]+]] : $*Int):
+// CHECK: bb0([[XADDR:%[0-9]+]] : @closureCapture $*Int):
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[XADDR]] : $*Int
 // CHECK: [[X:%[0-9]+]] = load [trivial] [[ACCESS]]
 // CHECK: return [[X]]
@@ -213,7 +213,7 @@ func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
   // CHECK: return [[ANON_CLOSURE_APP]]
 }
 // CHECK: sil private [ossa] @[[CLOSURE_NAME]] : $@convention(thin) (Int, @guaranteed { var Int }) -> Int
-// CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : @guaranteed ${ var Int }):
+// CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : @closureCapture @guaranteed ${ var Int }):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // CHECK: [[INTTYPE:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[XACCESS:%[0-9]+]] = begin_access [read] [unknown] [[XADDR]] : $*Int
@@ -290,7 +290,7 @@ func generateWithConstant(_ x : SomeSpecificClass) {
 }
 
 // CHECK-LABEL: sil private [ossa] @$s8closures20generateWithConstantyyAA17SomeSpecificClassCFAA0eG0CyXEfU_ : $@convention(thin) (@guaranteed SomeSpecificClass) -> @owned SomeClass {
-// CHECK: bb0([[T0:%.*]] : @guaranteed $SomeSpecificClass):
+// CHECK: bb0([[T0:%.*]] : @closureCapture @guaranteed $SomeSpecificClass):
 // CHECK:   debug_value [[T0]] : $SomeSpecificClass, let, name "x", argno 1
 // CHECK:   [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK:   [[T0_COPY_CASTED:%.*]] = upcast [[T0_COPY]] : $SomeSpecificClass to $SomeClass
@@ -374,7 +374,7 @@ func closeOverLetLValue() {
 // The let property needs to be captured into a temporary stack slot so that it
 // is loadable even though we capture the value.
 // CHECK-LABEL: sil private [ossa] @$s8closures18closeOverLetLValueyyFSiyXEfU_ : $@convention(thin) (@guaranteed ClassWithIntProperty) -> Int {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $ClassWithIntProperty):
+// CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $ClassWithIntProperty):
 // CHECK:   [[TMP_CLASS_ADDR:%.*]] = alloc_stack $ClassWithIntProperty, let, name "a", argno 1
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   store [[COPY_ARG]] to [init] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
@@ -389,7 +389,7 @@ func closeOverLetLValue() {
 // CHECK: } // end sil function '$s8closures18closeOverLetLValueyyFSiyXEfU_'
 
 // GUARANTEED-LABEL: sil private [ossa] @$s8closures18closeOverLetLValueyyFSiyXEfU_ : $@convention(thin) (@guaranteed ClassWithIntProperty) -> Int {
-// GUARANTEED: bb0(%0 : @guaranteed $ClassWithIntProperty):
+// GUARANTEED: bb0(%0 : @closureCapture @guaranteed $ClassWithIntProperty):
 // GUARANTEED:   [[TMP:%.*]] = alloc_stack $ClassWithIntProperty
 // GUARANTEED:   [[COPY:%.*]] = copy_value %0 : $ClassWithIntProperty
 // GUARANTEED:   store [[COPY]] to [init] [[TMP]] : $*ClassWithIntProperty
@@ -421,7 +421,7 @@ struct StructWithMutatingMethod {
 
 // Check that the closure body only takes the pointer.
 // CHECK-LABEL: sil private [ossa] @$s8closures24StructWithMutatingMethodV08mutatingE0{{.*}} : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int {
-// CHECK:       bb0(%0 : $*StructWithMutatingMethod):
+// CHECK:       bb0(%0 : @closureCapture $*StructWithMutatingMethod):
 
 class SuperBase {
   func boom() {}
@@ -436,7 +436,7 @@ class SuperSub : SuperBase {
   // CHECK: } // end sil function '$s8closures8SuperSubC1ayyF'
   func a() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> () {
-    // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
+    // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
     // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom :
     // CHECK:   = apply [[CLASS_METHOD]]([[ARG]])
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -459,13 +459,13 @@ class SuperSub : SuperBase {
   // CHECK: } // end sil function '$s8closures8SuperSubC1byyF'
   func b() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> () {
-    // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
+    // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:\$s8closures8SuperSubC1b.*]] : $@convention(thin) (@guaranteed SuperSub) -> ()
     // CHECK:   = apply [[INNER]]([[ARG]])
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     func b1() {
       // CHECK: sil private [ossa] @[[INNER_FUNC_2]] : $@convention(thin) (@guaranteed SuperSub) -> () {
-      // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
+      // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
       // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom :
       // CHECK:   = apply [[CLASS_METHOD]]([[ARG]]) : $@convention(method) (@guaranteed SuperSub) -> ()
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -499,7 +499,7 @@ class SuperSub : SuperBase {
   // CHECK: } // end sil function '$s8closures8SuperSubC1cyyF'
   func c() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> ()
-    // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
+    // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
     // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom :
     // CHECK:   = apply [[CLASS_METHOD]]([[ARG]]) : $@convention(method) (@guaranteed SuperSub) -> ()
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -531,13 +531,13 @@ class SuperSub : SuperBase {
   // CHECK: } // end sil function '$s8closures8SuperSubC1dyyF'
   func d() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> () {
-    // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
+    // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:\$s8closures8SuperSubC1d.*]] : $@convention(thin) (@guaranteed SuperSub) -> ()
     // CHECK:   = apply [[INNER]]([[ARG]])
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     let d1 = { () -> Void in
       // CHECK: sil private [ossa] @[[INNER_FUNC_2]] : $@convention(thin) (@guaranteed SuperSub) -> () {
-      // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
+      // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
       // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @$s8closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
@@ -559,7 +559,7 @@ class SuperSub : SuperBase {
   // CHECK: } // end sil function '$s8closures8SuperSubC1eyyF'
   func e() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_NAME1]] : $@convention(thin)
-    // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
+    // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_NAME2:\$s8closures8SuperSubC1e.*]] : $@convention(thin)
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
@@ -574,7 +574,7 @@ class SuperSub : SuperBase {
     // CHECK: } // end sil function '[[INNER_FUNC_NAME1]]'
     func e1() {
       // CHECK: sil private [ossa] @[[INNER_FUNC_NAME2]] : $@convention(thin)
-      // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
+      // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
       // CHECK:   [[ARG_COPY_SUPERCAST:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
       // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @$s8closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
@@ -599,7 +599,7 @@ class SuperSub : SuperBase {
   // CHECK: } // end sil function '$s8closures8SuperSubC1fyyF'
   func f() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> () {
-    // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
+    // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:\$s8closures8SuperSubC1fyyFyycfU_yyKXEfu_]] :
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
@@ -610,7 +610,7 @@ class SuperSub : SuperBase {
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     let f1 = {
       // CHECK: sil private [transparent] [ossa] @[[INNER_FUNC_2]]
-      // CHECK: bb0({{.*}}, [[ARG:%.*]] : @guaranteed $SuperSub):
+      // CHECK: bb0({{.*}}, [[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
       // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @$s8closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
@@ -628,7 +628,7 @@ class SuperSub : SuperBase {
   // CHECK: } // end sil function '$s8closures8SuperSubC1gyyF'
   func g() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> ()
-    // CHECK: bb0([[ARG:%.*]] : @guaranteed $SuperSub):
+    // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:\$s8closures8SuperSubC1g.*]] :
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
@@ -639,7 +639,7 @@ class SuperSub : SuperBase {
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     func g1() {
       // CHECK: sil private [transparent] [ossa] @[[INNER_FUNC_2]] :
-      // CHECK: bb0({{.*}}, [[ARG:%.*]] : @guaranteed $SuperSub):
+      // CHECK: bb0({{.*}}, [[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
       // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @$s8closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
@@ -695,7 +695,7 @@ class SuperSub : SuperBase {
 // -- outer closure
 // -- strong +0, unowned +1
 // CHECK: sil private [ossa] @[[OUTER_CLOSURE_FUN:\$s8closures24UnownedSelfNestedCaptureC06nestedE0yyFACycyXEfU_]] : $@convention(thin) (@guaranteed @sil_unowned UnownedSelfNestedCapture) -> @owned @callee_guaranteed () -> @owned UnownedSelfNestedCapture {
-// CHECK: bb0([[CAPTURED_SELF:%.*]] : @guaranteed $@sil_unowned UnownedSelfNestedCapture):
+// CHECK: bb0([[CAPTURED_SELF:%.*]] : @closureCapture @guaranteed $@sil_unowned UnownedSelfNestedCapture):
 // -- strong +0, unowned +2
 // CHECK:         [[CAPTURED_SELF_COPY:%.*]] = copy_value [[CAPTURED_SELF]] :
 // -- closure takes ownership of unowned ref
@@ -707,7 +707,7 @@ class SuperSub : SuperBase {
 // -- inner closure
 // -- strong +0, unowned +1
 // CHECK: sil private [ossa] @[[INNER_CLOSURE_FUN:\$s8closures24UnownedSelfNestedCaptureC06nestedE0yyFACycyXEfU_ACycfU_]] : $@convention(thin) (@guaranteed @sil_unowned UnownedSelfNestedCapture) -> @owned UnownedSelfNestedCapture {
-// CHECK: bb0([[CAPTURED_SELF:%.*]] : @guaranteed $@sil_unowned UnownedSelfNestedCapture):
+// CHECK: bb0([[CAPTURED_SELF:%.*]] : @closureCapture @guaranteed $@sil_unowned UnownedSelfNestedCapture):
 // -- strong +1, unowned +1
 // CHECK:         [[SELF:%.*]] = strong_copy_unowned_value [[CAPTURED_SELF:%.*]] :
 // -- strong +1, unowned +0 (claimed by return)
@@ -727,7 +727,7 @@ class ConcreteBase {
 }
 
 // CHECK-LABEL: sil private [ossa] @$s8closures14GenericDerivedC4swimyyFyyXEfU_ : $@convention(thin) <Ocean> (@guaranteed GenericDerived<Ocean>) -> ()
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $GenericDerived<Ocean>):
+// CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $GenericDerived<Ocean>):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $GenericDerived<Ocean> to $ConcreteBase
 // CHECK:   [[METHOD:%.*]] = function_ref @$s8closures12ConcreteBaseC4swimyyF
@@ -845,3 +845,22 @@ func closeOverStructDontCopyTrivial() {
   a = StructWithMutatingMethod()
   takeClosure { a.x }
 }
+
+// Make sure that we handle closure argument initialization when due to forward
+// declaration we represent a let as an lvalue
+func test() {
+    let k: SomeClass
+    let k2: SomeClass
+    var boolean: Bool { true }
+
+    if boolean {
+        k = SomeClass()
+        k2 = SomeClass()
+    } else {
+        k = SomeClass()
+        k2 = SomeClass()
+    }
+
+    assert(k.x == k2.x)
+}
+

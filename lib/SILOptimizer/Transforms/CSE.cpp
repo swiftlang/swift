@@ -27,8 +27,8 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -583,7 +583,7 @@ public:
   /// their lookup.
   ScopedHTType *AvailableValues;
 
-  SideEffectAnalysis *SEA;
+  BasicCalleeAnalysis *BCA;
 
   SILOptFunctionBuilder &FuncBuilder;
 
@@ -595,10 +595,10 @@ public:
   /// load of the property value.
   llvm::SmallVector<ApplyInst *, 8> lazyPropertyGetters;
 
-  CSE(bool RunsOnHighLevelSil, SideEffectAnalysis *SEA,
+  CSE(bool RunsOnHighLevelSil, BasicCalleeAnalysis *BCA,
       SILOptFunctionBuilder &FuncBuilder, DeadEndBlocks &DeadEndBBs,
       OwnershipFixupContext &RAUWFixupContext)
-      : SEA(SEA), FuncBuilder(FuncBuilder), DeadEndBBs(DeadEndBBs),
+      : BCA(BCA), FuncBuilder(FuncBuilder), DeadEndBBs(DeadEndBBs),
         RAUWFixupContext(RAUWFixupContext),
         RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
@@ -665,7 +665,8 @@ private:
   };
 
   bool processNode(DominanceInfoNode *Node);
-  bool processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V);
+  bool processOpenExistentialRef(OpenExistentialRefInst *Inst,
+                                 OpenExistentialRefInst *V);
 };
 } // namespace swift
 
@@ -802,11 +803,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
 /// \Inst is the open_existential_ref instruction
 /// \V is the dominating open_existential_ref instruction
 bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
-                                    ValueBase *V) {
-  // All the open instructions are single-value instructions.
-  auto VI = dyn_cast<SingleValueInstruction>(V);
-  if (!VI) return false;
-
+                                    OpenExistentialRefInst *VI) {
   llvm::SmallSetVector<SILInstruction *, 16> Candidates;
   const auto OldOpenedArchetype = Inst->getDefinedOpenedArchetype();
   const auto NewOpenedArchetype = VI->getDefinedOpenedArchetype();
@@ -845,7 +842,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
   // Use a cloner. It makes copying the instruction and remapping of
   // opened archetypes trivial.
   InstructionCloner Cloner(Inst->getFunction());
-  Cloner.registerOpenedExistentialRemapping(
+  Cloner.registerLocalArchetypeRemapping(
       OldOpenedArchetype->castTo<ArchetypeType>(), NewOpenedArchetype);
   auto &Builder = Cloner.getBuilder();
 
@@ -1067,16 +1064,22 @@ bool CSE::canHandle(SILInstruction *Inst) {
           return false;
       }
     }
-    
+
+    if (!AI->getFunction()->hasOwnership()) {
+      // In non-OSSA we don't balance CSE'd apply results which return an
+      // owned value.
+      if (auto ri = AI->getSingleResult()) {
+        if (ri.value().getConvention() != ResultConvention::Unowned)
+          return false;
+      }
+    }
+
     // We can CSE function calls which do not read or write memory and don't
     // have any other side effects.
-    FunctionSideEffects Effects;
-    SEA->getCalleeEffects(Effects, AI);
-
     // Note that the function also may not contain any retains. And there are
     // functions which are read-none and have a retain, e.g. functions which
     // _convert_ a global_addr to a reference and retain it.
-    auto MB = Effects.getMemBehavior(RetainObserveKind::ObserveRetains);
+    auto MB = BCA->getMemoryBehavior(ApplySite(AI), /*observeRetains*/false);
     if (MB == SILInstruction::MemoryBehavior::None)
       return true;
     
@@ -1395,14 +1398,14 @@ class SILCSE : public SILFunctionTransform {
 
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
 
-    auto *SEA = PM->getAnalysis<SideEffectAnalysis>();
+    auto *BCA = PM->getAnalysis<BasicCalleeAnalysis>();
     SILOptFunctionBuilder FuncBuilder(*this);
 
     auto *Fn = getFunction();
     DeadEndBlocks DeadEndBBs(Fn);
     InstModCallbacks callbacks;
     OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs};
-    CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, FixupCtx);
+    CSE C(RunsOnHighLevelSil, BCA, FuncBuilder, DeadEndBBs, FixupCtx);
     bool Changed = false;
 
     // Perform the traditional CSE.

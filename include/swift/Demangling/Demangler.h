@@ -210,6 +210,16 @@ public:
     Capacity += Growth;
   }
 
+  /// Copy a std::string to memory managed by the NodeFactory, returning a
+  /// StringRef pointing to the copied string data.
+  StringRef copyString(const std::string &str) {
+    size_t stringSize = str.size() + 1; // + 1 for terminating NUL.
+
+    char *copiedString = Allocate<char>(stringSize);
+    memcpy(copiedString, str.data(), stringSize);
+    return {copiedString, str.size()};
+  }
+
   /// Creates a node of kind \p K.
   NodePointer createNode(Node::Kind K);
 
@@ -465,8 +475,9 @@ protected:
   friend DemangleInitRAII;
   
   void addSubstitution(NodePointer Nd) {
-    if (Nd)
+    if (Nd) {
       Substitutions.push_back(Nd, *this);
+    }
   }
 
   NodePointer addChild(NodePointer Parent, NodePointer Child);
@@ -518,6 +529,7 @@ protected:
   NodePointer popFunctionParamLabels(NodePointer FuncType);
   NodePointer popTuple();
   NodePointer popTypeList();
+  NodePointer popPack();
   NodePointer popProtocol();
   NodePointer demangleBoundGenericType();
   NodePointer demangleBoundGenericArgs(NodePointer nominalType,
@@ -577,6 +589,7 @@ protected:
   NodePointer demangleGenericRequirement();
   NodePointer demangleGenericType();
   NodePointer demangleValueWitness();
+  NodePointer demangleMacroExpansion();
 
   NodePointer demangleTypeMangling();
   NodePointer demangleSymbolicReference(unsigned char rawKind);

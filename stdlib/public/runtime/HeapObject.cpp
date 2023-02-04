@@ -25,6 +25,7 @@
 #include "RuntimeInvocationsTracking.h"
 #include "WeakReference.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/CustomRRABI.h"
 #include "swift/Runtime/InstrumentsSupport.h"
 #include "swift/shims/GlobalObjects.h"
 #include "swift/shims/RuntimeShims.h"
@@ -42,6 +43,9 @@
 # include <objc/objc.h>
 # include "swift/Runtime/ObjCBridge.h"
 # include <dlfcn.h>
+#endif
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+# include <malloc_type_private.h>
 #endif
 #include "Leaks.h"
 
@@ -70,7 +74,7 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
   // Check the top of the second byte instead, since Android AArch64 reserves
   // the top byte for its own pointer tagging since Android 11.
   return (intptr_t)((uintptr_t)p << 8) > 0;
-#elif defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
+#elif defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__riscv) && __riscv_xlen == 64) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
   // On these platforms, except s390x, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
   // On s390x it is theoretically possible to have high bit set but in practice
@@ -114,12 +118,118 @@ static HeapObject *_swift_tryRetain_(HeapObject *object)
     return _ ## name ## _ args; \
 } while(0)
 
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+static malloc_type_summary_t
+computeMallocTypeSummary(const HeapMetadata *heapMetadata) {
+  assert(isHeapMetadataKind(heapMetadata->getKind()));
+  auto *classMetadata = heapMetadata->getClassObject();
+  auto *typeDesc = heapMetadata->getTypeContextDescriptor();
+
+  malloc_type_summary_t summary = {};
+
+  // Objc
+  if (classMetadata && classMetadata->isPureObjC()) {
+    summary.type_kind = MALLOC_TYPE_KIND_OBJC;
+    return summary;
+  }
+
+  // Runtime internal and unclassified
+  if (!typeDesc) {
+    summary.type_kind = MALLOC_TYPE_KIND_CXX;
+    return summary;
+  }
+
+  // Swift
+  summary.type_kind = MALLOC_TYPE_KIND_SWIFT;
+
+  bool isGenericData = true;
+  for (auto &field : *typeDesc->Fields.get()) {
+    if (field.isIndirectCase()) {
+      isGenericData = false;
+      if (field.isVar())
+        summary.layout_semantics.data_pointer = true;
+      else
+        summary.layout_semantics.immutable_pointer = true;
+    }
+  }
+
+  if (classMetadata->Flags & ClassFlags::UsesSwiftRefcounting) {
+    summary.layout_semantics.reference_count = true;
+  } else {
+    summary.layout_semantics.generic_data = isGenericData;
+  }
+
+  return summary;
+
+// FIXME: these are all the things we are potentially interested in
+//  typedef struct {
+// 	  bool data_pointer : 1;
+// 	  bool struct_pointer : 1;
+// 	  bool immutable_pointer : 1;
+// 	  bool anonymous_pointer : 1;
+// 	  bool reference_count : 1;
+// 	  bool resource_handle : 1;
+// 	  bool spatial_bounds : 1;
+// 	  bool tainted_data : 1;
+// 	  bool generic_data : 1;
+// 	  uint16_t unused : 7;
+// } malloc_type_layout_semantics_t;
+}
+
+struct MallocTypeCacheEntry {
+// union malloc_type_descriptor_t {
+//   struct {
+//     uint32_t hash;
+//     malloc_type_summary_t summary;
+//   };
+//   malloc_type_id_t type_id;
+// };
+  malloc_type_descriptor_t desc;
+
+  friend llvm::hash_code hash_value(const MallocTypeCacheEntry &entry) {
+    return hash_value(entry.desc.hash);
+  }
+  bool matchesKey(uint32_t key) const { return desc.hash == key; }
+};
+static ConcurrentReadableHashMap<MallocTypeCacheEntry> MallocTypes;
+
+static malloc_type_id_t getMallocTypeId(const HeapMetadata *heapMetadata) {
+  uint64_t metadataPtrBits = reinterpret_cast<uint64_t>(heapMetadata);
+  uint32_t key = (metadataPtrBits >> 32) ^ (metadataPtrBits >> 0);
+
+  {
+    auto snapshot = MallocTypes.snapshot();
+    if (auto *entry = snapshot.find(key))
+      return entry->desc.type_id;
+  }
+
+  malloc_type_descriptor_t desc = {
+    .hash = key,
+    .summary = computeMallocTypeSummary(heapMetadata)
+  };
+
+  MallocTypes.getOrInsert(
+      key, [desc](MallocTypeCacheEntry *entry, bool created) {
+        if (created)
+          entry->desc = desc;
+        return true;
+      });
+
+  return desc.type_id;
+}
+#endif // SWIFT_STDLIB_HAS_MALLOC_TYPE
+
 static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
                                        size_t requiredAlignmentMask) {
   assert(isAlignmentMask(requiredAlignmentMask));
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+  auto object = reinterpret_cast<HeapObject *>(swift_slowAllocTyped(
+      requiredSize, requiredAlignmentMask, getMallocTypeId(metadata)));
+#else
   auto object = reinterpret_cast<HeapObject *>(
       swift_slowAlloc(requiredSize, requiredAlignmentMask));
+#endif
 
   // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
   // check on the placement new allocator which we have observed on Windows,
@@ -342,8 +452,12 @@ _swift_release_dealloc(HeapObject *object);
 SWIFT_ALWAYS_INLINE
 static HeapObject *_swift_retain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
-  if (isValidPointerForNativeRetain(object))
-    object->refCounts.increment(1);
+  if (isValidPointerForNativeRetain(object)) {
+    // Return the result of increment() to make the eventual call to
+    // incrementSlow a tail call, which avoids pushing a stack frame on the fast
+    // path on ARM64.
+    return object->refCounts.increment(1);
+  }
   return object;
 }
 
@@ -354,6 +468,8 @@ HeapObject *swift::swift_retain(HeapObject *object) {
   CALL_IMPL(swift_retain, (object));
 #endif
 }
+
+CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_retain)
 
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain)(HeapObject *object) =
@@ -407,6 +523,8 @@ void swift::swift_release(HeapObject *object) {
   CALL_IMPL(swift_release, (object));
 #endif
 }
+
+CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_release)
 
 SWIFT_RUNTIME_EXPORT
 void (*SWIFT_RT_DECLARE_ENTRY _swift_release)(HeapObject *object) =
@@ -701,6 +819,13 @@ void swift::swift_rootObjCDealloc(HeapObject *self) {
 void swift::swift_deallocClassInstance(HeapObject *object,
                                        size_t allocatedSize,
                                        size_t allocatedAlignMask) {
+  size_t retainCount = swift_retainCount(object);
+  if (SWIFT_UNLIKELY(retainCount > 1))
+    swift::fatalError(0,
+                      "Object %p deallocated with retain count %zd, reference "
+                      "may have escaped from deinit.\n",
+                      object, retainCount);
+
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
   // references associated with this object.
@@ -709,6 +834,7 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 #else
   const bool fastDeallocSupported = true;
 #endif
+
   if (!fastDeallocSupported || !object->refCounts.getPureSwiftDeallocation()) {
     objc_destructInstance((id)object);
   }

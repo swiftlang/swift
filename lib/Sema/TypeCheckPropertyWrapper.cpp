@@ -436,10 +436,12 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = var->getASTContext();
   auto dc = var->getDeclContext();
   llvm::TinyPtrVector<CustomAttr *> result;
-  for (auto attr : var->getAttrs().getAttributes<CustomAttr>()) {
+
+  auto attachedAttrs = var->getSemanticAttrs();
+  for (auto attr : attachedAttrs.getAttributes<CustomAttr>()) {
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
-    auto nominal = evaluateOrDefault(
+    auto *nominal = evaluateOrDefault(
       ctx.evaluator, CustomAttrNominalRequest{mutableAttr, dc}, nullptr);
 
     // If we didn't find a nominal type with a @propertyWrapper attribute,
@@ -464,18 +466,6 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       continue;
     }
 
-//    // If the property wrapper requested an `_enclosingInstance: Never`
-//    // it must be declared as static. TODO: or global once we allow wrappers on top-level code
-//    auto wrappedInfo = var->getPropertyWrapperTypeInfo();
-//    if (wrappedInfo.requireNoEnclosingInstance) {
-//      if (!var->isStatic()) {
-//        ctx.Diags.diagnose(var->getLocation(),
-//                           diag::property_wrapper_var_must_be_static,
-//                           var->getName());
-//        continue;
-//      }
-//    }
-
     // Check that the variable is part of a single-variable pattern.
     auto binding = var->getParentPatternBinding();
     if (binding && binding->getSingleVar() != var) {
@@ -491,21 +481,21 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
     }
 
     // Check for conflicting attributes.
-    if (var->getAttrs().hasAttribute<LazyAttr>() ||
-        var->getAttrs().hasAttribute<NSCopyingAttr>() ||
-        var->getAttrs().hasAttribute<NSManagedAttr>() ||
-        (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>() &&
-         var->getAttrs().getAttribute<ReferenceOwnershipAttr>()->get() !=
+    if (attachedAttrs.hasAttribute<LazyAttr>() ||
+        attachedAttrs.hasAttribute<NSCopyingAttr>() ||
+        attachedAttrs.hasAttribute<NSManagedAttr>() ||
+        (attachedAttrs.hasAttribute<ReferenceOwnershipAttr>() &&
+         attachedAttrs.getAttribute<ReferenceOwnershipAttr>()->get() !=
              ReferenceOwnership::Strong)) {
       int whichKind;
-      if (var->getAttrs().hasAttribute<LazyAttr>())
+      if (attachedAttrs.hasAttribute<LazyAttr>())
         whichKind = 0;
-      else if (var->getAttrs().hasAttribute<NSCopyingAttr>())
+      else if (attachedAttrs.hasAttribute<NSCopyingAttr>())
         whichKind = 1;
-      else if (var->getAttrs().hasAttribute<NSManagedAttr>())
+      else if (attachedAttrs.hasAttribute<NSManagedAttr>())
         whichKind = 2;
       else {
-        auto attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>();
+        auto attr = attachedAttrs.getAttribute<ReferenceOwnershipAttr>();
         whichKind = 2 + static_cast<unsigned>(attr->get());
       }
       var->diagnose(diag::property_with_wrapper_conflict_attribute,
@@ -538,7 +528,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
 
     // Properties with wrappers must not override another property.
     if (isa<ClassDecl>(dc)) {
-      if (var->getAttrs().hasAttribute<OverrideAttr>()) {
+      if (attachedAttrs.hasAttribute<OverrideAttr>()) {
         var->diagnose(diag::property_with_wrapper_overrides,
                       var->getName())
           .highlight(attr->getRange());

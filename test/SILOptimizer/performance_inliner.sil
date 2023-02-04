@@ -886,7 +886,7 @@ bb2:
   return %10 : $()
 
 bb3:
-  copy_addr %1 to [initialization] %0 : $*T
+  copy_addr %1 to [init] %0 : $*T
   strong_release %15 : $Error
   br bb2
 

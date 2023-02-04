@@ -167,6 +167,16 @@ def verify_incremental_dependencies :
   Flag<["-"], "verify-incremental-dependencies">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enable the dependency verifier for each frontend job">;
+  
+def strict_implicit_module_context :
+  Flag<["-"], "strict-implicit-module-context">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enable the strict forwarding of compilation context to downstream implicit module dependencies">;
+  
+def no_strict_implicit_module_context :
+  Flag<["-"], "no-strict-implicit-module-context">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Disable the strict forwarding of compilation context to downstream implicit module dependencies">;
 
 def disallow_forwarding_driver :
   Flag<["-"], "disallow-use-new-driver">, Flags<[]>,
@@ -242,7 +252,7 @@ def tools_directory : Separate<["-"], "tools-directory">,
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
   
-def e : JoinedOrSeparate<["-"], "e">, Flags<[NewDriverOnlyOption]>,
+def e : Separate<["-"], "e">, Flags<[NewDriverOnlyOption]>,
   HelpText<"Executes a line of code provided on the command line">;
 
 def F : JoinedOrSeparate<["-"], "F">,
@@ -342,6 +352,10 @@ def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
 def remark_loading_module : Flag<["-"], "Rmodule-loading">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark and file path of each loaded module">;
+
+def remark_indexing_system_module : Flag<["-"], "Rindexing-system-module">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit a remark when indexing a system module">;
 
 def remark_skip_explicit_interface_build : Flag<["-"], "Rskip-explicit-interface-build">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -467,6 +481,12 @@ def autolink_force_load : Flag<["-"], "autolink-force-load">,
 def module_abi_name : Separate<["-"], "module-abi-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"ABI name to use for the contents of this module">;
+def package_name : Separate<["-"], "package-name">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Name of the package the module belongs to">;
+def export_as : Separate<["-"], "export-as">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  HelpText<"Module name to use when referenced in clients module interfaces">;
 
 def emit_module : Flag<["-"], "emit-module">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
@@ -552,6 +572,9 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
+def emit_clang_header_nonmodular_includes : Flag<["-"], "emit-clang-header-nonmodular-includes">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
+  HelpText<"Augment emitted Objective-C header with textual imports for every included modular import">;
 
 def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, ArgumentIsPath,
@@ -630,6 +653,11 @@ def enable_experimental_cxx_interop :
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
 
+def experimental_c_foreign_reference_types :
+  Flag<["-"], "experimental-c-foreign-reference-types">,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
+  HelpText<"Enable experimental C foreign references types (with reference coutning).">;
+
 def enable_experimental_cxx_interop_in_clang_header :
   Flag<["-"], "enable-experimental-cxx-interop-in-clang-header">,
   Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
@@ -657,6 +685,10 @@ def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
 def no_warnings_as_errors : Flag<["-"], "no-warnings-as-errors">,
   Flags<[FrontendOption]>,
   HelpText<"Don't treat warnings as errors">;
+  
+def suppress_remarks : Flag<["-"], "suppress-remarks">,
+  Flags<[FrontendOption]>,
+  HelpText<"Suppress all remarks">;
 
 def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -715,11 +747,11 @@ def strict_concurrency : Joined<["-"], "strict-concurrency=">,
 
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
   HelpText<"Enable an experimental feature">;
 
 def enable_upcoming_feature : Separate<["-"], "enable-upcoming-feature">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
   HelpText<"Enable a feature that will be introduced in an upcoming language "
            "version">;
 
@@ -1317,6 +1349,10 @@ def user_module_version : Separate<["-"], "user-module-version">,
   HelpText<"Module version specified from Swift module authors">,
   MetaVarName<"<vers>">;
 
+def allowable_client : Separate<["-"], "allowable-client">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable, NewDriverOnlyOption]>,
+  HelpText<"Module names that are allowed to import this module">,
+  MetaVarName<"<vers>">;
 // VFS
 
 def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,
@@ -1346,6 +1382,12 @@ def disable_autolinking_runtime_compatibility_concurrency
       HelpText<"Do not use autolinking for the concurrency runtime "
                "compatibility library">;
 
+def enable_autolinking_runtime_compatibility_bytecode_layouts
+    : Flag<[ "-" ], "enable-autolinking-runtime-compatibility-bytecode-layouts">,
+      Flags<[ FrontendOption ]>,
+      HelpText<"Enable autolinking for the bytecode layouts runtime "
+               "compatibility library">;
+
 def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph">;
@@ -1369,6 +1411,11 @@ def emit_extension_block_symbols: Flag<["-"], "emit-extension-block-symbols">,
   Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit 'swift.extension' symbols for extensions to external types instead of directly associating members and conformances with the extended nominal when generating symbol graphs">;
+
+def omit_extension_block_symbols: Flag<["-"], "omit-extension-block-symbols">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+        NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Directly associate members and conformances with the extended nominal when generating symbol graphs instead of emitting 'swift.extension' symbols for extensions to external types">;
 
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,
@@ -1694,5 +1741,12 @@ def nostartfiles:
   HelpText<"Do not link in the Swift language startup routines">;
 
 // END ONLY SUPPORTED IN NEW DRIVER
+
+def load_plugin_library:
+  Separate<["-"], "load-plugin-library">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to a dynamic library containing compiler plugins such as "
+           "macros">,
+  MetaVarName<"<path>">;
 
 include "FrontendOptions.td"

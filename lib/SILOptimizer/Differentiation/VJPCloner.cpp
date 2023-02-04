@@ -829,6 +829,9 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     case ResultConvention::Indirect:
       conv = ParameterConvention::Indirect_In_Guaranteed;
       break;
+    case ResultConvention::Pack:
+      conv = ParameterConvention::Pack_Guaranteed;
+      break;
     }
     return {tanType, conv};
   };
@@ -854,10 +857,14 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       break;
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
       conv = ResultConvention::Indirect;
+      break;
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Inout:
+      conv = ResultConvention::Pack;
       break;
     }
     return {tanType, conv};
@@ -976,7 +983,8 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       linkage, context.getASTContext().getIdentifier(pbName).str(), pbType,
       pbGenericEnv, original->getLocation(), original->isBare(),
       IsNotTransparent, vjp->isSerialized(),
-      original->isDynamicallyReplaceable(), original->isDistributed());
+      original->isDynamicallyReplaceable(), original->isDistributed(),
+      original->isRuntimeAccessible());
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
   return pullback;

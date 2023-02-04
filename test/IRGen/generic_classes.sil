@@ -297,7 +297,7 @@ entry(%c : $RootGeneric<F>):
 sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (RootGeneric<F>) -> @out F {
 entry(%z : $*F, %c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.y
-  copy_addr %p to [initialization] %z : $*F
+  copy_addr %p to [init] %z : $*F
   %t = tuple ()
   return %t : $()
 }
@@ -308,7 +308,7 @@ entry(%z : $*F, %c : $RootGeneric<F>):
 sil @RootGeneric_subst_concrete_fragile_dependent_member_access_y : $(RootGeneric<Int>) -> @out Int {
 entry(%z : $*Int, %c : $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.y
-  copy_addr %p to [initialization] %z : $*Int
+  copy_addr %p to [init] %z : $*Int
   %t = tuple ()
   return %t : $()
 }
@@ -415,5 +415,5 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   ret %swift.metadata_response [[T1]]
 // CHECK: }
 
-// OSIZE: define hidden swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMa"(i64 %0, %swift.type* {{.*}}) [[ATTRS:#[0-9]+]] {
+// OSIZE: define hidden swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMa"(i64 %0, %swift.type* {{.*}}) [[ATTRS:#[0-9]+]] {{(section)?.*}}{
 // OSIZE: [[ATTRS]] = {{{.*}}noinline

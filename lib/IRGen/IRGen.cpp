@@ -35,6 +35,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
+#include "swift/IRGen/TBDGen.h"
 #include "swift/LLVMPasses/Passes.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/SIL/SILModule.h"
@@ -43,7 +44,6 @@
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
-#include "swift/TBDGen/TBDGen.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/StringSet.h"
@@ -767,7 +767,7 @@ bool swift::performLLVM(const IRGenOptions &Opts,
       return true;
     }
     if (Opts.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
-      Module->print(RawOS.getValue(), nullptr);
+      Module->print(RawOS.value(), nullptr);
       return false;
     }
   } else {
@@ -1205,9 +1205,10 @@ swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
                                 IRGenOptions &Opts) {
   IRGenerator *irgen = new IRGenerator(Opts, *SILMod);
   auto targetMachine = irgen->createTargetMachine();
-  if (!targetMachine)
+  if (!targetMachine) {
+    delete irgen;
     return std::make_pair(nullptr, nullptr);
-
+  }
   // Create the IR emitter.
   IRGenModule *IGM = new IRGenModule(
       *irgen, std::move(targetMachine), nullptr, "", OutputFilename,
@@ -1299,7 +1300,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   if (!SILMod) {
     auto loweringDesc = ASTLoweringDescriptor{
         desc.Ctx, desc.Conv, desc.SILOpts, nullptr,
-        symsToEmit.map([](const auto &x) { return x.silRefsToEmit; })};
+        symsToEmit.transform([](const auto &x) { return x.silRefsToEmit; })};
     SILMod = llvm::cantFail(Ctx.evaluator(LoweredSILRequest{loweringDesc}));
 
     // If there was an error, bail.
@@ -1361,6 +1362,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       IGM.emitAccessibleFunctions();
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
+      IGM.emitRuntimeDiscoverableAttributes(filesToEmit);
       irgen.emitEagerClassInitialization();
       irgen.emitObjCActorsNeedingSuperclassSwizzle();
       irgen.emitDynamicReplacements();
@@ -1369,7 +1371,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     // Emit coverage mapping info. This needs to happen after we've emitted
     // any lazy definitions, as we need to know whether or not we emitted a
     // profiler increment for a given coverage map.
-    IGM.emitCoverageMapping();
+    irgen.emitCoverageMapping();
 
     // Emit symbols for eliminated dead methods.
     IGM.emitVTableStubs();

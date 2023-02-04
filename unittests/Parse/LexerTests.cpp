@@ -4,7 +4,6 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Syntax/Trivia.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
@@ -19,7 +18,6 @@
 
 using namespace swift;
 using namespace llvm;
-using syntax::TriviaKind;
 
 // The test fixture.
 class LexerTest : public ::testing::Test {
@@ -281,28 +279,22 @@ TEST_F(LexerTest, BOMNoCommentNoTrivia) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
-          HashbangMode::Disallowed, CommentRetentionMode::None,
-          TriviaRetentionMode::WithoutTrivia);
+          HashbangMode::Disallowed, CommentRetentionMode::None);
   
   Token Tok;
-  StringRef LeadingTrivia, TrailingTrivia;
-  
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ(StringRef(), LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
   
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ(StringRef(), LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
 }
 
 TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
@@ -313,55 +305,43 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
-          HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
-          TriviaRetentionMode::WithoutTrivia);
+          HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens);
   
   Token Tok;
-  StringRef LeadingTrivia, TrailingTrivia;
-  
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+
+  L.lex(Tok);
   ASSERT_EQ(tok::comment, Tok.getKind());
   ASSERT_EQ("// comment\n", Tok.getText());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ(StringRef(), LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
   
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ(StringRef(), LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
   
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  L.lex(Tok);
   ASSERT_EQ(tok::comment, Tok.getKind());
   ASSERT_EQ("//xx \n", Tok.getText());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ(StringRef(), LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
   
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  L.lex(Tok);
   ASSERT_EQ(tok::comment, Tok.getKind());
   ASSERT_EQ("/* x */", Tok.getText());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 24), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 24), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ(StringRef(), LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
   
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ(StringRef(), LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
 }
 
 TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
@@ -372,128 +352,22 @@ TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
-          HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
-          TriviaRetentionMode::WithoutTrivia);
+          HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken);
   
   Token Tok;
-  StringRef LeadingTrivia, TrailingTrivia;
-  
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(10u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ(StringRef(), LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
   
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
+  L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getCommentRange().getStart());
   ASSERT_EQ(13u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ(StringRef(), LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
-}
-
-TEST_F(LexerTest, BOMNoCommentTrivia) {
-  const char *Source = "\xEF\xBB\xBF" "// comment\naaa //xx \n/* x */";
-  
-  LangOptions LangOpts;
-  SourceManager SourceMgr;
-  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
-          HashbangMode::Disallowed, CommentRetentionMode::None,
-          TriviaRetentionMode::WithTrivia);
-  
-  Token Tok;
-  StringRef LeadingTrivia, TrailingTrivia;
-  
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
-  ASSERT_EQ(tok::identifier, Tok.getKind());
-  ASSERT_EQ("aaa", Tok.getText());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
-  ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ("\xEF\xBB\xBF" "// comment" "\n", LeadingTrivia);
-  ASSERT_EQ(" ", TrailingTrivia);
-
-  ParsedTrivia LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
-  ParsedTrivia TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
-  ASSERT_EQ((ParsedTrivia{{
-    ParsedTriviaPiece(TriviaKind::UnexpectedText, strlen("\xEF\xBB\xBF")),
-    ParsedTriviaPiece(TriviaKind::LineComment, strlen("// comment")),
-    ParsedTriviaPiece(TriviaKind::Newline, 1)
-  }}), LeadingTriviaPieces);
-  ASSERT_EQ((ParsedTrivia{{
-    ParsedTriviaPiece(TriviaKind::Space, 1)
-  }}), TrailingTriviaPieces);
-  
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
-  ASSERT_EQ(tok::eof, Tok.getKind());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getCommentRange().getStart());
-  ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ("//xx \n/* x */", LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
-
-  LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{
-    ParsedTriviaPiece(TriviaKind::LineComment, strlen("//xx ")),
-    ParsedTriviaPiece(TriviaKind::Newline, 1),
-    ParsedTriviaPiece(TriviaKind::BlockComment, strlen("/* x */"))
-  }}), LeadingTriviaPieces);
-}
-
-TEST_F(LexerTest, BOMAttachCommentTrivia) {
-  const char *Source = "\xEF\xBB\xBF" "// comment\naaa //xx \n/* x */";
-  
-  LangOptions LangOpts;
-  SourceManager SourceMgr;
-  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
-  
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
-          HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
-          TriviaRetentionMode::WithTrivia);
-  
-  Token Tok;
-  StringRef LeadingTrivia, TrailingTrivia;
-  
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
-  ASSERT_EQ(tok::identifier, Tok.getKind());
-  ASSERT_EQ("aaa", Tok.getText());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
-  ASSERT_EQ(10u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ("\xEF\xBB\xBF" "// comment" "\n", LeadingTrivia);
-  ASSERT_EQ(" ", TrailingTrivia);
-
-  ParsedTrivia LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
-  ParsedTrivia TrailingTriviaPieces = TriviaLexer::lexTrivia(TrailingTrivia);
-  ASSERT_EQ((ParsedTrivia{{
-    ParsedTriviaPiece(TriviaKind::UnexpectedText, strlen("\xEF\xBB\xBF")),
-    ParsedTriviaPiece(TriviaKind::LineComment, strlen("// comment")),
-    ParsedTriviaPiece(TriviaKind::Newline, 1)
-  }}), LeadingTriviaPieces);
-  ASSERT_EQ((ParsedTrivia{{
-    ParsedTriviaPiece(TriviaKind::Space, 1)
-  }}), TrailingTriviaPieces);
-  
-  L.lex(Tok, LeadingTrivia, TrailingTrivia);
-  ASSERT_EQ(tok::eof, Tok.getKind());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
-  ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getCommentRange().getStart());
-  ASSERT_EQ(13u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ("//xx \n/* x */", LeadingTrivia);
-  ASSERT_EQ(StringRef(), TrailingTrivia);
-
-  LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
-  ASSERT_EQ((ParsedTrivia{{
-    ParsedTriviaPiece(TriviaKind::LineComment, strlen("//xx ")),
-    ParsedTriviaPiece(TriviaKind::Newline, 1),
-    ParsedTriviaPiece(TriviaKind::BlockComment, strlen("/* x */"))
-  }}), LeadingTriviaPieces);
 }
 
 TEST_F(LexerTest, RestoreBasic) {
@@ -596,7 +470,7 @@ TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
   LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, 16));
-  SourceMgr.setCodeCompletionPoint(BufferID, 6);
+  SourceMgr.setIDEInspectionTarget(BufferID, 6);
 
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
 
@@ -802,7 +676,7 @@ TEST_F(LexerTest, DiagnoseEmbeddedNul) {
 
   Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
           LexerMode::Swift, HashbangMode::Disallowed,
-          CommentRetentionMode::None, TriviaRetentionMode::WithTrivia);
+          CommentRetentionMode::None);
 
   Token Tok;
   L.lex(Tok);
@@ -827,7 +701,7 @@ TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
 
   Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
           LexerMode::Swift, HashbangMode::Disallowed,
-          CommentRetentionMode::None, TriviaRetentionMode::WithTrivia,
+          CommentRetentionMode::None,
           /*Offset=*/5, /*EndOffset=*/SourceLen);
 
   ASSERT_FALSE(containsPrefix(

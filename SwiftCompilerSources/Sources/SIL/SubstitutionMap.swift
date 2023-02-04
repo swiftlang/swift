@@ -22,4 +22,6 @@ public struct SubstitutionMap {
   public init() {
     self.bridged = swift.SubstitutionMap()
   }
+
+  public var isEmpty: Bool { bridged.empty() }
 }

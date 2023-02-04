@@ -56,8 +56,7 @@ raw_ostream &getADDebugStream();
 ///     %index_1 = integer_literal $Builtin.Word, 1
 ///     %elt1 = index_addr %elt0, %index_1           // element address
 ///     ...
-// TODO(SR-12894): Find a better name and move this general utility to
-// ArraySemantic.h.
+// TODO(https://github.com/apple/swift/issues/55340): Find a better name and move this general utility to ArraySemantic.h.
 ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v);
 
 /// Given a value, finds its single `destructure_tuple` user if the value is

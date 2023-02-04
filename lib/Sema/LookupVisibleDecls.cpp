@@ -273,6 +273,8 @@ static void lookupTypeMembers(Type BaseType, Type LookupType,
   NominalTypeDecl *D = LookupType->getAnyNominal();
   assert(D && "should have a nominal type");
 
+  Consumer.onLookupNominalTypeMembers(D, Reason);
+
   SmallVector<ValueDecl*, 2> FoundDecls;
   collectVisibleMemberDecls(CurrDC, LS, BaseType, D, FoundDecls);
 
@@ -343,6 +345,10 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::Protocol:
       case DeclKind::OpaqueType:
       case DeclKind::BuiltinTuple:
+        return;
+
+      // Macros cannot be found by dynamic lookup.
+      case DeclKind::Macro:
         return;
 
       // Initializers cannot be found by dynamic lookup.
@@ -464,6 +470,9 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
 
     if (auto NormalConformance = dyn_cast<NormalProtocolConformance>(
           Conformance->getRootConformance())) {
+
+      Consumer.onLookupNominalTypeMembers(Proto, ReasonForThisProtocol);
+
       for (auto Member : Proto->getMembers()) {
         // Skip associated types and value requirements that aren't visible
         // or have a corresponding witness.
@@ -545,13 +554,13 @@ static void
   if (!Visited.insert(PD).second)
     return;
 
+  lookupTypeMembers(BaseTy, PD->getDeclaredInterfaceType(), Consumer, CurrDC,
+                    LS, Reason);
+
+  // Collect members from the inherited protocols.
   for (auto Proto : PD->getInheritedProtocols())
-    lookupVisibleProtocolMemberDecls(BaseTy, Proto,
-                                     Consumer, CurrDC, LS,
-                                     getReasonForSuper(Reason),
-                                     Sig, Visited);
-  lookupTypeMembers(BaseTy, PD->getDeclaredInterfaceType(),
-                    Consumer, CurrDC, LS, Reason);
+    lookupVisibleProtocolMemberDecls(BaseTy, Proto, Consumer, CurrDC, LS,
+                                     getReasonForSuper(Reason), Sig, Visited);
 }
 
 // Generate '$' and '_' prefixed variables for members that have attached property
@@ -862,6 +871,8 @@ namespace {
 
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
 public:
+  llvm::SmallVector<std::pair<NominalTypeDecl *, DeclVisibilityKind>, 2>
+      nominals;
   llvm::SetVector<FoundDeclTy> Results;
   llvm::SmallVector<ValueDecl *, 8> Decls;
   llvm::SetVector<FoundDeclTy> FilteredResults;
@@ -876,6 +887,11 @@ public:
     assert(DC && BaseTy);
   }
 
+  void onLookupNominalTypeMembers(NominalTypeDecl *NTD,
+                                  DeclVisibilityKind Reason) override {
+    nominals.emplace_back(NTD, Reason);
+  }
+
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
     if (!Results.insert({VD, Reason, dynamicLookupInfo}))
@@ -886,6 +902,10 @@ public:
   }
 
   void filterDecls(VisibleDeclConsumer &Consumer) {
+    for (auto nominal : nominals) {
+      Consumer.onLookupNominalTypeMembers(nominal.first, nominal.second);
+    }
+
     removeOverriddenDecls(Decls);
     removeShadowedDecls(Decls, DC);
 
@@ -1040,6 +1060,11 @@ struct KeyPathDynamicMemberConsumer : public VisibleDeclConsumer {
     // other members.
     return !isa<SubscriptDecl>(VD) && seen.insert(VD->getBaseName()).second &&
            !seenStaticBaseName(VD->getBaseName());
+  }
+
+  void onLookupNominalTypeMembers(NominalTypeDecl *NTD,
+                                  DeclVisibilityKind Reason) override {
+    consumer.onLookupNominalTypeMembers(NTD, Reason);
   }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,

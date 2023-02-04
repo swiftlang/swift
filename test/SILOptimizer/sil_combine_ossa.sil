@@ -1398,17 +1398,17 @@ bb0(%0 : $*FakeOptional<T>, %1 : $*T, %2 : $Builtin.Int1):
   inject_enum_addr %3 : $*FakeOptional<T>, #FakeOptional.none!enumelt
   %4 = alloc_stack $FakeOptional<T>
   %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt
-  copy_addr %1 to [initialization] %5 : $*T
+  copy_addr %1 to [init] %5 : $*T
   inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt
   cond_br %2, bb1, bb2
 
 bb1:
-  copy_addr [take] %3 to [initialization] %0 : $*FakeOptional<T>
+  copy_addr [take] %3 to [init] %0 : $*FakeOptional<T>
   destroy_addr %4 : $*FakeOptional<T>
   br bb3
 
 bb2:
-  copy_addr [take] %4 to [initialization] %0 : $*FakeOptional<T>
+  copy_addr [take] %4 to [init] %0 : $*FakeOptional<T>
   destroy_addr %3 : $*FakeOptional<T>
   br bb3
 
@@ -2697,7 +2697,7 @@ bb0:
   %0 = alloc_stack $FloatingPointRoundingRule
   inject_enum_addr %0 : $*FloatingPointRoundingRule, #FloatingPointRoundingRule.toNearestOrEven!enumelt
   %2 = alloc_stack $FloatingPointRoundingRule
-  copy_addr %0 to [initialization] %2 : $*FloatingPointRoundingRule
+  copy_addr %0 to [init] %2 : $*FloatingPointRoundingRule
   destroy_addr %0 : $*FloatingPointRoundingRule
   switch_enum_addr %2 : $*FloatingPointRoundingRule, case #FloatingPointRoundingRule.toNearestOrAwayFromZero!enumelt: bb1, default bb2
 
@@ -3131,7 +3131,7 @@ bb3 (%10: $Builtin.Int32):
 sil [ossa] @delete_dead_alloc_stack : $(@inout B) -> () {
 bb0(%0 : $*B):
   %1 = alloc_stack $B
-  copy_addr %0 to [initialization] %1 : $*B
+  copy_addr %0 to [init] %1 : $*B
   destroy_addr %1 : $*B
   dealloc_stack %1 : $*B
   %2 = tuple()
@@ -3161,7 +3161,7 @@ bb0:
 sil [ossa] @delete_dead_alloc_stack2 : $(@in B) -> () {
 bb0(%0 : $*B):
   %1 = alloc_stack $B
-  copy_addr [take] %0 to [initialization] %1 : $*B
+  copy_addr [take] %0 to [init] %1 : $*B
   destroy_addr %1 : $*B
   dealloc_stack %1 : $*B
   %2 = tuple()
@@ -3179,7 +3179,7 @@ sil [ossa] @use_b : $@convention(thin) (@inout B) -> ()
 sil [ossa] @dont_delete_dead_alloc_stack : $(@inout B) -> () {
 bb0(%0 : $*B):
   %1 = alloc_stack $B
-  copy_addr %0 to [initialization] %1 : $*B
+  copy_addr %0 to [init] %1 : $*B
   %2 = function_ref @use_b : $@convention(thin) (@inout B) -> ()
   %3 = apply %2(%1) : $@convention(thin) (@inout B) -> ()
   destroy_addr %1 : $*B
@@ -3198,13 +3198,13 @@ protocol someProtocol {
 // XHECK-NEXT: copy_addr
 // XHECK-NEXT: destroy_addr
 // XHECK-NEXT: [[T0:%.*]] = witness_method $T
-// XHECK_NEXT: apply [[T0]]<T>
+// XHECK-NEXT: apply [[T0]]<T>
 // XHECK: return
 sil [ossa] @witness_archetype : $@convention(thin) <T where T : someProtocol> (@in T) -> () {
 bb0(%0 : $*T):
   %3 = alloc_stack $someProtocol                  // users: %4, %7, %10, %13, %15
   %4 = init_existential_addr %3 : $*someProtocol, $T // user: %5
-  copy_addr %0 to [initialization] %4 : $*T       // id: %5
+  copy_addr %0 to [init] %4 : $*T       // id: %5
   destroy_addr %0 : $*T                           // id: %6
   %7 = open_existential_addr immutable_access %3 : $*someProtocol to $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993", someProtocol) Self // users: %8, %9
   %8 = witness_method $@opened("105977B0-D8EB-11E4-AC00-3C0754644993", someProtocol) Self, #someProtocol.i!getter, %7 : $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993", someProtocol) Self : $@convention(witness_method: someProtocol) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int // user: %9
@@ -3945,7 +3945,7 @@ bb0(%0 : @owned $VV):
   %0b = begin_borrow %0 : $VV
   %9 = ref_element_addr %0b : $VV, #VV.m
   %10 = alloc_stack $PM
-  copy_addr %9 to [initialization] %10 : $*PM
+  copy_addr %9 to [init] %10 : $*PM
   end_borrow %0b : $VV
   %12 = open_existential_addr immutable_access %10 : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60", PM) Self
   %13 = init_existential_addr %8 : $*PM, $@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60", PM) Self

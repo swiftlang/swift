@@ -40,7 +40,7 @@ void swift::ide::printCodeCompletionResultDescription(
 
   auto FirstTextChunk = str->getFirstTextChunkIndex(leadingPunctuation);
   int TextSize = 0;
-  if (FirstTextChunk.hasValue()) {
+  if (FirstTextChunk.has_value()) {
     auto Chunks = str->getChunks().slice(*FirstTextChunk);
     auto I = Chunks.begin(), E = Chunks.end();
     while (I != E) {
@@ -217,7 +217,7 @@ public:
     bool isOperator = result.isOperator();
 
     auto FirstTextChunk = str->getFirstTextChunkIndex(leadingPunctuation);
-    if (FirstTextChunk.hasValue()) {
+    if (FirstTextChunk.has_value()) {
       auto chunks = str->getChunks().slice(*FirstTextChunk);
       auto i = chunks.begin(), e = chunks.end();
       while (i != e) {
@@ -465,7 +465,7 @@ static void printCodeCompletionResultFilterName(
   }
 
   auto FirstTextChunk = str->getFirstTextChunkIndex();
-  if (FirstTextChunk.hasValue()) {
+  if (FirstTextChunk.has_value()) {
     auto chunks = str->getChunks().slice(*FirstTextChunk);
     auto i = chunks.begin(), e = chunks.end();
     while (i != e) {

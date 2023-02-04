@@ -50,17 +50,20 @@ class SwiftFormat(product.Product):
     def is_swiftpm_unified_build_product(cls):
         return True
 
+    def configuration(self):
+        return 'release' if self.is_release() else 'debug'
+
     def run_build_script_helper(self, action, host_target, additional_params=[]):
         script_path = os.path.join(
             self.source_dir, 'build-script-helper.py')
 
-        configuration = 'release' if self.is_release() else 'debug'
+        install_destdir = self.host_install_destdir(host_target)
 
         helper_cmd = [
             script_path,
             action,
             '--toolchain', self.install_toolchain_path(host_target),
-            '--configuration', configuration,
+            '--configuration', self.configuration(),
             '--build-path', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
             # There might have been a Package.resolved created by other builds
@@ -68,6 +71,9 @@ class SwiftFormat(product.Product):
             # reset the dependencies to be local.
             '--update'
         ]
+        helper_cmd.extend([
+            '--prefix', install_destdir + self.args.install_prefix
+        ])
         if self.args.verbose_build:
             helper_cmd.append('--verbose')
         helper_cmd.extend(additional_params)
@@ -79,6 +85,17 @@ class SwiftFormat(product.Product):
 
     def build(self, host_target):
         self.run_build_script_helper('build', host_target)
+        if self.args.swiftsyntax_lint:
+            self.lint_swiftsyntax()
+
+    def lint_swiftsyntax(self):
+        linting_cmd = [
+            os.path.join(os.path.dirname(self.source_dir), 'swift-syntax', 'format.py'),
+            '--lint',
+            '--swift-format', os.path.join(self.build_dir, self.configuration(),
+                                           'swift-format'),
+        ]
+        shell.call(linting_cmd)
 
     def should_test(self, host_target):
         return self.args.test_swiftformat
@@ -87,7 +104,10 @@ class SwiftFormat(product.Product):
         self.run_build_script_helper('test', host_target)
 
     def should_install(self, host_target):
-        return False
+        return self.args.install_swiftformat
+
+    def install(self, host_target):
+        self.run_build_script_helper('install', host_target)
 
     @classmethod
     def get_dependencies(cls):

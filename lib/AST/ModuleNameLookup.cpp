@@ -176,10 +176,12 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
                          getDerived()->canReturnEarly());
   if (canReturnEarly &&
       resolutionKind == ResolutionKind::Overloadable) {
-    // If we only found top-level functions, keep looking, since we may
-    // find additional overloads.
+    // If we only found top-level functions or macros, keep looking, since
+    // we may find additional overloads.
     if (std::all_of(decls.begin() + initialCount, decls.end(),
-                    [](ValueDecl *VD) { return isa<FuncDecl>(VD); }))
+                    [](ValueDecl *VD) {
+      return isa<FuncDecl>(VD) || isa<MacroDecl>(VD);
+    }))
       canReturnEarly = false;
   }
 

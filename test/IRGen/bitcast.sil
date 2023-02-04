@@ -122,7 +122,7 @@ bb0(%0 : $Int, %1 : $Int):
 sil @unchecked_ref_cast_addr : $@convention(thin) <T, U> (@in T) -> @out U {
 bb0(%0 : $*U, %1 : $*T):
   %a = alloc_stack $T
-  copy_addr %1 to [initialization] %a : $*T
+  copy_addr %1 to [init] %a : $*T
   unchecked_ref_cast_addr T in %a : $*T to U in %0 : $*U
   dealloc_stack %a : $*T
   destroy_addr %1 : $*T

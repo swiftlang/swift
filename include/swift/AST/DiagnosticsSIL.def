@@ -727,19 +727,41 @@ ERROR(noimplicitcopy_used_on_generic_or_existential, none,
 // move only checker diagnostics
 ERROR(sil_moveonlychecker_owned_value_consumed_more_than_once, none,
       "'%0' consumed more than once", (StringRef))
+ERROR(sil_moveonlychecker_owned_value_consumed_and_used_at_same_time, none,
+      "'%0' consumed and used at the same time", (StringRef))
 ERROR(sil_moveonlychecker_value_used_after_consume, none,
       "'%0' used after consume. Lifetime extension of variable requires a copy", (StringRef))
 ERROR(sil_moveonlychecker_guaranteed_value_consumed, none,
       "'%0' has guaranteed ownership but was consumed", (StringRef))
+ERROR(sil_moveonlychecker_guaranteed_value_captured_by_closure, none,
+      "'%0' has guaranteed ownership but was consumed due to being captured by a closure", (StringRef))
+ERROR(sil_moveonlychecker_let_value_consumed_in_closure, none,
+      "'%0' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations", (StringRef))
 ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_function, none,
       "'%0' consumed but not reinitialized before end of function", (StringRef))
+ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure, none,
+      "'%0' consumed in closure but not reinitialized before end of closure", (StringRef))
 ERROR(sil_moveonlychecker_value_consumed_in_a_loop, none,
       "'%0' consumed by a use in a loop", (StringRef))
+ERROR(sil_moveonlychecker_exclusivity_violation, none,
+      "'%0' has consuming use that cannot be eliminated due to a tight exclusivity scope", (StringRef))
+ERROR(sil_moveonlychecker_moveonly_field_consumed, none,
+      "'%0' has a move only field that was consumed before later uses", (StringRef))
 
+NOTE(sil_moveonlychecker_moveonly_field_consumed_here, none,
+     "move only field consumed here", ())
+NOTE(sil_moveonlychecker_boundary_use, none,
+     "boundary use here", ())
 NOTE(sil_moveonlychecker_consuming_use_here, none,
-     "consuming use", ())
+     "consuming use here", ())
+NOTE(sil_moveonlychecker_two_consuming_uses_here, none,
+     "two consuming uses here", ())
+NOTE(sil_moveonlychecker_consuming_and_non_consuming_uses_here, none,
+     "consuming and non-consuming uses here", ())
+NOTE(sil_moveonlychecker_consuming_closure_use_here, none,
+     "closure capture here", ())
 NOTE(sil_moveonlychecker_nonconsuming_use_here, none,
-     "non-consuming use", ())
+     "non-consuming use here", ())
 ERROR(sil_moveonlychecker_not_understand_no_implicit_copy, none,
       "Usage of @noImplicitCopy that the move checker does not know how to "
       "check!", ())

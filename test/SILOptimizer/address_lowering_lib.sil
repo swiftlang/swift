@@ -11,7 +11,7 @@ sil_stage raw
 // CHECK: [[BORROW:%.*]] = begin_borrow [lexical] [[VAL]] : $any Error
 // CHECK: [[OPENADDR:%.*]] = open_existential_box [[BORROW]] : $any Error to $*@opened("169A6848-B636-11EC-83C4-D0817AD59B9D", any Error) Self
 // CHECK: [[INIT:%.*]] = init_existential_addr [[ALLOC]] : $*Any, $@opened("169A6848-B636-11EC-83C4-D0817AD59B9D", any Error) Self
-// CHECK: copy_addr [[OPENADDR]] to [initialization] [[INIT]] : $*@opened("169A6848-B636-11EC-83C4-D0817AD59B9D", any Error) Self
+// CHECK: copy_addr [[OPENADDR]] to [init] [[INIT]] : $*@opened("169A6848-B636-11EC-83C4-D0817AD59B9D", any Error) Self
 // CHECK: destroy_addr [[ALLOC]] : $*Any
 // CHECK: end_borrow [[BORROW]] : $any Error
 // CHECK: destroy_value [[VAL]] : $any Error

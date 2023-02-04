@@ -28,16 +28,16 @@ private func log(_ message: @autoclosure () -> String) {
 /// Within safe swift code there shouldn't be any buffer overflows. But if the address
 /// of a stack variable is converted to an unsafe pointer, it's not in the control of
 /// the compiler anymore.
-/// This means, if there is any `address_to_pointer` instruction for an `alloc_stack`,
-/// such a function is marked for stack protection.
-/// Another case is `index_addr` for non-tail allocated memory. This pattern appears if
-/// pointer arithmetic is done with unsafe pointers in swift code.
+/// This means, if an `alloc_stack` ends up at an `address_to_pointer [stack_protection]`,
+/// the `alloc_stack`'s function is marked for stack protection.
+/// Another case is `index_addr [stack_protection]` for non-tail allocated memory. This
+/// pattern appears if pointer arithmetic is done with unsafe pointers in swift code.
 ///
 /// If the origin of an unsafe pointer can only be tracked to a function argument, the
 /// pass tries to find the root stack allocation for such an argument by doing an
-/// inter-procedural analysis. If this is not possible, the fallback is to move the
-/// argument into a temporary `alloc_stack` and do the unsafe pointer operations on
-/// the temporary.
+/// inter-procedural analysis. If this is not possible and the `enableMoveInoutStackProtection`
+/// option is set, the fallback is to move the argument into a temporary `alloc_stack`
+/// and do the unsafe pointer operations on the temporary.
 let stackProtection = ModulePass(name: "stack-protection", {
     (context: ModulePassContext) in
 
@@ -45,7 +45,7 @@ let stackProtection = ModulePass(name: "stack-protection", {
     return
   }
 
-  var optimization = StackProtectionOptimization()
+  var optimization = StackProtectionOptimization(enableMoveInout: context.options.enableMoveInoutStackProtection)
   optimization.processModule(context)
 })
 
@@ -54,18 +54,20 @@ let stackProtection = ModulePass(name: "stack-protection", {
 /// In contrast to the `stack-protection` pass, this pass doesn't do any inter-procedural
 /// analysis. It runs at Onone.
 let functionStackProtection = FunctionPass(name: "function-stack-protection", {
-  (function: Function, context: PassContext) in
+  (function: Function, context: FunctionPassContext) in
 
   if !context.options.enableStackProtection {
     return
   }
 
-  var optimization = StackProtectionOptimization()
+  var optimization = StackProtectionOptimization(enableMoveInout: context.options.enableMoveInoutStackProtection)
   optimization.process(function: function, context)
 })
 
 /// The optimization algorithm.
 private struct StackProtectionOptimization {
+
+  private let enableMoveInout: Bool
 
   // The following members are nil/not used if this utility is used on function-level.
 
@@ -76,7 +78,11 @@ private struct StackProtectionOptimization {
   // Functions (other than the currently processed one) which need stack protection,
   // are added to this array in `findOriginsInCallers`.
   private var needStackProtection: [Function] = []
-  
+
+  init(enableMoveInout: Bool) {
+    self.enableMoveInout = enableMoveInout
+  }
+
   /// The main entry point if running on module-level.
   mutating func processModule(_ moduleContext: ModulePassContext) {
     self.moduleContext = moduleContext
@@ -101,13 +107,13 @@ private struct StackProtectionOptimization {
   }
   
   /// The main entry point if running on function-level.
-  mutating func process(function: Function, _ context: PassContext) {
+  mutating func process(function: Function, _ context: FunctionPassContext) {
     var mustFixStackNesting = false
     for inst in function.instructions {
       process(instruction: inst, in: function, mustFixStackNesting: &mustFixStackNesting, context)
     }
     if mustFixStackNesting {
-      context.fixStackNesting(function: function)
+      function.fixStackNesting(context)
     }
   }
 
@@ -121,7 +127,7 @@ private struct StackProtectionOptimization {
   /// - if the origin is unknown, move the value into a temporary and set the function's
   ///   `needStackProtection` flag.
   private mutating func process(instruction: Instruction, in function: Function,
-                                mustFixStackNesting: inout Bool, _ context: PassContext) {
+                                mustFixStackNesting: inout Bool, _ context: FunctionPassContext) {
 
     // `withUnsafeTemporaryAllocation(of:capacity:_:)` is compiled to a `builtin "stackAlloc"`.
     if let bi = instruction as? BuiltinInst, bi.id == .StackAlloc {
@@ -147,6 +153,8 @@ private struct StackProtectionOptimization {
     case .yes:
       // For example:
       //     %baseAddr = alloc_stack $T
+      log("local: \(function.name) -- \(instruction)")
+
       function.setNeedsStackProtection(context)
 
     case .decidedInCaller(let arg):
@@ -157,7 +165,7 @@ private struct StackProtectionOptimization {
       defer { worklist.deinitialize() }
       worklist.push(arg)
 
-      if !findOriginsInCallers(&worklist) {
+      if findOriginsInCallers(&worklist) == NeedInsertMoves.yes {
         // We don't know the origin of the function argument. Therefore we need to do the
         // conservative default which is to move the value to a temporary stack location.
         if let beginAccess = scope {
@@ -179,22 +187,19 @@ private struct StackProtectionOptimization {
 
       // If the object is passed as an argument to its function, add those arguments
       // to the worklist.
-      switch worklist.push(rootsOf: obj) {
-      case .failed:
-        // If we cannot find the roots, the object is most likely not stack allocated.
-        return
-      case .succeeded(let foundStackAlloc):
-        if foundStackAlloc {
-          // The object is created by an `alloc_ref [stack]`.
-          function.setNeedsStackProtection(context)
-        }
+      let (_, foundStackAlloc) = worklist.push(rootsOf: obj)
+      if foundStackAlloc {
+        // The object is created by an `alloc_ref [stack]`.
+        log("objectIfStackPromoted: \(function.name) -- \(instruction)")
+
+        function.setNeedsStackProtection(context)
       }
       // In case the (potentially) stack allocated object is passed via an argument,
       // process the worklist as we do for indirect arguments (see above).
       // For example:
       //   bb0(%0: $Class):
       //     %baseAddr = ref_element_addr %0 : $Class, #Class.field
-      if !findOriginsInCallers(&worklist),
+      if findOriginsInCallers(&worklist) == NeedInsertMoves.yes,
          let beginAccess = scope {
         // We don't know the origin of the object. Therefore we need to do the
         // conservative default which is to move the value to a temporary stack location.
@@ -206,15 +211,26 @@ private struct StackProtectionOptimization {
       break
     }
   }
-  
+
+  /// Return value of `findOriginsInCallers()`.
+  enum NeedInsertMoves {
+    // Not all call sites could be identified, and if moves are enabled (`enableMoveInout`)
+    // the original argument should be moved to a temporary.
+    case yes
+
+    // Either all call sites could be identified, which means that stack protection is done
+    // in the callers, or moves are not enabled (`enableMoveInout` is false).
+    case no
+  }
+
   /// Find all origins of function arguments in `worklist`.
   /// All functions, which allocate such an origin are added to `self.needStackProtection`.
   /// Returns true if all origins could be found and false, if there are unknown origins.
-  private mutating func findOriginsInCallers(_ worklist: inout ArgumentWorklist) -> Bool {
+  private mutating func findOriginsInCallers(_ worklist: inout ArgumentWorklist) -> NeedInsertMoves {
   
     guard let moduleContext = moduleContext else {
       // Don't do any inter-procedural analysis when used on function-level.
-      return false
+      return enableMoveInout ? .yes : .no
     }
   
     // Put the resulting functions into a temporary array, because we only add them to
@@ -228,31 +244,36 @@ private struct StackProtectionOptimization {
     }
 
     while let arg = worklist.pop() {
-      let f = arg.function
+      let f = arg.parentFunction
       let uses = functionUses.getUses(of: f)
-      if uses.hasUnknownUses {
-        return false
+      if uses.hasUnknownUses && enableMoveInout {
+        return NeedInsertMoves.yes
       }
       
       for useInst in uses {
         guard let fri = useInst as? FunctionRefInst else {
-          return false
+          if enableMoveInout {
+            return NeedInsertMoves.yes
+          }
+          continue
         }
       
         for functionRefUse in fri.uses {
-          guard let apply = functionRefUse.instruction as? ApplySite else {
-            return false
-          }
-          guard let callerArgIdx = apply.callerArgIndex(calleeArgIndex: arg.index) else {
-            return false
+          guard let apply = functionRefUse.instruction as? ApplySite,
+                let callerArgIdx = apply.callerArgIndex(calleeArgIndex: arg.index) else {
+            if enableMoveInout {
+              return NeedInsertMoves.yes
+            }
+            continue
           }
           let callerArg = apply.arguments[callerArgIdx]
           if callerArg.type.isAddress {
             // It's an indirect argument.
             switch callerArg.accessBase.isStackAllocated {
             case .yes:
-              if !callerArg.function.needsStackProtection {
-                newFunctions.push(callerArg.function)
+              if !callerArg.parentFunction.needsStackProtection {
+                log("alloc_stack in caller: \(callerArg.parentFunction.name) -- \(callerArg)")
+                newFunctions.push(callerArg.parentFunction)
               }
             case .no:
               break
@@ -266,40 +287,42 @@ private struct StackProtectionOptimization {
             case .objectIfStackPromoted(let obj):
               // If the object is passed as an argument to its function,
               // add those arguments to the worklist.
-              switch worklist.push(rootsOf: obj) {
-              case .failed:
-                return false
-              case .succeeded(let foundStackAlloc):
-                if foundStackAlloc && !obj.function.needsStackProtection {
-                  // The object is created by an `alloc_ref [stack]`.
-                  newFunctions.push(obj.function)
-                }
+              let (foundUnknownRoots, foundStackAlloc) = worklist.push(rootsOf: obj)
+              if foundUnknownRoots && enableMoveInout {
+                return NeedInsertMoves.yes
+              }
+              if foundStackAlloc && !obj.parentFunction.needsStackProtection {
+                // The object is created by an `alloc_ref [stack]`.
+                log("object in caller: \(obj.parentFunction.name) -- \(obj)")
+                newFunctions.push(obj.parentFunction)
               }
             case .unknown:
-              return false
+              if enableMoveInout {
+                return NeedInsertMoves.yes
+              }
             }
           } else {
             // The argument is an object. If the object is itself passed as an argument
             // to its function, add those arguments to the worklist.
-            switch worklist.push(rootsOf: callerArg) {
-            case .failed:
-              return false
-            case .succeeded(let foundStackAlloc):
-              if foundStackAlloc && !callerArg.function.needsStackProtection {
-                // The object is created by an `alloc_ref [stack]`.
-                newFunctions.push(callerArg.function)
-              }
+            let (foundUnknownRoots, foundStackAlloc) = worklist.push(rootsOf: callerArg)
+            if foundUnknownRoots && enableMoveInout {
+              return NeedInsertMoves.yes
+            }
+            if foundStackAlloc && !callerArg.parentFunction.needsStackProtection {
+              // The object is created by an `alloc_ref [stack]`.
+              log("object arg in caller: \(callerArg.parentFunction.name) -- \(callerArg)")
+              newFunctions.push(callerArg.parentFunction)
             }
           }
         }
       }
     }
     needStackProtection.append(contentsOf: newFunctions)
-    return true
+    return NeedInsertMoves.no
   }
 
   /// Moves the value of an indirect argument to a temporary stack location, if possible.
-  private func moveToTemporary(argument: FunctionArgument, _ context: PassContext) {
+  private func moveToTemporary(argument: FunctionArgument, _ context: FunctionPassContext) {
     if !argument.convention.isInout {
       // We cannot move from a read-only argument.
       // Also, read-only arguments shouldn't be subject to buffer overflows (because
@@ -307,7 +330,7 @@ private struct StackProtectionOptimization {
       return
     }
 
-    let function = argument.function
+    let function = argument.parentFunction
     let entryBlock = function.entryBlock
     let loc = entryBlock.instructions.first!.location.autoGenerated
     let builder = Builder(atBeginOf: entryBlock, location: loc, context)
@@ -319,7 +342,7 @@ private struct StackProtectionOptimization {
     for block in function.blocks {
       let terminator = block.terminator
       if terminator.isFunctionExiting {
-        let exitBuilder = Builder(at: terminator, location: terminator.location.autoGenerated, context)
+        let exitBuilder = Builder(before: terminator, location: terminator.location.autoGenerated, context)
         exitBuilder.createCopyAddr(from: temporary, to: argument, takeSource: true, initializeDest: true)
         exitBuilder.createDeallocStack(temporary)
       }
@@ -331,7 +354,7 @@ private struct StackProtectionOptimization {
 
   /// Moves the value of a `beginAccess` to a temporary stack location, if possible.
   private func moveToTemporary(scope beginAccess: BeginAccessInst, mustFixStackNesting: inout Bool,
-                               _ context: PassContext) {
+                               _ context: FunctionPassContext) {
     if beginAccess.accessKind != .Modify {
       // We can only move from a `modify` access.
       // Also, read-only accesses shouldn't be subject to buffer overflows (because
@@ -347,15 +370,15 @@ private struct StackProtectionOptimization {
     }
 
     for endAccess in beginAccess.endInstructions {
-      let endBuilder = Builder(at: endAccess, location: endAccess.location.autoGenerated, context)
+      let endBuilder = Builder(before: endAccess, location: endAccess.location.autoGenerated, context)
       endBuilder.createCopyAddr(from: temporary, to: beginAccess, takeSource: true, initializeDest: true)
       endBuilder.createDeallocStack(temporary)
     }
 
     builder.createCopyAddr(from: beginAccess, to: temporary, takeSource: true, initializeDest: true)
-    log("move object protection in \(beginAccess.function.name): \(beginAccess)")
+    log("move object protection in \(beginAccess.parentFunction.name): \(beginAccess)")
 
-    beginAccess.function.setNeedsStackProtection(context)
+    beginAccess.parentFunction.setNeedsStackProtection(context)
 
     // Access scopes are not necessarily properly nested, which can result in
     // not properly nested stack allocations.
@@ -366,12 +389,19 @@ private struct StackProtectionOptimization {
 /// Worklist for inter-procedural analysis of function arguments.
 private struct ArgumentWorklist : ValueUseDefWalker {
   var walkUpCache = WalkerCache<SmallProjectionPath>()
-  private var foundStackAlloc = false
 
+  // Used in `push(rootsOf:)`
+  private var foundStackAlloc = false
+  private var foundUnknownRoots = false
+
+  // Contains arguments which are already handled and don't need to be put into the worklist again.
+  // Note that this cannot be a `ValueSet`, because argument can be from different functions.
   private var handled = Set<FunctionArgument>()
+
+  // The actual worklist.
   private var list: Stack<FunctionArgument>
 
-  init(_ context: PassContext) {
+  init(_ context: FunctionPassContext) {
     self.list = Stack(context)
   }
 
@@ -385,21 +415,15 @@ private struct ArgumentWorklist : ValueUseDefWalker {
     }
   }
 
-  enum PushResult {
-    case failed
-    case succeeded(foundStackAlloc: Bool)
-  }
-
   /// Pushes all roots of `object`, which are function arguments, to the worklist.
-  /// Returns `.succeeded(true)` if some of the roots are `alloc_ref [stack]` instructions.
-  mutating func push(rootsOf object: Value) -> PushResult {
+  /// If the returned `foundUnknownRoots` is true, it means that not all roots of `object` could
+  /// be tracked to a function argument.
+  /// If the returned `foundStackAlloc` than at least one found root is an `alloc_ref [stack]`.
+  mutating func push(rootsOf object: Value) -> (foundUnknownRoots: Bool, foundStackAlloc: Bool) {
     foundStackAlloc = false
-    switch walkUp(value: object, path: SmallProjectionPath(.anything)) {
-      case .continueWalk:
-        return .succeeded(foundStackAlloc: foundStackAlloc)
-      case .abortWalk:
-        return .failed
-    }
+    foundUnknownRoots = false
+    _ =  walkUp(value: object, path: SmallProjectionPath(.anything))
+    return (foundUnknownRoots, foundStackAlloc)
   }
 
   mutating func pop() -> FunctionArgument? {
@@ -413,15 +437,12 @@ private struct ArgumentWorklist : ValueUseDefWalker {
         if ar.canAllocOnStack {
           foundStackAlloc = true
         }
-        return .continueWalk
       case let arg as FunctionArgument:
-        if handled.insert(arg).0 {
-          list.push(arg)
-        }
-        return .continueWalk
-      default:
-        return .abortWalk
+        push(arg)
+    default:
+        foundUnknownRoots = true
     }
+    return .continueWalk
   }
 }
 
@@ -489,9 +510,8 @@ private extension Instruction {
 }
 
 private extension Function {
-  func setNeedsStackProtection(_ context: PassContext) {
+  func setNeedsStackProtection(_ context: FunctionPassContext) {
     if !needsStackProtection {
-      log("needs protection: \(name)")
       set(needStackProtection: true, context)
     }
   }

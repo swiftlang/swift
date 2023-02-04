@@ -3,10 +3,7 @@
 // RUN: %swift -module-name MySwift -target x86_64-unknown-windows-msvc -dump-clang-diagnostics -I %S/Inputs -enable-experimental-cxx-interop -emit-ir %s -parse-stdlib -parse-as-library -disable-legacy-type-info | %FileCheck %s -check-prefix=MICROSOFT_X64
 
 // REQUIRES: OS=windows-msvc
-
-// REQUIRES: CODEGENERATOR=X86
-// REQUIRES: CODEGENERATOR=ARM
-
+// REQUIRES: CPU=x86_64
 
 import Constructors
 import TypeClassification

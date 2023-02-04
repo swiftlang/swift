@@ -107,12 +107,6 @@ private:
   }
 
   void handleSourceText(StringRef Text) override {}
-  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) override {}
-
-  SyntaxTreeTransferMode syntaxTreeTransferMode() override {
-    return SyntaxTreeTransferMode::Off;
-  }
-
 };
 
 struct DocUpdateMutexState {

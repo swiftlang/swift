@@ -53,6 +53,7 @@ void AfterPoundExprCompletion::deliverResults(
     Lookup.addPoundAvailable(ParentStmtKind);
     Lookup.addPoundLiteralCompletions(/*needPound=*/false);
     Lookup.addObjCPoundKeywordCompletions(/*needPound=*/false);
+    Lookup.getMacroCompletions(/*needPound=*/false);
   }
 
   deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);

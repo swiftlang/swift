@@ -251,8 +251,8 @@ getAvailabilityConditionVersionSourceRange(const DeclAttributes &DeclAttrs,
   SourceRange Range;
   for (auto *Attr : DeclAttrs) {
     if (auto *AA = dyn_cast<AvailableAttr>(Attr)) {
-      if (AA->Introduced.hasValue() &&
-          AA->Introduced.getValue() == Version &&
+      if (AA->Introduced.has_value() &&
+          AA->Introduced.value() == Version &&
           AA->Platform == Platform) {
 
         // More than one: return invalid range.

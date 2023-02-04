@@ -111,7 +111,7 @@ importer::getClangSubmoduleForDecl(const clang::Decl *D,
   // Put an Objective-C class into the module that contains the @interface
   // definition, not just some @class forward declaration.
   if (auto maybeDefinition = getDefinitionForClangTypeDecl(D)) {
-    actual = maybeDefinition.getValue();
+    actual = maybeDefinition.value();
     if (!actual && !allowForwardDeclaration)
       return None;
   }

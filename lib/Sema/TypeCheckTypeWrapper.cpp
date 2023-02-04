@@ -20,10 +20,22 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeWrappers.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 
 using namespace swift;
+
+/// Check whether given declaration comes from the .swiftinterface file.
+static bool inSwiftInterfaceContext(NominalTypeDecl *typeDecl) {
+  auto *SF = typeDecl->getDeclContext()->getParentSourceFile();
+  return SF && SF->Kind == SourceFileKind::Interface;
+}
+
+static ValueDecl *findMember(NominalTypeDecl *typeDecl, Identifier memberName) {
+  auto members = typeDecl->lookupDirect(memberName);
+  return members.size() == 1 ? members.front() : nullptr;
+}
 
 static PatternBindingDecl *injectVariable(DeclContext *DC, Identifier name,
                                           Type type,
@@ -77,78 +89,135 @@ VarDecl *VarDecl::getUnderlyingTypeWrapperStorage() const {
                            nullptr);
 }
 
-NominalTypeDecl *NominalTypeDecl::getTypeWrapper() const {
-  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           GetTypeWrapper{mutableSelf}, nullptr);
+static void
+getDeclaredProtocolConformances(NominalTypeDecl *decl,
+                                SmallVectorImpl<ProtocolDecl *> &protocols) {
+  for (unsigned i : indices(decl->getInherited())) {
+    auto inheritedType = evaluateOrDefault(
+        decl->getASTContext().evaluator,
+        InheritedTypeRequest{decl, i, TypeResolutionStage::Interface}, Type());
+
+    if (!(inheritedType && inheritedType->isConstraintType()))
+      continue;
+
+    if (auto *protocol =
+            dyn_cast_or_null<ProtocolDecl>(inheritedType->getAnyNominal())) {
+      protocols.push_back(protocol);
+    }
+
+    if (auto composition = inheritedType->getAs<ProtocolCompositionType>()) {
+      for (auto member : composition->getMembers()) {
+        if (auto *protocol =
+                dyn_cast_or_null<ProtocolDecl>(member->getAnyNominal())) {
+          protocols.push_back(protocol);
+        }
+      }
+    }
+  }
 }
 
-static void getTypeWrappers(
-    NominalTypeDecl *decl,
-    SmallVectorImpl<std::pair<CustomAttr *, NominalTypeDecl *>> &typeWrappers) {
+static void getTypeWrappers(NominalTypeDecl *decl,
+                            SmallVectorImpl<TypeWrapperInfo> &typeWrappers) {
   auto &ctx = decl->getASTContext();
 
+  // Attributes applied directly to the type.
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto *mutableAttr = const_cast<CustomAttr *>(attr);
     auto *nominal = evaluateOrDefault(
-        ctx.evaluator, CustomAttrNominalRequest{mutableAttr, decl}, nullptr);
+        ctx.evaluator,
+        CustomAttrNominalRequest{mutableAttr, decl->getDeclContext()},
+        nullptr);
 
     if (!nominal)
       continue;
 
     auto *typeWrapper = nominal->getAttrs().getAttribute<TypeWrapperAttr>();
-    if (typeWrapper && typeWrapper->isValid())
-      typeWrappers.push_back({mutableAttr, nominal});
+    if (typeWrapper && typeWrapper->isValid()) {
+      auto attrType = evaluateOrDefault(
+          ctx.evaluator,
+          CustomAttrTypeRequest{mutableAttr, decl,
+                                CustomAttrTypeKind::TypeWrapper},
+          Type());
+
+      if (!attrType || attrType->hasError())
+        continue;
+
+      typeWrappers.push_back(
+          {mutableAttr, attrType, nominal, decl, /*isInferred=*/false});
+    }
+  }
+
+  // Do not allow transitive protocol inference between protocols.
+  if (isa<ProtocolDecl>(decl))
+    return;
+
+  // Attributes inferred from (explicit) protocol conformances
+  // associated with the declaration of the type.
+  SmallVector<ProtocolDecl *, 4> protocols;
+  getDeclaredProtocolConformances(decl, protocols);
+
+  for (auto *protocol : protocols) {
+    SmallVector<TypeWrapperInfo, 2> inferredAttrs;
+    getTypeWrappers(protocol, inferredAttrs);
+
+    // De-duplicate inferred type wrappers. This also makes sure
+    // that if both protocol and conforming type explicitly declare
+    // the same type wrapper there is no clash between them.
+    for (const auto &inferredAttr : inferredAttrs) {
+      if (llvm::find_if(typeWrappers, [&](const TypeWrapperInfo &attr) {
+            return attr.Wrapper == inferredAttr.Wrapper;
+          }) == typeWrappers.end())
+        typeWrappers.push_back(inferredAttr.asInferred());
+    }
   }
 }
 
-NominalTypeDecl *GetTypeWrapper::evaluate(Evaluator &evaluator,
-                                          NominalTypeDecl *decl) const {
+Optional<TypeWrapperInfo>
+GetTypeWrapper::evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
   // Note that we don't actually care whether there are duplicates,
   // using the same type wrapper multiple times is still an error.
-  SmallVector<std::pair<CustomAttr *, NominalTypeDecl *>, 2> typeWrappers;
+  SmallVector<TypeWrapperInfo, 2> typeWrappers;
 
   getTypeWrappers(decl, typeWrappers);
 
   if (typeWrappers.empty())
-    return nullptr;
+    return None;
 
   if (typeWrappers.size() != 1) {
-    ctx.Diags.diagnose(decl, diag::cannot_use_multiple_type_wrappers);
-    return nullptr;
+    ctx.Diags.diagnose(decl, diag::cannot_use_multiple_type_wrappers,
+                       decl->getDescriptiveKind(), decl->getName());
+
+    for (const auto &entry : typeWrappers) {
+      if (entry.AttachedTo == decl) {
+        ctx.Diags.diagnose(entry.Attr->getLocation(), diag::decl_declared_here,
+                           entry.Wrapper->getName());
+      } else {
+        ctx.Diags.diagnose(decl, diag::type_wrapper_inferred_from,
+                           entry.Wrapper->getName(),
+                           entry.AttachedTo->getDescriptiveKind(),
+                           entry.AttachedTo->getName());
+      }
+    }
+
+    return None;
   }
 
-  return typeWrappers.front().second;
-}
-
-Type GetTypeWrapperType::evaluate(Evaluator &evaluator,
-                                  NominalTypeDecl *decl) const {
-  SmallVector<std::pair<CustomAttr *, NominalTypeDecl *>, 2> typeWrappers;
-
-  getTypeWrappers(decl, typeWrappers);
-
-  if (typeWrappers.size() != 1)
-    return Type();
-
-  auto *typeWrapperAttr = typeWrappers.front().first;
-  auto type = evaluateOrDefault(
-      evaluator,
-      CustomAttrTypeRequest{typeWrapperAttr, decl->getDeclContext(),
-                            CustomAttrTypeKind::TypeWrapper},
-      Type());
-
-  if (!type || type->hasError()) {
-    return ErrorType::get(decl->getASTContext());
-  }
-  return type;
+  return typeWrappers.front();
 }
 
 VarDecl *NominalTypeDecl::getTypeWrapperProperty() const {
   auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            GetTypeWrapperProperty{mutableSelf}, nullptr);
+}
+
+ConstructorDecl *NominalTypeDecl::getTypeWrappedTypeStorageInitializer() const {
+  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      SynthesizeTypeWrappedTypeStorageWrapperInitializer{mutableSelf}, nullptr);
 }
 
 ConstructorDecl *
@@ -159,29 +228,97 @@ NominalTypeDecl::getTypeWrappedTypeMemberwiseInitializer() const {
       SynthesizeTypeWrappedTypeMemberwiseInitializer{mutableSelf}, nullptr);
 }
 
-NominalTypeDecl *NominalTypeDecl::getTypeWrapperStorageDecl() const {
+TypeDecl *NominalTypeDecl::getTypeWrapperStorageDecl() const {
   auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            GetTypeWrapperStorage{mutableSelf}, nullptr);
 }
 
-NominalTypeDecl *
-GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
-                                NominalTypeDecl *parent) const {
+static AccessLevel
+getAccessLevelForTypeWrapperStorage(NominalTypeDecl *attachedTo) {
+  auto &ctx = attachedTo->getASTContext();
+
+  if (isa<ProtocolDecl>(attachedTo))
+    return attachedTo->getFormalAccess();
+
+  llvm::SmallDenseMap<ProtocolDecl *, bool, 4> visitedProtocols;
+  std::function<bool(ProtocolDecl *)> hasPublicStorageAssociatedType =
+      [&](ProtocolDecl *protocol) {
+        if (visitedProtocols.count(protocol))
+          return visitedProtocols[protocol];
+
+        auto recordResult = [&](ProtocolDecl *P, bool hasWrapper) {
+          visitedProtocols[P] = hasWrapper;
+          return hasWrapper;
+        };
+
+        if (auto *storage =
+                protocol->getAssociatedType(ctx.Id_TypeWrapperStorage)) {
+          if (storage->getFormalAccess() == AccessLevel::Public)
+            return recordResult(protocol, true);
+        }
+
+        // Recursively check whether any of the parents have that
+        // requirement.
+        for (auto *parent : protocol->getProtocolDependencies()) {
+          bool hasPublicStorage = hasPublicStorageAssociatedType(parent);
+          (void)recordResult(parent, hasPublicStorage);
+
+          if (hasPublicStorage)
+            return recordResult(protocol, true);
+        }
+
+        return recordResult(protocol, false);
+      };
+
+  SmallVector<ProtocolDecl *, 4> protocols;
+  getDeclaredProtocolConformances(attachedTo, protocols);
+
+  for (auto *protocol : protocols) {
+    if (hasPublicStorageAssociatedType(protocol))
+      return AccessLevel::Public;
+  }
+
+  return AccessLevel::Internal;
+}
+
+TypeDecl *GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
+                                          NominalTypeDecl *parent) const {
   if (!parent->hasTypeWrapper())
     return nullptr;
 
   auto &ctx = parent->getASTContext();
 
-  auto *storage =
-      new (ctx) StructDecl(/*StructLoc=*/SourceLoc(), ctx.Id_TypeWrapperStorage,
-                           /*NameLoc=*/SourceLoc(),
-                           /*Inheritted=*/{},
-                           /*GenericParams=*/nullptr, parent);
+  // .swiftinterfaces have both attribute and a synthesized member
+  // (if it's public), so in this case we need use existing declaration
+  // if available.
+  if (inSwiftInterfaceContext(parent)) {
+    if (auto *storage = dyn_cast_or_null<TypeDecl>(
+            findMember(parent, ctx.Id_TypeWrapperStorage)))
+      return storage;
+  }
+
+  TypeDecl *storage = nullptr;
+  if (isa<ProtocolDecl>(parent)) {
+    // If type wrapper is associated with a protocol, we need to
+    // inject a new associated type - $Storage.
+    storage = new (ctx)
+        AssociatedTypeDecl(parent, /*keywordLoc=*/SourceLoc(),
+                           ctx.Id_TypeWrapperStorage, /*nameLoc=*/SourceLoc(),
+                           /*defaultDefinition=*/nullptr,
+                           /*trailingWhere=*/nullptr);
+  } else {
+    // For classes and structs we inject a new member struct - $Storage.
+    storage = new (ctx)
+        StructDecl(/*StructLoc=*/SourceLoc(), ctx.Id_TypeWrapperStorage,
+                   /*NameLoc=*/SourceLoc(),
+                   /*Inheritted=*/{},
+                   /*GenericParams=*/nullptr, parent);
+  }
 
   storage->setImplicit();
   storage->setSynthesized();
-  storage->setAccess(AccessLevel::Internal);
+  storage->setAccess(getAccessLevelForTypeWrapperStorage(parent));
 
   parent->addMember(storage);
 
@@ -193,25 +330,33 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
                                  NominalTypeDecl *parent) const {
   auto &ctx = parent->getASTContext();
 
-  auto *typeWrapper = parent->getTypeWrapper();
+  auto typeWrapper = parent->getTypeWrapper();
   if (!typeWrapper)
     return nullptr;
+
+  // .swiftinterfaces have both attribute and a synthesized member
+  // (if it's public), so in this case we need use existing declaration
+  // if available.
+  if (inSwiftInterfaceContext(parent)) {
+    if (auto *storage = dyn_cast_or_null<VarDecl>(
+            findMember(parent, ctx.Id_TypeWrapperProperty)))
+      return storage;
+  }
 
   auto *storage = parent->getTypeWrapperStorageDecl();
   assert(storage);
 
-  auto *typeWrapperType =
-      evaluateOrDefault(ctx.evaluator, GetTypeWrapperType{parent}, Type())
-          ->castTo<AnyGenericType>();
-  assert(typeWrapperType);
+  auto *typeWrapperType = typeWrapper->AttrType->castTo<AnyGenericType>();
 
-  // $_storage: Wrapper<$Storage>
+  // $storage: Wrapper<<ParentType>, <ParentType>.$Storage>
   auto propertyTy = BoundGenericType::get(
-      typeWrapper, /*Parent=*/typeWrapperType->getParent(),
-      /*genericArgs=*/{storage->getInterfaceType()->getMetatypeInstanceType()});
+      typeWrapper->Wrapper, /*Parent=*/typeWrapperType->getParent(),
+      /*genericArgs=*/
+      {parent->getSelfInterfaceType(), storage->getDeclaredInterfaceType()});
 
   return injectProperty(parent, ctx.Id_TypeWrapperProperty, propertyTy,
-                        VarDecl::Introducer::Var, AccessLevel::Internal);
+                        VarDecl::Introducer::Var,
+                        getAccessLevelForTypeWrapperStorage(parent));
 }
 
 VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
@@ -224,8 +369,18 @@ VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
   if (!property->isAccessedViaTypeWrapper())
     return nullptr;
 
-  auto *storage = wrappedType->getTypeWrapperStorageDecl();
+  assert(!isa<ProtocolDecl>(wrappedType));
+
+  auto *storage =
+      cast<NominalTypeDecl>(wrappedType->getTypeWrapperStorageDecl());
   assert(storage);
+
+  // Type wrapper variables are never initialized directly,
+  // initialization expression (if any) becomes an default
+  // argument of the initializer synthesized by the type wrapper.
+  if (auto *PBD = property->getParentPatternBinding()) {
+    PBD->setInitializerSubsumed(/*index=*/0);
+  }
 
   return injectProperty(storage, property->getName(),
                         property->getValueInterfaceType(),
@@ -233,7 +388,7 @@ VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
 }
 
 /// Given the property create a subscript to reach its type wrapper storage:
-/// `$_storage[storageKeyPath: \$Storage.<property>]`.
+/// `$storage[storageKeyPath: \$Storage.<property>]`.
 static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
                                                    AccessorDecl *useDC) {
   auto &ctx = useDC->getASTContext();
@@ -248,8 +403,13 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
   assert(typeWrapperVar);
   assert(storageVar);
 
+  auto createRefToSelf = [&]() {
+    return new (ctx) DeclRefExpr({useDC->getImplicitSelfDecl()},
+                                 /*Loc=*/DeclNameLoc(), /*Implicit=*/true);
+  };
+
   // \$Storage.<property-name>
-  auto *argExpr = KeyPathExpr::createImplicit(
+  auto *storageKeyPath = KeyPathExpr::createImplicit(
       ctx, /*backslashLoc=*/SourceLoc(),
       {KeyPathExpr::Component::forProperty(
           {storageVar},
@@ -257,17 +417,43 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
           /*Loc=*/SourceLoc())},
       /*endLoc=*/SourceLoc());
 
-  auto *subscriptBaseExpr = UnresolvedDotExpr::createImplicit(
-      ctx,
-      new (ctx) DeclRefExpr({useDC->getImplicitSelfDecl()},
-                            /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
-      typeWrapperVar->getName());
+  // WrappedType.<property-name>
+  auto *propertyKeyPath = KeyPathExpr::createImplicit(
+      ctx, /*backslashLoc=*/SourceLoc(),
+      {KeyPathExpr::Component::forUnresolvedProperty(
+          DeclNameRef(var->getName()), /*Loc=*/SourceLoc())},
+      /*endLoc=*/SourceLoc());
 
-  // $_storage[storageKeyPath: \$Storage.<property-name>]
-  return SubscriptExpr::create(
-      ctx, subscriptBaseExpr,
-      ArgumentList::forImplicitSingle(ctx, ctx.Id_storageKeyPath, argExpr),
-      ConcreteDeclRef(), /*implicit=*/true);
+  auto *subscriptBaseExpr = UnresolvedDotExpr::createImplicit(
+      ctx, createRefToSelf(), typeWrapperVar->getName());
+
+  SmallVector<Argument, 4> subscriptArgs;
+
+  // If this is a reference type, let's see whether type wrapper supports
+  // `wrappedSelf:propertyKeyPath:storageKeyPath:` overload.
+  if (isa<ClassDecl>(parent)) {
+    DeclName subscriptName(
+        ctx, DeclBaseName::createSubscript(),
+        {ctx.Id_wrappedSelf, ctx.Id_propertyKeyPath, ctx.Id_storageKeyPath});
+
+    auto *typeWrapper = parent->getTypeWrapper()->Wrapper;
+    auto candidates = typeWrapper->lookupDirect(subscriptName);
+
+    if (!candidates.empty()) {
+      subscriptArgs.push_back(
+          Argument(/*loc=*/SourceLoc(), ctx.Id_wrappedSelf, createRefToSelf()));
+    }
+  }
+
+  subscriptArgs.push_back(
+      Argument(/*loc=*/SourceLoc(), ctx.Id_propertyKeyPath, propertyKeyPath));
+  subscriptArgs.push_back(
+      Argument(/*loc=*/SourceLoc(), ctx.Id_storageKeyPath, storageKeyPath));
+
+  // $storage[storageKeyPath: \$Storage.<property-name>]
+  return SubscriptExpr::create(ctx, subscriptBaseExpr,
+                               ArgumentList::createImplicit(ctx, subscriptArgs),
+                               ConcreteDeclRef(), /*implicit=*/true);
 }
 
 BraceStmt *
@@ -391,99 +577,6 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
   return true;
 }
 
-BraceStmt *SynthesizeTypeWrappedTypeMemberwiseInitializerBody::evaluate(
-    Evaluator &evaluator, ConstructorDecl *ctor) const {
-  auto &ctx = ctor->getASTContext();
-  auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
-
-  // self.$_storage = .init(memberwise: $Storage(...))
-  auto *storageType = parent->getTypeWrapperStorageDecl();
-  assert(storageType);
-
-  auto *typeWrapperVar = parent->getTypeWrapperProperty();
-  assert(typeWrapperVar);
-
-  auto *storageVarRef = UnresolvedDotExpr::createImplicit(
-      ctx,
-      new (ctx) DeclRefExpr({ctor->getImplicitSelfDecl()},
-                            /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
-      typeWrapperVar->getName());
-
-  // Check whether given parameter requires a direct assignment to
-  // intialize the property.
-  //
-  // If `$Storage` doesn't have a member that corresponds
-  // to the current parameter it means that this is a property
-  // that not managed by the type wrapper which has to be
-  // initialized by direct assignment: `self.<name> = <arg>`
-  auto useDirectAssignment = [&](ParamDecl *param) {
-    // Properties with property wrappers are always managed by the type wrapper
-    if (param->hasAttachedPropertyWrapper())
-      return false;
-    return storageType->lookupDirect(param->getName()).empty();
-  };
-
-  SmallVector<ASTNode, 2> body;
-
-  SmallVector<Argument, 4> initArgs;
-  {
-    for (auto *param : *ctor->getParameters()) {
-      VarDecl *arg = param;
-
-      if (useDirectAssignment(param)) {
-        auto *propRef = UnresolvedDotExpr::createImplicit(
-            ctx,
-            new (ctx) DeclRefExpr({ctor->getImplicitSelfDecl()},
-                                  /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
-            arg->getName());
-
-        body.push_back(new (ctx) AssignExpr(
-            propRef, /*EqualLoc=*/SourceLoc(),
-            new (ctx) DeclRefExpr({arg}, /*DeclNameLoc=*/DeclNameLoc(),
-                                  /*Implicit=*/true),
-            /*Implicit=*/true));
-        continue;
-      }
-
-      // type wrappers wrap only backing storage of a wrapped
-      // property, so in this case we need to pass `_<name>` to
-      // `$Storage` constructor.
-      if (param->hasAttachedPropertyWrapper()) {
-        arg = param->getPropertyWrapperBackingProperty();
-        (void)param->getPropertyWrapperBackingPropertyType();
-      }
-
-      initArgs.push_back({/*labelLoc=*/SourceLoc(), arg->getName(),
-                          new (ctx) DeclRefExpr(arg, /*Loc=*/DeclNameLoc(),
-                                                /*Implicit=*/true)});
-    }
-  }
-
-  auto *storageInit = CallExpr::createImplicit(
-      ctx,
-      TypeExpr::createImplicitForDecl(
-          /*Loc=*/DeclNameLoc(), storageType, ctor,
-          ctor->mapTypeIntoContext(storageType->getInterfaceType())),
-      ArgumentList::createImplicit(ctx, initArgs));
-
-  auto *initRef = new (ctx) UnresolvedMemberExpr(
-      /*dotLoc=*/SourceLoc(), /*declNameLoc=*/DeclNameLoc(),
-      DeclNameRef::createConstructor(), /*implicit=*/true);
-  { initRef->setFunctionRefKind(FunctionRefKind::DoubleApply); }
-
-  // .init($Storage(...))
-  Expr *typeWrapperInit = CallExpr::createImplicit(
-      ctx, initRef,
-      ArgumentList::forImplicitSingle(ctx, ctx.Id_memberwise, storageInit));
-
-  body.push_back(new (ctx) AssignExpr(storageVarRef, /*EqualLoc=*/SourceLoc(),
-                                      typeWrapperInit,
-                                      /*Implicit=*/true));
-
-  return BraceStmt::create(ctx, /*lbloc=*/ctor->getLoc(), body,
-                           /*rbloc=*/ctor->getLoc(), /*implicit=*/true);
-}
-
 VarDecl *SynthesizeLocalVariableForTypeWrapperStorage::evaluate(
     Evaluator &evaluator, ConstructorDecl *ctor) const {
   auto &ctx = ctor->getASTContext();
@@ -495,7 +588,11 @@ VarDecl *SynthesizeLocalVariableForTypeWrapperStorage::evaluate(
   if (!(DC && DC->hasTypeWrapper()))
     return nullptr;
 
-  auto *storageDecl = DC->getTypeWrapperStorageDecl();
+  // Default protocol initializers do not get transformed.
+  if (isa<ProtocolDecl>(DC))
+    return nullptr;
+
+  auto *storageDecl = cast<NominalTypeDecl>(DC->getTypeWrapperStorageDecl());
   assert(storageDecl);
 
   SmallVector<TupleTypeElt, 4> members;
@@ -525,8 +622,8 @@ GetTypeWrapperInitializer::evaluate(Evaluator &evaluator,
   auto &ctx = typeWrapper->getASTContext();
   assert(typeWrapper->getAttrs().hasAttribute<TypeWrapperAttr>());
 
-  auto ctors = typeWrapper->lookupDirect(
-      DeclName(ctx, DeclBaseName::createConstructor(), {ctx.Id_memberwise}));
+  auto ctors = typeWrapper->lookupDirect(DeclName(
+      ctx, DeclBaseName::createConstructor(), {ctx.Id_for, ctx.Id_storage}));
 
   if (ctors.size() != 1)
     return nullptr;

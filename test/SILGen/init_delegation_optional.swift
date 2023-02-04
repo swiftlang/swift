@@ -23,7 +23,7 @@ extension Optional {
     self.init(nonFailable1: ())
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[RESULT_ADDR]]
-    // CHECK-NEXT: copy_addr [[PB]] to [initialization] [[OUT]]
+    // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT]]
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[RET:%[0-9]+]] = tuple ()
@@ -45,7 +45,7 @@ extension Optional {
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[RESULT_ADDR]]
     // CHECK-NEXT: [[OUT_SOME_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
-    // CHECK-NEXT: copy_addr [[PB]] to [initialization] [[OUT_SOME_ADDR]]
+    // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_SOME_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
@@ -84,7 +84,7 @@ extension Optional {
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: [[OUT_SOME_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
-    // CHECK-NEXT: copy_addr [[PB]] to [initialization] [[OUT_SOME_ADDR]]
+    // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_SOME_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
@@ -137,7 +137,7 @@ extension Optional {
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
-    // CHECK-NEXT: copy_addr [[PB]] to [initialization] [[OUT_DATA_ADDR]]
+    // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_DATA_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
@@ -190,7 +190,7 @@ extension Optional {
     //
     // CHECK: [[OPT_OPT_SOME_BB]]:
     // CHECK-NEXT: [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[OPT_OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
-    // CHECK-NEXT: copy_addr [[DATA_ADDR]] to [initialization] [[OPT_RESULT_ADDR]]
+    // CHECK-NEXT: copy_addr [[DATA_ADDR]] to [init] [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: destroy_addr [[DATA_ADDR]]
     // CHECK-NEXT: br bb5
     //
@@ -214,7 +214,7 @@ extension Optional {
     // CHECK-NEXT: dealloc_stack [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: dealloc_stack [[OPT_OPT_RESULT_ADDR]]
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
-    // CHECK-NEXT: copy_addr [[PB]] to [initialization] [[OUT_DATA_ADDR]]
+    // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_DATA_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
@@ -262,7 +262,7 @@ extension Optional {
     //
     // CHECK: [[SOME_BB]]:
     // CHECK-NEXT: [[TMP_RESULT_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[TMP_OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
-    // CHECK-NEXT: copy_addr [take] [[TMP_RESULT_ADDR]] to [initialization] [[OPT_RESULT_DATA_ADDR]]
+    // CHECK-NEXT: copy_addr [take] [[TMP_RESULT_ADDR]] to [init] [[OPT_RESULT_DATA_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: dealloc_stack [[TMP_OPT_RESULT_ADDR]]
     // CHECK-NEXT: br bb4
@@ -281,7 +281,7 @@ extension Optional {
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
-    // CHECK-NEXT: copy_addr [[PB]] to [initialization] [[OUT_DATA_ADDR]]
+    // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_DATA_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
@@ -334,7 +334,7 @@ extension Optional {
     // CHECK-NEXT: copy_addr [take] [[RESULT_ADDR]] to [[PB]]
     // CHECK-NEXT: dealloc_stack [[OPT_RESULT_ADDR]]
     // CHECK-NEXT: [[OUT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
-    // CHECK-NEXT: copy_addr [[PB]] to [initialization] [[OUT_DATA_ADDR]]
+    // CHECK-NEXT: copy_addr [[PB]] to [init] [[OUT_DATA_ADDR]]
     // CHECK-NEXT: inject_enum_addr [[OUT]] : {{.*}}, #Optional.some!enumelt
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
@@ -423,7 +423,7 @@ extension Optional where Wrapped == Optional<Bool> {
     self = .none
   }
 
-  // CHECK_LABEL: sil hidden [ossa] @$sSq24init_delegation_optionalSbSgRszlE13SpecFailable3ABSgSgyt_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$sSq24init_delegation_optionalSbSgRszlE13SpecFailable3ABSgSgyt_tcfC
   init?(SpecFailable3: ()) {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin Optional<Optional<Bool>>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Optional<Optional<Bool>> }, var

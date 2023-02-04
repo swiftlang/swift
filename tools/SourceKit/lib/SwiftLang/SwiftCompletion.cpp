@@ -23,7 +23,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
-#include "swift/IDE/CompletionInstance.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -105,12 +105,13 @@ static void swiftCodeCompleteImpl(
   CompletionContext.setAddCallWithNoDefaultArgs(opts.addCallWithNoDefaultArgs);
 
   Lang.performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, CancellationToken,
+      UnresolvedInputFile, Offset, /*InsertCodeCompletionToken=*/true, Args,
+      FileSystem, CancellationToken,
       [&](CancellableResult<SwiftLangSupport::CompletionLikeOperationParams>
               ParamsResult) {
         ParamsResult.mapAsync<CodeCompleteResult>(
             [&](auto &CIParams, auto DeliverTransformed) {
-              Lang.getCompletionInstance()->codeComplete(
+              Lang.getIDEInspectionInstance()->codeComplete(
                   CIParams.Invocation, Args, FileSystem,
                   CIParams.completionBuffer, Offset, CIParams.DiagC,
                   CompletionContext, CIParams.CancellationFlag,
@@ -224,7 +225,7 @@ static void getResultStructure(
   auto *CCStr = result.getCompletionString();
   auto FirstTextChunk = CCStr->getFirstTextChunkIndex(leadingPunctuation);
 
-  if (!FirstTextChunk.hasValue())
+  if (!FirstTextChunk.has_value())
     return;
 
   bool isOperator = result.isOperator();
@@ -585,7 +586,7 @@ getCodeCompletionKeywordKindForUID(UIdent uid) {
   if (uid == Keyword##kw##UID) { \
     return CodeCompletionKeywordKind::kw_##kw; \
   }
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
 
   // FIXME: should warn about unexpected keyword kind.
   return CodeCompletionKeywordKind::None;

@@ -18,6 +18,10 @@
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
 #include <dispatch/swift_concurrency_private.h>
 
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+#error Cannot use task-to-thread model with priority escalation
+#endif
+
 // Provide wrappers with runtime checks to make sure that the dispatch functions
 // are only called on OS-es where they are supported
 static inline dispatch_thread_override_info_s

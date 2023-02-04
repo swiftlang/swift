@@ -60,6 +60,11 @@ struct I {
   var value: Builtin.Int64
 }
 
+struct Slice {
+    var _startIndex: I
+    var _guts: AnyObject
+}
+
 typealias TXXI = (X, X, I)
 
 struct SXXI {
@@ -122,14 +127,14 @@ bb1:
 
 // CHECK-LABEL: sil [ossa] @combine_copy_addr
 // CHECK:      bb0(%0 : $*S, %1 : $*S):
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %0
 // CHECK-NEXT:   br bb1
 // CHECK:      bb1:
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 sil [ossa] @combine_copy_addr : $@convention(thin) (@in S) -> @out S {
 bb0(%0 : $*S, %1 : $*S):
-  copy_addr %1 to [initialization] %0 : $*S
+  copy_addr %1 to [init] %0 : $*S
   br bb1
 bb1:
   destroy_addr %1 : $*S
@@ -170,10 +175,10 @@ bb4:
 // CHECK: [[A:%.*]] = alloc_stack $T
 // CHECK: apply
 // CHECK: debug_value [[A]] : $*T, expr op_deref
-// CHECK-OPT: copy_addr [take] [[A]] to [initialization] %0 : $*T
+// CHECK-OPT: copy_addr [take] [[A]] to [init] %0 : $*T
 // CHECKOPT-NOT: destroy_addr
 // CHECKOPT-NOT: debug_value [[A]]
-// CHECKDEB: copy_addr [[A]] to [initialization] %0 : $*T
+// CHECKDEB: copy_addr [[A]] to [init] %0 : $*T
 // CHECKDEB: debug_value [[A]]
 // CHECKDEB-NEXT: destroy_addr [[A]] : $*T
 // CHECK-LABEL: } // end sil function 'backward_init'
@@ -183,7 +188,7 @@ bb0(%0 : $*T):
   %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
   debug_value %l1 : $*T, expr op_deref
-  copy_addr %l1 to [initialization] %0 : $*T
+  copy_addr %l1 to [init] %0 : $*T
   debug_value %0 : $*T, expr op_deref
   debug_value %l1 : $*T, expr op_deref
   destroy_addr %l1 : $*T
@@ -218,7 +223,7 @@ bb0(%0 : $*T, %1 : $Builtin.Int1):
   debug_value %0 : $*T, let, name "arg", argno 1, expr op_deref
   debug_value %1 : $Builtin.Int1, let, name "z", argno 2
   %4 = alloc_stack [lexical] $T, var, name "t"
-  copy_addr %0 to [initialization] %4 : $*T
+  copy_addr %0 to [init] %4 : $*T
   cond_br %1, bb1, bb2
 
 bb1:
@@ -265,7 +270,7 @@ bb0(%0 : $*T, %1 : $Builtin.Int1):
   debug_value %0 : $*T, let, name "arg", argno 1, expr op_deref
   debug_value %1 : $Builtin.Int1, let, name "z", argno 2
   %4 = alloc_stack $T, var, name "t"
-  copy_addr %0 to [initialization] %4 : $*T
+  copy_addr %0 to [init] %4 : $*T
   cond_br %1, bb1, bb2
 
 bb1:
@@ -301,7 +306,7 @@ bb3:
 sil hidden [ossa] @destroyLoop_lexical : $@convention(thin) <T> (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
   %a = alloc_stack [lexical] $T, var, name "t"
-  copy_addr %0 to [initialization] %a : $*T
+  copy_addr %0 to [init] %a : $*T
   br bb1
 
 bb1:
@@ -338,7 +343,7 @@ bb3:
 sil hidden [ossa] @destroyLoop_nonlexical : $@convention(thin) <T> (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
   %a = alloc_stack $T, var, name "t"
-  copy_addr %0 to [initialization] %a : $*T
+  copy_addr %0 to [init] %a : $*T
   br bb1
 
 bb1:
@@ -573,7 +578,7 @@ exit:
 sil [ossa] @hoist_over_load_from_stack : $@convention(thin) (@in X) -> @owned X {
 entry(%in_addr : $*X):
   %stack_addr = alloc_stack $X
-  copy_addr %in_addr to [initialization] %stack_addr : $*X
+  copy_addr %in_addr to [init] %stack_addr : $*X
   %unknown = function_ref @unknown : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
   %retval = load [take] %stack_addr : $*X
@@ -739,7 +744,7 @@ entry(%instance : @owned $S):
   %inner = begin_access [read] [static] %outer : $*S
   %field_addr = struct_element_addr %inner : $*S, #S.x
   %field_addr_2 =  struct_element_addr %addr_2 : $*S, #S.x
-  copy_addr %field_addr to [initialization] %field_addr_2 : $*X
+  copy_addr %field_addr to [init] %field_addr_2 : $*X
   end_access %inner : $*S
   destroy_addr %outer : $*S
   end_access %outer : $*S
@@ -764,7 +769,7 @@ entry(%instance : @owned $S):
   %outer = begin_access [read] [static] %addr : $*S
   apply undef(%outer) : $@convention(thin) (@inout S) -> ()
   %inner = begin_access [read] [static] %outer : $*S
-  copy_addr %inner to [initialization] %addr_2 : $*S
+  copy_addr %inner to [init] %addr_2 : $*S
   end_access %inner : $*S
   destroy_addr %outer : $*S
   end_access %outer : $*S
@@ -867,8 +872,8 @@ entry(%instance : @owned $SXXI):
     store %instance to [init] %addr : $*SXXI
     %x_1_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_1
     %x_2_addr = struct_element_addr %addr : $*SXXI, #SXXI.x_2
-    copy_addr %x_1_addr to [initialization] %x_1_alone : $*X
-    copy_addr %x_2_addr to [initialization] %x_2_alone : $*X
+    copy_addr %x_1_addr to [init] %x_1_alone : $*X
+    copy_addr %x_2_addr to [init] %x_2_alone : $*X
     destroy_addr %addr : $*SXXI
     %barrier = function_ref @unknown : $@convention(thin) () -> ()
     apply %barrier() : $@convention(thin) () -> ()
@@ -904,9 +909,9 @@ entry(%instance : @owned $STXXITXXII):
     %txxi_2_x_0_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 0
     %txxi_2_x_1_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 1
 
-    copy_addr %txxi_1_x_0_addr to [initialization] %txxi_1_alone : $*X
+    copy_addr %txxi_1_x_0_addr to [init] %txxi_1_alone : $*X
     %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
-    copy_addr %txxi_2_x_0_addr to [initialization] %txxi_2_alone : $*X
+    copy_addr %txxi_2_x_0_addr to [init] %txxi_2_alone : $*X
     %x2x1 = load [copy] %txxi_2_x_1_addr : $*X
     destroy_addr %addr : $*STXXITXXII
     %barrier = function_ref @unknown : $@convention(thin) () -> ()
@@ -939,7 +944,7 @@ entry(%instance : @owned $STXXITXXII):
     %txxi_1_x_0_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 0
     %txxi_1_x_1_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 1
 
-    copy_addr %txxi_1_x_0_addr to [initialization] %txxi_1_alone : $*X
+    copy_addr %txxi_1_x_0_addr to [init] %txxi_1_alone : $*X
     %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
     %txxi2 = load [copy] %txxi_2_addr : $*(X, X, I)
     destroy_addr %addr : $*STXXITXXII
@@ -1048,7 +1053,7 @@ entry(%out : $*T, %instance : @owned $AnyObject):
     %addr = alloc_stack $AnyObject
     store %instance to [init] %addr : $*AnyObject
     %cast_addr = unchecked_addr_cast %addr : $*AnyObject to $*T
-    copy_addr %cast_addr to [initialization] %out : $*T
+    copy_addr %cast_addr to [init] %out : $*T
     destroy_addr %addr : $*AnyObject
     dealloc_stack %addr : $*AnyObject
     %retval = tuple ()
@@ -1071,6 +1076,61 @@ entry(%instance : @owned $AnyObject):
     destroy_addr %addr : $*AnyObject
     dealloc_stack %addr : $*AnyObject
     return %cast : $X
+}
+
+// Don't fold a destroy_addr into a copy_addr of the whole aggregate if there
+// is an access to some trivial subobject afterwards.
+// CHECK-LABEL: sil [ossa] @nofold_destroy_addr_into_whole_with_later_trivial_subobject_use : {{.*}} {
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nofold_destroy_addr_into_whole_with_later_trivial_subobject_use'
+sil [ossa] @nofold_destroy_addr_into_whole_with_later_trivial_subobject_use : $@convention(thin) (@in Slice) -> (@out Slice) {
+bb0(%out : $*Slice, %4 : $*Slice):
+  copy_addr %4 to [init] %out : $*Slice
+  %8 = alloc_stack $I
+  %9 = struct_element_addr %4 : $*Slice, #Slice._startIndex
+  copy_addr %9 to [init] %8 : $*I
+  destroy_addr %4 : $*Slice
+  dealloc_stack %8 : $*I
+  %19 = tuple ()
+  return %19 : $()
+}
+
+// Like fold_struct_enclosing_tuples_leaf_fields_mixed_insts but with an access
+// of a trivial field afterwards.
+// CHECK-LABEL: sil [ossa] @nofold_struct_enclosing_tuples_leaf_fields_mixed_insts_with_later_trivial_subobject : {{.*}} {
+// CHECK:         load [trivial]
+// CHECK:         destroy_addr {{%[^,]+}} : $*STXXITXXII
+// CHECK-LABEL: } // end sil function 'nofold_struct_enclosing_tuples_leaf_fields_mixed_insts_with_later_trivial_subobject'
+sil [ossa] @nofold_struct_enclosing_tuples_leaf_fields_mixed_insts_with_later_trivial_subobject : $@convention(thin) (@owned STXXITXXII) -> @owned (X, X) {
+entry(%instance : @owned $STXXITXXII):
+    %addr = alloc_stack $STXXITXXII
+    %txxi_1_alone = alloc_stack $X
+    %txxi_2_alone = alloc_stack $X
+    store %instance to [init] %addr : $*STXXITXXII
+    %txxi_1_addr = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.txxi_1
+    %txxi_2_addr = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.txxi_2
+    %txxi_1_x_0_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 0
+    %txxi_1_x_1_addr = tuple_element_addr %txxi_1_addr : $*(X, X, I), 1
+    %txxi_2_x_0_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 0
+    %txxi_2_x_1_addr = tuple_element_addr %txxi_2_addr : $*(X, X, I), 1
+    %trivial = struct_element_addr %addr : $*STXXITXXII, #STXXITXXII.i
+
+    copy_addr %txxi_1_x_0_addr to [init] %txxi_1_alone : $*X
+    %x1x1 = load [copy] %txxi_1_x_1_addr : $*X
+    copy_addr %txxi_2_x_0_addr to [init] %txxi_2_alone : $*X
+    %x2x1 = load [copy] %txxi_2_x_1_addr : $*X
+    %i = load [trivial] %trivial : $*I
+    destroy_addr %addr : $*STXXITXXII
+    %barrier = function_ref @unknown : $@convention(thin) () -> ()
+    apply %barrier() : $@convention(thin) () -> ()
+
+    destroy_addr %txxi_1_alone : $*X
+    destroy_addr %txxi_2_alone : $*X
+    dealloc_stack %txxi_2_alone : $*X
+    dealloc_stack %txxi_1_alone : $*X
+    dealloc_stack %addr : $*STXXITXXII
+    %retval = tuple (%x1x1 : $X, %x2x1 : $X)
+    return %retval : $(X, X)
 }
 
 // CHECK-LABEL: sil [ossa] @hoist_over_apply_of_non_barrier_fn : {{.*}} {

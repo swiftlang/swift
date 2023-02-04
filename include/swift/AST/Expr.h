@@ -42,7 +42,7 @@ namespace swift {
   class ArchetypeType;
   class ASTContext;
   class AvailabilitySpec;
-  class IdentTypeRepr;
+  class DeclRefTypeRepr;
   class Type;
   class TypeRepr;
   class ValueDecl;
@@ -363,6 +363,12 @@ protected:
     : NumPadBits,
     NumElements : 32
   );
+
+  SWIFT_INLINE_BITFIELD(MacroExpansionExpr, Expr, (16-NumExprBits)+16,
+    : 16 - NumExprBits, // Align and leave room for subclasses
+    Discriminator : 16
+  );
+
   } Bits;
 
 private:
@@ -736,7 +742,7 @@ public:
   /// \p value The integer value.
   /// \return An implicit integer literal expression which evaluates to the value.
   static IntegerLiteralExpr *
-  createFromUnsigned(ASTContext &C, unsigned value);
+  createFromUnsigned(ASTContext &C, unsigned value, SourceLoc loc);
 
   /// Returns the value of the literal, appropriately constructed in the
   /// target type.
@@ -1103,7 +1109,7 @@ public:
   /// The kind of object literal.
   enum LiteralKind : unsigned {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) Name,
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
   };
 
 private:
@@ -1333,18 +1339,18 @@ public:
                                        DeclNameLoc NameLoc,
                                        TypeDecl *Decl);
 
-  /// Create a TypeExpr for a member TypeDecl of the given parent IdentTypeRepr.
-  static TypeExpr *createForMemberDecl(IdentTypeRepr *ParentTR,
-                                       DeclNameLoc NameLoc,
-                                       TypeDecl *Decl);
+  /// Create a \c TypeExpr for a member \c TypeDecl of the given parent
+  /// \c DeclRefTypeRepr.
+  static TypeExpr *createForMemberDecl(DeclRefTypeRepr *ParentTR,
+                                       DeclNameLoc NameLoc, TypeDecl *Decl);
 
-  /// Create a TypeExpr from an IdentTypeRepr with the given arguments applied
-  /// at the specified location.
+  /// Create a \c TypeExpr from an \c DeclRefTypeRepr with the given arguments
+  /// applied at the specified location.
   ///
   /// Returns nullptr if the reference cannot be formed, which is a hack due
   /// to limitations in how we model generic typealiases.
-  static TypeExpr *createForSpecializedDecl(IdentTypeRepr *ParentTR,
-                                            ArrayRef<TypeRepr*> Args,
+  static TypeExpr *createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
+                                            ArrayRef<TypeRepr *> Args,
                                             SourceRange AngleLocs,
                                             ASTContext &C);
 
@@ -2069,6 +2075,37 @@ public:
   SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
 
   static bool classof(const Expr *e) { return e->getKind() == ExprKind::Move; }
+};
+
+/// BorrowExpr - A 'borrow' surrounding an lvalue/accessor expression at an
+/// apply site marking the lvalue/accessor as being borrowed when passed to the
+/// callee.
+///
+/// getSemanticsProvidingExpr() looks through this because it doesn't
+/// provide the value and only very specific clients care where the
+/// 'borrow' was written.
+class BorrowExpr final : public IdentityExpr {
+  SourceLoc BorrowLoc;
+
+public:
+  BorrowExpr(SourceLoc borrowLoc, Expr *sub, Type type = Type(),
+             bool implicit = false)
+      : IdentityExpr(ExprKind::Borrow, sub, type, implicit),
+        BorrowLoc(borrowLoc) {}
+
+  static BorrowExpr *createImplicit(ASTContext &ctx, SourceLoc borrowLoc,
+                                    Expr *sub, Type type = Type()) {
+    return new (ctx) BorrowExpr(borrowLoc, sub, type, /*implicit=*/true);
+  }
+
+  SourceLoc getLoc() const { return BorrowLoc; }
+
+  SourceLoc getStartLoc() const { return BorrowLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Borrow;
+  }
 };
 
 /// TupleExpr - Parenthesized expressions like '(a: x+x)' and '(x, y, 4)'. Note
@@ -3303,7 +3340,7 @@ public:
   /// this array will be empty
   ArrayRef<ConversionPair> getArgumentConversions() const {
     return {getTrailingObjects<ConversionPair>(),
-            Bits.ErasureExpr.NumArgumentConversions };
+            static_cast<size_t>(Bits.ErasureExpr.NumArgumentConversions) };
   }
 
   /// Retrieve the conversion expressions mapping requirements from any
@@ -3313,7 +3350,7 @@ public:
   /// this array will be empty
   MutableArrayRef<ConversionPair> getArgumentConversions() {
     return {getTrailingObjects<ConversionPair>(),
-            Bits.ErasureExpr.NumArgumentConversions };
+            static_cast<size_t>(Bits.ErasureExpr.NumArgumentConversions) };
   }
 
   void setArgumentConversion(unsigned i, const ConversionPair &p) {
@@ -3510,6 +3547,50 @@ public:
   }
 };
 
+/// A pack element expression spelled with the contextual \c each
+/// keyword applied to a pack reference expression.
+///
+/// \code
+///  func zip<T..., U...>(t: (each T)..., u: (each U)...) {
+///    let zipped = (each t, each u)...
+///  }
+/// \endcode
+///
+/// Pack elements can only appear in the pattern expression of a
+/// \c PackExpansionExpr.
+class PackElementExpr final : public Expr {
+  SourceLoc EachLoc;
+  Expr *PackRefExpr;
+
+  PackElementExpr(SourceLoc eachLoc, Expr *packRefExpr,
+                  bool implicit = false, Type type = Type())
+      : Expr(ExprKind::PackElement, implicit, type),
+        EachLoc(eachLoc), PackRefExpr(packRefExpr) {}
+
+public:
+  static PackElementExpr *create(ASTContext &ctx, SourceLoc eachLoc,
+                                 Expr *packRefExpr, bool implicit = false,
+                                 Type type = Type());
+
+  Expr *getPackRefExpr() const { return PackRefExpr; }
+
+  void setPackRefExpr(Expr *packRefExpr) {
+    PackRefExpr = packRefExpr;
+  }
+
+  SourceLoc getStartLoc() const {
+    return EachLoc;
+  }
+
+  SourceLoc getEndLoc() const {
+    return PackRefExpr->getEndLoc();
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PackElement;
+  }
+};
+
 /// A pack expansion expression is a pattern expression followed by
 /// the expansion operator '...'. The pattern expression contains
 /// references to parameter packs of length N, and the expansion
@@ -3519,20 +3600,24 @@ public:
 /// that naturally accept a comma-separated list of values, including
 /// call argument lists, the elements of a tuple value, and the source
 /// of a for-in loop.
-class PackExpansionExpr: public Expr {
+class PackExpansionExpr final : public Expr {
+  SourceLoc RepeatLoc;
   Expr *PatternExpr;
-  SourceLoc DotsLoc;
+  GenericEnvironment *Environment;
 
-  PackExpansionExpr(Expr *patternExpr,
-                    SourceLoc dotsLoc,
+  PackExpansionExpr(SourceLoc repeatLoc,
+                    Expr *patternExpr,
+                    GenericEnvironment *environment,
                     bool implicit, Type type)
     : Expr(ExprKind::PackExpansion, implicit, type),
-      PatternExpr(patternExpr), DotsLoc(dotsLoc) {}
+      RepeatLoc(repeatLoc), PatternExpr(patternExpr),
+      Environment(environment) {}
 
 public:
   static PackExpansionExpr *create(ASTContext &ctx,
+                                   SourceLoc repeatLoc,
                                    Expr *patternExpr,
-                                   SourceLoc dotsLoc,
+                                   GenericEnvironment *environment,
                                    bool implicit = false,
                                    Type type = Type());
 
@@ -3542,12 +3627,22 @@ public:
     PatternExpr = patternExpr;
   }
 
+  void getExpandedPacks(SmallVectorImpl<ASTNode> &packs);
+
+  GenericEnvironment *getGenericEnvironment() {
+    return Environment;
+  }
+
+  void setGenericEnvironment(GenericEnvironment *env) {
+    Environment = env;
+  }
+
   SourceLoc getStartLoc() const {
-    return PatternExpr->getStartLoc();
+    return RepeatLoc;
   }
 
   SourceLoc getEndLoc() const {
-    return DotsLoc;
+    return PatternExpr->getEndLoc();
   }
 
   static bool classof(const Expr *E) {
@@ -3702,11 +3797,11 @@ class AbstractClosureExpr : public DeclContext, public Expr {
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
-                      unsigned Discriminator, DeclContext *Parent)
+                      DeclContext *Parent)
       : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
         Expr(Kind, Implicit, FnType),
         parameterList(nullptr) {
-    Bits.AbstractClosureExpr.Discriminator = Discriminator;
+    Bits.AbstractClosureExpr.Discriminator = InvalidDiscriminator;
   }
 
   CaptureInfo getCaptureInfo() const { return Captures; }
@@ -3735,11 +3830,18 @@ public:
   /// optimization and therefore make it into e.g. stack traces.
   /// Having their symbol names be stable across minor code changes is
   /// therefore pretty useful for debugging.)
-  unsigned getDiscriminator() const {
+  unsigned getDiscriminator() const;
+
+  /// Retrieve the raw discriminator, which may not have been computed yet.
+  ///
+  /// Only use this for queries that are checking for (e.g.) reentrancy or
+  /// intentionally do not want to initiate verification.
+  unsigned getRawDiscriminator() const {
     return Bits.AbstractClosureExpr.Discriminator;
   }
+
   void setDiscriminator(unsigned discriminator) {
-    assert(getDiscriminator() == InvalidDiscriminator);
+    assert(getRawDiscriminator() == InvalidDiscriminator);
     assert(discriminator != InvalidDiscriminator);
     Bits.AbstractClosureExpr.Discriminator = discriminator;
   }
@@ -3766,9 +3868,6 @@ public:
   ///
   /// Only valid when \c hasSingleExpressionBody() is true.
   Expr *getSingleExpressionBody() const;
-
-  /// Whether this closure has a body
-  bool hasBody() const;
 
   /// Returns the body of closures that have a body
   /// returns nullptr if the closure doesn't have a body
@@ -3898,9 +3997,9 @@ public:
               SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
               SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
-              unsigned discriminator, DeclContext *parent)
+              DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
-                          discriminator, parent),
+                          parent),
       Attributes(attributes), BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
@@ -4096,10 +4195,9 @@ public:
     AsyncLet = 3,
   };
 
-  AutoClosureExpr(Expr *Body, Type ResultTy, unsigned Discriminator,
-                  DeclContext *Parent)
+  AutoClosureExpr(Expr *Body, Type ResultTy, DeclContext *Parent)
       : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, /*Implicit=*/true,
-                            Discriminator, Parent) {
+                            Parent) {
     if (Body != nullptr)
       setBody(Body);
 
@@ -4178,6 +4276,7 @@ class CaptureListExpr final : public Expr,
                   AbstractClosureExpr *closureBody)
     : Expr(ExprKind::CaptureList, /*Implicit=*/false, Type()),
       closureBody(closureBody) {
+    assert(closureBody);
     Bits.CaptureListExpr.NumCaptures = captureList.size();
     std::uninitialized_copy(captureList.begin(), captureList.end(),
                             getTrailingObjects<CaptureListEntry>());
@@ -4260,6 +4359,10 @@ public:
       : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Range(Range) {
     Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
   }
+
+  static OpaqueValueExpr *
+  createImplicit(ASTContext &ctx, Type Ty, bool isPlaceholder = false,
+                 AllocationArena arena = AllocationArena::Permanent);
 
   /// Whether this opaque value expression represents a placeholder that
   /// is injected before type checking to act as a placeholder for some
@@ -5876,6 +5979,63 @@ public:
   }
 };
 
+/// An expression that may wrap a statement which produces a single value.
+class SingleValueStmtExpr : public Expr {
+public:
+  enum class Kind {
+    If, Switch
+  };
+
+private:
+  Stmt *S;
+  DeclContext *DC;
+
+  SingleValueStmtExpr(Stmt *S, DeclContext *DC)
+      : Expr(ExprKind::SingleValueStmt, /*isImplicit*/ true), S(S), DC(DC) {}
+
+public:
+  /// Creates a new SingleValueStmtExpr wrapping a statement.
+  static SingleValueStmtExpr *create(ASTContext &ctx, Stmt *S, DeclContext *DC);
+
+  /// Creates a new SingleValueStmtExpr wrapping a statement, and recursively
+  /// attempts to wrap any branches of that statement that can become single
+  /// value statement expressions.
+  ///
+  /// If \p mustBeExpr is true, branches will be eagerly wrapped even if they
+  /// may not be valid SingleValueStmtExprs (which Sema will later diagnose).
+  static SingleValueStmtExpr *createWithWrappedBranches(ASTContext &ctx,
+                                                        Stmt *S,
+                                                        DeclContext *DC,
+                                                        bool mustBeExpr);
+
+  /// Attempt to look through valid parent expressions to a child
+  /// SingleValueStmtExpr.
+  static SingleValueStmtExpr *tryDigOutSingleValueStmtExpr(Expr *E);
+
+  /// Retrieve the wrapped statement.
+  Stmt *getStmt() const { return S; }
+  void setStmt(Stmt *newS) { S = newS; }
+
+  /// Retrieve the kind of statement being wrapped.
+  Kind getStmtKind() const;
+
+  /// Retrieve the complete set of branches for the underlying statement.
+  ArrayRef<Stmt *> getBranches(SmallVectorImpl<Stmt *> &scratch) const;
+
+  /// Retrieve the single expression branches of the statement, excluding
+  /// branches that either have multiple expressions, or have statements.
+  ArrayRef<Expr *>
+  getSingleExprBranches(SmallVectorImpl<Expr *> &scratch) const;
+
+  DeclContext *getDeclContext() const { return DC; }
+
+  SourceRange getSourceRange() const;
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SingleValueStmt;
+  }
+};
+
 /// Expression node that effects a "one-way" constraint in
 /// the constraint system, allowing type information to flow from the
 /// subexpression outward but not the other way.
@@ -5909,6 +6069,10 @@ class TypeJoinExpr final : public Expr,
 
   DeclRefExpr *Var;
 
+  /// If this is joining the expression branches for a SingleValueStmtExpr,
+  /// this holds the expr node. Otherwise, it is \c nullptr.
+  SingleValueStmtExpr *SVE;
+
   size_t numTrailingObjects() const {
     return getNumElements();
   }
@@ -5917,11 +6081,34 @@ class TypeJoinExpr final : public Expr,
     return { getTrailingObjects<Expr *>(), getNumElements() };
   }
 
-  TypeJoinExpr(DeclRefExpr *var, ArrayRef<Expr *> elements);
+  TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
+               ArrayRef<Expr *> elements, SingleValueStmtExpr *SVE);
+
+  static TypeJoinExpr *
+  createImpl(ASTContext &ctx,
+             llvm::PointerUnion<DeclRefExpr *, TypeBase *> varOrType,
+             ArrayRef<Expr *> elements,
+             AllocationArena arena = AllocationArena::Permanent,
+             SingleValueStmtExpr *SVE = nullptr);
 
 public:
-  static TypeJoinExpr *create(ASTContext &ctx, DeclRefExpr *var,
-                              ArrayRef<Expr *> exprs);
+  static TypeJoinExpr *
+  create(ASTContext &ctx, DeclRefExpr *var, ArrayRef<Expr *> exprs,
+         AllocationArena arena = AllocationArena::Permanent) {
+    return createImpl(ctx, var, exprs, arena);
+  }
+
+  static TypeJoinExpr *
+  create(ASTContext &ctx, Type joinType, ArrayRef<Expr *> exprs,
+         AllocationArena arena = AllocationArena::Permanent) {
+    return createImpl(ctx, joinType.getPointer(), exprs, arena);
+  }
+
+  /// Create a join for the branch types of a SingleValueStmtExpr.
+  static TypeJoinExpr *
+  forBranchesOfSingleValueStmtExpr(ASTContext &ctx, Type joinType,
+                                   SingleValueStmtExpr *SVE,
+                                   AllocationArena arena);
 
   SourceLoc getLoc() const { return SourceLoc(); }
   SourceRange getSourceRange() const { return SourceRange(); }
@@ -5945,10 +6132,111 @@ public:
     getMutableElements()[i] = E;
   }
 
+  /// If this is joining the expression branches for a SingleValueStmtExpr,
+  /// this returns the expr node. Otherwise, returns \c nullptr.
+  SingleValueStmtExpr *getSingleValueStmtExpr() const { return SVE; }
+
   unsigned getNumElements() const { return Bits.TypeJoinExpr.NumElements; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TypeJoin;
+  }
+};
+
+/// An invocation of a macro expansion, spelled with `#` for freestanding
+/// macros or `@` for attached macros.
+class MacroExpansionExpr final : public Expr {
+private:
+  DeclContext *DC;
+  SourceLoc SigilLoc;
+  DeclNameRef MacroName;
+  DeclNameLoc MacroNameLoc;
+  SourceLoc LeftAngleLoc, RightAngleLoc;
+  ArrayRef<TypeRepr *> GenericArgs;
+  ArgumentList *ArgList;
+  Expr *Rewritten;
+  MacroRoles Roles;
+
+  /// The referenced macro.
+  ConcreteDeclRef macroRef;
+
+public:
+  enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
+  explicit MacroExpansionExpr(DeclContext *dc,
+                              SourceLoc sigilLoc, DeclNameRef macroName,
+                              DeclNameLoc macroNameLoc,
+                              SourceLoc leftAngleLoc,
+                              ArrayRef<TypeRepr *> genericArgs,
+                              SourceLoc rightAngleLoc,
+                              ArgumentList *argList,
+                              MacroRoles roles,
+                              bool isImplicit = false,
+                              Type ty = Type())
+      : Expr(ExprKind::MacroExpansion, isImplicit, ty),
+        DC(dc), SigilLoc(sigilLoc),
+        MacroName(macroName), MacroNameLoc(macroNameLoc),
+        LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
+        GenericArgs(genericArgs),
+        Rewritten(nullptr), Roles(roles) {
+    Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
+
+    // Macro expansions always have an argument list. If one is not provided, create
+    // an implicit one.
+    if (argList) {
+      ArgList = argList;
+    } else {
+      ArgList = ArgumentList::createImplicit(dc->getASTContext(), {});
+    }
+  }
+
+  DeclNameRef getMacroName() const { return MacroName; }
+  DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
+
+  Expr *getRewritten() const { return Rewritten; }
+  void setRewritten(Expr *rewritten) { Rewritten = rewritten; }
+
+  ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
+
+  SourceRange getGenericArgsRange() const {
+    return SourceRange(LeftAngleLoc, RightAngleLoc);
+  }
+
+  ArgumentList *getArgs() const { return ArgList; }
+  void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
+
+  MacroRoles getMacroRoles() const { return Roles; }
+
+  SourceLoc getLoc() const { return SigilLoc; }
+
+  ConcreteDeclRef getMacroRef() const { return macroRef; }
+  void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
+
+  DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *dc) { DC = dc; }
+
+  /// Returns a discriminator which determines this macro expansion's index
+  /// in the sequence of macro expansions within the current function.
+  unsigned getDiscriminator() const;
+
+  /// Retrieve the raw discriminator, which may not have been computed yet.
+  ///
+  /// Only use this for queries that are checking for (e.g.) reentrancy or
+  /// intentionally do not want to initiate verification.
+  unsigned getRawDiscriminator() const {
+    return Bits.MacroExpansionExpr.Discriminator;
+  }
+
+  void setDiscriminator(unsigned discriminator) {
+    assert(getRawDiscriminator() == InvalidDiscriminator);
+    assert(discriminator != InvalidDiscriminator);
+    Bits.MacroExpansionExpr.Discriminator = discriminator;
+  }
+
+  SourceRange getSourceRange() const;
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MacroExpansion;
   }
 };
 

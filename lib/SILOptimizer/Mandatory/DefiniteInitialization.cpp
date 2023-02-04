@@ -100,20 +100,20 @@ enum class DIKind : uint8_t { No, Yes, Partial };
 /// This implements the lattice merge operation for 2 optional DIKinds.
 static Optional<DIKind> mergeKinds(Optional<DIKind> OK1, Optional<DIKind> OK2) {
   // If OK1 is unset, ignore it.
-  if (!OK1.hasValue())
+  if (!OK1.has_value())
     return OK2;
 
-  DIKind K1 = OK1.getValue();
+  DIKind K1 = OK1.value();
 
   // If "this" is already partial, we won't learn anything.
   if (K1 == DIKind::Partial)
     return K1;
 
   // If OK2 is unset, take K1.
-  if (!OK2.hasValue())
+  if (!OK2.has_value())
     return K1;
 
-  DIKind K2 = OK2.getValue();
+  DIKind K2 = OK2.value();
 
   // If "K1" is yes, or no, then switch to partial if we find a different
   // answer.
@@ -153,7 +153,7 @@ namespace {
     unsigned size() const { return Data.size()/2; }
 
     DIKind get(unsigned Elt) const {
-      return getConditional(Elt).getValue();
+      return getConditional(Elt).value();
     }
 
     Optional<DIKind> getConditional(unsigned Elt) const {
@@ -172,10 +172,10 @@ namespace {
     }
     
     void set(unsigned Elt, Optional<DIKind> K) {
-      if (!K.hasValue())
+      if (!K.has_value())
         Data[Elt*2] = true, Data[Elt*2+1] = true;
       else
-        set(Elt, K.getValue());
+        set(Elt, K.value());
     }
 
     /// containsUnknownElements - Return true if there are any elements that are
@@ -183,7 +183,7 @@ namespace {
     bool containsUnknownElements() const {
       // Check that we didn't get any unknown values.
       for (unsigned i = 0, e = size(); i != e; ++i)
-        if (!getConditional(i).hasValue())
+        if (!getConditional(i).has_value())
           return true;
       return false;
     }
@@ -191,7 +191,7 @@ namespace {
     bool isAll(DIKind K) const {
       for (unsigned i = 0, e = size(); i != e; ++i) {
         auto Elt = getConditional(i);
-        if (!Elt.hasValue() || Elt.getValue() != K)
+        if (!Elt.has_value() || Elt.value() != K)
           return false;
       }
       return true;
@@ -200,7 +200,7 @@ namespace {
     bool hasAny(DIKind K) const {
       for (unsigned i = 0, e = size(); i != e; ++i) {
         auto Elt = getConditional(i);
-        if (Elt.hasValue() && Elt.getValue() == K)
+        if (Elt.has_value() && Elt.value() == K)
           return true;
       }
       return false;
@@ -213,7 +213,7 @@ namespace {
     /// known yet, switch them to the specified value.
     void changeUnsetElementsTo(DIKind K) {
       for (unsigned i = 0, e = size(); i != e; ++i)
-        if (!getConditional(i).hasValue())
+        if (!getConditional(i).has_value())
           set(i, K);
     }
     
@@ -228,7 +228,7 @@ namespace {
       OS << '(';
       for (unsigned i = 0, e = size(); i != e; ++i) {
         if (Optional<DIKind> Elt = getConditional(i)) {
-          switch (Elt.getValue()) {
+          switch (Elt.value()) {
             case DIKind::No:      OS << 'n'; break;
             case DIKind::Yes:     OS << 'y'; break;
             case DIKind::Partial: OS << 'p'; break;
@@ -294,9 +294,9 @@ namespace {
     void setUnknownToNotAvailable() {
       LocalAvailability.changeUnsetElementsTo(DIKind::No);
       OutAvailability.changeUnsetElementsTo(DIKind::No);
-      if (!LocalSelfInitialized.hasValue())
+      if (!LocalSelfInitialized.has_value())
         LocalSelfInitialized = DIKind::No;
-      if (!OutSelfInitialized.hasValue())
+      if (!OutSelfInitialized.has_value())
         OutSelfInitialized = DIKind::No;
     }
 
@@ -312,14 +312,14 @@ namespace {
                               const Optional<DIKind> out,
                               const Optional<DIKind> local,
                               Optional<DIKind> &result) {
-      if (local.hasValue()) {
+      if (local.has_value()) {
         // A local availability overrides the incoming value.
         result = local;
       } else {
         result = mergeKinds(out, pred);
       }
-      if (result.hasValue() &&
-          (!out.hasValue() || result.getValue() != out.getValue())) {
+      if (result.has_value() &&
+          (!out.has_value() || result.value() != out.value())) {
         return true;
       }
       return false;
@@ -373,7 +373,7 @@ namespace {
 
     /// If true, we're not done with our dataflow analysis yet.
     bool containsUndefinedValues() {
-      return (!OutSelfInitialized.hasValue() ||
+      return (!OutSelfInitialized.has_value() ||
               OutAvailability.containsUnknownElements());
     }
   };
@@ -459,7 +459,7 @@ namespace {
     /// corresponds to `self`.
     void injectActorHops();
 
-    /// Injects `self.$storage = .init(memberwise: $Storage(...))`
+    /// Injects `self.$storage = .init(storage: $Storage(...))`
     /// assignment instructions into the function after each point
     /// where `_storage` becomes fully initialized via `assign_by_wrapper`.
     /// This is only necessary only for user-defined initializers of a
@@ -1093,7 +1093,8 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
 
   auto *ctor = cast<ConstructorDecl>(storageVar->getDeclContext()->getAsDecl());
   auto *parentType = ctor->getDeclContext()->getSelfNominalTypeDecl();
-  auto *storageDecl = parentType->getTypeWrapperStorageDecl();
+  auto *storageDecl =
+      cast<NominalTypeDecl>(parentType->getTypeWrapperStorageDecl());
 
   for (auto *point : points) {
     SILBuilderWithScope::insertAfter(point, [&](SILBuilder &b) {
@@ -1117,7 +1118,7 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
       auto storageType = F.getLoweredType(
           ctor->mapTypeIntoContext(storageDecl->getDeclaredInterfaceType()));
 
-      // Argument value to use in call to <TypeWrapper>.init(memberwise:)
+      // Argument value to use in call to <TypeWrapper>.init(storage:)
       SILValue storageObj = allocStack(storageType);
 
       // let storageObj = $Storage(<destructured _storage tuple>)
@@ -1174,8 +1175,7 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
               }
 
               switch (convention.getSILArgumentConvention(argIdx)) {
-              case SILArgumentConvention::Indirect_In:
-              case SILArgumentConvention::Indirect_In_Constant: {
+              case SILArgumentConvention::Indirect_In: {
                 // The only way to load opaque type is to allocate a temporary
                 // variable on the stack for it and initialize from the element
                 // address.
@@ -1211,6 +1211,12 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
               case SILArgumentConvention::Indirect_Inout:
               case SILArgumentConvention::Indirect_InoutAliasable:
                 llvm_unreachable("inout arguments are not supported by $Storage.");
+
+              case SILArgumentConvention::Pack_Out:
+              case SILArgumentConvention::Pack_Owned:
+              case SILArgumentConvention::Pack_Guaranteed:
+              case SILArgumentConvention::Pack_Inout:
+                llvm_unreachable("pack arguments are not supported by $Storage.");
               }
 
               ++argIdx;
@@ -1253,12 +1259,13 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
                                  StoreOwnershipQualifier::Init);
       }
 
-      // self.$storage = <TypeWrapper>(memberwise: storageObj))
+      // self.$storage = <TypeWrapper>(storage: storageObj))
       {
         bool isClass = isa<ClassDecl>(parentType);
 
-        auto typeWrapper = parentType->getTypeWrapper();
-        auto *typeWrapperInit = typeWrapper->getTypeWrapperInitializer();
+        auto typeWrapperInfo = parentType->getTypeWrapper();
+        auto *typeWrapperInit =
+            typeWrapperInfo->Wrapper->getTypeWrapperInitializer();
         SILValue typeWrapperInitRef = createInitRef(typeWrapperInit);
 
         auto *self = TheMemory.findUninitializedSelfValue();
@@ -1291,6 +1298,11 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
               loc, selfRef, parentType->getTypeWrapperProperty());
         }
 
+        auto wrappedType = MetatypeType::get(self->getType().getASTType(),
+                                             MetatypeRepresentation::Thick);
+        auto wrappedMetatype =
+            b.createMetatype(loc, F.getLoweredType(wrappedType));
+
         auto typeWrapperType =
             b.createMetatype(loc, F.getLoweredType(MetatypeType::get(
                                       storagePropRef->getType().getASTType())));
@@ -1305,16 +1317,28 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
           wrapperInitArgs.push_back(*localWrapperObj);
         }
 
+        wrapperInitArgs.push_back(wrappedMetatype);
         wrapperInitArgs.push_back(storageObj);
         wrapperInitArgs.push_back(typeWrapperType);
 
-        // <wrapper-var> = <TypeWrapper>.init(memberwise: tmpStorage)
-        auto wrapperInitResult = b.createApply(
-            loc, typeWrapperInitRef,
-            SubstitutionMap::get(typeWrapperInit->getGenericSignature(),
-                                 /*substitutions=*/{storageType.getASTType()},
-                                 /*conformances=*/{}),
-            wrapperInitArgs);
+        TypeSubstitutionMap wrapperInitSubs;
+        {
+          auto sig =
+              typeWrapperInit->getGenericSignature().getCanonicalSignature();
+          wrapperInitSubs[sig.getGenericParams()[0]] =
+              wrappedType->getMetatypeInstanceType();
+          wrapperInitSubs[sig.getGenericParams()[1]] = storageType.getASTType();
+        }
+
+        // <wrapper-var> = <TypeWrapper>.init(for: <Type>, storage: tmpStorage)
+        auto wrapperInitResult =
+            b.createApply(loc, typeWrapperInitRef,
+                          SubstitutionMap::get(
+                              typeWrapperInit->getGenericSignature(),
+                              QueryTypeSubstitutionMap{wrapperInitSubs},
+                              LookUpConformanceInModule(
+                                  ctor->getDeclContext()->getParentModule())),
+                          wrapperInitArgs);
 
         // self.$storage is a property access so it has to has to be wrapped
         // in begin/end access instructions.
@@ -2960,35 +2984,34 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 
   // Create the control variable as the first instruction in the function (so
   // that it is easy to destroy the stack location.
-  SILBuilder B(TheMemory.getFunctionEntryPoint());
-  B.setCurrentDebugScope(TheMemory.getFunction().getDebugScope());
   SILType IVType =
     SILType::getBuiltinIntegerType(NumMemoryElements, Module.getASTContext());
   // Use an empty location for the alloc_stack. If Loc is variable declaration
   // the alloc_stack would look like the storage of that variable.
-  auto *ControlVariableBox = B.createAllocStack(
-      RegularLocation::getAutoGeneratedLocation(), IVType);
+  auto *ControlVariableBox =
+      SILBuilderWithScope(TheMemory.getFunctionEntryPoint())
+          .createAllocStack(RegularLocation::getAutoGeneratedLocation(),
+                            IVType);
 
   // Find all the return blocks in the function, inserting a dealloc_stack
   // before the return.
   for (auto &BB : TheMemory.getFunction()) {
     auto *Term = BB.getTerminator();
     if (Term->isFunctionExiting()) {
-      B.setInsertionPoint(Term);
-      B.setCurrentDebugScope(Term->getDebugScope());
-      B.createDeallocStack(Loc, ControlVariableBox);
+      SILBuilderWithScope(Term).createDeallocStack(Loc, ControlVariableBox);
     }
   }
   
   // Before the memory allocation, store zero in the control variable.
-  auto *InsertPoint =
-      &*std::next(TheMemory.getUninitializedValue()->getIterator());
-  B.setInsertionPoint(InsertPoint);
-  B.setCurrentDebugScope(InsertPoint->getDebugScope());
   SILValue ControlVariableAddr = ControlVariableBox;
-  auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
-  B.createStore(Loc, Zero, ControlVariableAddr,
-                StoreOwnershipQualifier::Trivial);
+  {
+    auto *InsertPoint =
+        &*std::next(TheMemory.getUninitializedValue()->getIterator());
+    SILBuilderWithScope B(InsertPoint);
+    auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
+    B.createStore(Loc, Zero, ControlVariableAddr,
+                  StoreOwnershipQualifier::Trivial);
+  }
 
   Identifier OrFn;
 
@@ -3012,7 +3035,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
         Use.onlyTouchesTrivialElements(TheMemory))
       continue;
     
-    B.setInsertionPoint(Use.Inst);
+    SILBuilderWithScope B(Use.Inst);
     
     // Only full initializations make something live.  inout uses, escapes, and
     // assignments only happen when some kind of init made the element live.
@@ -3101,7 +3124,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   if (HasConditionalSelfInitialized) {
     for (auto *I : StoresToSelf) {
       auto *bb = I->getParent();
-      B.setInsertionPoint(bb->begin());
+      SILBuilderWithScope B(bb->begin());
 
       // Set the most significant bit.
       APInt Bitmask = APInt::getHighBitsSet(NumMemoryElements, 1);
@@ -3219,14 +3242,8 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
   SILBuilderWithScope B(TheMemory.getUninitializedValue());
   Identifier ShiftRightFn, TruncateFn, CmpEqFn;
 
-  unsigned NumMemoryElements = TheMemory.getNumElements();
-
   unsigned SelfInitializedElt = TheMemory.getNumElements();
   unsigned SuperInitElt = TheMemory.getNumElements() - 1;
-
-  // We might need an extra bit to check if self was consumed.
-  if (HasConditionalSelfInitialized)
-    ++NumMemoryElements;
 
   // Utilities.
 
@@ -3748,7 +3765,7 @@ getSelfInitializedAtInst(SILInstruction *Inst) {
   SILBasicBlock *InstBB = Inst->getParent();
   auto &BlockInfo = getBlockInfo(InstBB);
 
-  if (BlockInfo.LocalSelfInitialized.hasValue())
+  if (BlockInfo.LocalSelfInitialized.has_value())
     return *BlockInfo.LocalSelfInitialized;
 
   Optional<DIKind> Result;
@@ -3757,7 +3774,7 @@ getSelfInitializedAtInst(SILInstruction *Inst) {
   // If the result wasn't computed, we must be analyzing code within
   // an unreachable cycle that is not dominated by "TheMemory".  Just force
   // the result to initialized so that clients don't have to handle this.
-  if (!Result.hasValue())
+  if (!Result.has_value())
     Result = DIKind::Yes;
 
   return *Result;

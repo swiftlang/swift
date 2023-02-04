@@ -468,8 +468,6 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
 /// If the specified value is a 'let' property in an initializer, return true.
 bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
-  NullablePtr<NominalTypeDecl> NTD;
-
   // If this is an element of a `_storage` tuple, we need to
   // check the `$Storage` to determine whether underlying storage
   // backing element is immutable.
@@ -477,15 +475,23 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
     auto *wrappedType = cast<NominalTypeDecl>(
         storageVar->getDeclContext()->getInnermostTypeContext());
     assert(wrappedType && "_storage reference without type wrapper");
-    NTD = wrappedType->getTypeWrapperStorageDecl();
-  } else {
-    // If we aren't representing 'self' in a non-delegating initializer, then we
-    // can't have 'let' properties.
-    if (!isNonDelegatingInit())
-      return IsLet;
 
-    NTD = MemorySILType.getNominalOrBoundGenericNominal();
+    auto storageVarType = storageVar->getInterfaceType()->getAs<TupleType>();
+    assert(Element < storageVarType->getNumElements());
+    auto propertyName = storageVarType->getElement(Element).getName();
+
+    auto *storageDecl =
+        cast<NominalTypeDecl>(wrappedType->getTypeWrapperStorageDecl());
+    auto *property = storageDecl->lookupDirect(propertyName).front();
+    return cast<VarDecl>(property)->isLet();
   }
+
+  // If we aren't representing 'self' in a non-delegating initializer, then we
+  // can't have 'let' properties.
+  if (!isNonDelegatingInit())
+    return IsLet;
+
+  auto NTD = MemorySILType.getNominalOrBoundGenericNominal();
 
   if (!NTD) {
     // Otherwise, we miscounted elements?
@@ -496,7 +502,7 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   auto &Module = MemoryInst->getModule();
 
   auto expansionContext = TypeExpansionContext(*MemoryInst->getFunction());
-  for (auto *VD : NTD.get()->getStoredProperties()) {
+  for (auto *VD : NTD->getStoredProperties()) {
     auto FieldType = MemorySILType.getFieldType(VD, Module, expansionContext);
     unsigned NumFieldElements =
         getElementCountRec(expansionContext, Module, FieldType, false);
@@ -944,11 +950,13 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Pack_Guaranteed:
+      case ParameterConvention::Pack_Owned:
+      case ParameterConvention::Pack_Inout:
         llvm_unreachable("address value passed to indirect parameter");
 
       // If this is an in-parameter, it is like a load.
       case ParameterConvention::Indirect_In:
-      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
         continue;

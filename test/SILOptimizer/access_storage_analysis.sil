@@ -439,7 +439,7 @@ bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
   %boxAddr = project_box %box : $<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>, 0
   %boxAccess = begin_access [read] [dynamic] %boxAddr : $*(left: TreeB<T>, right: TreeB<T>)
   %leftAddr = tuple_element_addr %boxAccess : $*(left: TreeB<T>, right: TreeB<T>), 0
-  copy_addr %leftAddr to [initialization] %0 : $*TreeB<T>
+  copy_addr %leftAddr to [init] %0 : $*TreeB<T>
   end_access %boxAccess : $*(left: TreeB<T>, right: TreeB<T>)
   %v = tuple ()
   return %v : $()

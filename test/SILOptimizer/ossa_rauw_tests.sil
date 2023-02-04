@@ -673,8 +673,6 @@ bb3:
 //
 // CHECK-LABEL: sil [ossa] @guaranteed_copy_rauw_owned : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
 // CHECK-NOT: copy_value
-// CHECK: begin_borrow
-// CHECK-NOT: copy_value
 // CHECK: } // end sil function 'guaranteed_copy_rauw_owned'
 sil [ossa] @guaranteed_copy_rauw_owned : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
 bb0(%0 : @guaranteed $FakeOptional<Klass>):

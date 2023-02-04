@@ -16,16 +16,18 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "../../SILGen/SILGen.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/BridgingUtils.h"
@@ -98,6 +100,7 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
                     IsSerialized_t isSerialized, ProfileCounter entryCount,
                     IsDynamicallyReplaceable_t isDynamic,
                     IsDistributed_t isDistributed,
+                    IsRuntimeAccessible_t isRuntimeAccessible,
                     IsExactSelfClass_t isExactSelfClass,
                     IsThunk_t isThunk,
                     SubclassScope classSubclassScope, Inline_t inlineStrategy,
@@ -121,13 +124,14 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
     fn->init(linkage, name, loweredType, genericEnv, isBareSILFunction, isTrans,
              isSerialized, entryCount, isThunk, classSubclassScope,
              inlineStrategy, E, debugScope, isDynamic, isExactSelfClass,
-             isDistributed);
+             isDistributed, isRuntimeAccessible);
     assert(fn->empty());
   } else {
     fn = new (M) SILFunction(
         M, linkage, name, loweredType, genericEnv, isBareSILFunction, isTrans,
         isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy,
-        E, debugScope, isDynamic, isExactSelfClass, isDistributed);
+        E, debugScope, isDynamic, isExactSelfClass, isDistributed,
+        isRuntimeAccessible);
   }
   if (entry) entry->setValue(fn);
 
@@ -155,13 +159,15 @@ SILFunction::SILFunction(
     IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
     SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
     const SILDebugScope *DebugScope, IsDynamicallyReplaceable_t isDynamic,
-    IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed)
+    IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
+    IsRuntimeAccessible_t isRuntimeAccessible)
     : SwiftObjectHeader(functionMetatype), Module(Module),
       index(Module.getNewFunctionIndex()),
       Availability(AvailabilityContext::alwaysAvailable()) {
   init(Linkage, Name, LoweredType, genericEnv, isBareSILFunction, isTrans,
        isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy, E,
-       DebugScope, isDynamic, isExactSelfClass, isDistributed);
+       DebugScope, isDynamic, isExactSelfClass, isDistributed,
+       isRuntimeAccessible);
 
   // Set our BB list to have this function as its parent. This enables us to
   // splice efficiently basic blocks in between functions.
@@ -177,7 +183,8 @@ void SILFunction::init(
     ProfileCounter entryCount, IsThunk_t isThunk,
     SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
     const SILDebugScope *DebugScope, IsDynamicallyReplaceable_t isDynamic,
-    IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed) {
+    IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
+    IsRuntimeAccessible_t isRuntimeAccessible) {
   setName(Name);
   this->LoweredType = LoweredType;
   this->GenericEnv = genericEnv;
@@ -197,6 +204,7 @@ void SILFunction::init(
   this->IsDynamicReplaceable = isDynamic;
   this->ExactSelfClass = isExactSelfClass;
   this->IsDistributed = isDistributed;
+  this->IsRuntimeAccessible = isRuntimeAccessible;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -252,7 +260,7 @@ void SILFunction::createSnapshot(int id) {
       getGenericEnvironment(), isBare(), isTransparent(), isSerialized(),
       getEntryCount(), isThunk(), getClassSubclassScope(), getInlineStrategy(),
       getEffectsKind(), getDebugScope(), isDynamicallyReplaceable(),
-      isExactSelfClass(), isDistributed());
+      isExactSelfClass(), isDistributed(), isRuntimeAccessible());
 
   // Copy all relevant properties.
   // TODO: It's really unfortunate that this needs to be done manually. It would
@@ -825,6 +833,9 @@ SILFunction::isPossiblyUsedExternally() const {
   if (isDistributed() && isThunk())
     return true;
 
+  if (isRuntimeAccessible())
+    return true;
+
   // Declaration marked as `@_alwaysEmitIntoClient` that
   // returns opaque result type with availability conditions
   // has to be kept alive to emit opaque type metadata descriptor.
@@ -1029,9 +1040,4 @@ SILInstruction::MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetain
 
   auto b = getMemBehvaiorFunction({this}, observeRetains);
   return (SILInstruction::MemoryBehavior)b;
-}
-
-SILFunction *SILFunction::getFunction(SILDeclRef ref, SILModule &M) {
-  swift::Lowering::SILGenModule SILGenModule(M, ref.getModuleContext());
-  return SILGenModule.getFunction(ref, swift::NotForDefinition);
 }

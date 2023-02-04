@@ -162,6 +162,7 @@ FunctionPointerKind::getStaticAsyncContextSize(IRGenModule &IGM) const {
   case SpecialKind::AsyncLetGetThrowing:
   case SpecialKind::AsyncLetFinish:
   case SpecialKind::TaskGroupWaitNext:
+  case SpecialKind::TaskGroupWaitAll:
   case SpecialKind::DistributedExecuteTarget:
     // The current guarantee for all of these functions is the same.
     // See TaskFutureWaitAsyncContext.
@@ -265,6 +266,22 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
   b.addAttribute(llvm::Attribute::NoCapture);
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
+
+  attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
+}
+
+static void addPackParameterAttributes(IRGenModule &IGM,
+                                       SILType paramSILType,
+                                       llvm::AttributeList &attrs,
+                                       unsigned argIndex) {
+  llvm::AttrBuilder b(IGM.getLLVMContext());
+  // Pack parameter pointers can't alias or be captured.
+  b.addAttribute(llvm::Attribute::NoAlias);
+  b.addAttribute(llvm::Attribute::NoCapture);
+  // TODO: we could mark this dereferenceable when the pack has fixed
+  // components.
+  // TODO: add an alignment attribute
+  // TODO: add a nonnull attribute
 
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
@@ -1533,7 +1550,6 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
   auto &ti = IGM.getTypeInfo(paramSILType);
   switch (auto conv = param.getConvention()) {
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_In_Guaranteed:
     addIndirectValueParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size());
     addPointerParameter(IGM.getStorageType(getSILFuncConventions().getSILType(
@@ -1547,6 +1563,13 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
         conv == ParameterConvention::Indirect_InoutAliasable);
     addPointerParameter(IGM.getStorageType(getSILFuncConventions().getSILType(
         param, IGM.getMaximalTypeExpansionContext())));
+    return ti;
+
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Inout:
+    addPackParameterAttributes(IGM, paramSILType, Attrs, ParamIRTypes.size());
+    addPointerParameter(ti.getStorageType());
     return ti;
 
   case ParameterConvention::Direct_Owned:
@@ -2530,7 +2553,9 @@ public:
                                  getCallee().getFunctionPointer().getKind());
 
     return FunctionPointer::createForAsyncCall(
-        calleeFunction, codeAuthInfo, awaitSig, awaitEntrySig.getType());
+        IGF.Builder.CreateBitCast(calleeFunction,
+                                  awaitEntrySig.getType()->getPointerTo()),
+        codeAuthInfo, awaitSig, awaitEntrySig.getType());
   }
 
   SILType getParameterType(unsigned index) override {
@@ -3186,7 +3211,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
       auto temp = IGF.createAlloca(resultTy, Alignment(), "indirect.result");
       if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
         temp = IGF.Builder.CreateElementBitCast(
-            temp, fnType->getParamType(0)->getPointerElementType());
+            temp, fnType->getParamType(0)->getNonOpaquePointerElementType());
       }
       emitToMemory(temp, substResultTI, isOutlined);
       return;
@@ -5034,7 +5059,7 @@ Callee irgen::getCFunctionPointerCallee(IRGenFunction &IGF,
                                         CalleeInfo &&calleeInfo) {
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, calleeInfo.OrigFnType);
   auto authInfo =
-    PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
+      PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
 
   auto fn = FunctionPointer::createSigned(FunctionPointer::Kind::Function,
                                           fnPtr, authInfo, sig);
@@ -5355,6 +5380,12 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
     return cast<llvm::Function>(SecondaryValue)->getFunctionType();
   }
 
+  if (awaitSignature) {
+    assert(llvm::cast<llvm::PointerType>(Value->getType())
+               ->isOpaqueOrPointeeTypeMatches(awaitSignature));
+    return cast<llvm::FunctionType>(awaitSignature);
+  }
+
   // Read the function type off the global or else from the Signature.
   if (auto *constant = dyn_cast<llvm::Constant>(Value)) {
     auto *gv = dyn_cast<llvm::GlobalValue>(Value);
@@ -5375,12 +5406,6 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
     assert(llvm::cast<llvm::PointerType>(Value->getType())
                ->isOpaqueOrPointeeTypeMatches(gv->getValueType()));
     return cast<llvm::FunctionType>(gv->getValueType());
-  }
-
-  if (awaitSignature) {
-    assert(llvm::cast<llvm::PointerType>(Value->getType())
-               ->isOpaqueOrPointeeTypeMatches(awaitSignature));
-    return cast<llvm::FunctionType>(awaitSignature);
   }
 
   assert(llvm::cast<llvm::PointerType>(Value->getType())

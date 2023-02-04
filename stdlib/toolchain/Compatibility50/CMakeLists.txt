@@ -1,3 +1,7 @@
+# Don't build the libraries for 64-bit watchOS targets;
+# there is no back-deployment to them.
+list(REMOVE_ITEM SWIFT_SDK_WATCHOS_ARCHITECTURES "arm64" "arm64e")
+
 set(library_name "swiftCompatibility50")
 
 add_swift_target_library("${library_name}" STATIC
@@ -6,7 +10,9 @@ add_swift_target_library("${library_name}" STATIC
 
   TARGET_SDKS ${SWIFT_DARWIN_PLATFORMS}
 
-  C_COMPILE_FLAGS ${CXX_COMPILE_FLAGS}
+  C_COMPILE_FLAGS
+    ${CXX_COMPILE_FLAGS}
+    "-DSWIFT_THREADING_IS_COMPATIBILITY_LIBRARY"
   LINK_FLAGS ${CXX_LINK_FLAGS}
   INCORPORATE_OBJECT_LIBRARIES swiftCompatibilityThreading
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

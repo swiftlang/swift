@@ -123,7 +123,7 @@ class KlassWithBuffer {
 
   // This test makes sure that we:
   //
-  // 1. Are able to propagate a +0 value value buffer.k into a +0 value and that
+  // 1. Are able to propagate a +0 value buffer.k into a +0 value and that
   // we then copy that +0 value into a +1 value, before we begin the epilog and
   // then return that value.
   // CHECK-LABEL: sil hidden [ossa] @$ss15KlassWithBufferC03getC14AsNativeObjectBoyF : $@convention(method) (@guaranteed KlassWithBuffer) -> @owned Builtin.NativeObject {
@@ -148,7 +148,7 @@ struct StructContainingBridgeObject {
 
   // CHECK-LABEL: sil hidden [ossa] @$ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
   // CHECK: bb0([[ARG:%.*]] : @owned $AnyObject,
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [lexical] [[ARG]]
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   [[CASTED_ARG:%.*]] = unchecked_ref_cast [[COPIED_ARG]] : $AnyObject to $Builtin.BridgeObject
   // CHECK:   assign [[CASTED_ARG]] to
@@ -176,19 +176,19 @@ extension FakeDictionary {
   // CHECK:   [[INDUCTION_VAR_1:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 1
   // CHECK:   [[X_0:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 0
   // CHECK:   [[X_1:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 1
-  // CHECK:   copy_addr [take] [[INDUCTION_VAR_0]] to [initialization] [[X_0]]
-  // CHECK:   copy_addr [take] [[INDUCTION_VAR_1]] to [initialization] [[X_1]]
+  // CHECK:   copy_addr [take] [[INDUCTION_VAR_0]] to [init] [[X_0]]
+  // CHECK:   copy_addr [take] [[INDUCTION_VAR_1]] to [init] [[X_1]]
   // CHECK:   [[X_0:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 0
   // CHECK:   [[X_1:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 1
   // CHECK:   [[TMP_X:%.*]] = alloc_stack $(Key, Value)
   // CHECK:   [[TMP_X_0:%.*]] = tuple_element_addr [[TMP_X]] : $*(Key, Value), 0
   // CHECK:   [[TMP_X_1:%.*]] = tuple_element_addr [[TMP_X]] : $*(Key, Value), 1
   // CHECK:   [[TMP_0:%.*]] = alloc_stack $Key
-  // CHECK:   copy_addr [[X_0]] to [initialization] [[TMP_0]]
-  // CHECK:   copy_addr [take] [[TMP_0]] to [initialization] [[TMP_X_0]]
+  // CHECK:   copy_addr [[X_0]] to [init] [[TMP_0]]
+  // CHECK:   copy_addr [take] [[TMP_0]] to [init] [[TMP_X_0]]
   // CHECK:   [[TMP_1:%.*]] = alloc_stack $Value
-  // CHECK:   copy_addr [[X_1]] to [initialization] [[TMP_1]]
-  // CHECK:   copy_addr [take] [[TMP_1]] to [initialization] [[TMP_X_1]]
+  // CHECK:   copy_addr [[X_1]] to [init] [[TMP_1]]
+  // CHECK:   copy_addr [take] [[TMP_1]] to [init] [[TMP_X_1]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$ss9FakeArrayV6appendyyxF : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout FakeArray<τ_0_0>) -> ()
   // CHECK:   apply [[FUNC]]<(Key, Value)>([[TMP_X]],
   // CHECK: } // end sil function '$ss14FakeDictionaryV20makeSureToCopyTuplesyyF'

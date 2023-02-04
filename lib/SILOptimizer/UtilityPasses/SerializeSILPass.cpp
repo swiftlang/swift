@@ -88,10 +88,7 @@ void MapOpaqueArchetypes::replace() {
     SILType mappedType = remapType(origArg->getType());
     auto *NewArg = clonedEntryBlock->createFunctionArgument(
         mappedType, origArg->getDecl(), true);
-    NewArg->setNoImplicitCopy(
-        cast<SILFunctionArgument>(origArg)->isNoImplicitCopy());
-    NewArg->setLifetimeAnnotation(
-        cast<SILFunctionArgument>(origArg)->getLifetimeAnnotation());
+    NewArg->copyFlags(cast<SILFunctionArgument>(origArg));
     entryArgs.push_back(NewArg);
   }
 
@@ -151,6 +148,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   // Check substitution maps.
   switch (inst.getKind()) {
   case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocBoxInst:
@@ -280,6 +278,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::CheckedCastAddrBranchInst:
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocStackRefInst:
+  case SILInstructionKind::DeallocPackInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::DeallocBoxInst:
@@ -347,8 +346,30 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::AwaitAsyncContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
+  case SILInstructionKind::HasSymbolInst:
     // Handle by operand and result check.
     break;
+
+  case SILInstructionKind::DynamicPackIndexInst:
+  case SILInstructionKind::PackPackIndexInst:
+  case SILInstructionKind::ScalarPackIndexInst:
+    return opaqueArchetypeWouldChange(context,
+              cast<AnyPackIndexInst>(&inst)->getIndexedPackType());
+
+  case SILInstructionKind::OpenPackElementInst: {
+    auto open = cast<OpenPackElementInst>(&inst);
+    bool wouldChange = false;
+    open->getOpenedGenericEnvironment()
+        ->forEachPackElementBinding([&](ElementArchetypeType *elementType,
+                                        PackType *packSubstitution) {
+      if (!wouldChange) {
+        if (opaqueArchetypeWouldChange(context,
+                                       packSubstitution->getCanonicalType()))
+          wouldChange = true;
+      }
+    });
+    return wouldChange;
+  }
 
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::PartialApplyInst:

@@ -308,6 +308,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   ABSTRACT_SINGLE_VALUE_INST(AllocationInst, SingleValueInstruction)
     SINGLE_VALUE_INST(AllocStackInst, alloc_stack,
                               AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AllocPackInst, alloc_pack,
+                              AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocRefInst, alloc_ref,
                               AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocRefDynamicInst, alloc_ref_dynamic,
@@ -347,7 +349,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(StringLiteralInst, string_literal,
                       LiteralInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
+    SINGLE_VALUE_INST(HasSymbolInst, has_symbol,
+                      LiteralInst, MayRead, DoesNotRelease)
+    SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, HasSymbolInst)
 
   // Dynamic Dispatch
   ABSTRACT_SINGLE_VALUE_INST(MethodInst, SingleValueInstruction)
@@ -595,6 +599,10 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(OpenExistentialBoxValueInst, open_existential_box_value,
                             SingleValueInstruction, MayRead, DoesNotRelease)
 
+  // Variadic generics
+  SINGLE_VALUE_INST(OpenPackElementInst, open_pack_element,
+                    SingleValueInstruction, None, DoesNotRelease)
+
   // Blocks
   SINGLE_VALUE_INST(ProjectBlockStorageInst, project_block_storage,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -636,6 +644,16 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // object; is there a more specific effect?
   SINGLE_VALUE_INST(KeyPathInst, keypath,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+
+  // Variadic pack indexing
+  ABSTRACT_SINGLE_VALUE_INST(AnyPackIndexInst, SingleValueInstruction)
+    SINGLE_VALUE_INST(DynamicPackIndexInst, dynamic_pack_index,
+                      AnyPackIndexInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(PackPackIndexInst, pack_pack_index,
+                      AnyPackIndexInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ScalarPackIndexInst, scalar_pack_index,
+                      AnyPackIndexInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST_RANGE(AnyPackIndexInst, DynamicPackIndexInst, ScalarPackIndexInst)
 
   // BindMemory and RebindMemory have no physical side effect. Semantically they
   // write to their affected memory region because any reads or writes accessing
@@ -685,6 +703,8 @@ ABSTRACT_INST(TermInst, SILInstruction)
 // Deallocation instructions.
 ABSTRACT_INST(DeallocationInst, SILInstruction)
   NON_VALUE_INST(DeallocStackInst, dealloc_stack,
+                 DeallocationInst, MayHaveSideEffects, DoesNotRelease)
+  NON_VALUE_INST(DeallocPackInst, dealloc_pack,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(DeallocStackRefInst, dealloc_stack_ref,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)

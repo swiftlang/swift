@@ -400,9 +400,9 @@ bb0:
 // CHECK-LABEL: sil [ossa] @fold_binary_bitwise
 // CHECK: bb0:
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int64, 0
-// CHECK_NEXT: %1 = integer_literal $Builtin.Int64, 1
-// CHECK_NEXT: %2 = integer_literal $Builtin.Int64, 1
-// CHECK_NEXT: return %2 : $Builtin.Int64
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT: %2 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT: return %2 : $Builtin.Int64
 }
 
 // For any x of the same size as Int.max and n>=1 , (x>>n) is always <= Int.max,
@@ -1078,7 +1078,7 @@ bb0(%0 : $*MyError, %1 : $*E2<X>):
 // CHECK-NOT: unconditional_checked_cast_addr
 // CHECK: [[ALLOC_BOX:%.*]] = alloc_existential_box $any Error, $E1
 // CHECK: [[PROJ:%.*]] = project_existential_box $E1 in [[ALLOC_BOX]] : $any Error
-// CHECK: copy_addr [take] %1 to [initialization] [[PROJ]]
+// CHECK: copy_addr [take] %1 to [init] [[PROJ]]
 // CHECK: store [[ALLOC_BOX]] to [init] %0 : $*any Error
 // CHECK: return
 sil [ossa] @replace_unconditional_check_cast_addr_for_type_to_error_existential : $@convention(thin) (@in E1) -> (@out Error) {

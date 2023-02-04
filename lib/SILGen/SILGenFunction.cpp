@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGenFunction.h"
+#include "Cleanup.h"
 #include "RValue.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
@@ -144,12 +145,70 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
     return getMagicFunctionName(cast<EnumElementDecl>(ref.getDecl())
                                   ->getDeclContext());
   case SILDeclRef::Kind::AsyncEntryPoint:
-  case SILDeclRef::Kind::EntryPoint:
+  case SILDeclRef::Kind::EntryPoint: {
     auto *file = ref.getDecl()->getDeclContext()->getParentSourceFile();
     return getMagicFunctionName(file);
   }
+  case SILDeclRef::Kind::RuntimeAttributeGenerator: {
+    if (auto *var = dyn_cast<VarDecl>(ref.getDecl()))
+      return var->getName();
+
+    auto *DC = dyn_cast<DeclContext>(ref.getDecl());
+    return getMagicFunctionName(DC ? DC : ref.getDecl()->getDeclContext());
+  }
+  }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
+}
+
+void SILGenFunction::enterDebugScope(SILLocation Loc, bool isBindingScope,
+                                     Optional<SILLocation> MacroExpansion,
+                                     StringRef MacroName,
+                                     Optional<SILLocation> MacroLoc) {
+  auto *Parent = DebugScopeStack.size() ? DebugScopeStack.back().getPointer()
+                                        : F.getDebugScope();
+  auto *Scope = Parent;
+  // Don't nest a scope for Loc under Parent unless it's actually different.
+  if (RegularLocation(Parent->getLoc()) != RegularLocation(Loc)) {
+    SILDebugScope *InlinedAt = nullptr;
+    // Create an inline scope for a macro expansion.
+    if (MacroExpansion && !MacroName.empty() && MacroLoc) {
+      InlinedAt = new (SGM.M) SILDebugScope(RegularLocation(*MacroExpansion),
+                                            &getFunction(), Parent);
+      SILGenFunctionBuilder B(SGM);
+      auto ExtInfo = SILFunctionType::ExtInfo::getThin();
+      auto FunctionType = SILFunctionType::get(
+          nullptr, ExtInfo, SILCoroutineKind::None,
+          ParameterConvention::Direct_Unowned, /*Params*/ {}, /*yields*/ {},
+          /*Results*/ {}, None, SubstitutionMap(), SubstitutionMap(),
+          SGM.M.getASTContext());
+      SILFunction *MacroFn = B.getOrCreateFunction(
+          *MacroLoc, MacroName, SILLinkage::DefaultForDeclaration, FunctionType,
+          IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+          IsNotDistributed, IsNotRuntimeAccessible);
+      auto MacroScope = new (SGM.M) SILDebugScope(Loc, MacroFn);
+      Parent = MacroScope;
+    }
+    Scope = new (SGM.M)
+        SILDebugScope(RegularLocation(Loc), &getFunction(), Parent, InlinedAt);
+  }
+  DebugScopeStack.emplace_back(Scope, isBindingScope);
+  B.setCurrentDebugScope(Scope);
+}
+
+  /// Return to the previous debug scope.
+void SILGenFunction::leaveDebugScope() {
+  // Pop any 'guard' scopes first.
+  while (DebugScopeStack.back().getInt())
+    DebugScopeStack.pop_back();
+
+  // Pop the scope we're leaving now.
+  DebugScopeStack.pop_back();
+  if (DebugScopeStack.size())
+    B.setCurrentDebugScope(DebugScopeStack.back().getPointer());
+  // Don't reset the debug scope after leaving the outermost scope,
+  // because the debugger is not expecting the function epilogue to
+  // be in a different scope.
 }
 
 std::tuple<ManagedValue, SILType>
@@ -254,6 +313,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (closure.kind == SILDeclRef::Kind::DefaultArgGenerator) {
         auto *param = getParameterAt(closure.getDecl(),
                                      closure.defaultArgIndex);
+        assert(param);
         loc = param->getLoc();
       } else {
         auto f = *closure.getAnyFunctionRef();
@@ -631,16 +691,22 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
       ->loadModule(SourceLoc(),
                    ImportPath::Module(llvm::makeArrayRef(UIKitName)));
     assert(UIKit && "couldn't find UIKit objc module?!");
-    SmallVector<ValueDecl *, 1> results;
+    SmallVector<ValueDecl *, 2> results;
     UIKit->lookupQualified(UIKit,
                            DeclNameRef(ctx.getIdentifier("UIApplicationMain")),
                            NL_QualifiedDefault,
                            results);
-    assert(results.size() == 1
-           && "couldn't find a unique UIApplicationMain in the UIKit ObjC "
-              "module?!");
 
-    ValueDecl *UIApplicationMainDecl = results.front();
+    // As the comment above alludes, using a qualified lookup into UIKit is
+    // *not* sound. In particular, it's possible for the lookup to find the
+    // (deprecated) Swift copy of UIApplicationMain in UIKit and try to call
+    // that instead of the C entrypoint. Let's try to force this to happen.
+    auto FoundUIApplicationMain = llvm::find_if(results, [](const ValueDecl *VD) {
+      return !VD->getClangNode().isNull();
+    });
+    assert(FoundUIApplicationMain != results.end() &&
+           "Could not find a UIApplicationMain to call!");
+    ValueDecl *UIApplicationMainDecl = *FoundUIApplicationMain;
 
     auto mainRef = SILDeclRef(UIApplicationMainDecl).asForeign();
     SILGenFunctionBuilder builder(SGM);
@@ -678,7 +744,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
         NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized,
-        IsNotDynamic, IsNotDistributed);
+        IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
     auto NSStringFromClass = B.createFunctionRef(mainClass, NSStringFromClassFn);
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
@@ -768,7 +834,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     auto NSApplicationMainFn = builder.getOrCreateFunction(
         mainClass, "NSApplicationMain", SILLinkage::PublicExternal,
         NSApplicationMainType, IsBare, IsTransparent, IsNotSerialized,
-        IsNotDynamic, IsNotDistributed);
+        IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
 
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
@@ -1030,6 +1096,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     }
 
     params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
+  } else if (function.kind == SILDeclRef::Kind::RuntimeAttributeGenerator) {
+    params = ParameterList::createEmpty(getASTContext());
   }
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
@@ -1144,6 +1212,40 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
 
   Cleanups.emitBranchAndCleanups(ReturnDest, loc, directResults);
   emitEpilog(loc);
+}
+
+void SILGenFunction::emitGeneratorFunction(
+    SILDeclRef function, Type resultInterfaceType, BraceStmt *body,
+    Optional<AbstractionPattern> pattern) {
+  MagicFunctionName = SILGenModule::getMagicFunctionName(function);
+
+  RegularLocation loc(function.getDecl());
+  loc.markAutoGenerated();
+
+  auto *dc = function.getDecl()->getInnermostDeclContext();
+  auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
+  emitProlog(captureInfo, ParameterList::createEmpty(getASTContext()),
+             /*selfParam=*/nullptr, dc, resultInterfaceType, /*throws=*/false,
+             SourceLoc(), pattern);
+
+  prepareEpilog(resultInterfaceType, /*hasThrows=*/false, CleanupLocation(loc));
+
+  emitStmt(body);
+
+  emitEpilog(loc);
+  mergeCleanupBlocks();
+}
+
+Initialization *SILGenFunction::getSingleValueStmtInit(Expr *E) {
+  if (SingleValueStmtInitStack.empty())
+    return nullptr;
+
+  // Check to see if this is an expression branch of an active
+  // SingleValueStmtExpr initialization.
+  if (!SingleValueStmtInitStack.back().Exprs.contains(E))
+    return nullptr;
+
+  return SingleValueStmtInitStack.back().Init;
 }
 
 void SILGenFunction::emitProfilerIncrement(ASTNode Node) {

@@ -111,6 +111,21 @@ void InheritedProtocolsRequest::writeDependencySink(
   }
 }
 
+Optional<ArrayRef<ValueDecl *>>
+ProtocolRequirementsRequest::getCachedResult() const {
+  auto proto = std::get<0>(getStorage());
+  if (!proto->areProtocolRequirementsValid())
+    return None;
+
+  return proto->ProtocolRequirements;
+}
+
+void ProtocolRequirementsRequest::cacheResult(ArrayRef<ValueDecl *> PDs) const {
+  auto proto = std::get<0>(getStorage());
+  proto->ProtocolRequirements = PDs;
+  proto->setProtocolRequirementsValid();
+}
+
 //----------------------------------------------------------------------------//
 // Missing designated initializers computation
 //----------------------------------------------------------------------------//

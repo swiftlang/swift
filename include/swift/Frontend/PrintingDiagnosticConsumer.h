@@ -33,6 +33,7 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   llvm::raw_ostream &Stream;
   bool ForceColors = false;
   bool PrintEducationalNotes = false;
+  bool EmitMacroExpansionFiles = false;
   bool DidErrorOccur = false;
   DiagnosticOptions::FormattingStyle FormattingStyle =
       DiagnosticOptions::FormattingStyle::LLVM;
@@ -44,6 +45,12 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   // constructing a snippet.
   SmallVector<std::string, 1> BufferedEducationalNotes;
   bool SuppressOutput = false;
+
+  /// swift-syntax rendering
+  void *queuedDiagnostics = nullptr;
+  void *queuedSourceFile = nullptr;
+  unsigned queuedDiagnosticsBufferID;
+  StringRef queuedBufferName;
 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());
@@ -69,6 +76,10 @@ public:
 
   void setFormattingStyle(DiagnosticOptions::FormattingStyle style) {
     FormattingStyle = style;
+  }
+
+  void setEmitMacroExpansionFiles(bool ShouldEmit) {
+    EmitMacroExpansionFiles = ShouldEmit;
   }
 
   bool didErrorOccur() {

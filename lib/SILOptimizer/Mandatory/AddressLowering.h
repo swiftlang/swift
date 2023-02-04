@@ -32,7 +32,7 @@ namespace swift {
 ///
 /// 4. Rewritten. The definition of this opaque value is fully translated
 /// into lowered SIL. Instructions are typically materialized and rewritten at
-/// the same time. A indirect result, however, is materialized as soon as its
+/// the same time. An indirect result, however, is materialized as soon as its
 /// alloc_stack is emitted, but only rewritten once the call itself is
 /// rewritten.
 ///

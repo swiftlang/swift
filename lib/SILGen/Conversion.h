@@ -298,7 +298,7 @@ public:
                            ManagedValue value, bool isInit) override;
 
   /// Given that the result of the given expression needs to sequentially
-  /// undergo the the given conversion and then this conversion, attempt to
+  /// undergo the given conversion and then this conversion, attempt to
   /// peephole the result.  If successful, the value will be set in this
   /// initialization.  The initialization will not yet be finished.
   bool tryPeephole(SILGenFunction &SGF, Expr *E, Conversion innerConversion);

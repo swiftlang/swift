@@ -68,7 +68,7 @@ These options are:
 * `--skip-build-clang-tools-extra` and `--skip-build-compiler-rt`: to ensure LLVM builds cleanly,
 * `--extra-cmake-options=`
   * `-DCMAKE_DISABLE_FIND_PACKAGE_Backtrace=TRUE,-DCMAKE_DISABLE_FIND_PACKAGE_LibXml2=TRUE,-DLLVM_VERSION_SUFFIX=''`: to ensure LLVM builds cleanly,
-  * `-DSWIFT_ENABLE_DISPATCH=FALSE,-DSWIFT_BUILD_SOURCEKIT=OFF,-DSWIFT_BUILD_SYNTAXPARSERLIB=OFF,-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=OFF,-DSWIFT_IMPLICIT_CONCURRENCY_IMPORT=OFF,-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=OFF`: to ensure Swift does not attempt to build libdispatch, which is not yet supported on OpenBSD,
+  * `-DSWIFT_ENABLE_DISPATCH=FALSE,-DSWIFT_BUILD_SOURCEKIT=OFF,-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=OFF,-DSWIFT_IMPLICIT_CONCURRENCY_IMPORT=OFF,-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=OFF`: to ensure Swift does not attempt to build libdispatch, which is not yet supported on OpenBSD,
   * `-DSWIFT_USE_LINKER=lld`: to specify that `lld` should be used over `gold`,
   * `-DCMAKE_INSTALL_DIR=/usr/local"`: to set the correct platform install directory.
 
@@ -84,7 +84,6 @@ $ ./utils/build-script \
         -DLLVM_VERSION_SUFFIX='',\
         -DSWIFT_ENABLE_DISPATCH=OFF,\
         -DSWIFT_BUILD_SOURCEKIT=OFF,\
-        -DSWIFT_BUILD_SYNTAXPARSERLIB=OFF,\
         -DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=OFF,\
         -DSWIFT_IMPLICIT_CONCURRENCY_IMPORT=OFF,\
         -DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=OFF,\

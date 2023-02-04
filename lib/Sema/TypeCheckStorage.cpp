@@ -20,6 +20,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -28,6 +29,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -93,24 +95,33 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
   return true;
 }
 
-static bool hasStoredProperties(NominalTypeDecl *decl) {
+static bool hasStoredProperties(NominalTypeDecl *decl,
+                                IterableDeclContext *implDecl) {
   bool isForeignReferenceTy =
       isa<ClassDecl>(decl) && cast<ClassDecl>(decl)->isForeignReferenceType();
 
   return (isa<StructDecl>(decl) ||
           (isa<ClassDecl>(decl) &&
-           (!decl->hasClangNode() || isForeignReferenceTy)));
+           (!decl->hasClangNode() || isForeignReferenceTy
+                || (decl != implDecl))));
 }
 
-static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
+static void computeLoweredStoredProperties(NominalTypeDecl *decl,
+                                           IterableDeclContext *implDecl) {
   // If declaration has a type wrapper, make sure that
-  // `$_storage` property is synthesized.
+  // `$storage` property is synthesized.
   if (decl->hasTypeWrapper())
     (void)decl->getTypeWrapperProperty();
 
+  // Expand synthesized member macros.
+  auto &ctx = decl->getASTContext();
+  evaluateOrDefault(ctx.evaluator,
+                    ExpandSynthesizedMemberMacroRequest{decl},
+                    false);
+
   // Just walk over the members of the type, forcing backing storage
-  // for lazy properties, property and type wrappers to be synthesized.
-  for (auto *member : decl->getMembers()) {
+  // for lazy properties and property wrappers to be synthesized.
+  for (auto *member : implDecl->getMembers()) {
     auto *var = dyn_cast<VarDecl>(member);
     if (!var || var->isStatic())
       continue;
@@ -160,6 +171,7 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
 /// in a deterministic order.
 static void enumerateStoredPropertiesAndMissing(
     NominalTypeDecl *decl,
+    IterableDeclContext *implDecl,
     llvm::function_ref<void(VarDecl *)> addStoredProperty,
     llvm::function_ref<void(MissingMemberDecl *)> addMissing) {
   // If we have a distributed actor, find the id and actorSystem
@@ -169,7 +181,7 @@ static void enumerateStoredPropertiesAndMissing(
   VarDecl *distributedActorSystem = nullptr;
   if (decl->isDistributedActor()) {
     ASTContext &ctx = decl->getASTContext();
-    for (auto *member : decl->getMembers()) {
+    for (auto *member : implDecl->getMembers()) {
       if (auto *var = dyn_cast<VarDecl>(member)) {
         if (!var->isStatic() && var->hasStorage()) {
           if (var->getName() == ctx.Id_id) {
@@ -190,7 +202,7 @@ static void enumerateStoredPropertiesAndMissing(
       addStoredProperty(distributedActorSystem);
   }
 
-  for (auto *member : decl->getMembers()) {
+  for (auto *member : implDecl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
       if (!var->isStatic() && var->hasStorage()) {
         // Skip any properties that we already emitted explicitly
@@ -209,20 +221,29 @@ static void enumerateStoredPropertiesAndMissing(
   }
 }
 
+static bool isInSourceFile(IterableDeclContext *idc) {
+  const DeclContext *dc = idc->getAsGenericContext();
+  return isa<SourceFile>(dc->getModuleScopeContext());
+}
+
 ArrayRef<VarDecl *>
 StoredPropertiesRequest::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
-  if (!hasStoredProperties(decl))
+  // If this is an imported class with an @_objcImplementation extension, get
+  // members from the extension instead.
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
     return ArrayRef<VarDecl *>();
 
   SmallVector<VarDecl *, 4> results;
 
   // Unless we're in a source file we don't have to do anything
   // special to lower lazy properties and property wrappers.
-  if (isa<SourceFile>(decl->getModuleScopeContext()))
-    computeLoweredStoredProperties(decl);
+  if (isInSourceFile(implDecl))
+    computeLoweredStoredProperties(decl, implDecl);
 
-  enumerateStoredPropertiesAndMissing(decl,
+  enumerateStoredPropertiesAndMissing(decl, implDecl,
     [&](VarDecl *var) {
       results.push_back(var);
     },
@@ -234,17 +255,21 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
 ArrayRef<Decl *>
 StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
                                                    NominalTypeDecl *decl) const {
-  if (!hasStoredProperties(decl))
+  // If this is an imported class with an @_objcImplementation extension, get
+  // members from the extension instead.
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
     return ArrayRef<Decl *>();
 
   SmallVector<Decl *, 4> results;
 
   // Unless we're in a source file we don't have to do anything
   // special to lower lazy properties and property wrappers.
-  if (isa<SourceFile>(decl->getModuleScopeContext()))
-    computeLoweredStoredProperties(decl);
+  if (isInSourceFile(implDecl))
+    computeLoweredStoredProperties(decl, implDecl);
 
-  enumerateStoredPropertiesAndMissing(decl,
+  enumerateStoredPropertiesAndMissing(decl, implDecl,
     [&](VarDecl *var) {
       results.push_back(var);
     },
@@ -3295,8 +3320,17 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
     if (isa<EnumDecl>(dc)) {
       storage->diagnose(diag::enum_stored_property);
       info = StorageImplInfo::getMutableComputed();
-    } else if (isa<ExtensionDecl>(dc) &&
-              !storage->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+    } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      // Extensions can dynamically replace a stored property.
+      if (storage->getAttrs().getAttribute<DynamicReplacementAttr>())
+        return;
+
+      // @_objcImplementation extensions on a non-category can declare stored
+      // properties; StoredPropertiesRequest knows to look for them there.
+      if (ext->isObjCImplementation() &&
+          ext->getCategoryNameForObjCImplementation() == Identifier())
+        return;
+
       storage->diagnose(diag::extension_stored_property);
 
       info = (info.supportsMutation()
@@ -3398,6 +3432,12 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
     } else if (storage->getParsedAccessor(AccessorKind::Get)) {
       readImpl = ReadImplKind::Get;
+    } else if (storage->getName() ==
+               storage->getASTContext().Id_TypeWrapperProperty) {
+      // Type wrapper `$storage` property is `get set` requirement.
+      readImpl = ReadImplKind::Get;
+      writeImpl = WriteImplKind::Set;
+      readWriteImpl = ReadWriteImplKind::Modify;
     }
 
     StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
@@ -3405,6 +3445,12 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
     return info;
   }
+
+  // Expand any attached accessor macros.
+  storage->forEachAttachedMacro(MacroRole::Accessor,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        expandAccessors(storage, customAttr, macro);
+      });
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
   bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);
@@ -3540,7 +3586,7 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   }
 
   // Always assume non-simple 'didSet' in code completion mode.
-  if (decl->getASTContext().SourceMgr.hasCodeCompletionBuffer())
+  if (decl->getASTContext().SourceMgr.hasIDEInspectionTargetBuffer())
     return false;
 
   // didSet must have a single parameter.

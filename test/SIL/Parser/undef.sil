@@ -59,8 +59,8 @@ bb0:
   mark_uninitialized [var] undef : $*()
   // CHECK: mark_function_escape undef : $*()
   mark_function_escape undef : $*()
-  // CHECK: copy_addr undef to [initialization] undef : $*()
-  copy_addr undef to [initialization] undef : $*()
+  // CHECK: copy_addr undef to [init] undef : $*()
+  copy_addr undef to [init] undef : $*()
   // CHECK: destroy_addr undef : $*()
   destroy_addr undef : $*()
   // CHECK: index_addr undef : $*(), undef : $Builtin.Int64
@@ -84,8 +84,8 @@ bb0:
   unowned_release undef : $@sil_unowned C
   // CHECK: load_weak undef : $*@sil_weak Optional<C>
   load_weak undef : $*@sil_weak Optional<C>
-  // CHECK: store_weak undef to [initialization] undef : $*@sil_weak Optional<C>
-  store_weak undef to [initialization] undef : $*@sil_weak Optional<C>
+  // CHECK: store_weak undef to [init] undef : $*@sil_weak Optional<C>
+  store_weak undef to [init] undef : $*@sil_weak Optional<C>
   // CHECK: fix_lifetime undef : $C
   fix_lifetime undef : $C
   // CHECK: mark_dependence undef : $C on undef : $C

@@ -18,8 +18,13 @@
 #define SWIFT_SIL_PARSETESTSPECIFICATION
 
 #include "swift/Basic/TaggedUnion.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/FormattedStream.h"
 
 namespace llvm {
 template <class T>
@@ -30,6 +35,7 @@ using llvm::StringRef;
 namespace swift {
 
 class SILFunction;
+class SILArgument;
 
 namespace test {
 
@@ -41,6 +47,7 @@ struct Argument {
     Value,
     Operand,
     Instruction,
+    BlockArgument,
     Block,
     Function,
   };
@@ -50,6 +57,7 @@ struct Argument {
                             SILValue,           // ValueArgument
                             Operand *,          // OperandArgument
                             SILInstruction *,   // InstructionArgument
+                            SILArgument *,      // BlockArgumentArgument
                             SILBasicBlock *,    // BlockArgument
                             SILFunction *       // FunctionArgument
                             >;
@@ -63,10 +71,15 @@ protected:
 
 public:
   Kind getKind() const { return kind; }
+  void print(llvm::raw_ostream &os);
+#ifndef NDEBUG
+  void dump() { print(llvm::errs()); }
+#endif
 };
 
-template <typename Stored, Argument::Kind TheKind>
+template <typename _Stored, Argument::Kind TheKind>
 struct ConcreteArgument : Argument {
+  using Stored = _Stored;
   using Super = ConcreteArgument<Stored, TheKind>;
   ConcreteArgument(Stored stored) : Argument(Union{stored}, TheKind) {}
   Stored getValue() { return storage.get<Stored>(); }
@@ -86,6 +99,11 @@ struct OperandArgument : ConcreteArgument<Operand *, Argument::Kind::Operand> {
 struct InstructionArgument
     : ConcreteArgument<SILInstruction *, Argument::Kind::Instruction> {
   InstructionArgument(SILInstruction *stored) : Super(stored) {}
+};
+
+struct BlockArgumentArgument
+    : ConcreteArgument<SILArgument *, Argument::Kind::BlockArgument> {
+  BlockArgumentArgument(SILArgument *stored) : Super(stored) {}
 };
 
 struct BlockArgument
@@ -132,41 +150,80 @@ struct Arguments {
   Arguments &operator=(Arguments const &) = delete;
   ~Arguments() { assertUsed(); }
   Argument &takeArgument() { return storage[untakenIndex++]; }
-  StringRef takeString() {
-    return cast<StringArgument>(takeArgument()).getValue();
+
+private:
+  template <typename Subtype>
+  typename Subtype::Stored getInstance(StringRef name, Argument &argument) {
+    if (isa<Subtype>(argument)) {
+      auto string = cast<Subtype>(argument).getValue();
+      return string;
+    }
+    llvm::errs() << "Attempting to take a " << name << " argument but have\n";
+    argument.print(llvm::errs());
+    llvm::report_fatal_error("Bad unit test");
   }
-  bool takeBool() { return cast<BoolArgument>(takeArgument()).getValue(); }
-  unsigned long long takeUInt() {
-    return cast<UIntArgument>(takeArgument()).getValue();
+  template <typename Subtype>
+  typename Subtype::Stored takeInstance(StringRef name) {
+    auto argument = takeArgument();
+    return getInstance<Subtype>(name, argument);
   }
+
+public:
+  StringRef takeString() { return takeInstance<StringArgument>("string"); }
+  bool takeBool() { return takeInstance<BoolArgument>("bool"); }
+  unsigned long long takeUInt() { return takeInstance<UIntArgument>("uint"); }
   SILValue takeValue() {
-    return cast<ValueArgument>(takeArgument()).getValue();
+    auto argument = takeArgument();
+    if (isa<InstructionArgument>(argument)) {
+      auto *instruction = cast<InstructionArgument>(argument).getValue();
+      auto *svi = cast<SingleValueInstruction>(instruction);
+      return svi;
+    } else if (isa<BlockArgumentArgument>(argument)) {
+      auto *arg = cast<BlockArgumentArgument>(argument).getValue();
+      return arg;
+    }
+    return getInstance<ValueArgument>("value", argument);
   }
-  Operand *takeOperand() {
-    return cast<OperandArgument>(takeArgument()).getValue();
-  }
+  Operand *takeOperand() { return takeInstance<OperandArgument>("operand"); }
   SILInstruction *takeInstruction() {
-    return cast<InstructionArgument>(takeArgument()).getValue();
+    return takeInstance<InstructionArgument>("instruction");
   }
-  SILBasicBlock *takeBlock() {
-    return cast<BlockArgument>(takeArgument()).getValue();
+  SILArgument *takeBlockArgument() {
+    return takeInstance<BlockArgumentArgument>("block argument");
   }
+  SILBasicBlock *takeBlock() { return takeInstance<BlockArgument>("block"); }
   SILFunction *takeFunction() {
-    return cast<FunctionArgument>(takeArgument()).getValue();
+    return takeInstance<FunctionArgument>("block");
   }
+};
+
+/// The specification for a test which has not yet been parsed.
+struct UnparsedSpecification {
+  /// The string which specifies the test.
+  ///
+  /// Not a StringRef because the TestSpecificationInst whose payload is of
+  /// interest gets deleted.
+  std::string string;
+  /// The next non-debug instruction.
+  ///
+  /// Provides an "anchor" for the specification.  Contextual arguments
+  /// (@{instruction|block|function}) can be parsed in terms of this
+  /// anchor.
+  SILInstruction *context;
 };
 
 /// Finds and deletes each test_specification instruction in \p function and
 /// appends its string payload to the provided vector.
-void getTestSpecifications(SILFunction *function,
-                           SmallVectorImpl<std::string> &specifications);
+void getTestSpecifications(
+    SILFunction *function,
+    SmallVectorImpl<UnparsedSpecification> &specifications);
 
 /// Given the string \p specification operand of a test_specification
 /// instruction from \p function, parse the arguments which it refers to into
 /// \p arguments and the component strings into \p argumentStrings.
 void parseTestArgumentsFromSpecification(
-    SILFunction *function, StringRef specification, Arguments &arguments,
-    SmallVectorImpl<StringRef> &argumentStrings);
+    SILFunction *function, UnparsedSpecification const &specification,
+    Arguments &arguments, SmallVectorImpl<StringRef> &argumentStrings);
 
 } // namespace test
 } // namespace swift

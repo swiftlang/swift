@@ -83,7 +83,7 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   LangOptions FakeLangOpts;
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
           HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
-          TriviaRetentionMode::WithoutTrivia, Offset, EndOffset);
+          Offset, EndOffset);
 
   SmallVector<SingleRawComment, 16> Comments;
   Token Tok;
@@ -137,7 +137,7 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
   // Check the cache in ASTContext.
   auto &Context = getASTContext();
   if (Optional<std::pair<RawComment, bool>> RC = Context.getRawComment(this)) {
-    auto P = RC.getValue();
+    auto P = RC.value();
     if (!SerializedOK || P.second)
       return P.first;
   }

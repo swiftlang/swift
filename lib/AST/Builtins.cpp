@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -95,6 +95,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheSILTokenType;
   if (Name == "UnsafeValueBuffer")
     return Context.TheUnsafeValueBufferType;
+  if (Name == "PackIndex")
+    return Context.ThePackIndexType;
   
   if (Name == "FPIEEE32")
     return Context.TheIEEE32Type;
@@ -1539,6 +1541,24 @@ static ValueDecl *getCreateTaskGroup(ASTContext &ctx, Identifier id) {
                             _rawPointer);
 }
 
+static ValueDecl *getCreateTaskGroupWithFlags(ASTContext &ctx, Identifier id) {
+  ModuleDecl *M = ctx.TheBuiltinModule;
+  DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
+  SynthesisContext SC(ctx, DC);
+
+  BuiltinFunctionBuilder builder(ctx);
+
+  // int
+  builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
+
+  // T.self
+  builder.addParameter(makeMetatype(makeGenericParam(0))); // 1 ChildTaskResult.Type
+
+  // -> Builtin.RawPointer
+  builder.setResult(makeConcrete(synthesizeType(SC, _rawPointer)));
+  return builder.build(id);
+}
+
 static ValueDecl *getDestroyTaskGroup(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_rawPointer),
@@ -1794,6 +1814,33 @@ static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
     return nullptr;
 
   return getBuiltinFunction(Id, { InTy }, OutTy);
+}
+
+static ValueDecl *getBitWidthOperation(
+  ASTContext &ctx,
+  Identifier id,
+  Type valueTy
+) {
+  if (!valueTy->getAs<BuiltinIntegerLiteralType>()) return nullptr;
+  return getBuiltinFunction(ctx, id, _thin, _parameters(valueTy), _word);
+}
+
+static ValueDecl *getIsNegativeOperation(
+  ASTContext &ctx,
+  Identifier id,
+  Type valueTy
+) {
+  if (!valueTy->getAs<BuiltinIntegerLiteralType>()) return nullptr;
+  return getBuiltinFunction(ctx, id, _thin, _parameters(valueTy), _int(1));
+}
+
+static ValueDecl *getWordAtIndexOperation(
+  ASTContext &ctx,
+  Identifier id,
+  Type valueTy
+) {
+  if (!valueTy->getAs<BuiltinIntegerLiteralType>()) return nullptr;
+  return getBuiltinFunction(ctx, id, _thin, _parameters(valueTy, _word), _word);
 }
 
 static ValueDecl *getUnreachableOperation(ASTContext &Context,
@@ -2271,10 +2318,6 @@ static bool isValidCmpXChgOrdering(StringRef SuccessString,
 }
 
 ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
-  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    return nullptr; // not needed for the parser library.
-  #endif
-
   // Builtin.TheTupleType resolves to the singleton instance of BuiltinTupleDecl.
   if (Id == Context.Id_TheTupleType)
     return Context.getBuiltinTupleDecl();
@@ -2701,7 +2744,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getLegacyCondFailOperation(Context, Id);
 
   case BuiltinValueKind::AddressOfBorrow:
+  case BuiltinValueKind::AddressOfBorrowOpaque:
   case BuiltinValueKind::UnprotectedAddressOfBorrow:
+  case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     if (!Types.empty()) return nullptr;
     return getAddressOfBorrowOperation(Context, Id);
 
@@ -2782,6 +2827,18 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::IntToFPWithOverflow:
     if (Types.size() != 2) return nullptr;
     return getIntToFPWithOverflowOperation(Context, Id, Types[0], Types[1]);
+
+  case BuiltinValueKind::BitWidth:
+    if (Types.size() != 1) return nullptr;
+    return getBitWidthOperation(Context, Id, Types[0]);
+
+  case BuiltinValueKind::IsNegative:
+    if (Types.size() != 1) return nullptr;
+    return getIsNegativeOperation(Context, Id, Types[0]);
+
+  case BuiltinValueKind::WordAtIndex:
+    if (Types.size() != 1) return nullptr;
+    return getWordAtIndexOperation(Context, Id, Types[0]);
 
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);
@@ -2871,6 +2928,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateTaskGroup:
     return getCreateTaskGroup(Context, Id);
+  case BuiltinValueKind::CreateTaskGroupWithFlags:
+    return getCreateTaskGroupWithFlags(Context, Id);
 
   case BuiltinValueKind::DestroyTaskGroup:
     return getDestroyTaskGroup(Context, Id);
@@ -2961,6 +3020,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinDefaultActorStorage:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE);
+    break;
+  case BuiltinTypeKind::BuiltinPackIndex:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_PACKINDEX);
     break;
   case BuiltinTypeKind::BuiltinNativeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_NATIVEOBJECT);

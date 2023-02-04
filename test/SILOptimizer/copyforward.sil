@@ -38,7 +38,7 @@ bb0(%0 : $AnyObject):
   %alloc2 = alloc_stack $ObjWrapper
   // The location loaded from is destroyed here with no corresponding
   // retain.
-  copy_addr [take] %alloc1 to [initialization] %alloc2 : $*ObjWrapper
+  copy_addr [take] %alloc1 to [init] %alloc2 : $*ObjWrapper
   cond_br undef, bb1, bb2
 bb1:
   // This retain and destroy are not obviously related but need to
@@ -47,7 +47,7 @@ bb1:
   destroy_addr %alloc2 : $*ObjWrapper
   br bb3
 bb2:
-  copy_addr [take] %alloc2 to [initialization] %alloc1 : $*ObjWrapper
+  copy_addr [take] %alloc2 to [init] %alloc1 : $*ObjWrapper
   br bb3
 bb3:
   dealloc_stack %alloc2 : $*ObjWrapper

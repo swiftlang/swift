@@ -179,6 +179,8 @@ public:
 
     RequiredProtocols protos;
     LayoutConstraint layout;
+
+    Type packShape;
   };
 
 private:
@@ -454,6 +456,13 @@ public:
   /// \note If the upper bound is a protocol or protocol composition,
   /// will return an instance of \c ExistentialType.
   Type getNonDependentUpperBounds(Type type) const;
+
+  /// Given a type parameter, compute the most specific supertype (upper bound)
+  /// that is possibly dependent on other type parameters.
+  ///
+  /// \note If the upper bound is a protocol or protocol composition,
+  /// will return an instance of \c ExistentialType.
+  Type getDependentUpperBounds(Type type) const;
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       TypeArrayView<GenericTypeParamType> genericParams,

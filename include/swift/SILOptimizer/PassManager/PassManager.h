@@ -78,6 +78,8 @@ class SwiftPassInvocation {
   bool aliveNodeSets[NodeSetCapacity];
   int numNodeSetsAllocated = 0;
 
+  bool needFixStackNesting = false;
+
   void endPassRunChecks();
 
 public:
@@ -133,6 +135,9 @@ public:
   void beginTransformFunction(SILFunction *function);
 
   void endTransformFunction();
+
+  void setNeedFixStackNesting(bool newValue) { needFixStackNesting = newValue; }
+  bool getNeedFixStackNesting() const { return needFixStackNesting; }
 };
 
 /// The SIL pass manager.
@@ -374,6 +379,7 @@ public:
                                   SILTransform *trans);
 
   static bool isPassDisabled(StringRef passName);
+  static bool isInstructionPassDisabled(StringRef instName);
   static bool disablePassesForFunction(SILFunction *function);
 
 private:

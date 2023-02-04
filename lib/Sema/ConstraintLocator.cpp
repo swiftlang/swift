@@ -97,9 +97,13 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::SyntacticElement:
   case ConstraintLocator::PackType:
   case ConstraintLocator::PackElement:
+  case ConstraintLocator::PackShape:
+  case ConstraintLocator::PackExpansionPattern:
   case ConstraintLocator::PatternBindingElement:
   case ConstraintLocator::NamedPatternDecl:
+  case ConstraintLocator::SingleValueStmtBranch:
   case ConstraintLocator::AnyPatternDecl:
+  case ConstraintLocator::GlobalActorType:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -379,6 +383,13 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     break;
   }
 
+  case ConstraintLocator::SingleValueStmtBranch: {
+    auto branch = elt.castTo<LocatorPathElt::SingleValueStmtBranch>();
+    out << "expr branch [" << branch.getExprBranchIndex() << "] of "
+           "single value stmt";
+    break;
+  }
+
   case ConstraintLocator::PatternMatch:
     out << "pattern match";
     break;
@@ -434,13 +445,25 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     break;
   }
 
-  case ConstraintLocator::ConstraintLocator::PackType:
-    out << "pack type";
+  case ConstraintLocator::ConstraintLocator::PackType: {
+    auto packElt = elt.castTo<LocatorPathElt::PackType>();
+    out << "pack type '" << packElt.getType()->getString(PO) << "'";
     break;
+  }
 
   case ConstraintLocator::PackElement: {
     auto packElt = elt.castTo<LocatorPathElt::PackElement>();
     out << "pack element #" << llvm::utostr(packElt.getIndex());
+    break;
+  }
+
+  case ConstraintLocator::PackShape: {
+    out << "pack shape";
+    break;
+  }
+
+  case ConstraintLocator::PackExpansionPattern: {
+    out << "pack expansion pattern";
     break;
   }
 
@@ -459,6 +482,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::AnyPatternDecl: {
     out << "'_' pattern decl";
+    break;
+  }
+
+  case ConstraintLocator::GlobalActorType: {
+    out << "global actor type";
     break;
   }
   }
@@ -577,6 +605,50 @@ bool ConstraintLocator::isForResultBuilderBodyResult() const {
   return isFirstElement<LocatorPathElt::ResultBuilderBodyResult>();
 }
 
+bool ConstraintLocator::isForMacroExpansion() const {
+  return directlyAt<MacroExpansionExpr>();
+}
+
+bool ConstraintLocator::isForSingleValueStmtConjunction() const {
+  auto *SVE = getAsExpr<SingleValueStmtExpr>(getAnchor());
+  if (!SVE)
+    return false;
+
+  // Ignore a trailing SyntacticElement path element for the statement.
+  auto path = getPath();
+  if (auto elt = getLastElementAs<LocatorPathElt::SyntacticElement>()) {
+    if (elt->getElement() == ASTNode(SVE->getStmt()))
+      path = path.drop_back();
+  }
+
+  // Other than the trailing SyntaticElement, we must be at the anchor.
+  return path.empty();
+}
+
+Optional<SingleValueStmtBranchKind>
+ConstraintLocator::isForSingleValueStmtBranch() const {
+  // Ignore a trailing ContextualType path element.
+  auto path = getPath();
+  if (auto elt = getLastElementAs<LocatorPathElt::ContextualType>())
+    path = path.drop_back();
+
+  if (path.empty())
+    return None;
+
+  if (!path.back().is<LocatorPathElt::SingleValueStmtBranch>())
+    return None;
+
+  auto *SVE = getAsExpr<SingleValueStmtExpr>(getAnchor());
+  if (!SVE)
+    return None;
+
+  if (auto *CE = dyn_cast<ClosureExpr>(SVE->getDeclContext())) {
+    if (CE->hasSingleExpressionBody() && !hasExplicitResult(CE))
+      return SingleValueStmtBranchKind::InSingleExprClosure;
+  }
+  return SingleValueStmtBranchKind::Regular;
+}
+
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?
@@ -606,19 +678,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
   
   out << "locator@" << (void*) this << " [";
 
-  if (auto *expr = anchor.dyn_cast<Expr *>()) {
-    out << Expr::getKindName(expr->getKind());
-    if (sm) {
-      out << '@';
-      expr->getLoc().print(out, *sm);
-    }
-  } else if (auto *pattern = anchor.dyn_cast<Pattern *>()) {
-    out << Pattern::getKindName(pattern->getKind()) << "Pattern";
-    if (sm) {
-      out << '@';
-      pattern->getLoc().print(out, *sm);
-    }
-  }
+  constraints::dumpAnchor(anchor, sm, out);
 
   for (auto elt : getPath()) {
     out << " -> ";

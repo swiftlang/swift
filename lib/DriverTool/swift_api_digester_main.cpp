@@ -138,8 +138,8 @@ class BestMatchMatcher : public NodeMatcher {
     for (auto Can : Candidates) {
       if (!internalCanMatch(Pin, Can))
         continue;
-      if (!Best.hasValue() ||
-          IsFirstMatchBetter({Pin, Can}, {Pin, Best.getValue()}))
+      if (!Best.has_value() ||
+          IsFirstMatchBetter({Pin, Can}, {Pin, Best.value()}))
         Best = Can;
     }
     return Best;
@@ -158,8 +158,8 @@ public:
   void match() override {
     for (auto L : Left) {
       if (auto Best = findBestMatch(L, Right)) {
-        MatchedRight.insert(Best.getValue());
-        Listener.foundMatch(L, Best.getValue(), Reason);
+        MatchedRight.insert(Best.value());
+        Listener.foundMatch(L, Best.value(), Reason);
       }
     }
   }
@@ -248,7 +248,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     for (auto Child : A->getChildren()) {
       if (auto VC = dyn_cast<SDKNodeDeclVar>(Child)) {
       auto LastPartOfA = getLastPartOfUsr(VC);
-        if (LastPartOfA && LastPartOfR.getValue() == LastPartOfA.getValue()) {
+        if (LastPartOfA && LastPartOfR.value() == LastPartOfA.value()) {
           std::string FullName = (llvm::Twine(A->getName()) + "." +
             Child->getName()).str();
           R->annotate(NodeAnnotation::ModernizeEnum,
@@ -266,7 +266,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
       return false;
     auto LastR = getLastPartOfUsr(R);
     auto LastA = getLastPartOfUsr(A);
-    if (LastR && LastA && LastR.getValue() == LastA.getValue()) {
+    if (LastR && LastA && LastR.value() == LastA.value()) {
       foundMatch(R, A, NodeMatchReason::Name);
       return true;
     }
@@ -486,7 +486,7 @@ void SameNameNodeMatcher::match() {
 
       // If LN and RN have the same name for some reason, keep track of RN.
       if (auto Kind = getNameMatchKind(LN, RN))
-        Candidates.push_back({RN, Kind.getValue()});
+        Candidates.push_back({RN, Kind.value()});
     }
 
     // Try to find the best match among all the candidates by the priority name
@@ -546,6 +546,16 @@ public:
 }// End of anonymous namespace
 
 namespace {
+
+static bool isMissingDeclAcceptable(const SDKNodeDecl *D) {
+  // Don't complain about removing importation of SwiftOnoneSupport.
+  if (D->getKind() == SDKNodeKind::DeclImport &&
+      D->getName() == "SwiftOnoneSupport") {
+    return true;
+  }
+  return false;
+}
+
 static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
   if (D->getSDKContext().checkingABI()) {
     // Don't complain about removing @_alwaysEmitIntoClient if we are checking ABI.
@@ -559,9 +569,7 @@ static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
   if (Ctx.getOpts().SkipRemoveDeprecatedCheck &&
       D->isDeprecated())
     return;
-  // Don't complain about removing importation of SwiftOnoneSupport.
-  if (D->getKind() == SDKNodeKind::DeclImport &&
-      D->getName() == "SwiftOnoneSupport") {
+  if (isMissingDeclAcceptable(D)) {
     return;
   }
   D->emitDiag(SourceLoc(), diag::removed_decl, false);
@@ -828,7 +836,8 @@ public:
     case SDKNodeKind::DeclImport:
     case SDKNodeKind::TypeFunc:
     case SDKNodeKind::TypeNominal:
-    case SDKNodeKind::TypeAlias: {
+    case SDKNodeKind::TypeAlias:
+    case SDKNodeKind::DeclMacro: {
       // If matched nodes are both function/var/TypeAlias decls, mapping their
       // parameters sequentially.
       SequentialNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(),
@@ -1674,7 +1683,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
             findUpdateCounterpart(PD))) {
           // Look up by the printed name in the counterpart.
           FoundInSuperclass =
-            RTD->lookupChildByPrintedName(Node->getPrintedName()).hasValue();
+            RTD->lookupChildByPrintedName(Node->getPrintedName()).has_value();
         }
       }
     }
@@ -1704,6 +1713,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
                                                 .findUpdateCounterpart(Node))) {
       DiagLoc = CD->getLoc();
     }
+    if (isMissingDeclAcceptable(Node))
+      return;
     Node->emitDiag(DiagLoc, diag::renamed_decl,
         Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind(),
           Ctx.getOpts().CompilerStyle)) + " " +
@@ -1835,7 +1846,7 @@ createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError, bool DisableFailOnE
   if (!SerializedDiagPath.empty()) {
     FailOnError = !DisableFailOnError;
     results.emplace_back(std::make_unique<PrintingDiagnosticConsumer>());
-    results.emplace_back(serialized_diagnostics::createConsumer(SerializedDiagPath));
+    results.emplace_back(serialized_diagnostics::createConsumer(SerializedDiagPath, false));
   } else if (CompilerStyleDiags) {
     FailOnError = !DisableFailOnError;
     results.emplace_back(std::make_unique<PrintingDiagnosticConsumer>());
@@ -2428,7 +2439,7 @@ public:
       bool isValid = false;
       if (auto Version = VersionParser::parseVersionString(
               SwiftVersion, SourceLoc(), nullptr)) {
-        if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
+        if (auto Effective = Version.value().getEffectiveLanguageVersion()) {
           InitInvoke.getLangOptions().EffectiveLanguageVersion = *Effective;
           isValid = true;
         }

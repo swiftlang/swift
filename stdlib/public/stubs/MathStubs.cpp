@@ -64,6 +64,7 @@ extern "C" {
     (defined(__linux__) && defined(__aarch64__)) || \
     (defined(__linux__) && defined(__powerpc64__)) || \
     (defined(__linux__) && defined(__s390x__)) || \
+    (defined(__linux__) && defined(__riscv) && __riscv_xlen == 64) || \
     (defined(__ANDROID__) && defined(__aarch64__))
 
 SWIFT_RUNTIME_STDLIB_API

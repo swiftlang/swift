@@ -119,7 +119,7 @@ entry(%0 : $*R<T>, %1 : $*E<(R<U>)->Int>, %2 : $*Int):
   %f = function_ref @generic_promotable_box2 : $@convention(thin) <V> (@in_guaranteed R<V>, @in_guaranteed Int, @guaranteed <τ_0_0> { var E<(R<τ_0_0>)->Int> } <V>) -> @out Int
   %b = alloc_box $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <U>
   %a = project_box %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <U>, 0
-  copy_addr %1 to [initialization] %a : $*E<(R<U>)->Int>
+  copy_addr %1 to [init] %a : $*E<(R<U>)->Int>
   %k = partial_apply [callee_guaranteed] %f<U>(%2, %b) : $@convention(thin) <V> (@in_guaranteed R<V>, @in_guaranteed Int, @guaranteed <τ_0_0> { var E<(R<τ_0_0>)->Int> } <V>) -> @out Int
   return %k : $@callee_guaranteed (@in_guaranteed R<U>) -> @out Int
 }

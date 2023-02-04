@@ -645,7 +645,7 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 
     if (auto enumDecl = dyn_cast<clang::EnumDecl>(decl)) {
       // Intentionally don't get the canonical type here.
-      if (auto typedefType = dyn_cast<clang::TypedefType>(enumDecl->getIntegerType().getTypePtr())) {
+      if (auto typedefType = dyn_cast<clang::TypedefType>(getUnderlyingType(enumDecl))) {
         // If the typedef is available in Swift, the user will get ambiguity.
         // It also means they may not have intended this API to be imported like this.
         if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
@@ -984,8 +984,8 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
   // in the same module as the decl
   // FIXME: This will miss macros.
   auto clangModule = getClangSubmoduleForDecl(decl);
-  if (clangModule.hasValue() && clangModule.getValue())
-    clangModule = clangModule.getValue()->getTopLevelModule();
+  if (clangModule.has_value() && clangModule.value())
+    clangModule = clangModule.value()->getTopLevelModule();
 
   auto conflicts = [&](const clang::Decl *OtherD) -> bool {
     // If these are simply redeclarations, they do not conflict.
@@ -1006,14 +1006,14 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
     }
 
     auto declModule = getClangSubmoduleForDecl(OtherD);
-    if (!declModule.hasValue())
+    if (!declModule.has_value())
       return false;
 
     // Handle the bridging header case. This is pretty nasty since things
     // can get added to it *later*, but there's not much we can do.
-    if (!declModule.getValue())
+    if (!declModule.value())
       return *clangModule == nullptr;
-    return *clangModule == declModule.getValue()->getTopLevelModule();
+    return *clangModule == declModule.value()->getTopLevelModule();
   };
 
   // Allow this lookup to find hidden names.  We don't want the
@@ -1796,7 +1796,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     // typedef (even if it's an anonymous enum).
     if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
       // Intentionally don't get the canonical type here.
-      if (auto typedefType = dyn_cast<clang::TypedefType>(enumDecl->getIntegerType().getTypePtr())) {
+      if (auto typedefType = dyn_cast<clang::TypedefType>(getUnderlyingType(enumDecl))) {
         // If the typedef is available in Swift, the user will get ambiguity.
         // It also means they may not have intended this API to be imported like this.
         if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
@@ -2200,6 +2200,34 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
+  SmallString<16> newName;
+  // Check if we need to rename the C++ method to disambiguate it.
+  if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
+    if (!method->isConst() && !method->isOverloadedOperator()) {
+      // See if any other methods within the same struct have the same name, but
+      // differ in constness.
+      auto otherDecls = dc->lookup(method->getDeclName());
+      bool shouldRename = false;
+      for (auto otherDecl : otherDecls) {
+        if (otherDecl == D)
+          continue;
+        if (auto otherMethod = dyn_cast<clang::CXXMethodDecl>(otherDecl)) {
+          // TODO: what if the other method is also non-const?
+          if (otherMethod->isConst()) {
+            shouldRename = true;
+            break;
+          }
+        }
+      }
+
+      if (shouldRename) {
+        newName = baseName;
+        newName += "Mutating";
+        baseName = newName;
+      }
+    }
+  }
+
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
   if (auto newtypeDecl = findSwiftNewtype(D, clangSema, version)) {
@@ -2243,11 +2271,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
               ? Optional<unsigned>(result.getErrorInfo()->ErrorParameterIndex)
               : None,
           method->hasRelatedResultType(), method->isInstanceMethod(),
-          result.getAsyncInfo().map(
+          result.getAsyncInfo().transform(
             [](const ForeignAsyncConvention::Info &info) {
               return info.completionHandlerParamIndex();
             }),
-          result.getAsyncInfo().map(
+          result.getAsyncInfo().transform(
             [&](const ForeignAsyncConvention::Info &info) {
               return method->getDeclName().getObjCSelector().getNameForSlot(
                                             info.completionHandlerParamIndex());
@@ -2383,7 +2411,7 @@ bool NameImporter::forEachDistinctImportName(
     return true;
 
   ImportNameKey key(newName.getDeclName(), newName.getEffectiveContext(),
-                    newName.getAsyncInfo().hasValue());
+                    newName.getAsyncInfo().has_value());
   if (action(newName, activeVersion))
     seenNames.push_back(key);
 
@@ -2394,7 +2422,7 @@ bool NameImporter::forEachDistinctImportName(
         if (!newName)
           return;
         ImportNameKey key(newName.getDeclName(), newName.getEffectiveContext(),
-                          newName.getAsyncInfo().hasValue());
+                          newName.getAsyncInfo().has_value());
 
         bool seen = llvm::any_of(
             seenNames, [&key](const ImportNameKey &existing) -> bool {

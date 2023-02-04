@@ -164,6 +164,10 @@ SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_module_source_info_path(
     swiftscan_module_details_t details);
 
+SWIFTSCAN_PUBLIC bool
+swiftscan_swift_binary_detail_get_is_framework(
+    swiftscan_module_details_t details);
+
 //=== Swift Placeholder Module Details query APIs -------------------------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
@@ -269,6 +273,9 @@ SWIFTSCAN_PUBLIC void
 swiftscan_string_set_dispose(swiftscan_string_set_t *set);
 
 SWIFTSCAN_PUBLIC void
+swiftscan_string_dispose(swiftscan_string_ref_t string);
+
+SWIFTSCAN_PUBLIC void
 swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result);
 
 SWIFTSCAN_PUBLIC void
@@ -296,6 +303,9 @@ swiftscan_compiler_supported_features_query();
 //=== Target-Info Functions -----------------------------------------------===//
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_compiler_target_info_query(swiftscan_scan_invocation_t invocation);
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_compiler_target_info_query_v2(swiftscan_scan_invocation_t invocation,
+                                        const char *main_executable_path);
 
 //=== Scanner Functions ---------------------------------------------------===//
 

@@ -470,9 +470,8 @@ void IRGenFunction::bindLocalTypeDataFromSelfWitnessTable(
           WitnessIndex wIndex(privateWitnessTableIndexToTableOffset(index),
                               /*prefix*/ false);
 
-          auto table =
-              emitInvariantLoadOfOpaqueWitness(*this, selfTable,
-                                        wIndex.forProtocolWitnessTable());
+          auto table = loadConditionalConformance(*this ,selfTable,
+                                                  wIndex.forProtocolWitnessTable());
           table = Builder.CreateBitCast(table, IGM.WitnessTablePtrTy);
           setProtocolWitnessTableName(IGM, table, archetype, proto);
 
@@ -542,12 +541,13 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
   };
 
   for (auto &fulfillment : fulfillments) {
-    CanType type = CanType(fulfillment.first.first);
+    CanType type = fulfillment.first.getTypeParameter();
     LocalTypeDataKind localDataKind;
 
     // For now, ignore witness-table fulfillments when they're not for
     // archetypes.
-    if (ProtocolDecl *protocol = fulfillment.first.second) {
+    if (fulfillment.first.isWitnessTable()) {
+      ProtocolDecl *protocol = fulfillment.first.getProtocol();
       if (auto archetype = dyn_cast<ArchetypeType>(type)) {
         auto conformsTo = archetype->getConformsTo();
         auto it = std::find(conformsTo.begin(), conformsTo.end(), protocol);
@@ -558,6 +558,8 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
       }
 
     } else {
+      assert(fulfillment.first.isMetadata());
+
       // Ignore type metadata fulfillments for non-dependent types that
       // we can produce very cheaply.  We don't want to end up emitting
       // the type metadata for Int by chasing through N layers of metadata

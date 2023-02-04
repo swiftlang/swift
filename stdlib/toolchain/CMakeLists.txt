@@ -46,6 +46,10 @@ endif()
 # runtime being patched only through public ABI.
 list(APPEND CXX_COMPILE_FLAGS "-DSWIFT_COMPATIBILITY_LIBRARY=1")
 
+if(SWIFT_BUILD_STDLIB)
+  add_subdirectory(CompatibilityBytecodeLayouts)
+endif()
+
 if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
   add_subdirectory(legacy_layouts)
   add_subdirectory(Compatibility50)

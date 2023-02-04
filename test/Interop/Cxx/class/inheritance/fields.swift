@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
-//
-// Windows doesn't support -lc++ or -lstdc++.
-// UNSUPPORTED: OS=windows-msvc
 
 import CxxShim
 import StdlibUnittest

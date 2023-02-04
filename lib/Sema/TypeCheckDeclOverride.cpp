@@ -1573,6 +1573,7 @@ namespace  {
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
     UNINTERESTING_ATTR(DiscardableResult)
 
+    UNINTERESTING_ATTR(ObjCImplementation)
     UNINTERESTING_ATTR(ObjCMembers)
     UNINTERESTING_ATTR(ObjCRuntimeName)
     UNINTERESTING_ATTR(RestatedObjCConformance)
@@ -1613,7 +1614,7 @@ namespace  {
     UNINTERESTING_ATTR(NoMetadata)
     UNINTERESTING_ATTR(CompileTimeConst)
 
-    UNINTERESTING_ATTR(BackDeploy)
+    UNINTERESTING_ATTR(BackDeployed)
     UNINTERESTING_ATTR(KnownToBeLocal)
 
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
@@ -1622,6 +1623,10 @@ namespace  {
 
     UNINTERESTING_ATTR(EagerMove)
     UNINTERESTING_ATTR(NoEagerMove)
+
+    UNINTERESTING_ATTR(RuntimeMetadata)
+
+    UNINTERESTING_ATTR(MacroRole)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

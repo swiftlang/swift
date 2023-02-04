@@ -7,6 +7,7 @@
 // 5.7 so that we can test new behavior even if the SDK we're using predates it.
 
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
 // UNSUPPORTED: freestanding
 
 import StdlibUnittest
@@ -656,8 +657,8 @@ suite.test("Fully exhaustive index interchange")
 
 #if _runtime(_ObjC)
 suite.test("Fully exhaustive index interchange/GraphemeBreakTests") {
-  for string in graphemeBreakTests.map { $0.0 } {
-    fullyExhaustiveIndexInterchange(string)
+  for test in graphemeBreakTests {
+    fullyExhaustiveIndexInterchange(test.string)
   }
 }
 #endif
@@ -995,6 +996,44 @@ suite.test("Index encoding correction/UTF-8→16/conversions/UTF-16") {
 }
 #endif
 
+suite.test("UTF-16 breadcrumbs") {
+
+  let string = #"""
+    The powerful programming language that is also easy to learn.
+    손쉽게 학습할 수 있는 강력한 프로그래밍 언어.
+    🪙 A 🥞 short 🍰 piece 🫘 of 🌰 text 👨‍👨‍👧‍👧 with 👨‍👩‍👦 some 🚶🏽 emoji 🇺🇸🇨🇦 characters 🧈
+    some🔩times 🛺 placed 🎣 in 🥌 the 🆘 mid🔀dle 🇦🇶or🏁 around 🏳️‍🌈 a 🍇 w🍑o🥒r🥨d
+    Unicode is such fun!
+    U̷n̷i̷c̷o̴d̴e̷ ̶i̸s̷ ̸s̵u̵c̸h̷ ̸f̵u̷n̴!̵
+    U̴̡̲͋̾n̵̻̳͌ì̶̠̕c̴̭̈͘ǫ̷̯͋̊d̸͖̩̈̈́ḛ̴́ ̴̟͎͐̈i̴̦̓s̴̜̱͘ ̶̲̮̚s̶̙̞͘u̵͕̯̎̽c̵̛͕̜̓h̶̘̍̽ ̸̜̞̿f̵̤̽ṷ̴͇̎͘ń̷͓̒!̷͍̾̚
+    U̷̢̢̧̨̼̬̰̪͓̞̠͔̗̼̙͕͕̭̻̗̮̮̥̣͉̫͉̬̲̺͍̺͊̂ͅ\#
+    n̶̨̢̨̯͓̹̝̲̣̖̞̼̺̬̤̝̊̌́̑̋̋͜͝ͅ\#
+    ḭ̸̦̺̺͉̳͎́͑\#
+    c̵̛̘̥̮̙̥̟̘̝͙̤̮͉͔̭̺̺̅̀̽̒̽̏̊̆͒͌̂͌̌̓̈́̐̔̿̂͑͠͝͝ͅ\#
+    """#
+
+  print(string.utf16.count)
+  let indices = Array(string.utf16.indices) + [string.utf16.endIndex]
+  for i in 0 ..< indices.count {
+    for j in 0 ..< indices.count {
+      let distance = string.utf16.distance(from: indices[i], to: indices[j])
+      expectEqual(distance, j - i,
+        """
+        i: \(i), indices[i]: \(indices[i]._description)
+        j: \(j), indices[j]: \(indices[j]._description)
+        """)
+
+      let target = string.utf16.index(indices[i], offsetBy: j - i)
+      expectEqual(target, indices[j],
+        """
+        i: \(i), indices[i]: \(indices[i]._description)
+        j: \(j), indices[j]: \(indices[j]._description)
+        target: \(target._description)
+        """)
+    }
+  }
+}
+
 suite.test("String.replaceSubrange index validation")
 .forEach(in: examples) { string in
   guard #available(SwiftStdlib 5.7, *) else {
@@ -1060,11 +1099,9 @@ suite.test("String.replaceSubrange index validation")
   }
 }
 
-suite.test("Substring.removeSubrange entire range")
-.skip(.always("Disabled due to rdar://99627624"))
-.code {
-  guard #available(SwiftStdlib 5.7, *) else {
-    // This is a regression found in 5.7+
+suite.test("Substring.removeSubrange entire range") {
+  guard #available(SwiftStdlib 5.8, *) else {
+    // This was a regression in 5.7.0, fixed in 5.7.1+
     return
   }
 
@@ -1085,4 +1122,91 @@ suite.test("Substring.removeSubrange entire range")
 
   expectTrue(b.isEmpty)
 #endif
+}
+
+if #available(SwiftStdlib 5.8, *) {
+  suite.test("String index rounding/Characters")
+  .forEach(in: examples) { string in
+    for index in string.allIndices(includingEnd: true) {
+      let end = string.endIndex
+      let expected = (index < end
+        ? string.indices.lastIndex { $0 <= index }!
+        : end)
+      let actual = string._index(roundingDown: index)
+      expectEqual(actual, expected,
+        """
+        index: \(index._description)
+        actual: \(actual._description)
+        expected: \(expected._description)
+        """)
+    }
+  }
+}
+
+suite.test("String index rounding/Scalars")
+.forEach(in: examples) { string in
+  for index in string.allIndices(includingEnd: true) {
+    let end = string.unicodeScalars.endIndex
+    let expected = (index < end
+      ? string.unicodeScalars.indices.lastIndex { $0 <= index }!
+      : end)
+    let actual = string.unicodeScalars._index(roundingDown: index)
+    expectEqual(actual, expected,
+      """
+      index: \(index._description)
+      actual: \(actual._description)
+      expected: \(expected._description)
+      """)
+  }
+}
+
+suite.test("String index rounding/UTF-16")
+.forEach(in: examples) { string in
+  //string.dumpIndices()
+  var utf16Indices = Set(string.utf16.indices)
+  utf16Indices.insert(string.utf16.endIndex)
+
+  for index in string.allIndices(includingEnd: true) {
+    let expected: String.Index
+    if utf16Indices.contains(index) {
+      expected = index
+    } else {
+      // If the index isn't valid in the UTF-16 view, it gets rounded down
+      // to the nearest scalar boundary. (Unintuitively, this is generally *not*
+      // the closest valid index within the UTF-16 view.)
+      expected = string.unicodeScalars.indices.lastIndex { $0 <= index }!
+    }
+    let actual = string.utf16._index(roundingDown: index)
+    expectEqual(actual, expected,
+      """
+      index: \(index._description)
+      actual: \(actual._description)
+      expected: \(expected._description)
+      """)
+  }
+}
+
+suite.test("String index rounding/UTF-8")
+.forEach(in: examples) { string in
+  //string.dumpIndices()
+  var utf8Indices = Set(string.utf8.indices)
+  utf8Indices.insert(string.utf8.endIndex)
+  for index in string.allIndices(includingEnd: true) {
+    let expected: String.Index
+    if utf8Indices.contains(index) {
+      expected = index
+    } else {
+      // If the index isn't valid in the UTF-8 view, it gets rounded down
+      // to the nearest scalar boundary. (Unintuitively, this is generally *not*
+      // the closest valid index within the UTF-8 view.)
+      expected = string.unicodeScalars.indices.lastIndex { $0 <= index }!
+    }
+    let actual = string.utf8._index(roundingDown: index)
+    expectEqual(actual, expected,
+      """
+      index: \(index._description)
+      actual: \(actual._description)
+      expected: \(expected._description)
+      """)
+  }
 }

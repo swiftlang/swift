@@ -2326,6 +2326,20 @@ static bool checkGlobalValueUsers(SILValue val,
   return true;
 }
 
+SILInstruction *
+SILCombiner::legacyVisitGlobalValueInst(GlobalValueInst *globalValue) {
+  // Delete all reference count instructions on a global_value if the only other
+  // users are projections (ref_element_addr and ref_tail_addr).
+  SmallVector<SILInstruction *, 8> toDelete;
+  if (!checkGlobalValueUsers(globalValue, toDelete))
+    return nullptr;
+  for (SILInstruction *inst : toDelete) {
+    eraseInstFromFunction(*inst);
+  }
+  return nullptr;
+
+}
+
 // Simplify `differentiable_function_extract` of `differentiable_function`.
 //
 // Before:

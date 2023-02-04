@@ -33,21 +33,20 @@
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/IRGen/TBDGen.h"
 #include "swift/Migrator/MigratorOptions.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Parser.h"
-#include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
-#include "swift/TBDGen/TBDGen.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/FileManager.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "clang/Basic/FileManager.h"
 
 #include <memory>
 
@@ -96,17 +95,14 @@ class CompilerInvocation {
   IRGenOptions IRGenOpts;
   TBDGenOptions TBDGenOpts;
   ModuleInterfaceOptions ModuleInterfaceOpts;
-  /// The \c SyntaxParsingCache to use when parsing the main file of this
-  /// invocation
-  SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
+  llvm::MemoryBuffer *IDEInspectionTargetBuffer = nullptr;
 
-  llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
+  /// The offset that IDEInspection wants to further examine in offset of bytes
+  /// from the beginning of the main source file.  Valid only if
+  /// \c isIDEInspection() == true.
+  unsigned IDEInspectionOffset = ~0U;
 
-  /// Code completion offset in bytes from the beginning of the main
-  /// source file.  Valid only if \c isCodeCompletion() == true.
-  unsigned CodeCompletionOffset = ~0U;
-
-  CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
+  IDEInspectionCallbacksFactory *IDEInspectionFactory = nullptr;
 
 public:
   CompilerInvocation();
@@ -190,6 +186,14 @@ public:
 
   ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
     return SearchPathOpts.getFrameworkSearchPaths();
+  }
+
+  void setCompilerPluginLibraryPaths(const std::vector<std::string> &Paths) {
+    SearchPathOpts.setCompilerPluginLibraryPaths(Paths);
+  }
+
+  ArrayRef<std::string> getCompilerPluginLibraryPaths() {
+    return SearchPathOpts.getCompilerPluginLibraryPaths();
   }
 
   void setExtraClangArgs(const std::vector<std::string> &Args) {
@@ -288,14 +292,6 @@ public:
   IRGenOptions &getIRGenOptions() { return IRGenOpts; }
   const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }
 
-  void setMainFileSyntaxParsingCache(SyntaxParsingCache *Cache) {
-    MainFileSyntaxParsingCache = Cache;
-  }
-
-  SyntaxParsingCache *getMainFileSyntaxParsingCache() const {
-    return MainFileSyntaxParsingCache;
-  }
-
   void setParseStdlib() {
     FrontendOpts.ParseStdlib = true;
   }
@@ -327,28 +323,33 @@ public:
     return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
 
-  void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {
+  void setIDEInspectionTarget(llvm::MemoryBuffer *Buf, unsigned Offset) {
     assert(Buf);
-    CodeCompletionBuffer = Buf;
-    CodeCompletionOffset = Offset;
+    IDEInspectionTargetBuffer = Buf;
+    IDEInspectionOffset = Offset;
     // We don't need typo-correction for code-completion.
     // FIXME: This isn't really true, but is a performance issue.
     LangOpts.TypoCorrectionLimit = 0;
   }
 
-  std::pair<llvm::MemoryBuffer *, unsigned> getCodeCompletionPoint() const {
-    return std::make_pair(CodeCompletionBuffer, CodeCompletionOffset);
+  std::pair<llvm::MemoryBuffer *, unsigned> getIDEInspectionTarget() const {
+    return std::make_pair(IDEInspectionTargetBuffer, IDEInspectionOffset);
   }
 
   /// \returns true if we are doing code completion.
-  bool isCodeCompletion() const {
-    return CodeCompletionOffset != ~0U;
+  bool isIDEInspection() const {
+    return IDEInspectionOffset != ~0U;
   }
 
   /// Retrieve a module hash string that is suitable for uniquely
   /// identifying the conditions under which the module was built, for use
   /// in generating a cached PCH file for the bridging header.
   std::string getPCHHash() const;
+
+  /// Retrieve a module hash string that is suitable for uniquely
+  /// identifying the conditions under which the current module is built,
+  /// from the perspective of a dependency scanning action.
+  std::string getModuleScanningHash() const;
 
   /// Retrieve the stdlib kind to implicitly import.
   ImplicitStdlibKind getImplicitStdlibKind() const {
@@ -494,6 +495,9 @@ public:
   llvm::vfs::FileSystem &getFileSystem() const {
     return *SourceMgr.getFileSystem();
   }
+  void setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
+    SourceMgr.setFileSystem(FS);
+  }
 
   ASTContext &getASTContext() { return *Context; }
   const ASTContext &getASTContext() const { return *Context; }
@@ -555,6 +559,10 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftConcurrency() const;
 
+  /// Whether the Swift Concurrency Shims support Clang library can be imported
+  /// i.e. if it can be found.
+  bool canImportSwiftConcurrencyShims() const;
+
   /// Verify that if an implicit import of the `StringProcessing` module if
   /// expected, it can actually be imported. Emit a warning, otherwise.
   void verifyImplicitStringProcessingImport();
@@ -588,9 +596,9 @@ public:
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
-  /// If a code completion buffer has been set, returns the corresponding source
+  /// If a IDE inspection buffer has been set, returns the corresponding source
   /// file.
-  SourceFile *getCodeCompletionFile() const;
+  SourceFile *getIDEInspectionFile() const;
 
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML
@@ -609,7 +617,7 @@ private:
   /// \return false if successful, true on error.
   bool setupDiagnosticVerifierIfNeeded();
 
-  Optional<unsigned> setUpCodeCompletionBuffer();
+  Optional<unsigned> setUpIDEInspectionTargetBuffer();
 
   /// Find a buffer for a given input file and ensure it is recorded in
   /// SourceMgr, PartialModules, or InputSourceCodeBufferIDs as appropriate.

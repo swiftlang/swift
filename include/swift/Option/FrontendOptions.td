@@ -119,9 +119,6 @@ def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
 
-def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
-  HelpText<"Verify that no unknown nodes exist in the libSyntax tree">;
-
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
   
@@ -342,6 +339,11 @@ def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
 
 def debug_requirement_machine : Joined<["-"], "debug-requirement-machine=">,
   HelpText<"Fine-grained debug output from the generics implementation">;
+
+def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
+  HelpText<"Dumps the results of each macro expansion">;
+def emit_macro_expansion_files : Separate<["-"], "emit-macro-expansion-files">,
+  HelpText<"Specify when to emit macro expansion file: 'none', 'debug', or 'diagnostics'">;
 
 def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -564,6 +566,13 @@ def disable_deserialization_recovery :
   Flag<["-"], "disable-deserialization-recovery">,
   HelpText<"Don't attempt to recover from missing xrefs (etc) in swiftmodules">;
 
+def enable_deserialization_safety :
+  Flag<["-"], "enable-deserialization-safety">,
+  HelpText<"Avoid reading potentially unsafe decls in swiftmodules">;
+def disable_deserialization_safety :
+  Flag<["-"], "disable-deserialization-safety">,
+  HelpText<"Don't avoid reading potentially unsafe decls in swiftmodules">;
+
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
@@ -571,17 +580,9 @@ def disable_experimental_string_processing :
   Flag<["-"], "disable-experimental-string-processing">,
   HelpText<"Disable experimental string processing">;
 
-def enable_experimental_variadic_generics :
-  Flag<["-"], "enable-experimental-variadic-generics">,
-  HelpText<"Enable experimental support for variadic generic types">;
-
 def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
   HelpText<"Enable experimental associated type inference via type witness systems">;
-
-def enable_experimental_implicit_some :
-  Flag<["-"], "enable-experimental-implicit-some">,
-  HelpText<"Enable experimental implicit some">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
@@ -840,9 +841,6 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
            "ease diffing">;
 
-def emit_syntax : Flag<["-"], "emit-syntax">,
-  HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
-
 def cxx_interop_getters_setters_as_properties :
   Flag<["-"], "cxx-interop-getters-setters-as-properties">,
   HelpText<"Import getters and setters as computed properties in Swift">,
@@ -903,6 +901,15 @@ def module_interface_preserve_types_as_written :
   Flag<["-"], "module-interface-preserve-types-as-written">,
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
+
+def alias_module_names_in_module_interface :
+  Flag<["-"], "alias-module-names-in-module-interface">,
+  HelpText<"When emitting a module interface, disambiguate modules using "
+           "distinct alias names">;
+def disable_alias_module_names_in_module_interface :
+  Flag<["-"], "disable-alias-module-names-in-module-interface">,
+  HelpText<"When emitting a module interface, disable disambiguating modules "
+           "using distinct alias names">;
 
 def experimental_spi_imports :
   Flag<["-"], "experimental-spi-imports">,
@@ -1103,6 +1110,30 @@ def enable_stack_protector :
 def disable_stack_protector :
   Flag<["-"], "disable-stack-protector">,
   HelpText<"Disable the stack-protector">;
+def enable_move_inout_stack_protector :
+  Flag<["-"], "enable-move-inout-stack-protector">,
+  HelpText<"Enable the stack protector by moving values to temporaries">;
+
+def enable_import_ptrauth_field_function_pointers :
+  Flag<["-"], "enable-import-ptrauth-field-function-pointers">,
+  HelpText<"Enable import of custom ptrauth qualified field function pointers">;
+def disable_import_ptrauth_field_function_pointers :
+  Flag<["-"], "disable-import-ptrauth-field-function-pointers">,
+  HelpText<"Disable import of custom ptrauth qualified field function pointers">;
+
+def enable_collocate_metadata_functions :
+  Flag<["-"], "enable-collocate-metadata-functions">,
+  HelpText<"Enable collocate metadata functions">;
+def disable_collocate_metadata_functions :
+  Flag<["-"], "disable-collocate-metadata-functions">,
+  HelpText<"Disable collocate metadata functions">;
+
+def enable_relative_protocol_witness_tables :
+  Flag<["-"], "enable-relative-protocol-witness-tables">,
+  HelpText<"Enable relative protocol witness tables">;
+def disable_relative_protocol_witness_tables :
+  Flag<["-"], "disable-relative-protocol-witness-tables">,
+  HelpText<"Disable relative protocol witness tables">;
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,

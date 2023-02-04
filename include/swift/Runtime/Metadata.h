@@ -18,7 +18,7 @@
 #define SWIFT_RUNTIME_METADATA_H
 
 #include "swift/ABI/Metadata.h"
-#include "swift/Reflection/Records.h"
+#include "swift/RemoteInspection/Records.h"
 #include "swift/Runtime/Once.h"
 #include "swift/shims/Visibility.h"
 
@@ -313,7 +313,7 @@ swift_getGenericMetadata(MetadataRequest request,
 ///   - installing new v-table entries and overrides; and
 ///   - registering the class with the runtime under ObjC interop.
 /// Most of this work can be achieved by calling swift_initClassMetadata.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 ClassMetadata *
 swift_allocateGenericClassMetadata(const ClassDescriptor *description,
                                    const void *arguments,
@@ -322,7 +322,7 @@ swift_allocateGenericClassMetadata(const ClassDescriptor *description,
 /// Allocate a generic value metadata object.  This is intended to be
 /// called by the metadata instantiation function of a generic struct or
 /// enum.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 ValueMetadata *
 swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
                                    const void *arguments,
@@ -354,6 +354,12 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
                       const Metadata *type,
                       const void * const *instantiationArgs);
 
+SWIFT_RUNTIME_EXPORT
+const RelativeWitnessTable *
+swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *conformance,
+                      const Metadata *type,
+                      const void * const *instantiationArgs);
+
 /// Retrieve an associated type witness from the given witness table.
 ///
 /// \param wtable The witness table.
@@ -366,6 +372,13 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_getAssociatedTypeWitness(
                                           MetadataRequest request,
                                           WitnessTable *wtable,
+                                          const Metadata *conformingType,
+                                          const ProtocolRequirement *reqBase,
+                                          const ProtocolRequirement *assocType);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse swift_getAssociatedTypeWitnessRelative(
+                                          MetadataRequest request,
+                                          RelativeWitnessTable *wtable,
                                           const Metadata *conformingType,
                                           const ProtocolRequirement *reqBase,
                                           const ProtocolRequirement *assocType);
@@ -383,6 +396,14 @@ MetadataResponse swift_getAssociatedTypeWitness(
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 const WitnessTable *swift_getAssociatedConformanceWitness(
                                   WitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance);
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+const RelativeWitnessTable *swift_getAssociatedConformanceWitnessRelative(
+                                  RelativeWitnessTable *wtable,
                                   const Metadata *conformingType,
                                   const Metadata *assocType,
                                   const ProtocolRequirement *reqBase,

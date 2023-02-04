@@ -57,6 +57,7 @@ RequirementMachine::getLocalRequirements(
 
   GenericSignature::LocalRequirements result;
   result.anchor = Map.getTypeForTerm(term, genericParams);
+  result.packShape = getReducedShape(depType);
 
   auto *props = Map.lookUpProperties(term);
   if (!props)
@@ -789,13 +790,16 @@ void RequirementMachine::verify(const MutableTerm &term) const {
       erased.add(Symbol::forName(symbol.getName(), Context));
       break;
 
+    case Symbol::Kind::Shape:
+      erased.add(symbol);
+      break;
+
     case Symbol::Kind::Protocol:
     case Symbol::Kind::GenericParam:
     case Symbol::Kind::Layout:
     case Symbol::Kind::Superclass:
     case Symbol::Kind::ConcreteType:
     case Symbol::Kind::ConcreteConformance:
-    case Symbol::Kind::Shape:
       llvm::errs() << "Bad interior symbol " << symbol << " in " << term << "\n";
       abort();
       break;

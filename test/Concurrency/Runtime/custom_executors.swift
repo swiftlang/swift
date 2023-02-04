@@ -2,6 +2,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+// UNSUPPORTED: freestanding
 
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime

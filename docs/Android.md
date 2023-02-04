@@ -133,7 +133,7 @@ $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libBlo
 In addition, you'll also need to copy the Android NDK's libc++:
 
 ```
-$ adb push /path/to/android-ndk-r25b/sources/cxx-stl/llvm-libc++/libs/arm64-v8a/libc++_shared.so /data/local/tmp
+$ adb push /path/to/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so /data/local/tmp
 ```
 
 Finally, you'll need to copy the `hello` executable you built in the

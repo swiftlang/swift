@@ -20,6 +20,10 @@
 #include "IRGenModule.h"
 #include "NativeConventionSchema.h"
 
+// FIXME: This include should removed once getFunctionLoweredSignature() is
+//        updated to take a different approach.
+#include "../SILGen/SILGen.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
@@ -67,7 +71,7 @@ namespace swift {
 class IRABIDetailsProviderImpl {
 public:
   IRABIDetailsProviderImpl(ModuleDecl &mod, const IRGenOptions &opts)
-      : typeConverter(mod),
+      : typeConverter(mod, /*addressLowered=*/true),
         silMod(SILModule::createEmptyModule(&mod, typeConverter, silOpts)),
         IRGen(opts, *silMod), IGM(IRGen, IRGen.createTargetMachine()) {}
 
@@ -126,7 +130,10 @@ public:
 
   llvm::Optional<LoweredFunctionSignature>
   getFunctionLoweredSignature(AbstractFunctionDecl *fd) {
-    auto function = SILFunction::getFunction(SILDeclRef(fd), *silMod);
+    auto declRef = SILDeclRef(fd);
+    auto function = Lowering::SILGenModule(*silMod, declRef.getModuleContext())
+                        .getFunction(declRef, swift::NotForDefinition);
+
     IGM.lowerSILFunction(function);
     auto silFuncType = function->getLoweredFunctionType();
     // FIXME: Async function support.

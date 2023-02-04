@@ -27,7 +27,7 @@ class SILPassManager;
 /// A list of the known analysis.
 struct SILAnalysisKind {
   enum InnerTy {
-#define ANALYSIS(NAME) NAME,
+#define SIL_ANALYSIS(NAME) NAME,
 #include "Analysis.def"
   } value;
 
@@ -334,7 +334,7 @@ public:
   FunctionInfoTy *operator->() { return *this; }
 };
 
-#define ANALYSIS(NAME) SILAnalysis *create##NAME##Analysis(SILModule *);
+#define SIL_ANALYSIS(NAME) SILAnalysis *create##NAME##Analysis(SILModule *);
 #include "Analysis.def"
 
 } // end namespace swift

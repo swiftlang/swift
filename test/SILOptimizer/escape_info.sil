@@ -41,7 +41,14 @@ final class F {
   @_hasStorage var y: Y
 }
 
-struct TwoF {
+protocol P {
+}
+
+struct OneF : P {
+  @_hasStorage var a: F
+}
+
+struct TwoF : P {
   @_hasStorage var a: F
   @_hasStorage var b: F
 }
@@ -570,7 +577,7 @@ bb2:
 
 bb3:
   %13 = unchecked_take_enum_data_addr %3 : $*E, #E.B!enumelt
-  copy_addr [take] %13 to [initialization] %0 : $*Z
+  copy_addr [take] %13 to [init] %0 : $*Z
   dealloc_stack %3 : $*E
   %15 = tuple ()
   return %15 : $()
@@ -709,10 +716,10 @@ bb1:
   br bb3
 bb2:
   destroy_value %2 : $X
-  copy_addr %1 to [initialization] %4 : $*X
+  copy_addr %1 to [init] %4 : $*X
   br bb3
 bb3:
-  copy_addr %4 to [initialization] %0 : $*X
+  copy_addr %4 to [init] %0 : $*X
   destroy_addr %4 : $*X
   dealloc_stack %4 : $*X
 
@@ -730,7 +737,7 @@ bb0:
   %1 = alloc_ref $Y
   %2 = enum $Optional<Y>, #Optional.some!enumelt, %1 : $Y
   %3 = ref_element_addr %0 : $WZ, #WZ.w
-  store_weak %2 to [initialization] %3 : $*@sil_weak Optional<Y>
+  store_weak %2 to [init] %3 : $*@sil_weak Optional<Y>
   %5 = load_weak %3 : $*@sil_weak Optional<Y>
   return %5 : $Optional<Y>
 }
@@ -744,7 +751,7 @@ bb0:
   %0 = alloc_ref $WZ
   %1 = alloc_ref $Y
   %2 = ref_element_addr %0 : $WZ, #WZ.u
-  store_unowned %1 to [initialization] %2 : $*@sil_unowned Y
+  store_unowned %1 to [init] %2 : $*@sil_unowned Y
   %4 = load_unowned %2 : $*@sil_unowned Y
   return %4 : $Y
 }
@@ -1009,6 +1016,10 @@ sil [ossa] @closure4 : $@convention(thin) (@guaranteed X, @guaranteed Y) -> () {
 }
 sil [ossa] @closure5 : $@convention(thin) (@guaranteed Y, @guaranteed X) -> () {
 [%1: escape => %0, noescape]
+}
+
+sil [ossa] @closure6 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> @owned Y {
+[%1: escape c*.v** => %r.c*.v**]
 }
 
 // CHECK-LABEL: Escape information for callClosure1:
@@ -1319,3 +1330,50 @@ sil @test_debug_value : $@convention(thin) () -> () {
   %11 = tuple ()
   return %11 : $()
 }
+
+// CHECK-LABEL: Escape information for test_walk_up_partial_apply_argument:
+// CHECK: global:   %0 = alloc_ref $Y                               // users: %3, %2
+// CHECK: global:   %6 = alloc_ref $X                               // user: %7
+// CHECK: End function test_walk_up_partial_apply_argument
+sil @test_walk_up_partial_apply_argument : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %2 = function_ref @closure6 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> @owned Y
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> @owned Y
+  %8 = apply %3(%0) : $@callee_guaranteed (@guaranteed Y) -> @owned Y
+  %9 = ref_element_addr %8 : $Y, #Y.s
+  %10 = struct_element_addr %9 : $*Str, #Str.a
+
+  %11 = alloc_ref $X
+  store %11 to %10 : $*X
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// CHECK-LABEL: Escape information for test_mismatching_existential_types:
+// CHECK:  -    :   %1 = alloc_ref $Y
+// CHECK: End function test_mismatching_existential_types
+sil @test_mismatching_existential_types : $@convention(thin) (@guaranteed F) -> () {
+bb0(%0 : $F):
+  %1 = alloc_ref $Y
+
+  %2 = alloc_stack $any P
+
+  %3 = init_existential_addr %2 : $*any P, $OneF
+  %4 = struct $OneF (%0 : $F)
+  store %4 to %3 : $*OneF
+
+  // Strictly speaking it's illegal to re-initialize an existential with a different concrete type.
+  // But for this test this doesn't matter.
+  %6 = init_existential_addr %2 : $*any P, $TwoF
+  %7 = struct_element_addr %6 : $*TwoF, #TwoF.b
+  %8 = load %7 : $*F
+
+  %9 = ref_element_addr %8 : $F, #F.y
+  store %1 to %9 : $*Y
+
+  dealloc_stack %2 : $*any P
+  %r = tuple()
+  return %r : $()
+}
+

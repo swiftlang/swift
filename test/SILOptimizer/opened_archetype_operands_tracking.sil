@@ -106,7 +106,7 @@ bb0(%0 : $*Self):
   %2 = function_ref @ItemStorage_alloc_init : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @thick ItemStorage<τ_0_0>.Type) -> @owned ItemStorage<τ_0_0>
   %3 = metatype $@thick ItemStorage<Self>.Type
   %4 = alloc_stack $Self
-  copy_addr %0 to [initialization] %4 : $*Self
+  copy_addr %0 to [init] %4 : $*Self
   %6 = apply %2<Self>(%4, %3) : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @thick ItemStorage<τ_0_0>.Type) -> @owned ItemStorage<τ_0_0>
   dealloc_stack %4 : $*Self
   %8 = upcast %6 : $ItemStorage<Self> to $DynamicStorage
@@ -163,14 +163,14 @@ bb0(%0 : $*T, %1 : $@thick Foo<T>.Type):
 sil @Foo_init : $@convention(method) <T where T : P> (@in T, @owned Foo<T>) -> @owned Foo<T> {
 bb0(%0 : $*T, %1 : $Foo<T>):
   %4 = alloc_stack $T
-  copy_addr %0 to [initialization] %4 : $*T
+  copy_addr %0 to [init] %4 : $*T
   %6 = ref_element_addr %1 : $Foo<T>, #Foo.x
-  copy_addr [take] %4 to [initialization] %6 : $*T
+  copy_addr [take] %4 to [init] %6 : $*T
   dealloc_stack %4 : $*T
   %9 = alloc_stack $T
-  copy_addr %0 to [initialization] %9 : $*T
+  copy_addr %0 to [init] %9 : $*T
   %11 = ref_element_addr %1 : $Foo<T>, #Foo.y
-  copy_addr [take] %9 to [initialization] %11 : $*T
+  copy_addr [take] %9 to [init] %11 : $*T
   dealloc_stack %9 : $*T
   destroy_addr %0 : $*T
   return %1 : $Foo<T>
@@ -183,21 +183,21 @@ bb0(%0 : $*Self):
   %2 = function_ref @Foo_alloc_init : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @thick Foo<τ_0_0>.Type) -> @owned Foo<τ_0_0>
   %3 = metatype $@thick Foo<Self>.Type
   %4 = alloc_stack $Self 
-  copy_addr %0 to [initialization] %4 : $*Self
+  copy_addr %0 to [init] %4 : $*Self
   %6 = apply %2<Self>(%4, %3) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @thick Foo<τ_0_0>.Type) -> @owned Foo<τ_0_0>
   dealloc_stack %4 : $*Self 
   // function_ref use
   %9 = function_ref @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () 
   %10 = ref_element_addr %6 : $Foo<Self>, #Foo.x 
   %11 = alloc_stack $Self
-  copy_addr %10 to [initialization] %11 : $*Self
+  copy_addr %10 to [init] %11 : $*Self
   %13 = apply %9<Self>(%11) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %11 : $*Self
   // function_ref use
   %15 = function_ref @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () 
   %16 = ref_element_addr %6 : $Foo<Self>, #Foo.y
   %17 = alloc_stack $Self
-  copy_addr %16 to [initialization] %17 : $*Self
+  copy_addr %16 to [init] %17 : $*Self
   %19 = apply %15<Self>(%17) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %17 : $*Self
   strong_release %6 : $Foo<Self> 

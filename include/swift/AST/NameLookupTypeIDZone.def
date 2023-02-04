@@ -47,6 +47,9 @@ SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest,
 SWIFT_REQUEST(NameLookup, InheritedProtocolsRequest,
               ArrayRef<ProtocolDecl *>(ProtocolDecl *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(NameLookup, ProtocolRequirementsRequest,
+              ArrayRef<ValueDecl *>(ProtocolDecl *), SeparatelyCached,
+              NoLocationInfo)
 SWIFT_REQUEST(NameLookup, LookupConformanceInModuleRequest,
               ProtocolConformanceRef(LookupConformanceDescriptor),
               Uncached, NoLocationInfo)

@@ -70,7 +70,7 @@ public:
   }
 
   MetadataSize getMetadataSize() const {
-    assert(AddressPoint.hasValue() && !AddressPoint->isInvalid()
+    assert(AddressPoint.has_value() && !AddressPoint->isInvalid()
            && "did not find address point?!");
     assert(*AddressPoint < this->NextOffset
            && "address point is after end?!");
@@ -217,7 +217,7 @@ llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
                                       const GenericTypeRequirements &reqts,
                                             unsigned reqtIndex,
                                             llvm::Value *metadata) {
-  assert(reqts.getRequirements()[reqtIndex].Protocol == nullptr);
+  assert(reqts.getRequirements()[reqtIndex].isMetadata());
   return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
                                       IGF.IGM.TypeMetadataPtrTy);
 }
@@ -230,7 +230,7 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
                                           const GenericTypeRequirements &reqts,
                                                 unsigned reqtIndex,
                                                 llvm::Value *metadata) {
-  assert(reqts.getRequirements()[reqtIndex].Protocol != nullptr);
+  assert(reqts.getRequirements()[reqtIndex].isWitnessTable());
   return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
                                       IGF.IGM.WitnessTablePtrTy);
 }
@@ -317,20 +317,12 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       super::noteStartOfGenericRequirements(forClass);
     }
 
-    void addGenericWitnessTable(GenericRequirement requirement,
-                                ClassDecl *forClass) {
+    void addGenericRequirement(GenericRequirement requirement,
+                               ClassDecl *forClass) {
       if (forClass == Target) {
         ++Layout.NumImmediateMembers;
       }
-      super::addGenericWitnessTable(requirement, forClass);
-    }
-
-    void addGenericArgument(GenericRequirement requirement,
-                            ClassDecl *forClass) {
-      if (forClass == Target) {
-        ++Layout.NumImmediateMembers;
-      }
-      super::addGenericArgument(requirement, forClass);
+      super::addGenericRequirement(requirement, forClass);
     }
 
     void addReifiedVTableEntry(SILDeclRef fn) {
@@ -366,7 +358,8 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     }
 
     void addFieldOffset(VarDecl *field) {
-      assert(IsInTargetFields == (field->getDeclContext() == Target));
+      assert(IsInTargetFields ==
+              (field->getDeclContext()->getImplementedObjCContext() == Target));
       if (IsInTargetFields) {
         ++Layout.NumImmediateMembers;
         Layout.FieldOffsets.try_emplace(field, getNextOffset());
@@ -382,7 +375,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      if (placeholder->getDeclContext() == Target) {
+      if (placeholder->getDeclContext()->getImplementedObjCContext() == Target) {
         Layout.NumImmediateMembers +=
           placeholder->getNumberOfFieldOffsetVectorEntries();
       }

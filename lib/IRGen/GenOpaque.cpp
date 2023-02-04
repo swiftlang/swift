@@ -308,8 +308,19 @@ llvm::PointerType *IRGenModule::getEnumValueWitnessTablePtrTy() {
 
 Address irgen::slotForLoadOfOpaqueWitness(IRGenFunction &IGF,
                                           llvm::Value *table,
-                                          WitnessIndex index) {
+                                          WitnessIndex index,
+                                          bool areEntriesRelative) {
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
+
+  // Are we loading from a relative protocol witness table.
+  if (areEntriesRelative) {
+    llvm::Value *slot =
+      IGF.Builder.CreateBitOrPointerCast(table, IGF.IGM.RelativeAddressPtrTy);
+    if (index.getValue() != 0)
+      slot = IGF.Builder.CreateConstInBoundsGEP1_32(IGF.IGM.RelativeAddressTy,
+                                                    slot, index.getValue());
+    return Address(slot, IGF.IGM.RelativeAddressTy, Alignment(4));
+  }
 
   // GEP to the appropriate index, avoiding spurious IR in the trivial case.
   llvm::Value *slot = table;
@@ -323,21 +334,34 @@ Address irgen::slotForLoadOfOpaqueWitness(IRGenFunction &IGF,
 /// Load a specific witness from a known table.  The result is
 /// always an i8*.
 llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                     bool isProtocolWitness,
                                                      llvm::Value *table,
                                                      WitnessIndex index,
                                                      llvm::Value **slotPtr) {
-  auto slot = slotForLoadOfOpaqueWitness(IGF, table, index);
+  // Is this is a load of a relative protocol witness table entry.
+  auto isRelativeTable = IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables &&
+    isProtocolWitness;
+
+  auto slot = slotForLoadOfOpaqueWitness(IGF, table, index, isRelativeTable);
   if (slotPtr) *slotPtr = slot.getAddress();
+
+  if (isRelativeTable) {
+    return IGF.emitLoadOfRelativePointer(slot, false, IGF.IGM.Int8Ty);
+  }
+
   return IGF.emitInvariantLoad(slot);
 }
 
 /// Load a specific witness from a known table.  The result is
 /// always an i8*.
 llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                     bool isProtocolWitness,
                                                      llvm::Value *table,
                                                      llvm::Value *index,
                                                      llvm::Value **slotPtr) {
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
+  assert(!isProtocolWitness &&
+         "This function does not yet support relative protocol witnesses");
 
   // GEP to the appropriate index.
   llvm::Value *slot =
@@ -423,7 +447,8 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
 
   llvm::Value *slot;
   llvm::Value *witness =
-    emitInvariantLoadOfOpaqueWitness(IGF, table, windex, &slot);
+    emitInvariantLoadOfOpaqueWitness(IGF, /*isProtocolWitness*/false, table,
+                                     windex, &slot);
   auto label = getValueWitnessLabel(index);
   auto signature = IGF.IGM.getValueWitnessSignature(index);
 

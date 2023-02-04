@@ -30,6 +30,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
@@ -90,14 +91,78 @@ static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
 NullablePtr<ASTScopeImpl>
 ASTScopeImpl::findChildContaining(SourceLoc loc,
                                   SourceManager &sourceMgr) const {
+  auto *moduleDecl = this->getSourceFile()->getParentModule();
+  auto *locSourceFile = moduleDecl->getSourceFileContainingLocation(loc);
+
   // Use binary search to find the child that contains this location.
   auto *const *child = llvm::lower_bound(
       getChildren(), loc,
-      [&sourceMgr](const ASTScopeImpl *scope, SourceLoc loc) {
+      [&](const ASTScopeImpl *scope, SourceLoc loc) {
         auto rangeOfScope = scope->getCharSourceRangeOfScope(sourceMgr);
         ASTScopeAssert(!sourceMgr.isBeforeInBuffer(rangeOfScope.getEnd(),
                                                    rangeOfScope.getStart()),
                        "Source range is backwards");
+
+        // If the scope source range and the loc are in two different source
+        // files, one or both of them are in a macro expansion buffer.
+
+        // Note that `scope->getSourceFile()` returns the root of the source tree,
+        // not the source file containing the location of the ASTScope.
+        auto scopeStart = scope->getSourceRangeOfThisASTNode().Start;
+        auto *scopeSourceFile = moduleDecl->getSourceFileContainingLocation(scopeStart);
+
+        if (scopeSourceFile != locSourceFile) {
+          // To compare a source location that is possibly inside a macro expansion
+          // with a source range that is also possibly in a macro expansion (not
+          // necessarily the same one as before) we need to find the LCA in the
+          // source file tree of macro expansions, and compare the original source
+          // ranges within that common ancestor. We can't walk all the way up to the
+          // source file containing the parent scope we're searching the children of,
+          // because two independent (possibly nested) macro expansions can have the
+          // same original source range in that file; freestanding and peer macros
+          // mean that we can have arbitrarily nested macro expansions that all add
+          // declarations to the same scope, that all originate from a single macro
+          // invocation in the original source file.
+
+          // A map from enclosing source files to original source ranges of the macro
+          // expansions within that file, recording the chain of macro expansions for
+          // the given scope.
+          llvm::SmallDenseMap<const SourceFile *, SourceRange> scopeExpansions;
+
+          // Walk up the chain of macro expansion buffers for the scope, recording the
+          // original source range of the macro expansion along the way using generated
+          // source info.
+          auto *scopeExpansion = scopeSourceFile;
+          scopeExpansions[scopeExpansion] = scope->getSourceRangeOfThisASTNode();
+          while (auto *ancestor = scopeExpansion->getEnclosingSourceFile()) {
+            auto generatedInfo =
+                sourceMgr.getGeneratedSourceInfo(*scopeExpansion->getBufferID());
+            scopeExpansions[ancestor] = generatedInfo->originalSourceRange;
+            scopeExpansion = ancestor;
+          }
+
+          // Walk up the chain of macro expansion buffers for the source loc we're
+          // searching for to find the LCA using `scopeExpansions`.
+          auto *potentialLCA = locSourceFile;
+          auto expansionLoc = loc;
+          while (potentialLCA) {
+            auto scopeExpansion = scopeExpansions.find(potentialLCA);
+            if (scopeExpansion != scopeExpansions.end()) {
+              // Take the original expansion range within the LCA of the loc and
+              // the scope to compare.
+              rangeOfScope =
+                  Lexer::getCharSourceRangeFromSourceRange(sourceMgr, scopeExpansion->second);
+              loc = expansionLoc;
+              break;
+            }
+
+            auto generatedInfo =
+                sourceMgr.getGeneratedSourceInfo(*potentialLCA->getBufferID());
+            expansionLoc = generatedInfo->originalSourceRange.Start;
+            potentialLCA = potentialLCA->getEnclosingSourceFile();
+          }
+        }
+
         loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
         return (rangeOfScope.getEnd() == loc ||
                 sourceMgr.isBeforeInBuffer(rangeOfScope.getEnd(), loc));
@@ -188,6 +253,9 @@ NullablePtr<const GenericParamList> GenericTypeScope::genericParams() const {
 }
 NullablePtr<const GenericParamList> ExtensionScope::genericParams() const {
   return decl->getGenericParams();
+}
+NullablePtr<const GenericParamList> MacroDeclScope::genericParams() const {
+  return decl->getParsedGenericParams();
 }
 
 #pragma mark lookInMyGenericParameters
@@ -529,6 +597,12 @@ bool CaseStmtBodyScope::isLabeledStmtLookupTerminator() const {
 }
 
 bool PatternEntryDeclScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool PatternEntryInitializerScope::isLabeledStmtLookupTerminator() const {
+  // This is needed for SingleValueStmtExprs, which may be used in bindings,
+  // and have nested statements.
   return false;
 }
 

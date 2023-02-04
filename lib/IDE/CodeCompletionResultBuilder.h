@@ -179,6 +179,11 @@ public:
     case AccessLevel::Internal:
       // 'internal' is the default, don't add it.
       break;
+    case AccessLevel::Package:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "package ");
+      break;
     case AccessLevel::Public:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
@@ -371,7 +376,7 @@ public:
     if (escapeAllKeywords) {
 #define KEYWORD(kw) .Case(#kw, true)
       shouldEscape = llvm::StringSwitch<bool>(Word)
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
         .Default(false);
     } else {
       shouldEscape = !canBeArgumentLabel(Word);

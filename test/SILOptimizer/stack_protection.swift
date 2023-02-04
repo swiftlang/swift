@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -module-name=test -emit-sil %s -O -enable-stack-protector | %FileCheck %s
+// RUN: %target-swift-frontend -module-name=test -emit-sil %s -O | %FileCheck %s --check-prefix=CHECK --check-prefix=DEFAULT
+// RUN: %target-swift-frontend -module-name=test -enable-move-inout-stack-protector -emit-sil %s -O -enable-stack-protector | %FileCheck %s --check-prefix=CHECK --check-prefix=MOVE
 
 // REQUIRES: swift_in_compiler
 
@@ -71,10 +72,12 @@ public func callOverflowInoutPointer() {
   inoutWithKnownCaller(&x)
 }
 
-// CHECK-LABEL: sil [stack_protection] @$s4test22inoutWithUnknownCalleryySizF
-// CHECK:         copy_addr [take] {{.*}} to [initialization]
-// CHECK:         copy_addr [take] {{.*}} to [initialization]
-// CHECK:       } // end sil function '$s4test22inoutWithUnknownCalleryySizF'
+// DEFAULT-LABEL: sil @$s4test22inoutWithUnknownCalleryySizF
+// MOVE-LABEL:    sil [stack_protection] @$s4test22inoutWithUnknownCalleryySizF
+// MOVE:            copy_addr [take] {{.*}} to [init]
+// MOVE:            copy_addr [take] {{.*}} to [init]
+// DEFAULT-NOT:     copy_addr
+// CHECK:         } // end sil function '$s4test22inoutWithUnknownCalleryySizF'
 public func inoutWithUnknownCaller(_ x: inout Int) {
   withUnsafeMutablePointer(to: &x) {
     $0[1] = 0

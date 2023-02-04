@@ -26,6 +26,7 @@ namespace swift {
 
 class AbstractClosureExpr;
 class ConformancePath;
+class MacroExpansionExpr;
 class RootProtocolConformance;
 
 namespace Mangle {
@@ -158,6 +159,7 @@ public:
     BackDeploymentThunk,
     BackDeploymentFallback,
     HasSymbolQuery,
+    RuntimeDiscoverableAttributeRecord,
   };
 
   /// lldb overrides the defaulted argument to 'true'.
@@ -341,6 +343,7 @@ public:
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
+  void appendAnyDecl(const ValueDecl *Decl);
   std::string mangleAnyDecl(const ValueDecl *Decl, bool prefix,
                             bool respectOriginallyDefinedIn = false);
   std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
@@ -359,6 +362,19 @@ public:
   std::string mangleGenericSignature(const GenericSignature sig);
 
   std::string mangleHasSymbolQuery(const ValueDecl *decl);
+
+  std::string
+  mangleRuntimeAttributeGeneratorEntity(const ValueDecl *decl, CustomAttr *attr,
+                                        SymbolKind SKind = SymbolKind::Default);
+
+  std::string mangleMacroExpansion(const MacroExpansionExpr *expansion);
+  std::string mangleMacroExpansion(const MacroExpansionDecl *expansion);
+  std::string mangleAttachedMacroExpansion(
+      const Decl *decl, CustomAttr *attr, MacroRole role);
+
+  void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC);
+  void appendMacroExpansionOperator(
+      StringRef macroName, MacroRole role, unsigned discriminator);
 
   enum SpecialContext {
     ObjCContext,
@@ -584,6 +600,9 @@ protected:
 
   void appendConstrainedExistential(Type base, GenericSignature sig,
                                     const ValueDecl *forDecl);
+
+  void appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
+                                             CustomAttr *attr);
 };
 
 } // end namespace Mangle

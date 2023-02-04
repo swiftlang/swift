@@ -96,16 +96,15 @@ public func forbidMacrosInInlinableCode1() {
   }
 }
 
-@available(_iOS13Aligned, *)
-@_backDeploy(before: _iOS14Aligned)
+@backDeployed(before: _iOS14Aligned)
 public func forbidMacrosInInlinableCode2() {
-  if #available(_iOS14Aligned, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
-  if #available(_iOS14, _macOS11_0, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+  if #available(_iOS14Aligned, *) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
+  if #available(_iOS14, _macOS11_0, *) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
   if #available(iOS 14.0, _macOS11_0, tvOS 14.0, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
-  if #unavailable(_iOS14Aligned) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
-  if #unavailable(_iOS14, _macOS11_0) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
-  if #unavailable(iOS 14.0, _macOS11_0, tvOS 14.0) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+  if #unavailable(_iOS14Aligned) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
+  if #unavailable(_iOS14, _macOS11_0) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
+  if #unavailable(iOS 14.0, _macOS11_0, tvOS 14.0) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
   doIt {
-    if #available(_iOS14Aligned, *) { } // expected-error {{availability macro cannot be used in a '@_backDeploy' function}}
+    if #available(_iOS14Aligned, *) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
   }
 }

@@ -17,6 +17,7 @@ The ultimate tool for building Swift.
 import json
 import os
 import platform
+import re
 import sys
 import time
 
@@ -44,24 +45,6 @@ from swift_build_support.swift_build_support.utils import log_analyzer
 
 
 # -----------------------------------------------------------------------------
-# Constants
-
-# These versions are community sourced. At any given time only the Xcode
-# version used by Swift CI is officially supported. See ci.swift.org
-_SUPPORTED_XCODE_BUILDS = [
-    ("13.0 beta 4", "13A5201i"),
-    ("13.0", "13A233"),
-    ("13.1 RC 1", "13A1030d"),
-    ("13.2 beta", "13C5066c"),
-    ("13.2.1", "13C100"),
-    ("13.3", "13E113"),
-    ("13.3.1", "13E500a"),
-    ("13.4", "13F17a"),
-    ("13.4.1", "13F100"),
-    ("14.0.0", "14A309"),
-]
-
-# -----------------------------------------------------------------------------
 # Helpers
 
 
@@ -71,6 +54,18 @@ def print_note(message, stream=sys.stdout):
     """
 
     stream.write('[{}] NOTE: {}\n'.format(sys.argv[0], message))
+    stream.flush()
+
+
+def print_warning(message, stream=sys.stdout):
+    """Writes a warning to the given stream. By default this function outputs
+    to stdout.
+    """
+
+    warning = "[{}] WARNING: {}\n".format(sys.argv[0], message)
+    magenta_warning = "\033[35m" + warning + "\033[0m"
+
+    stream.write(magenta_warning)
     stream.flush()
 
 
@@ -148,19 +143,24 @@ def validate_xcode_compatibility():
         print("note: skipping Xcode version check")
         return
 
-    version = shell.capture(
+    output = shell.capture(
         ['xcodebuild', '-version'], dry_run=False, echo=False).strip()
+    # Capture only version ex: '14.x' from full output
+    match = re.match(r"Xcode (\d+\.\d+(?:\.\d)?)", output)
+    if not match:
+        print(f"warning: unexpected xcodebuild output format: '{output}', "
+              "skipping Xcode compatibility check, please report this issue",
+              file=sys.stderr)
+        return
 
-    valid_build_numbers = tuple(x[1] for x in _SUPPORTED_XCODE_BUILDS)
-    if not version.endswith(valid_build_numbers):
-        valid_versions_string = "\n".join(
-            "{} ({})".format(*x) for x in _SUPPORTED_XCODE_BUILDS)
+    version_match = match.group(1)
+    current_version = tuple(int(v) for v in version_match.replace('.', ' ').split())
+    minimum_version = (13, 0)
+    if current_version < minimum_version:
         raise SystemExit(
-            "error: using unsupported Xcode version:\n\n{}\n\n"
-            "Install one of:\n{}\n\n"
-            "Or set 'SKIP_XCODE_VERSION_CHECK=1' in the environment".format(
-                version, valid_versions_string
-            )
+            f"error: using unsupported Xcode version '{version_match}'. "
+            f"Install Xcode {'.'.join(str(x) for x in minimum_version)} or newer, "
+            "or set 'SKIP_XCODE_VERSION_CHECK=1' in the environment"
         )
 
 
@@ -417,7 +417,6 @@ def apply_default_arguments(toolchain, args):
         args.extra_cmake_options.append(
             '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
                 args.swift_darwin_module_archs))
-
     if (args.infer_cross_compile_hosts_on_darwin and
             platform.system() == "Darwin"):
         args.cross_compile_hosts = _infer_cross_compile_hosts_on_darwin(
@@ -757,6 +756,17 @@ def main_normal():
         with shell.pushd(args.install_symroot):
             tar(source=prefix.lstrip('/'),
                 destination=args.symbols_package)
+
+    if args.cmake_generator == "Xcode":
+        print_warning(
+            "The Xcode projects generated with '--xcode' can be used for "
+            "navigation or editing purposes, but are not a recommended means "
+            "to building, running or debugging. For a full-fledged Xcode "
+            "workflow using these generated projects, see "
+            "https://github.com/apple/swift/blob/main/docs/HowToGuides/"
+            "GettingStarted.md#using-ninja-with-xcode"
+        )
+        print()
 
     return 0
 

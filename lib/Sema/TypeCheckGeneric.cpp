@@ -178,7 +178,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                 // Unbound generics and placeholders are
                                 // meaningless in opaque types.
                                 /*unboundTyOpener*/ nullptr,
-                                /*placeholderHandler*/ nullptr)
+                                /*placeholderHandler*/ nullptr,
+                                /*packElementOpener*/ nullptr)
                                 .resolveType(constraint);
 
       if (constraintType->hasError())
@@ -225,7 +226,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   auto interfaceType =
       TypeResolution::forInterface(opaqueDecl, TypeResolverContext::None,
                                    /*unboundTyOpener*/ nullptr,
-                                   /*placeholderHandler*/ nullptr)
+                                   /*placeholderHandler*/ nullptr,
+                                   /*packElementOpener*/ nullptr)
           .resolveType(repr);
 
   // Opaque types cannot be used in parameter position.
@@ -488,7 +490,7 @@ static void collectAdditionalExtensionRequirements(
     type = type->getCanonicalType();
 
   // A parameterized protocol type is not a nominal. Unwrap it to get
-  // the underlying nominal, and record a same-type requirement for
+  // the underlying nominal, and record same-type requirements for
   // the primary associated types.
   if (auto *paramProtoTy = type->getAs<ParameterizedProtocolType>()) {
     auto *protoTy = paramProtoTy->getBaseType();
@@ -530,8 +532,7 @@ static void collectAdditionalExtensionRequirements(
 
   // If we have a passthrough typealias, add the requirements from its
   // generic signature.
-  if (typealias && TypeChecker::isPassThroughTypealias(
-                       typealias, typealias->getUnderlyingType(), nominal)) {
+  if (typealias && TypeChecker::isPassThroughTypealias(typealias, nominal)) {
     for (auto req : typealias->getGenericSignature().getRequirements())
       sameTypeReqs.push_back(req);
   }
@@ -570,24 +571,24 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     return sig;
   }
 
+  if (auto accessor = dyn_cast<AccessorDecl>(GC))
+    if (auto subscript = dyn_cast<SubscriptDecl>(accessor->getStorage()))
+       return subscript->getGenericSignature();
+
   bool allowConcreteGenericParams = false;
   auto *genericParams = GC->getGenericParams();
   const auto *where = GC->getTrailingWhereClause();
+
+  if (!genericParams && !where) {
+    // We can fast-path computing the generic signature of non-generic
+    // declarations by re-using the parent context's signature.
+    return GC->getParentForLookup()->getGenericSignatureOfContext();
+  }
 
   if (genericParams) {
     // Setup the depth of the generic parameters.
     const_cast<GenericParamList *>(genericParams)
         ->setDepth(GC->getGenericContextDepth());
-
-    // Accessors can always use the generic context of their storage
-    // declarations. This is a compile-time optimization since it lets us
-    // avoid the requirements-gathering phase, but it also simplifies that
-    // work for accessors which don't mention the value type in their formal
-    // signatures (like the read and modify coroutines, since yield types
-    // aren't tracked in the AST type yet).
-    if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl())) {
-      return cast<SubscriptDecl>(accessor->getStorage())->getGenericSignature();
-    }
   }
 
   // ...or we may only have a contextual where clause.
@@ -606,28 +607,21 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   if (!genericParams && where)
     allowConcreteGenericParams = true;
 
-  if (!genericParams && !where) {
-    // We can fast-path computing the generic signature of non-generic
-    // declarations by re-using the parent context's signature.
-    if (auto accessor = dyn_cast<AccessorDecl>(GC->getAsDecl()))
-      if (auto subscript = dyn_cast<SubscriptDecl>(accessor->getStorage()))
-         return subscript->getGenericSignature();
-
-    return GC->getParentForLookup()->getGenericSignatureOfContext();
-  }
-
   GenericSignature parentSig;
   SmallVector<TypeLoc, 2> inferenceSources;
   SmallVector<Requirement, 2> sameTypeReqs;
-  if (auto VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
+  if (auto VD = dyn_cast<ValueDecl>(GC->getAsDecl())) {
     parentSig = GC->getParentForLookup()->getGenericSignatureOfContext();
 
     auto func = dyn_cast<AbstractFunctionDecl>(VD);
     auto subscr = dyn_cast<SubscriptDecl>(VD);
+    auto macro = dyn_cast<MacroDecl>(VD);
+    assert(func || subscr || macro || isa<NominalTypeDecl>(VD) ||
+           isa<TypeAliasDecl>(VD));
 
     // For functions and subscripts, resolve the parameter and result types and
-    // note them as inference sources.
-    if (subscr || func) {
+    // note them as requirement inference sources.
+    if (subscr || func || (macro && macro->parameterList)) {
       const auto baseOptions =
           TypeResolutionOptions(func ? TypeResolverContext::AbstractFunctionDecl
                                      : TypeResolverContext::SubscriptDecl);
@@ -635,8 +629,11 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       const auto resolution =
           TypeResolution::forStructural(GC, baseOptions,
                                         /*unboundTyOpener*/ nullptr,
-                                        /*placeholderHandler*/ nullptr);
-      auto params = func ? func->getParameters() : subscr->getIndices();
+                                        /*placeholderHandler*/ nullptr,
+                                        /*packElementOpener*/ nullptr);
+      auto params = func ? func->getParameters()
+                      : subscr ? subscr->getIndices()
+                      : macro->parameterList;
       for (auto param : *params) {
         auto *typeRepr = param->getTypeRepr();
         if (typeRepr == nullptr)
@@ -647,9 +644,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
           typeRepr = specifier->getBase();
 
-        if (auto *packExpansion = dyn_cast<PackExpansionTypeRepr>(typeRepr)) {
-          typeRepr = packExpansion->getPatternType();
-
+        if (auto *packExpansion = dyn_cast<VarargTypeRepr>(typeRepr)) {
           paramOptions.setContext(TypeResolverContext::VariadicFunctionInput);
         } else {
           paramOptions.setContext(TypeResolverContext::FunctionInput);
@@ -664,9 +659,11 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       }
 
       // Gather requirements from the result type.
-      auto *resultTypeRepr = [&subscr, &func]() -> TypeRepr * {
+      auto *resultTypeRepr = [&subscr, &func, &macro]() -> TypeRepr * {
         if (subscr) {
           return subscr->getElementTypeRepr();
+        } else if (macro) {
+          return macro->resultType.getTypeRepr();
         } else if (auto *FD = dyn_cast<FuncDecl>(func)) {
           return FD->getResultTypeRepr();
         } else {
@@ -686,14 +683,16 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     genericParams = nullptr;
 
     collectAdditionalExtensionRequirements(ext->getExtendedType(), sameTypeReqs);
-    
-   // Re-use the signature of the type being extended by default.
+
+    // Re-use the signature of the type being extended by default.
     if (sameTypeReqs.empty() && !ext->getTrailingWhereClause()) {
       return parentSig;
     }
 
-    // Allow parameters to be equated with concrete types.
+    // Extensions allow parameters to be equated with concrete types.
     allowConcreteGenericParams = true;
+  } else {
+    llvm_unreachable("Unknown generic declaration kind");
   }
 
   auto request = InferredGenericSignatureRequest{
@@ -970,6 +969,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
     context = TypeResolverContext::GenericRequirement;
   }
   auto options = TypeResolutionOptions(context);
+  options |= TypeResolutionFlags::AllowPackReferences;
   if (owner.dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
   Optional<TypeResolution> resolution;
@@ -977,13 +977,15 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   case TypeResolutionStage::Structural:
     resolution = TypeResolution::forStructural(owner.dc, options,
                                                /*unboundTyOpener*/ nullptr,
-                                               /*placeholderHandler*/ nullptr);
+                                               /*placeholderHandler*/ nullptr,
+                                               /*packElementOpener*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
     resolution = TypeResolution::forInterface(owner.dc, options,
                                               /*unboundTyOpener*/ nullptr,
-                                              /*placeholderHandler*/ nullptr);
+                                              /*placeholderHandler*/ nullptr,
+                                              /*packElementOpener*/ nullptr);
     break;
   }
 
@@ -1028,7 +1030,8 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
   const auto type =
       TypeResolution::forStructural(typeAlias, options,
                                     /*unboundTyOpener*/ nullptr,
-                                    /*placeholderHandler*/ nullptr)
+                                    /*placeholderHandler*/ nullptr,
+                                    /*packElementOpener*/ nullptr)
           .resolveType(underlyingTypeRepr);
 
   auto genericSig = typeAlias->getGenericSignature();

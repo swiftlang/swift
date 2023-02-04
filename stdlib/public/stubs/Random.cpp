@@ -19,6 +19,7 @@
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <Windows.h>
 #include <Bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
@@ -65,16 +66,18 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 
 SWIFT_RUNTIME_STDLIB_API
 void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
-  if (nbytes > ULONG_MAX) {
-    fatalError(0, "Fatal error: %zd exceeds ULONG_MAX\n", nbytes);
-  }
+  while (nbytes > 0) {
+    auto actual_nbytes = std::min(nbytes, (__swift_size_t)ULONG_MAX);
+    NTSTATUS status = BCryptGenRandom(nullptr,
+                                      static_cast<PUCHAR>(buf),
+                                      static_cast<ULONG>(actual_nbytes),
+                                      BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+    if (!BCRYPT_SUCCESS(status)) {
+      fatalError(0, "Fatal error: 0x%lX in '%s'\n", status, __func__);
+    }
 
-  NTSTATUS status = BCryptGenRandom(nullptr,
-                                    static_cast<PUCHAR>(buf),
-                                    static_cast<ULONG>(nbytes),
-                                    BCRYPT_USE_SYSTEM_PREFERRED_RNG);
-  if (!BCRYPT_SUCCESS(status)) {
-    fatalError(0, "Fatal error: 0x%lX in '%s'\n", status, __func__);
+    buf = static_cast<uint8_t *>(buf) + actual_nbytes;
+    nbytes -= actual_nbytes;
   }
 }
 

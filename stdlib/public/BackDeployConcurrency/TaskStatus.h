@@ -170,8 +170,7 @@ public:
   TaskGroupTaskStatusRecord()
       : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
         FirstChild(nullptr),
-        LastChild(nullptr) {
-  }
+        LastChild(nullptr) {}
 
   TaskGroupTaskStatusRecord(AsyncTask *child)
       : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
@@ -180,7 +179,9 @@ public:
     assert(!LastChild || !LastChild->childFragment()->getNextChild());
   }
 
-  TaskGroup *getGroup() { return reinterpret_cast<TaskGroup *>(this); }
+  TaskGroup *getGroup() {
+    return reinterpret_cast<TaskGroup *>(this);
+  }
 
   /// Return the first child linked by this record.  This may be null;
   /// if not, it (and all of its successors) are guaranteed to satisfy

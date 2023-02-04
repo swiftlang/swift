@@ -1,0 +1,75 @@
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -enable-experimental-feature VariadicGenerics | %IRGenFileCheck %s
+
+// Because of -enable-experimental-feature VariadicGenerics
+// REQUIRES: asserts
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: define{{.*}} @test_dynamic_1(
+// CHECK:         ret [[INT]] 4
+sil @test_dynamic_1 : $<T...> () -> Builtin.PackIndex {
+bb0:
+  %intIndex = integer_literal $Builtin.Word, 4
+  %index = dynamic_pack_index %intIndex of $Pack{repeat each T}
+  return %index : $Builtin.PackIndex
+}
+
+// CHECK-LABEL: define{{.*}} @test_scalar_1(
+// CHECK:         ret [[INT]] 0
+sil @test_scalar_1 : $<T...> () -> Builtin.PackIndex {
+bb0:
+  %index = scalar_pack_index 0 of $Pack{Int, repeat each T}
+  return %index : $Builtin.PackIndex
+}
+
+// CHECK-LABEL: define{{.*}} @test_scalar_2(
+// CHECK:         [[INDEX:%.*]] = add [[INT]] %0, 1
+// CHECK:         ret [[INT]] [[INDEX]]
+sil @test_scalar_2 : $<T...> () -> Builtin.PackIndex {
+bb0:
+  %index = scalar_pack_index 2 of $Pack{Int, repeat each T, Int}
+  return %index : $Builtin.PackIndex
+}
+
+// CHECK-LABEL: define{{.*}} @test_scalar_3(
+// CHECK:         [[T0:%.*]] = add [[INT]] %0, %0
+// CHECK:         [[INDEX:%.*]] = add [[INT]] [[T0]], 2
+// CHECK:         ret [[INT]] [[INDEX]]
+sil @test_scalar_3 : $<T...> () -> Builtin.PackIndex {
+bb0:
+  %index = scalar_pack_index 4 of $Pack{Int, repeat each T, Int, repeat each T, Int}
+  return %index : $Builtin.PackIndex
+}
+
+// CHECK-LABEL: define{{.*}} @test_pack_1(
+// CHECK:         ret [[INT]] 7
+sil @test_pack_1 : $<T...> () -> Builtin.PackIndex {
+bb0:
+  %intIndex = integer_literal $Builtin.Word, 7
+  %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T}
+  %index = pack_pack_index 0, %innerIndex of $Pack{repeat each T, Int}
+  return %index : $Builtin.PackIndex
+}
+
+// CHECK-LABEL: define{{.*}} @test_pack_2(
+// CHECK:         ret [[INT]] 8
+sil @test_pack_2 : $<T...> () -> Builtin.PackIndex {
+bb0:
+  %intIndex = integer_literal $Builtin.Word, 7
+  %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T}
+  %index = pack_pack_index 1, %innerIndex of $Pack{Int, repeat each T}
+  return %index : $Builtin.PackIndex
+}
+
+// CHECK-LABEL: define{{.*}} @test_pack_3(
+// CHECK:         [[T0:%.*]] = add [[INT]] %0, 1
+// CHECK:         [[INDEX:%.*]] = add [[INT]] [[T0]], 7
+// CHECK:         ret [[INT]] [[INDEX]]
+sil @test_pack_3 : $<T...> () -> Builtin.PackIndex {
+bb0:
+  %intIndex = integer_literal $Builtin.Word, 7
+  %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T}
+  %index = pack_pack_index 2, %innerIndex of $Pack{repeat each T, Int, repeat each T}
+  return %index : $Builtin.PackIndex
+}

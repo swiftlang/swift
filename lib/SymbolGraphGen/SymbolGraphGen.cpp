@@ -27,13 +27,13 @@ int serializeSymbolGraph(SymbolGraph &SG,
                          const SymbolGraphOptions &Options) {
   SmallString<256> FileName;
   FileName.append(SG.M.getNameStr());
-  if (SG.ExtendedModule.hasValue()) {
+  if (SG.ExtendedModule.has_value()) {
     FileName.push_back('@');
-    FileName.append(SG.ExtendedModule.getValue()->getNameStr());
-  } else if (SG.DeclaringModule.hasValue()) {
+    FileName.append(SG.ExtendedModule.value()->getNameStr());
+  } else if (SG.DeclaringModule.has_value()) {
     // Treat cross-import overlay modules as "extensions" of their declaring module
     FileName.push_back('@');
-    FileName.append(SG.DeclaringModule.getValue()->getNameStr());
+    FileName.append(SG.DeclaringModule.value()->getNameStr());
   }
   FileName.append(".symbols.json");
 
@@ -61,7 +61,7 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
   llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
   auto shouldIncludeImport = [&](AttributedImport<ImportedModule> import) {
-    auto docVisibility = import.docVisibility.getValueOr(AccessLevel::Public);
+    auto docVisibility = import.docVisibility.value_or(AccessLevel::Public);
     return docVisibility >= Options.MinimumAccessLevel;
   };
   swift::collectParsedExportedImports(M, ExportedImportedModules, QualifiedImports, shouldIncludeImport);

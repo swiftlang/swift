@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import BasicBridging
-import std
+import CxxStdlib
 
 /// The assert function to be used in the compiler.
 ///

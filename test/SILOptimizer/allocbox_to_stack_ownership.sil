@@ -188,7 +188,7 @@ bb0(%0 : $*LogicValue, %1 : $@thin Bool.Type):
   %2 = alloc_box ${ var LogicValue }
   %2a = project_box %2 : ${ var LogicValue }, 0
 // CHECK:  %2 = alloc_stack $any LogicValue
-  copy_addr [take] %0 to [initialization] %2a : $*LogicValue
+  copy_addr [take] %0 to [init] %2a : $*LogicValue
   %6 = open_existential_addr mutable_access %2a : $*LogicValue to $*@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self
   %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self, #LogicValue.getLogicValue, %6 : $*@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self : $@convention(witness_method: LogicValue) <T: LogicValue> (@in_guaranteed T) -> Bool
   %8 = apply %7<@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self>(%6) : $@convention(witness_method: LogicValue) <T: LogicValue> (@in_guaranteed T) -> Bool
@@ -469,6 +469,38 @@ bb0(%0 : $Int):
   unreachable
 }
 
+// CHECK-LABEL: sil [ossa] @test_copy_and_borrow_of_closure
+// CHECK-NOT:     alloc_box
+// CHECK:         alloc_stack
+// CHECK-NOT:     alloc_box
+// CHECK:       } // end sil function 'test_copy_and_borrow_of_closure'
+sil [ossa] @test_copy_and_borrow_of_closure : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  // This is not destroyed, but the unreachable makes the verifier not trip.
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  store %0 to [trivial] %1a : $*Int
+  %3 = function_ref @closure3 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
+  %4 = copy_value %1 : $<τ_0_0> { var τ_0_0 } <Int>
+  %5 = partial_apply %3(%4) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
+  %6 = begin_borrow %5 : $@callee_owned () -> ()
+  %7 = copy_value %6 : $@callee_owned () -> ()
+  apply %7() : $@callee_owned () -> ()
+  end_borrow %6 : $@callee_owned () -> ()
+  destroy_value %5 : $@callee_owned () -> ()
+  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <Int>
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @closure3 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> () {
+bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  destroy_value %0 : $<τ_0_0> { var τ_0_0 } <Int>      // id: %7
+  %r = tuple ()
+  return %r : $()
+}
+
 sil [ossa] @closureWithBoxArg : $@convention(thin) (@guaranteed { var SomeClass }) -> () {
 bb0(%0 : @guaranteed ${ var SomeClass }):
   %r = tuple ()
@@ -549,8 +581,8 @@ bb0(%0 : $*T):
   // CHECK: [[STACK:%[0-9a-zA-Z_]+]] = alloc_stack $T
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
-  // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
-  copy_addr %0 to [initialization] %4a : $*T
+  // CHECK: copy_addr %0 to [init] [[STACK]] : $*T
+  copy_addr %0 to [init] %4a : $*T
   // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @$s21closure_to_specializeTf0ns_n
   // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]])
   %6 = partial_apply %3<T>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
@@ -577,8 +609,8 @@ bb0(%0 : $*T):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
   %4copy = copy_value %4 : $<τ_0_0> { var τ_0_0 } <T>
-  // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
-  copy_addr %0 to [initialization] %4a : $*T
+  // CHECK: copy_addr %0 to [init] [[STACK]] : $*T
+  copy_addr %0 to [init] %4a : $*T
   // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @$s21closure_to_specializeTf0ns_n
   // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]])
   %6 = partial_apply %3<T>(%4copy) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
@@ -609,8 +641,8 @@ bb0(%0 : $*T):
   %4c = mark_uninitialized [var] %4 : $<τ_0_0> { var τ_0_0 } <T>
   %4a = project_box %4c : $<τ_0_0> { var τ_0_0 } <T>, 0
   %4copy = copy_value %4c : $<τ_0_0> { var τ_0_0 } <T>
-  // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
-  copy_addr %0 to [initialization] %4a : $*T
+  // CHECK: copy_addr %0 to [init] [[STACK]] : $*T
+  copy_addr %0 to [init] %4a : $*T
   // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @$s21closure_to_specializeTf0ns_n
   // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]])
   %6 = partial_apply %3<T>(%4copy) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
@@ -632,7 +664,7 @@ sil shared [ossa] @closure_to_specialize : $@convention(thin) <T where T : P> (@
 bb0(%0 : $*T, %1 : @owned $<τ_0_0> { var τ_0_0 } <T>):
   %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
   // CHECK-NEXT: copy_addr
-  copy_addr %2 to [initialization] %0 : $*T
+  copy_addr %2 to [init] %0 : $*T
   // CHECK-NOT: destroy_value
   destroy_value %1 : $<τ_0_0> { var τ_0_0 } <T>
   %5 = tuple ()
@@ -693,7 +725,7 @@ bb0(%0 : $Int, %1 : $*S<Q>):
   %5 = function_ref @closure1 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool
   %6 = alloc_box $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <Q>
   %6a = project_box %6 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <Q>, 0
-  copy_addr %1 to [initialization] %6a : $*S<Q>
+  copy_addr %1 to [init] %6a : $*S<Q>
   %8 = partial_apply %5<Q>(%0, %6) : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned <τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <τ_0_0>) -> Bool
   %9 = apply %4(%8) : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   destroy_addr %1 : $*S<Q>
@@ -711,7 +743,7 @@ bb0(%0 : $Int, %1 : $*S<T>):
   %5 = function_ref @closure1 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <τ_0_0>) -> Bool
   %6 = alloc_box $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
   %6a = project_box %6 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>, 0
-  copy_addr %1 to [initialization] %6a : $*S<T>
+  copy_addr %1 to [init] %6a : $*S<T>
   %8 = partial_apply %5<T>(%0, %6) : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <τ_0_0>) -> Bool
   %9 = apply %4(%8) : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   destroy_addr %1 : $*S<T>
@@ -728,7 +760,7 @@ bb0(%0 : $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>)
   %4 = function_ref @closure2 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <τ_0_0>) -> Bool
   %5 = alloc_box $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
   %5a = project_box %5 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>, 0
-  copy_addr %2 to [initialization] %5a : $*S<T>
+  copy_addr %2 to [init] %5a : $*S<T>
   %7 = partial_apply %4<T>(%0, %5) : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <τ_0_0>) -> Bool
   %8 = apply %3(%7) : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   destroy_value %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
@@ -748,13 +780,13 @@ bb0(%0 : $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>)
   %2 = project_box %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>, 0
   %3 = function_ref @binary : $@convention(thin) (Int, Int) -> Bool
   %4 = alloc_stack $S<T>
-  copy_addr %2 to [initialization] %4 : $*S<T>
+  copy_addr %2 to [init] %4 : $*S<T>
   %6 = function_ref @get : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
   %7 = apply %6<T>(%4) : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
   %8 = apply %3(%0, %7) : $@convention(thin) (Int, Int) -> Bool
   %9 = copy_value %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
   %10 = project_box %9 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>, 0
-  copy_addr %10 to [initialization] %4 : $*S<T>
+  copy_addr %10 to [init] %4 : $*S<T>
   destroy_value %9 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
   destroy_addr %4 : $*S<T>
   dealloc_stack %4 : $*S<T>
@@ -771,12 +803,12 @@ sil [ossa] @destroy_stack_value_after_closure : $@convention(thin) <T> (@in T) -
 // CHECK: bb0
 bb0(%0 : $*T, %1 : $*T):
   // CHECK: [[STACK:%.*]] = alloc_stack
-  // CHECK: copy_addr %1 to [initialization] [[STACK]]
+  // CHECK: copy_addr %1 to [init] [[STACK]]
   // CHECK: [[APPLIED:%.*]] = function_ref
   %3 = function_ref @applied : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> ()
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr %1 to [initialization] %4a : $*T
+  copy_addr %1 to [init] %4a : $*T
   // CHECK: [[PARTIAL:%.*]] = partial_apply [[APPLIED]]<T>([[STACK]])
   %6 = partial_apply %3<T>(%4) : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> ()
   // CHECK: debug_value [[PARTIAL]]
@@ -785,7 +817,7 @@ bb0(%0 : $*T, %1 : $*T):
   %7 = copy_value %6 : $@callee_owned () -> ()
   // CHECK: apply [[COPIED_PARTIAL]]() : $@callee_owned () -> ()
   %9 = apply %7() : $@callee_owned () -> ()
-  copy_addr %1 to [initialization] %0 : $*T
+  copy_addr %1 to [init] %0 : $*T
   // CHECK: destroy_value [[PARTIAL]]
   destroy_value %6 : $@callee_owned () -> ()
   // CHECK: destroy_addr [[STACK]]
@@ -800,7 +832,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <T>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <T>, 0
   %2 = function_ref @consume : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %3 = alloc_stack $T
-  copy_addr %1 to [initialization] %3 : $*T
+  copy_addr %1 to [init] %3 : $*T
   %5 = apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %3 : $*T
   destroy_value %0 : $<τ_0_0> { var τ_0_0 } <T>
@@ -1102,12 +1134,12 @@ bb2:
 // CHECK-LABEL: sil [ossa] @deinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK: [[STK:%.*]] = alloc_stack $T, var, name "x"
-// CHECK: copy_addr %2 to [initialization] [[STK]] : $*T
+// CHECK: copy_addr %2 to [init] [[STK]] : $*T
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*T
-// CHECK: copy_addr [[READ]] to [initialization] %0 : $*T
+// CHECK: copy_addr [[READ]] to [init] %0 : $*T
 // CHECK: end_access [[READ]] : $*T
 // CHECK: [[READ:%.*]] = begin_access [deinit] [static] [[STK]] : $*T
-// CHECK: copy_addr [take] [[READ]] to [initialization] %1 : $*T
+// CHECK: copy_addr [take] [[READ]] to [init] %1 : $*T
 // CHECK: end_access [[READ]] : $*T
 // CHECK-NOT: destroy_addr
 // CHECK: dealloc_stack [[STK]] : $*T
@@ -1118,12 +1150,12 @@ sil [ossa] @deinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
 bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>, var, name "x"
   %5 = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr %2 to [initialization] %5 : $*T
+  copy_addr %2 to [init] %5 : $*T
   %7 = begin_access [read] [static] %5 : $*T
-  copy_addr %7 to [initialization] %0 : $*T
+  copy_addr %7 to [init] %0 : $*T
   end_access %7 : $*T
   %10 = begin_access [read] [static] %5 : $*T
-  copy_addr %10 to [initialization] %1 : $*T
+  copy_addr %10 to [init] %1 : $*T
   end_access %10 : $*T
   destroy_value %4 : $<τ_0_0> { var τ_0_0 } <T>
   destroy_addr %2 : $*T
@@ -1139,14 +1171,14 @@ bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK-LABEL: sil [ossa] @nodeinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK: [[STK:%.*]] = alloc_stack $T, var, name "x"
-// CHECK: copy_addr %2 to [initialization] [[STK]] : $*T
+// CHECK: copy_addr %2 to [init] [[STK]] : $*T
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*T
-// CHECK: copy_addr [[READ]] to [initialization] %0 : $*T
+// CHECK: copy_addr [[READ]] to [init] %0 : $*T
 // CHECK: end_access [[READ]] : $*T
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*T
 // CHECK: [[INNER:%.*]] = begin_access [read] [static] [[READ]] : $*T
 // CHECK: end_access [[INNER]] : $*T
-// CHECK: copy_addr [[READ]] to [initialization] %1 : $*T
+// CHECK: copy_addr [[READ]] to [init] %1 : $*T
 // CHECK: end_access [[READ]] : $*T
 // CHECK: destroy_addr [[STK]] : $*T
 // CHECK: dealloc_stack [[STK]] : $*T
@@ -1157,14 +1189,14 @@ sil [ossa] @nodeinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T)
 bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>, var, name "x"
   %5 = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr %2 to [initialization] %5 : $*T
+  copy_addr %2 to [init] %5 : $*T
   %7 = begin_access [read] [static] %5 : $*T
-  copy_addr %7 to [initialization] %0 : $*T
+  copy_addr %7 to [init] %0 : $*T
   end_access %7 : $*T
   %10 = begin_access [read] [static] %5 : $*T
   %innerAccess = begin_access [read] [static] %10 : $*T
   end_access %innerAccess : $*T
-  copy_addr %10 to [initialization] %1 : $*T
+  copy_addr %10 to [init] %1 : $*T
   end_access %10 : $*T
   destroy_value %4 : $<τ_0_0> { var τ_0_0 } <T>
   destroy_addr %2 : $*T

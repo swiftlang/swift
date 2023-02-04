@@ -494,6 +494,13 @@ public:
   }
   SILInstruction *getDefiningInstruction();
 
+  /// Return the instruction that defines this value, terminator instruction
+  /// that produces this result, or null if it is not defined by an instruction.
+  const SILInstruction *getDefiningInstructionOrTerminator() const {
+    return const_cast<ValueBase*>(this)->getDefiningInstructionOrTerminator();
+  }
+  SILInstruction *getDefiningInstructionOrTerminator();
+
   /// Return the SIL instruction that can be used to describe the first time
   /// this value is available.
   ///
@@ -667,21 +674,6 @@ public:
     return Value->getDefiningInstruction();
   }
 
-  /// Returns the ValueOwnershipKind that describes this SILValue's ownership
-  /// semantics if the SILValue has ownership semantics. Returns is a value
-  /// without any Ownership Semantics.
-  ///
-  /// An example of a SILValue without ownership semantics is a
-  /// struct_element_addr.
-  ///
-  /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
-  ///
-  /// FIXME: remove this redundant API from SILValue.
-  [[deprecated("Please use ValueBase::getOwnershipKind()")]] ValueOwnershipKind
-  getOwnershipKind() const {
-    return Value->getOwnershipKind();
-  };
-
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
 
@@ -833,8 +825,6 @@ struct OperandOwnership {
     /// borrow scope.
     /// (tuple_extract, struct_extract, cast, switch)
     GuaranteedForwarding,
-    /// A GuaranteedForwarding value passed as a phi operand.
-    GuaranteedForwardingPhi,
     /// End Borrow. End the borrow scope opened directly by the operand.
     /// The operand must be a begin_borrow, begin_apply, or function argument.
     /// (end_borrow, end_apply)
@@ -927,7 +917,6 @@ inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
     return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
   case OperandOwnership::InteriorPointer:
   case OperandOwnership::GuaranteedForwarding:
-  case OperandOwnership::GuaranteedForwardingPhi:
     return {OwnershipKind::Guaranteed,
             UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::EndBorrow:
@@ -956,7 +945,6 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   case OperandOwnership::ForwardingConsume:
   case OperandOwnership::InteriorPointer:
   case OperandOwnership::GuaranteedForwarding:
-  case OperandOwnership::GuaranteedForwardingPhi:
   case OperandOwnership::EndBorrow:
   case OperandOwnership::Reborrow:
     return false;
@@ -1160,11 +1148,16 @@ inline SILValue getSILValueType(const Operand &op) {
 using OperandValueArrayRef = ArrayRefView<Operand, SILValue, getSILValueType>;
 
 /// An iterator over all uses of a ValueBase.
-class ValueBaseUseIterator : public std::iterator<std::forward_iterator_tag,
-                                                  Operand*, ptrdiff_t> {
+class ValueBaseUseIterator {
 protected:
   Operand *Cur;
 public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = Operand*;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
   ValueBaseUseIterator() = default;
   explicit ValueBaseUseIterator(Operand *cur) : Cur(cur) {}
   Operand *operator->() const { return Cur; }

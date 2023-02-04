@@ -3,9 +3,7 @@
 // RUN: %swift -module-name MySwift -target x86_64-apple-macosx10.9 -dump-clang-diagnostics -I %S/Inputs -enable-experimental-cxx-interop -emit-ir %s -parse-stdlib -parse-as-library -disable-legacy-type-info | %FileCheck %s -check-prefix=ITANIUM_X64
 
 // REQUIRES: OS=macosx
-
-// REQUIRES: CODEGENERATOR=X86
-// REQUIRES: CODEGENERATOR=ARM
+// REQUIRES: CPU=x86_64
 
 import Constructors
 import TypeClassification
