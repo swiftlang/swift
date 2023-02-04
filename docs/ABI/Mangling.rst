@@ -396,7 +396,10 @@ Entities
 
   macro-discriminator-list ::= macro-discriminator-list? 'fM' macro-expansion-operator INDEX
 
+  macro-expansion-operator ::= identifier 'a' // accessor attached macro
+  macro-expansion-operator ::= identifier 'A' // member-attribute attached macro
   macro-expansion-operator ::= identifier 'f' // freestanding macro
+  macro-expansion-operator ::= identifier 'm' // member attached macro
   macro-expansion-operator ::= identifier 'u' // uniquely-named entity
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
