@@ -928,7 +928,7 @@ namespace {
       }
     }
 
-    return decl->getGenericParams();
+    return decl->getParsedGenericParams();
   }
 }
 

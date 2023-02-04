@@ -2137,11 +2137,8 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return TupleType::getEmpty(ctx);
 
   // Handle opaque types.
-  if (decl->getOpaqueResultTypeRepr()) {
-    auto *opaqueDecl = decl->getOpaqueResultTypeDecl();
-    return (opaqueDecl
-            ? opaqueDecl->getDeclaredInterfaceType()
-            : ErrorType::get(ctx));
+  if (auto *opaqueDecl = decl->getOpaqueResultTypeDecl()) {
+      return opaqueDecl->getDeclaredInterfaceType();
   }
 
   auto options =
