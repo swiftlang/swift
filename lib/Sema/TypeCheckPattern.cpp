@@ -732,7 +732,7 @@ validateTypedPattern(TypedPattern *TP, DeclContext *dc,
   auto *Repr = TP->getTypeRepr();
   if (Repr && (Repr->hasOpaque() ||
                (Context.LangOpts.hasFeature(Feature::ImplicitSome) &&
-                Repr->isProtocol(dc)))) {
+                !collectOpaqueReturnTypeReprs(Repr, Context, dc).empty()))) {
     auto named = dyn_cast<NamedPattern>(
         TP->getSubPattern()->getSemanticsProvidingPattern());
     if (!named) {
