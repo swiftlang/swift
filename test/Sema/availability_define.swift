@@ -96,6 +96,7 @@ public func forbidMacrosInInlinableCode1() {
   }
 }
 
+@available(_iOS13Aligned, *)
 @backDeployed(before: _iOS14Aligned)
 public func forbidMacrosInInlinableCode2() {
   if #available(_iOS14Aligned, *) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
