@@ -427,6 +427,7 @@ public:
   /// Pretty-print the value.
   void dump() const;
   void print(raw_ostream &OS, const SourceManager &SM) const;
+  void print(raw_ostream &OS) const;
 
   inline bool operator==(const SILLocation& R) const {
     return kindAndFlags.packedKindAndFlags == R.kindAndFlags.packedKindAndFlags
@@ -434,6 +435,15 @@ public:
   }
 
   inline bool operator!=(const SILLocation &R) const { return !(*this == R); }
+
+  bool hasSameSourceLocation(const SILLocation &rhs) {
+    if (*this == rhs)
+      return true;
+    if (isASTNode() && rhs.isASTNode()) {
+      return getSourceLoc(getPrimaryASTNode()) == rhs.getSourceLoc(rhs.getPrimaryASTNode());
+    }
+    return false;
+  }
 
   friend llvm::hash_code hash_value(const SILLocation &);
 };
