@@ -4,7 +4,7 @@
 // Declarations //
 //////////////////
 
-public class CopyableKlass {
+public final class CopyableKlass {
     var k = Klass()
 }
 
@@ -12,7 +12,7 @@ public class CopyableKlass {
 public class Klass2 {}
 
 @_moveOnly
-public class Klass {
+public final class Klass {
     var int: Int
     var moveOnlyKlass: Klass2
     var copyableKlass: CopyableKlass
@@ -333,8 +333,9 @@ func klassBorrowAddressFunctionCall2() {
 // CHECK:  [[LOAD:%.*]] = load [copy] [[ACCESS]]
 // CHECK:  end_access [[ACCESS]]
 // CHECK:  [[BORROW_LOAD:%.*]] = begin_borrow [[LOAD]]
-// CHECK:  [[COPY_CLASS:%.*]] = apply {{%.*}}([[BORROW_LOAD]]
-// CHECK:  [[BORROWED_COPY_CLASS:%.*]] = begin_borrow [[COPY_CLASS]]
+// CHECK:  [[ADDR:%.*]] = ref_element_addr [[BORROW_LOAD]]
+// CHECK:  [[ACCESS_ADDR:%.*]] = begin_access [read] [dynamic] [[ADDR]]
+// CHECK:  [[BORROWED_COPY_CLASS:%.*]] = load_borrow [[ACCESS_ADDR]]
 // CHECK:  apply {{%.*}}([[BORROWED_COPY_CLASS]])
 // CHECK: } // end sil function '$s8moveonly38klassBorrowCopyableAddressFunctionCallyyF'
 func klassBorrowCopyableAddressFunctionCall() {
@@ -383,15 +384,13 @@ func moveOnlyStructMoveOnlyKlassNonConsumingUse() {
 // CHECK:   [[STRUCT_EXT_COPY:%.*]] = load [copy] [[STRUCT_EXT]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   [[STRUCT_EXT_COPY_BORROW:%.*]] = begin_borrow [[STRUCT_EXT_COPY]]
-// CHECK:   [[METHOD:%.*]] = class_method [[STRUCT_EXT_COPY_BORROW]]
-// CHECK:   [[KLS:%.*]] = apply [[METHOD]]([[STRUCT_EXT_COPY_BORROW]])
-// CHECK:   end_borrow [[STRUCT_EXT_COPY_BORROW]]
-// CHECK:   [[BORROWED_KLS:%.*]] = begin_borrow [[KLS]]
+// CHECK:   [[ELT_ADDR:%.*]] = ref_element_addr [[STRUCT_EXT_COPY_BORROW]]
+// CHECK:   [[ACCESS_ELT_ADDR:%.*]] = begin_access [read] [dynamic] [[ELT_ADDR]]
+// CHECK:   [[KLS:%.*]] = load_borrow [[ACCESS_ELT_ADDR]]
 // CHECK:   [[FN:%.*]] = function_ref @$s8moveonly21nonConsumingUseKlass2yyAA0E0CF
-// CHECK:   apply [[FN]]([[BORROWED_KLS]])
-// CHECK:   end_borrow [[BORROWED_KLS]]
+// CHECK:   apply [[FN]]([[KLS]])
+// CHECK:   end_borrow [[KLS]]
 // CHECK:   destroy_value [[STRUCT_EXT_COPY]]
-// CHECK:   destroy_value [[KLS]]
 // CHECK: } // end sil function '$s8moveonly018moveOnlyStructMovec5KlassecF15NonConsumingUseyyF'
 func moveOnlyStructMoveOnlyKlassMoveOnlyKlassNonConsumingUse() {
     var k = NonTrivialStruct()
@@ -408,15 +407,13 @@ func moveOnlyStructMoveOnlyKlassMoveOnlyKlassNonConsumingUse() {
 // CHECK:   [[STRUCT_EXT_COPY:%.*]] = load [copy] [[STRUCT_EXT]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   [[STRUCT_EXT_COPY_BORROW:%.*]] = begin_borrow [[STRUCT_EXT_COPY]]
-// CHECK:   [[METHOD:%.*]] = class_method [[STRUCT_EXT_COPY_BORROW]]
-// CHECK:   [[KLS:%.*]] = apply [[METHOD]]([[STRUCT_EXT_COPY_BORROW]])
-// CHECK:   end_borrow [[STRUCT_EXT_COPY_BORROW]]
-// CHECK:   [[BORROWED_KLS:%.*]] = begin_borrow [[KLS]]
+// CHECK:   [[FIELD:%.*]] = ref_element_addr [[STRUCT_EXT_COPY_BORROW]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD]]
+// CHECK:   [[BORROWED_KLS:%.*]] = load_borrow [[ACCESS]]
 // CHECK:   [[FN:%.*]] = function_ref @$s8moveonly28nonConsumingUseCopyableKlassyyAA0eF0CF
 // CHECK:   apply [[FN]]([[BORROWED_KLS]])
 // CHECK:   end_borrow [[BORROWED_KLS]]
 // CHECK:   destroy_value [[STRUCT_EXT_COPY]]
-// CHECK:   destroy_value [[KLS]]
 // CHECK: } // end sil function '$s8moveonly018moveOnlyStructMovec13KlassCopyableF15NonConsumingUseyyF'
 func moveOnlyStructMoveOnlyKlassCopyableKlassNonConsumingUse() {
     var k = NonTrivialStruct()
@@ -569,15 +566,13 @@ func moveOnlyStructCopyableStructCopyableStructCopyableKlassNonConsumingUse() {
 // CHECK:   [[COPYABLE_KLASS:%.*]] = load [copy] [[GEP3]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   [[BORROWED_COPYABLE_KLASS:%.*]] = begin_borrow [[COPYABLE_KLASS]]
-// CHECK:   [[FN:%.*]] = class_method [[BORROWED_COPYABLE_KLASS]] : $CopyableKlass, #CopyableKlass.k!getter :
-// CHECK:   [[MOVEONLY_KLASS:%.*]] = apply [[FN]]([[BORROWED_COPYABLE_KLASS]])
-// CHECK:   end_borrow [[BORROWED_COPYABLE_KLASS]]
-// CHECK:   [[BORROWED_MOVEONLY_KLASS:%.*]] = begin_borrow [[MOVEONLY_KLASS]]
+// CHECK:   [[FIELD:%.*]] = ref_element_addr [[BORROWED_COPYABLE_KLASS]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD]]
+// CHECK:   [[BORROWED_MOVEONLY_KLASS:%.*]] = load_borrow [[ACCESS]]
 // CHECK:   [[FN:%.*]] = function_ref @$s8moveonly20nonConsumingUseKlassyyAA0E0CF :
 // CHECK:   apply [[FN]]([[BORROWED_MOVEONLY_KLASS]])
 // CHECK:   end_borrow [[BORROWED_MOVEONLY_KLASS]]
 // CHECK:   destroy_value [[COPYABLE_KLASS]]
-// CHECK:   destroy_value [[MOVEONLY_KLASS]]
 // CHECK: } // end sil function '$s8moveonly022moveOnlyStructCopyabledede9KlassMovecF15NonConsumingUseyyF'
 func moveOnlyStructCopyableStructCopyableStructCopyableKlassMoveOnlyKlassNonConsumingUse() {
     var k = NonTrivialStruct()

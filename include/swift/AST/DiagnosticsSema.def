@@ -6936,6 +6936,8 @@ ERROR(moveonly_cannot_conform_to_protocol, none,
 ERROR(moveonly_cannot_conform_to_protocol_with_name, none,
      "move-only %0 %1 cannot conform to protocol %2",
      (DescriptiveDeclKind, DeclName, DeclName))
+ERROR(moveonly_non_final_class_cannot_contain_moveonly_field, none,
+     "non-final classes containing move only fields is not yet supported", ())
 
 //------------------------------------------------------------------------------
 // MARK: Runtime discoverable attributes (@runtimeMetadata)

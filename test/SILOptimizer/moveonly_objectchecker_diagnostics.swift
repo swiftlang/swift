@@ -5,7 +5,7 @@
 //////////////////
 
 @_moveOnly
-public class Klass {
+public final class Klass {
     var intField: Int
     var k: Klass
     init() {

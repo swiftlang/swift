@@ -28,7 +28,7 @@ public func consumeVal<T>(_ x: __owned AggGenericStruct<T>) {}
 public func consumeVal(_ x: __owned EnumTy) {}
 
 @_moveOnly
-public class Klass {
+public final class Klass {
     var intField: Int
     var k: Klass
     init() {
