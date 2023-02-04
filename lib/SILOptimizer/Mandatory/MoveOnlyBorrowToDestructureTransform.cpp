@@ -294,11 +294,11 @@ void BorrowToDestructureTransform::checkForErrorsOnSameInstruction() {
           continue;
 
         if (badOperand->isConsuming())
-          diagnosticEmitter.emitObjectConsumesDestructuredValueTwice(
-              mmci, use, badOperand);
+          diagnosticEmitter.emitObjectInstConsumesValueTwice(mmci, use,
+                                                             badOperand);
         else
-          diagnosticEmitter.emitObjectConsumesAndUsesDestructuredValue(
-              mmci, use, badOperand);
+          diagnosticEmitter.emitObjectInstConsumesAndUsesValue(mmci, use,
+                                                               badOperand);
         emittedError = true;
       }
 
@@ -359,7 +359,9 @@ bool BorrowToDestructureTransform::gatherBorrows(
     return true;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "Searching for borrows for inst: " << *mmci);
+  LLVM_DEBUG(llvm::dbgs() << "Performing BorrowToDestructureTramsform!\n"
+                             "Searching for borrows for inst: "
+                          << *mmci);
 
   StackList<Operand *> worklist(mmci->getFunction());
   for (auto *op : mmci->getUses())

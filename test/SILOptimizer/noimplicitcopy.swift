@@ -104,9 +104,9 @@ public func classDoubleConsumeOwnedArg(@_noImplicitCopy _ x2: __owned Klass) { /
 }
 
 public func classLoopConsume(_ x: Klass) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        classConsume(x2) // expected-note {{consuming use here}}
+        classConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -116,9 +116,9 @@ public func classLoopConsumeArg(@_noImplicitCopy _ x2: Klass) { // expected-erro
     }
 }
 
-public func classLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
+public func classLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        classConsume(x2) // expected-note {{consuming use here}}
+        classConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -149,11 +149,13 @@ public func classDiamondOwnedArg(@_noImplicitCopy _ x2: __owned Klass) {
 
 public func classDiamondInLoop(_ x: Klass) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           classConsume(x2) // expected-note {{consuming use here}}
       } else {
           classConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -169,11 +171,13 @@ public func classDiamondInLoopArg(@_noImplicitCopy _ x2: Klass) { // expected-er
 }
 
 public func classDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           classConsume(x2) // expected-note {{consuming use here}}
       } else {
           classConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -258,11 +262,9 @@ public func classAssignToVar4OwnedArg(@_noImplicitCopy _ x2: __owned Klass) { //
 }
 
 public func classAssignToVar5(_ x: Klass) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
-    classUseMoveOnlyWithoutEscaping(x2)
+    classUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use here}}
     x3 = x
     print(x3)
 }
@@ -276,11 +278,9 @@ public func classAssignToVar5Arg(_ x: Klass, @_noImplicitCopy _ x2: Klass) { // 
     print(x3)
 }
 
-public func classAssignToVar5OwnedArg(_ x: Klass, @_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
+public func classAssignToVar5OwnedArg(_ x: Klass, @_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' used after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
-    classUseMoveOnlyWithoutEscaping(x2)
+    classUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use here}}
     x3 = x
     print(x3)
 }
@@ -428,9 +428,9 @@ public func finalClassDoubleConsumeownedArg(@_noImplicitCopy _ x2: __owned Final
 }
 
 public func finalClassLoopConsume(_ x: FinalKlass) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        finalClassConsume(x2) // expected-note {{consuming use here}}
+        finalClassConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -440,9 +440,9 @@ public func finalClassLoopConsumeArg(@_noImplicitCopy _ x2: FinalKlass) { // exp
     }
 }
 
-public func finalClassLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
+public func finalClassLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        finalClassConsume(x2) // expected-note {{consuming use here}}
+        finalClassConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -473,11 +473,13 @@ public func finalClassDiamondOwnedArg(@_noImplicitCopy _ x2: __owned FinalKlass)
 
 public func finalClassDiamondInLoop(_ x: FinalKlass) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           finalClassConsume(x2) // expected-note {{consuming use here}}
       } else {
           finalClassConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -493,11 +495,13 @@ public func finalClassDiamondInLoopArg(@_noImplicitCopy _ x2: FinalKlass) { // e
 }
 
 public func finalClassDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           finalClassConsume(x2) // expected-note {{consuming use here}}
       } else {
           finalClassConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -582,11 +586,9 @@ public func finalClassAssignToVar4OwnedArg(@_noImplicitCopy _ x2: __owned FinalK
 }
 
 public func finalClassAssignToVar5(_ x: FinalKlass) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
-    finalClassUseMoveOnlyWithoutEscaping(x2)
+    finalClassUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use here}}
     x3 = x
     print(x3)
 }
@@ -600,11 +602,9 @@ public func finalClassAssignToVar5Arg(_ x: FinalKlass, @_noImplicitCopy _ x2: Fi
     print(x3)
 }
 
-public func finalClassAssignToVar5OwnedArg(_ x: FinalKlass, @_noImplicitCopy _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
+public func finalClassAssignToVar5OwnedArg(_ x: FinalKlass, @_noImplicitCopy _ x2: __owned FinalKlass) { // expected-error {{'x2' used after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
-    finalClassUseMoveOnlyWithoutEscaping(x2)
+    finalClassUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use here}}
     x3 = x
     print(x3)
 }
@@ -768,9 +768,9 @@ public func aggStructDoubleConsumeOwnedArg(@_noImplicitCopy _ x2: __owned AggStr
 }
 
 public func aggStructLoopConsume(_ x: AggStruct) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        aggStructConsume(x2) // expected-note {{consuming use here}}
+        aggStructConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -780,9 +780,9 @@ public func aggStructLoopConsumeArg(@_noImplicitCopy _ x2: AggStruct) { // expec
     }
 }
 
-public func aggStructLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) { // expected-error {{'x2' consumed more than once}}
+public func aggStructLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        aggStructConsume(x2) // expected-note {{consuming use here}}
+        aggStructConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -813,11 +813,13 @@ public func aggStructDiamondOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) {
 
 public func aggStructDiamondInLoop(_ x: AggStruct) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           aggStructConsume(x2) // expected-note {{consuming use here}}
       } else {
           aggStructConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -833,11 +835,13 @@ public func aggStructDiamondInLoopArg(@_noImplicitCopy _ x2: AggStruct) { // exp
 }
 
 public func aggStructDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) { // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           aggStructConsume(x2) // expected-note {{consuming use here}}
       } else {
           aggStructConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -1034,9 +1038,9 @@ public func aggGenericStructDoubleConsumeOwnedArg(@_noImplicitCopy _ x2: __owned
 }
 
 public func aggGenericStructLoopConsume(_ x: AggGenericStruct<Klass>) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        aggGenericStructConsume(x2) // expected-note {{consuming use here}}
+        aggGenericStructConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -1046,9 +1050,9 @@ public func aggGenericStructLoopConsumeArg(@_noImplicitCopy _ x2: AggGenericStru
     }
 }
 
-public func aggGenericStructLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Klass>) { // expected-error {{'x2' consumed more than once}}
+public func aggGenericStructLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Klass>) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        aggGenericStructConsume(x2) // expected-note {{consuming use here}}
+        aggGenericStructConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -1079,11 +1083,13 @@ public func aggGenericStructDiamondOwnedArg(@_noImplicitCopy _ x2: __owned AggGe
 
 public func aggGenericStructDiamondInLoop(_ x: AggGenericStruct<Klass>) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           aggGenericStructConsume(x2) // expected-note {{consuming use here}}
       } else {
           aggGenericStructConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -1099,11 +1105,13 @@ public func aggGenericStructDiamondInLoopArg(@_noImplicitCopy _ x2: AggGenericSt
 }
 
 public func aggGenericStructDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Klass>) { // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           aggGenericStructConsume(x2) // expected-note {{consuming use here}}
       } else {
           aggGenericStructConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -1294,9 +1302,9 @@ public func aggGenericStructDoubleConsumeOwnedArg<T>(@_noImplicitCopy _ x2: __ow
 }
 
 public func aggGenericStructLoopConsume<T>(_ x: AggGenericStruct<T>) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        aggGenericStructConsume(x2) // expected-note {{consuming use here}}
+        aggGenericStructConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -1306,9 +1314,9 @@ public func aggGenericStructLoopConsumeArg<T>(@_noImplicitCopy _ x2: AggGenericS
     }
 }
 
-public func aggGenericStructLoopConsumeOwnedArg<T>(@_noImplicitCopy _ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
+public func aggGenericStructLoopConsumeOwnedArg<T>(@_noImplicitCopy _ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        aggGenericStructConsume(x2) // expected-note {{consuming use here}}
+        aggGenericStructConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -1339,11 +1347,13 @@ public func aggGenericStructDiamondOwnedArg<T>(@_noImplicitCopy _ x2: __owned Ag
 
 public func aggGenericStructDiamondInLoop<T>(_ x: AggGenericStruct<T>) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           aggGenericStructConsume(x2) // expected-note {{consuming use here}}
       } else {
           aggGenericStructConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -1359,11 +1369,13 @@ public func aggGenericStructDiamondInLoopArg<T>(@_noImplicitCopy _ x2: AggGeneri
 }
 
 public func aggGenericStructDiamondInLoopOwnedArg<T>(@_noImplicitCopy _ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           aggGenericStructConsume(x2) // expected-note {{consuming use here}}
       } else {
           aggGenericStructConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -1562,9 +1574,9 @@ public func enumDoubleConsumeOwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { /
 }
 
 public func enumLoopConsume(_ x: EnumTy) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        enumConsume(x2) // expected-note {{consuming use here}}
+        enumConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -1574,9 +1586,9 @@ public func enumLoopConsumeArg(@_noImplicitCopy _ x2: EnumTy) { // expected-erro
     }
 }
 
-public func enumLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        enumConsume(x2) // expected-note {{consuming use here}}
+        enumConsume(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -1607,11 +1619,13 @@ public func enumDiamondOwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) {
 
 public func enumDiamondInLoop(_ x: EnumTy) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           enumConsume(x2) // expected-note {{consuming use here}}
       } else {
           enumConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -1627,11 +1641,13 @@ public func enumDiamondInLoopArg(@_noImplicitCopy _ x2: EnumTy) { // expected-er
 }
 
 public func enumDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           enumConsume(x2) // expected-note {{consuming use here}}
       } else {
           enumConsume(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -1716,11 +1732,9 @@ public func enumAssignToVar4OwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { //
 }
 
 public func enumAssignToVar5(_ x: EnumTy) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
-    enumUseMoveOnlyWithoutEscaping(x2)
+    enumUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use here}}
     x3 = x
     print(x3)
 }
@@ -1734,11 +1748,9 @@ public func enumAssignToVar5Arg(_ x: EnumTy, @_noImplicitCopy _ x2: EnumTy) { //
     print(x3)
 }
 
-public func enumAssignToVar5OwnedArg(_ x: EnumTy, @_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumAssignToVar5OwnedArg(_ x: EnumTy, @_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
-    enumUseMoveOnlyWithoutEscaping(x2)
+    enumUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use here}}
     x3 = x
     print(x3)
 }
@@ -1772,9 +1784,9 @@ public func enumPatternMatchIfLet1OwnedArg(@_noImplicitCopy _ x2: __owned EnumTy
 }
 
 public func enumPatternMatchIfLet2(_ x: EnumTy) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consuming in loop use here}}
             classUseMoveOnlyWithoutEscaping(x)
         }
     }
@@ -1788,9 +1800,9 @@ public func enumPatternMatchIfLet2Arg(@_noImplicitCopy _ x2: EnumTy) { // expect
     }
 }
 
-public func enumPatternMatchIfLet2OwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumPatternMatchIfLet2OwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consuming in loop use here}}
             classUseMoveOnlyWithoutEscaping(x)
         }
     }
@@ -1798,13 +1810,11 @@ public func enumPatternMatchIfLet2OwnedArg(@_noImplicitCopy _ x2: __owned EnumTy
 
 // This is wrong.
 public func enumPatternMatchSwitch1(_ x: EnumTy) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k):
         classUseMoveOnlyWithoutEscaping(k)
-        // This should be flagged as the use after free use. We are atleast
-        // erroring though.
-        enumUseMoveOnlyWithoutEscaping(x2)
+        enumUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use here}}
     case .int:
         break
     }
@@ -1822,13 +1832,11 @@ public func enumPatternMatchSwitch1Arg(@_noImplicitCopy _ x2: EnumTy) { // expec
     }
 }
 
-public func enumPatternMatchSwitch1OwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumPatternMatchSwitch1OwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k):
         classUseMoveOnlyWithoutEscaping(k)
-        // This should be flagged as the use after free use. We are atleast
-        // erroring though.
-        enumUseMoveOnlyWithoutEscaping(x2)
+        enumUseMoveOnlyWithoutEscaping(x2) // expected-note {{non-consuming use here}}
     case .int:
         break
     }
@@ -1864,10 +1872,10 @@ public func enumPatternMatchSwitch2OwnedArg(@_noImplicitCopy _ x2: __owned EnumT
 
 // QOI: We can do better here. We should also flag x2
 public func enumPatternMatchSwitch2WhereClause(_ x: EnumTy) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k)
-           where x2.doSomething():
+           where x2.doSomething(): // expected-note {{non-consuming use here}}
         classUseMoveOnlyWithoutEscaping(k)
     case .int:
         break
@@ -1888,10 +1896,10 @@ public func enumPatternMatchSwitch2WhereClauseArg(@_noImplicitCopy _ x2: EnumTy)
     }
 }
 
-public func enumPatternMatchSwitch2WhereClauseOwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumPatternMatchSwitch2WhereClauseOwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k)
-           where x2.doSomething():
+           where x2.doSomething(): // expected-note {{non-consuming use here}}
         classUseMoveOnlyWithoutEscaping(k)
     case .int:
         break
@@ -2033,11 +2041,8 @@ public func deferCaptureClassUseAfterConsume(_ x: Klass) {
 }
 
 public func deferCaptureClassUseAfterConsume2(_ x: Klass) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
-
-    // TODO: Defer error is b/c we have to lifetime extend x2 for the defer. The
-    // use is a guaranteed use, so we don't emit an error on that use.
-    defer {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' used after consume}}
+    defer { // expected-note {{non-consuming use here}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2)
         print(x2)
@@ -2065,8 +2070,8 @@ public func deferCaptureClassOwnedArgUseAfterConsume(@_noImplicitCopy _ x2: __ow
     print("foo")
 }
 
-public func deferCaptureClassOwnedArgUseAfterConsume2(@_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
-    defer {
+public func deferCaptureClassOwnedArgUseAfterConsume2(@_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' used after consume}}
+    defer { // expected-note {{non-consuming use here}}
         classUseMoveOnlyWithoutEscaping(x2)
         classConsume(x2)
         print(x2)
