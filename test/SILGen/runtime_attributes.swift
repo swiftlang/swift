@@ -10,7 +10,7 @@ import runtime_metadata_defs
 
 /// Test that generator has source locations for both explicit and inferred attributes.
 
-// CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes4TestAaBVmvpfa0A14_metadata_defs6Ignore : $@convention(thin) () -> @out Optional<Ignore>
+// CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s21runtime_metadata_defs6IgnoreV0A11_attributes4TestVfa : $@convention(thin) () -> @out Optional<Ignore>
 // CHECK: [[FILE_ID:%.*]] = string_literal utf8 "runtime_attributes/runtime_attributes.swift"
 // CHECK: [[STRING_INIT:%.*]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
 // CHECK-NEXT: [[FILE_STR:%.*]] = apply [[STRING_INIT]]([[FILE_ID]], {{.*}})
@@ -24,7 +24,7 @@ import runtime_metadata_defs
 // CHECK-NEXT: {{.*}} = apply [[IGNORE_INIT]]<Test.Type>({{.*}}, {{.*}}, [[FILE_STR]], [[LINE]], [[COLUMN]], {{.*}})
 struct Test : Ignorable {}
 
-// CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes8globalFnyycvpfa0A14_metadata_defs6Ignore : $@convention(thin) () -> @out Optional<Ignore>
+// CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s21runtime_metadata_defs6IgnoreV0A11_attributes8globalFnyyFfa : $@convention(thin) () -> @out Optional<Ignore>
 // CHECK: {{.*}} = string_literal utf8 "runtime_attributes/runtime_attributes.swift"
 // CHECK: {{.*}} = integer_literal $Builtin.IntLiteral, 33
 // CHECK: {{.*}} = integer_literal $Builtin.IntLiteral, 2
@@ -33,7 +33,7 @@ struct Test : Ignorable {}
 @Ignore func globalFn() {}
 
 struct MemberTests {
-  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes11MemberTestsV1xSivpfa0A14_metadata_defs6Ignore : $@convention(thin) () -> @out Optional<Ignore>
+  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s21runtime_metadata_defs6IgnoreV0A11_attributes11MemberTestsV1xSivpfa : $@convention(thin) () -> @out Optional<Ignore>
   // CHECK: {{.*}} = string_literal utf8 "runtime_attributes/runtime_attributes.swift"
   // CHECK: {{.*}} = integer_literal $Builtin.IntLiteral, 42
   // CHECK: {{.*}} = integer_literal $Builtin.IntLiteral, 4
@@ -41,7 +41,7 @@ struct MemberTests {
   // CHECK-NEXT: {{.*}} = apply [[IGNORE_INIT]]<WritableKeyPath<MemberTests, Int>>({{.*}})
   @Ignore var x: Int = 42
 
-  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes11MemberTestsV6instFn_1xSSSi_SaySiGtcvpfa0A14_metadata_defs6Ignore : $@convention(thin) () -> @out Optional<Ignore>
+  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s21runtime_metadata_defs6IgnoreV0A11_attributes11MemberTestsV6instFn_1xSSSi_SaySiGtFfa : $@convention(thin) () -> @out Optional<Ignore>
   // CHECK: {{.*}} = string_literal utf8 "runtime_attributes/runtime_attributes.swift"
   // CHECK: {{.*}} = integer_literal $Builtin.IntLiteral, 50
   // CHECK: {{.*}} = integer_literal $Builtin.IntLiteral, 4
@@ -49,7 +49,7 @@ struct MemberTests {
   // CHECK-NEXT: {{.*}} = apply [[IGNORE_INIT]]<(MemberTests, Int, [Int]) -> String>({{.*}})
   @Ignore func instFn(_: Int, x: [Int]) -> String { "" }
 
-  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes11MemberTestsV8staticFn_1ySi_SStSS_SiztcvpZfa0A14_metadata_defs6Ignore : $@convention(thin) () -> @out Optional<Ignore>
+  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s21runtime_metadata_defs6IgnoreV0A11_attributes11MemberTestsV8staticFn_1ySi_SStSS_SiztFZfa : $@convention(thin) () -> @out Optional<Ignore>
   // CHECK: {{.*}} = string_literal utf8 "runtime_attributes/runtime_attributes.swift"
   // CHECK: {{.*}} = integer_literal $Builtin.IntLiteral, 58
   // CHECK: {{.*}} = integer_literal $Builtin.IntLiteral, 4
@@ -57,7 +57,7 @@ struct MemberTests {
   // CHECK-NEXT: {{.*}} = apply [[IGNORE_INIT]]<(MemberTests.Type, String, inout Int) -> (Int, String)>({{.*}})
   @Ignore static func staticFn(_ x: String, y: inout Int) -> (Int, String) { (42, "") }
 
-  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes11MemberTestsV10mutatingFnSiycvpfa0A14_metadata_defs6Ignore : $@convention(thin) () -> @out Optional<Ignore>
+  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s21runtime_metadata_defs6IgnoreV0A11_attributes11MemberTestsV10mutatingFnSiyFfa : $@convention(thin) () -> @out Optional<Ignore>
   // CHECK: {{.*}} = string_literal utf8 "runtime_attributes/runtime_attributes.swift"
   // CHECK: {{.*}} = integer_literal $Builtin.IntLiteral, 66
   // CHECK: {{.*}} = integer_literal $Builtin.IntLiteral, 4
@@ -75,7 +75,7 @@ struct TestSelfUse {
   static var answer: Int = 42
   static var question: String = ""
 
-  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes11TestSelfUseV1xSSvpfaAA4Flag : $@convention(thin) () -> @out Optional<Flag<Int>>
+  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes4FlagVAA11TestSelfUseV1xSSvpfa : $@convention(thin) () -> @out Optional<Flag<Int>>
   // CHECK: [[ADDRESSOR:%.*]] = function_ref @$s18runtime_attributes11TestSelfUseV6answerSivau
   // CHECK-NEXT: [[ADDR_RESULT:%.*]] = apply [[ADDRESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
   // CHECK-NEXT: [[PROP_ADDR:%.*]] = pointer_to_address [[ADDR_RESULT]] : $Builtin.RawPointer to [strict] $*Int
@@ -90,7 +90,7 @@ struct TestSelfUse {
   // CHECK-NEXT: {{.*}} = apply [[FLAG_INIT_REF]]<Int, WritableKeyPath<TestSelfUse, String>>({{.*}}, [[PROP_VAL_COPY]], [[FUNC_NAME_STR]], {{.*}})
   @Flag(value: Self.answer) var x: String = ""
 
-  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes11TestSelfUseV4testyycvpfaAA4Flag : $@convention(thin) () -> @out Optional<Flag<String>>
+  // CHECK-LABEL: sil hidden [runtime_accessible] [ossa] @$s18runtime_attributes4FlagVAA11TestSelfUseV4testyyFfa : $@convention(thin) () -> @out Optional<Flag<String>>
   // CHECK: [[ADDRESSOR:%.*]] = function_ref @$s18runtime_attributes11TestSelfUseV8questionSSvau
   // CHECK-NEXT: [[ADDR_RESULT:%.*]] = apply [[ADDRESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
   // CHECK-NEXT: [[PROP_ADDR:%.*]] = pointer_to_address [[ADDR_RESULT]] : $Builtin.RawPointer to [strict] $*String
