@@ -1001,7 +1001,7 @@ public func enumAssignToVar4Arg(_ x2: inout EnumTy) {
 }
 
 public func enumAssignToVar5() {
-    var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(NonTrivialStruct())
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -1009,7 +1009,7 @@ public func enumAssignToVar5() {
     consumeVal(x3)
 }
 
-public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' used after consume}}
                                                             
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -1060,7 +1060,7 @@ public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{
 
 // This is wrong.
 public func enumPatternMatchSwitch1() {
-    var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(NonTrivialStruct())
     switch x2 { // expected-note {{consuming use here}}
     case let EnumTy.klass(k):
@@ -1107,7 +1107,7 @@ public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {
 
 // QOI: We can do better here. We should also flag x2
 public func enumPatternMatchSwitch2WhereClause() {
-    var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    var x2 = EnumTy.klass(NonTrivialStruct()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(NonTrivialStruct())
     switch x2 { // expected-note {{consuming use here}}
     case let EnumTy.klass(k)
@@ -1266,7 +1266,7 @@ public func deferCaptureClassUseAfterConsume() {
     var x2 = NonTrivialStruct()
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    // expected-error @-3 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
     defer { // expected-note {{non-consuming use here}}
         borrowVal(x2)
@@ -1281,7 +1281,7 @@ public func deferCaptureClassUseAfterConsume2() {
     var x2 = NonTrivialStruct()
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    // expected-error @-3 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-3 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
     defer { //  expected-note {{non-consuming use here}}
         borrowVal(x2)
@@ -1330,8 +1330,8 @@ public func closureAndDeferCaptureClassUseAfterConsume2() {
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-3 {{'x2' consumed more than once}}
-    // expected-error @-4 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
-    // expected-error @-5 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-4 {{'x2' used after consume}}
+    // expected-error @-5 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
     let f = {
         consumeVal(x2)
@@ -1356,8 +1356,8 @@ public func closureAndDeferCaptureClassUseAfterConsume3() {
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-3 {{'x2' consumed more than once}}
-    // expected-error @-4 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
-    // expected-error @-5 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-4 {{'x2' used after consume}}
+    // expected-error @-5 {{'x2' used after consume}}
     x2 = NonTrivialStruct()
     let f = {
         consumeVal(x2)
