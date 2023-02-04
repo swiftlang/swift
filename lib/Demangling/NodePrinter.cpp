@@ -340,6 +340,7 @@ private:
 
     case Node::Kind::PackExpansion:
     case Node::Kind::ProtocolListWithClass:
+    case Node::Kind::AccessorAttachedMacroExpansion:
     case Node::Kind::AccessorFunctionReference:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
@@ -442,6 +443,8 @@ private:
     case Node::Kind::Macro:
     case Node::Kind::MacroExpansionUniqueName:
     case Node::Kind::MaterializeForSet:
+    case Node::Kind::MemberAttributeAttachedMacroExpansion:
+    case Node::Kind::MemberAttachedMacroExpansion:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
     case Node::Kind::MethodDescriptor:
@@ -1338,9 +1341,21 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                        Node->getNumChildren() == 3? TypePrinting::WithColon
                                                   : TypePrinting::FunctionStyle,
                        /*hasName*/ true);
+  case Node::Kind::AccessorAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "accessor macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::FreestandingMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "freestanding macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::MemberAttributeAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "member attribute macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::MemberAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "member macro expansion #",
                        (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::MacroExpansionUniqueName:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,

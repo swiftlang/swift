@@ -849,30 +849,13 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   }
 
   // Figure out a reasonable name for the macro expansion buffer.
+  std::string discriminator;
   std::string bufferName;
   {
-    llvm::raw_string_ostream out(bufferName);
-
-
-    out << "macro:";
-    if (auto *value = dyn_cast<ValueDecl>(attachedTo))
-      out << value->getName();
-    out << "@" << macro->getName().getBaseName();
-    if (auto bufferID = declSourceFile->getBufferID()) {
-      unsigned startLine, startColumn;
-      std::tie(startLine, startColumn) =
-          sourceMgr.getLineAndColumnInBuffer(attachedTo->getStartLoc(), *bufferID);
-
-      SourceLoc endLoc =
-          Lexer::getLocForEndOfToken(sourceMgr, attachedTo->getEndLoc());
-      unsigned endLine, endColumn;
-      std::tie(endLine, endColumn) =
-          sourceMgr.getLineAndColumnInBuffer(endLoc, *bufferID);
-
-      out << ":" << sourceMgr.getIdentifierForBuffer(*bufferID) << ":"
-          << startLine << ":" << startColumn
-          << "-" << endLine << ":" << endColumn;
-    }
+    Mangle::ASTMangler mangler;
+    discriminator =
+      mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
+    bufferName = adjustMacroExpansionBufferName(discriminator);
   }
 
   // Dump macro expansions to standard output, if requested.
@@ -973,7 +956,6 @@ bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
       "type checking expanded declaration macro", member);
 
   bool addedAttributes = false;
-  auto *dc = member->getInnermostDeclContext();
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto decl : topLevelDecls) {
     // Add the new attributes to the semantic attribute list.
