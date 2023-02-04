@@ -2880,6 +2880,30 @@ ManglingError Remangler::mangleFreestandingMacroExpansion(
   return mangleChildNode(node, 2, depth + 1);
 }
 
+ManglingError Remangler::mangleAccessorAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMa";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
+ManglingError Remangler::mangleMemberAttributeAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMA";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
+ManglingError Remangler::mangleMemberAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMm";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
 ManglingError Remangler::mangleMacroExpansionUniqueName(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));

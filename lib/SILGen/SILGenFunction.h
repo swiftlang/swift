@@ -614,8 +614,8 @@ public:
   /// ends.
   void enterDebugScope(SILLocation Loc, bool isBindingScope = false,
                        Optional<SILLocation> MacroExpansion = {},
-                       DeclNameRef MacroName = {},
-                       DeclNameLoc MacroNameLoc = {});
+                       StringRef MacroName = {},
+                       Optional<SILLocation> MacroLoc = {});
 
   /// Return to the previous debug scope.
   void leaveDebugScope();

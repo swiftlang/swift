@@ -58,6 +58,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
 #include "clang/Lex/MacroInfo.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -395,6 +396,33 @@ void Decl::forEachAttachedMacro(MacroRole role,
 
     macroCallback(customAttr, macroDecl);
   }
+}
+
+unsigned Decl::getAttachedMacroDiscriminator(
+    MacroRole role, const CustomAttr *attr
+) const {
+  assert(isAttachedMacro(role) && "Not an attached macro role");
+
+  // Member-attribute macros are written on the enclosing declaration,
+  // but apply to the member itself. Adjust the owning declaration accordingly.
+  const Decl *owningDecl = this;
+  if (role == MacroRole::MemberAttribute) {
+    owningDecl = getDeclContext()->getAsDecl();
+  }
+
+  llvm::SmallDenseMap<Identifier, unsigned> nextDiscriminator;
+  Optional<unsigned> foundDiscriminator;
+
+  owningDecl->forEachAttachedMacro(
+    role,
+    [&](CustomAttr *foundAttr, MacroDecl *foundMacro) {
+      unsigned discriminator =
+        nextDiscriminator[foundMacro->getBaseIdentifier()]++;
+      if (attr == foundAttr)
+        foundDiscriminator = discriminator;
+    });
+
+  return *foundDiscriminator;
 }
 
 const Decl *Decl::getInnermostDeclWithAvailability() const {
@@ -3793,6 +3821,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Internal:
     return AccessScope(resultDC->getParentModule());
   case AccessLevel::Package:
+    return AccessScope::getPackage();
   case AccessLevel::Public:
   case AccessLevel::Open:
     return AccessScope::getPublic();
@@ -3828,8 +3857,15 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
   if (accessScope.getDeclContext() == useDC) return true;
   if (!AccessScope(useDC).isChildOf(accessScope)) return false;
 
+  // useDC is null only when caller wants to skip non-public type checks.
+  if (!useDC) return true;
+
+  // Check package access; accessing package decl should not be allowed if package names are different
+  if (accessScope.isPackage())
+    return VD->getDeclContext()->getParentModule()->getPackageName() == useDC->getParentModule()->getPackageName();
+
   // Check SPI access
-  if (!useDC || !VD->isSPI()) return true;
+  if (!VD->isSPI()) return true;
   auto useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
   return !useSF || useSF->isImportedAsSPI(VD) ||
          VD->getDeclContext()->getParentModule() == useDC->getParentModule();

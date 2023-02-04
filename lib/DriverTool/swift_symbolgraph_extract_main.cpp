@@ -181,6 +181,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
         llvm::StringSwitch<AccessLevel>(A->getValue())
             .Case("open", AccessLevel::Open)
             .Case("public", AccessLevel::Public)
+            .Case("package", AccessLevel::Package)
             .Case("internal", AccessLevel::Internal)
             .Case("fileprivate", AccessLevel::FilePrivate)
             .Case("private", AccessLevel::Private)
