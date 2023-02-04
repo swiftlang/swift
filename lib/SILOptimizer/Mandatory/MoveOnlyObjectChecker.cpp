@@ -320,12 +320,7 @@ bool swift::siloptimizer::cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(
 //                          MARK: OSSACanonicalizer
 //===----------------------------------------------------------------------===//
 
-bool OSSACanonicalizer::canonicalize(SILValue value) {
-  // First compute liveness. If we fail, bail.
-  if (!canonicalizer->computeLiveness(value)) {
-    return false;
-  }
-
+void OSSACanonicalizer::computeBoundaryData(SILValue value) {
   // Now we have our liveness information. First compute the original boundary
   // (which ignores destroy_value).
   PrunedLivenessBoundary originalBoundary;
@@ -343,7 +338,7 @@ bool OSSACanonicalizer::canonicalize(SILValue value) {
       llvm_unreachable("Last user of original boundary should be a user?!");
     case IsInterestingUser::NonLifetimeEndingUse:
       LLVM_DEBUG(llvm::dbgs() << "    NonLifetimeEndingUse!\n");
-      nonConsumingBoundaryUses.push_back(lastUser);
+      nonConsumingBoundaryUsers.push_back(lastUser);
       continue;
     case IsInterestingUser::LifetimeEndingUse:
       LLVM_DEBUG(llvm::dbgs() << "    LifetimeEndingUse!\n");
@@ -365,9 +360,18 @@ bool OSSACanonicalizer::canonicalize(SILValue value) {
       consumingUsesNeedingCopy.push_back(consumingUser);
     }
   }
+}
+
+bool OSSACanonicalizer::canonicalize(SILValue value) {
+  // First compute liveness. If we fail, bail.
+  if (!computeLiveness(value)) {
+    return false;
+  }
+
+  computeBoundaryData(value);
 
   // Finally, rewrite lifetimes.
-  canonicalizer->rewriteLifetimes();
+  rewriteLifetimes();
 
   return true;
 }
@@ -701,11 +705,13 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
       continue;
     }
 
-    // Once that is complete, we then canonicalize ownership, finding our
-    // boundary and any uses that need a copy. We in this section only deal with
-    // instructions due to our first step where we emitted errors for
+    // Once that is complete, we then begin to canonicalize ownership, finding
+    // our boundary and any uses that need a copy. We in this section only deal
+    // with instructions due to our first step where we emitted errors for
     // instructions containing multiple operands.
-    if (!canonicalizer.canonicalize(markedValue)) {
+
+    // Step 1. Compute liveness.
+    if (!canonicalizer.computeLiveness(markedValue)) {
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
       LLVM_DEBUG(
           llvm::dbgs()
@@ -717,12 +723,23 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
       changed = true;
     }
 
+    // NOTE: In the following we only rewrite lifetimes once we have emitted
+    // diagnostics. This ensures that we can emit diagnostics using the the
+    // liveness information before rewrite lifetimes has enriched the liveness
+    // info with maximized liveness information.
+
+    // Step 2. Compute our boundary non consuming, consuming uses, and consuming
+    // uses that need copies.
+    canonicalizer.computeBoundaryData(markedValue);
+
     // If we are asked to perform guaranteed checking, emit an error if we have
-    // /any/ consuming uses.
+    // /any/ consuming boundary uses or uses that need copies and then rewrite
+    // lifetimes.
     if (markedValue->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
       if (canonicalizer.foundAnyConsumingUses()) {
         diagnosticEmitter.emitObjectGuaranteedDiagnostic(markedValue);
       }
+      canonicalizer.rewriteLifetimes();
       continue;
     }
 
@@ -731,10 +748,13 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
       // any targets... continue. In the former case we want to fail with a
       // checker did not understand diagnostic later and in the former, we
       // succeeded.
+      canonicalizer.rewriteLifetimes();
       continue;
     }
 
+    // Finally emit our object owned diagnostics and then rewrite lifetimes.
     diagnosticEmitter.emitObjectOwnedDiagnostic(markedValue);
+    canonicalizer.rewriteLifetimes();
   }
 
   bool emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();

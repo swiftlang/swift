@@ -553,7 +553,7 @@ public:
   /// A namespace containing helper functors for use with various mapped
   /// ranges. Intended to be used to hide these noise types when working in an
   /// IDE.
-  struct LifetimeEndingUserIteratorHelpers {
+  struct RangeIterationHelpers {
     struct MapFunctor {
       SILInstruction *
       operator()(const std::pair<SILInstruction *, bool> &pair) const {
@@ -562,27 +562,56 @@ public:
       }
     };
 
-    struct FilterFunctor {
-      bool operator()(const std::pair<SILInstruction *, bool> &pair) const {
-        return pair.second;
-      }
+    struct LifetimeEnding {
+      struct FilterFunctor {
+        bool operator()(const std::pair<SILInstruction *, bool> &pair) const {
+          return pair.second;
+        }
+      };
+
+      using MapFilterIter = llvm::mapped_iterator<
+          llvm::filter_iterator<const std::pair<SILInstruction *, bool> *,
+                                FilterFunctor>,
+          MapFunctor>;
     };
 
-    using MapFilterIter = llvm::mapped_iterator<
-        llvm::filter_iterator<const std::pair<SILInstruction *, bool> *,
-                              FilterFunctor>,
-        MapFunctor>;
+    struct NonLifetimeEnding {
+      struct FilterFunctor {
+        bool operator()(const std::pair<SILInstruction *, bool> &pair) const {
+          return !pair.second;
+        }
+      };
+
+      using MapFilterIter = llvm::mapped_iterator<
+          llvm::filter_iterator<const std::pair<SILInstruction *, bool> *,
+                                FilterFunctor>,
+          MapFunctor>;
+    };
   };
-  using LifetimeEndingUserRange =
-      llvm::iterator_range<LifetimeEndingUserIteratorHelpers::MapFilterIter>;
+  using LifetimeEndingUserRange = llvm::iterator_range<
+      RangeIterationHelpers::LifetimeEnding::MapFilterIter>;
 
   /// Return a range consisting of the current set of consuming users fed into
   /// this PrunedLiveness instance.
   LifetimeEndingUserRange getLifetimeEndingUsers() const {
     return map_range(
         llvm::make_filter_range(
-            getAllUsers(), LifetimeEndingUserIteratorHelpers::FilterFunctor()),
-        LifetimeEndingUserIteratorHelpers::MapFunctor());
+            getAllUsers(),
+            RangeIterationHelpers::LifetimeEnding::FilterFunctor()),
+        RangeIterationHelpers::MapFunctor());
+  }
+
+  using NonLifetimeEndingUserRange = llvm::iterator_range<
+      RangeIterationHelpers::NonLifetimeEnding::MapFilterIter>;
+
+  /// Return a range consisting of the current set of non lifetime ending users
+  /// fed into this PrunedLiveness instance.
+  NonLifetimeEndingUserRange getNonLifetimeEndingUsers() const {
+    return map_range(
+        llvm::make_filter_range(
+            getAllUsers(),
+            RangeIterationHelpers::NonLifetimeEnding::FilterFunctor()),
+        RangeIterationHelpers::MapFunctor());
   }
 
   void print(llvm::raw_ostream &OS) const;

@@ -730,7 +730,7 @@ ERROR(sil_moveonlychecker_owned_value_consumed_more_than_once, none,
 ERROR(sil_moveonlychecker_owned_value_consumed_and_used_at_same_time, none,
       "'%0' consumed and used at the same time", (StringRef))
 ERROR(sil_moveonlychecker_value_used_after_consume, none,
-      "'%0' used after consume. Lifetime extension of variable requires a copy", (StringRef))
+      "'%0' used after consume", (StringRef))
 ERROR(sil_moveonlychecker_guaranteed_value_consumed, none,
       "'%0' has guaranteed ownership but was consumed", (StringRef))
 ERROR(sil_moveonlychecker_guaranteed_value_captured_by_closure, none,
@@ -754,6 +754,8 @@ NOTE(sil_moveonlychecker_boundary_use, none,
      "boundary use here", ())
 NOTE(sil_moveonlychecker_consuming_use_here, none,
      "consuming use here", ())
+NOTE(sil_moveonlychecker_other_consuming_use_here, none,
+     "other consuming use here", ())
 NOTE(sil_moveonlychecker_two_consuming_uses_here, none,
      "two consuming uses here", ())
 NOTE(sil_moveonlychecker_consuming_and_non_consuming_uses_here, none,
@@ -762,6 +764,9 @@ NOTE(sil_moveonlychecker_consuming_closure_use_here, none,
      "closure capture here", ())
 NOTE(sil_moveonlychecker_nonconsuming_use_here, none,
      "non-consuming use here", ())
+NOTE(sil_movekillscopyablevalue_value_cyclic_consumed_in_loop_here, none,
+     "consuming in loop use here", ())
+
 ERROR(sil_moveonlychecker_not_understand_no_implicit_copy, none,
       "Usage of @noImplicitCopy that the move checker does not know how to "
       "check!", ())

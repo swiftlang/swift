@@ -127,7 +127,7 @@ public func classMultipleNonConsumingUseArgTest(_ x2: inout Klass) { // expected
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func classMultipleNonConsumingUseArgTest2(_ x2: inout Klass) { // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+public func classMultipleNonConsumingUseArgTest2(_ x2: inout Klass) { // expected-error {{'x2' used after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -143,7 +143,7 @@ public func classMultipleNonConsumingUseArgTest3(_ x2: inout Klass) {  // expect
                    // expected-note @-1 {{consuming use here}}
 }
 
-public func classMultipleNonConsumingUseArgTest4(_ x2: inout Klass) { // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+public func classMultipleNonConsumingUseArgTest4(_ x2: inout Klass) { // expected-error {{'x2' used after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -340,7 +340,7 @@ public func classAssignToVar4Arg(_ x2: inout Klass) { // expected-error {{'x2' c
 }
 
 public func classAssignToVar5() {
-    var x2 = Klass() // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    var x2 = Klass() // expected-error {{'x2' used after consume}}
     x2 = Klass()
     var x3 = x2 // expected-note {{consuming use here}}
     // TODO: Need to mark this as the lifetime extending use. We fail
@@ -351,7 +351,7 @@ public func classAssignToVar5() {
 }
 
 public func classAssignToVar5Arg(_ x: Klass, _ x2: inout Klass) {
-    // expected-error @-1 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-1 {{'x2' used after consume}}
     // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -360,7 +360,7 @@ public func classAssignToVar5Arg(_ x: Klass, _ x2: inout Klass) {
 }
 
 public func classAssignToVar5Arg2(_ x: Klass, _ x2: inout Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-                                                                   // expected-error @-1 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+                                                                   // expected-error @-1 {{'x2' used after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
     x3 = x // expected-note {{consuming use here}}
@@ -645,7 +645,7 @@ public func finalClassAssignToVar4Arg(_ x2: inout FinalKlass) {
 }
 
 public func finalClassAssignToVar5() {
-    var x2 = FinalKlass() // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    var x2 = FinalKlass() // expected-error {{'x2' used after consume}}
     x2 = FinalKlass()
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -654,7 +654,7 @@ public func finalClassAssignToVar5() {
 }
 
 public func finalClassAssignToVar5Arg(_ x2: inout FinalKlass) {
-    // expected-error @-1 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-1 {{'x2' used after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
     x3 = FinalKlass()
@@ -1669,7 +1669,7 @@ public func enumAssignToVar4Arg(_ x2: inout EnumTy) {
 }
 
 public func enumAssignToVar5() {
-    var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(Klass())
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -1678,7 +1678,7 @@ public func enumAssignToVar5() {
 }
 
 public func enumAssignToVar5Arg(_ x2: inout EnumTy) {
-    // expected-error @-1 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-1 {{'x2' used after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
     x3 = EnumTy.klass(Klass())
@@ -1736,7 +1736,7 @@ public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{
 
 // This is wrong.
 public func enumPatternMatchSwitch1() {
-    var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(Klass())
     switch x2 { // expected-note {{consuming use here}}
     case let EnumTy.klass(k):
@@ -1783,7 +1783,7 @@ public func enumPatternMatchSwitch2Arg(_ x2: inout EnumTy) { // expected-error {
 
 // QOI: We can do better here. We should also flag x2
 public func enumPatternMatchSwitch2WhereClause() {
-    var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(Klass())
     switch x2 { // expected-note {{consuming use here}}
     case let EnumTy.klass(k)
@@ -1956,7 +1956,7 @@ public func closureCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 
 public func deferCaptureClassUseAfterConsume() {
     var x2 = Klass()
-    // expected-error @-1 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-1 {{'x2' used after consume}}
     // expected-error @-2 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-3 {{'x2' consumed more than once}}
     x2 = Klass()
@@ -1974,7 +1974,7 @@ public func deferCaptureClassUseAfterConsume2() {
     var x2 = Klass()
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    // expected-error @-3 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-3 {{'x2' used after consume}}
     x2 = Klass()
     defer { // expected-note {{non-consuming use here}}
         borrowVal(x2)
@@ -2023,8 +2023,8 @@ public func closureAndDeferCaptureClassUseAfterConsume2() {
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-3 {{'x2' consumed more than once}}
-    // expected-error @-4 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
-    // expected-error @-5 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-4 {{'x2' used after consume}}
+    // expected-error @-5 {{'x2' used after consume}}
     x2 = Klass()
     let f = {
         consumeVal(x2)
@@ -2049,8 +2049,8 @@ public func closureAndDeferCaptureClassUseAfterConsume3() {
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-3 {{'x2' consumed more than once}}
-    // expected-error @-4 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
-    // expected-error @-5 {{'x2' used after consume. Lifetime extension of variable requires a copy}}
+    // expected-error @-4 {{'x2' used after consume}}
+    // expected-error @-5 {{'x2' used after consume}}
     x2 = Klass()
     let f = {
         consumeVal(x2)
@@ -2300,7 +2300,7 @@ func fieldSensitiveTestReinitFieldMultiBlock1() {
 }
 
 func fieldSensitiveTestReinitFieldMultiBlock2() {
-    var a = NonTrivialStruct() // expected-error {{'a' used after consume. Lifetime extension of variable requires a copy}}
+    var a = NonTrivialStruct() // expected-error {{'a' used after consume}}
     a = NonTrivialStruct()
     consumeVal(a.k) // expected-note {{consuming use here}}
 
@@ -2342,7 +2342,7 @@ func fieldSensitiveTestReinitFieldMultiBlock4() {
 }
 
 func fieldSensitiveTestReinitEnumMultiBlock() {
-    var e = NonTrivialEnum.first // expected-error {{'e' used after consume. Lifetime extension of variable requires a copy}}
+    var e = NonTrivialEnum.first // expected-error {{'e' used after consume}}
     e = NonTrivialEnum.second(Klass())
     switch e { // expected-note {{consuming use here}}
     case .second:
@@ -2393,7 +2393,7 @@ func sameCallSiteTestConsumeTwice(_ k: inout Klass) { // expected-error {{'k' co
     k = Klass()
 }
 
-func sameCallSiteConsumeAndUse(_ k: inout Klass) { // expected-error {{'k' used after consume. Lifetime extension of variable requires a copy}}
+func sameCallSiteConsumeAndUse(_ k: inout Klass) { // expected-error {{'k' used after consume}}
     func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: Klass) {}
     consumeKlassAndUseKlass(k, k)
     // expected-note @-1 {{consuming use here}}

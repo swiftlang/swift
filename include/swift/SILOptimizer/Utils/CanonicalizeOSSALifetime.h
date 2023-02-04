@@ -360,6 +360,11 @@ public:
     return liveness.getLifetimeEndingUsers();
   }
 
+  using NonLifetimeEndingUserRange = PrunedLiveness::NonLifetimeEndingUserRange;
+  NonLifetimeEndingUserRange getNonLifetimeEndingUsers() const {
+    return liveness.getNonLifetimeEndingUsers();
+  }
+
   using UserRange = PrunedLiveness::ConstUserRange;
   UserRange getUsers() const { return liveness.getAllUsers(); }
 

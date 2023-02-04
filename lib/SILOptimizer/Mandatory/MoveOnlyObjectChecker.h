@@ -22,6 +22,7 @@
 
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "llvm/ADT/IntervalMap.h"
@@ -42,7 +43,7 @@ struct OSSACanonicalizer {
   SmallVector<SILInstruction *, 32> consumingBoundaryUsers;
 
   /// A list of non-consuming boundary uses.
-  SmallVector<SILInstruction *, 32> nonConsumingBoundaryUses;
+  SmallVector<SILInstruction *, 32> nonConsumingBoundaryUsers;
 
   /// The actual canonicalizer that we use.
   ///
@@ -71,6 +72,18 @@ struct OSSACanonicalizer {
   }
 
   bool canonicalize(SILValue value);
+
+  bool computeLiveness(SILValue value) {
+    return canonicalizer->computeLiveness(value);
+  }
+
+  void computeBoundaryData(SILValue value);
+
+  void rewriteLifetimes() { canonicalizer->rewriteLifetimes(); }
+
+  void findOriginalBoundary(PrunedLivenessBoundary &resultingFoundBoundary) {
+    canonicalizer->findOriginalBoundary(resultingFoundBoundary);
+  }
 
   bool foundAnyConsumingUses() const {
     return consumingUsesNeedingCopy.size() || consumingBoundaryUsers.size();
