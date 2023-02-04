@@ -677,6 +677,9 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
       break;
     }
     break;
+  case ParameterConvention::Pack_Guaranteed:
+  case ParameterConvention::Pack_Owned:
+  case ParameterConvention::Pack_Inout:
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Indirect_In:
     // Currently this

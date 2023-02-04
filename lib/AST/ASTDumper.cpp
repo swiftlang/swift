@@ -3021,6 +3021,8 @@ public:
   void visitMacroExpansionExpr(MacroExpansionExpr *E) {
     printCommon(E, "macro_expansion_expr");
     PrintWithColorRAII(OS, IdentifierColor) << " name=" << E->getMacroName();
+    PrintWithColorRAII(OS, DiscriminatorColor)
+      << " discriminator=" << E->getRawDiscriminator();
     if (E->getArgs()) {
       OS << '\n';
       printArgumentList(E->getArgs());
@@ -3764,8 +3766,10 @@ namespace {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec("dependent_member_type", DMT);
-      } else {
+      } else if (originator.is<PlaceholderTypeRepr *>()) {
         printFlag("placeholder_type_repr");
+      } else {
+        assert(false && "unknown originator");
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -3824,6 +3828,18 @@ namespace {
 
     void visitPackType(PackType *T, StringRef label) {
       printCommon(label, "pack_type");
+      printField("num_elements", T->getNumElements());
+      Indent += 2;
+      for (Type elt : T->getElementTypes()) {
+        printRec(elt);
+      }
+      Indent -= 2;
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitSILPackType(SILPackType *T, StringRef label) {
+      printCommon(label, "sil_pack_type");
+      printField("element_is_address", T->isElementAddress());
       printField("num_elements", T->getNumElements());
       Indent += 2;
       for (Type elt : T->getElementTypes()) {

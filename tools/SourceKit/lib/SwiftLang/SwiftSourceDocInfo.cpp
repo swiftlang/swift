@@ -1172,6 +1172,7 @@ static bool passCursorInfoForDecl(
     });
     return false;
   }
+
   if (MainInfo.VD != OrigInfo.VD && !OrigInfo.Unavailable) {
     CursorSymbolInfo &CtorSymbol = Symbols.emplace_back();
     if (auto Err =
@@ -1182,16 +1183,21 @@ static bool passCursorInfoForDecl(
       Symbols.pop_back();
     }
   }
-  for (auto D : Info.getShorthandShadowedDecls()) {
-    CursorSymbolInfo &SymbolInfo = Symbols.emplace_back();
-    DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
-                   ArrayRef<NominalTypeDecl *>(), Invoc);
-    if (auto Err =
-            fillSymbolInfo(SymbolInfo, DInfo, Info.getLoc(), AddSymbolGraph,
-                           Lang, Invoc, PreviousSnaps, Allocator)) {
-      // Ignore but make sure to remove the partially-filled symbol
-      llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
-      Symbols.pop_back();
+
+  // Add in shadowed declarations if on a decl. For references just go to the
+  // actual declaration.
+  if (!Info.isRef()) {
+    for (auto D : Info.getShorthandShadowedDecls()) {
+      CursorSymbolInfo &SymbolInfo = Symbols.emplace_back();
+      DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
+                     ArrayRef<NominalTypeDecl *>(), Invoc);
+      if (auto Err =
+          fillSymbolInfo(SymbolInfo, DInfo, Info.getLoc(), AddSymbolGraph,
+                         Lang, Invoc, PreviousSnaps, Allocator)) {
+        // Ignore but make sure to remove the partially-filled symbol
+        llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
+        Symbols.pop_back();
+      }
     }
   }
 
@@ -1885,6 +1891,7 @@ void SwiftLangSupport::getCursorInfo(
     bool SymbolGraph, bool CancelOnSubsequentRequest,
     ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken,
+    bool VerifySolverBasedCursorInfo,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
 
   std::string error;
@@ -1961,11 +1968,6 @@ void SwiftLangSupport::getCursorInfo(
   // Currently, we only verify that the solver-based cursor implementation
   // produces the same results as the AST-based implementation. Only enable it
   // in assert builds for now.
-#ifndef NDEBUG
-  bool EnableSolverBasedCursorInfo = true;
-#else
-  bool EnableSolverBasedCursorInfo = false;
-#endif
 
   // If solver based completion is enabled, a string description of the cursor
   // info result produced by the solver-based implementation. Once the AST-based
@@ -1973,7 +1975,7 @@ void SwiftLangSupport::getCursorInfo(
   // AST-based result.
   std::string SolverBasedResultDescription;
   size_t SolverBasedResultCount = 0;
-  if (EnableSolverBasedCursorInfo) {
+  if (VerifySolverBasedCursorInfo) {
     std::string InputFileError;
     llvm::SmallString<64> RealInputFilePath;
     fileSystem->getRealPath(InputFile, RealInputFilePath);

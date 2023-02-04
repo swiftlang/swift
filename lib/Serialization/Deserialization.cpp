@@ -2654,13 +2654,13 @@ getActualMacroRole(uint8_t context) {
   case (uint8_t)serialization::MacroRole::THE_DK: \
     return swift::MacroRole::THE_DK;
   CASE(Expression)
-  CASE(FreestandingDeclaration)
+  CASE(Declaration)
   CASE(Accessor)
   CASE(MemberAttribute)
+  CASE(Member)
 #undef CASE
-  default:
-    return None;
   }
+  return None;
 }
 
 static Optional<swift::MacroIntroducedDeclNameKind>
@@ -3094,7 +3094,7 @@ public:
     GenericSignatureID genericSigID;
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
-    bool needsNewVTableEntry, firstTimeRequired;
+    bool overriddenAffectsABI, needsNewVTableEntry, firstTimeRequired;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -3104,6 +3104,7 @@ public:
                                                async, throws, storedInitKind,
                                                genericSigID,
                                                overriddenID,
+                                               overriddenAffectsABI,
                                                rawAccessLevel,
                                                needsNewVTableEntry,
                                                firstTimeRequired,
@@ -3130,15 +3131,25 @@ public:
       attrs.setRawAttributeChain(DAttrs);
     }
 
-    auto overridden = MF.getDeclChecked(overriddenID);
-    if (!overridden) {
-      // Pass through deserialization errors.
-      if (overridden.errorIsA<FatalDeserializationError>())
-        return overridden.takeError();
+    Expected<Decl *> overriddenOrError = MF.getDeclChecked(overriddenID);
+    Decl *overridden;
+    if (overriddenOrError) {
+      overridden = overriddenOrError.get();
+    } else if (overriddenOrError.errorIsA<FatalDeserializationError>()) {
+      // Pass through fatal deserialization errors.
+      return overriddenOrError.takeError();
+    } else if (MF.allowCompilerErrors()) {
+      // Drop overriding relationship when allowing errors.
+      llvm::consumeError(overriddenOrError.takeError());
+      overridden = nullptr;
+    } else {
+      llvm::consumeError(overriddenOrError.takeError());
+      if (overriddenAffectsABI || !ctx.LangOpts.EnableDeserializationRecovery) {
+        return llvm::make_error<OverrideError>(name, errorFlags,
+                                               numVTableEntries);
+      }
 
-      llvm::consumeError(overridden.takeError());
-      return llvm::make_error<OverrideError>(
-          name, errorFlags, numVTableEntries);
+      overridden = nullptr;
     }
 
     for (auto dependencyID : argNameAndDependencyIDs.slice(numArgNames)) {
@@ -3198,7 +3209,7 @@ public:
     ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{ctor},
                               std::move(needsNewVTableEntry));
 
-    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
+    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden));
     if (auto *overridden = ctor->getOverriddenDecl()) {
       if (!attributeChainContains<RequiredAttr>(DAttrs) ||
           !overridden->isRequired()) {
@@ -5369,18 +5380,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
-      case decls_block::BackDeploy_DECL_ATTR: {
+      case decls_block::BackDeployed_DECL_ATTR: {
         bool isImplicit;
         unsigned Platform;
         DEF_VER_TUPLE_PIECES(Version);
-        serialization::decls_block::BackDeployDeclAttrLayout::readRecord(
+        serialization::decls_block::BackDeployedDeclAttrLayout::readRecord(
             scratch, isImplicit, LIST_VER_TUPLE_PIECES(Version), Platform);
         llvm::VersionTuple Version;
         DECODE_VER_TUPLE(Version)
-        Attr = new (ctx) BackDeployAttr(SourceLoc(), SourceRange(),
-                                        (PlatformKind)Platform,
-                                        Version,
-                                        isImplicit);
+        Attr = new (ctx)
+            BackDeployedAttr(SourceLoc(), SourceRange(), (PlatformKind)Platform,
+                             Version, isImplicit);
         break;
       }
 
@@ -5421,42 +5431,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
-      case decls_block::Declaration_DECL_ATTR: {
+      case decls_block::MacroRole_DECL_ATTR: {
         bool isImplicit;
-        uint8_t rawMacroRole;
-        uint64_t numPeers, numMembers;
-        ArrayRef<uint64_t> introducedDeclNames;
-        serialization::decls_block::DeclarationDeclAttrLayout::
-            readRecord(scratch, isImplicit, rawMacroRole, numPeers,
-                       numMembers, introducedDeclNames);
-        auto role = *getActualMacroRole(rawMacroRole);
-        if (introducedDeclNames.size() != (numPeers + numMembers) * 2)
-          return MF.diagnoseFatal();
-        SmallVector<MacroIntroducedDeclName, 1> peersAndMembers;
-        ArrayRef<MacroIntroducedDeclName> peersAndMembersRef;
-        for (unsigned i = 0; i < introducedDeclNames.size(); i += 2) {
-          auto kind = getActualMacroIntroducedDeclNameKind(
-              (uint8_t)introducedDeclNames[i]);
-          auto identifier =
-              MF.getIdentifier(IdentifierID(introducedDeclNames[i + 1]));
-          peersAndMembers.push_back(MacroIntroducedDeclName(*kind, identifier));
-        }
-        Attr = DeclarationAttr::create(
-            ctx, SourceLoc(), SourceRange(), role,
-            peersAndMembersRef.take_front(numPeers),
-            peersAndMembersRef.take_back(numMembers),
-            isImplicit);
-        break;
-      }
-
-      case decls_block::Attached_DECL_ATTR: {
-        bool isImplicit;
+        uint8_t rawMacroSyntax;
         uint8_t rawMacroRole;
         uint64_t numNames;
         ArrayRef<uint64_t> introducedDeclNames;
-        serialization::decls_block::AttachedDeclAttrLayout::
-            readRecord(scratch, isImplicit, rawMacroRole, numNames,
-                       introducedDeclNames);
+        serialization::decls_block::MacroRoleDeclAttrLayout::
+            readRecord(scratch, isImplicit, rawMacroSyntax, rawMacroRole,
+                       numNames, introducedDeclNames);
         auto role = *getActualMacroRole(rawMacroRole);
         if (introducedDeclNames.size() != numNames * 2)
           return MF.diagnoseFatal();
@@ -5468,8 +5451,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
               MF.getIdentifier(IdentifierID(introducedDeclNames[i + 1]));
           names.push_back(MacroIntroducedDeclName(*kind, identifier));
         }
-        Attr = AttachedAttr::create(
-            ctx, SourceLoc(), SourceRange(), role, names, isImplicit);
+        Attr = MacroRoleAttr::create(
+            ctx, SourceLoc(), SourceRange(),
+            static_cast<MacroSyntax>(rawMacroSyntax), role, names, isImplicit);
         break;
       }
 
@@ -5762,6 +5746,9 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   CASE(Direct_Owned)
   CASE(Direct_Unowned)
   CASE(Direct_Guaranteed)
+  CASE(Pack_Inout)
+  CASE(Pack_Guaranteed)
+  CASE(Pack_Owned)
 #undef CASE
   }
   return None;
@@ -5794,6 +5781,7 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   CASE(Unowned)
   CASE(UnownedInnerPointer)
   CASE(Autoreleased)
+  CASE(Pack)
 #undef CASE
   }
   return None;
@@ -6859,6 +6847,26 @@ Expected<Type> DESERIALIZE_TYPE(PACK_TYPE)(
   }
 
   return PackType::get(MF.getContext(), elements);
+}
+
+Expected<Type> DESERIALIZE_TYPE(SIL_PACK_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  unsigned elementIsAddress;
+  ArrayRef<uint64_t> elementTypeIDs;
+  decls_block::SILPackTypeLayout::readRecord(scratch, elementIsAddress,
+                                             elementTypeIDs);
+
+  SmallVector<CanType, 8> elementTypes;
+  for (auto elementTypeID : elementTypeIDs) {
+    auto elementType = MF.getTypeChecked(elementTypeID);
+    if (!elementType)
+      return elementType.takeError();
+    elementTypes.push_back(elementType.get()->getCanonicalType());
+  }
+
+  return SILPackType::get(MF.getContext(),
+                          SILPackType::ExtInfo{bool(elementIsAddress)},
+                          elementTypes);
 }
 
 Expected<Type> DESERIALIZE_TYPE(ERROR_TYPE)(ModuleFile &MF,

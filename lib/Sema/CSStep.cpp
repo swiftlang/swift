@@ -880,7 +880,7 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
     CS.Timer.emplace(element.getLocator(), CS);
   }
 
-  assert(!ModifiedOptions.hasValue() &&
+  assert(!ModifiedOptions.has_value() &&
          "Previously modified options should have been restored in resume");
   if (CS.isForCodeCompletion() &&
       !element.mightContainCodeCompletionToken(CS)) {

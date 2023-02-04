@@ -1,0 +1,628 @@
+// RUN: %target-sil-opt -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -sil-move-only-borrow-to-destructure %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+@_moveOnly
+class MoveOnlyKlass {
+  var value: Builtin.Int32
+}
+
+@_moveOnly
+struct KlassPair {
+  var lhs: Klass
+  var rhs: MoveOnlyKlass
+}
+
+@_moveOnly
+struct AggStruct {
+  var pair: KlassPair
+}
+
+@_moveOnly
+struct KlassPair2 {
+  var lhs: MoveOnlyKlass
+  var rhs: MoveOnlyKlass
+}
+
+@_moveOnly
+struct AggStruct2 {
+  var lhs: MoveOnlyKlass
+  var pair: KlassPair2
+  var rhs: MoveOnlyKlass
+}
+
+@_moveOnly
+struct SingleIntContainingStruct {
+    var value: Builtin.Int32
+}
+
+sil @misc_use : $@convention(thin) () -> ()
+sil @aggstruct_consume : $@convention(thin) (@owned AggStruct) -> ()
+sil @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+sil @moveonlyklass_use : $@convention(thin) (@guaranteed MoveOnlyKlass) -> ()
+sil @klass_use : $@convention(thin) (@guaranteed Klass) -> ()
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil [ossa] @test_access_single_child_field_consume : $@convention(method) (@guaranteed AggStruct) -> @owned KlassPair {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $AggStruct):
+// CHECK:   [[INIT_COPY:%.*]] = copy_value [[ARG]] : $AggStruct
+// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_copy] [[INIT_COPY]] : $AggStruct
+// CHECK:   [[DESTRUCTURE_COPY:%.*]] = copy_value [[MARKED_VALUE]] : $AggStruct
+// CHECK:   debug_value [[MARKED_VALUE]] : $AggStruct, let, name "self", argno 1, implicit
+// CHECK:   destroy_value [[MARKED_VALUE]] : $AggStruct
+// CHECK:   [[DESTRUCTURE_COPY_1:%.*]] = destructure_struct [[DESTRUCTURE_COPY]] : $AggStruct
+// CHECK:   return [[DESTRUCTURE_COPY_1]] : $KlassPair
+// CHECK: } // end sil function 'test_access_single_child_field_consume'
+sil [ossa] @test_access_single_child_field_consume : $@convention(method) (@guaranteed AggStruct) -> @owned KlassPair {
+bb0(%0 : @guaranteed $AggStruct):
+  %1 = copy_value %0 : $AggStruct
+  %2 = mark_must_check [no_copy] %1 : $AggStruct
+  debug_value %2 : $AggStruct, let, name "self", argno 1, implicit
+  %4 = begin_borrow %2 : $AggStruct
+  %5 = struct_extract %4 : $AggStruct, #AggStruct.pair
+  %6 = copy_value %5 : $KlassPair
+  end_borrow %4 : $AggStruct
+  destroy_value %2 : $AggStruct
+  return %6 : $KlassPair
+}
+
+// CHECK-LABEL: sil [ossa] @test_access_grandfield_consume : $@convention(method) (@guaranteed AggStruct) -> @owned MoveOnlyKlass {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $AggStruct):
+// CHECK:   [[INIT_COPY:%.*]] = copy_value [[ARG]] : $AggStruct
+// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_copy] [[INIT_COPY]] : $AggStruct
+// CHECK:   [[DESTRUCTURE_COPY:%.*]] = copy_value [[MARKED_VALUE]] : $AggStruct
+// CHECK:   debug_value [[MARKED_VALUE]] : $AggStruct, let, name "self", argno 1, implicit
+// CHECK:   destroy_value [[MARKED_VALUE]] : $AggStruct
+// CHECK:   [[DESTRUCTURE_COPY_1:%.*]] = destructure_struct [[DESTRUCTURE_COPY]] : $AggStruct
+// CHECK:   ([[LHS:%.*]], [[RHS:%.*]]) = destructure_struct [[DESTRUCTURE_COPY_1]] : $KlassPair
+// CHECK:   destroy_value [[LHS]]
+// CHECK:   return [[RHS]] : $MoveOnlyKlass
+// CHECK: } // end sil function 'test_access_grandfield_consume'
+sil [ossa] @test_access_grandfield_consume : $@convention(method) (@guaranteed AggStruct) -> @owned MoveOnlyKlass {
+bb0(%0 : @guaranteed $AggStruct):
+  %1 = copy_value %0 : $AggStruct
+  %2 = mark_must_check [no_copy] %1 : $AggStruct
+  debug_value %2 : $AggStruct, let, name "self", argno 1, implicit
+  %4 = begin_borrow %2 : $AggStruct
+  %5 = struct_extract %4 : $AggStruct, #AggStruct.pair
+  %6 = copy_value %5 : $KlassPair
+  %7 = begin_borrow %6 : $KlassPair
+  %8 = struct_extract %7 : $KlassPair, #KlassPair.rhs
+  %9 = copy_value %8 : $MoveOnlyKlass
+  end_borrow %7 : $KlassPair
+  destroy_value %6 : $KlassPair
+  end_borrow %4 : $AggStruct
+  destroy_value %2 : $AggStruct
+  return %9 : $MoveOnlyKlass
+}
+
+// CHECK-LABEL: sil [ossa] @test_ref_element_addr : $@convention(thin) (@owned MoveOnlyKlass) -> @owned MoveOnlyKlass {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [no_implicit_copy] [[ARG]]
+// CHECK:   [[COPY_MARKED_ARG:%.*]] = copy_value [[MARKED_ARG]]
+// CHECK:   [[BORROW_MARKED_ARG:%.*]] = begin_borrow [[COPY_MARKED_ARG]]
+// CHECK:   ref_element_addr [[BORROW_MARKED_ARG]]
+// CHECK:   end_borrow [[BORROW_MARKED_ARG]]
+// CHECK:   destroy_value [[COPY_MARKED_ARG]]
+// CHECK:   return [[MARKED_ARG]]
+// CHECK: } // end sil function 'test_ref_element_addr'
+sil [ossa] @test_ref_element_addr : $@convention(thin) (@owned MoveOnlyKlass) -> @owned MoveOnlyKlass {
+bb0(%0 : @owned $MoveOnlyKlass):
+  %1 = mark_must_check [no_implicit_copy] %0 : $MoveOnlyKlass
+  %2 = begin_borrow %1 : $MoveOnlyKlass
+  %3 = ref_element_addr %2 : $MoveOnlyKlass, #MoveOnlyKlass.value
+  %4 = integer_literal $Builtin.Int32, 1
+  store %4 to [trivial] %3 : $*Builtin.Int32
+  end_borrow %2 : $MoveOnlyKlass
+  return %1 : $MoveOnlyKlass
+}
+
+// CHECK-LABEL: sil [ossa] @test_return_of_extracted_trivial_type : $@convention(thin) (@guaranteed SingleIntContainingStruct) -> Builtin.Int32 {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [no_copy] [[ARG_COPY]]
+// CHECK:   [[MARKED_ARG_COPY:%.*]] = copy_value [[MARKED_ARG]]
+// CHECK:   [[MISC_USE:%.*]] = function_ref @misc_use : $@convention(thin) () -> ()
+// CHECK:   apply [[MISC_USE]]()
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[MARKED_ARG_COPY]]
+// CHECK:   [[EXT:%.*]] = struct_extract [[BORROW]]
+// CHECK:   end_borrow [[BORROW]]
+// CHECK:   destroy_value [[MARKED_ARG_COPY]]
+// CHECK:   return [[EXT]]
+// CHECK: } // end sil function 'test_return_of_extracted_trivial_type'
+sil [ossa] @test_return_of_extracted_trivial_type : $@convention(thin) (@guaranteed SingleIntContainingStruct) -> Builtin.Int32 {
+bb0(%0 : @guaranteed $SingleIntContainingStruct):
+  %1 = copy_value %0 : $SingleIntContainingStruct
+  %2 = mark_must_check [no_copy] %1 : $SingleIntContainingStruct
+  debug_value %2 : $SingleIntContainingStruct, let, name "x", argno 1
+  %4 = begin_borrow %2 : $SingleIntContainingStruct
+  %5 = struct_extract %4 : $SingleIntContainingStruct, #SingleIntContainingStruct.value
+  end_borrow %4 : $SingleIntContainingStruct
+  %f = function_ref @misc_use : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  destroy_value %2 : $SingleIntContainingStruct
+  return %5 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @phis_are_cleaned_up : $@convention(thin) (@owned AggStruct2) -> () {
+// CHECK: bb3([[FIRST_PHI:%.*]] : @owned $MoveOnlyKlass, [[SECOND_PHI:%.*]] : @owned $MoveOnlyKlass, [[THIRD_PHI:%.*]] : @owned $MoveOnlyKlass):
+// CHECK:   destroy_value [[SECOND_PHI]]
+// CHECK:   destroy_value [[THIRD_PHI]]
+// CHECK:   apply {{%.*}}([[FIRST_PHI]])
+// CHECK:   destroy_value [[FIRST_PHI]]
+// CHECK: } // end sil function 'phis_are_cleaned_up'
+sil [ossa] @phis_are_cleaned_up : $@convention(thin) (@owned AggStruct2) -> () {
+bb0(%0 : @owned $AggStruct2):
+  %1 = move_value [lexical] %0 : $AggStruct2
+  %2 = mark_must_check [no_implicit_copy] %1 : $AggStruct2
+  debug_value %2 : $AggStruct2, let, name "x2", argno 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = begin_borrow %2 : $AggStruct2
+  %9 = struct_extract %8 : $AggStruct2, #AggStruct2.pair
+  %10 = copy_value %9 : $KlassPair2
+  %11 = begin_borrow %10 : $KlassPair2
+  %12 = struct_extract %11 : $KlassPair2, #KlassPair2.rhs
+  %13 = copy_value %12 : $MoveOnlyKlass
+  end_borrow %11 : $KlassPair2
+  destroy_value %10 : $KlassPair2
+  %16 = function_ref @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+  %17 = apply %16(%13) : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+  end_borrow %8 : $AggStruct2
+  br bb3
+
+bb2:
+  %20 = begin_borrow %2 : $AggStruct2
+  %21 = struct_extract %20 : $AggStruct2, #AggStruct2.pair
+  %22 = copy_value %21 : $KlassPair2
+  %23 = begin_borrow %22 : $KlassPair2
+  %24 = struct_extract %23 : $KlassPair2, #KlassPair2.rhs
+  %25 = copy_value %24 : $MoveOnlyKlass
+  end_borrow %23 : $KlassPair2
+  destroy_value %22 : $KlassPair2
+  %28 = function_ref @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+  %29 = apply %28(%25) : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+  end_borrow %20 : $AggStruct2
+  br bb3
+
+bb3:
+  %32 = begin_borrow %2 : $AggStruct2
+  %33 = struct_extract %32 : $AggStruct2, #AggStruct2.lhs
+  %34 = copy_value %33 : $MoveOnlyKlass
+  %35 = function_ref @moveonlyklass_use : $@convention(thin) (@guaranteed MoveOnlyKlass) -> ()
+  %36 = apply %35(%34) : $@convention(thin) (@guaranteed MoveOnlyKlass) -> ()
+  destroy_value %34 : $MoveOnlyKlass
+  end_borrow %32 : $AggStruct2
+  destroy_value %2 : $AggStruct2
+  %39 = tuple ()
+  return %39 : $()
+}
+
+///////////////////////////////
+// Single Field Struct Tests //
+///////////////////////////////
+
+//===---
+// Tests that make sure that we can properly destructure/extract values from
+// chains of single field structs.
+
+@_moveOnly
+struct MultiLevelSingleFieldStructChild {
+  var k: MoveOnlyKlass
+}
+
+@_moveOnly
+struct MultiLevelSingleFieldStructParent {
+  var f: MultiLevelSingleFieldStructChild
+}
+
+@_moveOnly
+struct MultiLevelSingleFieldStructGrandParent {
+  var f: MultiLevelSingleFieldStructParent
+}
+
+// CHECK-LABEL: sil [ossa] @grandParentToPrimitiveField : $@convention(thin) (@guaranteed MultiLevelSingleFieldStructGrandParent) -> @owned MoveOnlyKlass {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $MultiLevelSingleFieldStructGrandParent):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_copy] [[ARG_COPY]]
+// CHECK:   [[COPY_MARKED_VALUE:%.*]] = copy_value [[MARKED_VALUE]]
+// CHECK:   destroy_value [[MARKED_VALUE]]
+// CHECK:   [[DESTRUCTURE_1:%.*]] = destructure_struct [[COPY_MARKED_VALUE]]
+// CHECK:   [[DESTRUCTURE_2:%.*]] = destructure_struct [[DESTRUCTURE_1]]
+// CHECK:   [[DESTRUCTURE_3:%.*]] = destructure_struct [[DESTRUCTURE_2]]
+// CHECK:   return [[DESTRUCTURE_3]]
+// CHECK: } // end sil function 'grandParentToPrimitiveField'
+sil [ossa] @grandParentToPrimitiveField : $@convention(thin) (@guaranteed MultiLevelSingleFieldStructGrandParent) -> @owned MoveOnlyKlass {
+bb0(%0 : @guaranteed $MultiLevelSingleFieldStructGrandParent):
+  %1 = copy_value %0 : $MultiLevelSingleFieldStructGrandParent
+  %2 = mark_must_check [no_copy] %1 : $MultiLevelSingleFieldStructGrandParent
+  debug_value %2 : $MultiLevelSingleFieldStructGrandParent, let, name "p", argno 1
+  %4 = begin_borrow %2 : $MultiLevelSingleFieldStructGrandParent
+  %5 = struct_extract %4 : $MultiLevelSingleFieldStructGrandParent, #MultiLevelSingleFieldStructGrandParent.f
+  %6 = copy_value %5 : $MultiLevelSingleFieldStructParent
+  %7 = begin_borrow %6 : $MultiLevelSingleFieldStructParent
+  %8 = struct_extract %7 : $MultiLevelSingleFieldStructParent, #MultiLevelSingleFieldStructParent.f
+  %9 = copy_value %8 : $MultiLevelSingleFieldStructChild
+  end_borrow %7 : $MultiLevelSingleFieldStructParent
+  destroy_value %6 : $MultiLevelSingleFieldStructParent
+  %12 = begin_borrow %9 : $MultiLevelSingleFieldStructChild
+  %13 = struct_extract %12 : $MultiLevelSingleFieldStructChild, #MultiLevelSingleFieldStructChild.k
+  %14 = copy_value %13 : $MoveOnlyKlass
+  end_borrow %12 : $MultiLevelSingleFieldStructChild
+  destroy_value %9 : $MultiLevelSingleFieldStructChild
+  end_borrow %4 : $MultiLevelSingleFieldStructGrandParent
+  destroy_value %2 : $MultiLevelSingleFieldStructGrandParent
+  return %14 : $MoveOnlyKlass
+}
+
+// CHECK-LABEL: sil hidden [ossa] @grandParentToChildField : $@convention(thin) (@guaranteed MultiLevelSingleFieldStructGrandParent) -> @owned MultiLevelSingleFieldStructChild {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $MultiLevelSingleFieldStructGrandParent):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_copy] [[ARG_COPY]]
+// CHECK:   [[COPY_MARKED_VALUE:%.*]] = copy_value [[MARKED_VALUE]]
+// CHECK:   destroy_value [[MARKED_VALUE]]
+// CHECK:   [[DESTRUCTURE_1:%.*]] = destructure_struct [[COPY_MARKED_VALUE]]
+// CHECK:   [[DESTRUCTURE_2:%.*]] = destructure_struct [[DESTRUCTURE_1]]
+// CHECK:   return [[DESTRUCTURE_2]]
+// CHECK: } // end sil function 'grandParentToChildField'
+sil hidden [ossa] @grandParentToChildField : $@convention(thin) (@guaranteed MultiLevelSingleFieldStructGrandParent) -> @owned MultiLevelSingleFieldStructChild {
+bb0(%0 : @guaranteed $MultiLevelSingleFieldStructGrandParent):
+  %1 = copy_value %0 : $MultiLevelSingleFieldStructGrandParent
+  %2 = mark_must_check [no_copy] %1 : $MultiLevelSingleFieldStructGrandParent
+  debug_value %2 : $MultiLevelSingleFieldStructGrandParent, let, name "p", argno 1
+  %4 = begin_borrow %2 : $MultiLevelSingleFieldStructGrandParent
+  %5 = struct_extract %4 : $MultiLevelSingleFieldStructGrandParent, #MultiLevelSingleFieldStructGrandParent.f
+  %6 = copy_value %5 : $MultiLevelSingleFieldStructParent
+  %7 = begin_borrow %6 : $MultiLevelSingleFieldStructParent
+  %8 = struct_extract %7 : $MultiLevelSingleFieldStructParent, #MultiLevelSingleFieldStructParent.f
+  %9 = copy_value %8 : $MultiLevelSingleFieldStructChild
+  end_borrow %7 : $MultiLevelSingleFieldStructParent
+  destroy_value %6 : $MultiLevelSingleFieldStructParent
+  end_borrow %4 : $MultiLevelSingleFieldStructGrandParent
+  destroy_value %2 : $MultiLevelSingleFieldStructGrandParent
+  return %9 : $MultiLevelSingleFieldStructChild
+}
+
+// CHECK-LABEL: sil [ossa] @singlefield_grandparent_to_singlefield_parent : $@convention(thin) (@guaranteed MultiLevelSingleFieldStructGrandParent) -> @owned MultiLevelSingleFieldStructParent {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $MultiLevelSingleFieldStructGrandParent):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_copy] [[ARG_COPY]]
+// CHECK:   [[COPY_MARKED_VALUE:%.*]] = copy_value [[MARKED_VALUE]]
+// CHECK:   destroy_value [[MARKED_VALUE]]
+// CHECK:   [[DESTRUCTURE_1:%.*]] = destructure_struct [[COPY_MARKED_VALUE]]
+// CHECK:   return [[DESTRUCTURE_1]]
+// CHECK: } // end sil function 'singlefield_grandparent_to_singlefield_parent'
+sil [ossa] @singlefield_grandparent_to_singlefield_parent : $@convention(thin) (@guaranteed MultiLevelSingleFieldStructGrandParent) -> @owned MultiLevelSingleFieldStructParent {
+bb0(%0 : @guaranteed $MultiLevelSingleFieldStructGrandParent):
+  %1 = copy_value %0 : $MultiLevelSingleFieldStructGrandParent
+  %2 = mark_must_check [no_copy] %1 : $MultiLevelSingleFieldStructGrandParent
+  debug_value %2 : $MultiLevelSingleFieldStructGrandParent, let, name "p", argno 1
+  %4 = begin_borrow %2 : $MultiLevelSingleFieldStructGrandParent
+  %5 = struct_extract %4 : $MultiLevelSingleFieldStructGrandParent, #MultiLevelSingleFieldStructGrandParent.f
+  %6 = copy_value %5 : $MultiLevelSingleFieldStructParent
+  end_borrow %4 : $MultiLevelSingleFieldStructGrandParent
+  destroy_value %2 : $MultiLevelSingleFieldStructGrandParent
+  return %6 : $MultiLevelSingleFieldStructParent
+}
+
+// CHECK-LABEL: sil [ossa] @singlefield_grandparent_to_singlefield_grandparent : $@convention(thin) (@guaranteed MultiLevelSingleFieldStructGrandParent) -> @owned MultiLevelSingleFieldStructGrandParent {
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_copy] [[ARG_COPY]]
+// CHECK:   [[COPY_MARKED_VALUE:%.*]] = copy_value [[MARKED_VALUE]]
+// CHECK:   destroy_value [[MARKED_VALUE]]
+// CHECK:   return [[COPY_MARKED_VALUE]]
+// CHECK: } // end sil function 'singlefield_grandparent_to_singlefield_grandparent'
+sil [ossa] @singlefield_grandparent_to_singlefield_grandparent : $@convention(thin) (@guaranteed MultiLevelSingleFieldStructGrandParent) -> @owned MultiLevelSingleFieldStructGrandParent {
+bb0(%0 : @guaranteed $MultiLevelSingleFieldStructGrandParent):
+  %1 = copy_value %0 : $MultiLevelSingleFieldStructGrandParent
+  %2 = mark_must_check [no_copy] %1 : $MultiLevelSingleFieldStructGrandParent
+  debug_value %2 : $MultiLevelSingleFieldStructGrandParent, let, name "p", argno 1
+  %4 = copy_value %2 : $MultiLevelSingleFieldStructGrandParent
+  destroy_value %2 : $MultiLevelSingleFieldStructGrandParent
+  return %4 : $MultiLevelSingleFieldStructGrandParent
+}
+
+/////////////////////////////////////////////////////////////
+// Single Field Struct In Middle Of Multiple Field Structs //
+/////////////////////////////////////////////////////////////
+
+//----
+// These tests make sure that we properly handle single field structs along a
+// chain of multi-field structs.
+//
+
+@_moveOnly
+struct GrandParentMultiFieldStruct {
+  var first: MoveOnlyKlass
+  var second: SingleFieldParentOfMultiFieldChild
+  var third: MoveOnlyKlass
+}
+
+@_moveOnly
+struct SingleFieldParentOfMultiFieldChild {
+  var child: ChildMultiFieldStruct
+}
+
+@_moveOnly
+struct ChildMultiFieldStruct {
+  var lhs: MoveOnlyKlass
+  var rhs: MoveOnlyKlass
+}
+
+// CHECK-LABEL: sil [ossa] @access_primitive_field_trampolining_from_multifield_through_singlefield : $@convention(thin) (@guaranteed GrandParentMultiFieldStruct) -> @owned MoveOnlyKlass {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_copy] [[ARG_COPY]]
+// CHECK:   [[COPY_MARKED_VALUE:%.*]] = copy_value [[MARKED_VALUE]]
+// CHECK:   destroy_value [[MARKED_VALUE]]
+// CHECK:   ([[GP_LHS:%.*]], [[GP_TARGET:%.*]], [[GP_RHS:%.*]]) = destructure_struct [[COPY_MARKED_VALUE]]
+// CHECK:   destroy_value [[GP_RHS]]
+// CHECK:   destroy_value [[GP_LHS]]
+// CHECK:   [[P_DESTRUCTURE:%.*]] = destructure_struct [[GP_TARGET]]
+// CHECK:   ([[CHILD_LHS:%.*]], [[CHILD_RHS:%.*]]) = destructure_struct [[P_DESTRUCTURE]]
+// CHECK:   destroy_value [[CHILD_RHS]]
+// CHECK:   return [[CHILD_LHS]]
+// CHECK: } // end sil function 'access_primitive_field_trampolining_from_multifield_through_singlefield'
+sil [ossa] @access_primitive_field_trampolining_from_multifield_through_singlefield : $@convention(thin) (@guaranteed GrandParentMultiFieldStruct) -> @owned MoveOnlyKlass {
+bb0(%0 : @guaranteed $GrandParentMultiFieldStruct):
+  %1 = copy_value %0 : $GrandParentMultiFieldStruct
+  %2 = mark_must_check [no_copy] %1 : $GrandParentMultiFieldStruct
+  debug_value %2 : $GrandParentMultiFieldStruct, let, name "p", argno 1
+  %4 = begin_borrow %2 : $GrandParentMultiFieldStruct
+  %5 = struct_extract %4 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.second
+  %6 = copy_value %5 : $SingleFieldParentOfMultiFieldChild
+  %7 = begin_borrow %6 : $SingleFieldParentOfMultiFieldChild
+  %8 = struct_extract %7 : $SingleFieldParentOfMultiFieldChild, #SingleFieldParentOfMultiFieldChild.child
+  %9 = copy_value %8 : $ChildMultiFieldStruct
+  end_borrow %7 : $SingleFieldParentOfMultiFieldChild
+  destroy_value %6 : $SingleFieldParentOfMultiFieldChild
+  %12 = begin_borrow %9 : $ChildMultiFieldStruct
+  %13 = struct_extract %12 : $ChildMultiFieldStruct, #ChildMultiFieldStruct.lhs
+  %14 = copy_value %13 : $MoveOnlyKlass
+  end_borrow %12 : $ChildMultiFieldStruct
+  destroy_value %9 : $ChildMultiFieldStruct
+  end_borrow %4 : $GrandParentMultiFieldStruct
+  destroy_value %2 : $GrandParentMultiFieldStruct
+  return %14 : $MoveOnlyKlass
+}
+
+// CHECK-LABEL: sil [ossa] @access_primitive_field_trampolining_from_multifield_through_singlefield_2 : $@convention(thin) (@guaranteed GrandParentMultiFieldStruct) -> @owned MoveOnlyKlass {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_copy] [[ARG_COPY]]
+// CHECK:   [[COPY_MARKED_VALUE:%.*]] = copy_value [[MARKED_VALUE]]
+// CHECK:   destroy_value [[MARKED_VALUE]]
+// CHECK:   ([[GP_LHS:%.*]], [[GP_TARGET:%.*]], [[GP_RHS:%.*]]) = destructure_struct [[COPY_MARKED_VALUE]]
+// CHECK:   destroy_value [[GP_RHS]]
+// CHECK:   destroy_value [[GP_LHS]]
+// CHECK:   [[P_DESTRUCTURE:%.*]] = destructure_struct [[GP_TARGET]]
+// CHECK:   ([[CHILD_LHS:%.*]], [[CHILD_RHS:%.*]]) = destructure_struct [[P_DESTRUCTURE]]
+// CHECK:   destroy_value [[CHILD_LHS]]
+// CHECK:   return [[CHILD_RHS]]
+// CHECK: } // end sil function 'access_primitive_field_trampolining_from_multifield_through_singlefield_2'
+sil [ossa] @access_primitive_field_trampolining_from_multifield_through_singlefield_2 : $@convention(thin) (@guaranteed GrandParentMultiFieldStruct) -> @owned MoveOnlyKlass {
+bb0(%0 : @guaranteed $GrandParentMultiFieldStruct):
+  %1 = copy_value %0 : $GrandParentMultiFieldStruct
+  %2 = mark_must_check [no_copy] %1 : $GrandParentMultiFieldStruct
+  debug_value %2 : $GrandParentMultiFieldStruct, let, name "p", argno 1
+  %4 = begin_borrow %2 : $GrandParentMultiFieldStruct
+  %5 = struct_extract %4 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.second
+  %6 = copy_value %5 : $SingleFieldParentOfMultiFieldChild
+  %7 = begin_borrow %6 : $SingleFieldParentOfMultiFieldChild
+  %8 = struct_extract %7 : $SingleFieldParentOfMultiFieldChild, #SingleFieldParentOfMultiFieldChild.child
+  %9 = copy_value %8 : $ChildMultiFieldStruct
+  end_borrow %7 : $SingleFieldParentOfMultiFieldChild
+  destroy_value %6 : $SingleFieldParentOfMultiFieldChild
+  %12 = begin_borrow %9 : $ChildMultiFieldStruct
+  %13 = struct_extract %12 : $ChildMultiFieldStruct, #ChildMultiFieldStruct.rhs
+  %14 = copy_value %13 : $MoveOnlyKlass
+  end_borrow %12 : $ChildMultiFieldStruct
+  destroy_value %9 : $ChildMultiFieldStruct
+  end_borrow %4 : $GrandParentMultiFieldStruct
+  destroy_value %2 : $GrandParentMultiFieldStruct
+  return %14 : $MoveOnlyKlass
+}
+
+// CHECK-LABEL: sil [ossa] @access_primitive_field_trampolining_from_multifield_through_singlefield_with_tuple : $@convention(thin) (@guaranteed GrandParentMultiFieldStruct) -> (@owned MoveOnlyKlass, @owned MoveOnlyKlass) {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_copy] [[ARG_COPY]]
+// CHECK:   [[COPY_MARKED_VALUE:%.*]] = copy_value [[MARKED_VALUE]]
+// CHECK:   destroy_value [[MARKED_VALUE]]
+// CHECK:   ([[GP_LHS:%.*]], [[GP_TARGET:%.*]], [[GP_RHS:%.*]]) = destructure_struct [[COPY_MARKED_VALUE]]
+// CHECK:   destroy_value [[GP_RHS]]
+// CHECK:   [[P_DESTRUCTURE:%.*]] = destructure_struct [[GP_TARGET]]
+// CHECK:   ([[CHILD_LHS:%.*]], [[CHILD_RHS:%.*]]) = destructure_struct [[P_DESTRUCTURE]]
+// CHECK:   destroy_value [[CHILD_LHS]]
+// CHECK:   [[RESULT:%.*]] = tuple ([[GP_LHS]] : $MoveOnlyKlass, [[CHILD_RHS]] : $MoveOnlyKlass)
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'access_primitive_field_trampolining_from_multifield_through_singlefield_with_tuple'
+sil [ossa] @access_primitive_field_trampolining_from_multifield_through_singlefield_with_tuple : $@convention(thin) (@guaranteed GrandParentMultiFieldStruct) -> (@owned MoveOnlyKlass, @owned MoveOnlyKlass) {
+bb0(%0 : @guaranteed $GrandParentMultiFieldStruct):
+  %1 = copy_value %0 : $GrandParentMultiFieldStruct
+  %2 = mark_must_check [no_copy] %1 : $GrandParentMultiFieldStruct
+  debug_value %2 : $GrandParentMultiFieldStruct, let, name "p", argno 1
+  %4 = begin_borrow %2 : $GrandParentMultiFieldStruct
+  %5 = struct_extract %4 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.first
+  %6 = copy_value %5 : $MoveOnlyKlass
+  %7 = begin_borrow %2 : $GrandParentMultiFieldStruct
+  %8 = struct_extract %7 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.second
+  %9 = copy_value %8 : $SingleFieldParentOfMultiFieldChild
+  %10 = begin_borrow %9 : $SingleFieldParentOfMultiFieldChild
+  %11 = struct_extract %10 : $SingleFieldParentOfMultiFieldChild, #SingleFieldParentOfMultiFieldChild.child
+  %12 = copy_value %11 : $ChildMultiFieldStruct
+  end_borrow %10 : $SingleFieldParentOfMultiFieldChild
+  destroy_value %9 : $SingleFieldParentOfMultiFieldChild
+  %15 = begin_borrow %12 : $ChildMultiFieldStruct
+  %16 = struct_extract %15 : $ChildMultiFieldStruct, #ChildMultiFieldStruct.rhs
+  %17 = copy_value %16 : $MoveOnlyKlass
+  end_borrow %15 : $ChildMultiFieldStruct
+  destroy_value %12 : $ChildMultiFieldStruct
+  end_borrow %7 : $GrandParentMultiFieldStruct
+  end_borrow %4 : $GrandParentMultiFieldStruct
+  destroy_value %2 : $GrandParentMultiFieldStruct
+  %23 = tuple (%6 : $MoveOnlyKlass, %17 : $MoveOnlyKlass)
+  return %23 : $(MoveOnlyKlass, MoveOnlyKlass)
+}
+
+////////////////////
+// Dataflow Tests //
+////////////////////
+
+// A test that consumes .first in bb1 and does nothing else.
+//
+// func test(_ p: GrandParentMultiFieldStruct) -> () {
+//     if bool {
+//         let x = p.first
+//         let _ = x
+//     }
+// }
+//
+// CHECK-lABEL: sil [ossa] @consume_field_in_one_side_of_diamond : $@convention(thin) (@guaranteed GrandParentMultiFieldStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [no_copy] [[ARG_COPY]]
+// CHECK:   [[DESTRUCTURE_COPY:%.*]] = copy_value [[MARKED_ARG]]
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   ([[DESTR_FIRST:%.*]], [[DESTR_SECOND:%.*]], [[DESTR_THIRD:%.*]]) = destructure_struct [[DESTRUCTURE_COPY]]
+// CHECK:   destroy_value [[DESTR_THIRD]]
+// CHECK:   destroy_value [[DESTR_SECOND]]
+// CHECK:   move_value [lexical] [[DESTR_FIRST]]
+// CHECK:   br bb3
+//
+// CHECK: bb2:
+// CHECK-NEXT:   destroy_value [[DESTRUCTURE_COPY]]
+// CHECK-NEXT:   br bb3
+//
+// CHECK: bb3:
+// CHECK-NEXT:   destroy_value [[MARKED_ARG]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'consume_field_in_one_side_of_diamond'
+sil [ossa] @consume_field_in_one_side_of_diamond : $@convention(thin) (@guaranteed GrandParentMultiFieldStruct) -> () {
+bb0(%0 : @guaranteed $GrandParentMultiFieldStruct):
+  %1 = copy_value %0 : $GrandParentMultiFieldStruct
+  %2 = mark_must_check [no_copy] %1 : $GrandParentMultiFieldStruct
+  debug_value %2 : $GrandParentMultiFieldStruct, let, name "p", argno 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = begin_borrow %2 : $GrandParentMultiFieldStruct
+  %9 = struct_extract %8 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.first
+  %10 = copy_value %9 : $MoveOnlyKlass
+  %11 = move_value [lexical] %10 : $MoveOnlyKlass
+  %12 = mark_must_check [no_implicit_copy] %11 : $MoveOnlyKlass
+  debug_value %12 : $MoveOnlyKlass, let, name "x"
+  end_borrow %8 : $GrandParentMultiFieldStruct
+  %15 = copy_value %12 : $MoveOnlyKlass
+  %16 = move_value %15 : $MoveOnlyKlass
+  destroy_value %16 : $MoveOnlyKlass
+  destroy_value %12 : $MoveOnlyKlass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_value %2 : $GrandParentMultiFieldStruct
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This SIL tests out the following code pattern.
+//
+// func test(_ p: GrandParentMultiFieldStruct) -> () {
+//     if bool {
+//         let x = p.first
+//         _ = x
+//     } else {
+//         let x = p.second
+//         _ = x
+//     }
+//     let x = p.third
+//     _ = x
+// }
+//
+// CHECK-LABEL: sil [ossa] @test_consumes_in_both_sides_of_diamond_with_cont_consume : $@convention(thin) (@guaranteed GrandParentMultiFieldStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [no_copy] [[ARG_COPY]]
+// CHECK:   [[DESTRUCTURE_COPY:%.*]] = copy_value [[MARKED_ARG]]
+// CHECK:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK:   ([[DESTR_FIRST:%.*]], [[DESTR_SECOND:%.*]], [[DESTR_THIRD:%.*]]) = destructure_struct [[DESTRUCTURE_COPY]]
+// CHECK:   destroy_value [[DESTR_SECOND]]
+// CHECK:   move_value [lexical] [[DESTR_FIRST]]
+// CHECK:   br bb3([[DESTR_THIRD]] :
+//
+// CHECK: bb2:
+// CHECK:   ([[DESTR_FIRST:%.*]], [[DESTR_SECOND:%.*]], [[DESTR_THIRD:%.*]]) = destructure_struct [[DESTRUCTURE_COPY]]
+// CHECK:   destroy_value [[DESTR_FIRST]]
+// CHECK:   move_value [lexical] [[DESTR_SECOND]]
+// CHECK:   br bb3([[DESTR_THIRD]] :
+//
+// CHECK: bb3([[CONT_ARG:%.*]] : @owned
+// CHECK:   [[MOVED_CONT_ARG:%.*]] = move_value [lexical] [[CONT_ARG]]
+// CHECK-NEXT:   mark_must_check [no_implicit_copy] [[MOVED_CONT_ARG]]
+// CHECK-NEXT:   debug_value
+// CHECK-NEXT:   destroy_value
+// CHECK-NEXT:   destroy_value [[MARKED_ARG]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'test_consumes_in_both_sides_of_diamond_with_cont_consume'
+sil [ossa] @test_consumes_in_both_sides_of_diamond_with_cont_consume : $@convention(thin) (@guaranteed GrandParentMultiFieldStruct) -> () {
+bb0(%0 : @guaranteed $GrandParentMultiFieldStruct):
+  %1 = copy_value %0 : $GrandParentMultiFieldStruct
+  %2 = mark_must_check [no_copy] %1 : $GrandParentMultiFieldStruct
+  debug_value %2 : $GrandParentMultiFieldStruct, let, name "p", argno 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = begin_borrow %2 : $GrandParentMultiFieldStruct
+  %9 = struct_extract %8 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.first
+  %10 = copy_value %9 : $MoveOnlyKlass
+  %11 = move_value [lexical] %10 : $MoveOnlyKlass
+  %12 = mark_must_check [no_implicit_copy] %11 : $MoveOnlyKlass
+  debug_value %12 : $MoveOnlyKlass, let, name "x"
+  end_borrow %8 : $GrandParentMultiFieldStruct
+  destroy_value %12 : $MoveOnlyKlass
+  br bb3
+
+bb2:
+  %17 = begin_borrow %2 : $GrandParentMultiFieldStruct
+  %18 = struct_extract %17 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.second
+  %19 = copy_value %18 : $SingleFieldParentOfMultiFieldChild
+  %20 = move_value [lexical] %19 : $SingleFieldParentOfMultiFieldChild
+  %21 = mark_must_check [no_implicit_copy] %20 : $SingleFieldParentOfMultiFieldChild
+  debug_value %21 : $SingleFieldParentOfMultiFieldChild, let, name "x"
+  end_borrow %17 : $GrandParentMultiFieldStruct
+  destroy_value %21 : $SingleFieldParentOfMultiFieldChild
+  br bb3
+
+bb3:
+  %26 = begin_borrow %2 : $GrandParentMultiFieldStruct
+  %27 = struct_extract %26 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.third
+  %28 = copy_value %27 : $MoveOnlyKlass
+  %29 = move_value [lexical] %28 : $MoveOnlyKlass
+  %30 = mark_must_check [no_implicit_copy] %29 : $MoveOnlyKlass
+  debug_value %30 : $MoveOnlyKlass, let, name "x"
+  end_borrow %26 : $GrandParentMultiFieldStruct
+  destroy_value %30 : $MoveOnlyKlass
+  destroy_value %2 : $GrandParentMultiFieldStruct
+  %35 = tuple ()
+  return %35 : $()
+}

@@ -222,6 +222,11 @@ BridgedArgumentConvention SILArgumentConvention_getBridged(SILArgumentConvention
       return ArgumentConvention_Direct_Owned;
     case SILArgumentConvention::Direct_Guaranteed:
       return ArgumentConvention_Direct_Guaranteed;
+    case SILArgumentConvention::Pack_Inout:
+    case SILArgumentConvention::Pack_Out:
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Owned:
+      llvm_unreachable("cannot bridge variadic generics");
   }
 }
 
@@ -410,6 +415,11 @@ static BridgedArgumentConvention bridgeArgumentConvention(SILArgumentConvention 
       return ArgumentConvention_Direct_Owned;
     case SILArgumentConvention::Direct_Guaranteed:
       return ArgumentConvention_Direct_Guaranteed;
+    case SILArgumentConvention::Pack_Inout:
+    case SILArgumentConvention::Pack_Out:
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Owned:
+      llvm_unreachable("cannot bridge variadic generics");
   }
 }
 

@@ -354,7 +354,8 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
                       const Metadata *type,
                       const void * const *instantiationArgs);
 
-const WitnessTable *
+SWIFT_RUNTIME_EXPORT
+const RelativeWitnessTable *
 swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *conformance,
                       const Metadata *type,
                       const void * const *instantiationArgs);
@@ -377,7 +378,7 @@ MetadataResponse swift_getAssociatedTypeWitness(
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_getAssociatedTypeWitnessRelative(
                                           MetadataRequest request,
-                                          WitnessTable *wtable,
+                                          RelativeWitnessTable *wtable,
                                           const Metadata *conformingType,
                                           const ProtocolRequirement *reqBase,
                                           const ProtocolRequirement *assocType);
@@ -401,8 +402,8 @@ const WitnessTable *swift_getAssociatedConformanceWitness(
                                   const ProtocolRequirement *assocConformance);
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
-const WitnessTable *swift_getAssociatedConformanceWitnessRelative(
-                                  WitnessTable *wtable,
+const RelativeWitnessTable *swift_getAssociatedConformanceWitnessRelative(
+                                  RelativeWitnessTable *wtable,
                                   const Metadata *conformingType,
                                   const Metadata *assocType,
                                   const ProtocolRequirement *reqBase,

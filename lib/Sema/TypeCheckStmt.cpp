@@ -58,10 +58,10 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckStmt"
 
 namespace {
-  class ContextualizeClosures : public ASTWalker {
+  class ContextualizeClosuresAndMacros : public ASTWalker {
     DeclContext *ParentDC;
   public:
-    ContextualizeClosures(DeclContext *parent) : ParentDC(parent) {}
+    ContextualizeClosuresAndMacros(DeclContext *parent) : ParentDC(parent) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
@@ -105,7 +105,7 @@ namespace {
         // we need to walk into it with a new sequence.
         // Otherwise, it'll have been separately type-checked.
         if (!CE->isSeparatelyTypeChecked())
-          CE->getBody()->walk(ContextualizeClosures(CE));
+          CE->getBody()->walk(ContextualizeClosuresAndMacros(CE));
 
         TypeChecker::computeCaptures(CE);
         return Action::SkipChildren(E);
@@ -115,6 +115,11 @@ namespace {
       if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
         if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
           DAE->getCallerSideDefaultExpr()->walk(*this);
+
+      // Macro expansion expressions require a DeclContext as well.
+      if (auto macroExpansion = dyn_cast<MacroExpansionExpr>(E)) {
+        macroExpansion->setDeclContext(ParentDC);
+      }
 
       return Action::Continue(E);
     }
@@ -201,12 +206,12 @@ namespace {
 } // end anonymous namespace
 
 void TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
-  ContextualizeClosures CC(DC);
+  ContextualizeClosuresAndMacros CC(DC);
   E->walk(CC);
 }
 
 void TypeChecker::contextualizeTopLevelCode(TopLevelCodeDecl *TLCD) {
-  ContextualizeClosures CC(TLCD);
+  ContextualizeClosuresAndMacros CC(TLCD);
   if (auto *body = TLCD->getBody())
     body->walk(CC);
 }
@@ -225,6 +230,7 @@ namespace {
 
     /// Local declaration discriminators.
     llvm::SmallDenseMap<Identifier, unsigned> DeclDiscriminators;
+
   public:
     SetLocalDiscriminators(
         unsigned initialDiscriminator = 0
@@ -991,7 +997,7 @@ public:
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
     bool HadError = typeCheckStmt(S);
-    S->walk(ContextualizeClosures(DC));
+    S->walk(ContextualizeClosuresAndMacros(DC));
     return HadError;
   }
 
@@ -1830,6 +1836,12 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
     return;
   }
 
+  if (auto *Cond = node.dyn_cast<StmtConditionElement *>()) {
+    bool IsFalsable; // ignored
+    TypeChecker::typeCheckStmtConditionElement(*Cond, IsFalsable, DC);
+    return;
+  }
+
   llvm_unreachable("Type checking null ASTNode");
 }
 
@@ -2157,6 +2169,19 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   class ASTNodeFinder : public ASTWalker {
     SourceManager &SM;
     SourceLoc Loc;
+
+    /// When the \c ASTNode that we want to check was found inside a brace
+    /// statement, we need to store a *reference* to the element in the
+    /// \c BraceStmt. When the brace statement gets type checked for result
+    /// builders its elements will be updated in-place, which makes
+    /// \c FoundNodeRef now point to the type-checked replacement node. We need
+    /// this behavior.
+    ///
+    /// But for all other cases, we just want to store a plain \c ASTNode. To
+    /// make sure we free the \c ASTNode again, we store it in
+    /// \c FoundNodeStorage and set \c FoundNodeRef to point to
+    /// \c FoundNodeStorage.
+    ASTNode FoundNodeStorage;
     ASTNode *FoundNode = nullptr;
 
     /// The innermost DeclContext that contains \c FoundNode.
@@ -2224,6 +2249,20 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         }
         // Already walked into.
         return Action::Stop();
+      } else if (auto Conditional = dyn_cast<LabeledConditionalStmt>(S)) {
+        for (StmtConditionElement &Cond : Conditional->getCond()) {
+          if (SM.isBeforeInBuffer(Loc, Cond.getStartLoc())) {
+            break;
+          }
+          SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, Cond.getEndLoc());
+          if (SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc) {
+            continue;
+          }
+
+          FoundNodeStorage = ASTNode(&Cond);
+          FoundNode = &FoundNodeStorage;
+          return Action::Stop();
+        }
       }
 
       return Action::Continue(S);
@@ -2264,7 +2303,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         SourceLoc endLoc = Lexer::getLocForEndOfToken(SM, D->getEndLoc());
         if (!(SM.isBeforeInBuffer(endLoc, Loc) || endLoc == Loc)) {
           if (!isa<TopLevelCodeDecl>(D)) {
-            FoundNode = new ASTNode(D);
+            FoundNodeStorage = ASTNode(D);
+            FoundNode = &FoundNodeStorage;
           }
         }
       }
@@ -2296,8 +2336,10 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   // Function builder function doesn't support partial type checking.
   if (auto *func = dyn_cast<FuncDecl>(DC)) {
     if (Type builderType = getResultBuilderType(func)) {
-      auto optBody =
-          TypeChecker::applyResultBuilderBodyTransform(func, builderType);
+      auto optBody = TypeChecker::applyResultBuilderBodyTransform(
+          func, builderType,
+          /*ClosuresInResultBuilderDontParticipateInInference=*/
+              ctx.CompletionCallback == nullptr);
       if (optBody && *optBody) {
         // Wire up the function body now.
         func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
@@ -2395,7 +2437,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
         body = *optBody;
         alreadyTypeChecked = true;
 
-        body->walk(ContextualizeClosures(AFD));
+        body->walk(ContextualizeClosuresAndMacros(AFD));
       }
     } else if (func->hasSingleExpressionBody() &&
                func->getResultInterfaceType()->isVoid()) {

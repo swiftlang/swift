@@ -440,18 +440,16 @@ PASS(MoveOnlyObjectChecker, "sil-move-only-object-checker",
      "Pass that enforces move only invariants on raw SIL for objects")
 PASS(MoveOnlyAddressChecker, "sil-move-only-address-checker",
      "Pass that enforces move only invariants on raw SIL for addresses")
-PASS(MoveKillsCopyableValuesChecker, "sil-move-kills-copyable-values-checker",
-     "Pass that checks that any copyable (non-move only) value that is passed "
-     "to _move do not have any uses later than the _move")
+PASS(ConsumeOperatorCopyableValuesChecker, "sil-consume-operator-copyable-values-checker",
+     "Pass that performs checking of the consume operator for copyable values")
 PASS(TrivialMoveOnlyTypeEliminator, "sil-trivial-move-only-type-eliminator",
      "Pass that rewrites SIL to remove move only types from values of trivial type")
 PASS(MoveOnlyTypeEliminator, "sil-move-only-type-eliminator",
      "Pass that rewrites SIL to remove move only types from all values")
 PASS(LexicalLifetimeEliminator, "sil-lexical-lifetime-eliminator",
      "Pass that removes lexical lifetime markers from borrows and alloc stack")
-PASS(MoveKillsCopyableAddressesChecker, "sil-move-kills-copyable-addresses-checker",
-     "Pass that checks that any copyable (non-move only) address that is passed "
-     "to _move do not have any uses later than the _move")
+PASS(ConsumeOperatorCopyableAddressesChecker, "sil-consume-operator-copyable-addresses-checker",
+     "Pass that performs consume operator checking for copyable addresses")
 PASS(DebugInfoCanonicalizer, "sil-onone-debuginfo-canonicalizer",
      "Canonicalize debug info at -Onone by propagating debug info into coroutine funclets")
 PASS(PartialApplySimplification, "partial-apply-simplification",
@@ -460,6 +458,12 @@ PASS(MovedAsyncVarDebugInfoPropagator, "sil-moved-async-var-dbginfo-propagator",
      "Propagate debug info from moved async vars after coroutine funclet boundaries")
 PASS(MoveOnlyDeinitInsertion, "sil-move-only-deinit-insertion",
      "After running move only checking, convert last destroy_values to deinit calls")
+PASS(MoveOnlyBorrowToDestructureTransform,
+     "sil-move-only-borrow-to-destructure",
+     "Pass that is phased ordered before move only object checking that is "
+     "used to convert borrow+projection to destructures. Once this has run, the move "
+     "only object checker runs and ensures that the destructures do not create "
+     "any move only errors with respect to non-borrow+projection uses")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)

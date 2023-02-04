@@ -379,6 +379,7 @@ public:
     switch (conv) {
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Pack_Inout:
       return conv;
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
@@ -389,7 +390,12 @@ public:
     case SILArgumentConvention::Indirect_In_Guaranteed:
       return pai->isOnStack() ? SILArgumentConvention::Indirect_In_Guaranteed
                               : SILArgumentConvention::Indirect_In;
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Owned:
+      return pai->isOnStack() ? SILArgumentConvention::Pack_Guaranteed
+                              : SILArgumentConvention::Pack_Owned;
     case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Pack_Out:
       llvm_unreachable("partial_apply cannot have an @out operand");
     }
     llvm_unreachable("covered switch");

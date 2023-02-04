@@ -40,6 +40,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -435,15 +436,15 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
 }
 
 Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
-                                  bool isSILMode, bool isSILType,
                                   GenericSignature GenericSig,
-                                  GenericParamList *GenericParams,
+                                  SILTypeResolutionContext *SILContext,
                                   DeclContext *DC, bool ProduceDiagnostics) {
   TypeResolutionOptions options = None;
-  if (isSILMode)
+  if (SILContext) {
     options |= TypeResolutionFlags::SILMode;
-  if (isSILType)
-    options |= TypeResolutionFlags::SILType;
+    if (SILContext->IsSILType)
+      options |= TypeResolutionFlags::SILType;
+  }
 
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
@@ -460,7 +461,7 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
              // For now, just return the placeholder type.
              PlaceholderType::get,
              /*packElementOpener*/ nullptr)
-      .resolveType(TyR, GenericParams);
+      .resolveType(TyR, SILContext);
 }
 
 namespace {

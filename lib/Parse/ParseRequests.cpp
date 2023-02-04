@@ -180,6 +180,11 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       break;
     }
 
+    case GeneratedSourceInfo::MemberMacroExpansion: {
+      parser.parseExpandedMemberList(items);
+      break;
+    }
+
     case GeneratedSourceInfo::AccessorMacroExpansion: {
       ASTNode astNode = ASTNode::getFromOpaqueValue(generatedInfo->astNode);
       auto attachedDecl = astNode.get<Decl *>();

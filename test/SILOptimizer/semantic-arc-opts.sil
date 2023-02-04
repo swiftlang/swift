@@ -1529,7 +1529,7 @@ bb3(%7 : @owned $FakeOptional<Builtin.NativeObject>):
 
 // SemanticARCOptVisitor::performGuaranteedCopyValueOptimization should not optimize this case.
 //
-// CHECK-LABEL: sil [ossa] @testDeadInterleavedBorrow : $@convention(c) (@owned FakeOptional<AnyObject>) -> () {
+// CHECK-LABEL: sil [ossa] @testDeadInterleavedBorrow : $@convention(c) () -> () {
 // CHECK: [[B:%.*]] = begin_borrow [lexical] %0 : $FakeOptional<AnyObject>
 // CHECK: copy_value
 // CHECK: switch_enum
@@ -1539,8 +1539,9 @@ bb3(%7 : @owned $FakeOptional<Builtin.NativeObject>):
 // CHECK: end_borrow
 // CHECK: destroy_value [[COPY]] : $AnyObject
 // CHECK-LABEL: } // end sil function 'testDeadInterleavedBorrow'
-sil [ossa] @testDeadInterleavedBorrow : $@convention(c) (@owned FakeOptional<AnyObject>) -> () {
-bb0(%opt : @owned $FakeOptional<AnyObject>):
+sil [ossa] @testDeadInterleavedBorrow : $@convention(c) () -> () {
+bb0:
+    %opt = apply undef() : $@convention(thin) () -> (@owned FakeOptional<AnyObject>)
     %opt_borrow = begin_borrow [lexical] %opt : $FakeOptional<AnyObject>
     %opt_borrow_copy = copy_value %opt_borrow : $FakeOptional<AnyObject>
     switch_enum %opt_borrow_copy : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: some, case #FakeOptional.none!enumelt: none
@@ -1567,7 +1568,7 @@ exit:
 
 // SemanticARCOptVisitor::performGuaranteedCopyValueOptimization should not optimize this case.
 //
-// CHECK-LABEL: sil [ossa] @testDeadAndAliveInterleavedBorrow : $@convention(c) (@owned FakeOptional<AnyObject>) -> () {
+// CHECK-LABEL: sil [ossa] @testDeadAndAliveInterleavedBorrow : $@convention(c) () -> () {
 // CHECK: [[B:%.*]] = begin_borrow [lexical] %0 : $FakeOptional<AnyObject>
 // CHECK: copy_value
 // CHECK: switch_enum
@@ -1586,8 +1587,9 @@ exit:
 // CHECK: destroy_value [[COPY]] : $AnyObject
 // CHECK: destroy_value %0 : $FakeOptional<AnyObject>
 // CHECK-LABEL: } // end sil function 'testDeadAndAliveInterleavedBorrow'
-sil [ossa] @testDeadAndAliveInterleavedBorrow : $@convention(c) (@owned FakeOptional<AnyObject>) -> () {
-bb0(%opt : @owned $FakeOptional<AnyObject>):
+sil [ossa] @testDeadAndAliveInterleavedBorrow : $@convention(c) () -> () {
+bb0:
+    %opt = apply undef() : $@convention(thin) () -> (@owned FakeOptional<AnyObject>)
     %opt_borrow = begin_borrow [lexical] %opt : $FakeOptional<AnyObject>
     %opt_borrow_copy = copy_value %opt_borrow : $FakeOptional<AnyObject>
     switch_enum %opt_borrow_copy : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: some, case #FakeOptional.none!enumelt: none

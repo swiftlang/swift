@@ -2,147 +2,167 @@
 # Each line is a case-sensitive file pattern followed by one or more owners.
 # Order is important. The last matching pattern has the most precedence.
 # More information: https://docs.github.com/en/articles/about-code-owners
+#
+# Please mirror the repository's file hierarchy in case-sensitive lexicographic
+# order.
+
+# TODO: /.clang-format
+# TODO: /.dir-locals.el
+# TODO: /.flake8
+# TODO: /.gitattributes
 
 # .github
-/.github/                         @shahmishal
-/.github/CODEOWNERS               @AnthonyLatsis @shahmishal
-/.github/ISSUE_TEMPLATE/          @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
-/.github/PULL_REQUEST_TEMPLATE.md @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
+/.github/                                 @shahmishal
+/.github/CODEOWNERS                       @AnthonyLatsis @shahmishal
+/.github/ISSUE_TEMPLATE/                  @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
+/.github/PULL_REQUEST_TEMPLATE.md         @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
+
+# TODO: /.gitignore
+# TODO: /.mailmap
+# TODO: /Brewfile
+# TODO: /CHANGELOG.md
+# TODO: /CMakeLists.txt
+# TODO: /CODE_OF_CONDUCT.md
+# TODO: /CODE_OWNERS.TXT
+# TODO: /CONTRIBUTING.md
+# TODO: /LICENSE.txt
+# TODO: /README.md
+
+# SwiftCompilerSources
+/SwiftCompilerSources                     @eeckstein
+
+# apinotes
+# TODO: /apinotes
+
+# benchmark
+# TODO: /benchmark
+
+# bindings
+# TODO: /bindings
+
+# cmake
+/cmake/**/*Windows*                       @compnerd
 
 # docs
-/docs/HowToGuides/ @AnthonyLatsis @LucianoPAlmeida @xedin
-/docs/Generics/    @slavapestov
-/docs/Generics.rst @slavapestov
+/docs/Generics.rst                        @slavapestov
+/docs/Generics/                           @slavapestov
+/docs/HowToGuides/                        @AnthonyLatsis @LucianoPAlmeida @xedin
 
-# Standard Library
-# TODO: /stdlib/
-/stdlib/public/Cxx/        @zoecarver @hyp @egorzhdan
-/stdlib/public/Distributed/ @ktoso
-/stdlib/public/Windows/    @compnerd
-# TODO: /*test/stdlib/
-# TODO: /unittests/stdlib/
-
-# ASTGen
-/lib/ASTGen/  @zoecarver @CodaFi
-/test/ASTGen/ @zoecarver @CodaFi
-
-# Dependency scanning
-include/swift/DependencyScan                 @artemcm
-lib/DependencyScan                           @artemcm
-lib/Frontend/ModuleInterfaceLoader.cpp       @artemcm
-lib/Serialization/SerializedModuleLoader.cpp @artemcm
-test/ScanDependencies                        @artemcm
-
-# Driver
-include/swift/Driver @artemcm
-lib/Driver           @artemcm
-test/Driver          @artemcm
-
-# Owners of the parser
-/include/swift/Parse/ @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
-/lib/Parse/           @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
-/*test/Parse/         @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
-/unittests/Parse/     @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
-
-SwiftCompilerSources @eeckstein
-
-# C++ Interop
-include/swift/ClangImporter @zoecarver @hyp @egorzhdan
-include/swift/PrintAsClang  @zoecarver @hyp @egorzhdan
-lib/ClangImporter           @zoecarver @hyp @egorzhdan
-lib/PrintAsClang            @zoecarver @hyp @egorzhdan
-test/Interop                @zoecarver @hyp @egorzhdan
-
-# Threading implementation
-include/swift/Threading @al45tair
-lib/Threading           @al45tair
-
-# Windows support
-cmake/**/*Windows*    @compnerd
-lib/Basic/Windows     @compnerd
-utils/*windows*       @compnerd
-
-# Repository checkout utils
-
-/utils/update_checkout/ @shahmishal
-/utils/update-checkout* @shahmishal
-
-
-# AST
-/include/swift/AST/               @hborla @slavapestov @xedin
-/include/swift/AST/*Conformance*  @slavapestov
-/include/swift/AST/*Distributed*  @ktoso
-/include/swift/AST/Evaluator*     @CodaFi @slavapestov
-/include/swift/AST/*Generic*      @hborla @slavapestov
-/include/swift/AST/*Protocol*     @hborla @slavapestov
-/include/swift/AST/*Requirement*  @hborla @slavapestov
-/include/swift/AST/*Substitution* @slavapestov
-/lib/AST/                         @hborla @slavapestov @xedin
-/lib/AST/*Conformance*            @slavapestov
-/lib/AST/Evaluator*               @CodaFi @slavapestov
-/lib/AST/*Generic*                @hborla @slavapestov
-/lib/AST/ModuleLoader.cpp         @artemcm
-/lib/AST/*Requirement*            @hborla @slavapestov
-/lib/AST/RequirementMachine/      @slavapestov
-/lib/AST/*Substitution            @slavapestov
-/unittests/AST/                   @hborla @slavapestov @xedin
-/unittests/AST/*Evaluator*        @CodaFi @slavapestov
-
-# Sema
-/include/swift/Sema/                     @hborla @slavapestov @xedin
-/include/swift/Sema/Constraint*          @hborla @xedin
-/include/swift/Sema/CS*                  @hborla @xedin
-/lib/Sema/                               @hborla @slavapestov @xedin
-/lib/Sema/Constraint*                    @hborla @xedin
-/lib/Sema/CS*                            @hborla @xedin
-/lib/Sema/CodeSynthesisDistributed*      @hborla @ktoso
-/lib/Sema/DerivedConformance*            @slavapestov
-/lib/Sema/DerivedConformanceDistributed* @ktoso @slavapestov
-/lib/Sema/TypeCheckDistributed*          @hborla @ktoso @xedin
-/lib/Sema/TypeCheckType*                 @AnthonyLatsis @hborla @slavapestov @xedin
-/lib/Sema/TypeCheckProtocol*             @AnthonyLatsis @hborla @slavapestov
-/test/Constraints/                       @hborla @xedin
-/test/decl/                              @hborla @slavapestov
-/test/decl/protocol/                     @AnthonyLatsis @hborla @slavapestov
-# FIXME: This file could have a dedicated directory.
-/test/decl/protocol/special/DistributedActor.swift  @ktoso
-# FIXME: Should there be a 'Sema' folder under 'Distributed'? Or perhaps it
-# should be the other way around, i.e 'Sema/Distributed', 'SILGen/Distributed',
-# etc.?
-/test/Distributed/*                      @ktoso
-# FIXME: Is there a better way to structure this high-level 'Inputs' dir.? We
-# want only the Sema bits here.
-/test/Distributed/Inputs/                @ktoso
-/test/expr/                              @hborla @slavapestov @xedin
-/test/Generics/                          @hborla @slavapestov
-/test/Sema/                              @hborla @slavapestov @xedin
-/test/stmt/                              @hborla @xedin
-/test/type/                              @hborla @slavapestov @xedin
-/validation-test/Sema/                   @hborla @slavapestov @xedin
-/unittests/Sema/                         @hborla @xedin
-
-# SIL/SILGen
+# include
+/include/swift/AST/                                @hborla @slavapestov @xedin
+/include/swift/AST/*Conformance*                   @slavapestov
+/include/swift/AST/*Distributed*                   @ktoso
+/include/swift/AST/*Generic*                       @hborla @slavapestov
+/include/swift/AST/*Protocol*                      @hborla @slavapestov
+/include/swift/AST/*Requirement*                   @hborla @slavapestov
+/include/swift/AST/*Substitution*                  @slavapestov
+/include/swift/AST/Evaluator*                      @CodaFi @slavapestov
+/include/swift/ClangImporter                       @zoecarver @hyp @egorzhdan
+/include/swift/DependencyScan                      @artemcm
+/include/swift/Driver                              @artemcm
+# TODO: /include/swift/IRGen/
+/include/swift/Parse/                              @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+/include/swift/PrintAsClang                        @zoecarver @hyp @egorzhdan
 # TODO: /include/swift/SIL/
+# TODO: /include/swift/SILOptimizer/
+/include/swift/SILOptimizer/Utils/Distributed*     @ktoso
+/include/swift/Sema/                               @hborla @slavapestov @xedin
+/include/swift/Sema/CS*                            @hborla @xedin
+/include/swift/Sema/Constraint*                    @hborla @xedin
+/include/swift/Threading                           @al45tair
+
+# lib
+/lib/AST/                                           @hborla @slavapestov @xedin
+/lib/AST/*Conformance*                              @slavapestov
+/lib/AST/*Generic*                                  @hborla @slavapestov
+/lib/AST/*Requirement*                              @hborla @slavapestov
+/lib/AST/*Substitution                              @slavapestov
+/lib/AST/Evaluator*                                 @CodaFi @slavapestov
+/lib/AST/ModuleLoader.cpp                           @artemcm
+/lib/AST/RequirementMachine/                        @slavapestov
+/lib/ASTGen/                                        @zoecarver @CodaFi
+/lib/Basic/Windows                                  @compnerd
+/lib/ClangImporter                                  @zoecarver @hyp @egorzhdan
+/lib/DependencyScan                                 @artemcm
+/lib/Driver                                         @artemcm
+/lib/Frontend/ModuleInterfaceLoader.cpp             @artemcm
+# TODO: /lib/IRGen/
+/lib/IRGen/*Distributed*                            @ktoso
+/lib/Parse/                                         @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+/lib/PrintAsClang                                   @zoecarver @hyp @egorzhdan
 # TODO: /lib/SIL/
 # TODO: /lib/SILGen/
-/lib/SILGen/*Distributed* @ktoso
-/test/Distributed/SIL/    @ktoso
-# TODO: /*test/SIL/
-# TODO: /*test/SILGen/
-# TODO: /unittests/SIL/
-
-# SILOptimizer
-# TODO: /include/swift/SILOptimizer/
-/include/swift/SILOptimizer/Utils/Distributed* @ktoso
+/lib/SILGen/*Distributed*                           @ktoso
 # TODO: /lib/SILOptimizer/
-/lib/SILOptimizer/Utils/Distributed*           @ktoso
-# TODO: /*test/SILOptimizer/
+/lib/SILOptimizer/Utils/Distributed*                @ktoso
+/lib/Sema/                                          @hborla @slavapestov @xedin
+/lib/Sema/CS*                                       @hborla @xedin
+/lib/Sema/CodeSynthesisDistributed*                 @hborla @ktoso
+/lib/Sema/Constraint*                               @hborla @xedin
+/lib/Sema/DerivedConformance*                       @slavapestov
+/lib/Sema/DerivedConformanceDistributed*            @ktoso @slavapestov
+/lib/Sema/TypeCheckDistributed*                     @hborla @ktoso @xedin
+/lib/Sema/TypeCheckProtocol*                        @AnthonyLatsis @hborla @slavapestov
+/lib/Sema/TypeCheckType*                            @AnthonyLatsis @hborla @slavapestov @xedin
+/lib/Serialization/SerializedModuleLoader.cpp       @artemcm
+/lib/Threading                                      @al45tair
 
-# IRGen
-# TODO: /include/swift/IRGen/
-# TODO: /lib/IRGen/
-/lib/IRGen/*Distributed* @ktoso
-# TODO: /*test/IRGen/
+# localization
+# TODO: /localization
 
-# TODO: Find a better place for this entry.
-/test/Distributed/Runtime @ktoso
+# stdlib
+# TODO: /stdlib/
+/stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan
+/stdlib/public/Distributed/               @ktoso
+/stdlib/public/Windows/                   @compnerd
+
+# test
+/test/ASTGen/                                       @zoecarver @CodaFi
+/test/Constraints/                                  @hborla @xedin
+/test/Distributed/                                  @ktoso
+/test/Driver/                                       @artemcm
+/test/Generics/                                     @hborla @slavapestov
+# TODO: /test/IRGen/
+/test/Interop/                                      @zoecarver @hyp @egorzhdan
+/test/Parse/                                        @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+# TODO: /test/SIL/
+# TODO: /test/SILGen/
+# TODO: /test/SILOptimizer/
+/test/ScanDependencies/                             @artemcm
+/test/Sema/                                         @hborla @slavapestov @xedin
+/test/decl/                                         @hborla @slavapestov
+/test/decl/protocol/                                @AnthonyLatsis @hborla @slavapestov
+# FIXME: This file could have a dedicated directory.
+/test/decl/protocol/special/DistributedActor.swift  @ktoso
+/test/expr/                                         @hborla @slavapestov @xedin
+# TODO: /test/stdlib/
+/test/stmt/                                         @hborla @xedin
+/test/type/                                         @hborla @slavapestov @xedin
+
+# tools
+# TODO: /tools
+
+# unittests
+/unittests/AST/                           @hborla @slavapestov @xedin
+/unittests/AST/*Evaluator*                @CodaFi @slavapestov
+/unittests/Parse/                         @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+# TODO: /unittests/SIL/
+/unittests/Sema/                          @hborla @xedin
+# TODO: /unittests/stdlib/
+
+# userdocs
+# TODO: /userdocs
+
+# utils
+/utils/*windows*                          @compnerd
+/utils/update-checkout*                   @shahmishal
+/utils/update_checkout/                   @shahmishal
+
+# validation-test
+# TODO: /validation-test/IRGen/
+/validation-test/Parse/                   @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
+# TODO: /validation-test/SIL/
+# TODO: /validation-test/SILGen/
+# TODO: /validation-test/SILOptimizer/
+/validation-test/Sema/                    @hborla @slavapestov @xedin
+# TODO: /validation-test/stdlib/

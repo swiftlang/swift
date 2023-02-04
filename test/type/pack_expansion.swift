@@ -61,7 +61,7 @@ struct Outer<T...> {
   }
 
   struct AlsoGood<U...> {
-    typealias Value = (repeat (T, E<repeat each U>))
+    typealias Value = (repeat (each T, E<repeat each U>))
   }
 }
 

@@ -609,6 +609,8 @@ final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
 
 final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {}
 
+final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {}
+
 final public class StrongCopyUnownedValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class StrongCopyUnmanagedValueInst : SingleValueInstruction, UnaryInstruction  {}

@@ -175,6 +175,10 @@ class ModuleDecl
 
   /// The name of the package this module belongs to
   mutable Identifier PackageName;
+
+  /// Module name to use when referenced in clients module interfaces.
+  mutable Identifier ExportAsName;
+
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -408,6 +412,12 @@ public:
   /// Set the name of the package this module belongs to
   void setPackageName(Identifier name) {
     PackageName = name;
+  }
+
+  Identifier getExportAsName() const { return ExportAsName; }
+
+  void setExportAsName(Identifier name) {
+    ExportAsName = name;
   }
 
   /// Retrieve the actual module name of an alias used for this module (if any).

@@ -4596,6 +4596,14 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
       proto->isComputingRequirementSignature())
     return ErrorType::get(ctx);
 
+  // No move-only type can witness an associatedtype requirement.
+  if (type->isPureMoveOnly()) {
+    // describe the failure reason as it not conforming to Copyable
+    auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
+    assert(copyable && "missing _Copyable from stdlib!");
+    return CheckTypeWitnessResult(copyable->getDeclaredInterfaceType());
+  }
+
   const auto depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
                                               assocType);
 

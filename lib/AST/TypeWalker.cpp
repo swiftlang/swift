@@ -56,6 +56,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
+  bool visitSILPackType(SILPackType *ty) {
+    for (auto elementTy : ty->getElementTypes())
+      if (doIt(elementTy))
+        return true;
+    return false;
+  }
+
   bool visitPackExpansionType(PackExpansionType *ty) {
     if (doIt(ty->getCountType()))
       return true;

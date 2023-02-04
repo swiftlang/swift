@@ -1130,9 +1130,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // FIXME: This predicate matches the status quo, but there's no reason
   // indexing cannot run for actions that do not require stdlib e.g. to better
   // facilitate tests.
-  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action) &&
-      // TODO: indexing often crashes when interop is enabled (rdar://87719859).
-      !Invocation.getLangOptions().EnableCXXInterop) {
+  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action)) {
     emitIndexData(Instance);
   }
 
@@ -1931,15 +1929,19 @@ createDispatchingDiagnosticConsumerIfNeeded(
 /// If no serialized diagnostics are being produced, returns null.
 static std::unique_ptr<DiagnosticConsumer>
 createSerializedDiagnosticConsumerIfNeeded(
-    const FrontendInputsAndOutputs &inputsAndOutputs) {
+    const FrontendInputsAndOutputs &inputsAndOutputs,
+    bool emitMacroExpansionFiles
+) {
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
-      [](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
+      [emitMacroExpansionFiles](
+          const InputFile &input
+      ) -> std::unique_ptr<DiagnosticConsumer> {
         auto serializedDiagnosticsPath = input.getSerializedDiagnosticsPath();
         if (serializedDiagnosticsPath.empty())
           return nullptr;
         return serialized_diagnostics::createConsumer(
-            serializedDiagnosticsPath);
+            serializedDiagnosticsPath, emitMacroExpansionFiles);
       });
 }
 
@@ -2270,7 +2272,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // See https://github.com/apple/swift/issues/45288 for details.
   std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher =
       createSerializedDiagnosticConsumerIfNeeded(
-        Invocation.getFrontendOptions().InputsAndOutputs);
+        Invocation.getFrontendOptions().InputsAndOutputs,
+        Invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
   if (SerializedConsumerDispatcher)
     Instance->addDiagnosticConsumer(SerializedConsumerDispatcher.get());
 
@@ -2287,6 +2290,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   PDC.setFormattingStyle(
       Invocation.getDiagnosticOptions().PrintedFormattingStyle);
+
+  PDC.setEmitMacroExpansionFiles(
+      Invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
 
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();

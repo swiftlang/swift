@@ -177,7 +177,9 @@ int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
   llvm::StringRef prefixes[] = {
     /*Swift 4*/   "_T0",
     /*Swift 4.x*/ "$S", "_$S",
-    /*Swift 5+*/  "$s", "_$s"};
+    /*Swift 5+*/  "$s", "_$s",
+    /*Swift 5+ for filenames*/ "@__swiftmacro_",
+  };
 
   // Look for any of the known prefixes
   for (auto prefix : prefixes) {
@@ -1914,6 +1916,9 @@ NodePointer Demangler::demangleImplParamConvention(Node::Kind ConvKind) {
     case 'g': attr = "@guaranteed"; break;
     case 'e': attr = "@deallocating"; break;
     case 'y': attr = "@unowned"; break;
+    case 'v': attr = "@pack_owned"; break;
+    case 'p': attr = "@pack_guaranteed"; break;
+    case 'm': attr = "@pack_guaranteed"; break;
     default:
       pushBack();
       return nullptr;
@@ -1930,6 +1935,7 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
     case 'd': attr = "@unowned"; break;
     case 'u': attr = "@unowned_inner_pointer"; break;
     case 'a': attr = "@autoreleased"; break;
+    case 'k': attr = "@pack_out"; break;
     default:
       pushBack();
       return nullptr;
@@ -3590,6 +3596,7 @@ NodePointer Demangler::demangleFunctionEntity() {
       Kind = Node::Kind::RuntimeAttributeGenerator;
       break;
     case 'm': return demangleEntity(Node::Kind::Macro);
+    case 'M': return demangleMacroExpansion();
     case 'p': return demangleEntity(Node::Kind::GenericTypeParamDecl);
     case 'P':
       Args = None;
@@ -3888,4 +3895,27 @@ NodePointer Demangler::demangleValueWitness() {
   NodePointer VW = createNode(Node::Kind::ValueWitness);
   addChild(VW, createNode(Node::Kind::Index, unsigned(Kind)));
   return addChild(VW, popNode(Node::Kind::Type));
+}
+
+NodePointer Demangler::demangleMacroExpansion() {
+  Node::Kind kind;
+  switch (nextChar()) {
+  case 'f':
+    kind = Node::Kind::FreestandingMacroExpansion;
+    break;
+
+  case 'u':
+    kind = Node::Kind::MacroExpansionUniqueName;
+    break;
+
+  default:
+    return nullptr;
+  }
+
+  NodePointer name = popNode(Node::Kind::Identifier);
+  NodePointer context = popNode(Node::Kind::FreestandingMacroExpansion);
+  if (!context)
+    context = popContext();
+  NodePointer discriminator = demangleIndexAsNode();
+  return createWithChildren(kind, context, name, discriminator);
 }

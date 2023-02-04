@@ -1,6 +1,10 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature RuntimeDiscoverableAttrs
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module %S/Inputs/RuntimeAttrs.swift -o %t
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature RuntimeDiscoverableAttrs -I %t
 
 // REQUIRES: asserts
+
+import RuntimeAttrs
 
 @runtimeMetadata
 struct Flag<T> {
@@ -126,8 +130,14 @@ struct TestNoAmbiguity {
   @Flag func testInst(_: Int, _: Int) {} // Ok
 }
 
-@Flag("flag from protocol")
+@Flag
 protocol Flagged {}
+
+@Flag
+protocol OtherFlagged {}
+
+@Flag("flag from protocol") // expected-error {{reflection metadata attributes applied to protocols cannot have additional attribute arguments}}
+protocol InvalidFlagged {}
 
 struct Inference1 : Flagged {} // Ok
 class Inference2 : Flagged {}  // Ok
@@ -232,3 +242,110 @@ struct TestSelfUse {
   @Flag(Self.description) var x: Int = 42
   @Flag(Self.description) func test() {}
 }
+
+
+@runtimeMetadata
+enum EnumFlag<B, V> {
+  case type(B.Type)
+  case method((B) -> V)
+  case property(KeyPath<B, V>)
+  case function(() -> V)
+}
+
+@EnumFlag
+protocol EnumFlagged {}
+
+extension EnumFlag {
+  init(attachedTo: KeyPath<B, V>) { self = .property(attachedTo) }
+  init(attachedTo: @escaping (B) -> V) { self = .method(attachedTo) }
+}
+
+extension EnumFlag where V == Void {
+  init(attachedTo: B.Type) { self = .type(attachedTo) }
+}
+
+extension EnumFlag where B == Void {
+  init(attachedTo: @escaping () -> V) { self = .function(attachedTo) }
+}
+
+@EnumFlag func globalEnumTest() -> (Int, [String])? {
+  nil
+}
+
+@EnumFlag struct EnumTypeTest {
+  @EnumFlag var x: Int = 42
+  @EnumFlag func testInst() {}
+  @EnumFlag static func testStatic() -> Int { 42 }
+}
+
+@Flag extension EnumTypeTest { // expected-error {{@Flag can only be applied to unavailable extensions in the same module as 'EnumTypeTest'}}
+}
+
+@available(*, unavailable)
+@Flag extension EnumTypeTest { // Ok
+}
+
+@available(*, unavailable)
+@EnumFlag extension EnumTypeTest { // expected-error {{@EnumFlag is already applied to type 'EnumTypeTest'; did you want to remove it?}} {{275:1-11=}}
+}
+
+@available(*, unavailable)
+@Flag extension CrossModuleTest { // expected-error {{@Flag can only be applied to unavailable extensions in the same module as 'CrossModuleTest'}}
+}
+
+struct InvalidConformanceTest1 {}
+struct InvalidConformanceTest2 {}
+
+extension InvalidConformanceTest1 : Flagged {} // expected-error {{type 'InvalidConformanceTest1' does not conform to protocol 'Flagged'}}
+// expected-note@-1 {{protocol 'Flagged' requires reflection metadata attribute @Flag}}
+
+extension InvalidConformanceTest2 : Flagged & EnumFlagged {}
+// expected-error@-1 {{type 'InvalidConformanceTest2' does not conform to protocol 'Flagged'}}
+// expected-error@-2 {{type 'InvalidConformanceTest2' does not conform to protocol 'EnumFlagged'}}
+// expected-note@-3 {{protocol 'Flagged' requires reflection metadata attribute @Flag}}
+// expected-note@-4 {{protocol 'EnumFlagged' requires reflection metadata attribute @EnumFlag}}
+
+@Flag
+struct ValidConformance1 {}
+extension ValidConformance1 : Flagged {} // Ok
+
+struct ValidConformance2 : Flagged {}
+extension ValidConformance2 : OtherFlagged {} // Ok (@Flag is inferred from Flagged protocol conformance)
+
+@EnumFlag @Flag
+class MultiAttrTest {
+  init() {}
+}
+
+extension MultiAttrTest : Flagged & EnumFlagged {} // Ok
+
+@Flag
+class BaseClass {}
+
+@Flag
+class ValidChild : BaseClass {} // Ok
+
+class InvalidChild : BaseClass {}
+// expected-error@-1 {{superclass 'BaseClass' requires reflection metadata attribute @Flag}}
+// expected-note@-2 {{add missing reflection metadata attribute @Flag}} {{1-1=@Flag }}
+// expected-note@-3 {{opt-out of reflection metadata attribute @Flag using unavailable extension}} {{34-34=\n\n@available(*, unavailable)\n@Flag extension InvalidChild {\}\n}}
+
+class OptedOutChild : BaseClass {} // Ok (used unavailable extension to opt-out of the attribute)
+
+@available(*, unavailable)
+@Flag
+extension OptedOutChild {}
+
+protocol InvalidProtoWithSuperclass : BaseClass {}
+// expected-error@-1 {{superclass 'BaseClass' requires reflection metadata attribute @Flag}}
+// expected-note@-2 {{add missing reflection metadata attribute @Flag}} {{1-1=@Flag }}
+// expected-note@-3 {{opt-out of reflection metadata attribute @Flag using unavailable extension}} {{51-51=\n\n@available(*, unavailable)\n@Flag extension InvalidProtoWithSuperclass {\}\n}}
+
+@Flag
+protocol ValidProtoWithSuperclass : BaseClass {} // Ok
+
+protocol OptedOutProtoWithSuperclass : BaseClass {} // Ok
+
+@available(*, unavailable)
+@Flag
+extension OptedOutProtoWithSuperclass {}

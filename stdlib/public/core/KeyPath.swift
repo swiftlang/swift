@@ -177,7 +177,9 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     }
     else {
       let offset = Int(bitPattern: _kvcKeyPathStringPtr) - 1
-      if (offset <= maximumOffsetOn32BitArchitecture) {
+      // Pointers above 0x7fffffff will come in as negative numbers which are
+      // less than maximumOffsetOn32BitArchitecture, be sure to reject them.
+      if (offset >= 0 && offset <= maximumOffsetOn32BitArchitecture) {
         return offset
       }
       return nil

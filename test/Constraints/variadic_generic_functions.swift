@@ -3,7 +3,7 @@
 // REQUIRES: asserts
 
 func debugPrint<T...>(_ items: repeat each T)
-  where T: CustomDebugStringConvertible
+  where each T: CustomDebugStringConvertible
 {
   /*for (item: T) in items {
     stdout.write(item.debugDescription)
@@ -11,7 +11,7 @@ func debugPrint<T...>(_ items: repeat each T)
 }
 
 func max<T...>(_ values: repeat each T) -> T?
-  where T: Comparable
+  where each T: Comparable
 {
   return nil
 }

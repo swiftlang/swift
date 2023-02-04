@@ -32,6 +32,10 @@ struct SILArgumentConvention {
     Direct_Owned,
     Direct_Unowned,
     Direct_Guaranteed,
+    Pack_Owned,
+    Pack_Inout,
+    Pack_Guaranteed,
+    Pack_Out,
   } Value;
 
   SILArgumentConvention(decltype(Value) NewValue) : Value(NewValue) {}
@@ -60,6 +64,15 @@ struct SILArgumentConvention {
     case ParameterConvention::Direct_Owned:
       Value = SILArgumentConvention::Direct_Owned;
       return;
+    case ParameterConvention::Pack_Owned:
+      Value = SILArgumentConvention::Pack_Owned;
+      return;
+    case ParameterConvention::Pack_Guaranteed:
+      Value = SILArgumentConvention::Pack_Guaranteed;
+      return;
+    case ParameterConvention::Pack_Inout:
+      Value = SILArgumentConvention::Pack_Inout;
+      return;
     }
     llvm_unreachable("covered switch isn't covered?!");
   }
@@ -74,6 +87,7 @@ struct SILArgumentConvention {
     switch (Value) {
       case SILArgumentConvention::Indirect_Inout:
       case SILArgumentConvention::Indirect_InoutAliasable:
+      case SILArgumentConvention::Pack_Inout:
         return true;
       case SILArgumentConvention::Indirect_In_Guaranteed:
       case SILArgumentConvention::Indirect_In:
@@ -81,6 +95,9 @@ struct SILArgumentConvention {
       case SILArgumentConvention::Direct_Unowned:
       case SILArgumentConvention::Direct_Owned:
       case SILArgumentConvention::Direct_Guaranteed:
+      case SILArgumentConvention::Pack_Owned:
+      case SILArgumentConvention::Pack_Guaranteed:
+      case SILArgumentConvention::Pack_Out:
         return false;
     }
     llvm_unreachable("covered switch isn't covered?!");
@@ -90,6 +107,7 @@ struct SILArgumentConvention {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Pack_Owned:
       return true;
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Direct_Guaranteed:
@@ -97,6 +115,9 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Pack_Inout:
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Out:
       return false;
     }
     llvm_unreachable("covered switch isn't covered?!");
@@ -106,6 +127,7 @@ struct SILArgumentConvention {
     switch (Value) {
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Direct_Guaranteed:
+    case SILArgumentConvention::Pack_Guaranteed:
       return true;
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_In:
@@ -113,6 +135,9 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Pack_Inout:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Out:
       return false;
     }
     llvm_unreachable("covered switch isn't covered?!");
@@ -131,6 +156,10 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Pack_Inout:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Out:
       return false;
     }
     llvm_unreachable("covered switch isn't covered?!");

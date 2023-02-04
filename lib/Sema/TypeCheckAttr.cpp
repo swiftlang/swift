@@ -158,11 +158,9 @@ public:
   IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Isolated)
   IGNORED_ATTR(Preconcurrency)
-  IGNORED_ATTR(BackDeploy)
+  IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
-  IGNORED_ATTR(Expression)
-  IGNORED_ATTR(Declaration)
-  IGNORED_ATTR(Attached)
+  IGNORED_ATTR(MacroRole)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -336,7 +334,7 @@ public:
   void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
 
   void checkAvailableAttrs(ArrayRef<AvailableAttr *> Attrs);
-  void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
+  void checkBackDeployedAttrs(ArrayRef<BackDeployedAttr *> Attrs);
 
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
 
@@ -1495,12 +1493,12 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
 
   AttributeChecker Checker(D);
   // We need to check all availableAttrs, OriginallyDefinedInAttr and
-  // BackDeployAttr relative to each other, so collect them and check in
+  // BackDeployedAttr relative to each other, so collect them and check in
   // batch later.
   llvm::SmallVector<AvailableAttr *, 4> availableAttrs;
-  llvm::SmallVector<BackDeployAttr *, 4> backDeployAttrs;
+  llvm::SmallVector<BackDeployedAttr *, 4> backDeployedAttrs;
   llvm::SmallVector<OriginallyDefinedInAttr*, 4> ODIAttrs;
-  for (auto attr : D->getAttrs()) {
+  for (auto attr : D->getSemanticAttrs()) {
     if (!attr->isValid()) continue;
 
     // If Attr.def says that the attribute cannot appear on this kind of
@@ -1508,8 +1506,8 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     if (attr->canAppearOnDecl(D)) {
       if (auto *ODI = dyn_cast<OriginallyDefinedInAttr>(attr)) {
         ODIAttrs.push_back(ODI);
-      } else if (auto *BD = dyn_cast<BackDeployAttr>(attr)) {
-        backDeployAttrs.push_back(BD);
+      } else if (auto *BD = dyn_cast<BackDeployedAttr>(attr)) {
+        backDeployedAttrs.push_back(BD);
       } else {
         // check @available attribute both collectively and individually.
         if (auto *AV = dyn_cast<AvailableAttr>(attr)) {
@@ -1555,7 +1553,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
   Checker.checkAvailableAttrs(availableAttrs);
-  Checker.checkBackDeployAttrs(backDeployAttrs);
+  Checker.checkBackDeployedAttrs(backDeployedAttrs);
   Checker.checkOriginalDefinedInAttrs(ODIAttrs);
 }
 
@@ -3566,18 +3564,14 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getDeclContext();
 
   // Figure out which nominal declaration this custom attribute refers to.
-  auto found = evaluateOrDefault(
-    Ctx.evaluator, CustomAttrDeclRequest{attr, dc}, nullptr);
+  auto *nominal = evaluateOrDefault(
+    Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
 
-  NominalTypeDecl *nominal = nullptr;
-  if (found) {
-    nominal = found.dyn_cast<NominalTypeDecl *>();
-  }
-
-  if (!found) {
+  if (!nominal) {
     // Try resolving an attached macro attribute.
     auto *macro = evaluateOrDefault(
-        Ctx.evaluator, ResolveAttachedMacroRequest{attr, dc}, nullptr);
+        Ctx.evaluator, ResolveMacroRequest{attr, getAttachedMacroRoles(), dc},
+        nullptr);
     if (macro || !attr->isValid())
       return;
 
@@ -3695,6 +3689,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     case DeclKind::Protocol: {
       // Allow on protocols because they are sources
       // of inference.
+      if (attr->hasArgs()) {
+        diagnoseAndRemoveAttr(
+            attr, diag::cannot_use_attr_with_custom_arguments_on_protocol);
+      }
       return;
     }
 
@@ -3718,6 +3716,40 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       if (isGenericContext(dc))
         break;
 
+      return;
+    }
+
+    case DeclKind::Extension: {
+      auto *ext = cast<ExtensionDecl>(D);
+
+      // Only allowed on unavailable extensions in the same module as type
+      // as a way to opt-out from use of the attribute.
+      if (AvailableAttr::isUnavailable(ext)) {
+        auto *extendedType = ext->getExtendedNominal();
+
+        // If there is no type, fallback to default diagnostic.
+        if (!extendedType)
+          break;
+
+        if (extendedType->getParentModule() == ext->getParentModule()) {
+          for (auto directAttr : extendedType->getRuntimeDiscoverableAttrs()) {
+            auto directAttrDecl =
+                extendedType->getRuntimeDiscoverableAttrTypeDecl(directAttr);
+            if (directAttrDecl == nominal) {
+              diagnose(attr->getLocation(),
+                       diag::invalid_attr_redeclaration_in_extension,
+                       nominal->getNameStr(), extendedType->getName())
+                  .fixItRemove(directAttr->getRangeWithAt());
+            }
+          }
+
+          return;
+        }
+      }
+
+      diagnoseAndRemoveAttr(
+          attr, diag::invalid_decl_for_runtime_discoverable_attr_in_extension,
+          nominal->getNameStr(), ext->getExtendedNominal()->getName());
       return;
     }
 
@@ -4509,15 +4541,20 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
 void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> Attrs) {
   if (Attrs.empty())
     return;
-  // If all available are spi available, we should use @_spi instead.
-  if (std::all_of(Attrs.begin(), Attrs.end(), [](AvailableAttr *AV) {
-    return AV->IsSPI;
-  })) {
-    diagnose(D->getLoc(), diag::spi_preferred_over_spi_available);
-  };
+
+  // Only diagnose top level decls since nested ones may have inherited availability.
+  if (!D->getDeclContext()->getInnermostDeclarationDeclContext()) {
+    // If all available are spi available, we should use @_spi instead.
+    if (std::all_of(Attrs.begin(), Attrs.end(), [](AvailableAttr *AV) {
+      return AV->IsSPI;
+    })) {
+      diagnose(D->getLoc(), diag::spi_preferred_over_spi_available);
+    }
+  }
 }
 
-void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
+void AttributeChecker::checkBackDeployedAttrs(
+    ArrayRef<BackDeployedAttr *> Attrs) {
   if (Attrs.empty())
     return;
 
@@ -4541,7 +4578,7 @@ void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
   auto *VD = cast<ValueDecl>(D);
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
-  auto *ActiveAttr = D->getAttrs().getBackDeploy(Ctx);
+  auto *ActiveAttr = D->getAttrs().getBackDeployed(Ctx);
 
   for (auto *Attr : Attrs) {
     // Back deployment only makes sense for public declarations.
@@ -7113,7 +7150,16 @@ void AttributeChecker::visitCompilerInitializedAttr(
 }
 
 void AttributeChecker::visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::RuntimeDiscoverableAttrs)) {
+  auto isEnabled = [&]() {
+    if (Ctx.LangOpts.hasFeature(Feature::RuntimeDiscoverableAttrs))
+      return true;
+
+    // Accept attributes that come from swiftinterface files.
+    auto *parentSF = D->getDeclContext()->getParentSourceFile();
+    return parentSF && parentSF->Kind == SourceFileKind::Interface;
+  };
+
+  if (!isEnabled()) {
     diagnose(attr->getLocation(),
              diag::runtime_discoverable_attrs_are_experimental);
     attr->setInvalid();
@@ -7417,22 +7463,18 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 
 template <typename ATTR>
 static void forEachCustomAttribute(
-    ValueDecl *decl,
+    Decl *decl,
     llvm::function_ref<void(CustomAttr *attr, NominalTypeDecl *)> fn) {
   auto &ctx = decl->getASTContext();
 
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto *mutableAttr = const_cast<CustomAttr *>(attr);
 
-    auto found = evaluateOrDefault(
+    auto *nominal = evaluateOrDefault(
         ctx.evaluator,
-        CustomAttrDeclRequest{mutableAttr, decl->getDeclContext()}, nullptr);
-    if (!found)
-      continue;
-
-    auto nominal = found.dyn_cast<NominalTypeDecl *>();
+        CustomAttrNominalRequest{mutableAttr, decl->getDeclContext()}, nullptr);
     if (!nominal)
-      continue; // FIXME: add another entry point for macros we've found
+      continue;
 
     if (nominal->getAttrs().hasAttribute<ATTR>())
       fn(mutableAttr, nominal);
@@ -7441,7 +7483,7 @@ static void forEachCustomAttribute(
 
 ArrayRef<CustomAttr *>
 GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
-                                           ValueDecl *decl) const {
+                                           Decl *decl) const {
   auto &ctx = decl->getASTContext();
 
   llvm::SmallMapVector<NominalTypeDecl *, CustomAttr *, 4> attrs;
@@ -7449,7 +7491,7 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
   enum class GatheringMode { Direct, Inference };
 
   auto gatherRuntimeAttrsOnDecl =
-      [&](ValueDecl *decl,
+      [&](Decl *decl,
           llvm::SmallMapVector<NominalTypeDecl *, CustomAttr *, 4> &attrs,
           GatheringMode mode) {
         forEachCustomAttribute<RuntimeMetadataAttr>(
@@ -7481,13 +7523,85 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
     return copy;
   };
 
+  // Verify that a subclass or a protocol has all of the reflection
+  // metadata attributes expected by the superclass.
+  auto verifySuperclassAttrRequirements = [&](NominalTypeDecl *typeDecl,
+                                              ClassDecl *superclass) {
+    auto attrRequirements = superclass->getRuntimeDiscoverableAttrs();
+    if (attrRequirements.empty())
+      return;
+
+    // All of the reflection metadata attributes declared in
+    // unavailable extensions of this type in the same module.
+    llvm::SmallPtrSet<NominalTypeDecl *, 4> unavailableAttrs;
+    for (auto *extension : typeDecl->getExtensions()) {
+      if (extension->isConstrainedExtension() ||
+          extension->getParentModule() != typeDecl->getParentModule())
+        continue;
+
+      forEachCustomAttribute<RuntimeMetadataAttr>(
+          extension, [&](CustomAttr *attr, NominalTypeDecl *attrDecl) {
+            unavailableAttrs.insert(attrDecl);
+          });
+    }
+
+    for (auto *attr : attrRequirements) {
+      auto *attrDecl = superclass->getRuntimeDiscoverableAttrTypeDecl(attr);
+      if (attrs.count(attrDecl) || unavailableAttrs.count(attrDecl))
+        continue;
+
+      std::string attrName = attrDecl->getNameStr().str();
+      std::string subclassName = typeDecl->getNameStr().str();
+
+      ctx.Diags.diagnose(
+          typeDecl, diag::missing_reflection_metadata_attribute_on_subclass,
+          superclass->getName(), attrName);
+
+      ctx.Diags
+          .diagnose(typeDecl, diag::add_missing_reflection_metadata_attr,
+                    attrName)
+          .fixItInsert(
+              typeDecl->getAttributeInsertionLoc(/*forModifier=*/false),
+              "@" + attrName + " ");
+
+      ctx.Diags
+          .diagnose(typeDecl,
+                    diag::opt_out_from_missing_reflection_metadata_attr,
+                    attrName)
+          .fixItInsertAfter(typeDecl->getEndLoc(),
+                            "\n\n@available(*, unavailable)\n@" + attrName +
+                                " extension " + subclassName + " {}\n");
+    }
+  };
+
+  // Gather reflection metadata attributes only if this extension is:
+  //  - unavailable;
+  //  - unconstrained;
+  //  - declared in the same module as the extended type.
+  if (auto *ED = dyn_cast<ExtensionDecl>(decl)) {
+    if (!AvailableAttr::isUnavailable(ED))
+      return copyAttrs(attrs);
+
+    if (ED->isConstrainedExtension() ||
+        ED->getParentModule() != decl->getDeclContext()->getParentModule())
+      return copyAttrs(attrs);
+  }
+
   // First, gather all of the runtime attributes directly on the decl.
   gatherRuntimeAttrsOnDecl(decl, attrs, GatheringMode::Direct);
 
   auto *NTD = dyn_cast<NominalTypeDecl>(decl);
-  // Attribute inference is only possible from protocol conformances.
-  if (!NTD || isa<ProtocolDecl>(NTD) || NTD->getDeclContext()->isLocalContext())
+  if (!NTD || NTD->getDeclContext()->isLocalContext())
     return copyAttrs(attrs);
+
+  // If this is a protocol, let's check whether superclass
+  // has any reflection metadata attribute requirements.
+  if (auto *protocol = dyn_cast<ProtocolDecl>(NTD)) {
+    if (auto *superclass = protocol->getSuperclassDecl())
+      verifySuperclassAttrRequirements(NTD, superclass);
+
+    return copyAttrs(attrs);
+  }
 
   // Gather any attributes inferred from (explicit) protocol conformances
   // associated with the declaration of the type.
@@ -7506,5 +7620,47 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
     gatherRuntimeAttrsOnDecl(protocol, attrs, GatheringMode::Inference);
   }
 
+  // Check superclass attribute requirements after inference.
+  if (auto *classDecl = dyn_cast<ClassDecl>(NTD)) {
+    if (auto *superclass = classDecl->getSuperclassDecl())
+      verifySuperclassAttrRequirements(NTD, superclass);
+  }
+
   return copyAttrs(attrs);
+}
+
+void TypeChecker::checkReflectionMetadataAttributes(ExtensionDecl *ED) {
+  auto &ctx = ED->getASTContext();
+  auto *extendedType = ED->getExtendedNominal();
+
+  // If extension has any reflection metadata attributes, trigger the
+  // request to set their types.
+  for (auto *attr : ED->getRuntimeDiscoverableAttrs()) {
+    (void)evaluateOrDefault(
+        ctx.evaluator,
+        CustomAttrTypeRequest{attr, ED->getDeclContext(),
+                              CustomAttrTypeKind::RuntimeMetadata},
+        nullptr);
+  }
+
+  for (auto *protocol : ED->getLocalProtocols()) {
+    forEachCustomAttribute<RuntimeMetadataAttr>(
+        protocol, [&](CustomAttr *attr, NominalTypeDecl *attrType) {
+          if (llvm::none_of(
+                  extendedType->getRuntimeDiscoverableAttrs(),
+                  [&](CustomAttr *typeAttr) {
+                    return extendedType->getRuntimeDiscoverableAttrTypeDecl(
+                               typeAttr) == attrType;
+                  })) {
+            ctx.Diags.diagnose(ED->getLoc(), diag::type_does_not_conform,
+                               ED->getExtendedType(),
+                               protocol->getDeclaredInterfaceType());
+
+            ctx.Diags.diagnose(
+                ED->getLoc(),
+                diag::missing_reflection_metadata_attribute_on_type,
+                protocol->getName(), attrType->getNameStr());
+          }
+        });
+  }
 }

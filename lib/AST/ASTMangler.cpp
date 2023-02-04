@@ -18,11 +18,14 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/ParameterList.h"
@@ -31,6 +34,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -45,6 +49,7 @@
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -1068,6 +1073,24 @@ static const char *getMetatypeRepresentationOp(MetatypeRepresentation Rep) {
   llvm_unreachable("Unhandled MetatypeRepresentation in switch.");
 }
 
+static char getParamConvention(ParameterConvention conv) {
+  // @in and @out are mangled the same because they're put in
+  // different places.
+  switch (conv) {
+    case ParameterConvention::Indirect_In: return 'i';
+    case ParameterConvention::Indirect_Inout: return 'l';
+    case ParameterConvention::Indirect_InoutAliasable: return 'b';
+    case ParameterConvention::Indirect_In_Guaranteed: return 'n';
+    case ParameterConvention::Direct_Owned: return 'x';
+    case ParameterConvention::Direct_Unowned: return 'y';
+    case ParameterConvention::Direct_Guaranteed: return 'g';
+    case ParameterConvention::Pack_Owned: return 'x';
+    case ParameterConvention::Pack_Inout: return 'y';
+    case ParameterConvention::Pack_Guaranteed: return 'g';
+  }
+  llvm_unreachable("bad parameter convention");
+}
+
 /// Whether to mangle the given type as generic.
 static bool shouldMangleAsGeneric(Type type) {
   if (!type)
@@ -1260,6 +1283,23 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         }
       }
       appendOperator("QP");
+      return;
+    }
+
+    case TypeKind::SILPack: {
+      auto packTy = cast<SILPackType>(tybase);
+
+      if (packTy->getNumElements() == 0)
+        appendOperator("y");
+      else {
+        bool firstField = true;
+        for (auto element : packTy->getElementTypes()) {
+          appendType(element, sig, forDecl);
+          appendListSeparator(firstField);
+        }
+      }
+      appendOperator("QS");
+      Buffer << (packTy->isElementAddress() ? 'i' : 'd');
       return;
     }
 
@@ -1860,21 +1900,6 @@ void ASTMangler::appendSymbolicExtendedExistentialType(
   appendOperator("Xj");
 }
 
-static char getParamConvention(ParameterConvention conv) {
-  // @in and @out are mangled the same because they're put in
-  // different places.
-  switch (conv) {
-    case ParameterConvention::Indirect_In: return 'i';
-    case ParameterConvention::Indirect_Inout: return 'l';
-    case ParameterConvention::Indirect_InoutAliasable: return 'b';
-    case ParameterConvention::Indirect_In_Guaranteed: return 'n';
-    case ParameterConvention::Direct_Owned: return 'x';
-    case ParameterConvention::Direct_Unowned: return 'y';
-    case ParameterConvention::Direct_Guaranteed: return 'g';
-  }
-  llvm_unreachable("bad parameter convention");
-}
-
 static Optional<char>
 getParamDifferentiability(SILParameterDifferentiability diffKind) {
   switch (diffKind) {
@@ -1893,6 +1918,7 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::Unowned: return 'd';
     case ResultConvention::UnownedInnerPointer: return 'u';
     case ResultConvention::Autoreleased: return 'a';
+    case ResultConvention::Pack: return 'k';
   }
   llvm_unreachable("bad result convention");
 }
@@ -3351,6 +3377,14 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
     return appendEntity(decl, "fp", decl->isStatic());
   if (auto macro = dyn_cast<MacroDecl>(decl))
     return appendEntity(decl, "fm", false);
+  if (auto expansion = dyn_cast<MacroExpansionDecl>(decl)) {
+    appendMacroExpansionContext(
+        expansion->getLoc(), expansion->getDeclContext());
+    appendMacroExpansionOperator(
+        expansion->getMacro().getBaseName().userFacingName(),
+        expansion->getDiscriminator());
+    return;
+  }
 
   assert(isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl));
 
@@ -3674,6 +3708,97 @@ std::string ASTMangler::mangleRuntimeAttributeGeneratorEntity(
   beginMangling();
   appendRuntimeAttributeGeneratorEntity(decl, attr);
   appendSymbolKind(SKind);
+  return finalize();
+}
+
+void ASTMangler::appendMacroExpansionContext(
+    SourceLoc loc, DeclContext *origDC
+) {
+  if (loc.isInvalid())
+    return appendContext(origDC, StringRef());
+
+  ASTContext &ctx = origDC->getASTContext();
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
+  auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
+  if (!generatedSourceInfo)
+    return appendContext(origDC, StringRef());
+
+  SourceLoc outerExpansionLoc;
+  DeclContext *outerExpansionDC;
+  DeclBaseName baseName;
+  unsigned discriminator;
+  switch (generatedSourceInfo->kind) {
+  case GeneratedSourceInfo::ExpressionMacroExpansion: {
+    auto parent = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode);
+    if (auto expr =
+            cast_or_null<MacroExpansionExpr>(parent.dyn_cast<Expr *>())) {
+      outerExpansionLoc = expr->getLoc();
+      baseName = expr->getMacroName().getBaseName();
+      discriminator = expr->getDiscriminator();
+    } else {
+      auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
+      outerExpansionLoc = decl->getLoc();
+      baseName = decl->getMacro().getBaseName();
+      discriminator = decl->getDiscriminator();
+    }
+    break;
+  }
+
+  case GeneratedSourceInfo::FreestandingDeclMacroExpansion: {
+    auto expansion =
+        cast<MacroExpansionDecl>(
+          ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
+            .get<Decl *>());
+    outerExpansionLoc = expansion->getLoc();
+    outerExpansionDC = expansion->getDeclContext();
+    discriminator = expansion->getDiscriminator();
+    break;
+  }
+
+  case GeneratedSourceInfo::AccessorMacroExpansion:
+  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::MemberMacroExpansion:
+  case GeneratedSourceInfo::PrettyPrinted:
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+    return appendContext(origDC, StringRef());
+  }
+
+  // If we hit the point where the structure is represented as a DeclContext,
+  // we're done.
+  if (origDC->isChildContextOf(outerExpansionDC))
+    return appendContext(origDC, StringRef());
+
+  // Append our own context and discriminator.
+  appendMacroExpansionContext(outerExpansionLoc, origDC);
+  appendMacroExpansionOperator(baseName.userFacingName(), discriminator);
+}
+
+void ASTMangler::appendMacroExpansionOperator(
+    StringRef macroName, unsigned discriminator
+) {
+  appendIdentifier(macroName);
+  appendOperator("fMf", Index(discriminator));
+}
+
+std::string ASTMangler::mangleMacroExpansion(
+    const MacroExpansionExpr *expansion) {
+  beginMangling();
+  appendMacroExpansionContext(expansion->getLoc(), expansion->getDeclContext());
+  appendMacroExpansionOperator(
+      expansion->getMacroName().getBaseName().userFacingName(),
+      expansion->getDiscriminator());
+  return finalize();
+}
+
+std::string ASTMangler::mangleMacroExpansion(
+    const MacroExpansionDecl *expansion) {
+  beginMangling();
+  appendMacroExpansionContext(expansion->getLoc(), expansion->getDeclContext());
+  appendMacroExpansionOperator(
+      expansion->getMacro().getBaseName().userFacingName(),
+      expansion->getDiscriminator());
   return finalize();
 }
 

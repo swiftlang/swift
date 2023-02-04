@@ -1247,6 +1247,16 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.IndexStorePath = A->getValue();
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
+    StringRef clangArg = A->getValue();
+    if (clangArg.consume_front("-working-directory")) {
+      if (!clangArg.empty() && clangArg.front() != '=') {
+        // Have an old -working-directory<path> argument. Convert it into
+        // two separate arguments as Clang no longer supports that format.
+        Opts.ExtraArgs.push_back("-working-directory");
+        Opts.ExtraArgs.push_back(clangArg.str());
+        continue;
+      }
+    }
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
@@ -1474,6 +1484,15 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                      arg->getOption().getPrefixedName(), arg->getValue());
       return true;
     }
+  }
+
+  for (const Arg *arg: Args.filtered(OPT_emit_macro_expansion_files)) {
+    StringRef contents = arg->getValue();
+    bool negated = contents.startswith("no-");
+    if (negated)
+      contents = contents.drop_front(3);
+    if (contents == "diagnostics")
+      Opts.EmitMacroExpansionFiles = !negated;
   }
 
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
@@ -1826,9 +1845,13 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableStackProtection =
       Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
                    Opts.EnableStackProtection);
-  Opts.EnableMoveInoutStackProtection =
-      Args.hasFlag(OPT_enable_move_inout_stack_protector, OPT_disable_stack_protector,
-                   Opts.EnableMoveInoutStackProtection);
+  Opts.EnableMoveInoutStackProtection = Args.hasArg(
+      OPT_enable_move_inout_stack_protector, OPT_disable_stack_protector,
+      Opts.EnableMoveInoutStackProtection);
+  Opts.EnableImportPtrauthFieldFunctionPointers =
+      Args.hasArg(OPT_enable_import_ptrauth_field_function_pointers,
+                  OPT_disable_import_ptrauth_field_function_pointers,
+                  Opts.EnableImportPtrauthFieldFunctionPointers);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);

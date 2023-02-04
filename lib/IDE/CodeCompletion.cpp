@@ -200,10 +200,8 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
 
     const auto ty = swift::performTypeResolution(
         ParsedTypeLoc.getTypeRepr(), P.Context,
-        /*isSILMode=*/false,
-        /*isSILType=*/false,
         CurDeclContext->getGenericSignatureOfContext(),
-        /*GenericParams=*/nullptr,
+        /*SILContext=*/nullptr,
         CurDeclContext,
         /*ProduceDiagnostics=*/false);
     if (!ty->hasError()) {
@@ -266,8 +264,8 @@ public:
 
   void completeTypeDeclResultBeginning() override;
   void completeTypeSimpleBeginning() override;
-  void completeTypeIdentifierWithDot(DeclRefTypeRepr *TR) override;
-  void completeTypeIdentifierWithoutDot(DeclRefTypeRepr *TR) override;
+  void completeTypeSimpleWithDot(TypeRepr *TR) override;
+  void completeTypeSimpleWithoutDot(TypeRepr *TR) override;
 
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
@@ -494,21 +492,16 @@ void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot(
-    DeclRefTypeRepr *TR) {
-  if (!TR) {
-    completeTypeSimpleBeginning();
-    return;
-  }
-  Kind = CompletionKind::TypeIdentifierWithDot;
+void CodeCompletionCallbacksImpl::completeTypeSimpleWithDot(TypeRepr *TR) {
+  assert(TR);
+  Kind = CompletionKind::TypeSimpleWithDot;
   ParsedTypeLoc = TypeLoc(TR);
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
-    DeclRefTypeRepr *TR) {
+void CodeCompletionCallbacksImpl::completeTypeSimpleWithoutDot(TypeRepr *TR) {
   assert(TR);
-  Kind = CompletionKind::TypeIdentifierWithoutDot;
+  Kind = CompletionKind::TypeSimpleWithoutDot;
   ParsedTypeLoc = TypeLoc(TR);
   CurDeclContext = P.CurDeclContext;
 }
@@ -953,6 +946,13 @@ addClosureSignatureKeywordsIfApplicable(CodeCompletionResultSink &Sink,
 
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
                                               bool MaybeFuncBody) {
+  auto addEffectsSpecifierKeywords = [&] {
+    if (!llvm::is_contained(ParsedKeywords, "async"))
+      addKeyword(Sink, "async", CodeCompletionKeywordKind::None);
+    if (!llvm::is_contained(ParsedKeywords, "throws"))
+      addKeyword(Sink, "throws", CodeCompletionKeywordKind::kw_throws);
+  };
+
   switch (Kind) {
   case CompletionKind::None:
   case CompletionKind::DotExpr:
@@ -974,13 +974,9 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::OptionalBinding:
     break;
 
-  case CompletionKind::EffectsSpecifier: {
-    if (!llvm::is_contained(ParsedKeywords, "async"))
-      addKeyword(Sink, "async", CodeCompletionKeywordKind::None);
-    if (!llvm::is_contained(ParsedKeywords, "throws"))
-      addKeyword(Sink, "throws", CodeCompletionKeywordKind::kw_throws);
+  case CompletionKind::EffectsSpecifier:
+    addEffectsSpecifierKeywords();
     break;
-  }
 
   case CompletionKind::AccessorBeginning: {
     // TODO: Omit already declared or mutally exclusive accessors.
@@ -1037,8 +1033,15 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
 
     break;
   case CompletionKind::CaseStmtBeginning:
-  case CompletionKind::TypeIdentifierWithDot:
-  case CompletionKind::TypeIdentifierWithoutDot:
+  case CompletionKind::TypeSimpleWithDot:
+    break;
+
+  case CompletionKind::TypeSimpleWithoutDot:
+    // Suggest effects specifiers after a tuple type because it may be
+    // intended as a parameter list.
+    if (isa_and_nonnull<TupleTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
+      addEffectsSpecifierKeywords();
+    }
     break;
 
   case CompletionKind::TypeDeclResultBeginning: {
@@ -1241,8 +1244,8 @@ void swift::ide::postProcessCompletionResults(
     if (result->getKind() == CodeCompletionResultKind::Declaration &&
         result->getAssociatedDeclKind() == CodeCompletionDeclKind::Protocol &&
         Kind != CompletionKind::TypeSimpleBeginning &&
-        Kind != CompletionKind::TypeIdentifierWithoutDot &&
-        Kind != CompletionKind::TypeIdentifierWithDot &&
+        Kind != CompletionKind::TypeSimpleWithoutDot &&
+        Kind != CompletionKind::TypeSimpleWithDot &&
         Kind != CompletionKind::TypeDeclResultBeginning &&
         Kind != CompletionKind::GenericRequirement) {
       flair |= CodeCompletionFlairBit::RareTypeAtCurrentPosition;
@@ -1597,7 +1600,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     return;
 
   undoSingleExpressionReturn(CurDeclContext);
-  if (Kind != CompletionKind::TypeIdentifierWithDot) {
+  if (Kind != CompletionKind::TypeSimpleWithDot) {
     // Type member completion does not need a type-checked AST.
     typeCheckContextAt(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
@@ -1753,13 +1756,13 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     break;
   }
 
-  case CompletionKind::TypeIdentifierWithDot: {
+  case CompletionKind::TypeSimpleWithDot: {
     Lookup.setHaveDot(SourceLoc());
     Lookup.getTypeCompletions(ParsedTypeLoc.getType());
     break;
   }
 
-  case CompletionKind::TypeIdentifierWithoutDot: {
+  case CompletionKind::TypeSimpleWithoutDot: {
     Lookup.getTypeCompletions(ParsedTypeLoc.getType());
     break;
   }

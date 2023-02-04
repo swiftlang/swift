@@ -1823,6 +1823,15 @@ public:
   bool diagnoseAsError() override;
 };
 
+class NotCopyableFailure final : public FailureDiagnostic {
+  Type noncopyableTy;
+public:
+  NotCopyableFailure(const Solution &solution, Type noncopyableTy, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), noncopyableTy(noncopyableTy) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a contextual mismatch between expected collection element type
 /// and the one provided (e.g. source of the assignment or argument to a call)
 /// e.g.:
@@ -2870,29 +2879,6 @@ class AddMissingMacroPound final : public FailureDiagnostic {
 
 public:
   AddMissingMacroPound(const Solution &solution, MacroDecl *macro,
-                       ConstraintLocator *locator)
-    : FailureDiagnostic(solution, locator),
-      macro(macro) { }
-
-  bool diagnoseAsError() override;
-};
-
-/// Diagnose situations where we end up type checking a reference to a macro
-/// that has parameters, but was not provided any arguments.
-///
-/// \code
-/// func print(_ value: Any)
-/// @expression macro print<Value...>(_ value: Value...)
-///
-/// func test(e: E) {
-///   #print
-/// }
-/// \endcode
-class AddMissingMacroArguments final : public FailureDiagnostic {
-  MacroDecl *macro;
-
-public:
-  AddMissingMacroArguments(const Solution &solution, MacroDecl *macro,
                        ConstraintLocator *locator)
     : FailureDiagnostic(solution, locator),
       macro(macro) { }

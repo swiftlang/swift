@@ -185,7 +185,7 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
     case ExprKind::NilLiteral:
     case ExprKind::StringLiteral: {
       auto rawLiteral = extractRawLiteral(expr);
-      if (rawLiteral.hasValue()) {
+      if (rawLiteral.has_value()) {
         return std::make_shared<RawLiteralValue>(rawLiteral.value());
       }
 
@@ -325,7 +325,8 @@ extractCustomAttrValues(VarDecl *propertyDecl) {
             {label, argExpr->getType(), extractCompileTimeValue(argExpr)});
       }
     }
-    customAttrValues.push_back({propertyWrapper->getType(), parameters});
+
+    customAttrValues.push_back({propertyWrapper, parameters});
   }
 
   return customAttrValues;
@@ -458,29 +459,14 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
   return Result;
 }
 
-void writeFileInformation(llvm::json::OStream &JSON, const VarDecl *VD) {
-  SourceRange sourceRange = VD->getSourceRange();
-  if (sourceRange.isInvalid())
+void writeLocationInformation(llvm::json::OStream &JSON, SourceLoc Loc,
+                              const ASTContext &ctx) {
+  if (Loc.isInvalid())
     return;
 
-  const ASTContext &ctx = VD->getDeclContext()->getASTContext();
-  JSON.attribute("file", ctx.SourceMgr.getDisplayNameForLoc(sourceRange.Start));
-  JSON.attribute(
-      "line",
-      ctx.SourceMgr.getPresumedLineAndColumnForLoc(sourceRange.Start).first);
-}
-
-void writeFileInformation(llvm::json::OStream &JSON,
-                          const NominalTypeDecl *NTD) {
-  DeclContext *DC = NTD->getInnermostDeclContext();
-  SourceLoc loc = extractNearestSourceLoc(DC);
-  if (loc.isInvalid())
-    return;
-
-  const ASTContext &ctx = DC->getASTContext();
-  JSON.attribute("file", ctx.SourceMgr.getDisplayNameForLoc(loc));
+  JSON.attribute("file", ctx.SourceMgr.getDisplayNameForLoc(Loc));
   JSON.attribute("line",
-                 ctx.SourceMgr.getPresumedLineAndColumnForLoc(loc).first);
+                 ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first);
 }
 
 void writeValue(llvm::json::OStream &JSON,
@@ -569,7 +555,7 @@ void writeValue(llvm::json::OStream &JSON,
     JSON.attribute("valueKind", "Enum");
     JSON.attributeObject("value", [&]() {
       JSON.attribute("name", enumValue->getIdentifier());
-      if (enumValue->getParameters().hasValue()) {
+      if (enumValue->getParameters().has_value()) {
         auto params = enumValue->getParameters().value();
         JSON.attributeArray("arguments", [&] {
           for (auto FP : params) {
@@ -592,17 +578,20 @@ void writeValue(llvm::json::OStream &JSON,
   }
 }
 
-void writeAttributes(
+void writePropertyWrapperAttributes(
     llvm::json::OStream &JSON,
-    llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers) {
-  if (!PropertyWrappers.hasValue()) {
+    llvm::Optional<std::vector<CustomAttrValue>> PropertyWrappers,
+    const ASTContext &ctx) {
+  if (!PropertyWrappers.has_value()) {
     return;
   }
 
-  JSON.attributeArray("attributes", [&] {
+  JSON.attributeArray("propertyWrappers", [&] {
     for (auto PW : PropertyWrappers.value()) {
       JSON.object([&] {
-        JSON.attribute("type", toFullyQualifiedTypeNameString(PW.Type));
+        JSON.attribute("type",
+                       toFullyQualifiedTypeNameString(PW.Attr->getType()));
+        writeLocationInformation(JSON, PW.Attr->getLocation(), ctx);
         JSON.attributeArray("arguments", [&] {
           for (auto FP : PW.Parameters) {
             JSON.object([&] {
@@ -620,7 +609,7 @@ void writeAttributes(
 void writeEnumCases(
     llvm::json::OStream &JSON,
     llvm::Optional<std::vector<EnumElementDeclValue>> EnumElements) {
-  if (!EnumElements.hasValue()) {
+  if (!EnumElements.has_value()) {
     return;
   }
 
@@ -628,10 +617,10 @@ void writeEnumCases(
     for (const auto &Case : EnumElements.value()) {
       JSON.object([&] {
         JSON.attribute("name", Case.Name);
-        if (Case.RawValue.hasValue()) {
+        if (Case.RawValue.has_value()) {
           JSON.attribute("rawValue", Case.RawValue.value());
         }
-        if (Case.Parameters.hasValue()) {
+        if (Case.Parameters.has_value()) {
           JSON.attributeArray("parameters", [&] {
             for (const auto &Parameter : Case.Parameters.value()) {
               JSON.object([&] {
@@ -698,15 +687,15 @@ void writeAttrInformation(llvm::json::OStream &JSON,
         if (!attr->Rename.empty())
           JSON.attribute("rename", attr->Rename);
 
-        if (attr->Introduced.hasValue())
+        if (attr->Introduced.has_value())
           JSON.attribute("introducedVersion",
                          attr->Introduced.value().getAsString());
 
-        if (attr->Deprecated.hasValue())
+        if (attr->Deprecated.has_value())
           JSON.attribute("deprecatedVersion",
                          attr->Deprecated.value().getAsString());
 
-        if (attr->Obsoleted.hasValue())
+        if (attr->Obsoleted.has_value())
           JSON.attribute("obsoletedVersion",
                          attr->Obsoleted.value().getAsString());
 
@@ -730,7 +719,9 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
             "kind",
             TypeDecl->getDescriptiveKindName(TypeDecl->getDescriptiveKind())
                 .str());
-        writeFileInformation(JSON, TypeDecl);
+        writeLocationInformation(
+            JSON, extractNearestSourceLoc(TypeDecl->getInnermostDeclContext()),
+            TypeDecl->getInnermostDeclContext()->getASTContext());
         JSON.attributeArray("properties", [&] {
           for (const auto &PropertyInfo : TypeInfo.Properties) {
             JSON.object([&] {
@@ -741,9 +732,11 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
               JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
               JSON.attribute("isComputed",
                              !decl->hasStorage() ? "true" : "false");
-              writeFileInformation(JSON, decl);
+              writeLocationInformation(JSON, decl->getLoc(),
+                                       decl->getDeclContext()->getASTContext());
               writeValue(JSON, PropertyInfo.Value);
-              writeAttributes(JSON, PropertyInfo.PropertyWrappers);
+              writePropertyWrapperAttributes(
+                  JSON, PropertyInfo.PropertyWrappers, decl->getASTContext());
               writeResultBuilderInformation(JSON, TypeDecl, decl);
               writeAttrInformation(JSON, decl->getAttrs());
             });

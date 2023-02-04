@@ -3894,8 +3894,8 @@ ERROR(unresolved_member_no_inference,none,
       (DeclNameRef))
 ERROR(cannot_infer_base_of_unresolved_member,none,
       "cannot infer contextual base in reference to member %0", (DeclNameRef))
-ERROR(cannot_infer_concrete_for_opaque_result,none,
-      "cannot infer concrete type for opaque result %0 from return expression",
+ERROR(cannot_infer_underlying_for_opaque_result,none,
+      "cannot infer underlying type for opaque result %0 from return expression",
       (Type))
 ERROR(unresolved_nil_literal,none,
       "'nil' requires a contextual type", ())
@@ -5216,6 +5216,9 @@ ERROR(pack_reference_outside_expansion,none,
 ERROR(each_non_pack,none,
       "'each' cannot be applied to non-pack type %0",
       (Type))
+ERROR(pack_expansion_missing_pack_reference,none,
+      "pack expansion %0 must specify a pack reference",
+      (TypeRepr*))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
 ERROR(multiple_ellipsis_in_tuple,none,
@@ -5299,6 +5302,8 @@ NOTE(overridden_required_initializer_here,none,
 // Functions
 ERROR(attribute_requires_function_type,none,
       "@%0 attribute only applies to function types", (StringRef))
+ERROR(generic_function_type,none,
+      "function values cannot be generic", ())
 ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
 ERROR(unreferenced_generic_parameter,NoUsage,
@@ -5380,6 +5385,9 @@ ERROR(illegal_sil_type,none,
       "type %0 is not a legal SIL value type", (Type))
 ERROR(sil_box_arg_mismatch,none,
       "SIL box type has wrong number of generic arguments for layout", ())
+ERROR(sil_pack_element_uuid_not_found,none,
+      "open_pack_element instruction not found for @pack_element type UUID; "
+      "possible forward reference?", ())
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,
       "metatypes in SIL must have @thin, @thick, or @objc_metatype attribute",
@@ -6064,7 +6072,7 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
   "a property initializer in a '@frozen' type|" \
-  "a '@_backDeploy' function'}"
+  "a '@backDeployed' function'}"
 
 #define DECL_OR_ACCESSOR "%select{%0|%0 for}"
 
@@ -6645,6 +6653,9 @@ ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
       none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
 ERROR(noimplicitcopy_attr_invalid_in_generic_context,
       none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
+ERROR(moveonly_generics, none, "move-only type %0 cannot be used with generics yet", (Type))
+ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
+      "'@_noImplicitCopy' has no effect when applied to a move only type", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
@@ -6860,8 +6871,8 @@ WARNING(macro_type_access_warn,none,
         (bool, AccessLevel, AccessLevel, bool))
 ERROR(macro_in_nested,none,
       "macro %0 can only be declared at file scope", (DeclName))
-ERROR(macro_without_context,none,
-      "macro %0 must declare its applicable contexts (e.g., '@expression')",
+ERROR(macro_without_role,none,
+      "macro %0 must declare its applicable roles via '@freestanding' or @attached'",
        (DeclName))
 ERROR(macro_expansion_missing_pound,none,
       "expansion of macro %0 requires leading '#'", (DeclName))
@@ -6914,6 +6925,14 @@ ERROR(invalid_decl_for_runtime_discoverable_attr,none,
       "@%0 can only be applied to non-generic types, methods, "
       "instance properties, and global functions", (StringRef))
 
+ERROR(invalid_decl_for_runtime_discoverable_attr_in_extension,none,
+      "@%0 can only be applied to unavailable extensions in the same module"
+      " as %1", (StringRef, DeclName))
+
+ERROR(invalid_attr_redeclaration_in_extension,none,
+      "@%0 is already applied to type %1; did you want to remove it?",
+      (StringRef, DeclName))
+
 ERROR(duplicate_runtime_discoverable_attr,none,
       "duplicate runtime discoverable attribute", ())
 
@@ -6931,7 +6950,26 @@ ERROR(runtime_attribute_type_requirement_not_accessible,none,
       "(which is %select{private|fileprivate|internal|package|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
 
+ERROR(cannot_use_attr_with_custom_arguments_on_protocol,none,
+      "reflection metadata attributes applied to protocols cannot have"
+      " additional attribute arguments; attribute arguments must be"
+      " explicitly written on the conforming type",
+      ())
+
+NOTE(missing_reflection_metadata_attribute_on_type,none,
+     "protocol %0 requires reflection metadata attribute @%1",
+     (DeclName, StringRef))
+
+ERROR(missing_reflection_metadata_attribute_on_subclass,none,
+      "superclass %0 requires reflection metadata attribute @%1",
+      (DeclName, StringRef))
+NOTE(add_missing_reflection_metadata_attr,none,
+     "add missing reflection metadata attribute @%0", (StringRef))
+NOTE(opt_out_from_missing_reflection_metadata_attr,none,
+     "opt-out of reflection metadata attribute @%0 using"
+     " unavailable extension",
+     (StringRef))
+
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
-

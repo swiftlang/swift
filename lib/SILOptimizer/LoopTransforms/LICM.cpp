@@ -688,7 +688,7 @@ void LoopTreeOptimization::propagateSummaries(
 bool LoopTreeOptimization::isSafeReadOnlyApply(BasicCalleeAnalysis *BCA, ApplyInst *AI) {
   if (auto ri = AI->getSingleResult()) {
     // We don't balance CSE'd apply results which return an owned value.
-    if (ri.getValue().getConvention() != ResultConvention::Unowned)
+    if (ri.value().getConvention() != ResultConvention::Unowned)
       return false;
   }
 

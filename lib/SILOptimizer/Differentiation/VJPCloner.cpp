@@ -829,6 +829,9 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     case ResultConvention::Indirect:
       conv = ParameterConvention::Indirect_In_Guaranteed;
       break;
+    case ResultConvention::Pack:
+      conv = ParameterConvention::Pack_Guaranteed;
+      break;
     }
     return {tanType, conv};
   };
@@ -857,6 +860,11 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
       conv = ResultConvention::Indirect;
+      break;
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Inout:
+      conv = ResultConvention::Pack;
       break;
     }
     return {tanType, conv};

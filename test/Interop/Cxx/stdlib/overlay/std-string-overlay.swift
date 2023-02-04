@@ -10,11 +10,11 @@ var StdStringOverlayTestSuite = TestSuite("std::string overlay")
 
 StdStringOverlayTestSuite.test("std::string <=> Swift.String") {
   let cxx1 = std.string()
-  let swift1 = String(cxxString: cxx1)
+  let swift1 = String(cxx1)
   expectEqual(swift1, "")
 
   let cxx2 = std.string("something123")
-  let swift2 = String(cxxString: cxx2)
+  let swift2 = String(cxx2)
   expectEqual(swift2, "something123")
 
   let cxx3: std.string = "literal"
@@ -23,18 +23,41 @@ StdStringOverlayTestSuite.test("std::string <=> Swift.String") {
   // Non-ASCII characters are represented by more than one CChar.
   let cxx4: std.string = "тест"
   expectEqual(cxx4.size(), 8)
-  let swift4 = String(cxxString: cxx4)
+  let swift4 = String(cxx4)
   expectEqual(swift4, "тест")
 
   let cxx5: std.string = "emoji_🤖"
   expectEqual(cxx5.size(), 10)
-  let swift5 = String(cxxString: cxx5)
+  let swift5 = String(cxx5)
   expectEqual(swift5, "emoji_🤖")
 
   let cxx6 = std.string("xyz\0abc")
   expectEqual(cxx6.size(), 7)
-  let swift6 = String(cxxString: cxx6)
+  let swift6 = String(cxx6)
   expectEqual(swift6, "xyz\0abc")
+
+  var cxx7 = std.string()
+  let bytes: [UInt8] = [0xE1, 0xC1, 0xAC]
+  for byte in bytes {
+    cxx7.push_back(CChar(bitPattern: byte))
+  }
+  let swift7 = String(cxx7)
+  expectEqual(swift7, "���")
+}
+
+StdStringOverlayTestSuite.test("std::string as Swift.CustomDebugStringConvertible") {
+  let cxx1 = std.string()
+  expectEqual(cxx1.debugDescription, "std.string()")
+
+  let cxx2 = std.string("something123")
+  expectEqual(cxx2.debugDescription, "std.string(something123)")
+
+  let bytes: [UInt8] = [0xE1, 0xC1, 0xAC]
+  var cxx3 = std.string()
+  for byte in bytes {
+    cxx3.push_back(CChar(bitPattern: byte))
+  }
+  expectEqual(cxx3.debugDescription, "std.string(���)")
 }
 
 StdStringOverlayTestSuite.test("std::string as Swift.Sequence") {
@@ -54,6 +77,21 @@ StdStringOverlayTestSuite.test("std::string as Swift.Sequence") {
   }
   expectEqual(6, chars)
   expectEqual(97 + 98 + 99 + 49 + 50 + 51, sum)
+}
+
+StdStringOverlayTestSuite.test("std::string as CustomStringConvertible") {
+  let cxx1 = std.string()
+  expectEqual(cxx1.description, "")
+
+  let cxx2 = std.string("something123")
+  expectEqual(cxx2.description, "something123")
+
+  let bytes: [UInt8] = [0xE1, 0xC1, 0xAC]
+  var cxx3 = std.string()
+  for byte in bytes {
+    cxx3.push_back(CChar(bitPattern: byte))
+  }
+  expectEqual(cxx3.description, "���")
 }
 
 runAllTests()

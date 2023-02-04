@@ -20,6 +20,10 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Type.h"
 
+/// Prefix used for the names of macro expansion buffers, to replace the
+/// leading "$s" used for Swift manglings.
+#define MACRO_EXPANSION_BUFFER_MANGLING_PREFIX "@__swiftmacro_"
+
 namespace swift {
 
 class CustomAttr;
@@ -52,6 +56,13 @@ void expandAccessors(
 /// Expand the attributes for the given member declaration based
 /// on the custom attribute that references the given macro.
 bool expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member);
+
+/// Expand the synthesized members for the given declaration based on
+/// the custom attribute that references the given macro.
+///
+/// Returns \c true if the macro added new synthesized members, \c false
+/// otherwise.
+bool expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 
 } // end namespace swift
 

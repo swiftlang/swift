@@ -9,6 +9,7 @@ Mangling
 ::
 
   mangled-name ::= '$s' global  // Swift stable mangling
+  mangled-name ::= '@__swiftmacro_' global // Swift mangling for filenames
   mangled-name ::= '_T0' global // Swift 4.0
   mangled-name ::= '$S' global  // Swift 4.2
 
@@ -365,6 +366,7 @@ Entities
   entity-spec ::= decl-name type 'fp'                                               // generic type parameter
   entity-spec ::= decl-name type 'fo'                                               // enum element (currently not used)
   entity-spec ::= decl-name label-list? type generic-signature? 'fm'   // macro
+  entity-spec ::= context macro-discriminator-list  // macro expansion
   entity-spec ::= identifier 'Qa'                                                   // associated type declaration
 
   ACCESSOR ::= 'm'                           // materializeForSet
@@ -391,6 +393,11 @@ Entities
 
   RELATED-DISCRIMINATOR ::= [a-j]
   RELATED-DISCRIMINATOR ::= [A-J]
+
+  macro-discriminator-list ::= macro-discriminator-list? 'fM' macro-expansion-operator INDEX
+
+  macro-expansion-operator ::= identifier 'f' // freestanding macro
+  macro-expansion-operator ::= identifier 'u' // uniquely-named entity
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
 
@@ -660,6 +667,7 @@ Types
   
   type ::= pattern-type count-type 'Qp'      // pack expansion type
   type ::= pack-element-list 'QP'            // pack type
+  type ::= pack-element-list 'QS' DIRECTNESS // SIL pack type
 
   pack-element-list ::= type '_' type*
   pack-element-list ::= empty-list
@@ -741,6 +749,9 @@ mangled in to disambiguate.
   PARAM-CONVENTION ::= 'y'                   // direct unowned
   PARAM-CONVENTION ::= 'g'                   // direct guaranteed
   PARAM-CONVENTION ::= 'e'                   // direct deallocating
+  PARAM-CONVENTION ::= 'v'                   // pack owned
+  PARAM-CONVENTION ::= 'p'                   // pack guaranteed
+  PARAM-CONVENTION ::= 'm'                   // pack inout
 
   PARAM-DIFFERENTIABILITY ::= 'w'            // @noDerivative
 
@@ -749,8 +760,12 @@ mangled in to disambiguate.
   RESULT-CONVENTION ::= 'd'                  // unowned
   RESULT-CONVENTION ::= 'u'                  // unowned inner pointer
   RESULT-CONVENTION ::= 'a'                  // auto-released
+  RESULT-CONVENTION ::= 'k'                  // pack
 
   RESULT-DIFFERENTIABILITY ::= 'w'            // @noDerivative
+
+  DIRECTNESS ::= 'i'                         // indirect
+  DIRECTNESS ::= 'd'                         // direct
 
 For the most part, manglings follow the structure of formal language
 types.  However, in some cases it is more useful to encode the exact

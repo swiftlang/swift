@@ -1957,6 +1957,9 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                 .Case("@guaranteed", 'g')
                 .Case("@deallocating", 'e')
                 .Case("@unowned", 'y')
+                .Case("@pack_guaranteed", 'p')
+                .Case("@pack_owned", 'v')
+                .Case("@pack_inout", 'm')
                 .Default(0);
         if (!ConvCh) {
           return MANGLING_ERROR(ManglingError::InvalidImplParameterConvention,
@@ -1980,6 +1983,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                         .Case("@unowned", 'd')
                         .Case("@unowned_inner_pointer", 'u')
                         .Case("@autoreleased", 'a')
+                        .Case("@pack_out", 'k')
                         .Default(0);
         if (!ConvCh) {
           return MANGLING_ERROR(ManglingError::InvalidImplParameterConvention,
@@ -2866,6 +2870,22 @@ ManglingError Remangler::mangleMacro(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "fm";
   return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleFreestandingMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMf";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
+ManglingError Remangler::mangleMacroExpansionUniqueName(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMu";
+  return mangleChildNode(node, 2, depth + 1);
 }
 
 ManglingError Remangler::mangleSuffix(Node *node, unsigned depth) {

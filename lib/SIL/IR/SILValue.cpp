@@ -116,11 +116,8 @@ ValueBase::getDefiningInstructionResult() {
 }
 
 bool ValueBase::isLexical() const {
-  if (auto *argument = dyn_cast<SILFunctionArgument>(this)) {
-    // TODO: Recognize guaranteed arguments as lexical too.
-    return argument->getOwnershipKind() == OwnershipKind::Owned &&
-           argument->getLifetime().isLexical();
-  }
+  if (auto *argument = dyn_cast<SILFunctionArgument>(this))
+    return argument->getLifetime().isLexical();
   if (auto *bbi = dyn_cast<BeginBorrowInst>(this))
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
@@ -235,6 +232,10 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
   case SILArgumentConvention::Indirect_Out:
+  case SILArgumentConvention::Pack_Inout:
+  case SILArgumentConvention::Pack_Out:
+  case SILArgumentConvention::Pack_Owned:
+  case SILArgumentConvention::Pack_Guaranteed:
     value = OwnershipKind::None;
     return;
   case SILArgumentConvention::Direct_Owned:

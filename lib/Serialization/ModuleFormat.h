@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 736; // add package access modifier
+const uint16_t SWIFTMODULE_VERSION_MINOR = 742; // Constructor affects ABI
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -359,6 +359,9 @@ enum class ParameterConvention : uint8_t {
   Direct_Guaranteed,
   Indirect_In_Guaranteed,
   Indirect_In_Constant,
+  Pack_Owned,
+  Pack_Inout,
+  Pack_Guaranteed,
 };
 using ParameterConventionField = BCFixed<4>;
 
@@ -377,6 +380,7 @@ enum class ResultConvention : uint8_t {
   Unowned,
   UnownedInnerPointer,
   Autoreleased,
+  Pack,
 };
 using ResultConventionField = BCFixed<3>;
 
@@ -610,9 +614,10 @@ enum class GenericEnvironmentKind : uint8_t {
 // the module version.
 enum class MacroRole : uint8_t {
   Expression,
-  FreestandingDeclaration,
+  Declaration,
   Accessor,
   MemberAttribute,
+  Member,
 };
 using MacroRoleField = BCFixed<3>;
 
@@ -860,6 +865,7 @@ namespace options_block {
     MODULE_ABI_NAME,
     IS_CONCURRENCY_CHECKED,
     MODULE_PACKAGE_NAME,
+    MODULE_EXPORT_AS_NAME,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -921,6 +927,11 @@ namespace options_block {
 
   using ModulePackageNameLayout = BCRecordLayout<
     MODULE_PACKAGE_NAME,
+    BCBlob
+  >;
+
+  using ModuleExportAsNameLayout = BCRecordLayout<
+    MODULE_EXPORT_AS_NAME,
     BCBlob
   >;
 }
@@ -1322,6 +1333,12 @@ namespace decls_block {
     TypeIDField         // type
   >;
 
+  TYPE_LAYOUT(SILPackTypeLayout,
+    SIL_PACK_TYPE,
+    BCFixed<1>,         // is address
+    BCArray<TypeIDField>// component types
+  );
+
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
     IdentifierIDField, // name
@@ -1438,6 +1455,7 @@ namespace decls_block {
     CtorInitializerKindField,  // initializer kind
     GenericSignatureIDField, // generic environment
     DeclIDField, // overridden decl
+    BCFixed<1>,   // whether the overridden decl affects ABI
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // 'required' but overridden is not (used for recovery)
@@ -2196,8 +2214,8 @@ namespace decls_block {
     BCBlob      // Message
   >;
 
-  using BackDeployDeclAttrLayout = BCRecordLayout<
-    BackDeploy_DECL_ATTR,
+  using BackDeployedDeclAttrLayout = BCRecordLayout<
+    BackDeployed_DECL_ATTR,
     BCFixed<1>,     // implicit flag
     BC_AVAIL_TUPLE, // OS version
     BCVBR<5>        // platform
@@ -2216,19 +2234,11 @@ namespace decls_block {
     AccessLevelField    // visibility
   >;
 
-  using DeclarationDeclAttrLayout = BCRecordLayout<
-    Declaration_DECL_ATTR,
+  using MacroRoleDeclAttrLayout = BCRecordLayout<
+    MacroRole_DECL_ATTR,
     BCFixed<1>,                // implicit flag
-    MacroRoleField,         // macro context
-    BCVBR<5>,                  // number of peer names
-    BCVBR<5>,                  // number of member names
-    BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
-  >;
-
-  using AttachedDeclAttrLayout = BCRecordLayout<
-    Attached_DECL_ATTR,
-    BCFixed<1>,                // implicit flag
-    MacroRoleField,            // macro roles
+    BCFixed<1>,                // macro syntax
+    MacroRoleField,            // macro role
     BCVBR<5>,                  // number of names
     BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
   >;

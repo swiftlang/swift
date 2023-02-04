@@ -1509,7 +1509,13 @@ namespace {
                                 outputSubstType, input, resultTy);
         return;
       }
+      case ParameterConvention::Pack_Guaranteed:
+      case ParameterConvention::Pack_Owned:
+        SGF.SGM.diagnose(Loc, diag::not_implemented,
+                         "reabstraction of pack values");
+        return;
       case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Pack_Inout:
         llvm_unreachable("inout reabstraction handled elsewhere");
       case ParameterConvention::Indirect_InoutAliasable:
         llvm_unreachable("abstraction difference in aliasable argument not "
@@ -1726,12 +1732,15 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
   switch (info.getConvention()) {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Pack_Inout:
     return ManagedValue::forLValue(value);
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Pack_Owned:
     return SGF.emitManagedRValueWithCleanup(value);
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Pack_Guaranteed:
     if (value->getOwnershipKind() == OwnershipKind::None)
       return ManagedValue::forUnmanaged(value);
     return ManagedValue::forBorrowedObjectRValue(value);
@@ -2773,6 +2782,8 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
       return SGF.emitManagedRValueWithCleanup(resultValue, resultTL);
+    case ResultConvention::Pack:
+      llvm_unreachable("shouldn't have direct result with pack results");
     case ResultConvention::UnownedInnerPointer:
       // FIXME: We can't reasonably lifetime-extend an inner-pointer result
       // through a thunk. We don't know which parameter to the thunk was

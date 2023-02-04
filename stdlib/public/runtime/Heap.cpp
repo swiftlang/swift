@@ -74,7 +74,11 @@ static inline malloc_zone_t *DEFAULT_ZONE() {
 // the use of AlignedAlloc. This allows manually allocated to memory to always
 // be deallocated with AlignedFree without knowledge of its original allocation
 // alignment.
-//
+static size_t computeAlignment(size_t alignMask) {
+  return (alignMask == ~(size_t(0))) ? _swift_MinAllocationAlignment
+                                     : alignMask + 1;
+}
+
 // For alignMask > (_minAllocationAlignment-1)
 // i.e. alignment == 0 || alignment > _minAllocationAlignment:
 //   The runtime must use AlignedAlloc, and the standard library must
@@ -94,13 +98,30 @@ void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
     p = malloc(size);
 #endif
   } else {
-    size_t alignment = (alignMask == ~(size_t(0)))
-                           ? _swift_MinAllocationAlignment
-                           : alignMask + 1;
+    size_t alignment = computeAlignment(alignMask);
     p = AlignedAlloc(size, alignment);
   }
   if (!p) swift::crash("Could not allocate memory.");
   return p;
+}
+
+void *swift::swift_slowAllocTyped(size_t size, size_t alignMask,
+                                  MallocTypeId typeId) {
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
+    void *p;
+    // This check also forces "default" alignment to use malloc_memalign().
+    if (alignMask <= MALLOC_ALIGN_MASK) {
+      p = malloc_type_zone_malloc(DEFAULT_ZONE(), size, typeId);
+    } else {
+      size_t alignment = computeAlignment(alignMask);
+      p = malloc_type_zone_memalign(DEFAULT_ZONE(), alignment, size, typeId);
+    }
+    if (!p) swift::crash("Could not allocate memory.");
+    return p;
+  }
+#endif
+  return swift_slowAlloc(size, alignMask);
 }
 
 // Unknown alignment is specified by passing alignMask == ~(size_t(0)), forcing

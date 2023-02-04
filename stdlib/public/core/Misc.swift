@@ -154,3 +154,8 @@ public func _getTypeByMangledNameInContext(
 public func _unsafePerformance<T>(_ c: () -> T) -> T {
   return c()
 }
+
+
+/// This is not a protocol you can explicitly use in your programs.
+/// It exists for the compiler and type checker for diagnostic purposes.
+@_marker public protocol _Copyable { }

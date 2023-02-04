@@ -174,6 +174,15 @@ public:
     return mv;
   }
 
+  ManagedValue visitPackExpansionType(CanPackExpansionType t,
+                                      AbstractionPattern orig) {
+    // Pack expansions in the formal parameter list are made
+    // concrete as packs.
+    return visitType(PackType::get(SGF.getASTContext(), {t})
+                       ->getCanonicalType(),
+                     orig);
+  }
+
   ManagedValue visitTupleType(CanTupleType t, AbstractionPattern orig) {
     // Only destructure if the abstraction pattern is also a tuple.
     if (!orig.isTuple())
@@ -303,15 +312,8 @@ struct ArgumentInitHelper {
     // form.
     if (!isNoImplicitCopy) {
       if (!value->getType().isMoveOnly()) {
-        // Follow the "normal path": perform a lexical borrow if the lifetime is
-        // lexical.
-        if (value->getOwnershipKind() == OwnershipKind::Owned) {
-          if (lifetime.isLexical()) {
-            value = SILValue(
-                SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
-            SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
-          }
-        }
+        // Follow the normal path.  The value's lifetime will be enforced based
+        // on its ownership.
         return value;
       }
 
@@ -1070,24 +1072,40 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
       DC->mapTypeIntoContext(resultType), TypeExpansionContext::minimal());
   auto resultConvType = resultTIConv.getLoweredType();
 
+  auto &ctx = SGF.getASTContext();
+
+  SILType resultSILType = resultTI.getLoweredType().getAddressType();
+
+  // FIXME: respect susbtitution properly and collect the appropriate
+  // tuple components from resultType that correspond to the
+  // pack expansion in origType.
+  bool isPackExpansion = resultType->is<PackExpansionType>();
+  if (isPackExpansion) {
+    resultType = PackType::get(ctx, {resultType});
+
+    bool indirect =
+      origResultType.arePackElementsPassedIndirectly(SGF.SGM.Types);
+    SILPackType::ExtInfo extInfo(indirect);
+    resultSILType = SILType::getPrimitiveAddressType(
+      SILPackType::get(ctx, extInfo, {resultSILType.getASTType()}));
+  }
+
   // And the abstraction pattern may force an indirect return even if the
   // concrete type wouldn't normally be returned indirectly.
-  if (!SILModuleConventions::isReturnedIndirectlyInSIL(resultConvType,
-                                                       SGF.SGM.M))
-    
+  if (!isPackExpansion &&
+      !SILModuleConventions::isReturnedIndirectlyInSIL(resultConvType,
+                                                       SGF.SGM.M)) {
     if (!SILModuleConventions(SGF.SGM.M).useLoweredAddresses()
-        || origResultType.getResultConvention(SGF.SGM.Types) != AbstractionPattern::Indirect) {
+        || origResultType.getResultConvention(SGF.SGM.Types) != AbstractionPattern::Indirect)
       return;
   }
-  auto &ctx = SGF.getASTContext();
   auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
                                  ctx.getIdentifier("$return_value"),
                                  DC);
   var->setSpecifier(ParamSpecifier::InOut);
   var->setInterfaceType(resultType);
-  auto *arg = SGF.F.begin()->createFunctionArgument(
-      resultTI.getLoweredType().getAddressType(), var);
+  auto *arg = SGF.F.begin()->createFunctionArgument(resultSILType, var);
   (void)arg;
 }
 

@@ -290,7 +290,7 @@ bool SILModule::isTypeABIAccessible(SILType type,
 
 bool SILModule::isTypeMetadataForLayoutAccessible(SILType type) {
   if (type.is<ReferenceStorageType>() || type.is<SILFunctionType>() ||
-      type.is<AnyMetatypeType>())
+      type.is<AnyMetatypeType>() || type.is<SILPackType>())
     return false;
 
   return ::isTypeMetadataForLayoutAccessible(*this, type);

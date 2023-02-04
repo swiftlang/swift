@@ -1083,6 +1083,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
     break;
   }
+  case SILInstructionKind::AllocPackInst: {
+    const AllocPackInst *API = cast<AllocPackInst>(&SI);
+    writeOneTypeLayout(API->getKind(), 0, API->getPackType());
+    break;
+  }
   case SILInstructionKind::ProjectBoxInst: {
     auto PBI = cast<ProjectBoxInst>(&SI);
     
@@ -1482,6 +1487,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::SetDeallocatingInst:
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocStackRefInst:
+  case SILInstructionKind::DeallocPackInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:

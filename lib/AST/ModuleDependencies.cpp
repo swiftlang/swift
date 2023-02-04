@@ -422,7 +422,19 @@ ModuleDependenciesCache::ModuleDependenciesCache(
 Optional<const ModuleDependencyInfo*>
 ModuleDependenciesCache::findDependency(
     StringRef moduleName, Optional<ModuleDependencyKind> kind) const {
-  return globalScanningService.findDependency(moduleName, kind);
+  auto optionalDep = globalScanningService.findDependency(moduleName, kind);
+  // During a scan, only produce the cached source module info for the current module
+  // under scan.
+  if (optionalDep.hasValue()) {
+    auto dep = optionalDep.getValue();
+    if (dep->getAsSwiftSourceModule() &&
+        moduleName != mainScanModuleName &&
+        moduleName != "DummyMainModuleForResolvingCrossImportOverlays") {
+      return None;
+    }
+  }
+
+  return optionalDep;
 }
 
 bool ModuleDependenciesCache::hasDependency(
@@ -454,9 +466,9 @@ void ModuleDependenciesCache::updateDependency(
 void ModuleDependenciesCache::resolveDependencyImports(ModuleDependencyID moduleID,
                                                        const std::vector<ModuleDependencyID> &dependencyIDs) {
   auto optionalDependencyInfo = findDependency(moduleID.first, moduleID.second);
-  assert(optionalDependencyInfo.hasValue() && "Resolving unknown dependency");
+  assert(optionalDependencyInfo.has_value() && "Resolving unknown dependency");
   // Copy the existing info to a mutable one we can then replace it with, after resolving its dependencies.
-  auto dependencyInfo = *(optionalDependencyInfo.getValue());
+  auto dependencyInfo = *(optionalDependencyInfo.value());
   dependencyInfo.resolveDependencies(dependencyIDs);
   updateDependency(moduleID, dependencyInfo);
 }

@@ -28,7 +28,7 @@ bb(%0 : @guaranteed $C):
 
 // CHECK-LABEL: sil [ossa] @callerWithOwned : $@convention(thin) (@owned C) -> Builtin.Int64 {
 // CHECK: bb0(%0 : @owned $C):
-// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] %0 : $C
+// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
 // CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Builtin.Int64
 // CHECK:   end_borrow [[BORROW]] : $C
@@ -63,7 +63,7 @@ bb2:
 
 // CHECK-LABEL: sil [ossa] @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error any Error) {
 // CHECK: bb0(%0 : @owned $C):
-// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] %0 : $C
+// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
 // CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Builtin.Int64
 // CHECK: bb{{.*}}:
@@ -122,8 +122,10 @@ bb0(%0 : @guaranteed $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned
 // CHECK:   [[ARG_COPY_2:%.*]] = copy_value [[ARG_COPY]]
 // CHECK:   [[PAI:%.*]] = partial_apply [[FN]]([[ARG_COPY]])
 // CHECK:   [[ARG_COPY_3:%.*]] = copy_value [[ARG]]
+// CHECK:   [[MOVE_ARG_COPY_3:%[^,]+]] = move_value [lexical] [[ARG_COPY_3]]
+// CHECK:   [[MOVE_ARG_COPY_2:%[^,]+]] = move_value [lexical] [[ARG_COPY_2]]
 // CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
-// CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG_COPY_3]], [[ARG_COPY_2]])
+// CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[MOVE_ARG_COPY_3]], [[MOVE_ARG_COPY_2]])
 // CHECK:   [[PAI_COPY:%.*]] = copy_value [[PAI]]
 // CHECK:   [[OPAQUE_FN:%.*]] = function_ref @partial_apply_user
 // CHECK:   apply [[OPAQUE_FN]]([[PAI_COPY]])
@@ -293,9 +295,10 @@ bb3:
 // CHECK-LABEL: sil [ossa] @term_nonossa_checked_cast_addr_br_takealways_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:   [[ARG_MOVE:%[^,]+]] = move_value [lexical] [[ARG_COPY]] : $Builtin.NativeObject
 // CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
-// CHECK-NEXT:   store [[ARG_COPY]] to [init] [[SRC_ADDR]]
+// CHECK-NEXT:   store [[ARG_MOVE]] to [init] [[SRC_ADDR]]
 // CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [take] [[SRC_ADDR]]
 // CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
 //
@@ -368,9 +371,10 @@ bb3:
 // CHECK-LABEL: sil [ossa] @checked_cast_addr_br_takeonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:   [[ARG_MOVE:%[^,]+]] = move_value [lexical] [[ARG_COPY]] : $Builtin.NativeObject
 // CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
-// CHECK-NEXT:   store [[ARG_COPY]] to [init] [[SRC_ADDR]]
+// CHECK-NEXT:   store [[ARG_MOVE]] to [init] [[SRC_ADDR]]
 // CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [take] [[SRC_ADDR]]
 // CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
 //
@@ -424,9 +428,10 @@ bb3:
 // CHECK-LABEL: sil [ossa] @checked_cast_addr_br_copyonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:   [[ARG_MOVE:%[^,]+]] = move_value [lexical] [[ARG_COPY]]
 // CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
 // CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
-// CHECK-NEXT:   store [[ARG_COPY]] to [init] [[SRC_ADDR]]
+// CHECK-NEXT:   store [[ARG_MOVE]] to [init] [[SRC_ADDR]]
 // CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load_borrow [[SRC_ADDR]]
 // CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
 //

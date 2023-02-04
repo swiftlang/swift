@@ -192,27 +192,29 @@ SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
 static Optional<std::string>
 dumpBufferToFile(const llvm::MemoryBuffer *buffer) {
   // Create file in the system temporary directory.
-  SmallString<128> tempFileModel;
-  llvm::sys::path::system_temp_directory(true, tempFileModel);
-  llvm::sys::path::append(
-      tempFileModel, "swift-generated-sources-%%%%%%.swift");
-
-  // Open up a unique file.
-  int tempFD = 0;
-  SmallString<128> tempFileName;
-  if (llvm::sys::fs::createUniqueFile(tempFileModel, tempFD, tempFileName))
+  SmallString<128> outputFileName;
+  llvm::sys::path::system_temp_directory(true, outputFileName);
+  llvm::sys::path::append(outputFileName, "swift-generated-sources");
+  if (llvm::sys::fs::create_directory(outputFileName))
     return None;
 
-  // Dump the contents there.
-  auto contents = buffer->getBuffer();
-  llvm::raw_fd_ostream out(tempFD, true);
-  out << contents;
-  if (contents.empty() || contents.back() != '\n')
-    out << "\n";
-  out.flush();
+  // Finalize the name of the resulting file. This is unique based on name
+  // mangling.
+  llvm::sys::path::append(outputFileName, buffer->getBufferIdentifier());
 
-  llvm::sys::DontRemoveFileOnSignal(tempFileName);
-  return tempFileName.str().str();
+  std::error_code ec = atomicallyWritingToFile(outputFileName,
+     [&](llvm::raw_pwrite_stream &out) {
+       auto contents = buffer->getBuffer();
+       out << contents;
+
+      // Make sure we have a trailing newline.
+      if (contents.empty() || contents.back() != '\n')
+        out << "\n";
+    });
+  if (ec)
+    return None;
+
+  return outputFileName.str().str();
 }
 
 StringRef SourceManager::getIdentifierForBuffer(
@@ -225,6 +227,11 @@ StringRef SourceManager::getIdentifierForBuffer(
   // so external clients can see it, do so now.
   if (ForceGeneratedSourceToDisk) {
     if (auto generatedInfo = getGeneratedSourceInfo(bufferID)) {
+      // We only care about macros, so skip everything else.
+      if (generatedInfo->kind == GeneratedSourceInfo::ReplacedFunctionBody ||
+          generatedInfo->kind == GeneratedSourceInfo::PrettyPrinted)
+        return buffer->getBufferIdentifier();
+
       if (generatedInfo->onDiskBufferCopyFileName.empty()) {
         if (auto newFileNameOpt = dumpBufferToFile(buffer)) {
           generatedInfo->onDiskBufferCopyFileName =
@@ -314,6 +321,7 @@ void SourceManager::setGeneratedSourceInfo(
   case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
     break;
 

@@ -66,11 +66,16 @@ TYPE_ATTR(dynamic_self)
 #include "swift/AST/ReferenceStorage.def"
 TYPE_ATTR(error)
 TYPE_ATTR(out)
+TYPE_ATTR(direct)
 TYPE_ATTR(in)
 TYPE_ATTR(inout)
 TYPE_ATTR(inout_aliasable)
 TYPE_ATTR(in_guaranteed)
 TYPE_ATTR(in_constant)
+TYPE_ATTR(pack_owned)
+TYPE_ATTR(pack_guaranteed)
+TYPE_ATTR(pack_inout)
+TYPE_ATTR(pack_out)
 TYPE_ATTR(owned)
 TYPE_ATTR(unowned_inner_pointer)
 TYPE_ATTR(guaranteed)
@@ -79,6 +84,7 @@ TYPE_ATTR(callee_owned)
 TYPE_ATTR(callee_guaranteed)
 TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
+TYPE_ATTR(pack_element)
 TYPE_ATTR(pseudogeneric)
 TYPE_ATTR(yields)
 TYPE_ATTR(yield_once)
@@ -92,7 +98,7 @@ TYPE_ATTR(thin)
 TYPE_ATTR(thick)
 
 // Declaration Attributes and Modifers
-// To add a new entry here, update https://github.com/apple/swift-syntax
+// To add a new entry here, update `utils/gyb_syntax_support/AttributeKinds.py`
 % for attr in DECL_ATTR_KINDS + DECL_MODIFIER_KINDS + DEPRECATED_MODIFIER_KINDS:
 %   if type(attr) is ContextualDeclAttributeAlias:
 CONTEXTUAL_DECL_ATTR_ALIAS(${attr.name}, ${attr.class_name})

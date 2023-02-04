@@ -291,25 +291,34 @@ PackType *PackType::flattenPackTypes() {
   return PackType::get(getASTContext(), elts);
 }
 
-CanPackType PackType::getReducedShape() {
+template <class T>
+static CanPackType getReducedShapeOfPack(const ASTContext &ctx,
+                                         const T &elementTypes) {
   SmallVector<Type, 4> elts;
+  elts.reserve(elementTypes.size());
 
-  auto &ctx = getASTContext();
-
-  for (auto elt : getElementTypes()) {
+  for (auto elt : elementTypes) {
     // T... => shape(T)...
-    if (auto *packExpansionType = elt->getAs<PackExpansionType>()) {
+    if (auto *packExpansionType = elt->template getAs<PackExpansionType>()) {
       elts.push_back(packExpansionType->getReducedShape());
       continue;
     }
 
     // Use () as a placeholder for scalar shape.
-    assert(!elt->is<PackArchetypeType>() &&
+    assert(!elt->template is<PackArchetypeType>() &&
            "Pack archetype outside of a pack expansion");
     elts.push_back(ctx.TheEmptyTupleType);
   }
 
   return CanPackType(PackType::get(ctx, elts));
+}
+
+CanPackType PackType::getReducedShape() {
+  return getReducedShapeOfPack(getASTContext(), getElementTypes());
+}
+
+CanPackType SILPackType::getReducedShape() const {
+  return getReducedShapeOfPack(getASTContext(), getElementTypes());
 }
 
 CanType TypeBase::getReducedShape() {
@@ -424,4 +433,13 @@ CanPackType PackArchetypeType::getSingletonPackType() {
   SmallVector<Type, 1> types;
   types.push_back(PackExpansionType::get(this, getReducedShape()));
   return CanPackType(PackType::get(getASTContext(), types));
+}
+
+bool SILPackType::containsPackExpansionType() const {
+  for (auto type : getElementTypes()) {
+    if (isa<PackExpansionType>(type))
+      return true;
+  }
+
+  return false;
 }

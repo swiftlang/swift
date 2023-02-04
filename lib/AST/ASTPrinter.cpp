@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "InlinableText.h"
 #include "swift/AST/ASTPrinter.h"
+#include "InlinableText.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -61,6 +61,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
@@ -1883,6 +1884,11 @@ bool isNonSendableExtension(const Decl *D) {
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    // Always print unavilable extensions that carry reflection
+    // metadata attributes.
+    if (!ED->getRuntimeDiscoverableAttrs().empty())
+      return true;
+
     if (Options.printExtensionContentAsMembers(ED))
       return false;
   }
@@ -2299,7 +2305,15 @@ static void addNamespaceMembers(Decl *decl,
 
   // This is only to keep track of the members we've already seen.
   llvm::SmallPtrSet<Decl *, 16> addedMembers;
+  const auto *declOwner = namespaceDecl->getOwningModule();
+  if (declOwner)
+    declOwner = declOwner->getTopLevelModule();
   for (auto redecl : namespaceDecl->redecls()) {
+    // Skip namespace declarations that come from other top-level modules.
+    if (const auto *redeclOwner = redecl->getOwningModule()) {
+      if (declOwner && declOwner != redeclOwner->getTopLevelModule())
+        continue;
+    }
     for (auto member : redecl->decls()) {
       if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
         // Add all specializations to a worklist so we don't accidently mutate
@@ -2323,10 +2337,16 @@ static void addNamespaceMembers(Decl *decl,
       if (!name)
         continue;
 
-      CXXNamespaceMemberLookup lookupRequest({cast<EnumDecl>(decl), name});
-      for (auto found : evaluateOrDefault(ctx.evaluator, lookupRequest, {})) {
-        if (addedMembers.insert(found).second)
-          members.push_back(found);
+      auto allResults = evaluateOrDefault(
+          ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
+
+      for (auto found : allResults) {
+        auto clangMember = found.get<clang::NamedDecl *>();
+        if (auto importedDecl =
+                ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
+          if (addedMembers.insert(importedDecl).second)
+            members.push_back(importedDecl);
+        }
       }
     }
   }
@@ -2960,12 +2980,6 @@ static bool usesFeatureTypeWrappers(Decl *decl) {
 }
 
 static bool usesFeatureRuntimeDiscoverableAttrs(Decl *decl) {
-  if (decl->getAttrs().hasAttribute<RuntimeMetadataAttr>())
-    return true;
-
-  if (auto *VD = dyn_cast<ValueDecl>(decl))
-    return !VD->getRuntimeDiscoverableAttrs().empty();
-
   return false;
 }
 
@@ -3593,6 +3607,13 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
 }
 
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
+  if (const auto *namespaceDecl =
+          dyn_cast_or_null<clang::NamespaceDecl>(decl->getClangDecl())) {
+    // Enum that correponds to the C++ namespace should only be printed once.
+    if (!Printer.shouldPrintRedeclaredClangDecl(
+            namespaceDecl->getOriginalNamespace()))
+      return;
+  }
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
@@ -5439,6 +5460,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
       if (archetype->isParameterPack() && Options.PrintExplicitEach)
         return false;
+      if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
+        return false;
     }
     return T->hasSimpleTypeRepr();
   }
@@ -5679,8 +5702,10 @@ public:
         Printer << "error_expr";
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
-      } else {
+      } else if (originator.is<PlaceholderTypeRepr *>()) {
         Printer << "placeholder_type_repr";
+      } else {
+        assert(false && "unknown originator");
       }
       Printer << ">>";
     } else {
@@ -5742,6 +5767,21 @@ public:
   }
 
   void visitPackType(PackType *T) {
+    Printer << "Pack{";
+
+    auto Fields = T->getElementTypes();
+    for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
+      if (i)
+        Printer << ", ";
+      Type EltType = Fields[i];
+      visit(EltType);
+    }
+    Printer << "}";
+  }
+
+  void visitSILPackType(SILPackType *T) {
+    if (!T->isElementAddress())
+      Printer << "@direct ";
     Printer << "Pack{";
 
     auto Fields = T->getElementTypes();
@@ -6289,6 +6329,10 @@ public:
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_Guaranteed:
       llvm_unreachable("callee convention cannot be indirect");
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+    case ParameterConvention::Pack_Inout:
+      llvm_unreachable("callee convention cannot be a pack");
     }
     llvm_unreachable("bad convention");
   }
@@ -6581,12 +6625,58 @@ public:
     }
   }
 
+  static Type findPackForElementArchetype(ElementArchetypeType *T) {
+    // The type in @pack_element is looked up in the generic params
+    // of the identified open_pack_element instruction.  The param list
+    // is long gone, but the sugar survives in the type parameters of
+    // the generic signature of the contextual substitution map in the
+    // opened element environment.
+    auto env = T->getGenericEnvironment();
+    auto subs = env->getPackElementContextSubstitutions();
+    auto sig = subs.getGenericSignature();
+    auto params = sig.getGenericParams();
+
+    auto elementShapeClass =
+      env->getOpenedElementShapeClass()->mapTypeOutOfContext();
+
+    // The element archetypes are at a depth one past the max depth
+    // of the base signature.
+    unsigned elementDepth = params.back()->getDepth() + 1;
+
+    // Transform the archetype's interface type to be based on the
+    // corresponding non-canonical type parameter.
+    auto interfaceType = T->getInterfaceType();
+    return interfaceType.subst([&](SubstitutableType *type) -> Type {
+      // Don't transform types that aren't element type parameters.
+      auto *elementParam = type->getAs<GenericTypeParamType>();
+      if (!elementParam || elementParam->getDepth() != elementDepth)
+        return Type();
+
+      // Loop through the type parameters looking for the type parameter
+      // pack at the appropriate index.  We only expect to actually do
+      // this once for each type, so it's fine to do it in the callback.
+      unsigned nextIndex = 0;
+      for (auto *genericParam : params) {
+        if (!genericParam->isParameterPack())
+          continue;
+
+        if (!sig->haveSameShape(genericParam, elementShapeClass))
+          continue;
+
+        if (nextIndex == elementParam->getIndex())
+          return genericParam;
+        nextIndex++;
+      }
+      llvm_unreachable("ran out of type parameters");
+      return Type();
+    }, LookUpConformanceInSignature(sig.getPointer()));
+  }
+
   void visitElementArchetypeType(ElementArchetypeType *T) {
     if (Options.PrintForSIL) {
-      Printer << "@element(\"" << T->getOpenedElementID() << ") ";
-
-      auto interfaceTy = T->getInterfaceType();
-      visit(interfaceTy);
+      Printer << "@pack_element(\"" << T->getOpenedElementID() << "\") ";
+      auto packTy = findPackForElementArchetype(T);
+      visit(packTy);
     } else {
       visit(T->getInterfaceType());
     }
@@ -6933,6 +7023,9 @@ static StringRef getStringForParameterConvention(ParameterConvention conv) {
   case ParameterConvention::Direct_Owned: return "@owned ";
   case ParameterConvention::Direct_Unowned: return "";
   case ParameterConvention::Direct_Guaranteed: return "@guaranteed ";
+  case ParameterConvention::Pack_Guaranteed: return "@pack_guaranteed ";
+  case ParameterConvention::Pack_Owned: return "@pack_owned ";
+  case ParameterConvention::Pack_Inout: return "@pack_inout ";
   }
   llvm_unreachable("bad parameter convention");
 }
@@ -6981,6 +7074,7 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   case ResultConvention::Unowned: return "";
   case ResultConvention::UnownedInnerPointer: return "@unowned_inner_pointer ";
   case ResultConvention::Autoreleased: return "@autoreleased ";
+  case ResultConvention::Pack: return "@pack_out ";
   }
   llvm_unreachable("bad result convention");
 }

@@ -301,7 +301,7 @@ struct SSALivenessTest : UnitTest {
     SmallVector<SILBasicBlock *, 8> discoveredBlocks;
     SSAPrunedLiveness liveness(&discoveredBlocks);
     liveness.initializeDef(value);
-    SimpleLiveRangeSummary summary = liveness.computeSimple();
+    LiveRangeSummary summary = liveness.computeSimple();
     if (summary.innerBorrowKind == InnerBorrowKind::Reborrowed)
       llvm::outs() << "Incomplete liveness: Reborrowed inner scope\n";
 
@@ -373,6 +373,9 @@ struct MultiDefLivenessTest : UnitTest {
 // Arguments:
 // - bool: pruneDebug
 // - bool: maximizeLifetimes
+// - bool: "respectAccessScopes", whether to contract lifetimes to end within
+//         access scopes which they previously enclosed but can't be hoisted
+//         before
 // - SILValue: value to canonicalize
 // Dumps:
 // - function after value canonicalization
@@ -384,11 +387,30 @@ struct CanonicalizeOSSALifetimeTest : UnitTest {
     DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
     auto pruneDebug = arguments.takeBool();
     auto maximizeLifetimes = arguments.takeBool();
+    auto respectAccessScopes = arguments.takeBool();
     InstructionDeleter deleter;
-    CanonicalizeOSSALifetime canonicalizer(pruneDebug, maximizeLifetimes, accessBlockAnalysis,
-                                           domTree, deleter);
+    CanonicalizeOSSALifetime canonicalizer(
+        pruneDebug, maximizeLifetimes,
+        respectAccessScopes ? accessBlockAnalysis : nullptr, domTree, deleter);
     auto value = arguments.takeValue();
     canonicalizer.canonicalizeValueLifetime(value);
+    getFunction()->dump();
+  }
+};
+
+// Arguments:
+// - SILValue: value to canonicalize
+// Dumps:
+// - function after value canonicalization
+struct CanonicalizeBorrowScopeTest : UnitTest {
+  CanonicalizeBorrowScopeTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto value = arguments.takeValue();
+    auto borrowedValue = BorrowedValue(value);
+    assert(borrowedValue && "specified value isn't a BorrowedValue!?");
+    InstructionDeleter deleter;
+    CanonicalizeBorrowScope canonicalizer(deleter);
+    canonicalizer.canonicalizeBorrowScope(borrowedValue);
     getFunction()->dump();
   }
 };
@@ -616,6 +638,8 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
 
     // Alphabetical mapping from string to unit test subclass.
     ADD_UNIT_TEST_SUBCLASS("canonicalize-ossa-lifetime", CanonicalizeOSSALifetimeTest)
+    ADD_UNIT_TEST_SUBCLASS("canonicalize-borrow-scope",
+                           CanonicalizeBorrowScopeTest)
     ADD_UNIT_TEST_SUBCLASS("dump-function", DumpFunction)
     ADD_UNIT_TEST_SUBCLASS("find-borrow-introducers", FindBorrowIntroducers)
     ADD_UNIT_TEST_SUBCLASS("find-enclosing-defs", FindEnclosingDefsTest)

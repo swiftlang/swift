@@ -1149,6 +1149,7 @@ public:
   void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
+  void visitAllocPackInst(AllocPackInst *i);
   void visitAllocRefInst(AllocRefInst *i);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
@@ -1324,6 +1325,7 @@ public:
   void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocStackRefInst(DeallocStackRefInst *i);
+  void visitDeallocPackInst(DeallocPackInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
@@ -5496,6 +5498,10 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   emitDebugInfoForAllocStack(i, type, addr.getAddress());
 }
 
+void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
+  IGM.unimplemented(i->getLoc().getSourceLoc(), "alloc_pack");
+}
+
 static void
 buildTailArrays(IRGenSILFunction &IGF,
                 SmallVectorImpl<std::pair<SILType, llvm::Value *>> &TailArrays,
@@ -5593,6 +5599,10 @@ void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {
       Builder.CreateLifetimeEnd(selfValue);
     }
   }
+}
+
+void IRGenSILFunction::visitDeallocPackInst(swift::DeallocPackInst *i) {
+  IGM.unimplemented(i->getLoc().getSourceLoc(), "dealloc_pack");
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
@@ -5794,6 +5804,45 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
     setLoweredDynamicallyEnforcedAddress(access, addr, scratch);
     return;
   }
+  case SILAccessEnforcement::Signed: {
+    auto &ti = getTypeInfo(access->getType());
+    auto *sea = cast<StructElementAddrInst>(access->getOperand());
+    auto *Int64PtrTy = llvm::Type::getInt64PtrTy(IGM.getLLVMContext());
+    auto *Int64PtrPtrTy = Int64PtrTy->getPointerTo();
+    if (access->getAccessKind() == SILAccessKind::Read) {
+      // When we see a signed read access, generate code to:
+      // authenticate the signed pointer, and store the authenticated value to a
+      // shadow stack location. Set the lowered address of the access to this
+      // stack location.
+      auto pointerAuthQual = sea->getField()->getPointerAuthQualifier();
+      auto *pointerToSignedFptr = getLoweredAddress(sea).getAddress();
+      auto *pointerToIntPtr =
+          Builder.CreateBitCast(pointerToSignedFptr, Int64PtrPtrTy);
+      auto *signedFptr = Builder.CreateLoad(pointerToIntPtr, Int64PtrTy,
+                                            IGM.getPointerAlignment());
+      auto *resignedFptr = emitPointerAuthResign(
+          *this, signedFptr,
+          PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr),
+          PointerAuthInfo::emit(*this,
+                                IGM.getOptions().PointerAuth.FunctionPointers,
+                                pointerToSignedFptr, PointerAuthEntity()));
+      auto temp = ti.allocateStack(*this, access->getType(), "ptrauth.temp");
+      auto *tempAddressToIntPtr =
+          Builder.CreateBitCast(temp.getAddressPointer(), Int64PtrPtrTy);
+      Builder.CreateStore(resignedFptr, tempAddressToIntPtr,
+                          IGM.getPointerAlignment());
+      setLoweredAddress(access, temp.getAddress());
+      return;
+    }
+    if (access->getAccessKind() == SILAccessKind::Modify) {
+      // When we see a signed modify access, create a shadow stack location and
+      // set the lowered address of the access to this stack location.
+      auto temp = ti.allocateStack(*this, access->getType(), "ptrauth.temp");
+      setLoweredAddress(access, temp.getAddress());
+      return;
+    }
+    llvm_unreachable("Incompatible access kind with begin_access [signed]");
+  }
   }
   llvm_unreachable("bad access enforcement");
 }
@@ -5812,6 +5861,7 @@ void IRGenSILFunction::visitBeginUnpairedAccessInst(
 
   case SILAccessEnforcement::Static:
   case SILAccessEnforcement::Unsafe:
+  case SILAccessEnforcement::Signed:
     // nothing to do
     return;
 
@@ -5873,6 +5923,39 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
     Builder.CreateLifetimeEnd(scratch);
     return;
   }
+
+  case SILAccessEnforcement::Signed: {
+    if (access->getAccessKind() != SILAccessKind::Modify) {
+      // nothing to do.
+      return;
+    }
+    // When we see a signed modify access, get the lowered address of the
+    // access which is the shadow stack slot, sign the value and write back to
+    // the struct field.
+    auto *Int64PtrTy = llvm::Type::getInt64PtrTy(IGM.getLLVMContext());
+    auto *Int64PtrPtrTy = Int64PtrTy->getPointerTo();
+    auto pointerAuthQual = cast<StructElementAddrInst>(access->getOperand())
+                               ->getField()
+                               ->getPointerAuthQualifier();
+    auto *pointerToSignedFptr =
+        getLoweredAddress(access->getOperand()).getAddress();
+    auto tempAddress = getLoweredAddress(access);
+    auto *tempAddressToIntPtr =
+        Builder.CreateBitCast(tempAddress.getAddress(), Int64PtrPtrTy);
+    auto *tempAddressValue = Builder.CreateLoad(tempAddressToIntPtr, Int64PtrTy,
+                                                IGM.getPointerAlignment());
+    auto *signedFptr = emitPointerAuthResign(
+        *this, tempAddressValue,
+        PointerAuthInfo::emit(*this,
+                              IGM.getOptions().PointerAuth.FunctionPointers,
+                              tempAddress.getAddress(), PointerAuthEntity()),
+        PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr));
+
+    auto *pointerToIntPtr =
+        Builder.CreateBitCast(pointerToSignedFptr, Int64PtrPtrTy);
+    Builder.CreateStore(signedFptr, pointerToIntPtr, IGM.getPointerAlignment());
+    return;
+  }
   }
   llvm_unreachable("bad access enforcement");
 }
@@ -5884,6 +5967,7 @@ void IRGenSILFunction::visitEndUnpairedAccessInst(EndUnpairedAccessInst *i) {
 
   case SILAccessEnforcement::Static:
   case SILAccessEnforcement::Unsafe:
+  case SILAccessEnforcement::Signed:
     // nothing to do
     return;
 

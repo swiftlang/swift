@@ -450,6 +450,7 @@ struct ImmutableAddressUseVerifier {
   bool isConsumingOrMutatingArgumentConvention(SILArgumentConvention conv) {
     switch (conv) {
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Pack_Guaranteed:
       return false;
 
     case SILArgumentConvention::Indirect_InoutAliasable:
@@ -462,6 +463,9 @@ struct ImmutableAddressUseVerifier {
       // TODO: Remove this in favor of using Inout and In_Guaranteed.
       return false;
 
+    case SILArgumentConvention::Pack_Out:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_Inout:
@@ -1519,6 +1523,12 @@ public:
     // dealloc_stack. This can come up if the source contains a
     // withUnsafePointer where the pointer escapes.
     // It's illegal code but the compiler should not crash on it.
+  }
+
+  void checkAllocPackInst(AllocPackInst *AI) {
+    requireAddressType(SILPackType, AI->getType(),
+                       "result of alloc_pack must be an address of "
+                       "lowered pack type");
   }
 
   void checkAllocRefBase(AllocRefInstBase *ARI) {
@@ -3126,6 +3136,11 @@ public:
             "Operand of dealloc_stack must be an alloc_stack or partial_apply "
             "[stack]");
   }
+  void checkDeallocPackInst(DeallocPackInst *DI) {
+    require(isa<SILUndef>(DI->getOperand()) ||
+            isa<AllocPackInst>(DI->getOperand()),
+            "Operand of dealloc_pack must be an alloc_pack");
+  }
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand()->getType().isObject(),
             "Operand of dealloc_ref must be object");
@@ -3271,6 +3286,10 @@ public:
                 EI->getForwardingOwnershipKind() == OwnershipKind::Guaranteed,
             "invalid forwarding ownership kind on tuple_extract instruction");
 
+    require(!EI->getStructDecl()->isNonTrivialPtrAuth(),
+            "Imported structs with ptrauth qualified fields should not be "
+            "promoted to a value");
+
     if (EI->getModule().getStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
@@ -3318,6 +3337,14 @@ public:
     require(EI->getField()->getDeclContext() == sd,
             "struct_element_addr field is not a member of the struct");
 
+    if (EI->getStructDecl()->isNonTrivialPtrAuth()) {
+      for (auto *use : EI->getUses()) {
+        auto *bai = dyn_cast<BeginAccessInst>(use->getUser());
+        require(bai && bai->getEnforcement() == SILAccessEnforcement::Signed,
+                "Access to ptrauth qualified fields should be scoped with "
+                "begin_access [signed]/end_access");
+      }
+    }
     if (EI->getModule().getStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
@@ -5533,12 +5560,17 @@ public:
                          if (!bbarg->getType().isAddress())
                            return true;
                          switch (paramInfo.getConvention()) {
-                         default:
+                         case ParameterConvention::Direct_Unowned:
+                         case ParameterConvention::Direct_Guaranteed:
+                         case ParameterConvention::Direct_Owned:
                            return false;
                          case ParameterConvention::Indirect_In:
                          case ParameterConvention::Indirect_Inout:
                          case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_In_Guaranteed:
+                         case ParameterConvention::Pack_Owned:
+                         case ParameterConvention::Pack_Guaranteed:
+                         case ParameterConvention::Pack_Inout:
                            return true;
                          }
                        }),

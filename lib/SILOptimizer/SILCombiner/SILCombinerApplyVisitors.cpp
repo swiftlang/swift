@@ -673,6 +673,7 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
       switch (PI.getConvention()) {
         case ParameterConvention::Indirect_In:
         case ParameterConvention::Direct_Owned:
+        case ParameterConvention::Pack_Owned:
           Builder.emitDestroyOperation(FAS.getLoc(), Arg);
           break;
         case ParameterConvention::Indirect_In_Guaranteed:
@@ -680,6 +681,8 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
         case ParameterConvention::Indirect_InoutAliasable:
         case ParameterConvention::Direct_Unowned:
         case ParameterConvention::Direct_Guaranteed:
+        case ParameterConvention::Pack_Guaranteed:
+        case ParameterConvention::Pack_Inout:
           break;
       }
     }

@@ -1806,7 +1806,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
   // by the lexer, so there is no reason to emit another diagnostic.
   case tok::unknown:
-    if (Tok.getText().startswith("\"\"\"")) {
+    if (startsWithMultilineStringDelimiter(Tok)) {
       // This was due to unterminated multi-line string.
       IsInputIncomplete = true;
     }
@@ -2189,7 +2189,6 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
     Tok.setKind(tok::identifier);
     baseNameLoc = consumeToken();
   } else {
-    baseName = Context.getIdentifier(Tok.getText());
     checkForInputIncomplete();
     diagnose(Tok, diag);
     return DeclNameRef();
@@ -3367,8 +3366,9 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
   return makeParserResult(
       status,
       new (Context) MacroExpansionExpr(
-          poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
-          Context.AllocateCopy(genericArgs), rightAngleLoc, argList));
+          CurDeclContext, poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
+          Context.AllocateCopy(genericArgs), rightAngleLoc, argList,
+          MacroRole::Expression));
 }
 
 /// parseExprCollection - Parse a collection literal expression.

@@ -1073,6 +1073,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         PackageName.emit(ScratchRecord, M->getPackageName().str());
       }
 
+      if (!M->getExportAsName().empty()) {
+        options_block::ModuleExportAsNameLayout ExportAs(Out);
+        ExportAs.emit(ScratchRecord, M->getExportAsName().str());
+      }
+
       if (M->isConcurrencyChecked()) {
         options_block::IsConcurrencyCheckedLayout IsConcurrencyChecked(Out);
         IsConcurrencyChecked.emit(ScratchRecord);
@@ -2224,9 +2229,10 @@ static uint8_t getRawStableMacroRole(swift::MacroRole context) {
   case swift::MacroRole::NAME: \
     return static_cast<uint8_t>(serialization::MacroRole::NAME);
   CASE(Expression)
-  CASE(FreestandingDeclaration)
+  CASE(Declaration)
   CASE(Accessor)
   CASE(MemberAttribute)
+  CASE(Member)
   }
 #undef CASE
   llvm_unreachable("bad result declaration macro kind");
@@ -2731,11 +2737,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_BackDeploy: {
-      auto *theAttr = cast<BackDeployAttr>(DA);
+    case DAK_BackDeployed: {
+      auto *theAttr = cast<BackDeployedAttr>(DA);
       ENCODE_VER_TUPLE(Version, llvm::Optional<llvm::VersionTuple>(theAttr->Version));
-      auto abbrCode = S.DeclTypeAbbrCodes[BackDeployDeclAttrLayout::Code];
-      BackDeployDeclAttrLayout::emitRecord(
+      auto abbrCode = S.DeclTypeAbbrCodes[BackDeployedDeclAttrLayout::Code];
+      BackDeployedDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           theAttr->isImplicit(),
           LIST_VER_TUPLE_PIECES(Version),
@@ -2988,29 +2994,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Declaration: {
-      auto *theAttr = cast<DeclarationAttr>(DA);
-      auto abbrCode = S.DeclTypeAbbrCodes[DeclarationDeclAttrLayout::Code];
-      auto rawMacroRole =
-          getRawStableMacroRole(theAttr->getMacroRole());
-      SmallVector<IdentifierID, 4> introducedDeclNames;
-      for (auto name : theAttr->getPeerAndMemberNames()) {
-        introducedDeclNames.push_back(IdentifierID(
-            getRawStableMacroIntroducedDeclNameKind(name.getKind())));
-        introducedDeclNames.push_back(
-            S.addDeclBaseNameRef(name.getIdentifier()));
-      }
-
-      DeclarationDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
-          rawMacroRole, theAttr->getPeerNames().size(),
-          theAttr->getMemberNames().size(), introducedDeclNames);
-      return;
-    }
-
-    case DAK_Attached: {
-      auto *theAttr = cast<AttachedAttr>(DA);
-      auto abbrCode = S.DeclTypeAbbrCodes[AttachedDeclAttrLayout::Code];
+    case DAK_MacroRole: {
+      auto *theAttr = cast<MacroRoleAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[MacroRoleDeclAttrLayout::Code];
       auto rawMacroRole =
           getRawStableMacroRole(theAttr->getMacroRole());
       SmallVector<IdentifierID, 4> introducedDeclNames;
@@ -3021,8 +3007,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
             S.addDeclBaseNameRef(name.getIdentifier()));
       }
 
-      AttachedDeclAttrLayout::emitRecord(
+      MacroRoleDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          static_cast<uint8_t>(theAttr->getMacroSyntax()),
           rawMacroRole, theAttr->getNames().size(),
           introducedDeclNames);
       return;
@@ -3149,11 +3136,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     if (accessScope.isPublic())
       return true;
 
-    // Testable allows access to internal details.
-    if (value->getDeclContext()->getParentModule()->isTestingEnabled() &&
-        accessScope.isInternal())
-      return true;
-
     if (auto accessor = dyn_cast<AccessorDecl>(value))
       // Accessors are as safe as their storage.
       if (isDeserializationSafe(accessor->getStorage()))
@@ -3202,7 +3184,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 #endif
 
     // Private imports allow safe access to everything.
-    if (DC->getParentModule()->arePrivateImportsEnabled())
+    if (DC->getParentModule()->arePrivateImportsEnabled() ||
+        DC->getParentModule()->isTestingEnabled())
       return;
 
     // Ignore things with no access level.
@@ -3548,17 +3531,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     // its overrides after they've been compiled: if the declaration is '@objc'
     // and 'dynamic'. In that case, all accesses to the method or property will
     // go through the Objective-C method tables anyway.
-    if (overridden->hasClangNode() || overridden->shouldUseObjCDispatch())
+    if (!isa<ConstructorDecl>(override) &&
+        (overridden->hasClangNode() || overridden->shouldUseObjCDispatch()))
       return false;
 
     // In a public-override-internal case, the override doesn't have ABI
-    // implications.
+    // implications. This corresponds to hiding the override keyword from the
+    // module interface.
     auto isPublic = [](const ValueDecl *VD) {
       return VD->getFormalAccessScope(VD->getDeclContext(),
                                       /*treatUsableFromInlineAsPublic*/true)
                .isPublic();
     };
-    if (isPublic(override) && !isPublic(overridden))
+    if (override->getDeclContext()->getParentModule()->isResilient() &&
+        isPublic(override) && !isPublic(overridden))
       return false;
 
     return true;
@@ -4512,9 +4498,12 @@ public:
     uint8_t rawAccessLevel = getRawStableAccessLevel(ctor->getFormalAccess());
 
     bool firstTimeRequired = ctor->isRequired();
-    if (auto *overridden = ctor->getOverriddenDecl())
+    auto *overridden = ctor->getOverriddenDecl();
+    if (overridden) {
       if (firstTimeRequired && overridden->isRequired())
         firstTimeRequired = false;
+    }
+    bool overriddenAffectsABI = overriddenDeclAffectsABI(ctor, overridden);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -4530,7 +4519,8 @@ public:
                                     ctor->getInitKind()),
                                   S.addGenericSignatureRef(
                                                  ctor->getGenericSignature()),
-                                  S.addDeclRef(ctor->getOverriddenDecl()),
+                                  S.addDeclRef(overridden),
+                                  overriddenAffectsABI,
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
                                   firstTimeRequired,
@@ -4802,6 +4792,9 @@ static uint8_t getRawStableParameterConvention(swift::ParameterConvention pc) {
   SIMPLE_CASE(ParameterConvention, Direct_Owned)
   SIMPLE_CASE(ParameterConvention, Direct_Unowned)
   SIMPLE_CASE(ParameterConvention, Direct_Guaranteed)
+  SIMPLE_CASE(ParameterConvention, Pack_Owned)
+  SIMPLE_CASE(ParameterConvention, Pack_Inout)
+  SIMPLE_CASE(ParameterConvention, Pack_Guaranteed)
   }
   llvm_unreachable("bad parameter convention kind");
 }
@@ -4826,6 +4819,7 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
   SIMPLE_CASE(ResultConvention, Unowned)
   SIMPLE_CASE(ResultConvention, UnownedInnerPointer)
   SIMPLE_CASE(ResultConvention, Autoreleased)
+  SIMPLE_CASE(ResultConvention, Pack)
   }
   llvm_unreachable("bad result convention kind");
 }
@@ -4980,6 +4974,20 @@ public:
           S.Out, S.ScratchRecord, abbrCode,
           S.addTypeRef(elt));
     }
+  }
+
+  void visitSILPackType(const SILPackType *packTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[SILPackTypeLayout::Code];
+
+    SmallVector<TypeID, 8> variableData;
+    for (auto elementType : packTy->getElementTypes()) {
+      variableData.push_back(S.addTypeRef(elementType));
+    }
+
+    SILPackTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                  packTy->isElementAddress(),
+                                  variableData);
   }
 
   void visitParenType(const ParenType *parenTy) {

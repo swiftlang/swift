@@ -13,7 +13,7 @@ func inferSameShape<T..., U...>(ts t: repeat each T, us u: repeat each U) where 
 
 // CHECK-LABEL: desugarSameShape(ts:us:)
 // CHECK-NEXT: Generic signature: <T..., U... where T : P, ((T, U)...) : Any, U : P>
-func desugarSameShape<T..., U...>(ts t: repeat each T, us u: repeat each U) where T: P, U: P, (repeat (each T.A, each U.A)): Any {
+func desugarSameShape<T..., U...>(ts t: repeat each T, us u: repeat each U) where each T: P, each U: P, (repeat (each T.A, each U.A)): Any {
 }
 
 // CHECK-LABEL: multipleSameShape1(ts:us:vs:)

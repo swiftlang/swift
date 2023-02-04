@@ -1846,7 +1846,7 @@ createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError, bool DisableFailOnE
   if (!SerializedDiagPath.empty()) {
     FailOnError = !DisableFailOnError;
     results.emplace_back(std::make_unique<PrintingDiagnosticConsumer>());
-    results.emplace_back(serialized_diagnostics::createConsumer(SerializedDiagPath));
+    results.emplace_back(serialized_diagnostics::createConsumer(SerializedDiagPath, false));
   } else if (CompilerStyleDiags) {
     FailOnError = !DisableFailOnError;
     results.emplace_back(std::make_unique<PrintingDiagnosticConsumer>());

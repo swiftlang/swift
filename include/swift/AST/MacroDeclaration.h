@@ -21,6 +21,17 @@
 
 namespace swift {
 
+/// Describes the syntax that is used for a macro, which affects its role.
+enum class MacroSyntax: uint8_t {
+  /// Freestanding macro syntax starting with an explicit '#' followed by the
+  /// macro name and optional arguments.
+  Freestanding,
+
+  /// Attached macro syntax written as an attribute with a leading `@` followed
+  /// by the macro name an optional arguments.
+  Attached,
+};
+
 /// The context in which a macro can be used, which determines the syntax it
 /// uses.
 enum class MacroRole: uint32_t {
@@ -28,17 +39,24 @@ enum class MacroRole: uint32_t {
   /// in the source code.
   Expression = 0x01,
   /// A freestanding declaration macro.
-  FreestandingDeclaration = 0x02,
+  Declaration = 0x02,
   /// An attached macro that declares accessors for a variable or subscript
   /// declaration.
   Accessor = 0x04,
   /// An attached macro that generates attributes for the
   /// members inside the declaration.
   MemberAttribute = 0x08,
+  /// An attached macro that generates synthesized members
+  /// inside the declaration.
+  Member = 0x10,
 };
 
 /// The contexts in which a particular macro declaration can be used.
 using MacroRoles = OptionSet<MacroRole>;
+
+void simple_display(llvm::raw_ostream &out, MacroRoles roles);
+bool operator==(MacroRoles lhs, MacroRoles rhs);
+llvm::hash_code hash_value(MacroRoles roles);
 
 /// Retrieve the string form of the given macro role, as written on the
 /// corresponding attribute.
@@ -48,9 +66,13 @@ StringRef getMacroRoleString(MacroRole role);
 /// written in the source code with the `#` syntax.
 bool isFreestandingMacro(MacroRoles contexts);
 
+MacroRoles getFreestandingMacroRoles();
+
 /// Whether a macro with the given set of macro contexts is attached, i.e.,
 /// written in the source code as an attribute with the `@` syntax.
 bool isAttachedMacro(MacroRoles contexts);
+
+MacroRoles getAttachedMacroRoles();
 
 enum class MacroIntroducedDeclNameKind {
   Named,
