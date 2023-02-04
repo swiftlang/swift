@@ -28,7 +28,7 @@
 ///         }
 ///     }
 ///
-///     // Calling fatalError(_file:line:) unconditionally stops the program.
+///     // Calling fatalError(_:file:line:) unconditionally stops the program.
 ///     func crashAndBurn() -> Never {
 ///         fatalError("Something very, very bad happened")
 ///     }
