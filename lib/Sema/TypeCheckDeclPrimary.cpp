@@ -2586,6 +2586,20 @@ public:
     TypeChecker::checkDeclCircularity(ED);
 
     TypeChecker::checkConformancesInContext(ED);
+
+    // If our enum is marked as move only, it cannot be indirect or have any
+    // indirect cases.
+    if (ED->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+      if (ED->isIndirect())
+        ED->diagnose(diag::moveonly_enums_do_not_support_indirect,
+                     ED->getBaseIdentifier());
+      for (auto *elt : ED->getAllElements()) {
+        if (elt->isIndirect()) {
+          elt->diagnose(diag::moveonly_enums_do_not_support_indirect,
+                        ED->getBaseIdentifier());
+        }
+      }
+    }
   }
 
   void visitStructDecl(StructDecl *SD) {
