@@ -91,20 +91,20 @@ public:
       TypeTreeLeafTypeRange destructureNeededBits,
       FieldSensitivePrunedLivenessBoundary &boundary);
 
-  void emitObjectConsumesDestructuredValueTwice(MarkMustCheckInst *markedValue,
-                                                Operand *firstConsumingUse,
-                                                Operand *secondConsumingUse);
-  void
-  emitObjectConsumesAndUsesDestructuredValue(MarkMustCheckInst *markedValue,
-                                             Operand *consumingUse,
-                                             Operand *nonConsumingUse);
+  void emitObjectInstConsumesValueTwice(MarkMustCheckInst *markedValue,
+                                        Operand *firstConsumingUse,
+                                        Operand *secondConsumingUse);
+  void emitObjectInstConsumesAndUsesValue(MarkMustCheckInst *markedValue,
+                                          Operand *consumingUse,
+                                          Operand *nonConsumingUse);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing
   /// copy. If filter is non-null, allow for the caller to pre-process operands
   /// and emit their own diagnostic. If filter returns true, then we assume that
   /// the caller processed it correctly. false, then we continue to process it.
-  void emitObjectDiagnosticsForFoundUses(bool ignorePartialApply = false) const;
+  void
+  emitObjectDiagnosticsForGuaranteedUses(bool ignorePartialApply = false) const;
   void emitObjectDiagnosticsForPartialApplyUses() const;
 
   void registerDiagnosticEmitted(MarkMustCheckInst *value) {

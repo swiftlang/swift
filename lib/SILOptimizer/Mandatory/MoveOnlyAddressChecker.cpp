@@ -1012,6 +1012,8 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   // For convenience, grab the user of op.
   auto *user = op->getUser();
 
+  LLVM_DEBUG(llvm::dbgs() << "Visiting user: " << *user);
+
   // First check if we have init/reinit. These are quick/simple.
   if (::memInstMustInitialize(op)) {
     LLVM_DEBUG(llvm::dbgs() << "Found init: " << *user);
