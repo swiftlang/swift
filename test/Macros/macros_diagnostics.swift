@@ -67,11 +67,20 @@ func overloaded1(_ p: Any) { }
 // expected-note@-1{{'intIdentity(value:_:)' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 
-@freestanding(declaration) macro unaryDeclMacro(_ x: String)
+// FIXME: #63376
+// @freestanding(expression) macro usesAssocType<T: BinaryInteger>: T.Magnitude = #externalMacro(module: "MissingModule", type: "MissingType")
+
+@freestanding(declaration) macro badDeclMacro(_ x: String)
+// expected-error @-1 {{declaration macros must declare introduced names with 'names:'}}{{26-26=names: <#names...#>}}
+// expected-error @-2 {{macro 'badDeclMacro' requires a definition}}
+@freestanding(declaration, names: arbitrary)
+macro unaryDeclMacro(_ x: String)
 // expected-error @-1 {{macro 'unaryDeclMacro' requires a definition}}
-@freestanding(declaration) macro unaryDeclMacro(_ x: String, blah: Bool)
+@freestanding(declaration, names: arbitrary)
+macro unaryDeclMacro(_ x: String, blah: Bool)
 // expected-error @-1 {{macro 'unaryDeclMacro(_:blah:)' requires a definition}}
-@freestanding(declaration) macro genericDeclMacro<T: Numeric, U: Numeric>(_ x: T, _ y: U)
+@freestanding(declaration, names: arbitrary)
+macro genericDeclMacro<T: Numeric, U: Numeric>(_ x: T, _ y: U)
 // expected-error @-1 {{macro 'genericDeclMacro' requires a definition}}
 // expected-note @-2 {{where 'U' = 'String'}}
 

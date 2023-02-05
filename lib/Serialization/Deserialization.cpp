@@ -5453,7 +5453,8 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         }
         Attr = MacroRoleAttr::create(
             ctx, SourceLoc(), SourceRange(),
-            static_cast<MacroSyntax>(rawMacroSyntax), role, names, isImplicit);
+            static_cast<MacroSyntax>(rawMacroSyntax), SourceLoc(), role, names,
+            SourceLoc(), isImplicit);
         break;
       }
 

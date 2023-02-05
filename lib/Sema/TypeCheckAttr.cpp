@@ -160,7 +160,6 @@ public:
   IGNORED_ATTR(Preconcurrency)
   IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
-  IGNORED_ATTR(MacroRole)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -341,6 +340,8 @@ public:
   void visitSendableAttr(SendableAttr *attr);
 
   void visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr);
+
+  void visitMacroRoleAttr(MacroRoleAttr *attr);
 };
 
 } // end anonymous namespace
@@ -7232,6 +7233,15 @@ void AttributeChecker::visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr) {
     }
 
     attr->setInvalid();
+  }
+}
+
+void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
+  if (attr->getMacroRole() == MacroRole::Declaration &&
+      attr->getNames().empty()) {
+    diagnoseAndRemoveAttr(attr, diag::macro_must_declare_introduced_names,
+                          /*declaration*/0)
+        .fixItInsert(attr->getRParenLoc(), "names: <#names...#>");
   }
 }
 

@@ -9866,6 +9866,13 @@ MacroRoles MacroDecl::getMacroRoles() const {
   return contexts;
 }
 
+const MacroRoleAttr *MacroDecl::getMacroRoleAttr(MacroRole role) const {
+  for (auto attr : getAttrs().getAttributes<MacroRoleAttr>())
+    if (attr->getMacroRole() == role)
+      return attr;
+  llvm_unreachable("Macro role not declared for this MacroDecl");
+}
+
 MacroDefinition MacroDecl::getDefinition() const {
   return evaluateOrDefault(
       getASTContext().evaluator,

@@ -1206,6 +1206,10 @@ class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
   /// parent nominal type.
   llvm::DenseSet<DeclBaseName> LazilyCompleteNames;
 
+  /// The set of names for which we have expanded relevant macros for in the
+  /// parent nominal type.
+  llvm::DenseSet<DeclName> LazilyCompleteNamesForMacroExpansion;
+
 public:
   /// Create a new member lookup table.
   explicit MemberLookupTable(ASTContext &ctx);
@@ -1232,6 +1236,23 @@ public:
   /// will return inconsistent or stale results.
   void clearLazilyCompleteCache() {
     LazilyCompleteNames.clear();
+  }
+
+  bool isLazilyCompleteForMacroExpansion(DeclName name) const {
+    // If we've already expanded macros for a simple name, we must have expanded
+    // all macros that produce names with the same base identifier.
+    bool isBaseNameComplete = name.isCompoundName() &&
+        isLazilyCompleteForMacroExpansion(DeclName(name.getBaseName()));
+    return isBaseNameComplete ||
+        LazilyCompleteNamesForMacroExpansion.contains(name);
+  }
+
+  void markLazilyCompleteForMacroExpansion(DeclName name) {
+    LazilyCompleteNamesForMacroExpansion.insert(name);
+  }
+
+  void clearLazilyCompleteForMacroExpansionCache() {
+    LazilyCompleteNamesForMacroExpansion.clear();
   }
 
   /// Iterator into the lookup table.
@@ -1312,16 +1333,6 @@ MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
 }
 
 void MemberLookupTable::addMember(Decl *member) {
-   // Peer through macro expansions.
-   if (auto *med = dyn_cast<MacroExpansionDecl>(member)) {
-     auto expanded = evaluateOrDefault(med->getASTContext().evaluator,
-                                       ExpandMacroExpansionDeclRequest{med},
-                                       nullptr);
-     for (auto *decl : expanded)
-       addMember(decl);
-     return;
-   }
-
   // Only value declarations matter.
   auto vd = dyn_cast<ValueDecl>(member);
   if (!vd)
@@ -1366,6 +1377,7 @@ void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
   if (ext->hasLazyMembers()) {
     table->addMembers(ext->getCurrentMembersWithoutLoading());
     table->clearLazilyCompleteCache();
+    table->clearLazilyCompleteForMacroExpansionCache();
   } else {
     table->addMembers(ext->getMembers());
   }
@@ -1490,6 +1502,55 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
     assert(!e->hasUnparsedMembers());
 
     populateLookupTableEntryFromLazyIDCLoader(ctx, table, name, e);
+  }
+}
+
+static void
+populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
+                                            MemberLookupTable &table,
+                                            DeclName name,
+                                            NominalTypeDecl *dc) {
+  auto expandAndPopulate = [&](MacroExpansionDecl *med) {
+    auto expanded = evaluateOrDefault(med->getASTContext().evaluator,
+                                      ExpandMacroExpansionDeclRequest{med},
+                                      nullptr);
+    for (auto *decl : expanded)
+      table.addMember(decl);
+  };
+
+  for (auto *member : dc->getCurrentMembersWithoutLoading()) {
+    auto *med = dyn_cast<MacroExpansionDecl>(member);
+    if (!med)
+      continue;
+    auto macro = evaluateOrDefault(
+        ctx.evaluator, ResolveMacroRequest{med, MacroRole::Declaration, dc},
+        nullptr);
+    if (!macro)
+      continue;
+    auto *attr = macro->getMacroRoleAttr(MacroRole::Declaration);
+    // If a macro produces arbitrary names, we have to expand it to factor its
+    // expansion results into name lookup.
+    if (attr->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary)) {
+      expandAndPopulate(med);
+    }
+    // Otherwise, we expand the macro if it has the same decl base name being
+    // looked for.
+    else {
+      auto it = llvm::find_if(attr->getNames(),
+                              [&](const MacroIntroducedDeclName &introName) {
+        // FIXME: The `Named` kind of `MacroIntroducedDeclName` should store a
+        // `DeclName` instead of `Identifier`. This is so that we can compare
+        // base identifiers when the macro specifies a compound name.
+        // Currently only simple names are allowed in a `MacroRoleAttr`.
+        if (!name.isSpecial())
+          return introName.getIdentifier() == name.getBaseIdentifier();
+        else
+          return introName.getIdentifier().str() ==
+              name.getBaseName().userFacingName();
+      });
+      if (it != attr->getNames().end())
+        expandAndPopulate(med);
+    }
   }
 }
 
@@ -1654,6 +1715,11 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     }
 
     Table.markLazilyComplete(baseName);
+  }
+
+  if (!Table.isLazilyCompleteForMacroExpansion(name)) {
+    populateLookupTableEntryFromMacroExpansions(ctx, Table, name, decl);
+    Table.markLazilyCompleteForMacroExpansion(name);
   }
 
   // Look for a declaration with this name.

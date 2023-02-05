@@ -2314,25 +2314,31 @@ class MacroRoleAttr final
   MacroSyntax syntax;
   MacroRole role;
   unsigned numNames;
+  SourceLoc lParenLoc, rParenLoc;
 
   MacroRoleAttr(SourceLoc atLoc, SourceRange range, MacroSyntax syntax,
-                MacroRole role, ArrayRef<MacroIntroducedDeclName> names,
-                bool implicit);
+                SourceLoc lParenLoc, MacroRole role,
+                ArrayRef<MacroIntroducedDeclName> names,
+                SourceLoc rParenLoc, bool implicit);
 
 public:
   static MacroRoleAttr *create(ASTContext &ctx, SourceLoc atLoc,
                                SourceRange range, MacroSyntax syntax,
-                               MacroRole role,
+                               SourceLoc lParenLoc, MacroRole role,
                                ArrayRef<MacroIntroducedDeclName> names,
-                               bool implicit);
+                               SourceLoc rParenLoc, bool implicit);
 
   size_t numTrailingObjects(OverloadToken<MacroIntroducedDeclName>) const {
     return numNames;
   }
 
+  SourceLoc getLParenLoc() const { return lParenLoc; }
+  SourceLoc getRParenLoc() const { return rParenLoc; }
+
   MacroSyntax getMacroSyntax() const { return syntax; }
   MacroRole getMacroRole() const { return role; }
   ArrayRef<MacroIntroducedDeclName> getNames() const;
+  bool hasNameKind(MacroIntroducedDeclNameKind kind) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_MacroRole;

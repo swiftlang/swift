@@ -140,9 +140,12 @@ func testNestedDeclInExpr() {
   let _: () -> Void = #nestedDeclInExpr
 }
 
-@freestanding(declaration) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
 // Test overload
-@freestanding(declaration) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+// Test non-arbitrary names
+@freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
+macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
 // FIXME: Declaration macro expansions in BraceStmt don't work yet.
 //#bitwidthNumberedStructs("MyIntGlobal")
@@ -164,6 +167,7 @@ func testFreestandingMacroExpansion() {
 
   struct Foo2 {
     #bitwidthNumberedStructs("MyIntTwo", blah: false)
+    #defineDeclsWithKnownNames()
   }
   // CHECK: MyIntTwo8
   print(Foo2.MyIntTwo8.self)
@@ -173,6 +177,14 @@ func testFreestandingMacroExpansion() {
   print(Foo2.MyIntTwo32.self)
   // CHECK: MyIntTwo64
   print(Foo2.MyIntTwo64.self)
+  // CHECK: A
+  print(Foo2.A.self)
+  // CHECK: B
+  print(Foo2.B.self)
+  // CHECK: 1
+  print(Foo2().foo)
+  // CHECK: 2
+  print(Foo2().addOne(1))
 
   #if TEST_DIAGNOSTICS
   struct Foo3 {
