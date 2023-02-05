@@ -114,11 +114,11 @@ class VJPCloner::Implementation final
       return;
     // Get linear map struct size.
     auto *returnBB = &*original->findReturnBB();
-    auto pullbackStructType =
-        remapType(pullbackInfo.getLinearMapStructLoweredType(returnBB));
+    auto pullbackTupleType =
+        remapType(pullbackInfo.getLinearMapTupleLoweredType(returnBB));
     Builder.setInsertionPoint(vjp->getEntryBlock());
     auto topLevelSubcontextSize = emitMemoryLayoutSize(
-        Builder, original->getLocation(), pullbackStructType.getASTType());
+        Builder, original->getLocation(), pullbackTupleType.getASTType());
     // Create an context.
     pullbackContextValue = Builder.createBuiltin(
         original->getLocation(),
@@ -164,19 +164,19 @@ class VJPCloner::Implementation final
   // requirements on successor block arguments, where an additional predecessor
   // enum argument is not acceptable.
   SILBasicBlock *createTrampolineBasicBlock(TermInst *termInst,
-                                            StructInst *pbStructVal,
+                                            TupleInst *pbTupleVal,
                                             SILBasicBlock *succBB);
 
-  /// Build a pullback struct value for the given original terminator
+  /// Build a pullback tuple value for the given original terminator
   /// instruction.
-  StructInst *buildPullbackValueStructValue(TermInst *termInst);
+  TupleInst *buildPullbackValueTupleValue(TermInst *termInst);
 
   /// Build a predecessor enum instance using the given builder for the given
   /// original predecessor/successor blocks and pullback struct value.
   EnumInst *buildPredecessorEnumValue(SILBuilder &builder,
                                       SILBasicBlock *predBB,
                                       SILBasicBlock *succBB,
-                                      SILValue pbStructVal);
+                                      SILValue pbTupleVal);
 
 public:
   /// Remap original basic blocks, adding predecessor enum arguments.
@@ -222,7 +222,7 @@ public:
     auto loc = ri->getOperand().getLoc();
     // Build pullback struct value for original block.
     auto *origExit = ri->getParent();
-    auto *pbStructVal = buildPullbackValueStructValue(ri);
+    auto *pbTupleVal = buildPullbackValueTupleValue(ri);
 
     // Get the value in the VJP corresponding to the original result.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
@@ -238,17 +238,17 @@ public:
     SILValue partialApplyArg;
     if (borrowedPullbackContextValue) {
       // Initialize the top-level subcontext buffer with the top-level pullback
-      // struct.
+      // tuple.
       auto addr = emitProjectTopLevelSubcontext(
-          Builder, loc, borrowedPullbackContextValue, pbStructVal->getType());
+          Builder, loc, borrowedPullbackContextValue, pbTupleVal->getType());
       Builder.createStore(
-          loc, pbStructVal, addr,
-          pbStructVal->getType().isTrivial(*pullback) ?
+          loc, pbTupleVal, addr,
+          pbTupleVal->getType().isTrivial(*pullback) ?
               StoreOwnershipQualifier::Trivial : StoreOwnershipQualifier::Init);
       partialApplyArg = pullbackContextValue;
       Builder.createEndBorrow(loc, borrowedPullbackContextValue);
     } else {
-      partialApplyArg = pbStructVal;
+      partialApplyArg = pbTupleVal;
     }
 
     auto *pullbackPartialApply = Builder.createPartialApply(
@@ -290,9 +290,9 @@ public:
     // Build pullback struct value for original block.
     // Build predecessor enum value for destination block.
     auto *origBB = bi->getParent();
-    auto *pbStructVal = buildPullbackValueStructValue(bi);
+    auto *pbTupleVal = buildPullbackValueTupleValue(bi);
     auto *enumVal = buildPredecessorEnumValue(getBuilder(), origBB,
-                                              bi->getDestBB(), pbStructVal);
+                                              bi->getDestBB(), pbTupleVal);
 
     // Remap arguments, appending the new enum values.
     SmallVector<SILValue, 8> args;
@@ -308,31 +308,31 @@ public:
   void visitCondBranchInst(CondBranchInst *cbi) {
     Builder.setCurrentDebugScope(getOpScope(cbi->getDebugScope()));
     // Build pullback struct value for original block.
-    auto *pbStructVal = buildPullbackValueStructValue(cbi);
+    auto *pbTupleVal = buildPullbackValueTupleValue(cbi);
     // Create a new `cond_br` instruction.
     getBuilder().createCondBranch(
         cbi->getLoc(), getOpValue(cbi->getCondition()),
-        createTrampolineBasicBlock(cbi, pbStructVal, cbi->getTrueBB()),
-        createTrampolineBasicBlock(cbi, pbStructVal, cbi->getFalseBB()));
+        createTrampolineBasicBlock(cbi, pbTupleVal, cbi->getTrueBB()),
+        createTrampolineBasicBlock(cbi, pbTupleVal, cbi->getFalseBB()));
   }
 
   void visitSwitchEnumTermInst(SwitchEnumTermInst inst) {
     Builder.setCurrentDebugScope(getOpScope(inst->getDebugScope()));
-    // Build pullback struct value for original block.
-    auto *pbStructVal = buildPullbackValueStructValue(*inst);
+    // Build pullback tuple value for original block.
+    auto *pbTupleVal = buildPullbackValueTupleValue(*inst);
 
     // Create trampoline successor basic blocks.
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> caseBBs;
     for (unsigned i : range(inst.getNumCases())) {
       auto caseBB = inst.getCase(i);
       auto *trampolineBB =
-          createTrampolineBasicBlock(inst, pbStructVal, caseBB.second);
+          createTrampolineBasicBlock(inst, pbTupleVal, caseBB.second);
       caseBBs.push_back({caseBB.first, trampolineBB});
     }
     // Create trampoline default basic block.
     SILBasicBlock *newDefaultBB = nullptr;
     if (auto *defaultBB = inst.getDefaultBBOrNull().getPtrOrNull())
-      newDefaultBB = createTrampolineBasicBlock(inst, pbStructVal, defaultBB);
+      newDefaultBB = createTrampolineBasicBlock(inst, pbTupleVal, defaultBB);
 
     // Create a new `switch_enum` instruction.
     switch (inst->getKind()) {
@@ -360,29 +360,29 @@ public:
   void visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
     Builder.setCurrentDebugScope(getOpScope(ccbi->getDebugScope()));
     // Build pullback struct value for original block.
-    auto *pbStructVal = buildPullbackValueStructValue(ccbi);
+    auto *pbTupleVal = buildPullbackValueTupleValue(ccbi);
     // Create a new `checked_cast_branch` instruction.
     getBuilder().createCheckedCastBranch(
         ccbi->getLoc(), ccbi->isExact(), getOpValue(ccbi->getOperand()),
         getOpType(ccbi->getTargetLoweredType()),
         getOpASTType(ccbi->getTargetFormalType()),
-        createTrampolineBasicBlock(ccbi, pbStructVal, ccbi->getSuccessBB()),
-        createTrampolineBasicBlock(ccbi, pbStructVal, ccbi->getFailureBB()),
+        createTrampolineBasicBlock(ccbi, pbTupleVal, ccbi->getSuccessBB()),
+        createTrampolineBasicBlock(ccbi, pbTupleVal, ccbi->getFailureBB()),
         ccbi->getTrueBBCount(), ccbi->getFalseBBCount());
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *ccabi) {
     Builder.setCurrentDebugScope(getOpScope(ccabi->getDebugScope()));
     // Build pullback struct value for original block.
-    auto *pbStructVal = buildPullbackValueStructValue(ccabi);
+    auto *pbTupleVal = buildPullbackValueTupleValue(ccabi);
     // Create a new `checked_cast_addr_branch` instruction.
     getBuilder().createCheckedCastAddrBranch(
         ccabi->getLoc(), ccabi->getConsumptionKind(),
         getOpValue(ccabi->getSrc()), getOpASTType(ccabi->getSourceFormalType()),
         getOpValue(ccabi->getDest()),
         getOpASTType(ccabi->getTargetFormalType()),
-        createTrampolineBasicBlock(ccabi, pbStructVal, ccabi->getSuccessBB()),
-        createTrampolineBasicBlock(ccabi, pbStructVal, ccabi->getFailureBB()),
+        createTrampolineBasicBlock(ccabi, pbTupleVal, ccabi->getSuccessBB()),
+        createTrampolineBasicBlock(ccabi, pbTupleVal, ccabi->getFailureBB()),
         ccabi->getTrueBBCount(), ccabi->getFalseBBCount());
   }
 
@@ -654,15 +654,14 @@ public:
     mapValue(ai, originalDirectResult);
 
     // Checkpoint the pullback.
-    auto *pullbackDecl = pullbackInfo.lookUpLinearMapDecl(ai);
+    auto pullbackType = pullbackInfo.lookUpLinearMapType(ai);
 
     // If actual pullback type does not match lowered pullback type, reabstract
     // the pullback using a thunk.
     auto actualPullbackType =
         getOpType(pullback->getType()).getAs<SILFunctionType>();
     auto loweredPullbackType =
-        getOpType(getLoweredType(pullbackDecl->getInterfaceType()))
-            .castTo<SILFunctionType>();
+        getOpType(getLoweredType(pullbackType)).castTo<SILFunctionType>();
     if (!loweredPullbackType->isEqual(actualPullbackType)) {
       // Set non-reabstracted original pullback type in nested apply info.
       nestedApplyInfo.originalPullbackType = actualPullbackType;
@@ -688,14 +687,14 @@ public:
   void visitTryApplyInst(TryApplyInst *tai) {
     Builder.setCurrentDebugScope(getOpScope(tai->getDebugScope()));
     // Build pullback struct value for original block.
-    auto *pbStructVal = buildPullbackValueStructValue(tai);
+    auto *pbTupleVal = buildPullbackValueTupleValue(tai);
     // Create a new `try_apply` instruction.
     auto args = getOpValueArray<8>(tai->getArguments());
     getBuilder().createTryApply(
         tai->getLoc(), getOpValue(tai->getCallee()),
         getOpSubstitutionMap(tai->getSubstitutionMap()), args,
-        createTrampolineBasicBlock(tai, pbStructVal, tai->getNormalBB()),
-        createTrampolineBasicBlock(tai, pbStructVal, tai->getErrorBB()),
+        createTrampolineBasicBlock(tai, pbTupleVal, tai->getNormalBB()),
+        createTrampolineBasicBlock(tai, pbTupleVal, tai->getErrorBB()),
         tai->getApplyOptions());
   }
 
@@ -942,10 +941,9 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     // Accept a pullback struct in the pullback parameter list. This is the
     // returned pullback's closure context.
     auto *origExit = &*original->findReturnBB();
-    auto *pbStruct = pullbackInfo.getLinearMapStruct(origExit);
-    auto pbStructType =
-    pbStruct->getDeclaredInterfaceType()->getReducedType(witnessCanGenSig);
-    pbParams.push_back({pbStructType, ParameterConvention::Direct_Owned});
+    auto pbTupleType =
+          pullbackInfo.getLinearMapTupleLoweredType(origExit).getASTType();
+    pbParams.emplace_back(pbTupleType, ParameterConvention::Direct_Owned);
   }
 
   // Add pullback results for the requested wrt parameters.
@@ -991,7 +989,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
 }
 
 SILBasicBlock *VJPCloner::Implementation::createTrampolineBasicBlock(
-    TermInst *termInst, StructInst *pbStructVal, SILBasicBlock *succBB) {
+    TermInst *termInst, TupleInst *pbTupleVal, SILBasicBlock *succBB) {
   assert(llvm::find(termInst->getSuccessorBlocks(), succBB) !=
              termInst->getSuccessorBlocks().end() &&
          "Basic block is not a successor of terminator instruction");
@@ -1006,7 +1004,7 @@ SILBasicBlock *VJPCloner::Implementation::createTrampolineBasicBlock(
   trampolineBuilder.setCurrentDebugScope(getOpScope(termInst->getDebugScope()));
   auto *origBB = termInst->getParent();
   auto *succEnumVal =
-      buildPredecessorEnumValue(trampolineBuilder, origBB, succBB, pbStructVal);
+      buildPredecessorEnumValue(trampolineBuilder, origBB, succBB, pbTupleVal);
   SmallVector<SILValue, 4> forwardedArguments(
       trampolineBB->getArguments().begin(), trampolineBB->getArguments().end());
   forwardedArguments.push_back(succEnumVal);
@@ -1015,25 +1013,25 @@ SILBasicBlock *VJPCloner::Implementation::createTrampolineBasicBlock(
   return trampolineBB;
 }
 
-StructInst *
-VJPCloner::Implementation::buildPullbackValueStructValue(TermInst *termInst) {
+TupleInst *
+VJPCloner::Implementation::buildPullbackValueTupleValue(TermInst *termInst) {
   assert(termInst->getFunction() == original);
   auto loc = RegularLocation::getAutoGeneratedLocation();
   auto origBB = termInst->getParent();
   auto *vjpBB = BBMap[origBB];
-  auto structLoweredTy =
-      remapType(pullbackInfo.getLinearMapStructLoweredType(origBB));
+  auto tupleLoweredTy =
+      remapType(pullbackInfo.getLinearMapTupleLoweredType(origBB));
   auto bbPullbackValues = pullbackValues[origBB];
   if (!origBB->isEntry()) {
     auto *predEnumArg = vjpBB->getArguments().back();
     bbPullbackValues.insert(bbPullbackValues.begin(), predEnumArg);
   }
-  return getBuilder().createStruct(loc, structLoweredTy, bbPullbackValues);
+  return getBuilder().createTuple(loc, tupleLoweredTy, bbPullbackValues);
 }
 
 EnumInst *VJPCloner::Implementation::buildPredecessorEnumValue(
     SILBuilder &builder, SILBasicBlock *predBB, SILBasicBlock *succBB,
-    SILValue pbStructVal) {
+    SILValue pbTupleVal) {
   auto loc = RegularLocation::getAutoGeneratedLocation();
   auto enumLoweredTy =
       remapType(pullbackInfo.getBranchingTraceEnumLoweredType(succBB));
@@ -1046,25 +1044,25 @@ EnumInst *VJPCloner::Implementation::buildPredecessorEnumValue(
   if (loopInfo->getLoopFor(predBB)) {
     auto rawPtrType = SILType::getRawPointerType(getASTContext());
     assert(enumEltType == rawPtrType);
-    auto pbStructType = pbStructVal->getType();
-    SILValue pbStructSize =
-        emitMemoryLayoutSize(Builder, loc, pbStructType.getASTType());
+    auto pbTupleType = pbTupleVal->getType();
+    SILValue pbTupleSize =
+        emitMemoryLayoutSize(Builder, loc, pbTupleType.getASTType());
     auto rawBufferValue = builder.createBuiltin(
         loc,
         getASTContext().getIdentifier(
             getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext)),
         rawPtrType, SubstitutionMap(),
-        {borrowedPullbackContextValue, pbStructSize});
+        {borrowedPullbackContextValue, pbTupleSize});
     auto typedBufferValue = builder.createPointerToAddress(
-        loc, rawBufferValue, pbStructType.getAddressType(),
+        loc, rawBufferValue, pbTupleType.getAddressType(),
         /*isStrict*/ true);
     builder.createStore(
-        loc, pbStructVal, typedBufferValue,
-        pbStructType.isTrivial(*pullback) ?
+        loc, pbTupleVal, typedBufferValue,
+        pbTupleType.isTrivial(*pullback) ?
             StoreOwnershipQualifier::Trivial : StoreOwnershipQualifier::Init);
     return builder.createEnum(loc, rawBufferValue, enumEltDecl, enumLoweredTy);
   }
-  return builder.createEnum(loc, pbStructVal, enumEltDecl, enumLoweredTy);
+  return builder.createEnum(loc, pbTupleVal, enumEltDecl, enumLoweredTy);
 }
 
 bool VJPCloner::Implementation::run() {

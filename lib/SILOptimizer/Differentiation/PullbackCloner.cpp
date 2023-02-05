@@ -90,7 +90,7 @@ private:
   /// elements destructured from the linear map basic block argument. In the
   /// beginning of each pullback basic block, the block's pullback struct is
   /// destructured into individual elements stored here.
-  llvm::DenseMap<VarDecl *, SILValue> pullbackStructElements;
+  llvm::DenseMap<SILBasicBlock*, SILInstructionResultArray> pullbackTupleElements;
 
   /// Mapping from original basic blocks and successor basic blocks to
   /// corresponding pullback trampoline basic blocks. Trampoline basic blocks
@@ -158,31 +158,36 @@ private:
   // Pullback struct mapping
   //--------------------------------------------------------------------------//
 
-  void initializePullbackStructElements(SILBasicBlock *origBB,
-                                        SILInstructionResultArray values) {
-    auto *pbStructDecl = getPullbackInfo().getLinearMapStruct(origBB);
-    assert(pbStructDecl->getStoredProperties().size() == values.size() &&
-           "The number of pullback struct fields must equal the number of "
+  void initializePullbackTupleElements(SILBasicBlock *origBB,
+                                       SILInstructionResultArray values) {
+    auto *pbTupleTyple = getPullbackInfo().getLinearMapTupleType(origBB);
+    assert(pbTupleTyple->getNumElements() == values.size() &&
+           "The number of pullback tuple fields must equal the number of "
            "pullback struct element values");
-    for (auto pair : llvm::zip(pbStructDecl->getStoredProperties(), values)) {
-      assert(std::get<1>(pair)->getOwnershipKind() !=
-                 OwnershipKind::Guaranteed &&
-             "Pullback struct elements must be @owned");
-      auto insertion =
-          pullbackStructElements.insert({std::get<0>(pair), std::get<1>(pair)});
-      (void)insertion;
-      assert(insertion.second && "A pullback struct element already exists!");
-    }
+    auto res = pullbackTupleElements.insert({origBB, values});
+    (void)res;
+    assert(res.second && "A pullback struct element already exists!");
   }
 
-  /// Returns the pullback struct element value corresponding to the given
-  /// original block and pullback struct field.
-  SILValue getPullbackStructElement(SILBasicBlock *origBB, VarDecl *field) {
-    assert(getPullbackInfo().getLinearMapStruct(origBB) ==
-           cast<StructDecl>(field->getDeclContext()));
-    assert(pullbackStructElements.count(field) &&
-           "Pullback struct element for this field does not exist!");
-    return pullbackStructElements.lookup(field);
+  /// Returns the pullback tuple element value corresponding to the given
+  /// original block and apply inst.
+  SILValue getPullbackTupleElement(ApplyInst *ai) {
+    unsigned idx = getPullbackInfo().lookUpLinearMapIndex(ai);
+    assert((idx > 0 || (idx == 0 && ai->getParentBlock()->isEntry())) &&
+           "impossible linear map index");
+    auto values = pullbackTupleElements.lookup(ai->getParentBlock());
+    assert(idx < values.size() &&
+           "pullback tuple element for this apply does not exist!");
+    return values[idx];
+  }
+
+  /// Returns the pullback tuple element value corresponding to the predecessor
+  /// for the given original block.
+  SILValue getPullbackPredTupleElement(SILBasicBlock *origBB) {
+    assert(!origBB->isEntry() && "no predecessors for entry block");
+    auto values = pullbackTupleElements.lookup(origBB);
+    assert(values.size() && "pullback tuple cannot be empty");
+    return values[0];
   }
 
   //--------------------------------------------------------------------------//
@@ -878,11 +883,6 @@ public:
     }
     auto applyInfo = applyInfoLookup->getSecond();
 
-    // Get the pullback.
-    auto *field = getPullbackInfo().lookUpLinearMapDecl(ai);
-    assert(field);
-    auto pullback = getPullbackStructElement(ai->getParent(), field);
-
     // Get the original result of the `apply` instruction.
     SmallVector<SILValue, 8> origDirectResults;
     forEachApplyDirectResult(ai, [&](SILValue directResult) {
@@ -905,8 +905,10 @@ public:
 
     // Handle callee pullback indirect results.
     // Create local allocations for these and destroy them after the call.
+    auto pullback = getPullbackTupleElement(ai);
     auto pullbackType =
         remapType(pullback->getType()).castTo<SILFunctionType>();
+
     auto actualPullbackType = applyInfo.originalPullbackType
                                   ? *applyInfo.originalPullbackType
                                   : pullbackType;
@@ -1902,8 +1904,8 @@ bool PullbackCloner::Implementation::run() {
   for (auto *origBB : originalBlocks) {
     auto *pullbackBB = pullback.createBasicBlock();
     pullbackBBMap.insert({origBB, pullbackBB});
-    auto pbStructLoweredType =
-        remapType(getPullbackInfo().getLinearMapStructLoweredType(origBB));
+    auto pbTupleLoweredType =
+        remapType(getPullbackInfo().getLinearMapTupleLoweredType(origBB));
     // If the BB is the original exit, then the pullback block that we just
     // created must be the pullback function's entry. For the pullback entry,
     // create entry arguments and continue to the next block.
@@ -1915,7 +1917,7 @@ bool PullbackCloner::Implementation::run() {
       builder.setInsertionPoint(pullbackBB);
       // Obtain the context object, if any, and the top-level subcontext, i.e.
       // the main pullback struct.
-      SILValue mainPullbackStruct;
+      SILValue mainPullbackTuple;
       if (getPullbackInfo().hasLoops()) {
         // The last argument is the context object (`Builtin.NativeObject`).
         contextValue = pullbackBB->getArguments().back();
@@ -1923,19 +1925,19 @@ bool PullbackCloner::Implementation::run() {
                SILType::getNativeObjectType(getASTContext()));
         // Load the pullback struct.
         auto subcontextAddr = emitProjectTopLevelSubcontext(
-            builder, pbLoc, contextValue, pbStructLoweredType);
-        mainPullbackStruct = builder.createLoad(
+            builder, pbLoc, contextValue, pbTupleLoweredType);
+        mainPullbackTuple = builder.createLoad(
             pbLoc, subcontextAddr,
-            pbStructLoweredType.isTrivial(getPullback()) ?
+            pbTupleLoweredType.isTrivial(getPullback()) ?
                 LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take);
       } else {
         // Obtain and destructure pullback struct elements.
-        mainPullbackStruct = pullbackBB->getArguments().back();
-        assert(mainPullbackStruct->getType() == pbStructLoweredType);
+        mainPullbackTuple = pullbackBB->getArguments().back();
+        assert(mainPullbackTuple->getType() == pbTupleLoweredType);
       }
 
-      auto *dsi = builder.createDestructureStruct(pbLoc, mainPullbackStruct);
-      initializePullbackStructElements(origBB, dsi->getResults());
+      auto *dsi = builder.createDestructureTuple(pbLoc, mainPullbackTuple);
+      initializePullbackTupleElements(origBB, dsi->getResults());
       continue;
     }
     // Get all active values in the original block.
@@ -1972,15 +1974,15 @@ bool PullbackCloner::Implementation::run() {
       }
       }
     }
-    // Add a pullback struct argument.
-    auto *pbStructArg = pullbackBB->createPhiArgument(pbStructLoweredType,
-                                                      OwnershipKind::Owned);
+    // Add a pullback tuple argument.
+    auto *pbTupleArg = pullbackBB->createPhiArgument(pbTupleLoweredType,
+                                                     OwnershipKind::Owned);
     // Destructure the pullback struct to get the elements.
     builder.setCurrentDebugScope(
         remapScope(origBB->getTerminator()->getDebugScope()));
     builder.setInsertionPoint(pullbackBB);
-    auto *dsi = builder.createDestructureStruct(pbLoc, pbStructArg);
-    initializePullbackStructElements(origBB, dsi->getResults());
+    auto *dsi = builder.createDestructureTuple(pbLoc, pbTupleArg);
+    initializePullbackTupleElements(origBB, dsi->getResults());
 
     // - Create pullback trampoline blocks for each successor block of the
     //   original block. Pullback trampoline blocks only have a pullback
@@ -2420,14 +2422,14 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
   if (vjpCloner.getLoopInfo()->getLoopFor(origPredBB)) {
     assert(pullbackTrampolineBBArg->getType() ==
                SILType::getRawPointerType(getASTContext()));
-    auto pbStructType =
-        remapType(getPullbackInfo().getLinearMapStructLoweredType(origPredBB));
-    auto predPbStructAddr = pullbackTrampolineBBBuilder.createPointerToAddress(
-        loc, pullbackTrampolineBBArg, pbStructType.getAddressType(),
+    auto pbTupleType =
+      remapType(getPullbackInfo().getLinearMapTupleLoweredType(origPredBB));
+    auto predPbTupleAddr = pullbackTrampolineBBBuilder.createPointerToAddress(
+        loc, pullbackTrampolineBBArg, pbTupleType.getAddressType(),
         /*isStrict*/ true);
     auto predPbStructVal = pullbackTrampolineBBBuilder.createLoad(
-        loc, predPbStructAddr,
-        pbStructType.isTrivial(getPullback()) ?
+        loc, predPbTupleAddr,
+        pbTupleType.isTrivial(getPullback()) ?
             LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take);
     trampolineArguments.push_back(predPbStructVal);
   } else {
@@ -2481,8 +2483,7 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   // 2. Extract the predecessor enum value from the pullback struct value.
   auto *predEnum = getPullbackInfo().getBranchingTraceDecl(bb);
   (void)predEnum;
-  auto *predEnumField = getPullbackInfo().lookUpLinearMapStructEnumField(bb);
-  auto predEnumVal = getPullbackStructElement(bb, predEnumField);
+  auto predEnumVal = getPullbackPredTupleElement(bb);
 
   // Propagate adjoint values from active basic block arguments to
   // incoming values (predecessor terminator operands).
@@ -2597,7 +2598,8 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   // Branch to pullback successor blocks.
   assert(pullbackSuccessorCases.size() == predEnum->getNumElements());
   builder.createSwitchEnum(pbLoc, predEnumVal, /*DefaultBB*/ nullptr,
-                           pullbackSuccessorCases);
+                           pullbackSuccessorCases, None, ProfileCounter(),
+                           OwnershipKind::Owned);
 }
 
 //--------------------------------------------------------------------------//
