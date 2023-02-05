@@ -171,7 +171,8 @@ public:
         // which require an @guaranteed operand into which we'd be attempting to
         // substitute an @owned operand.
         if (calleeYields[i]->getOwnershipKind() == OwnershipKind::Owned &&
-            !yield->getOperandRef(i).isConsuming()) {
+            !yield->getOperandRef(i).isConsuming() &&
+            Builder->getFunction().hasOwnership()) {
           auto *bbi = Builder->createBeginBorrow(Loc, remappedYield);
           guaranteedYields.push_back(bbi);
           remappedYield = bbi;
