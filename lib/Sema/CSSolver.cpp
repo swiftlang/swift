@@ -1835,6 +1835,8 @@ Constraint *ConstraintSystem::selectDisjunction() {
   if (disjunctions.empty())
     return nullptr;
 
+  optimizeDisjunctions(disjunctions);
+
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;
 
