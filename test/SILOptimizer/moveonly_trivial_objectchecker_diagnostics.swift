@@ -147,10 +147,10 @@ public func aggStructDoubleConsumeOwnedArg(_ x2: __owned AggStruct) { // expecte
 }
 
 public func aggStructLoopConsume(_ x: AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -160,9 +160,9 @@ public func aggStructLoopConsumeArg(_ x2: AggStruct) { // expected-error {{'x2' 
     }
 }
 
-public func aggStructLoopConsumeOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed more than once}}
+public func aggStructLoopConsumeOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -193,12 +193,14 @@ public func aggStructDiamondOwnedArg(_ x2: __owned AggStruct) {
 
 public func aggStructDiamondInLoop(_ x: AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consuming use here}}
+    // expected-error @-2 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -214,11 +216,13 @@ public func aggStructDiamondInLoopArg(_ x2: AggStruct) { // expected-error {{'x2
 }
 
 public func aggStructDiamondInLoopOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -413,10 +417,10 @@ public func aggGenericStructDoubleConsumeOwnedArg(_ x2: __owned AggGenericStruct
 }
 
 public func aggGenericStructLoopConsume(_ x: AggGenericStruct<CopyableKlass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -426,9 +430,9 @@ public func aggGenericStructLoopConsumeArg(_ x2: AggGenericStruct<CopyableKlass>
     }
 }
 
-public func aggGenericStructLoopConsumeOwnedArg(_ x2: __owned AggGenericStruct<CopyableKlass>) { // expected-error {{'x2' consumed more than once}}
+public func aggGenericStructLoopConsumeOwnedArg(_ x2: __owned AggGenericStruct<CopyableKlass>) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -459,12 +463,14 @@ public func aggGenericStructDiamondOwnedArg(_ x2: __owned AggGenericStruct<Copya
 
 public func aggGenericStructDiamondInLoop(_ x: AggGenericStruct<CopyableKlass>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consuming use here}}
+    // expected-error @-2 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -480,11 +486,13 @@ public func aggGenericStructDiamondInLoopArg(_ x2: AggGenericStruct<CopyableKlas
 }
 
 public func aggGenericStructDiamondInLoopOwnedArg(_ x2: __owned AggGenericStruct<CopyableKlass>) { // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
-          consumeVal(x2) // expected-note {{consuming use here}}
+          consumeVal(x2) // expected-note {{other consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -670,10 +678,10 @@ public func aggGenericStructDoubleConsumeOwnedArg<T>(_ x2: __owned AggGenericStr
 }
 
 public func aggGenericStructLoopConsume<T>(_ x: AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -683,9 +691,9 @@ public func aggGenericStructLoopConsumeArg<T>(_ x2: AggGenericStruct<T>) { // ex
     }
 }
 
-public func aggGenericStructLoopConsumeOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
+public func aggGenericStructLoopConsumeOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -716,12 +724,14 @@ public func aggGenericStructDiamondOwnedArg<T>(_ x2: __owned AggGenericStruct<T>
 
 public func aggGenericStructDiamondInLoop<T>(_ x: AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consuming use here}}
+    // expected-error @-2 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -737,11 +747,13 @@ public func aggGenericStructDiamondInLoopArg<T>(_ x2: AggGenericStruct<T>) { // 
 }
 
 public func aggGenericStructDiamondInLoopOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -935,10 +947,10 @@ public func enumDoubleConsumeOwnedArg(_ x2: __owned EnumTy) { // expected-error 
 }
 
 public func enumLoopConsume(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consuming in loop use here}}
     }
 }
 
@@ -948,9 +960,9 @@ public func enumLoopConsumeArg(_ x2: EnumTy) { // expected-error {{'x2' has guar
     }
 }
 
-public func enumLoopConsumeOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumLoopConsumeOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-note {{consuming in loop use here}};
     }
 }
 
@@ -981,12 +993,14 @@ public func enumDiamondOwnedArg(_ x2: __owned EnumTy) {
 
 public func enumDiamondInLoop(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
-               // expected-note @-1 {{consuming use here}}
+    // expected-note @-1 {{consuming use here}}
+    // expected-error @-2 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -1002,11 +1016,13 @@ public func enumDiamondInLoopArg(_ x2: EnumTy) { // expected-error {{'x2' has gu
 }
 
 public func enumDiamondInLoopOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming in loop use here}}
       }
     }
 }
@@ -1097,12 +1113,10 @@ public func enumAssignToVar4OwnedArg(_ x2: __owned EnumTy) { // expected-error {
 }
 
 public func enumAssignToVar5(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x // expected-error {{'x2' used after consume}}
                // expected-note @-1 {{consuming use here}}
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
-    borrowVal(x2)
+    borrowVal(x2) // expected-note {{non-consuming use here}}
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
@@ -1117,12 +1131,10 @@ public func enumAssignToVar5Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {
     consumeVal(x3)
 }
 
-public func enumAssignToVar5OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumAssignToVar5OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
                                                                           // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
-    borrowVal(x2)
+    borrowVal(x2) // expected-note {{non-consuming use here}}
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
@@ -1157,10 +1169,10 @@ public func enumPatternMatchIfLet1OwnedArg(_ x2: __owned EnumTy) { // expected-e
 }
 
 public func enumPatternMatchIfLet2(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consuming in loop use here}}
             borrowVal(x)
         }
     }
@@ -1174,9 +1186,9 @@ public func enumPatternMatchIfLet2Arg(_ x2: EnumTy) { // expected-error {{'x2' h
     }
 }
 
-public func enumPatternMatchIfLet2OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumPatternMatchIfLet2OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consuming in loop use here}}
             borrowVal(x)
         }
     }
@@ -1184,14 +1196,12 @@ public func enumPatternMatchIfLet2OwnedArg(_ x2: __owned EnumTy) { // expected-e
 
 // TODO: This is wrong.
 public func enumPatternMatchSwitch1(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x // expected-error {{'x2' used after consume}}
                // expected-note @-1 {{consuming use here}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k):
         borrowVal(k)
-        // This should be flagged as the use after free use. We are atleast
-        // erroring though.
-        borrowVal(x2)
+        borrowVal(x2) // expected-note {{non-consuming use here}}
     case .int:
         break
     }
@@ -1209,13 +1219,11 @@ public func enumPatternMatchSwitch1Arg(_ x2: EnumTy) { // expected-error {{'x2' 
     }
 }
 
-public func enumPatternMatchSwitch1OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumPatternMatchSwitch1OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k):
         borrowVal(k)
-        // This should be flagged as the use after free use. We are atleast
-        // erroring though.
-        borrowVal(x2)
+        borrowVal(x2) // expected-note {{non-consuming use here}}
     case .int:
         break
     }
@@ -1251,11 +1259,11 @@ public func enumPatternMatchSwitch2OwnedArg(_ x2: __owned EnumTy) {
 
 // TODO: We can do better here. We should also flag x2
 public func enumPatternMatchSwitch2WhereClause(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x // expected-error {{'x2' used after consume}}
                // expected-note @-1 {{consuming use here}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k)
-           where x2.doSomething():
+           where x2.doSomething(): // expected-note {{non-consuming use here}}
         borrowVal(k)
     case .int:
         break
@@ -1276,10 +1284,10 @@ public func enumPatternMatchSwitch2WhereClauseArg(_ x2: EnumTy) { // expected-er
     }
 }
 
-public func enumPatternMatchSwitch2WhereClauseOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumPatternMatchSwitch2WhereClauseOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k)
-           where x2.doSomething():
+           where x2.doSomething(): // expected-note {{non-consuming use here}}
         borrowVal(k)
     case .int:
         break
@@ -1434,12 +1442,10 @@ public func deferCaptureClassUseAfterConsume(_ x: NonTrivialStruct) { // expecte
 }
 
 public func deferCaptureClassUseAfterConsume2(_ x: NonTrivialStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x // expected-error {{'x2' used after consume}}
     // expected-note @-1 {{consuming use here}}
     // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // TODO: Defer error is b/c we have to lifetime extend x2 for the defer. The
-    // use is a guaranteed use, so we don't emit an error on that use.
-    defer {
+    defer { // expected-note {{non-consuming use here}}
         borrowVal(x2)
         consumeVal(x2) // expected-note {{consuming use here}}
         consumeVal(x2) // expected-note {{consuming use here}}
@@ -1470,9 +1476,9 @@ public func deferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned NonTrivialStr
 }
 
 public func deferCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned NonTrivialStruct) {
-    // expected-error @-1 {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' used after consume}}
     // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    defer {
+    defer { // expected-note {{non-consuming use here}}
         borrowVal(x2)
         consumeVal(x2) // expected-note {{consuming use here}}
         consumeVal(x2) // expected-note {{consuming use here}}
