@@ -33,6 +33,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -785,19 +786,7 @@ std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
   return finalize();
 }
 
-std::string
-ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
-                          bool prefix,
-                          bool respectOriginallyDefinedIn) {
-  DWARFMangling = true;
-  RespectOriginallyDefinedIn = respectOriginallyDefinedIn;
-  if (prefix) {
-    beginMangling();
-  } else {
-    beginManglingWithoutPrefix();
-  }
-  llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
-
+void ASTMangler::appendAnyDecl(const ValueDecl *Decl) {
   if (auto Ctor = dyn_cast<ConstructorDecl>(Decl)) {
     appendConstructorEntity(Ctor, /*isAllocating=*/false);
   } else if (auto Dtor = dyn_cast<DestructorDecl>(Decl)) {
@@ -811,6 +800,22 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
   } else {
     appendEntity(Decl);
   }
+}
+
+std::string
+ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
+                          bool prefix,
+                          bool respectOriginallyDefinedIn) {
+  DWARFMangling = true;
+  RespectOriginallyDefinedIn = respectOriginallyDefinedIn;
+  if (prefix) {
+    beginMangling();
+  } else {
+    beginManglingWithoutPrefix();
+  }
+  llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
+
+  appendAnyDecl(Decl);
 
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
@@ -3382,6 +3387,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
         expansion->getLoc(), expansion->getDeclContext());
     appendMacroExpansionOperator(
         expansion->getMacro().getBaseName().userFacingName(),
+        MacroRole::Declaration,
         expansion->getDiscriminator());
     return;
   }
@@ -3729,6 +3735,7 @@ void ASTMangler::appendMacroExpansionContext(
   DeclContext *outerExpansionDC;
   DeclBaseName baseName;
   unsigned discriminator;
+  MacroRole role;
   switch (generatedSourceInfo->kind) {
   case GeneratedSourceInfo::ExpressionMacroExpansion: {
     auto parent = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode);
@@ -3737,11 +3744,13 @@ void ASTMangler::appendMacroExpansionContext(
       outerExpansionLoc = expr->getLoc();
       baseName = expr->getMacroName().getBaseName();
       discriminator = expr->getDiscriminator();
+      role = MacroRole::Expression;
     } else {
       auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
       outerExpansionLoc = decl->getLoc();
       baseName = decl->getMacro().getBaseName();
       discriminator = decl->getDiscriminator();
+      role = MacroRole::Declaration;
     }
     break;
   }
@@ -3754,12 +3763,40 @@ void ASTMangler::appendMacroExpansionContext(
     outerExpansionLoc = expansion->getLoc();
     outerExpansionDC = expansion->getDeclContext();
     discriminator = expansion->getDiscriminator();
+    role = MacroRole::Declaration;
     break;
   }
 
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-  case GeneratedSourceInfo::MemberMacroExpansion:
+  case GeneratedSourceInfo::MemberMacroExpansion: {
+    auto decl = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
+      .get<Decl *>();
+    auto attr = generatedSourceInfo->attachedMacroCustomAttr;
+
+    switch (generatedSourceInfo->kind) {
+    case GeneratedSourceInfo::AccessorMacroExpansion:
+      role = MacroRole::Accessor;
+      break;
+
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+      role = MacroRole::MemberAttribute;
+      break;
+
+    case GeneratedSourceInfo::MemberMacroExpansion:
+      role = MacroRole::Member;
+      break;
+
+    default:
+      llvm_unreachable("Unhandled macro role");
+    }
+
+    outerExpansionLoc = decl->getLoc();
+    outerExpansionDC = decl->getDeclContext();
+    discriminator = decl->getAttachedMacroDiscriminator(role, attr);
+    break;
+  }
+
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
     return appendContext(origDC, StringRef());
@@ -3772,14 +3809,33 @@ void ASTMangler::appendMacroExpansionContext(
 
   // Append our own context and discriminator.
   appendMacroExpansionContext(outerExpansionLoc, origDC);
-  appendMacroExpansionOperator(baseName.userFacingName(), discriminator);
+  appendMacroExpansionOperator(
+      baseName.userFacingName(), role, discriminator);
 }
 
 void ASTMangler::appendMacroExpansionOperator(
-    StringRef macroName, unsigned discriminator
+    StringRef macroName, MacroRole role, unsigned discriminator
 ) {
   appendIdentifier(macroName);
-  appendOperator("fMf", Index(discriminator));
+
+  switch (role) {
+  case MacroRole::Expression:
+  case MacroRole::Declaration:
+    appendOperator("fMf", Index(discriminator));
+    break;
+
+  case MacroRole::Accessor:
+    appendOperator("fMa", Index(discriminator));
+    break;
+
+  case MacroRole::MemberAttribute:
+    appendOperator("fMA", Index(discriminator));
+    break;
+
+  case MacroRole::Member:
+    appendOperator("fMm", Index(discriminator));
+    break;
+  }
 }
 
 std::string ASTMangler::mangleMacroExpansion(
@@ -3788,6 +3844,7 @@ std::string ASTMangler::mangleMacroExpansion(
   appendMacroExpansionContext(expansion->getLoc(), expansion->getDeclContext());
   appendMacroExpansionOperator(
       expansion->getMacroName().getBaseName().userFacingName(),
+      MacroRole::Expression,
       expansion->getDiscriminator());
   return finalize();
 }
@@ -3798,7 +3855,38 @@ std::string ASTMangler::mangleMacroExpansion(
   appendMacroExpansionContext(expansion->getLoc(), expansion->getDeclContext());
   appendMacroExpansionOperator(
       expansion->getMacro().getBaseName().userFacingName(),
+      MacroRole::Declaration,
       expansion->getDiscriminator());
+  return finalize();
+}
+
+std::string ASTMangler::mangleAttachedMacroExpansion(
+    const Decl *decl, CustomAttr *attr, MacroRole role) {
+  beginMangling();
+
+  DeclContext *macroDeclContext = decl->getDeclContext();
+  if (role == MacroRole::MemberAttribute) {
+    appendContextOf(cast<ValueDecl>(decl));
+    macroDeclContext = decl->getDeclContext()->getParent();
+  } else if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
+    appendAnyDecl(valueDecl);
+  } else {
+    appendContext(decl->getDeclContext(), "");
+  }
+
+  StringRef macroName;
+  auto *macroDecl = evaluateOrDefault(
+      decl->getASTContext().evaluator,
+      ResolveMacroRequest{attr, role, macroDeclContext},
+      nullptr);
+  if (macroDecl)
+    macroName = macroDecl->getName().getBaseName().userFacingName();
+  else
+    macroName = "__unknown_macro__";
+
+  appendMacroExpansionOperator(
+      macroName, role,
+      decl->getAttachedMacroDiscriminator(role, attr));
   return finalize();
 }
 
@@ -3864,8 +3952,13 @@ void ASTMangler::appendRuntimeAttributeGeneratorEntity(const ValueDecl *decl,
                                                        CustomAttr *attr) {
   auto *attrType = decl->getRuntimeDiscoverableAttrTypeDecl(attr);
 
-  appendEntity(decl, "vp", decl->isStatic());
+  appendContext(attrType, attrType->getAlternateModuleName());
+
+  if (auto dc = dyn_cast<DeclContext>(decl)) {
+    appendContext(dc, decl->getAlternateModuleName());
+  } else {
+    appendEntity(decl);
+  }
+
   appendOperator("fa");
-  appendContextOf(attrType);
-  appendDeclName(attrType);
 }

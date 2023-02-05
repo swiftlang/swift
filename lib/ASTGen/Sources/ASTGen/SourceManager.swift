@@ -49,11 +49,20 @@ extension SourceManager {
 extension SourceManager {
   /// Detach a given node from its parent, keeping track of where it
   /// occurred in the program.
-  func detach<Node: SyntaxProtocol>(_ node: Node) -> Node {
+  func detach<Node: SyntaxProtocol>(
+    _ node: Node,
+    foldingWith operatorTable: OperatorTable? = nil
+  ) -> Node {
     // Already detached
     if node.parent == nil { return node }
 
-    let detached = node.detach()
+    let detached: Node
+    if let operatorTable = operatorTable {
+      detached = operatorTable.foldAll(node) { _ in }.as(Node.self)!.detach()
+    } else {
+      detached = node.detach()
+    }
+
     detachedNodes[Syntax(detached)] = (node.root, node.position.utf8Offset)
     return detached
   }
@@ -120,47 +129,5 @@ extension SourceManager {
     }
     let address = bufferBaseAddress.advanced(by: offsetFromSourceFile)
     return CxxSourceLoc(mutating: address)
-  }
-}
-
-/// Interaction with BasicMacroExpansionContext.
-extension SourceManager {
-  /// Detach a node within a macro expansion context.
-  ///
-  /// TODO: This ties together BasicMacroExpansionContext and SourceManager
-  /// in a rather redundant manner. We'll probably want to drop use of
-  /// BasicMacroExpansionContext entirely.
-  func detach<Node: SyntaxProtocol>(
-    _ node: Node,
-    in context: BasicMacroExpansionContext,
-    foldingWith operatorTable: OperatorTable? = nil
-  ) -> Node {
-    // Already detached
-    if node.parent == nil { return node }
-
-    var detached = context.detach(node)
-
-    if let operatorTable = operatorTable {
-      detached = operatorTable.foldAll(node) { _ in }.as(Node.self)!
-    }
-
-    detachedNodes[Syntax(detached)] = (node.root, node.position.utf8Offset)
-    return detached
-  }
-
-  /// Create a new macro expansion context
-  func createMacroExpansionContext(discriminator: String = "") -> BasicMacroExpansionContext {
-    // Collect the set of source files for this context.
-    var sourceFiles: [SourceFileSyntax : BasicMacroExpansionContext.KnownSourceFile] = [:]
-    for (syntax, exported) in exportedSourceFilesBySyntax {
-      sourceFiles[syntax] = .init(
-        moduleName: exported.pointee.moduleName,
-        fullFilePath: exported.pointee.fileName
-      )
-    }
-
-    return BasicMacroExpansionContext(
-      expansionDiscriminator: discriminator, sourceFiles: sourceFiles
-    )
   }
 }

@@ -163,8 +163,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
 
 void SILGenFunction::enterDebugScope(SILLocation Loc, bool isBindingScope,
                                      Optional<SILLocation> MacroExpansion,
-                                     DeclNameRef MacroName,
-                                     DeclNameLoc MacroNameLoc) {
+                                     StringRef MacroName,
+                                     Optional<SILLocation> MacroLoc) {
   auto *Parent = DebugScopeStack.size() ? DebugScopeStack.back().getPointer()
                                         : F.getDebugScope();
   auto *Scope = Parent;
@@ -172,7 +172,7 @@ void SILGenFunction::enterDebugScope(SILLocation Loc, bool isBindingScope,
   if (RegularLocation(Parent->getLoc()) != RegularLocation(Loc)) {
     SILDebugScope *InlinedAt = nullptr;
     // Create an inline scope for a macro expansion.
-    if (MacroExpansion && MacroName && MacroNameLoc.isValid()) {
+    if (MacroExpansion && !MacroName.empty() && MacroLoc) {
       InlinedAt = new (SGM.M) SILDebugScope(RegularLocation(*MacroExpansion),
                                             &getFunction(), Parent);
       SILGenFunctionBuilder B(SGM);
@@ -183,10 +183,9 @@ void SILGenFunction::enterDebugScope(SILLocation Loc, bool isBindingScope,
           /*Results*/ {}, None, SubstitutionMap(), SubstitutionMap(),
           SGM.M.getASTContext());
       SILFunction *MacroFn = B.getOrCreateFunction(
-          Loc, MacroName.getBaseIdentifier().str(),
-          SILLinkage::DefaultForDeclaration, FunctionType, IsNotBare,
-          IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
-          IsNotRuntimeAccessible);
+          *MacroLoc, MacroName, SILLinkage::DefaultForDeclaration, FunctionType,
+          IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+          IsNotDistributed, IsNotRuntimeAccessible);
       auto MacroScope = new (SGM.M) SILDebugScope(Loc, MacroFn);
       Parent = MacroScope;
     }
@@ -1235,6 +1234,18 @@ void SILGenFunction::emitGeneratorFunction(
 
   emitEpilog(loc);
   mergeCleanupBlocks();
+}
+
+Initialization *SILGenFunction::getSingleValueStmtInit(Expr *E) {
+  if (SingleValueStmtInitStack.empty())
+    return nullptr;
+
+  // Check to see if this is an expression branch of an active
+  // SingleValueStmtExpr initialization.
+  if (!SingleValueStmtInitStack.back().Exprs.contains(E))
+    return nullptr;
+
+  return SingleValueStmtInitStack.back().Init;
 }
 
 void SILGenFunction::emitProfilerIncrement(ASTNode Node) {

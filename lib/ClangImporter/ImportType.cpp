@@ -1267,8 +1267,8 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::Variable:
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::Enum:
-  case ImportTypeKind::RecordField:
     return false;
+  case ImportTypeKind::RecordField:
   case ImportTypeKind::Result:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
@@ -1419,7 +1419,8 @@ static ImportedType adjustTypeForConcreteImport(
     bool allowNSUIntegerAsInt, Bridgeability bridging,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnostic,
     ImportTypeAttrs attrs, OptionalTypeKind optKind,
-    bool resugarNSErrorPointer) {
+    bool resugarNSErrorPointer,
+    clang::Qualifiers::ObjCLifetime objCLifetime) {
   Type importedType = importResult.AbstractType;
   ImportHint hint = importResult.Hint;
 
@@ -1464,6 +1465,8 @@ static ImportedType adjustTypeForConcreteImport(
     // bridge, do so.
     if (canBridgeTypes(importKind) &&
         importKind != ImportTypeKind::PropertyWithReferenceSemantics &&
+        !(importKind == ImportTypeKind::RecordField &&
+          objCLifetime <= clang::Qualifiers::OCL_ExplicitNone) &&
         !(importKind == ImportTypeKind::Typedef &&
           bridging == Bridgeability::None)) {
       // id and Any can be bridged without Foundation. There would be
@@ -1484,7 +1487,10 @@ static ImportedType adjustTypeForConcreteImport(
     // In some contexts, we bridge them to use the Swift function type
     // representation. This includes typedefs of block types, which use the
     // Swift function type representation.
-    if (!canBridgeTypes(importKind))
+    // FIXME: Do not bridge on RecordFields to keep previous behaviour for
+    // the time being.
+    if (!canBridgeTypes(importKind) ||
+        importKind == ImportTypeKind::RecordField)
       break;
 
     // Determine the function type representation we need.
@@ -1579,15 +1585,26 @@ static ImportedType adjustTypeForConcreteImport(
   assert(importedType);
 
   if (importKind == ImportTypeKind::RecordField &&
-      importedType->isAnyClassReferenceType() &&
       !importedType->isForeignReferenceType()) {
-    // Wrap retainable struct fields in Unmanaged.
-    // FIXME: Eventually we might get C++-like support for strong pointers in
-    // structs, at which point we should really be checking the lifetime
-    // qualifiers.
-    // FIXME: This should apply to blocks as well, but Unmanaged is constrained
-    // to AnyObject.
-    importedType = getUnmanagedType(impl, importedType);
+    switch (objCLifetime) {
+      // Wrap retainable struct fields in Unmanaged.
+      case clang::Qualifiers::OCL_None:
+      case clang::Qualifiers::OCL_ExplicitNone:
+        // FIXME: This should apply to blocks as well, but Unmanaged is constrained
+        // to AnyObject.
+        if (importedType->isAnyClassReferenceType()) {
+          importedType = getUnmanagedType(impl, importedType);
+        }
+        break;
+      // FIXME: Eventually we might get C++-like support for strong pointers in
+      // structs, at which point we should really be checking the lifetime
+      // qualifiers.
+      case clang::Qualifiers::OCL_Strong:
+      case clang::Qualifiers::OCL_Weak:
+        return {Type(), false};
+      case clang::Qualifiers::OCL_Autoreleasing:
+        llvm_unreachable("invalid Objective-C lifetime");
+    }
   }
 
   // Apply attrs.
@@ -1665,6 +1682,8 @@ ImportedType ClangImporter::Implementation::importType(
     }
   }
 
+  clang::Qualifiers::ObjCLifetime objCLifetime = type.getObjCLifetime();
+
   // Perform abstract conversion, ignoring how the type is actually used.
   SwiftTypeConverter converter(
       *this, addImportDiagnosticFn, allowNSUIntegerAsInt, bridging,
@@ -1674,7 +1693,8 @@ ImportedType ClangImporter::Implementation::importType(
   // Now fix up the type based on how we're concretely using it.
   auto adjustedType = adjustTypeForConcreteImport(
       *this, importResult, importKind, allowNSUIntegerAsInt, bridging,
-      addImportDiagnosticFn, attrs, optionality, resugarNSErrorPointer);
+      addImportDiagnosticFn, attrs, optionality, resugarNSErrorPointer,
+      objCLifetime);
 
   return adjustedType;
 }

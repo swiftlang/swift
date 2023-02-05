@@ -14,7 +14,7 @@ extension ASTGenVisitor {
       })
   }
 
-  public func visit(_ node: IfStmtSyntax) -> ASTNode {
+  func makeIfStmt(_ node: IfExprSyntax) -> ASTNode {
     let conditions = node.conditions.map { self.visit($0).rawValue }
     assert(conditions.count == 1)  // TODO: handle multiple conditions.
 
@@ -22,10 +22,20 @@ extension ASTGenVisitor {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
 
     if let elseBody = node.elseBody, node.elseKeyword != nil {
-      return .stmt(IfStmt_create(ctx, loc, conditions.first!, body, loc, visit(elseBody).rawValue))
+      return .stmt(IfStmt_create(ctx, loc, conditions.first!, body, loc,
+                                 visit(elseBody).rawValue))
     }
 
     return .stmt(IfStmt_create(ctx, loc, conditions.first!, body, nil, nil))
+  }
+
+  public func visit(_ node: ExpressionStmtSyntax) -> ASTNode {
+    switch Syntax(node.expression).as(SyntaxEnum.self) {
+    case .ifExpr(let e):
+      return makeIfStmt(e)
+    default:
+      fatalError("Unhandled case!")
+    }
   }
 
   public func visit(_ node: ReturnStmtSyntax) -> ASTNode {

@@ -567,6 +567,9 @@ private:
     if (L.isASTNode<DestructorDecl>())
       return "deinit";
 
+    if (ValueDecl *D = L.getAsASTNode<ValueDecl>())
+      return D->getBaseIdentifier().str();
+
     return StringRef();
   }
 

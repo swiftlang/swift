@@ -85,13 +85,13 @@ public:
     return !Value.getPointer() && Value.getInt() == AccessLimitKind::Package;
   }
 
-  /// Returns true if this scope is more restrictive than the argument scope.
-  /// It's often used to compute the min access scope. The order of restrictiveness
-  /// is: private (most restrictive), fileprivate, internal, package, public (least restrictive).
-  /// \see DeclContext::isChildContextOf
+  /// Returns true if the context of this (use site) is more restrictive than
+  /// the argument context (decl site). This function does _not_ check the
+  /// restrictiveness of the access level between this and the argument. \see
+  /// AccessScope::isInContext
   bool isChildOf(AccessScope AS) const {
-    if (isInternalOrLess()) {
-      if (AS.isInternalOrLess())
+    if (isInContext()) {
+      if (AS.isInContext())
         return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
       else
         return AS.isPackage() || AS.isPublic();
@@ -103,7 +103,27 @@ public:
     return false;
   }
 
-  bool isInternalOrLess() const { return getDeclContext() != nullptr; }
+  /// Result depends on whether it's called at a use site or a decl site:
+  ///
+  /// For example,
+  ///
+  /// ```
+  /// public func foo(_ arg: bar) {} // `bar` is a `package` decl in another
+  /// module
+  /// ```
+  ///
+  /// The meaning of \c isInContext changes whether it's at the use site or the
+  /// decl site.
+  ///
+  /// The use site of \c bar, i.e. \c foo, is "in context" (decl context is
+  /// non-null), regardless of the access level of \c foo (\c public in this
+  /// case).
+  ///
+  /// The decl site of \c bar is only "in context" if the access level of the
+  /// decl is \c internal or more restrictive. The context at the decl site is\c
+  /// FileUnit if the decl is \c fileprivate or \c private; \c ModuleDecl if \c
+  /// internal, and null if \c package or \c public.
+  bool isInContext() const { return getDeclContext() != nullptr; }
 
   /// Returns the associated access level for diagnostic purposes.
   AccessLevel accessLevelForDiagnostics() const;

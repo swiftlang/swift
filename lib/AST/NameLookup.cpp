@@ -2798,7 +2798,6 @@ bool TypeRepr::isProtocol(DeclContext *dc){
   auto &ctx = dc->getASTContext();
   return findIf([&ctx, dc](TypeRepr *ty) {
     return declsAreProtocols(directReferencesForTypeRepr(ctx.evaluator, ctx, ty, dc));
-
   });
 }
 
@@ -2847,20 +2846,13 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
         return Action::Continue();
       
       if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
-        auto meta = dyn_cast<MetatypeTypeRepr>(existential->getConstraint());
-        auto generic = dyn_cast<GenericIdentTypeRepr>(existential->getConstraint());
-        if(generic)
-          Reprs.push_back(existential);
-        return Action::VisitChildrenIf(meta || generic);
+        return Action::SkipChildren();
       } else if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)) {
         if (!compositionRepr->isTypeReprAny())
           Reprs.push_back(compositionRepr);
         return Action::SkipChildren();
       } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
-        // prevent any P<some P>
-        if (!Reprs.empty() && isa<ExistentialTypeRepr>(Reprs.front())){
-          Reprs.clear();
-        }
+        return Action::Continue();
       } else if (auto declRefTR = dyn_cast<DeclRefTypeRepr>(repr)) {
         if (declRefTR->isProtocol(dc))
           Reprs.push_back(declRefTR);
@@ -3470,6 +3462,12 @@ void FindLocalVal::visitBraceStmt(BraceStmt *S, bool isTopLevelCode) {
   }
 
   for (auto elem : S->getElements()) {
+    // If we have a SingleValueStmtExpr, there may be local bindings in the
+    // wrapped statement.
+    if (auto *E = elem.dyn_cast<Expr *>()) {
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E))
+        visit(SVE->getStmt());
+    }
     if (auto *S = elem.dyn_cast<Stmt*>())
       visit(S);
   }

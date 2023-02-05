@@ -3574,7 +3574,7 @@ NodePointer Demangler::demangleFunctionEntity() {
     TypeAndMaybePrivateName,
     TypeAndIndex,
     Index,
-    ContextAndName,
+    ContextArg,
   } Args;
 
   Node::Kind Kind = Node::Kind::EmptyList;
@@ -3592,7 +3592,7 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;
     case 'a':
-      Args = ContextAndName;
+      Args = ContextArg;
       Kind = Node::Kind::RuntimeAttributeGenerator;
       break;
     case 'm': return demangleEntity(Node::Kind::Macro);
@@ -3610,7 +3610,7 @@ NodePointer Demangler::demangleFunctionEntity() {
   }
 
   NodePointer NameOrIndex = nullptr, ParamType = nullptr, LabelList = nullptr,
-              Context = nullptr, Id = nullptr;
+              Context = nullptr;
   switch (Args) {
     case None:
       break;
@@ -3626,9 +3626,8 @@ NodePointer Demangler::demangleFunctionEntity() {
     case Index:
       NameOrIndex = demangleIndexAsNode();
       break;
-    case ContextAndName:
-      Context = demangleOperator();
-      Id = demangleOperator();
+    case ContextArg:
+      Context = popNode();
       break;
   }
   NodePointer Entity = createWithChild(Kind, popContext());
@@ -3647,9 +3646,8 @@ NodePointer Demangler::demangleFunctionEntity() {
       Entity = addChild(Entity, NameOrIndex);
       Entity = addChild(Entity, ParamType);
       break;
-    case ContextAndName:
+    case ContextArg:
       Entity = addChild(Entity, Context);
-      Entity = addChild(Entity, Id);
       break;
   }
   return Entity;
@@ -3897,11 +3895,30 @@ NodePointer Demangler::demangleValueWitness() {
   return addChild(VW, popNode(Node::Kind::Type));
 }
 
+static bool isMacroExpansionNodeKind(Node::Kind kind) {
+  return kind == Node::Kind::AccessorAttachedMacroExpansion ||
+         kind == Node::Kind::MemberAttributeAttachedMacroExpansion ||
+         kind == Node::Kind::FreestandingMacroExpansion ||
+         kind == Node::Kind::MemberAttachedMacroExpansion;
+}
+
 NodePointer Demangler::demangleMacroExpansion() {
   Node::Kind kind;
   switch (nextChar()) {
+  case 'a':
+    kind = Node::Kind::AccessorAttachedMacroExpansion;
+    break;
+
+  case 'A':
+    kind = Node::Kind::MemberAttributeAttachedMacroExpansion;
+    break;
+
   case 'f':
     kind = Node::Kind::FreestandingMacroExpansion;
+    break;
+
+  case 'm':
+    kind = Node::Kind::MemberAttachedMacroExpansion;
     break;
 
   case 'u':
@@ -3913,7 +3930,7 @@ NodePointer Demangler::demangleMacroExpansion() {
   }
 
   NodePointer name = popNode(Node::Kind::Identifier);
-  NodePointer context = popNode(Node::Kind::FreestandingMacroExpansion);
+  NodePointer context = popNode(isMacroExpansionNodeKind);
   if (!context)
     context = popContext();
   NodePointer discriminator = demangleIndexAsNode();

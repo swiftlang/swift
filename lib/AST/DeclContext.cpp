@@ -583,7 +583,7 @@ void DeclContext::dumpContext() const {
 void AccessScope::dump() const {
   llvm::errs() << getAccessLevelSpelling(accessLevelForDiagnostics()) << ": ";
 
-  if (isPublic()) {
+  if (isPublic() || isPackage()) {
     llvm::errs() << "(null)\n";
     return;
   }
@@ -1194,7 +1194,7 @@ AccessScope::AccessScope(const DeclContext *DC, AccessLimitKind limitKind)
     isPrivate = true;
   }
   if (!DC || isa<ModuleDecl>(DC))
-    assert(!isPrivate && "public or internal scope can't be private");
+    assert(!isPrivate && "public, package, or internal scope can't be private");
 }
 
 bool AccessScope::isFileScope() const {
@@ -1210,6 +1210,8 @@ bool AccessScope::isInternal() const {
 AccessLevel AccessScope::accessLevelForDiagnostics() const {
   if (isPublic())
     return AccessLevel::Public;
+  if (isPackage())
+    return AccessLevel::Package;
   if (isa<ModuleDecl>(getDeclContext()))
     return AccessLevel::Internal;
   if (getDeclContext()->isModuleScopeContext()) {

@@ -24,7 +24,7 @@ struct Date { }
 
 struct MyWrapperThingy<T> {
   var storage: T
-  
+
   var wrappedValue: T {
     get {
       print("Getting value \(storage)")
@@ -44,7 +44,7 @@ struct MyStruct {
 
   @myPropertyWrapper
   var name: String
-  // CHECK-DUMP: macro:name@myPropertyWrapper
+  // CHECK-DUMP: @__swiftmacro_15accessor_macros8MyStructV4nameSSvp17myPropertyWrapperfMa_.swift
   // CHECK-DUMP: get {
   // CHECK-DUMP:   _name.wrappedValue
   // CHECK-DUMP: }
@@ -54,7 +54,7 @@ struct MyStruct {
 
   @myPropertyWrapper
   var birthDate: Date? = nil
-  // CHECK-DUMP: macro:birthDate@myPropertyWrapper
+  // CHECK-DUMP: @__swiftmacro_15accessor_macros8MyStructV9birthDateAA0F0VSgvp17myPropertyWrapperfMa_.swift 
   // CHECK-DUMP: get {
   // CHECK-DUMP:   _birthDate.wrappedValue
   // CHECK-DUMP: }

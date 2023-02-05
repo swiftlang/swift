@@ -310,6 +310,20 @@ public:
   
   std::vector<BreakContinueDest> BreakContinueDestStack;
   std::vector<PatternMatchContext*> SwitchStack;
+
+  /// Information for a parent SingleValueStmtExpr initialization.
+  struct SingleValueStmtInitialization {
+    /// The target expressions to be used for initialization.
+    SmallPtrSet<Expr *, 4> Exprs;
+    Initialization *Init;
+
+    SingleValueStmtInitialization(Initialization *init) : Init(init) {}
+  };
+
+  /// A stack of active SingleValueStmtExpr initializations that may be
+  /// initialized by the branches of a statement.
+  std::vector<SingleValueStmtInitialization> SingleValueStmtInitStack;
+
   /// Keep track of our current nested scope.
   ///
   /// The boolean tracks whether this is a binding scope, which should be
@@ -600,8 +614,8 @@ public:
   /// ends.
   void enterDebugScope(SILLocation Loc, bool isBindingScope = false,
                        Optional<SILLocation> MacroExpansion = {},
-                       DeclNameRef MacroName = {},
-                       DeclNameLoc MacroNameLoc = {});
+                       StringRef MacroName = {},
+                       Optional<SILLocation> MacroLoc = {});
 
   /// Return to the previous debug scope.
   void leaveDebugScope();
@@ -611,6 +625,11 @@ public:
                             CanType formalResultType,
                             SmallVectorImpl<SILValue> &directResultsBuffer,
                             SmallVectorImpl<CleanupHandle> &cleanups);
+
+  /// Check to see if an initalization for a SingleValueStmtExpr is active, and
+  /// if the provided expression is for one of its branches. If so, returns the
+  /// initialization to use for the expression. Otherwise returns \c nullptr.
+  Initialization *getSingleValueStmtInit(Expr *E);
 
   //===--------------------------------------------------------------------===//
   // Entry points for codegen

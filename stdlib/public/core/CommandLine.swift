@@ -42,8 +42,13 @@ public enum CommandLine {
     return _argc
   }
 
-  /// Access to the raw argv value from C. Accessing the argument vector
-  /// through this pointer is unsafe.
+  /// Access to the raw argv value from C.
+  ///
+  /// The value of this property is a `nil`-terminated C array. Including the
+  /// trailing `nil`, there are ``argc`` `+ 1` elements in the array.
+  ///
+  /// - Note: Accessing the argument vector through this pointer is unsafe.
+  ///   Where possible, use ``arguments`` instead.
   public static var unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>?> {
     return _unsafeArgv

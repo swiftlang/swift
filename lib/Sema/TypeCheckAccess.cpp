@@ -182,7 +182,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     return;
   // Don't spend time checking local declarations; this is always valid by the
   // time we get to this point.
-  if (!contextAccessScope.isPublic() &&
+  if (contextAccessScope.isInContext() &&
       contextAccessScope.getDeclContext()->isLocalContext())
     return;
 
@@ -2106,6 +2106,8 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
     desiredAccessScope = AccessScope(ED->getModuleContext());
     break;
   case AccessLevel::Package:
+    desiredAccessScope = AccessScope::getPackage();
+    break;
   case AccessLevel::Public:
   case AccessLevel::Open:
     break;

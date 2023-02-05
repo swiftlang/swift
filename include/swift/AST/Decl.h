@@ -875,6 +875,11 @@ public:
   /// declaration.
   void forEachAttachedMacro(MacroRole role, MacroCallback) const;
 
+  /// Retrieve the discriminator for the given custom attribute that names
+  /// an attached macro.
+  unsigned getAttachedMacroDiscriminator(
+      MacroRole role, const CustomAttr *attr) const;
+
   /// Returns the innermost enclosing decl with an availability annotation.
   const Decl *getInnermostDeclWithAvailability() const;
 

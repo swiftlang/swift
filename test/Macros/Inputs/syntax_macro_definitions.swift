@@ -533,3 +533,39 @@ extension DeclGroupSyntax {
     }
   }
 }
+
+public enum LeftHandOperandFinderMacro: ExpressionMacro {
+  class Visitor<Context: MacroExpansionContext>: SyntaxVisitor {
+    let context: Context
+
+    init(context: Context) {
+      self.context = context
+      super.init(viewMode: .sourceAccurate)
+    }
+
+    override func visit(
+      _ node: InfixOperatorExprSyntax
+    ) -> SyntaxVisitorContinueKind {
+      guard let lhsStartLoc = context.location(of: node.leftOperand),
+            let lhsEndLoc = context.location(
+              of: node.leftOperand, at: .beforeTrailingTrivia, filePathMode: .fileID
+            ) else {
+        fatalError("missing source location information")
+      }
+
+      print("Source range for LHS is \(lhsStartLoc.file!): \(lhsStartLoc.line!):\(lhsStartLoc.column!)-\(lhsEndLoc.line!):\(lhsEndLoc.column!)")
+
+      return .visitChildren
+    }
+  }
+
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    let visitor = Visitor(context: context)
+    visitor.walk(node)
+
+    return node.argumentList.first!.expression
+  }
+}

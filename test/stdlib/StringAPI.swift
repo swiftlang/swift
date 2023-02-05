@@ -508,4 +508,28 @@ StringTests.test("Regression/radar-87371813") {
   expectEqual(s2.hashValue, s3.hashValue)
 }
 
+StringTests.test("_isIdentical(to:)") {
+  let a = "Hello"
+  let b = "Hello"
+  expectTrue(a._isIdentical(to: a))
+  expectTrue(b._isIdentical(to: b))
+  expectTrue(a._isIdentical(to: b)) // Both small ASCII strings
+  expectTrue(b._isIdentical(to: a))
+
+  let c = "Cafe\u{301}"
+  let d = "Cafe\u{301}"
+  let e = "Café"
+  expectTrue(c._isIdentical(to: d))
+  expectTrue(d._isIdentical(to: c))
+  expectFalse(c._isIdentical(to: e))
+  expectFalse(d._isIdentical(to: e))
+
+  let f = String(repeating: "foo", count: 1000)
+  let g = String(repeating: "foo", count: 1000)
+  expectEqual(f, g)
+  expectFalse(f._isIdentical(to: g)) // Two large, distinct native strings
+  expectTrue(f._isIdentical(to: f))
+  expectTrue(g._isIdentical(to: g))
+}
+
 runAllTests()

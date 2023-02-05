@@ -167,8 +167,8 @@ class LLVM_LIBRARY_VISIBILITY MacroScope {
 
 public:
   explicit MacroScope(SILGenFunction &SGF, CleanupLocation loc,
-                      SILLocation MacroExpansion, DeclNameRef MacroName,
-                      DeclNameLoc MacroNameLoc)
+                      SILLocation MacroExpansion, StringRef MacroName,
+                      SILLocation MacroNameLoc)
       : SGF(SGF) {
     SGF.enterDebugScope(loc, false, MacroExpansion, MacroName, MacroNameLoc);
   }
