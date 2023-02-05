@@ -2,7 +2,7 @@
 name: Feature request
 about: Share an idea
 title: ''
-labels: feature request, triage needed
+labels: feature, triage needed
 assignees: ''
 
 ---
