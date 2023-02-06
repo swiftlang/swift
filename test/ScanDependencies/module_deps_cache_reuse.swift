@@ -81,7 +81,6 @@ import SubE
 // CHECK-DAG:     "swift": "SwiftOnoneSupport"
 // CHECK: ],
 
-
 /// --------Swift module G
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}G-{{.*}}.swiftmodule"
 // CHECK: "directDependencies"

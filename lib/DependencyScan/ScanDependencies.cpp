@@ -176,16 +176,14 @@ static std::vector<ModuleDependencyID>
 computeTopologicalSortOfExplicitDependencies(
     const ModuleDependencyIDSetVector &allModules,
     const ModuleDependenciesCache &cache) {
+  std::unordered_set<ModuleDependencyID> visited;
+  std::vector<ModuleDependencyID> result;
+  std::stack<ModuleDependencyID> stack;
+
   // Must be explicitly-typed to allow recursion
-  std::function<void(const ModuleDependencyID &,
-                     std::stack<ModuleDependencyID> &,
-                     std::unordered_set<ModuleDependencyID> &,
-                     std::vector<ModuleDependencyID> &)>
-      visit;
-  visit = [&visit, &cache](const ModuleDependencyID &moduleID,
-                           std::stack<ModuleDependencyID> &stack,
-                           std::unordered_set<ModuleDependencyID> &visited,
-                           std::vector<ModuleDependencyID> &result) {
+  std::function<void(const ModuleDependencyID &)> visit;
+  visit = [&visit, &cache, &visited, &result,
+           &stack](const ModuleDependencyID &moduleID) {
     // Mark this node as visited -- we are done if it already was.
     if (!visited.insert(moduleID).second)
       return;
@@ -196,7 +194,7 @@ computeTopologicalSortOfExplicitDependencies(
       // since that would mean we have found a cycle, which should not
       // be possible because we checked for cycles earlier.
       stack.push(succID);
-      visit(succID, stack, visited, result);
+      visit(succID);
       auto top = stack.top();
       stack.pop();
       assert(top == succID);
@@ -206,13 +204,10 @@ computeTopologicalSortOfExplicitDependencies(
     result.push_back(moduleID);
   };
 
-  std::unordered_set<ModuleDependencyID> visited;
-  std::vector<ModuleDependencyID> result;
-  std::stack<ModuleDependencyID> stack;
   for (const auto &modID : allModules) {
     assert(stack.empty());
     stack.push(modID);
-    visit(modID, stack, visited, result);
+    visit(modID);
     auto top = stack.top();
     stack.pop();
     assert(top == modID);
@@ -222,13 +217,15 @@ computeTopologicalSortOfExplicitDependencies(
   return result;
 }
 
-/// For each module in the graph, compute a set of all its dependencies
+/// For each module in the graph, compute a set of all its dependencies,
 /// direct *and* transitive.
 static std::unordered_map<ModuleDependencyID,
                           std::set<ModuleDependencyID>>
 computeTransitiveClosureOfExplicitDependencies(
     const std::vector<ModuleDependencyID> &topologicallySortedModuleList,
     const ModuleDependenciesCache &cache) {
+  // The usage of an ordered ::set is important to ensure the
+  // dependencies are listed in a deterministic order.
   std::unordered_map<ModuleDependencyID, std::set<ModuleDependencyID>>
       result;
   for (const auto &modID : topologicallySortedModuleList)
@@ -286,7 +283,7 @@ resolveExplicitModuleInputs(ModuleDependencyID moduleID,
     } break;
     case swift::ModuleDependencyKind::Clang: {
       auto clangDepDetails = depInfo->getAsClangModule();
-      assert(binaryDepDetails && "Expected Clang Module dependency.");
+      assert(clangDepDetails && "Expected Clang Module dependency.");
       commandLine.push_back("-Xcc");
       commandLine.push_back("-fmodule-file=" + depModuleID.first + "=" +
                             clangDepDetails->pcmOutputPath);
