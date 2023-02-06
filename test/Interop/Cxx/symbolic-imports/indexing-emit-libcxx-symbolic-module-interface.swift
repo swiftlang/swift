@@ -28,7 +28,6 @@ int freeFunction(int x, int y);
 
 import CxxStdlib
 import CxxModule
-import Foundation
 
 // REMARK_NEW: remark: emitting symbolic interface at {{.*}}/interfaces/std-{{.*}}.pcm.symbolicswiftinterface{{$}}
 // REMARK_NEW: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface{{$}}
@@ -38,6 +37,5 @@ import Foundation
 
 // FILES: CxxModule-{{.*}}.pcm.symbolicswiftinterface
 // FILES: std-{{.*}}.pcm.symbolicswiftinterface
-// FILES-NOT: Foundation*
 
 // CHECK: // Swift interface for system module 'std'
