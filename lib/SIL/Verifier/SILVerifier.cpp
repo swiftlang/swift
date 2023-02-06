@@ -2342,8 +2342,11 @@ public:
     switch (BAI->getAccessKind()) {
     case SILAccessKind::Init:
     case SILAccessKind::Deinit:
-      require(BAI->getEnforcement() == SILAccessEnforcement::Static,
-              "init/deinit accesses cannot use non-static enforcement");
+      // A signed access preserves the access marker until IRGen
+      require(
+          BAI->getEnforcement() == SILAccessEnforcement::Static ||
+              BAI->getEnforcement() == SILAccessEnforcement::Signed,
+          "init/deinit accesses cannot use non-static/non-signed enforcement");
       break;
 
     case SILAccessKind::Read:
@@ -3286,7 +3289,10 @@ public:
                 EI->getForwardingOwnershipKind() == OwnershipKind::Guaranteed,
             "invalid forwarding ownership kind on tuple_extract instruction");
 
-    require(!EI->getStructDecl()->isNonTrivialPtrAuth(),
+    require(!EI->getModule()
+                    .getOptions()
+                    .EnableImportPtrauthFieldFunctionPointers ||
+                !EI->getField()->getPointerAuthQualifier().isPresent(),
             "Imported structs with ptrauth qualified fields should not be "
             "promoted to a value");
 
@@ -3337,7 +3343,8 @@ public:
     require(EI->getField()->getDeclContext() == sd,
             "struct_element_addr field is not a member of the struct");
 
-    if (EI->getStructDecl()->isNonTrivialPtrAuth()) {
+    if (EI->getModule().getOptions().EnableImportPtrauthFieldFunctionPointers &&
+        EI->getField()->getPointerAuthQualifier().isPresent()) {
       for (auto *use : EI->getUses()) {
         auto *bai = dyn_cast<BeginAccessInst>(use->getUser());
         require(bai && bai->getEnforcement() == SILAccessEnforcement::Signed,
