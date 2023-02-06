@@ -981,13 +981,9 @@ CastsTests.test("Recursive AnyHashable") {
 // https://github.com/apple/swift/issues/56987
 #if _runtime(_ObjC)
 CastsTests.test("Do not overuse __SwiftValue")
-.skip(.osxAny("Not yet fully enabled for Apple OSes"))
-.skip(.iOSAny("Not yet fully enabled for Apple OSes"))
-.skip(.iOSSimulatorAny("Not yet fully enabled for Apple OSes"))
-.skip(.tvOSAny("Not yet fully enabled for Apple OSes"))
-.skip(.tvOSSimulatorAny("Not yet fully enabled for Apple OSes"))
-.skip(.watchOSAny("Not yet fully enabled for Apple OSes"))
-.skip(.watchOSSimulatorAny("Not yet fully enabled for Apple OSes"))
+.skip(.custom({
+  if #available(SwiftStdlib 5.9, *) { return false } else { return true }
+}, reason: "Requires stdlib from Swift 5.9 or later"))
 .code {
   struct Bar {}
   // This used to succeed because of overeager __SwiftValue
