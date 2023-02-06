@@ -274,3 +274,31 @@ func testAmbiguousInResultBuilder() {
 // AMBIGUOUS_IN_RESULT_BUILDER: End completions
   }
 }
+
+func testCompleteGlobalInResultBuilderIf() {
+  func buildView(@ViewBuilder2 content: () -> MyView) {}
+
+  @resultBuilder public struct ViewBuilder2 {
+    static func buildBlock() -> MyView { fatalError() }
+    static func buildBlock(_ content: MyView) -> MyView { fatalError() }
+    static func buildIf(_ content: MyView?) -> MyView? { fatalError() }
+    static func buildEither(first: MyView) -> MyView { fatalError() }
+    static func buildEither(second: MyView) -> MyView { fatalError() }
+  }
+
+  struct MyView {}
+
+  func test() {
+    buildView {
+      if true {
+        MyView()
+      } else {
+        #^GLOBAL_IN_RESULT_BUILDER_IF^#
+      }
+    }
+  }
+
+  // GLOBAL_IN_RESULT_BUILDER_IF: Begin completions
+  // GLOBAL_IN_RESULT_BUILDER_IF-DAG: Decl[Struct]/Local/TypeRelation[Convertible]: MyView[#MyView#]; name=MyView
+  // GLOBAL_IN_RESULT_BUILDER_IF: End completions
+}
