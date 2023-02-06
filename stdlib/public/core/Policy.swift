@@ -17,8 +17,9 @@
 //===----------------------------------------------------------------------===//
 /// A type that has no values and can't be constructed.
 ///
-/// Use `Never` as the return type of a function that doesn't return normally
-/// --- for example, because it runs forever or terminates the program.
+/// Use `Never` as the return type of a function
+/// that doesn't return normally --- for example,
+/// because it runs forever or terminates the program.
 ///
 ///     // An infinite loop never returns.
 ///     func forever() -> Never {
@@ -33,14 +34,17 @@
 ///     }
 ///
 /// A function that returns `Never` is called a _nonreturning_ function.
-/// Closures, methods, computed properties, and subscripts can also be
-/// nonreturning.
+/// Closures, methods, computed properties, and subscripts
+/// can also be nonreturning.
 ///
-/// There's no way to create an instance of `Never`; this characteristic makes
-/// it an _uninhabited_ type. You can use an uninhabited type like `Never` to
-/// represent states in your program that are impossible to reach during
-/// execution. Swift's type system uses this information --- for example, to
-/// reason about control statements in cases that are known to be unreachable.
+/// There's no way to create an instance of `Never`;
+/// this characteristic makes it an _uninhabited_ type.
+/// You can use an uninhabited type like `Never`
+/// to represent states in your program
+/// that are impossible to reach during execution.
+/// Swift's type system uses this information ---
+/// for example, to reason about control statements
+/// in cases that are known to be unreachable.
 ///
 ///     let favoriteNumber: Result<Int, Never> = .success(42)
 ///     switch favoriteNumber {
@@ -48,10 +52,12 @@
 ///         print("My favorite number is", value)
 ///     }
 ///
-/// In the code above, `favoriteNumber` has a failure type of `Never`,
-/// indicating that it always succeeds. The switch statement is therefore
-/// exhaustive, even though it doesn't contain a `.failure` case, because that
-/// case could never be reached.
+/// In the code above,
+/// `favoriteNumber` has a failure type of `Never`,
+/// indicating that it always succeeds.
+/// The switch statement is therefore exhaustive,
+/// even though it doesn't contain a `.failure` case,
+/// because that case could never be reached.
 @frozen
 public enum Never {}
 
