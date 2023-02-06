@@ -250,11 +250,16 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
      ```
      If you installed and want to use Sccache, include the `--sccache` option in
      the invocation as well.
+   <!-- FIXME: Without this "hard" line break, the note doesn’t get properly spaced from the bullet -->
+   <br />
 
    > **Note**  
-   > If you aren't planning to edit the parts of the compiler that are written
-   > in Swift, pass `--bootstrapping=hosttools` to speed up local development.
-   > This requires a recent Xcode and/or swift toolchain to be installed.
+   > If you are planning to work on the compiler, but not the parts that are
+   > written in Swift, pass `--bootstrapping=hosttools` to speed up local
+   > development. Note that on Linux — unlike macOS, where the toolchain already
+   > comes with Xcode — this option additionally requires
+   > [a recent Swift toolchain](https://www.swift.org/download/) to be
+   > installed.
 
    This will create a directory `swift-project/build/Ninja-RelWithDebInfoAssert`
    containing the Swift compiler and standard library and clang/LLVM build artifacts.

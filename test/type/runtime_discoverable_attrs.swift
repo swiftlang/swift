@@ -349,3 +349,27 @@ protocol OptedOutProtoWithSuperclass : BaseClass {} // Ok
 @available(*, unavailable)
 @Flag
 extension OptedOutProtoWithSuperclass {}
+
+@runtimeMetadata
+struct FlagForFailures {
+  init(attachedTo: Int.Type) {}
+  init<T>(attachedTo: KeyPath<Int, T>) {}
+  init(attachedTo: (Int) -> Void, _: String) {}
+}
+
+@FlagForFailures // expected-error {{cannot convert value of type 'InvalidMembersTests.Type' to expected argument type 'Int.Type'}}
+struct InvalidMembersTests {
+  @FlagForFailures var x: Int
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<InvalidMembersTests, Int>' to expected argument type 'KeyPath<Int, Int>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('InvalidMembersTests' and 'Int') are expected to be equal}}
+
+  @FlagForFailures("") static func testStatic() {}
+  // expected-error@-1 {{cannot convert value of type '(InvalidMembersTests.Type) -> ()' to expected argument type '(Int) -> Void'}}
+
+  @FlagForFailures(42) func testInst() {}
+  // expected-error@-1 {{cannot convert value of type '(InvalidMembersTests) -> ()' to expected argument type '(Int) -> Void'}}
+  // expected-error@-2:20 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+}
+
+@FlagForFailures("global") func testGlobalInvalid() {}
+// expected-error@-1 {{cannot convert value of type '() -> ()' to expected argument type '(Int) -> Void'}}
