@@ -1079,6 +1079,9 @@ protected:
       // to rank code completion items that match the type expected by
       // buildBlock higher.
       buildBlockArguments.push_back(expr);
+    } else if (ctx.CompletionCallback && expr->getSourceRange().isValid() && !ctx.SourceMgr.rangeContainsIDEInspectionTarget(expr->getSourceRange())) {
+      auto *resultVar = buildPlaceholderVar(expr->getStartLoc(), newBody);
+      buildBlockArguments.push_back(builder.buildVarRef(resultVar, expr->getStartLoc()));
     } else {
       auto *capture = captureExpr(expr, newBody);
       // A reference to the synthesized variable is passed as an argument
