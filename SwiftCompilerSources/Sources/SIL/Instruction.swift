@@ -278,7 +278,7 @@ final public class DeallocStackRefInst : Instruction, UnaryInstruction {
   public var allocRef: AllocRefInstBase { operand as! AllocRefInstBase }
 }
 
-final public class MarkUninitializedInst : Instruction, UnaryInstruction {
+final public class MarkUninitializedInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public class CondFailInst : Instruction, UnaryInstruction {
