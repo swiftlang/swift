@@ -5368,6 +5368,7 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   return uniqueForeignWitnessTableRef(result.second);
 }
 
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
 namespace {
 
 /// A cache-entry type suitable for use with LockingConcurrentMap.
@@ -5644,6 +5645,7 @@ swift::swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *confor
   return reinterpret_cast<RelativeWitnessTable*>(((uintptr_t)table) |
                                                  (uintptr_t)0x1);
 }
+#endif
 
 /// Find the name of the associated type with the given descriptor.
 static StringRef findAssociatedTypeName(const ProtocolDescriptor *protocol,
@@ -5858,6 +5860,7 @@ RelativeWitnessTable *swift::lookThroughOptionalConditionalWitnessTable(
   return table;
 }
 
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
 SWIFT_CC(swift)
 static MetadataResponse
 swift_getAssociatedTypeWitnessRelativeSlowImpl(
@@ -5954,6 +5957,7 @@ swift::swift_getAssociatedTypeWitnessRelative(MetadataRequest request,
                                                     conformingType, reqBase,
                                                     assocType);
 }
+#endif
 
 using AssociatedConformanceWitness = std::atomic<void *>;
 
@@ -6098,6 +6102,7 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
                                                    assocConformance);
 }
 
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
 SWIFT_CC(swift)
 static const RelativeWitnessTable *swift_getAssociatedConformanceWitnessRelativeSlowImpl(
                                   RelativeWitnessTable *wtable,
@@ -6186,6 +6191,7 @@ const RelativeWitnessTable *swift::swift_getAssociatedConformanceWitnessRelative
                                                    assocType, reqBase,
                                                    assocConformance);
 }
+#endif
 
 bool swift::swift_compareProtocolConformanceDescriptors(
     const ProtocolConformanceDescriptor *lhs,
