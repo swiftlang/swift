@@ -2974,7 +2974,9 @@ namespace {
         return nullptr;
       auto lowered = getLoweredType();
       auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
-      return typeLayoutEntry.layoutString(IGM);
+      auto genericSig =
+          lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+      return typeLayoutEntry.layoutString(IGM, genericSig);
     }
 
     llvm::Constant *getLayoutString() {
@@ -4826,7 +4828,9 @@ namespace {
         return nullptr;
       auto lowered = getLoweredType();
       auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
-      return typeLayoutEntry.layoutString(IGM);
+      auto genericSig =
+          lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+      return typeLayoutEntry.layoutString(IGM, genericSig);
     }
 
     llvm::Constant *getLayoutString() {
@@ -5060,7 +5064,9 @@ namespace {
     }
 
     bool hasCompletionFunction() {
-      return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
+      // TODO: ONLY FOR TESTING!!!! WE NEED TO EMIT THE LAYOUT STRING INTO THE
+      // METADATA PATTERN!!!
+      return true; //! isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
     }
   };
 

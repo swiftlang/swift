@@ -59,6 +59,7 @@ public:
     Resilient = 0x0f,
     SinglePayloadEnum = 0x10,
 
+    Alignment = 0x7f,
     Skip = 0x80,
     // We may use the MSB as flag that a count follows,
     // so all following values are reserved
@@ -72,6 +73,7 @@ private:
       size_t size;
       uint32_t genericIdx;
       llvm::Function* metaTypeRef;
+      uint64_t alignment;
     };
   };
 
@@ -140,6 +142,13 @@ public:
     containsGenerics = true;
   }
 
+  void addAlignment(uint64_t alignment) {
+    RefCounting op;
+    op.kind = RefCountingKind::Alignment;
+    op.alignment = alignment;
+    refCountings.push_back(op);
+  }
+
   void result(IRGenModule &IGM, ConstantStructBuilder &B) const {
     auto sizePlaceholder = B.addPlaceholderWithSize(IGM.SizeTy);
     size_t skip = 0;
@@ -149,6 +158,13 @@ public:
     for (auto &refCounting : refCountings) {
       if (refCounting.kind == RefCountingKind::Skip) {
         skip += refCounting.size;
+        continue;
+      }
+
+      if (refCounting.kind == RefCountingKind::Alignment) {
+        skip += refCounting.alignment;
+        auto alignmentMask = refCounting.alignment - 1;
+        skip &= ~alignmentMask;
         continue;
       }
 
@@ -167,6 +183,11 @@ public:
         skip = 0;
       } else if (refCounting.kind == RefCountingKind::Resilient) {
         if (containsGenerics) {
+          if (instCopyBytes > 0) {
+            genericInstOps.push_back(
+                {GenericInstOp::Type::Copy, {instCopyBytes}});
+            instCopyBytes = 0;
+          }
           GenericInstOp op;
           op.type = GenericInstOp::Type::Resilient;
           op.resilient = {skip, refCounting.metaTypeRef};
@@ -292,72 +313,45 @@ static std::string scalarToString(ScalarKind kind) {
 }
 
 llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty,
-                                               bool &isGeneric) {
-  auto *nominal = ty.getNominalOrBoundGenericNominal();
+                                               GenericSignature genericSig) {
+  CanType fieldType = ty.getASTType();
 
+  auto sig = genericSig.getCanonicalSignature();
   IRGenMangler mangler;
   std::string symbolName =
       mangler.mangleSymbolNameForMangledMetadataAccessorString(
-          "get_type_metadata_for_layout_string",
-          nominal->getGenericSignature().getCanonicalSignature(),
-          ty.getASTType()->mapTypeOutOfContext()->getCanonicalType());
+          "get_type_metadata_for_layout_string", sig,
+          fieldType->mapTypeOutOfContext()->getCanonicalType());
 
-  auto *fnTy = llvm::FunctionType::get(
-      IGM.TypeMetadataPtrTy, {IGM.TypeMetadataPtrPtrTy}, false /*vaargs*/);
+  auto helperFn = IGM.getOrCreateHelperFunction(
+      symbolName, IGM.TypeMetadataPtrTy /*retTy*/,
+      IGM.TypeMetadataPtrPtrTy /*argTys*/, [&](IRGenFunction &IGF) {
+        if (genericSig) {
+          auto genericEnv = genericSig.getGenericEnvironment();
+          SmallVector<GenericRequirement, 4> requirements;
 
-  llvm::Function *fn = llvm::Function::Create(
-      fnTy, llvm::Function::InternalLinkage, symbolName, &IGM.Module);
-  fn->setDoesNotThrow();
-  IRGenFunction IGF(IGM, fn);
-  if (IGM.DebugInfo)
-    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
+          enumerateGenericSignatureRequirements(
+              sig,
+              [&](GenericRequirement reqt) { requirements.push_back(reqt); });
 
-  auto *contextMetatype = IGF.collectParameters().claimNext();
+          auto bindingsBufPtr = IGF.collectParameters().claimNext();
+          bindFromGenericRequirementsBuffer(
+              IGF, requirements,
+              Address(bindingsBufPtr, IGM.TypeMetadataPtrTy,
+                      IGM.getPointerAlignment()),
+              MetadataState::Complete, [&](CanType t) {
+                return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
+              });
+          auto substTy =
+              genericEnv->mapTypeIntoContext(fieldType->mapTypeOutOfContext())
+                  ->getCanonicalType();
+        }
 
-  Address addr(
-      IGF.Builder.CreateBitCast(contextMetatype, IGM.TypeMetadataPtrPtrTy),
-      IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment());
+        auto ret = IGF.emitTypeMetadataRefForLayout(ty);
+        IGF.Builder.CreateRet(ret);
+      });
 
-  MetadataResponse response;
-  if (auto *boundGenericTy = ty.getASTType()->getAs<BoundGenericType>()) {
-    isGeneric = true;
-    auto generics = boundGenericTy->getGenericArgs();
-    llvm::SmallVector<llvm::Value *, 4> typeParams;
-    for (auto generic : generics) {
-      if (auto *archetypeType = generic->getAs<ArchetypeType>()) {
-        auto param =
-            archetypeType->getInterfaceType()->getAs<GenericTypeParamType>();
-
-        auto typeParamAddr = IGF.Builder.CreateConstArrayGEP(
-            addr, param->getIndex(), IGF.IGM.getPointerSize());
-        auto *typeParam = IGF.Builder.CreateLoad(typeParamAddr);
-        IGF.setInvariantLoad(typeParam);
-        typeParams.push_back(typeParam);
-      } else {
-        typeParams.push_back(
-            IGF.emitTypeMetadataRef(generic->getCanonicalType()));
-      }
-    }
-
-    GenericArguments genericArgs;
-    genericArgs.collectTypes(IGM, nominal);
-
-    auto *accessor = IGM.getAddrOfGenericTypeMetadataAccessFunction(
-        nominal, genericArgs.Types, NotForDefinition);
-
-    response = IGF.emitGenericTypeMetadataAccessFunctionCall(
-        accessor, typeParams, MetadataState::Complete);
-  } else {
-    auto *accessor = IGM.getAddrOfTypeMetadataAccessFunction(ty.getASTType(),
-                                                             NotForDefinition);
-    response = IGF.emitGenericTypeMetadataAccessFunctionCall(
-        accessor, {}, MetadataState::Complete);
-  }
-  Explosion ret;
-  ret.add(response.getMetadata());
-  IGF.emitScalarReturn(IGM.TypeMetadataPtrTy, ret);
-
-  return fn;
+  return static_cast<llvm::Function *>(helperFn);
 }
 
 TypeLayoutEntry::~TypeLayoutEntry() {}
@@ -440,13 +434,15 @@ llvm::Value *TypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty, true);
 }
 
-llvm::Constant *TypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+llvm::Constant *
+TypeLayoutEntry::layoutString(IRGenModule &IGM,
+                              GenericSignature genericSig) const {
   assert(isEmpty());
   return nullptr;
 }
 
-bool TypeLayoutEntry::refCountString(IRGenModule &IGM,
-                                     LayoutStringBuilder &B) const {
+bool TypeLayoutEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
+                                     GenericSignature genericSig) const {
   assert(isEmpty());
   return true;
 }
@@ -1079,14 +1075,16 @@ llvm::Value *ScalarTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
       IGF.IGM.Int1Ty, typeInfo.isBitwiseTakable(ResilienceExpansion::Maximal));
 }
 
-llvm::Constant *ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+llvm::Constant *
+ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM,
+                                    GenericSignature genericSig) const {
   if (_layoutString) {
     return *_layoutString;
   }
 
   LayoutStringBuilder B{};
 
-  if (!refCountString(IGM, B)) {
+  if (!refCountString(IGM, B, genericSig)) {
     return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
   }
 
@@ -1103,7 +1101,8 @@ llvm::Constant *ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 }
 
 bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
-                                           LayoutStringBuilder &B) const {
+                                           LayoutStringBuilder &B,
+                                           GenericSignature genericSig) const {
   auto size = typeInfo.getFixedSize().getValue();
   switch (scalarKind) {
   case ScalarKind::ErrorReference:
@@ -1537,19 +1536,22 @@ llvm::Value *AlignedGroupEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return isBitwiseTakable;
 }
 
-llvm::Constant *AlignedGroupEntry::layoutString(IRGenModule &IGM) const {
+llvm::Constant *
+AlignedGroupEntry::layoutString(IRGenModule &IGM,
+                                GenericSignature genericSig) const {
   if (_layoutString) {
     return *_layoutString;
   }
 
   LayoutStringBuilder B{};
 
-  if (!refCountString(IGM, B)) {
+  if (!refCountString(IGM, B, genericSig)) {
     return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
   }
 
   ConstantInitBuilder IB(IGM);
   auto SB = IB.beginStruct();
+  SB.setPacked(true);
 
   B.result(IGM, SB);
 
@@ -1559,12 +1561,15 @@ llvm::Constant *AlignedGroupEntry::layoutString(IRGenModule &IGM) const {
   return *_layoutString;
 }
 
-bool AlignedGroupEntry::refCountString(IRGenModule &IGM,
-                                       LayoutStringBuilder &B) const {
+bool AlignedGroupEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
+                                       GenericSignature genericSig) const {
   for (auto *entry : entries) {
-    if (!entry->refCountString(IGM, B)) {
+    if (!entry->refCountString(IGM, B, genericSig)) {
       return false;
     }
+  }
+  if (auto alignment = fixedAlignment(IGM)) {
+    B.addAlignment(alignment->getValue());
   }
 
   return true;
@@ -1903,19 +1908,22 @@ ArchetypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return emitLoadOfIsBitwiseTakable(IGF, archetype);
 }
 
-llvm::Constant *ArchetypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+llvm::Constant *
+ArchetypeLayoutEntry::layoutString(IRGenModule &IGM,
+                                   GenericSignature genericSig) const {
   if (_layoutString) {
     return *_layoutString;
   }
 
   LayoutStringBuilder B{};
 
-  if (!refCountString(IGM, B)) {
+  if (!refCountString(IGM, B, genericSig)) {
     return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
   }
 
   ConstantInitBuilder IB(IGM);
   auto SB = IB.beginStruct();
+  SB.setPacked(true);
 
   B.result(IGM, SB);
 
@@ -1926,7 +1934,8 @@ llvm::Constant *ArchetypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 }
 
 bool ArchetypeLayoutEntry::refCountString(IRGenModule &IGM,
-                                          LayoutStringBuilder &B) const {
+                                          LayoutStringBuilder &B,
+                                          GenericSignature genericSig) const {
   auto archetypeType = dyn_cast<ArchetypeType>(archetype.getASTType());
   auto params = archetypeType->getGenericEnvironment()->getGenericParams();
   for (auto param : params) {
@@ -2045,7 +2054,9 @@ llvm::Value *EnumTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return isBitwiseTakable;
 }
 
-llvm::Constant *EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+llvm::Constant *
+EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
+                                  GenericSignature genericSig) const {
   return nullptr;
   // LayoutStringBuilder B{};
 
@@ -2058,6 +2069,7 @@ llvm::Constant *EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 
   // ConstantInitBuilder IB(IGM);
   // auto SB = IB.beginStruct();
+  // SB.setPacked(true);
 
   // B.result(IGM, SB);
 
@@ -2066,11 +2078,8 @@ llvm::Constant *EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
 }
 
 bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
-                                         LayoutStringBuilder &B) const {
-  if (isMultiPayloadEnum()) {
-    return false;
-  }
-
+                                         LayoutStringBuilder &B,
+                                         GenericSignature genericSig) const {
   switch (copyDestroyKind(IGM)) {
   case CopyDestroyStrategy::POD: {
     auto size = fixedSize(IGM);
@@ -2081,15 +2090,17 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
   }
   case CopyDestroyStrategy::NullableRefcounted:
   case CopyDestroyStrategy::ForwardToPayload:
-    return cases[0]->refCountString(IGM, B);
+    return cases[0]->refCountString(IGM, B, genericSig);
     break;
   case CopyDestroyStrategy::Normal:
-    // if (containsArchetypeField()) {
-    //   createMetatypeAccessorFunction(IRGenModule &IGM, SILType archetype)
-    //   return false;
-    // }
+    auto *accessor = createMetatypeAccessorFunction(IGM, ty, genericSig);
+    if (genericSig) {
+      B.addGenericResilientRefCount(accessor);
+    } else {
+      B.addResilientRefCount(accessor);
+    }
 
-    return false;
+    return true;
   }
 }
 
@@ -3233,10 +3244,12 @@ ResilientTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return emitLoadOfIsBitwiseTakable(IGF, ty);
 }
 
-llvm::Constant *ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+llvm::Constant *
+ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM,
+                                       GenericSignature genericSig) const {
   LayoutStringBuilder B{};
 
-  if (!refCountString(IGM, B)) {
+  if (!refCountString(IGM, B, genericSig)) {
     return nullptr;
   }
 
@@ -3249,11 +3262,11 @@ llvm::Constant *ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
                                   /*constant*/ true);
 }
 
-bool ResilientTypeLayoutEntry::refCountString(IRGenModule &IGM,
-                                              LayoutStringBuilder &B) const {
-  bool isGeneric = false;
-  auto *accessor = createMetatypeAccessorFunction(IGM, ty, isGeneric);
-  if (isGeneric) {
+bool ResilientTypeLayoutEntry::refCountString(
+    IRGenModule &IGM, LayoutStringBuilder &B,
+    GenericSignature genericSig) const {
+  auto *accessor = createMetatypeAccessorFunction(IGM, ty, genericSig);
+  if (genericSig) {
     B.addGenericResilientRefCount(accessor);
   } else {
     B.addResilientRefCount(accessor);
@@ -3497,12 +3510,14 @@ void TypeInfoBasedTypeLayoutEntry::storeEnumTagSinglePayload(
 }
 
 llvm::Constant *
-TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM,
+                                           GenericSignature genericSig) const {
   return nullptr;
 }
 
 bool TypeInfoBasedTypeLayoutEntry::refCountString(
-    IRGenModule &IGM, LayoutStringBuilder &B) const {
+    IRGenModule &IGM, LayoutStringBuilder &B,
+    GenericSignature genericSig) const {
   // auto *accessor = createMetatypeAccessorFunction(IGM, representative);
   // B.addResilientRefCount(accessor);
   return false;
@@ -3582,8 +3597,8 @@ AlignedGroupEntry *TypeLayoutCache::getOrCreateAlignedGroupEntry(
 TypeLayoutEntry *TypeLayoutCache::getEmptyEntry() { return &emptyEntry; }
 
 EnumTypeLayoutEntry *TypeLayoutCache::getOrCreateEnumEntry(
-    unsigned numEmptyCases,
-    const std::vector<TypeLayoutEntry *> &nonEmptyCases) {
+    unsigned numEmptyCases, const std::vector<TypeLayoutEntry *> &nonEmptyCases,
+    SILType ty) {
 
   llvm::FoldingSetNodeID id;
   EnumTypeLayoutEntry::Profile(id, numEmptyCases, nonEmptyCases);
@@ -3593,7 +3608,8 @@ EnumTypeLayoutEntry *TypeLayoutCache::getOrCreateEnumEntry(
   }
   auto bytes = sizeof(EnumTypeLayoutEntry);
   auto mem = bumpAllocator.Allocate(bytes, alignof(EnumTypeLayoutEntry));
-  auto newEntry = new (mem) EnumTypeLayoutEntry(numEmptyCases, nonEmptyCases);
+  auto newEntry =
+      new (mem) EnumTypeLayoutEntry(numEmptyCases, nonEmptyCases, ty);
   enumEntries.InsertNode(newEntry, insertPos);
   newEntry->computeProperties();
   return newEntry;

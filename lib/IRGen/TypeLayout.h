@@ -112,8 +112,10 @@ public:
   virtual llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const;
   virtual llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const;
   virtual llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const;
-  virtual llvm::Constant *layoutString(IRGenModule &IGM) const;
-  virtual bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const;
+  virtual llvm::Constant *layoutString(IRGenModule &IGM,
+                                       GenericSignature genericSig) const;
+  virtual bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
+                              GenericSignature genericSig) const;
 
   virtual void destroy(IRGenFunction &IGF, Address addr) const;
 
@@ -204,8 +206,10 @@ public:
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
   llvm::Type *getStorageType(IRGenFunction &IGF) const;
-  llvm::Constant *layoutString(IRGenModule &IGM) const override;
-  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
+  llvm::Constant *layoutString(IRGenModule &IGM,
+                               GenericSignature genericSig) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
+                      GenericSignature genericSig) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -263,8 +267,10 @@ public:
   bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
-  llvm::Constant *layoutString(IRGenModule &IGM) const override;
-  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
+  llvm::Constant *layoutString(IRGenModule &IGM,
+                               GenericSignature genericSig) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
+                      GenericSignature genericSig) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -321,8 +327,10 @@ public:
   bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
-  llvm::Constant *layoutString(IRGenModule &IGM) const override;
-  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
+  llvm::Constant *layoutString(IRGenModule &IGM,
+                               GenericSignature genericSig) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
+                      GenericSignature genericSig) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -383,8 +391,10 @@ public:
   bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
-  llvm::Constant *layoutString(IRGenModule &IGM) const override;
-  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
+  llvm::Constant *layoutString(IRGenModule &IGM,
+                               GenericSignature genericSig) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
+                      GenericSignature genericSig) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -468,11 +478,13 @@ public:
   unsigned numEmptyCases;
   unsigned minimumAlignment;
   std::vector<TypeLayoutEntry *> cases;
+  SILType ty;
 
   EnumTypeLayoutEntry(unsigned numEmptyCases,
-                      const std::vector<TypeLayoutEntry *> &cases)
+                      const std::vector<TypeLayoutEntry *> &cases, SILType ty)
       : TypeLayoutEntry(TypeLayoutEntryKind::Enum),
-        numEmptyCases(numEmptyCases), minimumAlignment(1), cases(cases) {}
+        numEmptyCases(numEmptyCases), minimumAlignment(1), cases(cases),
+        ty(ty) {}
 
   ~EnumTypeLayoutEntry();
 
@@ -496,8 +508,10 @@ public:
   CopyDestroyStrategy copyDestroyKind(IRGenModule &IGM) const;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
-  llvm::Constant *layoutString(IRGenModule &IGM) const override;
-  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
+  llvm::Constant *layoutString(IRGenModule &IGM,
+                               GenericSignature genericSig) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
+                      GenericSignature genericSig) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -667,8 +681,10 @@ public:
                                  llvm::Value *numEmptyCases,
                                  Address enumAddr) const override;
 
-  llvm::Constant *layoutString(IRGenModule &IGM) const override;
-  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B) const override;
+  llvm::Constant *layoutString(IRGenModule &IGM,
+                               GenericSignature genericSig) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
+                      GenericSignature genericSig) const override;
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   void dump() const override;
@@ -700,7 +716,8 @@ public:
 
   EnumTypeLayoutEntry *
   getOrCreateEnumEntry(unsigned numEmptyCase,
-                       const std::vector<TypeLayoutEntry *> &nonEmptyCases);
+                       const std::vector<TypeLayoutEntry *> &nonEmptyCases,
+                       SILType ty);
 
   TypeInfoBasedTypeLayoutEntry *
   getOrCreateTypeInfoBasedEntry(const TypeInfo &ti, SILType representative);

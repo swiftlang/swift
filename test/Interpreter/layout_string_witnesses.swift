@@ -22,6 +22,37 @@ class TestClass {
     }
 }
 
+func testXX() {
+    let ptr = UnsafeMutablePointer<Level0<TestClass>>.allocate(capacity: 1)
+
+    do {
+        let x = Level0(x: TestClass(), z: TestClass())
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = Level0(x: TestClass(), z: TestClass())
+
+        // CHECK: Before deinit
+        print("Before deinit")
+        
+        // CHECK-NEXT: TestClass deinitialized!
+        // CHECK-NEXT: TestClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+        
+
+    // CHECK-NEXT: TestClass deinitialized!
+    // CHECK-NEXT: TestClass deinitialized!
+    testDestroy(ptr)
+    
+    ptr.deallocate()
+}
+testXX()
+
 func testSimple() {
     let ptr = UnsafeMutablePointer<Simple>.allocate(capacity: 1)
 

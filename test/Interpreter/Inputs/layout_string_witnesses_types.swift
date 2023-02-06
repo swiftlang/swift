@@ -182,6 +182,55 @@ struct InternalGeneric<T> {
     let y: Int
 }
 
+public enum SinglePayloadEnum<T> {
+    case empty
+    case nonEmpty(T?)
+}
+
+public struct SinglePayloadEnumWrapper<T> {
+    let x: SinglePayloadEnum<SinglePayloadEnum<T>>
+    let y: Int
+
+    public init(x: SinglePayloadEnum<SinglePayloadEnum<T>>, y: Int) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public protocol P {
+    associatedtype T
+}
+
+public struct SinglePayloadEnumWrapper2<T: P> {
+    let x: SinglePayloadEnum<SinglePayloadEnum<T.T>>
+    let y: Int
+
+    public init(x: SinglePayloadEnum<SinglePayloadEnum<T.T>>, y: Int) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public class Level3<T> {
+    let x: T? = nil
+}
+
+public struct Level2<T> {
+    let x: Level3<T> = Level3<T>()
+    let y: Int32 = 2
+}
+
+public struct Level0<T> {
+    let x: T
+    let y: Level2<T> = Level2()
+    let z: T
+
+    public init(x: T, z: T) {
+        self.x = x
+        self.z = z
+    }
+}
+
 @inline(never)
 public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
     ptr.pointee = x

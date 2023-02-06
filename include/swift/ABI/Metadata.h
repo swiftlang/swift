@@ -305,6 +305,12 @@ public:
   }
 
   const uint8_t *getLayoutString() const {
+    if (isAnyClass()) {
+      return asFullMetadata(
+                 reinterpret_cast<const TargetAnyClassMetadata<Runtime> *>(
+                     this))
+          ->layoutString;
+    }
     return asFullMetadata(this)->layoutString;
   }
 
@@ -321,7 +327,12 @@ public:
   }
 
   void setLayoutString(const uint8_t *layoutString) {
-    asFullMetadata(this)->layoutString = layoutString;
+    if (isAnyClass()) {
+      asFullMetadata(reinterpret_cast<TargetAnyClassMetadata<Runtime> *>(this))
+          ->layoutString = layoutString;
+    } else {
+      asFullMetadata(this)->layoutString = layoutString;
+    }
   }
   
   // Define forwarders for value witnesses. These invoke this metadata's value

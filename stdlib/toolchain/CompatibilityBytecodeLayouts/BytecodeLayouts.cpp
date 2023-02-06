@@ -29,6 +29,9 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include <Block.h>
 #endif
+#if SWIFT_PTRAUTH
+#include <ptrauth.h>
+#endif
 
 using namespace swift;
 
@@ -76,8 +79,15 @@ typedef Metadata* (*MetadataAccessor)(Metadata**);
 const Metadata *getResilientTypeMetadata(Metadata* metadata, const uint8_t *layoutStr, size_t &offset) {
   auto absolute = layoutStr + offset;
   auto relativeOffset = (uintptr_t)(intptr_t)readBytes<int32_t>(layoutStr, offset);
-  MetadataAccessor fn =
-      (MetadataAccessor)((uintptr_t) + absolute + relativeOffset);
+  MetadataAccessor fn;
+
+#if SWIFT_PTRAUTH
+  fn = (MetadataAccessor)ptrauth_sign_unauthenticated(
+      (void *)((uintptr_t) + absolute + relativeOffset),
+      ptrauth_key_function_pointer, 0);
+#else
+  fn = (MetadataAccessor)((uintptr_t) + absolute + relativeOffset);
+#endif
 
   return fn(getGenericArgs(metadata));
 }
@@ -134,30 +144,32 @@ swift_generic_destroy(void *address, void *metadata) {
 
   // fixed data is 32 bytes
   size_t offset = layoutStringHeaderSize;
+  uintptr_t addrOffset = 0;
 
   while (true) {
     uint64_t skip = readBytes<uint64_t>(typeLayout, offset);
     auto tag = static_cast<RefCountingKind>(skip >> 56);
     skip &= ~(0xffULL << 56);
-    addr += skip;
+    addrOffset += skip;
 
     if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
       return;
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Metatype)) {
       auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
       auto *type = reinterpret_cast<Metadata*>(typePtr);
-      type->vw_destroy((OpaqueValue *)addr);
-      addr += type->vw_size();
+      type->vw_destroy((OpaqueValue *)(addr + addrOffset));
+      addrOffset += type->vw_size();
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
       auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
-      type->vw_destroy((OpaqueValue *)addr);
-      addr += type->vw_size();
+      type->vw_destroy((OpaqueValue *)(addr + addrOffset));
+      addrOffset += type->vw_size();
     } else {
       const auto &destroyFunc = destroyTable[static_cast<uint8_t>(tag)];
       if (SWIFT_LIKELY(destroyFunc.isIndirect)) {
-        destroyFunc.fn((void *)((*(uintptr_t *)addr) & destroyFunc.mask));
+        destroyFunc.fn(
+            (void *)((*(uintptr_t *)(addr + addrOffset)) & destroyFunc.mask));
       } else {
-        destroyFunc.fn(((void *)addr));
+        destroyFunc.fn(((void *)(addr + addrOffset)));
       }
     }
   }
@@ -259,7 +271,7 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
 
   memcpy(dest, src, size);
 
-  if (SWIFT_LIKELY(!typedMetadata->getValueWitnesses()->isBitwiseTakable())) {
+  if (SWIFT_LIKELY(typedMetadata->getValueWitnesses()->isBitwiseTakable())) {
     return;
   }
 
@@ -344,6 +356,8 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
 
     if (tag == 0) {
       break;
+    } else if (tag == 1) {
+      continue;
     } else {
       const Metadata *genericType;
       if (tag == 2) {
@@ -385,15 +399,17 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
       break;
     } else if (tag == 1) {
       memcpy((void*)(instancedLayoutStr + instancedLayoutStrOffset), (void*)(layoutStr + layoutStrOffset), sizeOrOffset);
-      layoutStrOffset += sizeOrOffset;
-      instancedLayoutStrOffset += sizeOrOffset;
       if (skipBytes) {
         size_t firstRCOffset = instancedLayoutStrOffset;
         auto firstRC = readBytes<uint64_t>(instancedLayoutStr, firstRCOffset);
+        firstRCOffset = instancedLayoutStrOffset;
         firstRC += skipBytes;
         writeBytes(instancedLayoutStr, firstRCOffset, firstRC);
         skipBytes = 0;
       }
+
+      layoutStrOffset += sizeOrOffset;
+      instancedLayoutStrOffset += sizeOrOffset;
     } else {
       skipBytes += sizeOrOffset;
       const Metadata *genericType;
@@ -431,7 +447,7 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
 
         instancedLayoutStrOffset += sizeof(uint64_t);
 
-        skipBytes = 0;
+        skipBytes = sizeof(uintptr_t);
       } else {
         const ValueWitnessTable *vwt = genericType->getValueWitnesses();
         if (vwt->isPOD()) {
