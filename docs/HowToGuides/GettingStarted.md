@@ -271,9 +271,8 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    on Linux, add the `--xctest` flag to `build-script`.
 
 In the following sections, for simplicity, we will assume that you are using a
-`Ninja-RelWithDebInfoAssert` build on macOS running on an Intel-based Mac,
-unless explicitly mentioned otherwise. You will need to slightly tweak the paths
-for other build configurations.
+`Ninja-RelWithDebInfoAssert` build on macOS, unless explicitly mentioned otherwise.
+You will need to slightly tweak the paths for other build configurations.
 
 ### Troubleshooting build issues
 
