@@ -27,5 +27,10 @@ func testUnsafeSendableInAsync(queue: DispatchQueue) async {
   queue.async {
     x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
   }
+
+  queue.sync {
+    x = 17 // okay
+  }
+
   print(x)
 }
