@@ -166,6 +166,17 @@ public:
 
   SourceLoc getIDEInspectionTargetLoc() const;
 
+  /// Returns whether `Range` contains `Loc`. This also respects the
+  /// `ReplacedRanges`, i.e. if `Loc` is in a range that replaces a range which
+  /// overlaps `Range`, this also returns `true`.
+  bool containsRespectingReplacedRanges(SourceRange Range, SourceLoc Loc) const;
+
+  /// Returns whether `Enclosing` contains `Inner`. This also respects the
+  /// `ReplacedRanges`, i.e. if `Inner` is contained in a range that replaces a
+  /// range which overlaps `Range`, this also returns `true`.
+  bool rangeContainsRespectingReplacedRanges(SourceRange Enclosing,
+                                             SourceRange Inner) const;
+
   const llvm::DenseMap<SourceRange, SourceRange> &getReplacedRanges() const {
     return ReplacedRanges;
   }
