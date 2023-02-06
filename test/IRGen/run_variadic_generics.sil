@@ -121,8 +121,8 @@ entry(%intIndex : $Builtin.Word):
 }
 
 // Verify that we just gep into a parameter pack when that's all that the pack consists of.
-// CHECK-LL: define {{.*}}void @direct_access_from_parameter(i64 [[INDEX:%[^,]+]], i64 {{%[^,]+}}, %swift.type** [[PACK:%[^,]+]])
-// CHECK-LL:   [[ELEMENT_ADDRESS:%[^,]+]] = getelementptr inbounds %swift.type*, %swift.type** [[PACK]], i64 [[INDEX]]
+// CHECK-LL: define {{.*}}void @direct_access_from_parameter(i{{(32|64)}} [[INDEX:%[^,]+]], i{{(32|64)}} {{%[^,]+}}, %swift.type** [[PACK:%[^,]+]])
+// CHECK-LL:   [[ELEMENT_ADDRESS:%[^,]+]] = getelementptr inbounds %swift.type*, %swift.type** [[PACK]], i{{(32|64)}} [[INDEX]]
 // CHECK-LL:   [[ELEMENT:%[^,]+]] = load %swift.type*, %swift.type** [[ELEMENT_ADDRESS]]
 // CHECK-LL:   call swiftcc void @printGenericType(%swift.type* [[ELEMENT]], %swift.type* [[ELEMENT]])
 sil @direct_access_from_parameter : $<T_1...> (Builtin.Word) -> () {
