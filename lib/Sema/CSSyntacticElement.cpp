@@ -227,24 +227,24 @@ private:
   }
 };
 
-/// Find any references to not yet resolved outer closure parameters
-/// used in the body of the inner closure. This is required because
+/// Find any references to not yet resolved outer VarDecls (including closure
+/// parameters) used in the body of the inner closure. This is required because
 /// isolated conjunctions, just like single-expression closures, have
 /// to be connected to type variables they are going to use, otherwise
 /// they'll get placed in a separate solver component and would never
 /// produce a solution.
-class UnresolvedClosureParameterCollector : public ASTWalker {
+class UnresolvedVarCollector : public ASTWalker {
   ConstraintSystem &CS;
 
   llvm::SmallSetVector<TypeVariableType *, 4> Vars;
 
 public:
-  UnresolvedClosureParameterCollector(ConstraintSystem &cs) : CS(cs) {}
+  UnresolvedVarCollector(ConstraintSystem &cs) : CS(cs) {}
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
       auto *decl = DRE->getDecl();
-      if (isa<ParamDecl>(decl)) {
+      if (isa<VarDecl>(decl)) {
         if (auto type = CS.getTypeIfAvailable(decl)) {
           if (auto *typeVar = type->getAs<TypeVariableType>()) {
             Vars.insert(typeVar);
@@ -342,7 +342,7 @@ static void createConjunction(ConstraintSystem &cs,
     isIsolated = true;
   }
 
-  UnresolvedClosureParameterCollector paramCollector(cs);
+  UnresolvedVarCollector paramCollector(cs);
 
   for (const auto &entry : elements) {
     ASTNode element = std::get<0>(entry);
