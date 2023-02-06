@@ -299,7 +299,7 @@ public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo parent: some DeclGroupSyntax,
-    providingAttributesFor member: DeclSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext
   ) throws -> [AttributeSyntax] {
     guard member.is(VariableDeclSyntax.self) else {
@@ -329,7 +329,7 @@ extension TypeWrapperMacro: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo decl: some DeclGroupSyntax,
-    providingAttributesFor member: DeclSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext
   ) throws -> [AttributeSyntax] {
     guard let varDecl = member.as(VariableDeclSyntax.self),
@@ -451,7 +451,7 @@ public struct WrapStoredPropertiesMacro: MemberAttributeMacro {
   >(
     of node: AttributeSyntax,
     attachedTo decl: Declaration,
-    providingAttributesFor member: DeclSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
     in context: Context
   ) throws -> [AttributeSyntax] {
     guard let property = member.as(VariableDeclSyntax.self),
@@ -660,7 +660,7 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo declaration: some DeclGroupSyntax,
-    providingAttributesFor member: DeclSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext
   ) throws -> [SwiftSyntax.AttributeSyntax] {
     guard member.isObservableStoredProperty else {
