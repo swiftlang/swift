@@ -2165,7 +2165,7 @@ static bool isDirectToStorageAccess(const DeclContext *UseDC,
   if (!var->hasStorage())
     return false;
 
-  auto *AFD = dyn_cast<AbstractFunctionDecl>(UseDC);
+  auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(UseDC);
   if (AFD == nullptr)
     return false;
 
