@@ -354,11 +354,13 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
                       const Metadata *type,
                       const void * const *instantiationArgs);
 
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
 SWIFT_RUNTIME_EXPORT
 const RelativeWitnessTable *
 swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *conformance,
                       const Metadata *type,
                       const void * const *instantiationArgs);
+#endif
 
 /// Retrieve an associated type witness from the given witness table.
 ///
@@ -375,6 +377,7 @@ MetadataResponse swift_getAssociatedTypeWitness(
                                           const Metadata *conformingType,
                                           const ProtocolRequirement *reqBase,
                                           const ProtocolRequirement *assocType);
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_getAssociatedTypeWitnessRelative(
                                           MetadataRequest request,
@@ -382,7 +385,7 @@ MetadataResponse swift_getAssociatedTypeWitnessRelative(
                                           const Metadata *conformingType,
                                           const ProtocolRequirement *reqBase,
                                           const ProtocolRequirement *assocType);
-
+#endif
 /// Retrieve an associated conformance witness table from the given witness
 /// table.
 ///
@@ -401,6 +404,7 @@ const WitnessTable *swift_getAssociatedConformanceWitness(
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
 
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 const RelativeWitnessTable *swift_getAssociatedConformanceWitnessRelative(
                                   RelativeWitnessTable *wtable,
@@ -408,6 +412,7 @@ const RelativeWitnessTable *swift_getAssociatedConformanceWitnessRelative(
                                   const Metadata *assocType,
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
+#endif
 
 /// Determine whether two protocol conformance descriptors describe the same
 /// conformance of a type to a protocol.
