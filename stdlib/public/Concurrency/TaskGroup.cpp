@@ -45,6 +45,10 @@
 #include <android/log.h>
 #endif
 
+#if __has_include(<unistd.h>)
+#include <unistd.h>
+#endif
+
 #if defined(_WIN32)
 #include <io.h>
 #endif
@@ -568,10 +572,10 @@ struct TaskGroupStatus {
 #if defined(_WIN32)
     #define STDERR_FILENO 2
    _write(STDERR_FILENO, message, strlen(message));
-#else
+#elif defined(STDERR_FILENO)
     write(STDERR_FILENO, message, strlen(message));
 #endif
-#if defined(__APPLE__)
+#if defined(SWIFT_STDLIB_HAS_ASL)
     asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #elif defined(__ANDROID__)
     __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
@@ -1077,6 +1081,15 @@ static void _enqueueCompletedTask(NaiveTaskGroupQueue<ReadyQueueItem> *readyQueu
   assert(readyItem.getTask()->isFuture());
   readyQueue->enqueue(readyItem);
 }
+
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+ static void _enqueueRawError(DiscardingTaskGroup *group,
+                              NaiveTaskGroupQueue<ReadyQueueItem> *readyQueue,
+                              SwiftError *error) {
+   auto readyItem = ReadyQueueItem::getRawError(group, error);
+   readyQueue->enqueue(readyItem);
+ }
+ #endif
 
 // TaskGroup is locked upon entry and exit
 void AccumulatingTaskGroup::enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) {
