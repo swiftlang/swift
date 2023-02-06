@@ -711,6 +711,8 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
     out << "RepresentationTypeMetadata";
   } else if (Value == ValueWitnessTable) {
     out << "ValueWitnessTable";
+  } else if (Value == Shape) {
+    out << "Shape";
   } else {
     assert(isSingletonKind());
     if (Value >= ValueWitnessDiscriminatorBase) {
