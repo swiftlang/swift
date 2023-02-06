@@ -276,9 +276,8 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    on Linux, add the `--xctest` flag to `build-script`.
 
 In the following sections, for simplicity, we will assume that you are using a
-`Ninja-RelWithDebInfoAssert` build on macOS running on an Intel-based Mac,
-unless explicitly mentioned otherwise. You will need to slightly tweak the paths
-for other build configurations.
+`Ninja-RelWithDebInfoAssert` build on macOS, unless explicitly mentioned otherwise.
+You will need to slightly tweak the paths for other build configurations.
 
 ### Troubleshooting build issues
 
@@ -365,13 +364,13 @@ several more steps are necessary to set up this environment:
 * Create a new Xcode workspace.
 * Add the generated Xcode projects or Swift packages that are relevant to your
   tasks to your workspace. All the Xcode projects can be found among the
-  build artifacts under `build/Xcode-ReleaseAssert`. For example:
-  * If you are aiming for the compiler, add `build/Xcode-ReleaseAssert/swift-macosx-*/Swift.xcodeproj`.
+  build artifacts under `build/Xcode-*/`. For example:
+  * If you are aiming for the compiler, add `build/Xcode-*/swift-macosx-*/Swift.xcodeproj`.
     This project also includes the standard library and runtime sources. If you
     need the parts of the compiler that are implemented in Swift itself, add the
     `swift/SwiftCompilerSources/Package.swift` package as well.
   * If you are aiming for just the standard library or runtime, add
-    `build/Xcode-ReleaseAssert/swift-macosx-*/stdlib/Swift-stdlib.xcodeproj`.
+    `build/Xcode-*/swift-macosx-*/stdlib/Swift-stdlib.xcodeproj`.
   <!-- FIXME: Without this "hard" line break, the note doesn’t get properly spaced from the bullet -->
   <br />
 

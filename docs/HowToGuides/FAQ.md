@@ -18,9 +18,9 @@ The general idea is to build as little as you can.
   aren't doing so already.
 - Use `build-script`'s various `--skip-*` flags to skip configuring for
   platforms that you do not care about.
-- If you're on macOS, use `--swift-darwin-supported-archs="x86_64"`.
-- Use a release build without assertions (`--release --no-assertions`).
-  While debuginfo and assertions are valuable to enable when working on the
+- If you're on macOS, use `--swift-darwin-supported-archs "$(uname -m)"`.
+- Build the release variant without assertions (`--release --no-assertions`).
+  While debug info and assertions are valuable to enable when working on the
   toolchain itself, they are not so useful if you are working only on changes
   to the build system.
 
