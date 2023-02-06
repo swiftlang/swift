@@ -5,7 +5,7 @@
 
 // REQUIRES: OS=macosx
 
-@available(macOS, introduced: 10.9, deprecated: 10.10, obsoleted: 10.11, message: "Everyone makes mistakes", renamed: "S2")
+@available(macOS, introduced: 10.9, deprecated: 11.0, obsoleted: 18.1, message: "Everyone makes mistakes", renamed: "S2")
 public struct S {}
 
 // CHECK: "domain": "macOS"
@@ -15,12 +15,12 @@ public struct S {}
 // CHECK-NEXT: "minor": 9
 
 // CHECK: deprecated 
-// CHECK-NEXT: "major": 10
-// CHECK-NEXT: "minor": 10
+// CHECK-NEXT: "major": 11
+// CHECK-NEXT: "minor": 0
 
 // CHECK: obsoleted
-// CHECK-NEXT: "major": 10
-// CHECK-NEXT: "minor": 11
+// CHECK-NEXT: "major": 18
+// CHECK-NEXT: "minor": 1
 
 // CHECK: "message": "Everyone makes mistakes"
 // CHECK: "renamed": "S2"
