@@ -2029,7 +2029,7 @@ public:
       };
       auto externalDef = evaluateOrDefault(
           Ctx.evaluator, request, ExternalMacroDefinition()
-                                           );
+      );
       if (!externalDef.opaqueHandle) {
         MD->diagnose(
             diag::external_macro_not_found,

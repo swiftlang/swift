@@ -6921,9 +6921,6 @@ ERROR(external_macro_arg_not_type_name,none,
       "the external macro's %select{module|type}0", (unsigned))
 ERROR(attached_declaration_macro_not_supported,none,
       "attached declaration macros are not yet supported", ())
-ERROR(macro_must_declare_introduced_names,none,
-      "%select{declaration}0 macros must declare introduced names with "
-      "'names:'", (unsigned))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

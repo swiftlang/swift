@@ -70,9 +70,8 @@ func overloaded1(_ p: Any) { }
 // FIXME: #63376
 // @freestanding(expression) macro usesAssocType<T: BinaryInteger>: T.Magnitude = #externalMacro(module: "MissingModule", type: "MissingType")
 
-@freestanding(declaration) macro badDeclMacro(_ x: String)
-// expected-error @-1 {{declaration macros must declare introduced names with 'names:'}}{{26-26=names: <#names...#>}}
-// expected-error @-2 {{macro 'badDeclMacro' requires a definition}}
+@freestanding(declaration) macro justProducesDiags(_ x: String) // okay
+// expected-error @-1 {{macro 'justProducesDiags' requires a definition}}
 @freestanding(declaration, names: arbitrary)
 macro unaryDeclMacro(_ x: String)
 // expected-error @-1 {{macro 'unaryDeclMacro' requires a definition}}
