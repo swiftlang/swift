@@ -94,10 +94,10 @@ KNOWN_SETTINGS=(
 
     ## Darwin Options
     darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration, default is 1 on Darwin platforms, 0 otherwise"
-    darwin-deployment-version-ios                 "7.0"             "minimum deployment target version for iOS"
-    darwin-deployment-version-osx                 "10.9"            "minimum deployment target version for OS X"
-    darwin-deployment-version-tvos                "9.0"             "minimum deployment target version for tvOS"
-    darwin-deployment-version-watchos             "2.0"             "minimum deployment target version for watchOS"
+    darwin-deployment-version-ios                 "11.0"            "minimum deployment target version for iOS"
+    darwin-deployment-version-osx                 "10.13"           "minimum deployment target version for OS X"
+    darwin-deployment-version-tvos                "11.0"            "minimum deployment target version for tvOS"
+    darwin-deployment-version-watchos             "4.0"             "minimum deployment target version for watchOS"
     darwin-install-extract-symbols                ""                "whether to extract symbols with dsymutil during installations"
     darwin-install-extract-symbols-use-just-built-dsymutil "1"       "whether we should extract symbols using the just built dsymutil"
     darwin-symroot-path-filters                   ""                "space-separated list of path patterns to consider for symbol generation"
