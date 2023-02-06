@@ -207,6 +207,13 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       SILValue slot =
         SGF.B.createStructElementAddr(Loc, resultSlot, field,
                                       fieldTy.getAddressType());
+
+      if (SGF.getOptions().EnableImportPtrauthFieldFunctionPointers &&
+          field->getPointerAuthQualifier().isPresent()) {
+        slot = SGF.B.createBeginAccess(
+            Loc, slot, SILAccessKind::Init, SILAccessEnforcement::Signed,
+            /* noNestedConflict */ false, /* fromBuiltin */ false);
+      }
       InitializationPtr init(new KnownAddressInitialization(slot));
 
       // If it's memberwise initialized, do so now.
@@ -259,6 +266,10 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         }
 
         SGF.emitExprInto(field->getParentInitializer(), init.get());
+      }
+      if (SGF.getOptions().EnableImportPtrauthFieldFunctionPointers &&
+          field->getPointerAuthQualifier().isPresent()) {
+        SGF.B.createEndAccess(Loc, slot, /* aborted */ false);
       }
     }
 

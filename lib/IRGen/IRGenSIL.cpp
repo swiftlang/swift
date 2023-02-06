@@ -5835,7 +5835,8 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
       setLoweredAddress(access, temp.getAddress());
       return;
     }
-    if (access->getAccessKind() == SILAccessKind::Modify) {
+    if (access->getAccessKind() == SILAccessKind::Modify ||
+        access->getAccessKind() == SILAccessKind::Init) {
       // When we see a signed modify access, create a shadow stack location and
       // set the lowered address of the access to this stack location.
       auto temp = ti.allocateStack(*this, access->getType(), "ptrauth.temp");
@@ -5926,7 +5927,8 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
   }
 
   case SILAccessEnforcement::Signed: {
-    if (access->getAccessKind() != SILAccessKind::Modify) {
+    if (access->getAccessKind() != SILAccessKind::Modify ||
+        access->getAccessKind() != SILAccessKind::Init) {
       // nothing to do.
       return;
     }
