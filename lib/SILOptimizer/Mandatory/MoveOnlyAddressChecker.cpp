@@ -1386,7 +1386,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
     // If we didn't find a single block error, then we need to go search for our
     // liveness error in successor blocks. We know that this means that our
     // current block must be live out. Do a quick check just to be careful.
-    using IsLive = PrunedLiveBlocks::IsLive;
+    using IsLive = FieldSensitivePrunedLiveBlocks::IsLive;
     SmallVector<IsLive, 8> isLiveArray;
 #ifndef NDEBUG
     liveness.getBlockLiveness(errorUser->getParent(), errorSpan, isLiveArray);

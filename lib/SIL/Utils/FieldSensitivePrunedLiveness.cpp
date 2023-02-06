@@ -19,7 +19,6 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/ScopedAddressUtils.h"
@@ -446,13 +445,109 @@ void TypeTreeLeafTypeRange::constructProjectionsForNeededElements(
 }
 
 //===----------------------------------------------------------------------===//
+//                    MARK: FieldSensitivePrunedLiveBlocks
+//===----------------------------------------------------------------------===//
+
+void FieldSensitivePrunedLiveBlocks::computeScalarUseBlockLiveness(
+    SILBasicBlock *userBB, unsigned bitNo) {
+  // If, we are visiting this block, then it is not already LiveOut. Mark it
+  // LiveWithin to indicate a liveness boundary within the block.
+  markBlockLive(userBB, bitNo, LiveWithin);
+
+  BasicBlockWorklist worklist(userBB->getFunction());
+  worklist.push(userBB);
+
+  while (auto *block = worklist.pop()) {
+    // The popped `bb` is live; now mark all its predecessors LiveOut.
+    //
+    // Traversal terminates at any previously visited block, including the
+    // blocks initialized as definition blocks.
+    for (auto *predBlock : block->getPredecessorBlocks()) {
+      switch (getBlockLiveness(predBlock, bitNo)) {
+      case Dead:
+        worklist.pushIfNotVisited(predBlock);
+        LLVM_FALLTHROUGH;
+      case LiveWithin:
+        markBlockLive(predBlock, bitNo, LiveOut);
+        break;
+      case LiveOut:
+        break;
+      }
+    }
+  }
+}
+
+/// Update the current def's liveness based on one specific use instruction.
+///
+/// Return the updated liveness of the \p use block (LiveOut or LiveWithin).
+///
+/// Terminators are not live out of the block.
+void FieldSensitivePrunedLiveBlocks::updateForUse(
+    SILInstruction *user, unsigned startBitNo, unsigned endBitNo,
+    SmallVectorImpl<IsLive> &resultingLivenessInfo) {
+  resultingLivenessInfo.clear();
+
+  SWIFT_ASSERT_ONLY(seenUse = true);
+
+  auto *bb = user->getParent();
+  getBlockLiveness(bb, startBitNo, endBitNo, resultingLivenessInfo);
+
+  for (auto pair : llvm::enumerate(resultingLivenessInfo)) {
+    unsigned index = pair.index();
+    unsigned specificBitNo = startBitNo + index;
+    switch (pair.value()) {
+    case LiveOut:
+    case LiveWithin:
+      continue;
+    case Dead: {
+      // This use block has not yet been marked live. Mark it and its
+      // predecessor blocks live.
+      computeScalarUseBlockLiveness(bb, specificBitNo);
+      resultingLivenessInfo.push_back(getBlockLiveness(bb, specificBitNo));
+      continue;
+    }
+    }
+    llvm_unreachable("covered switch");
+  }
+}
+
+llvm::StringRef
+FieldSensitivePrunedLiveBlocks::getStringRef(IsLive isLive) const {
+  switch (isLive) {
+  case Dead:
+    return "Dead";
+  case LiveWithin:
+    return "LiveWithin";
+  case LiveOut:
+    return "LiveOut";
+  }
+}
+
+void FieldSensitivePrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
+  if (!discoveredBlocks) {
+    OS << "No deterministic live block list\n";
+    return;
+  }
+  SmallVector<IsLive, 8> isLive;
+  for (auto *block : *discoveredBlocks) {
+    block->printAsOperand(OS);
+    OS << ": ";
+    for (unsigned i : range(getNumBitsToTrack()))
+      OS << getStringRef(this->getBlockLiveness(block, i)) << ", ";
+    OS << "\n";
+  }
+}
+
+void FieldSensitivePrunedLiveBlocks::dump() const { print(llvm::dbgs()); }
+
+//===----------------------------------------------------------------------===//
 //                        MARK: FieldSensitiveLiveness
 //===----------------------------------------------------------------------===//
 
 void FieldSensitivePrunedLiveness::updateForUse(SILInstruction *user,
                                                 TypeTreeLeafTypeRange range,
                                                 bool lifetimeEnding) {
-  SmallVector<PrunedLiveBlocks::IsLive, 8> resultingLiveness;
+  SmallVector<FieldSensitivePrunedLiveBlocks::IsLive, 8> resultingLiveness;
   liveBlocks.updateForUse(user, range.startEltOffset, range.endEltOffset,
                           resultingLiveness);
 
@@ -479,7 +574,7 @@ bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
     return true;
   }
 
-  using IsLive = PrunedLiveBlocks::IsLive;
+  using IsLive = FieldSensitivePrunedLiveBlocks::IsLive;
 
   auto *block = inst->getParent();
 
@@ -491,12 +586,12 @@ bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
     LLVM_DEBUG(llvm::dbgs() << "    Visiting bit: " << bit << '\n');
     bool isLive = false;
     switch (pair.value()) {
-    case PrunedLiveBlocks::Dead:
+    case FieldSensitivePrunedLiveBlocks::Dead:
       LLVM_DEBUG(llvm::dbgs() << "        Dead... continuing!\n");
       // We are only not within the boundary if all of our bits are dead. We
       // track this via allDeadBits. So, just continue.
       continue;
-    case PrunedLiveBlocks::LiveOut:
+    case FieldSensitivePrunedLiveBlocks::LiveOut:
       // If we are LiveOut and are not a def block, then we know that we are
       // within the boundary for this bit. We consider ourselves to be within
       // the boundary if /any/ of our bits are within the boundary. So return
@@ -513,7 +608,7 @@ bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
       LLVM_DEBUG(llvm::dbgs()
                  << "        LiveOut, but a def block... searching block!\n");
       [[clang::fallthrough]];
-    case PrunedLiveBlocks::LiveWithin:
+    case FieldSensitivePrunedLiveBlocks::LiveWithin:
       bool shouldContinue = false;
       if (!isLive)
         LLVM_DEBUG(llvm::dbgs() << "        LiveWithin... searching block!\n");
@@ -576,13 +671,13 @@ bool FieldSensitivePrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
   return false;
 }
 
-static StringRef getStringRef(PrunedLiveBlocks::IsLive isLive) {
+static StringRef getStringRef(FieldSensitivePrunedLiveBlocks::IsLive isLive) {
   switch (isLive) {
-  case PrunedLiveBlocks::Dead:
+  case FieldSensitivePrunedLiveBlocks::Dead:
     return "Dead";
-  case PrunedLiveBlocks::LiveWithin:
+  case FieldSensitivePrunedLiveBlocks::LiveWithin:
     return "LiveWithin";
-  case PrunedLiveBlocks::LiveOut:
+  case FieldSensitivePrunedLiveBlocks::LiveOut:
     return "LiveOut";
   }
 }
@@ -594,7 +689,7 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
 
   LLVM_DEBUG(llvm::dbgs() << "Liveness Boundary Compuation!\n");
 
-  using IsLive = PrunedLiveBlocks::IsLive;
+  using IsLive = FieldSensitivePrunedLiveBlocks::IsLive;
   SmallVector<IsLive, 8> isLiveTmp;
   for (SILBasicBlock *block : getDiscoveredBlocks()) {
     SWIFT_DEFER { isLiveTmp.clear(); };
@@ -610,9 +705,10 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
       LLVM_DEBUG(llvm::dbgs() << "Bit: " << index << ". Liveness: "
                               << getStringRef(pair.value()) << '\n');
       switch (pair.value()) {
-      case PrunedLiveBlocks::LiveOut:
+      case FieldSensitivePrunedLiveBlocks::LiveOut:
         for (SILBasicBlock *succBB : block->getSuccessors()) {
-          if (getBlockLiveness(succBB, index) == PrunedLiveBlocks::Dead) {
+          if (getBlockLiveness(succBB, index) ==
+              FieldSensitivePrunedLiveBlocks::Dead) {
             LLVM_DEBUG(llvm::dbgs() << "Marking succBB as boundary edge: bb"
                                     << succBB->getDebugID() << '\n');
             boundary.getBoundaryEdgeBits(succBB).set(index);
@@ -622,13 +718,13 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::computeBoundary(
                                        boundary);
         foundAnyNonDead = true;
         break;
-      case PrunedLiveBlocks::LiveWithin: {
+      case FieldSensitivePrunedLiveBlocks::LiveWithin: {
         asImpl().findBoundariesInBlock(block, index, /*isLiveOut*/ false,
                                        boundary);
         foundAnyNonDead = true;
         break;
       }
-      case PrunedLiveBlocks::Dead:
+      case FieldSensitivePrunedLiveBlocks::Dead:
         // We do not assert here like in the normal pruned liveness
         // implementation since we can have dead on some bits and liveness along
         // others.
@@ -682,7 +778,7 @@ void findBoundaryInNonDefBlock(SILBasicBlock *block, unsigned bitNo,
                                FieldSensitivePrunedLivenessBoundary &boundary,
                                const FieldSensitivePrunedLiveness &liveness) {
   assert(liveness.getBlockLiveness(block, bitNo) ==
-         PrunedLiveBlocks::LiveWithin);
+         FieldSensitivePrunedLiveBlocks::LiveWithin);
 
   LLVM_DEBUG(llvm::dbgs() << "Looking for boundary in non-def block\n");
   for (SILInstruction &inst : llvm::reverse(*block)) {
@@ -895,7 +991,7 @@ void FieldSensitiveMultiDefPrunedLiveRange::findBoundariesInBlock(
       if (llvm::all_of(block->getPredecessorBlocks(),
                        [&](SILBasicBlock *predBlock) -> bool {
                          return getBlockLiveness(predBlock, bitNo) ==
-                                PrunedLiveBlocks::IsLive::LiveOut;
+                                FieldSensitivePrunedLiveBlocks::IsLive::LiveOut;
                        })) {
         boundary.getBoundaryEdgeBits(block).set(bitNo);
       }
