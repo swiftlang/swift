@@ -3103,7 +3103,8 @@ public:
 
 class CheckRedeclarationRequest
     : public SimpleRequest<
-          CheckRedeclarationRequest, evaluator::SideEffect(ValueDecl *),
+          CheckRedeclarationRequest,
+          evaluator::SideEffect(ValueDecl *, NominalTypeDecl *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySource |
               RequestFlags::DependencySink> {
 public:
@@ -3113,10 +3114,13 @@ public:
   friend SimpleRequest;
 
    // Evaluation.
-  evaluator::SideEffect
-  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+  /// \p SelfNominalType is \c VD->getDeclContext()->getSelfNominalType().
+  /// Passed as a parameter in here so this request doesn't tigger self nominal
+  /// type computation.
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD,
+                                 NominalTypeDecl *SelfNominalType) const;
 
- public:
+public:
   // Separate caching.
   bool isCached() const { return true; }
   Optional<evaluator::SideEffect> getCachedResult() const;

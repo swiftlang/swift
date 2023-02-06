@@ -842,10 +842,9 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
       CancellationFlag,
       [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<CursorInfoResults>(
-            [&CancellationFlag, Offset](auto &Result, auto DeliverTransformed) {
+            [&CancellationFlag](auto &Result, auto DeliverTransformed) {
               auto &Mgr = Result.CI->getSourceMgr();
-              auto RequestedLoc = Mgr.getLocForOffset(
-                  Mgr.getIDEInspectionTargetBufferID(), Offset);
+              auto RequestedLoc = Mgr.getIDEInspectionTargetLoc();
               ConsumerToCallbackAdapter Consumer(
                   Result.DidReuseAST, CancellationFlag, DeliverTransformed);
               std::unique_ptr<IDEInspectionCallbacksFactory> callbacksFactory(
