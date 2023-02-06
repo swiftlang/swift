@@ -2043,7 +2043,9 @@ namespace {
       // C structs. That'll require some SIL and IRGen work, though.
       if (decl->isNonTrivialToPrimitiveCopy() ||
           decl->isNonTrivialToPrimitiveDestroy()) {
-        isNonTrivialPtrAuth = isNonTrivialDueToAddressDiversifiedPtrAuth(decl);
+        isNonTrivialPtrAuth = Impl.SwiftContext.SILOpts
+                                  .EnableImportPtrauthFieldFunctionPointers &&
+                              isNonTrivialDueToAddressDiversifiedPtrAuth(decl);
         if (!isNonTrivialPtrAuth) {
           // Note that there is a third predicate related to these,
           // isNonTrivialToPrimitiveDefaultInitialize. That one's not important
