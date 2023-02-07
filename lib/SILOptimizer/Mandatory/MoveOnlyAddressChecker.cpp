@@ -1986,6 +1986,44 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     if (MoveOnlyChecker(getFunction(), deAnalysis, domTree).checkFunction()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
+
+    if (!getOptions().VerifyAll)
+      return;
+
+    // TODO: Enable this by default when verify all is disabled and make it a
+    // diagnostic error saying file a bug.
+    for (auto &block : *getFunction()) {
+      for (auto &inst : block) {
+        if (auto *cvi = dyn_cast<CopyValueInst>(&inst)) {
+          if (cvi->getOperand()->getType().isMoveOnly()) {
+            llvm::errs() << "Should have eliminated copy at this point: "
+                         << *cvi;
+            llvm::report_fatal_error("standard compiler error");
+          }
+          continue;
+        }
+
+        if (auto *li = dyn_cast<LoadInst>(&inst)) {
+          if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy &&
+              li->getType().isMoveOnly()) {
+            llvm::errs() << "Should have eliminated copy at this point: "
+                         << *li;
+            llvm::report_fatal_error("standard compiler error");
+          }
+          continue;
+        }
+
+        if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
+          if (!copyAddr->isTakeOfSrc() &&
+              copyAddr->getSrc()->getType().isMoveOnly()) {
+            llvm::errs() << "Should have eliminated copy at this point: "
+                         << *copyAddr;
+            llvm::report_fatal_error("standard compiler error");
+          }
+          continue;
+        }
+      }
+    }
   }
 };
 

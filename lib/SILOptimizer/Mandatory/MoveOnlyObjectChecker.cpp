@@ -806,20 +806,6 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     if (checker.changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
-
-    if (getOptions().VerifyAll) {
-      for (auto &block : *getFunction()) {
-        for (auto &inst : block) {
-          if (auto *cvi = dyn_cast<CopyValueInst>(&inst)) {
-            if (cvi->getOperand()->getType().isMoveOnly()) {
-              llvm::errs() << "Should have eliminated copy at this point: "
-                           << *cvi;
-              llvm::report_fatal_error("standard compiler error");
-            }
-          }
-        }
-      }
-    }
   }
 };
 

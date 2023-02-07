@@ -213,10 +213,10 @@ struct borrowtodestructure::Implementation {
     initialValue = SILValue();
   }
 
-  void init(SILValue rootAddress) {
+  void init(SILValue rootValue) {
     clear();
-    liveness.init(rootAddress);
-    liveness.initializeDef(rootAddress, TypeTreeLeafTypeRange(rootAddress));
+    liveness.init(rootValue);
+    liveness.initializeDef(rootValue, TypeTreeLeafTypeRange(rootValue));
   }
 
   bool gatherUses(SILValue value);
@@ -233,7 +233,7 @@ struct borrowtodestructure::Implementation {
 
   /// Rewrite all of the uses of our borrow on our borrow operand, performing
   /// destructures as appropriate.
-  void rewriteUses();
+  void rewriteUses(InstructionDeleter *deleter = nullptr);
 
   void cleanup();
 
@@ -241,7 +241,7 @@ struct borrowtodestructure::Implementation {
 
   /// Returns mark_must_check if we are processing borrows or the enum argument
   /// if we are processing switch_enum.
-  SILValue getRootValue() const { return interface.mmci; }
+  SILValue getRootValue() const { return liveness.getRootValue(); }
 
   DiagnosticEmitter &getDiagnostics() const {
     return interface.diagnosticEmitter;
@@ -261,7 +261,7 @@ struct borrowtodestructure::Implementation {
 };
 
 bool Implementation::gatherUses(SILValue value) {
-  LLVM_DEBUG(llvm::dbgs() << "Gathering uses!\n");
+  LLVM_DEBUG(llvm::dbgs() << "Gathering uses for: " << *value);
   StackList<Operand *> useWorklist(value->getFunction());
 
   for (auto *use : value->getUses()) {
@@ -980,15 +980,8 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
     // destructure.
     for (unsigned i : range(predAvailableValues.size())) {
       if (auto value = predAvailableValues[i]) {
-#if false
-        auto iterOffsetSize = TypeOffsetSizePair(value, mmci);
-        typeSpanToValue.insert(iterOffsetSize.startOffset,
-                               iterOffsetSize.getEndOffset(),
-                               value);
-#else
         // We check later that we store entire values.
         typeSpanToValue.insert(i, i + 1, value);
-#endif
       }
     }
 
@@ -1168,7 +1161,7 @@ dumpIntervalMap(IntervalMapAllocator::Map &map) {
 }
 #endif
 
-void Implementation::rewriteUses() {
+void Implementation::rewriteUses(InstructionDeleter *deleter) {
   blocksToUses.setFrozen();
 
   LLVM_DEBUG(llvm::dbgs()
@@ -1282,7 +1275,10 @@ void Implementation::rewriteUses() {
               first = builder.createOwnedMoveOnlyWrapperToCopyableValue(
                   getSafeLoc(inst), first);
             }
+            SILInstruction *oldInst = operand.get()->getDefiningInstruction();
             operand.set(first);
+            if (deleter)
+              deleter->forceTrackAsDead(oldInst);
             continue;
           }
 
@@ -1313,7 +1309,10 @@ void Implementation::rewriteUses() {
           // NOTE: This needs to be /after/the interior pointer operand usage
           // above so that we can use the end scope of our interior pointer base
           // value.
+          SILInstruction *oldInst = operand.get()->getDefiningInstruction();
           operand.set(innerValue);
+          if (deleter)
+            deleter->forceTrackAsDead(oldInst);
           continue;
         }
 
@@ -1371,7 +1370,10 @@ void Implementation::rewriteUses() {
                 borrowBuilder.createGuaranteedMoveOnlyWrapperToCopyableValue(
                     loc, value);
           }
+          auto *oldInst = operand.get()->getDefiningInstruction();
           operand.set(value);
+          if (deleter)
+            deleter->forceTrackAsDead(oldInst);
 
           // If we have a terminator that is a trivial use (e.x.: we
           // struct_extract a trivial value). Just put the end_borrow before the
@@ -1441,7 +1443,10 @@ void Implementation::rewriteUses() {
           iterValue = consumeBuilder.createOwnedMoveOnlyWrapperToCopyableValue(
               loc, iterValue);
         }
+        auto *oldInst = operand.get()->getDefiningInstruction();
         operand.set(iterValue);
+        if (deleter)
+          deleter->forceTrackAsDead(oldInst);
 
         // Then go through our available values and use the interval map to
         // update them with the destructured values if we have one for it.
@@ -1594,10 +1599,131 @@ static bool gatherBorrows(MarkMustCheckInst *mmci,
 }
 
 //===----------------------------------------------------------------------===//
+//                          MARK: Switch Enum Search
+//===----------------------------------------------------------------------===//
+
+static bool
+gatherSwitchEnum(SILValue value,
+                 SmallVectorImpl<SwitchEnumInst *> &switchEnumWorklist) {
+  LLVM_DEBUG(llvm::dbgs() << "Gathering switch enums for value: " << *value);
+
+  auto *fn = value->getFunction();
+  StackList<Operand *> useWorklist(fn);
+  for (auto *use : value->getUses()) {
+    useWorklist.push_back(use);
+  }
+
+  // Grab the start of our switch enum worklist, so that after we visit the
+  // switch_enums that are users of this value, we can recursively visit those
+  // values.
+  unsigned start = switchEnumWorklist.size();
+
+  while (!useWorklist.empty()) {
+    auto *nextUse = useWorklist.pop_back_val();
+    LLVM_DEBUG(llvm::dbgs() << "    NextUse: " << *nextUse->getUser());
+    switch (nextUse->getOperandOwnership()) {
+    case OperandOwnership::NonUse:
+      continue;
+
+    // Conservatively treat a conversion to an unowned value as a pointer
+    // escape. If we see this in the SIL, fail and return false so we emit a
+    // "compiler doesn't understand error".
+    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::PointerEscape:
+      LLVM_DEBUG(llvm::dbgs()
+                 << "        Found forwarding unowned or pointer escape!\n");
+      return false;
+
+    // These might be uses that we need to perform a destructure or insert
+    // struct_extracts for.
+    case OperandOwnership::TrivialUse:
+    case OperandOwnership::InstantaneousUse:
+    case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::InteriorPointer:
+    case OperandOwnership::BitwiseEscape: {
+      // Look through copy_value of a move only value. We treat copy_value of
+      // copyable values as normal uses.
+      if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
+        if (cvi->getOperand()->getType().isMoveOnly()) {
+          LLVM_DEBUG(llvm::dbgs() << "        Found copy value of move only "
+                                     "field... looking through!\n");
+          for (auto *use : cvi->getUses())
+            useWorklist.push_back(use);
+          continue;
+        }
+
+        // If we don't have a copy of a move only type, we just treat this as a
+        // normal use, so we just continue.
+      }
+      continue;
+    }
+
+    case OperandOwnership::ForwardingConsume:
+    case OperandOwnership::DestroyingConsume:
+      // We don't care about forwarding consumes or destroying consumes.
+      continue;
+
+    case OperandOwnership::GuaranteedForwarding:
+      // Look through guaranteed forwarding unless we have a switch enum. If we
+      // have a switch enum, we add it to the list.
+      if (auto *switchEnum = dyn_cast<SwitchEnumInst>(nextUse->getUser())) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "        Found switch enum: " << *nextUse->getUser());
+        switchEnumWorklist.push_back(switchEnum);
+        continue;
+      }
+
+      ForwardingOperand(nextUse).visitForwardedValues([&](SILValue value) {
+        for (auto *use : value->getUses()) {
+          useWorklist.push_back(use);
+        }
+        return true;
+      });
+      continue;
+
+    case OperandOwnership::Borrow:
+      LLVM_DEBUG(llvm::dbgs() << "        Found recursive borrow!\n");
+      // Look through borrows.
+      for (auto value : nextUse->getUser()->getResults()) {
+        for (auto *use : value->getUses()) {
+          useWorklist.push_back(use);
+        }
+      }
+      continue;
+    case OperandOwnership::EndBorrow:
+      LLVM_DEBUG(llvm::dbgs() << "        Found end borrow!\n");
+      continue;
+    case OperandOwnership::Reborrow:
+      llvm_unreachable("Unsupported for now?!");
+    }
+  }
+
+  unsigned end = switchEnumWorklist.size();
+  if (start == end)
+    return true;
+
+  for (unsigned i : range(start, end)) {
+    auto *s = switchEnumWorklist[i];
+    for (auto argList : s->getSuccessorBlockArgumentLists()) {
+      for (SILValue value : argList) {
+        if (value->getType().isTrivial(*fn))
+          continue;
+
+        if (!gatherSwitchEnum(value, switchEnumWorklist))
+          return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 //                        MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
 bool BorrowToDestructureTransform::transform() {
+  auto *fn = mmci->getFunction();
   StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
 
   // If we failed to gather borrows due to the transform not understanding part
@@ -1610,8 +1736,136 @@ bool BorrowToDestructureTransform::transform() {
   if (borrowWorklist.empty())
     return true;
 
-  // Attempt to gather uses. Return false if we saw something that we did not
-  // understand.
+  // Then go through our borrows and attempt to gather up guaranteed
+  // switch_enums. If we see any of them, we need to transform them into owned
+  // switch_enums.
+  SmallVector<SwitchEnumInst *, 8> switchEnumWorklist;
+  for (auto *borrow : borrowWorklist) {
+    // Attempt to gather the switch enums and if we fail, return false.
+    if (!gatherSwitchEnum(borrow, switchEnumWorklist))
+      return false;
+  }
+
+  // Now perform the checking of our switch_enum, working in stack order.
+  {
+    SmallVector<CopyValueInst *, 8> switchEnumArgCopyValueToDelete;
+    InstructionDeleter deleter;
+    while (!switchEnumWorklist.empty()) {
+      auto *s = switchEnumWorklist.pop_back_val();
+      for (auto argList : s->getSuccessorBlockArgumentLists()) {
+        for (SILValue arg : argList) {
+          // Skip trivial or copyable values. If we have a copyable value, we
+          // will handle it as part of the cleanup phase at the end when we
+          // convert the actual switch_enum to be an owned switch_enum.
+          if (arg->getType().isTrivial(*fn) || !arg->getType().isMoveOnly())
+            continue;
+
+          SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+          Implementation impl(*this, discoveredBlocks);
+          impl.init(arg);
+          if (!impl.gatherUses(arg)) {
+            diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
+            continue;
+          }
+
+          // Next make sure that any destructure needing instructions are on the
+          // boundary in a per bit field sensitive manner.
+          unsigned diagnosticCount = diagnosticEmitter.getDiagnosticCount();
+          impl.checkDestructureUsesOnBoundary();
+
+          // If we emitted any diagnostic, break out. We return true since we
+          // actually succeeded in our processing by finding the error. We only
+          // return false if we want to tell the rest of the checker that there
+          // was an internal compiler error that we need to emit a "compiler
+          // doesn't understand error".
+          if (diagnosticCount != diagnosticEmitter.getDiagnosticCount())
+            return true;
+
+          // Then check if we had two consuming uses on the same instruction or
+          // a consuming/non-consuming use on the same isntruction.
+          impl.checkForErrorsOnSameInstruction();
+
+          // If we emitted any diagnostic, break out. We return true since we
+          // actually succeeded in our processing by finding the error. We only
+          // return false if we want to tell the rest of the checker that there
+          // was an internal compiler error that we need to emit a "compiler
+          // doesn't understand error".
+          if (diagnosticCount != diagnosticEmitter.getDiagnosticCount())
+            return true;
+
+          // At this point, we know that all of our destructure requiring uses
+          // are on the boundary of our live range. Now we need to do the
+          // rewriting.
+          impl.blockToAvailableValues.emplace(impl.liveness);
+          impl.rewriteUses(&deleter);
+
+          // Now that we have done our rewritting, we need to do a few cleanups
+          // starting by inserting compensating destroys for all of our inserted
+          // phis/destructures/initial value copy.
+          impl.cleanup();
+
+          // Now grab our initialValue which will be a copy_value from our
+          // argument and RAUW it. We are going to convert the argument
+          // later. We left it in to ensure that as we recreated instructions,
+          // OSSA invariants were satisfied locally (albeit the actual IR was
+          // not in a consistent state).
+          auto *cvi = cast<CopyValueInst>(impl.initialValue);
+          switchEnumArgCopyValueToDelete.push_back(cvi);
+        }
+      }
+
+      // Now that we have processed all of the arguments for this switch_enum,
+      // cleanup any dead instructions.
+      deleter.cleanupDeadInstructions();
+
+      // Now that we have processed the switch_enum, we need to convert the
+      // switch_enum to be owned. We do this by introducing a copy on the
+      // switch_enum argument and then insert a destroy_value after the single
+      // copy_value in each destination block that we originally inserted.
+      {
+        SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+        SSAPrunedLiveness liveness(&discoveredBlocks);
+        PrunedLivenessBoundary boundary;
+
+        SILBuilderWithScope builder(s);
+        SILValue newOperand =
+            builder.createCopyValue(getSafeLoc(s), s->getOperand());
+        s->setOperand(0, newOperand);
+        s->setForwardingOwnershipKind(OwnershipKind::Owned);
+        for (auto argList : s->getSuccessorBlockArgumentLists()) {
+          for (SILArgument *arg : argList) {
+            if (arg->getType().isTrivial(*fn))
+              continue;
+            arg->setOwnershipKind(OwnershipKind::Owned);
+
+            if (arg->getType().isMoveOnly())
+              continue;
+
+            // If we have a copyable type, we need to insert compensating
+            // destroys.
+            SWIFT_DEFER {
+              liveness.clear();
+              discoveredBlocks.clear();
+              boundary.clear();
+            };
+            addCompensatingDestroys(liveness, boundary, arg);
+          }
+        }
+      }
+
+      // Now eliminate our unneeded copyvalues from earlier than we inserted to
+      // satisfy OSSA invariants.
+      while (!switchEnumArgCopyValueToDelete.empty()) {
+        auto *cvi = switchEnumArgCopyValueToDelete.pop_back_val();
+        cvi->replaceAllUsesWith(cvi->getOperand());
+        cvi->eraseFromParent();
+      }
+    }
+  }
+
+  // Now that we have handled our switch_enum we need to handle our
+  // borrows... begin by gathering uses. Return false if we saw something that
+  // we did not understand.
   SmallVector<SILBasicBlock *, 8> discoveredBlocks;
   Implementation impl(*this, discoveredBlocks);
   impl.init(mmci);
@@ -1657,10 +1911,12 @@ bool BorrowToDestructureTransform::transform() {
 
   // Then clean up all of our borrows/copies/struct_extracts which no longer
   // have any uses...
-  InstructionDeleter deleter;
-  while (!borrowWorklist.empty()) {
-    deleter.recursivelyForceDeleteUsersAndFixLifetimes(
-        borrowWorklist.pop_back_val());
+  {
+    InstructionDeleter deleter;
+    while (!borrowWorklist.empty()) {
+      deleter.recursivelyForceDeleteUsersAndFixLifetimes(
+          borrowWorklist.pop_back_val());
+    }
   }
 
   return true;
