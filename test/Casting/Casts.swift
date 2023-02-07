@@ -1036,4 +1036,14 @@ CastsTests.test("Do not overuse __SwiftValue (non-ObjC)") {
   expectTrue(Foo() is AnyObject)
 }
 
+CastsTests.test("Don't put AnyHashable inside AnyObject") {
+  class C: Hashable {}
+  let a = C()
+  let b = AnyHashable(a)
+  let c = a as! AnyObject
+  expectTrue(a === c)
+  let d = c as! C
+  expectTrue(a === d)
+}
+
 runAllTests()
