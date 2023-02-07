@@ -275,9 +275,6 @@ public:
   SILValue getSingleForwardedValue() const;
 };
 
-/// Returns true if the instruction is a 'reborrow'.
-bool isReborrowInstruction(const SILInstruction *inst);
-
 class BorrowingOperandKind {
 public:
   enum Kind : uint8_t {
