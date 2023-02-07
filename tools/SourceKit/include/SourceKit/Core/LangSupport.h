@@ -519,8 +519,7 @@ struct CursorSymbolInfo {
 
   llvm::Optional<unsigned> ParentNameOffset;
 
-  void print(llvm::raw_ostream &OS, std::string Indentation,
-             bool ForSolverBasedCursorInfoVerification = false) const {
+  void print(llvm::raw_ostream &OS, std::string Indentation) const {
     OS << Indentation << "CursorSymbolInfo" << '\n';
     OS << Indentation << "  Kind: " << Kind.getName() << '\n';
     OS << Indentation << "  DeclarationLang: " << DeclarationLang.getName()
@@ -529,14 +528,7 @@ struct CursorSymbolInfo {
     OS << Indentation << "  USR: " << USR << '\n';
     OS << Indentation << "  TypeName: " << TypeName << '\n';
     OS << Indentation << "  TypeUSR: " << TypeUSR << '\n';
-    // The ContainerTypeUSR varies too much between the solver-based and
-    // AST-based implementation. A few manual inspections showed that the
-    // solver-based container is usually more correct than the old. Instead of
-    // fixing the AST-based container type computation, exclude the container
-    // type from the verification.
-    if (!ForSolverBasedCursorInfoVerification) {
-      OS << Indentation << "  ContainerTypeUSR: " << ContainerTypeUSR << '\n';
-    }
+    OS << Indentation << "  ContainerTypeUSR: " << ContainerTypeUSR << '\n';
     OS << Indentation << "  DocComment: " << DocComment << '\n';
     OS << Indentation << "  GroupName: " << GroupName << '\n';
     OS << Indentation << "  LocalizationKey: " << LocalizationKey << '\n';
@@ -600,23 +592,17 @@ struct CursorInfoData {
   /// Whether the ASTContext was reused for this cursor info.
   bool DidReuseAST = false;
 
-  /// If \p ForSolverBasedCursorInfoVerification is \c true, fields that are
-  /// acceptable to differ between the AST-based and the solver-based result,
-  /// will be excluded.
-  void print(llvm::raw_ostream &OS, std::string Indentation,
-             bool ForSolverBasedCursorInfoVerification = false) const {
+  void print(llvm::raw_ostream &OS, std::string Indentation) const {
     OS << Indentation << "CursorInfoData" << '\n';
     OS << Indentation << "  Symbols:" << '\n';
     for (auto Symbol : Symbols) {
-      Symbol.print(OS, Indentation + "    ", ForSolverBasedCursorInfoVerification);
+      Symbol.print(OS, Indentation + "    ");
     }
     OS << Indentation << "  AvailableActions:" << '\n';
     for (auto AvailableAction : AvailableActions) {
       AvailableAction.print(OS, Indentation + "    ");
     }
-    if (!ForSolverBasedCursorInfoVerification) {
-      OS << Indentation << "DidReuseAST: " << DidReuseAST << '\n';
-    }
+    OS << Indentation << "DidReuseAST: " << DidReuseAST << '\n';
   }
 
   SWIFT_DEBUG_DUMP { print(llvm::errs(), ""); }
@@ -973,7 +959,6 @@ public:
       bool SymbolGraph, bool CancelOnSubsequentRequest,
       ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
-      bool VerifySolverBasedCursorInfo,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void
