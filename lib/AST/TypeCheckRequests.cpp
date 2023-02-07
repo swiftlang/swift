@@ -1664,7 +1664,7 @@ void swift::simple_display(
 
 DeclNameRef UnresolvedMacroReference::getMacroName() const {
   if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
-    return med->getMacro();
+    return med->getMacroName();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getMacroName();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
@@ -1688,7 +1688,7 @@ SourceLoc UnresolvedMacroReference::getSigilLoc() const {
 
 DeclNameLoc UnresolvedMacroReference::getMacroNameLoc() const {
   if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
-    return med->getMacroLoc();
+    return med->getMacroNameLoc();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getMacroNameLoc();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {

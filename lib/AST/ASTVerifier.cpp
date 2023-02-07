@@ -2436,7 +2436,7 @@ public:
       auto dc = getCanonicalDeclContext(expansion->getDeclContext());
       MacroExpansionDiscriminatorKey key{
         dc,
-        expansion->getMacro().getBaseName().getIdentifier()
+        expansion->getMacroName().getBaseName().getIdentifier()
       };
       auto &discriminatorSet = MacroExpansionDiscriminators[key];
       unsigned discriminator = expansion->getDiscriminator();
