@@ -34,11 +34,46 @@
 
 using namespace swift;
 
+static VarDecl*
+lookupActorProperty(NominalTypeDecl *decl, DeclName name) {
+  assert(decl && "decl was null");
+  auto &C = decl->getASTContext();
+
+  auto clazz = dyn_cast<ClassDecl>(decl);
+  if (!clazz)
+    return nullptr;
+
+  auto refs = decl->lookupDirect(name);
+  if (refs.size() != 1)
+    return nullptr;
+
+  auto var = dyn_cast<VarDecl>(refs.front());
+  if (!var)
+    return nullptr;
+
+  Type expectedType = C.getUnownedSerialExecutorDecl()->getDeclaredInterfaceType();
+  if (!expectedType)
+    return nullptr;
+
+  if (!var->getInterfaceType()->isEqual(expectedType))
+    return nullptr;
+
+  return var;
+}
+
 bool DerivedConformance::canDeriveActor(DeclContext *dc,
                                         NominalTypeDecl *nominal) {
+  auto &C = nominal->getASTContext();
   auto classDecl = dyn_cast<ClassDecl>(nominal);
-  return classDecl && classDecl->isActor() && dc == nominal &&
-        !classDecl->getUnownedExecutorProperty();
+  auto result = classDecl && classDecl->isActor() && dc == nominal
+      && lookupActorProperty(nominal, C.Id_unownedExecutor) == nullptr
+                  ;
+  // NOTE: we always synthesize, but we may find an existing member
+//                &&
+//                !classDecl->getUnownedExecutorProperty();
+  fprintf(stderr, "[%s:%d](%s) can derive actor? [%s]: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__, nominal->getName().str().str().c_str(),
+          result ? "yes" : "no");
+  return result;
 }
 
 /// Turn a Builtin.Executor value into an UnownedSerialExecutor.
@@ -127,6 +162,7 @@ deriveBodyActor_unownedExecutor(AbstractFunctionDecl *getter, void *) {
 
 /// Derive the declaration of Actor's unownedExecutor property.
 static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
+  fprintf(stderr, "[%s:%d](%s) deriveActor_unownedExecutor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   ASTContext &ctx = derived.Context;
 
   // Retrieve the types and declarations we'll need to form this operation.
@@ -177,8 +213,9 @@ ValueDecl *DerivedConformance::deriveActor(ValueDecl *requirement) {
   if (!var)
     return nullptr;
 
-  if (var->getName() == Context.Id_unownedExecutor)
+  if (var->getName() == Context.Id_unownedExecutor) {
     return deriveActor_unownedExecutor(*this);
+  }
 
   return nullptr;
 }
