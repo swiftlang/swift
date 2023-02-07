@@ -461,6 +461,8 @@ static Optional<LineColumnRange> parseExpectedFixItRange(
 
   if (const auto lineAndCol = parseLineAndColumn()) {
     std::tie(Range.EndLine, Range.EndCol) = lineAndCol.value();
+    if (Range.EndLine == LineColumnRange::NoValue)
+      Range.EndLine = Range.StartLine;
   } else {
     return None;
   }
