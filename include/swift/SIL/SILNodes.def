@@ -550,6 +550,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(TupleElementAddrInst, tuple_element_addr,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(PackElementGetInst, pack_element_get,
+                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(StructInst, struct,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(StructExtractInst, struct_extract,
@@ -816,6 +818,8 @@ NON_VALUE_INST(EndApplyInst, end_apply,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(AbortApplyInst, abort_apply,
                SILInstruction, MayHaveSideEffects, MayRelease)
+NON_VALUE_INST(PackElementSetInst, pack_element_set,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
 // Runtime failure
 // FIXME: Special MemBehavior for runtime failure?

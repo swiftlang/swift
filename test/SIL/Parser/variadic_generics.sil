@@ -56,3 +56,23 @@ bb0:
   %ret = tuple ()
   return %ret : $()
 }
+
+// CHECK-LABEL: sil @test5 :
+// CHECK: [[PACK:%.*]] = alloc_pack $Pack{Int, repeat each T}
+// CHECK: [[INDEX:%.*]] = dynamic_pack_index %0 of $Pack{Int, repeat each T}
+// CHECK: [[ADDR:%.*]] = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000003") U
+// CHECK: pack_element_set [[ADDR]] : $*@pack_element("01234567-89AB-CDEF-0123-000000000003") U into [[INDEX]] of [[PACK]] : $*Pack{Int, repeat each T}
+// CHECK: pack_element_get [[INDEX]] of [[PACK]] : $*Pack{Int, repeat each T} as $*@pack_element("01234567-89AB-CDEF-0123-000000000003") U
+sil @test5 : $<T...> (Builtin.Word) -> () {
+bb0(%i : $Builtin.Word):
+  %pack1 = alloc_pack $Pack{Int, repeat each T}
+  %index = dynamic_pack_index %i of $Pack{Int, repeat each T}
+  %0 = open_pack_element %index of <U...> at <Pack{Int, repeat each T}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000003"
+  %addr = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000003") U
+  pack_element_set %addr : $*@pack_element("01234567-89AB-CDEF-0123-000000000003") U into %index of %pack1 : $*Pack{Int, repeat each T}
+  %addr2 = pack_element_get %index of %pack1 : $*Pack{Int, repeat each T} as $*@pack_element("01234567-89AB-CDEF-0123-000000000003") U
+  dealloc_stack %addr : $*@pack_element("01234567-89AB-CDEF-0123-000000000003") U
+  dealloc_pack %pack1 : $*Pack{Int, repeat each T}
+  %ret = tuple ()
+  return %ret : $()
+}

@@ -1975,6 +1975,22 @@ public:
                               packIndex, openedElementEnvironment));
   }
 
+  PackElementGetInst *
+  createPackElementGet(SILLocation loc, SILValue packIndex,
+                       SILValue pack, SILType elementType) {
+    return insert(PackElementGetInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              packIndex, pack, elementType));
+  }
+
+  PackElementSetInst *
+  createPackElementSet(SILLocation loc, SILValue elementValue,
+                       SILValue packIndex, SILValue pack) {
+    return insert(new (getModule()) PackElementSetInst(
+                              getSILDebugLocation(loc),
+                              elementValue, packIndex, pack));
+  }
+
   ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,
                                                      SILValue Storage) {
     auto CaptureTy = Storage->getType()

@@ -2515,6 +2515,30 @@ void SILCloner<ImplClass>::visitOpenPackElementInst(
       Inst, getBuilder().createOpenPackElement(loc, newIndexValue, newEnv));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitPackElementGetInst(PackElementGetInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto loc = getOpLocation(Inst->getLoc());
+  auto newIndex = getOpValue(Inst->getIndex());
+  auto newPack = getOpValue(Inst->getPack());
+  auto newElementType = getOpType(Inst->getElementType());
+  recordClonedInstruction(
+      Inst, getBuilder().createPackElementGet(loc, newIndex, newPack,
+                                              newElementType));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitPackElementSetInst(PackElementSetInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto loc = getOpLocation(Inst->getLoc());
+  auto newElementValue = getOpValue(Inst->getValue());
+  auto newIndex = getOpValue(Inst->getIndex());
+  auto newPack = getOpValue(Inst->getPack());
+  recordClonedInstruction(
+      Inst, getBuilder().createPackElementSet(loc, newElementValue,
+                                              newIndex, newPack));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitCopyBlockInst(CopyBlockInst *Inst) {

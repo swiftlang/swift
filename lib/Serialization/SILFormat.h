@@ -159,6 +159,8 @@ namespace sil_block {
     SIL_INST_INCREMENT_PROFILER_COUNTER,
     SIL_MOVEONLY_DEINIT,
     SIL_INST_HAS_SYMBOL,
+    SIL_PACK_ELEMENT_GET,
+    SIL_PACK_ELEMENT_SET,    
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -463,6 +465,29 @@ namespace sil_block {
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField
+  >;
+
+  // The pack_element_get instruction.
+  using SILPackElementGetLayout = BCRecordLayout<
+    SIL_PACK_ELEMENT_GET,
+    TypeIDField,            // element type
+    SILTypeCategoryField,   // element type category
+    TypeIDField,            // pack type
+    SILTypeCategoryField,   // pack type category
+    ValueIDField,           // pack value 
+    ValueIDField            // index value
+  >;
+
+  // The pack_element_set instruction.
+  using SILPackElementSetLayout = BCRecordLayout<
+    SIL_PACK_ELEMENT_SET,
+    TypeIDField,            // element type
+    SILTypeCategoryField,   // element type category
+    ValueIDField,           // element value
+    TypeIDField,            // pack type
+    SILTypeCategoryField,   // pack type category
+    ValueIDField,           // pack value 
+    ValueIDField            // index value
   >;
 
   // The tail_addr instruction.

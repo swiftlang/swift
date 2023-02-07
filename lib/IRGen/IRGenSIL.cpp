@@ -1279,6 +1279,8 @@ public:
   void visitDynamicPackIndexInst(DynamicPackIndexInst *i);
   void visitPackPackIndexInst(PackPackIndexInst *i);
   void visitScalarPackIndexInst(ScalarPackIndexInst *i);
+  void visitPackElementGetInst(PackElementGetInst *i);
+  void visitPackElementSetInst(PackElementSetInst *i);
 
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
@@ -6883,6 +6885,39 @@ void IRGenSILFunction::visitOpenPackElementInst(swift::OpenPackElementInst *i) {
       });
 
   // The result is just used for type dependencies.
+}
+
+void IRGenSILFunction::visitPackElementGetInst(PackElementGetInst *i) {
+  Address pack = getLoweredAddress(i->getPack());
+  llvm::Value *index = getLoweredSingletonExplosion(i->getIndex());
+
+  auto elementType = i->getElementType();
+  auto &elementTI = getTypeInfo(elementType);
+
+  auto elementStorageAddr =
+    emitStorageAddressOfPackElement(*this, pack, index, elementType);
+
+  assert(elementType.isAddress() &&
+         i->getPackType()->isElementAddress() &&
+         "direct packs not currently supported");
+  auto ptr = Builder.CreateLoad(elementStorageAddr);
+  auto elementAddr = elementTI.getAddressForPointer(ptr);
+  setLoweredAddress(i, elementAddr);
+}
+
+void IRGenSILFunction::visitPackElementSetInst(PackElementSetInst *i) {
+  Address pack = getLoweredAddress(i->getPack());
+  llvm::Value *index = getLoweredSingletonExplosion(i->getIndex());
+
+  auto elementType = i->getElementType();
+  auto elementStorageAddress =
+    emitStorageAddressOfPackElement(*this, pack, index, elementType);
+
+  assert(elementType.isAddress() &&
+         i->getPackType()->isElementAddress() &&
+         "direct packs not currently supported");
+  auto elementValue = getLoweredAddress(i->getValue());
+  Builder.CreateStore(elementValue.getAddress(), elementStorageAddress);
 }
 
 void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){

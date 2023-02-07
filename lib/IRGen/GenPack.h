@@ -67,6 +67,14 @@ llvm::Value *emitIndexOfStructuralPackComponent(IRGenFunction &IGF,
                                                 CanPackType packType,
                                                 unsigned componentIndex);
 
+/// Emit the address that stores the given pack element.
+///
+/// For indirect packs, note that this is the address of the pack
+/// array element, not the address stored in the pack array element.
+Address emitStorageAddressOfPackElement(IRGenFunction &IGF,
+                                        Address pack, llvm::Value *index,
+                                        SILType elementType);
+
 } // end namespace irgen
 } // end namespace swift
 

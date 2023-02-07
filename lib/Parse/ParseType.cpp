@@ -179,7 +179,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   case tok::identifier:
     // In SIL files (not just when parsing SIL types), accept the
     // Pack{} syntax for spelling variadic type packs.
-    if (SIL && Tok.isContextualKeyword("Pack") &&
+    if (isInSILMode() && Tok.isContextualKeyword("Pack") &&
         peekToken().is(tok::l_brace)) {
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::contextual_keyword);
