@@ -467,10 +467,12 @@ namespace {
 /// AST walker that infers requirements from type representations.
 struct InferRequirementsWalker : public TypeWalker {
   ModuleDecl *module;
+  DeclContext *dc;
   SmallVector<Requirement, 2> reqs;
   SmallVector<RequirementError, 2> errors;
 
-  explicit InferRequirementsWalker(ModuleDecl *module) : module(module) {}
+  explicit InferRequirementsWalker(ModuleDecl *module, DeclContext *dc)
+      : module(module), dc(dc) {}
 
   Action walkToTypePre(Type ty) override {
     // Unbound generic types are the result of recovered-but-invalid code, and
@@ -482,11 +484,32 @@ struct InferRequirementsWalker : public TypeWalker {
   }
 
   Action walkToTypePost(Type ty) override {
+    // Skip `Sendable` conformance requirements that are inferred from
+    // `@preconcurrency` declarations.
+    auto skipRequirement = [&](Requirement req, Decl *fromDecl) {
+      if (!fromDecl->preconcurrency())
+        return false;
+
+      // If this decl is `@preconcurrency`, include concurrency
+      // requirements. The explicit annotation directly on the decl
+      // will still exclude `Sendable` requirements from ABI.
+      auto *decl = dc->getAsDecl();
+      if (!decl || decl->preconcurrency())
+        return false;
+
+      return (req.getKind() == RequirementKind::Conformance &&
+          req.getSecondType()->castTo<ProtocolType>()->getDecl()
+            ->isSpecificProtocol(KnownProtocolKind::Sendable));
+    };
+
     // Infer from generic typealiases.
     if (auto typeAlias = dyn_cast<TypeAliasType>(ty.getPointer())) {
       auto decl = typeAlias->getDecl();
       auto subMap = typeAlias->getSubstitutionMap();
       for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
+        if (skipRequirement(rawReq, decl))
+          continue;
+
         desugarRequirement(rawReq.subst(subMap), SourceLoc(), reqs, errors);
       }
 
@@ -567,6 +590,9 @@ struct InferRequirementsWalker : public TypeWalker {
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
     for (const auto &rawReq : genericSig.getRequirements()) {
+      if (skipRequirement(rawReq, decl))
+        continue;
+
       auto req = rawReq.subst(subMap);
       desugarRequirement(req, SourceLoc(), reqs, errors);
     }
@@ -585,12 +611,13 @@ struct InferRequirementsWalker : public TypeWalker {
 /// We automatically infer 'T : Hashable' from the fact that 'struct Set'
 /// declares a Hashable requirement on its generic parameter.
 void swift::rewriting::inferRequirements(
-    Type type, SourceLoc loc, ModuleDecl *module,
+    Type type, SourceLoc loc,
+    ModuleDecl *module, DeclContext *dc,
     SmallVectorImpl<StructuralRequirement> &result) {
   if (!type)
     return;
 
-  InferRequirementsWalker walker(module);
+  InferRequirementsWalker walker(module, dc);
   type.walk(walker);
 
   for (const auto &req : walker.reqs)
@@ -619,11 +646,11 @@ void swift::rewriting::realizeRequirement(
     if (shouldInferRequirements) {
       auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
                                : SourceLoc());
-      inferRequirements(firstType, firstLoc, moduleForInference, result);
+      inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
 
       auto secondLoc = (reqRepr ? reqRepr->getConstraintRepr()->getStartLoc()
                                 : SourceLoc());
-      inferRequirements(secondType, secondLoc, moduleForInference, result);
+      inferRequirements(secondType, secondLoc, moduleForInference, dc, result);
     }
 
     realizeTypeRequirement(dc, firstType, secondType, loc, result, errors);
@@ -634,7 +661,7 @@ void swift::rewriting::realizeRequirement(
     if (shouldInferRequirements) {
       auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
                                : SourceLoc());
-      inferRequirements(firstType, firstLoc, moduleForInference, result);
+      inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
     }
 
     SmallVector<Requirement, 2> reqs;
@@ -652,11 +679,11 @@ void swift::rewriting::realizeRequirement(
     if (shouldInferRequirements) {
       auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
                                : SourceLoc());
-      inferRequirements(firstType, firstLoc, moduleForInference, result);
+      inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
 
       auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
                                 : SourceLoc());
-      inferRequirements(secondType, secondLoc, moduleForInference, result);
+      inferRequirements(secondType, secondLoc, moduleForInference, dc, result);
     }
 
     SmallVector<Requirement, 2> reqs;
@@ -700,7 +727,8 @@ void swift::rewriting::realizeInheritedRequirements(
     auto *typeRepr = inheritedTypes[index].getTypeRepr();
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
     if (shouldInferRequirements) {
-      inferRequirements(inheritedType, loc, moduleForInference, result);
+      inferRequirements(inheritedType, loc, moduleForInference,
+                        decl->getInnermostDeclContext(), result);
     }
 
     realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
