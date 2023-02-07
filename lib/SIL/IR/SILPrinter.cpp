@@ -2308,6 +2308,16 @@ public:
     *this << ", shape $" << env->getOpenedElementShapeClass()
           << ", uuid \"" << env->getOpenedElementUUID() << "\"";
   }
+  void visitPackElementGetInst(PackElementGetInst *I) {
+    *this << Ctx.getID(I->getIndex()) << " of "
+          << getIDAndType(I->getPack()) << " as "
+          << I->getElementType();
+  }
+  void visitPackElementSetInst(PackElementSetInst *I) {
+    *this << getIDAndType(I->getValue()) << " into "
+          << Ctx.getID(I->getIndex()) << " of "
+          << getIDAndType(I->getPack());
+  }
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
     *this << getIDAndType(PBSI->getOperand());
   }
