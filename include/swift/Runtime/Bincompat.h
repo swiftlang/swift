@@ -38,6 +38,9 @@ bool useLegacyOptionalNilInjectionInCasting();
 /// Obj-C interop
 bool useLegacyObjCBoxingInCasting();
 
+/// Whether to use legacy semantics when unboxing __SwiftValue
+bool useLegacySwiftValueUnboxingInCasting();
+
 } // namespace bincompat
 
 } // namespace runtime
