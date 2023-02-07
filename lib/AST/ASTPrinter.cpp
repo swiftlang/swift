@@ -4373,7 +4373,9 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
              "unexpected convenience initializer");
     }
   } else if (decl->getInitKind() == CtorInitializerKind::Factory) {
-    Printer << "/*not inherited*/ ";
+    if (Options.PrintFactoryInitializerComment) {
+      Printer << "/*not inherited*/ ";
+    }
   }
 
   printContextIfNeeded(decl);
