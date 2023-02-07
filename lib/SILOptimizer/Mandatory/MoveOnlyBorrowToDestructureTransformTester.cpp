@@ -53,85 +53,9 @@ static bool runTransform(SILFunction *fn,
     auto *mmci = moveIntroducersToProcess.back();
     moveIntroducersToProcess = moveIntroducersToProcess.drop_back();
 
-    unsigned currentDiagnosticCount = diagnosticEmitter.getDiagnosticCount();
-
-    StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
-
-    // If we failed to gather borrows due to the transform not understanding
-    // part of the SIL, emit a diagnostic, RAUW the mark must check, and
-    // continue.
-    if (!BorrowToDestructureTransform::gatherBorrows(mmci, borrowWorklist)) {
-      diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
-      mmci->replaceAllUsesWith(mmci->getOperand());
-      mmci->eraseFromParent();
-      madeChange = true;
-      continue;
-    }
-
-    // If we do not have any borrows to process, continue and process the next
-    // instruction.
-    if (borrowWorklist.empty())
-      continue;
-
-    SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-
-    // Now that we have found all of our borrows, we want to find struct_extract
-    // uses of our borrow as well as any operands that cannot use an owned
-    // value.
-    SWIFT_DEFER { discoveredBlocks.clear(); };
     BorrowToDestructureTransform transform(allocator, mmci, diagnosticEmitter,
-                                           poa, discoveredBlocks);
-
-    // Attempt to gather uses. Return if we saw something that we did not
-    // understand. Emit a compiler did not understand diagnostic, RAUW the mmci
-    // so later passes do not see it, and set madeChange to true.
-    if (!transform.gatherUses(borrowWorklist)) {
-      diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
-      mmci->replaceAllUsesWith(mmci->getOperand());
-      mmci->eraseFromParent();
-      madeChange = true;
-      continue;
-    }
-
-    // Next make sure that any destructure needing instructions are on the
-    // boundary in a per bit field sensitive manner.
-    transform.checkDestructureUsesOnBoundary();
-
-    // If we emitted any diagnostic, set madeChange to true, eliminate our mmci,
-    // and continue.
-    if (currentDiagnosticCount != diagnosticEmitter.getDiagnosticCount()) {
-      mmci->replaceAllUsesWith(mmci->getOperand());
-      mmci->eraseFromParent();
-      madeChange = true;
-      continue;
-    }
-
-    // Then check if we had two consuming uses on the same instruction or a
-    // consuming/non-consuming use on the same isntruction.
-    transform.checkForErrorsOnSameInstruction();
-
-    // If we emitted any diagnostic, set madeChange to true, eliminate our mmci,
-    // and continue.
-    if (currentDiagnosticCount != diagnosticEmitter.getDiagnosticCount()) {
-      mmci->replaceAllUsesWith(mmci->getOperand());
-      mmci->eraseFromParent();
-      madeChange = true;
-      continue;
-    }
-
-    // At this point, we know that all of our destructure requiring uses are on
-    // the boundary of our live range. Now we need to do the rewriting.
-    transform.blockToAvailableValues.emplace(transform.liveness);
-    transform.rewriteUses();
-
-    // Now that we have done our rewritting, we need to do a few cleanups.
-    //
-    // NOTE: We do not eliminate our mark_must_check since we want later passes
-    // to do additional checking upon the mark_must_check including making sure
-    // that our destructures do not need cause the need for additional copies to
-    // be inserted. We only eliminate the mark_must_check if we emitted a
-    // diagnostic of some sort.
-    transform.cleanup(borrowWorklist);
+                                           poa);
+    transform.transform();
     madeChange = true;
   }
 

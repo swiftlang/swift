@@ -143,8 +143,8 @@ bool BorrowToDestructureTransform::gatherUses(
       blocksToUses.insert(
           nextUse->getParentBlock(),
           {nextUse, {*leafRange, false /*is lifetime ending*/}});
-      liveness.updateForUse(nextUse->getUser(), *leafRange,
-                            false /*is lifetime ending*/);
+      liveness->updateForUse(nextUse->getUser(), *leafRange,
+                             false /*is lifetime ending*/);
       instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
       continue;
     }
@@ -167,8 +167,8 @@ bool BorrowToDestructureTransform::gatherUses(
       destructureNeedingUses.push_back(nextUse);
       blocksToUses.insert(nextUse->getParentBlock(),
                           {nextUse, {*leafRange, true /*is lifetime ending*/}});
-      liveness.updateForUse(nextUse->getUser(), *leafRange,
-                            true /*is lifetime ending*/);
+      liveness->updateForUse(nextUse->getUser(), *leafRange,
+                             true /*is lifetime ending*/);
       instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
       continue;
     }
@@ -207,7 +207,7 @@ void BorrowToDestructureTransform::checkForErrorsOnSameInstruction() {
   // check if any of our consuming uses that are on the boundary are used by the
   // same instruction as a different consuming or non-consuming use.
   instToInterestingOperandIndexMap.setFrozen();
-  SmallBitVector usedBits(liveness.getNumSubElements());
+  SmallBitVector usedBits(liveness->getNumSubElements());
 
   for (auto instRangePair : instToInterestingOperandIndexMap.getRange()) {
     SWIFT_DEFER { usedBits.reset(); };
@@ -321,7 +321,7 @@ void BorrowToDestructureTransform::checkDestructureUsesOnBoundary() const {
                << "    DestructureNeedingUse: " << *use->getUser());
 
     auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use->get(), mmci);
-    if (!liveness.isWithinBoundary(use->getUser(), destructureUseSpan)) {
+    if (!liveness->isWithinBoundary(use->getUser(), destructureUseSpan)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "        On boundary or within boundary! No error!\n");
       continue;
@@ -336,8 +336,9 @@ void BorrowToDestructureTransform::checkDestructureUsesOnBoundary() const {
     // TODO: Fix diagnostic to use destructure needing use and boundary
     // uses.
     LLVM_DEBUG(llvm::dbgs() << "        Within boundary! Emitting error!\n");
-    FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
-    liveness.computeBoundary(boundary);
+    FieldSensitivePrunedLivenessBoundary boundary(
+        liveness->getNumSubElements());
+    liveness->computeBoundary(boundary);
     diagnosticEmitter.emitObjectDestructureNeededWithinBorrowBoundary(
         mmci, use->getUser(), destructureUseSpan, boundary);
   }
@@ -1069,7 +1070,7 @@ void BorrowToDestructureTransform::rewriteUses() {
              << "Performing BorrowToDestructureTransform::rewriteUses()!\n");
 
   llvm::SmallPtrSet<Operand *, 8> seenOperands;
-  SmallBitVector bitsNeededInBlock(liveness.getNumSubElements());
+  SmallBitVector bitsNeededInBlock(liveness->getNumSubElements());
   IntervalMapAllocator::Map typeSpanToValue(allocator.get());
 
   auto *fn = mmci->getFunction();
@@ -1456,4 +1457,62 @@ void BorrowToDestructureTransform::cleanup(
 
   // And finally do the same thing for our initial copy_value.
   addCompensatingDestroys(liveness, boundary, initialValue);
+}
+
+//===----------------------------------------------------------------------===//
+//                        MARK: Top Level Entrypoint
+//===----------------------------------------------------------------------===//
+
+bool BorrowToDestructureTransform::transform() {
+  StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
+
+  // If we failed to gather borrows due to the transform not understanding part
+  // of the SIL, fail and return false.
+  if (!BorrowToDestructureTransform::gatherBorrows(mmci, borrowWorklist))
+    return false;
+
+  // If we do not have any borrows to process, return true early to show we
+  // succeeded in processing.
+  if (borrowWorklist.empty())
+    return true;
+
+  // Attempt to gather uses. Return false if we saw something that we did not
+  // understand.
+  if (!gatherUses(borrowWorklist))
+    return false;
+
+  // Next make sure that any destructure needing instructions are on the
+  // boundary in a per bit field sensitive manner.
+  unsigned diagnosticCount = diagnosticEmitter.getDiagnosticCount();
+  checkDestructureUsesOnBoundary();
+
+  // If we emitted any diagnostic, break out. We return true since we actually
+  // succeeded in our processing by finding the error. We only return false if
+  // we want to tell the rest of the checker that there was an internal
+  // compiler error that we need to emit a "compiler doesn't understand
+  // error".
+  if (diagnosticCount != diagnosticEmitter.getDiagnosticCount())
+    return true;
+
+  // Then check if we had two consuming uses on the same instruction or a
+  // consuming/non-consuming use on the same isntruction.
+  checkForErrorsOnSameInstruction();
+
+  // If we emitted any diagnostic, break out. We return true since we actually
+  // succeeded in our processing by finding the error. We only return false if
+  // we want to tell the rest of the checker that there was an internal
+  // compiler error that we need to emit a "compiler doesn't understand
+  // error".
+  if (diagnosticCount != diagnosticEmitter.getDiagnosticCount())
+    return true;
+
+  // At this point, we know that all of our destructure requiring uses are on
+  // the boundary of our live range. Now we need to do the rewriting.
+  blockToAvailableValues.emplace(*liveness);
+  rewriteUses();
+
+  // Now that we have done our rewritting, we need to do a few cleanups.
+  cleanup(borrowWorklist);
+
+  return true;
 }

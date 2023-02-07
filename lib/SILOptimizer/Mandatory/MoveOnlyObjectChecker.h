@@ -118,7 +118,8 @@ struct OSSACanonicalizer {
 
 class DiagnosticEmitter;
 
-struct BorrowToDestructureTransform {
+class BorrowToDestructureTransform {
+public:
   class IntervalMapAllocator {
   public:
     using Map = llvm::IntervalMap<
@@ -182,10 +183,12 @@ struct BorrowToDestructureTransform {
     }
   };
 
+private:
   IntervalMapAllocator &allocator;
   MarkMustCheckInst *mmci;
   DiagnosticEmitter &diagnosticEmitter;
-  FieldSensitiveSSAPrunedLiveRange liveness;
+  // Temporarily optional as this code is refactored.
+  Optional<FieldSensitiveSSAPrunedLiveRange> liveness;
   SmallVector<Operand *, 8> destructureNeedingUses;
   PostOrderAnalysis *poa;
   PostOrderFunctionInfo *pofi = nullptr;
@@ -203,16 +206,23 @@ struct BorrowToDestructureTransform {
   SmallFrozenMultiMap<SILInstruction *, Operand *, 8>
       instToInterestingOperandIndexMap;
 
-  BorrowToDestructureTransform(
-      IntervalMapAllocator &allocator, MarkMustCheckInst *mmci,
-      DiagnosticEmitter &diagnosticEmitter, PostOrderAnalysis *poa,
-      SmallVectorImpl<SILBasicBlock *> &discoveredBlocks)
+  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+
+public:
+  BorrowToDestructureTransform(IntervalMapAllocator &allocator,
+                               MarkMustCheckInst *mmci,
+                               DiagnosticEmitter &diagnosticEmitter,
+                               PostOrderAnalysis *poa)
       : allocator(allocator), mmci(mmci), diagnosticEmitter(diagnosticEmitter),
-        liveness(mmci->getFunction(), &discoveredBlocks), poa(poa) {
-    liveness.init(mmci);
-    liveness.initializeDef(mmci, TypeTreeLeafTypeRange(mmci));
+        liveness(), poa(poa) {
+    liveness.emplace(mmci->getFunction(), &discoveredBlocks);
+    liveness->init(mmci);
+    liveness->initializeDef(mmci, TypeTreeLeafTypeRange(mmci));
   }
 
+  bool transform();
+
+private:
   PostOrderFunctionInfo *getPostOrderFunctionInfo() {
     if (!pofi)
       pofi = poa->get(mmci->getFunction());

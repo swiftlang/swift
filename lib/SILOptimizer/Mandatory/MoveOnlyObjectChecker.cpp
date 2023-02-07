@@ -422,65 +422,13 @@ struct MoveOnlyChecker {
 bool MoveOnlyChecker::convertBorrowExtractsToOwnedDestructures(
     MarkMustCheckInst *mmci, DiagnosticEmitter &diagnosticEmitter,
     DominanceInfo *domTree, PostOrderAnalysis *poa) {
-  StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
-
-  // If we failed to gather borrows due to the transform not understanding part
-  // of the SIL, fail and return false.
-  if (!BorrowToDestructureTransform::gatherBorrows(mmci, borrowWorklist))
-    return false;
-
-  // If we do not have any borrows to process, return true early to show we
-  // succeeded in processing.
-  if (borrowWorklist.empty()) {
-    LLVM_DEBUG(llvm::dbgs() << "    Did not find any borrows to process!\n");
-    return true;
-  }
-
-  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-
-  // Now that we have found all of our borrows, we want to find struct_extract
-  // uses of our borrow as well as any operands that cannot use an owned value.
-  SWIFT_DEFER { discoveredBlocks.clear(); };
   BorrowToDestructureTransform transform(allocator, mmci, diagnosticEmitter,
-                                         poa, discoveredBlocks);
-
-  // Attempt to gather uses. Return false if we saw something that we did not
-  // understand.
-  if (!transform.gatherUses(borrowWorklist))
+                                         poa);
+  if (!transform.transform()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Failed to perform borrow to destructure transform!\n");
     return false;
-
-  // Next make sure that any destructure needing instructions are on the
-  // boundary in a per bit field sensitive manner.
-  unsigned diagnosticCount = diagnosticEmitter.getDiagnosticCount();
-  transform.checkDestructureUsesOnBoundary();
-
-  // If we emitted any diagnostic, break out. We return true since we actually
-  // succeeded in our processing by finding the error. We only return false if
-  // we want to tell the rest of the checker that there was an internal
-  // compiler error that we need to emit a "compiler doesn't understand
-  // error".
-  if (diagnosticCount != diagnosticEmitter.getDiagnosticCount())
-    return true;
-
-  // Then check if we had two consuming uses on the same instruction or a
-  // consuming/non-consuming use on the same isntruction.
-  transform.checkForErrorsOnSameInstruction();
-
-  // If we emitted any diagnostic, break out. We return true since we actually
-  // succeeded in our processing by finding the error. We only return false if
-  // we want to tell the rest of the checker that there was an internal
-  // compiler error that we need to emit a "compiler doesn't understand
-  // error".
-  if (diagnosticCount != diagnosticEmitter.getDiagnosticCount())
-    return true;
-
-  // At this point, we know that all of our destructure requiring uses are on
-  // the boundary of our live range. Now we need to do the rewriting.
-  transform.blockToAvailableValues.emplace(transform.liveness);
-  transform.rewriteUses();
-
-  // Now that we have done our rewritting, we need to do a few cleanups.
-  transform.cleanup(borrowWorklist);
+  }
 
   return true;
 }
