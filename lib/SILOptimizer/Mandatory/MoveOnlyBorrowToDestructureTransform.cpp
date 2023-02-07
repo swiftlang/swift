@@ -25,6 +25,7 @@
 
 #define DEBUG_TYPE "sil-move-only-checker"
 
+#include "MoveOnlyBorrowToDestructure.h"
 #include "MoveOnlyDiagnostics.h"
 #include "MoveOnlyObjectChecker.h"
 

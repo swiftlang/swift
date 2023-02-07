@@ -57,6 +57,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/RecyclingAllocator.h"
 
+#include "MoveOnlyBorrowToDestructure.h"
 #include "MoveOnlyDiagnostics.h"
 #include "MoveOnlyObjectChecker.h"
 
