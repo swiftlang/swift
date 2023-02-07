@@ -3005,6 +3005,13 @@ public:
   }
 
   ResultConvention getResult(const TypeLowering &tl) const override {
+    // C++ constructors return indirectly.
+    // TODO: this may be different depending on the ABI, so we may have to
+    // check with clang here.
+    if (isa<clang::CXXConstructorDecl>(TheDecl)) {
+      return ResultConvention::Indirect;
+    }
+
     if (isCFTypedef(tl, TheDecl->getReturnType())) {
       // The CF attributes aren't represented in the type, so we need
       // to check them here.
@@ -3109,15 +3116,19 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
   }
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    AbstractionPattern origPattern = AbstractionPattern::getCXXMethod(origType, method,
-                                                                      foreignInfo.self);
-    bool isMutating =
-        TC.Context.getClangModuleLoader()->isCXXMethodMutating(method);
-    auto conventions = CXXMethodConventions(method, isMutating);
-    return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
-                              substInterfaceType, extInfoBuilder, conventions,
-                              foreignInfo, constant, constant, None,
-                              ProtocolConformanceRef());
+    // Static methods and ctors should be lowered like plane functions
+    // (case below).
+    if (!isa<clang::CXXConstructorDecl>(method) || method->isStatic()) {
+      AbstractionPattern origPattern = AbstractionPattern::getCXXMethod(origType, method,
+                                                                        foreignInfo.self);
+      bool isMutating =
+          TC.Context.getClangModuleLoader()->isCXXMethodMutating(method);
+      auto conventions = CXXMethodConventions(method, isMutating);
+      return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
+                                substInterfaceType, extInfoBuilder, conventions,
+                                foreignInfo, constant, constant, None,
+                                ProtocolConformanceRef());
+    }
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
