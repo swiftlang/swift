@@ -83,22 +83,28 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   %direct_access_from_parameter = function_ref @direct_access_from_parameter : $@convention(thin) <T_1...> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // --0---> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%0) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: A
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%0) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // ----1----> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%1) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: B
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%1) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // -----2------> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%2) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: C
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%2) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // -------3-------> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%3) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: D
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%3) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // --------4---------> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%4) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: E
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%4) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // ----------5----------> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%5) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: F
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%5) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
 
   %outb = integer_literal $Builtin.Int32, 0
   %out = struct $Int32 (%outb : $Builtin.Int32)
