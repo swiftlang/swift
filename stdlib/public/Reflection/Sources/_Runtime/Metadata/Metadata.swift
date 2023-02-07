@@ -85,6 +85,23 @@ extension Metadata {
   }
 }
 
+@available(SwiftStdlib 5.9, *)
+extension Metadata {
+  @available(SwiftStdlib 5.9, *)
+  internal var isAnyClass: Bool {
+    switch kind {
+    case .class,
+         .objcClassWrapper,
+         .foreignClass,
+         .foreignReferenceType:
+      return true
+
+    default:
+      return false
+    }
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Stdlib conformances
 //===----------------------------------------------------------------------===//

@@ -55,3 +55,18 @@ public struct RelativeIndirectablePointerIntPair<
     }
   }
 }
+
+extension UnsafeRawPointer {
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  public func relativeIndirectablePointerIntPairAddress<T, U: FixedWidthInteger>(
+    as type: T.Type,
+    and type2: U.Type
+  ) -> UnsafeRawPointer {
+    let relativePointer = RelativeIndirectablePointerIntPair<T, U>(
+      offset: loadUnaligned(as: Int32.self)
+    )
+    
+    return relativePointer.address(from: self)
+  }
+}

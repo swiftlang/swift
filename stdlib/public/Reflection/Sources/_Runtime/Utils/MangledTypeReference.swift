@@ -25,6 +25,13 @@ public struct MangledTypeReference {
 
 @available(SwiftStdlib 5.9, *)
 extension MangledTypeReference {
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  public var length: Int {
+    getSymbolicMangledNameLength(ptr)
+  }
+
+  @available(SwiftStdlib 5.9, *)
   @inlinable
   var standardSubstitution: Any.Type? {
     let byte1 = ptr.loadUnaligned(fromByteOffset: 1, as: UInt8.self)

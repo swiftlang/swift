@@ -873,6 +873,11 @@ SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_INTERNAL MetadataResponse
 getSuperclassMetadata(MetadataRequest request, const ClassMetadata *self);
 
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+bool _swift_class_isSubclass(const Metadata *subclass,
+                             const Metadata *superclass);
+
 #if !NDEBUG
 /// Verify that the given metadata pointer correctly roundtrips its
 /// mangled name through the demangler.
