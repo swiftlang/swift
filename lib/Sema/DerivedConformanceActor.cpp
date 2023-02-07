@@ -37,8 +37,13 @@ using namespace swift;
 bool DerivedConformance::canDeriveActor(DeclContext *dc,
                                         NominalTypeDecl *nominal) {
   auto classDecl = dyn_cast<ClassDecl>(nominal);
-  return classDecl && classDecl->isActor() && dc == nominal &&
-        !classDecl->getUnownedExecutorProperty();
+  auto result = classDecl && classDecl->isActor() && dc == nominal;
+  ; // NOTE: we always synthesize, but we may find an existing member
+//  &&
+  fprintf(stderr, "[%s:%d](%s) can derive actor? [%s]: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__, nominal->getName().str().str().c_str(),
+          result ? "yes" : "no");
+//        !classDecl->getUnownedExecutorProperty();
+  return result;
 }
 
 /// Turn a Builtin.Executor value into an UnownedSerialExecutor.
@@ -127,6 +132,7 @@ deriveBodyActor_unownedExecutor(AbstractFunctionDecl *getter, void *) {
 
 /// Derive the declaration of Actor's unownedExecutor property.
 static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
+  fprintf(stderr, "[%s:%d](%s) deriveActor_unownedExecutor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   ASTContext &ctx = derived.Context;
 
   // Retrieve the types and declarations we'll need to form this operation.
@@ -172,13 +178,39 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   return property;
 }
 
+static ValueDecl* checkUserDeclared(DerivedConformance &derived, ValueDecl *requirement) {
+  auto proto = derived.Protocol;
+  auto *classDecl = dyn_cast<ClassDecl>(derived.Nominal);
+
+  DeclName memberName = requirement->getName();
+  fprintf(stderr, "[%s:%d](%s) member name:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  memberName.dump();
+  auto unownedExecutorDecl = derived.Context.getUnownedSerialExecutorDecl();
+  auto result = TypeChecker::lookupMember(classDecl, unownedExecutorDecl->getDeclaredInterfaceType(),
+                                          DeclNameRef(memberName));
+
+  if (result.empty()) {
+    return nullptr;
+  }
+
+  return result.front().getValueDecl();
+}
+
 ValueDecl *DerivedConformance::deriveActor(ValueDecl *requirement) {
   auto var = dyn_cast<VarDecl>(requirement);
   if (!var)
     return nullptr;
 
-  if (var->getName() == Context.Id_unownedExecutor)
-    return deriveActor_unownedExecutor(*this);
+  if (var->getName() == Context.Id_unownedExecutor) {
+//    fprintf(stderr, "[%s:%d](%s) check if we can derive\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    if (auto value = checkUserDeclared(*this, requirement)) {
+//      fprintf(stderr, "[%s:%d](%s) found existing\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//      return value;
+//    } else {
+//      fprintf(stderr, "[%s:%d](%s) call deriveActor_unownedExecutor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      return deriveActor_unownedExecutor(*this);
+//    }
+  }
 
   return nullptr;
 }

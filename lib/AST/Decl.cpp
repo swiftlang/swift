@@ -5688,17 +5688,36 @@ ArrayRef<ValueDecl *> ProtocolDecl::getProtocolRequirements() const {
 }
 
 ValueDecl *ProtocolDecl::getSingleRequirement(DeclName name) const {
+  bool printIt = false;
+  if (name.isSimpleName(getASTContext().Id_unownedExecutor)) {
+    printIt = true;
+    fprintf(stderr, "[%s:%d](%s) getSingleRequirement EXECUTOR ===============================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  }
+
   auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name);
   ValueDecl *result = nullptr;
   for (auto candidate : results) {
+    if (printIt) {
+      fprintf(stderr, "[%s:%d](%s) candidate:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      candidate->dump();
+    }
     if (candidate->getDeclContext() != this ||
         !candidate->isProtocolRequirement())
       continue;
     if (result) {
       // Multiple results.
+      if (printIt) {
+        fprintf(stderr, "[%s:%d](%s) MULTIPLE RESULTS! RETURN NIL\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      }
       return nullptr;
     }
     result = candidate;
+  }
+  if (printIt) {
+    fprintf(stderr, "[%s:%d](%s) FOUND IT\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    result->dump();
+    fprintf(stderr, "[%s:%d](%s) HERE:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    result->getDeclContext()->dumpContext();
   }
 
   return result;
@@ -9356,38 +9375,113 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 }
 
 const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
+  auto &C = getASTContext();
   auto &ctx = getASTContext();
+  auto module = getParentModule();
 
-  auto hasUnownedSerialExecutorType = [&](VarDecl *property) {
-    if (auto type = property->getInterfaceType())
-      if (auto td = type->getAnyNominal())
-        if (td == ctx.getUnownedSerialExecutorDecl())
-          return true;
-    return false;
-  };
+  if (!isAnyActor()) {
+    return nullptr;
+  }
 
-  VarDecl *candidate = nullptr;
-  for (auto member: getMembers()) {
-    // Instance properties called unownedExecutor.
-    if (auto property = dyn_cast<VarDecl>(member)) {
-      if (property->getName() == ctx.Id_unownedExecutor &&
-          !property->isStatic()) {
-        if (!candidate) {
-          candidate = property;
-          continue;
-        }
+  ProtocolDecl *actorProto;
+  if (isActor()) {
+    fprintf(stderr, "[%s:%d](%s) actor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    actorProto = C.getProtocol(KnownProtocolKind::Actor);
+  } else if (isDistributedActor()) {
+    fprintf(stderr, "[%s:%d](%s) dist\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    actorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
+  } else {
+    fprintf(stderr, "[%s:%d](%s) none\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    return nullptr;
+  }
 
-        bool oldHasRightType = hasUnownedSerialExecutorType(candidate);
-        if (oldHasRightType == hasUnownedSerialExecutorType(property)) {
-          // just ignore the new property, we should diagnose this eventually
-        } else if (!oldHasRightType) {
-          candidate = property;
-        }
-      }
+  auto mutableThis = const_cast<ClassDecl *>(this);
+
+//  // METHOD 2: but qualified seems to be more about types
+  llvm::SmallVector<ValueDecl*, 2> results;
+  mutableThis->lookupQualified(getSelfNominalTypeDecl(),
+                               DeclNameRef(C.Id_unownedExecutor),
+                               NL_ProtocolMembers,
+                               results);
+
+
+//  // METHOD 1: look up direct, works ok for direct but does not check extensions...
+//  auto results = mutableThis->lookupDirect(C.Id_unownedExecutor);
+
+  VarDecl* result = nullptr;
+  for (auto candidate : results) {
+    if (!isa<ProtocolDecl>(candidate->getDeclContext()))
+      continue;
+
+    fprintf(stderr, "[%s:%d](%s) candidate:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    candidate->dump();
+    if (VarDecl *var = dyn_cast<VarDecl>(candidate)) {
+      result = var;
     }
   }
 
-  return candidate;
+  fprintf(stderr, "[%s:%d](%s) found executor property:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  if (result) {
+    result->dump();
+  } else {
+    fprintf(stderr, "[%s:%d](%s) NONE!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  }
+  return result;
+
+//
+//  auto ActConformance = module->lookupConformance(
+//      this->getDeclaredInterfaceType(), actorProto,
+//      /*allowMissing=*/false);
+//
+//  if (ActConformance.isInvalid()) {
+//    fprintf(stderr, "[%s:%d](%s) invalid actor conformance\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    return nullptr;
+//  }
+//
+//  auto executorDecl = C.getUnownedSerialExecutorDecl();
+//  auto unownedExecutorWitness = ActConformance.getWitnessByName(
+//      executorDecl->getInterfaceType(),
+//      DeclName(C.Id_unownedExecutor));
+//
+//  if (VarDecl *var = dyn_cast<VarDecl>(unownedExecutorWitness.getDecl())) {
+//    return var;
+//  }
+//  return nullptr;
+
+  // OLD IMPL:
+//  auto hasUnownedSerialExecutorType = [&](VarDecl *property) {
+//    if (auto type = property->getInterfaceType())
+//      if (auto td = type->getAnyNominal())
+//        if (td == ctx.getUnownedSerialExecutorDecl())
+//          return true;
+//    return false;
+//  };
+//
+//  VarDecl *candidate = nullptr;
+//  for (auto member: getMembers()) {
+//    // Instance properties called unownedExecutor.
+//    if (auto property = dyn_cast<VarDecl>(member)) {
+//      if (property->getName() == ctx.Id_unownedExecutor &&
+//          !property->isStatic()) {
+//        if (!candidate) {
+//          candidate = property;
+//          continue;
+//        }
+//
+//        bool oldHasRightType = hasUnownedSerialExecutorType(candidate);
+//        if (oldHasRightType == hasUnownedSerialExecutorType(property)) {
+//          // just ignore the new property, we should diagnose this eventually
+//        } else if (!oldHasRightType) {
+//          candidate = property;
+//        }
+//      }
+//    }
+//  }
+//
+//  fprintf(stderr, "[%s:%d](%s) found candidate manually:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//  candidate->dump();
+//
+//  return candidate;
 }
 
 bool ClassDecl::isRootDefaultActor() const {

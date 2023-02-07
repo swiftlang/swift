@@ -55,10 +55,10 @@ actor MyActor: WithSpecifiedExecutor {
 
   nonisolated let executor: SpecifiedExecutor
 
-  /// FIXME: Compiler should not require us to restate this here. We'll fix it.
-  nonisolated var unownedExecutor: UnownedSerialExecutor {
-    executor.asUnownedSerialExecutor()
-  }
+//  /// FIXME: Compiler should not require us to restate this here. We'll fix it.
+//  nonisolated var unownedExecutor: UnownedSerialExecutor {
+//    executor.asUnownedSerialExecutor()
+//  }
 
   init(executor: SpecifiedExecutor) {
     self.executor = executor
