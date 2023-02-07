@@ -2396,7 +2396,10 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   if (!body || application.hadError)
     return true;
 
-  fn.setTypecheckedBody(cast<BraceStmt>(body), fn.hasSingleExpressionBody());
+  fn.setTypecheckedBody(cast<BraceStmt>(body),
+                        solution.getAppliedBuilderTransform(fn)
+                            ? false
+                            : fn.hasSingleExpressionBody());
   return false;
 }
 
