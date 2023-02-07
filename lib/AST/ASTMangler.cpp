@@ -3386,7 +3386,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
     appendMacroExpansionContext(
         expansion->getLoc(), expansion->getDeclContext());
     appendMacroExpansionOperator(
-        expansion->getMacro().getBaseName().userFacingName(),
+        expansion->getMacroName().getBaseName().userFacingName(),
         MacroRole::Declaration,
         expansion->getDiscriminator());
     return;
@@ -3748,7 +3748,7 @@ void ASTMangler::appendMacroExpansionContext(
     } else {
       auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
       outerExpansionLoc = decl->getLoc();
-      baseName = decl->getMacro().getBaseName();
+      baseName = decl->getMacroName().getBaseName();
       discriminator = decl->getDiscriminator();
       role = MacroRole::Declaration;
     }
@@ -3854,7 +3854,7 @@ std::string ASTMangler::mangleMacroExpansion(
   beginMangling();
   appendMacroExpansionContext(expansion->getLoc(), expansion->getDeclContext());
   appendMacroExpansionOperator(
-      expansion->getMacro().getBaseName().userFacingName(),
+      expansion->getMacroName().getBaseName().userFacingName(),
       MacroRole::Declaration,
       expansion->getDiscriminator());
   return finalize();
