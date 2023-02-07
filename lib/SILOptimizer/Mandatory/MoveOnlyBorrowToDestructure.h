@@ -60,20 +60,10 @@ class BorrowToDestructureTransform {
   IntervalMapAllocator &allocator;
   MarkMustCheckInst *mmci;
   DiagnosticEmitter &diagnosticEmitter;
-  SmallVector<Operand *, 8> destructureNeedingUses;
   PostOrderAnalysis *poa;
   PostOrderFunctionInfo *pofi = nullptr;
   SmallVector<SILInstruction *, 8> createdDestructures;
   SmallVector<SILPhiArgument *, 8> createdPhiArguments;
-
-  using InterestingUser = FieldSensitivePrunedLiveness::InterestingUser;
-  SmallFrozenMultiMap<SILBasicBlock *, std::pair<Operand *, InterestingUser>, 8>
-      blocksToUses;
-
-  /// A frozen multi-map we use to diagnose consuming uses that are used by the
-  /// same instruction as another consuming use or non-consuming use.
-  SmallFrozenMultiMap<SILInstruction *, Operand *, 8>
-      instToInterestingOperandIndexMap;
 
 public:
   BorrowToDestructureTransform(IntervalMapAllocator &allocator,

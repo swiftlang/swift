@@ -192,6 +192,17 @@ struct borrowtodestructure::Implementation {
   /// so that we have an independent owned value.
   SILValue initialValue;
 
+  using InterestingUser = FieldSensitivePrunedLiveness::InterestingUser;
+  SmallFrozenMultiMap<SILBasicBlock *, std::pair<Operand *, InterestingUser>, 8>
+      blocksToUses;
+
+  /// A frozen multi-map we use to diagnose consuming uses that are used by the
+  /// same instruction as another consuming use or non-consuming use.
+  SmallFrozenMultiMap<SILInstruction *, Operand *, 8>
+      instToInterestingOperandIndexMap;
+
+  SmallVector<Operand *, 8> destructureNeedingUses;
+
   Implementation(BorrowToDestructureTransform &interface,
                  SmallVectorImpl<SILBasicBlock *> &discoveredBlocks)
       : interface(interface),
@@ -303,12 +314,12 @@ bool Implementation::gatherUses(SILValue value) {
       }
 
       LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
-      interface.blocksToUses.insert(
+      blocksToUses.insert(
           nextUse->getParentBlock(),
           {nextUse, {*leafRange, false /*is lifetime ending*/}});
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             false /*is lifetime ending*/);
-      interface.instToInterestingOperandIndexMap.insert(nextUse->getUser(),
+      instToInterestingOperandIndexMap.insert(nextUse->getUser(),
                                                         nextUse);
       continue;
     }
@@ -329,13 +340,13 @@ bool Implementation::gatherUses(SILValue value) {
       }
 
       LLVM_DEBUG(llvm::dbgs() << "        Found lifetime ending use!\n");
-      interface.destructureNeedingUses.push_back(nextUse);
-      interface.blocksToUses.insert(
+      destructureNeedingUses.push_back(nextUse);
+      blocksToUses.insert(
           nextUse->getParentBlock(),
           {nextUse, {*leafRange, true /*is lifetime ending*/}});
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             true /*is lifetime ending*/);
-      interface.instToInterestingOperandIndexMap.insert(nextUse->getUser(),
+      instToInterestingOperandIndexMap.insert(nextUse->getUser(),
                                                         nextUse);
       continue;
     }
@@ -373,11 +384,11 @@ void Implementation::checkForErrorsOnSameInstruction() {
   // At this point, we have emitted all boundary checks. We also now need to
   // check if any of our consuming uses that are on the boundary are used by the
   // same instruction as a different consuming or non-consuming use.
-  interface.instToInterestingOperandIndexMap.setFrozen();
+  instToInterestingOperandIndexMap.setFrozen();
   SmallBitVector usedBits(liveness.getNumSubElements());
 
   for (auto instRangePair :
-       interface.instToInterestingOperandIndexMap.getRange()) {
+       instToInterestingOperandIndexMap.getRange()) {
     SWIFT_DEFER { usedBits.reset(); };
 
     // First loop through our uses and handle any consuming twice errors. We
@@ -487,7 +498,7 @@ void Implementation::checkDestructureUsesOnBoundary() const {
   // needing uses, make sure that none of our destructure needing uses are
   // within our boundary. If so, we have an automatic error since we have a
   // use-after-free.
-  for (auto *use : interface.destructureNeedingUses) {
+  for (auto *use : destructureNeedingUses) {
     LLVM_DEBUG(llvm::dbgs()
                << "    DestructureNeedingUse: " << *use->getUser());
 
@@ -1158,7 +1169,7 @@ dumpIntervalMap(IntervalMapAllocator::Map &map) {
 #endif
 
 void Implementation::rewriteUses() {
-  interface.blocksToUses.setFrozen();
+  blocksToUses.setFrozen();
 
   LLVM_DEBUG(llvm::dbgs()
              << "Performing BorrowToDestructureTransform::rewriteUses()!\n");
@@ -1189,7 +1200,7 @@ void Implementation::rewriteUses() {
                << "Visiting block bb" << block->getDebugID() << '\n');
 
     // See if we have any operands that we need to process...
-    if (auto operandList = interface.blocksToUses.find(block)) {
+    if (auto operandList = blocksToUses.find(block)) {
       // If we do, gather up the bits that we need.
       for (auto operand : *operandList) {
         auto &subEltSpan = operand.second.subEltSpan;
