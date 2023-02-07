@@ -6814,6 +6814,11 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
   return false;
 }
 
+/// Whether this property has any attached runtime metadata attributes.
+bool VarDecl::hasRuntimeMetadataAttributes() const {
+  return !getRuntimeDiscoverableAttrs().empty();
+}
+
 bool VarDecl::hasImplicitPropertyWrapper() const {
   if (getAttrs().hasAttribute<CustomAttr>()) {
     if (!getAttachedPropertyWrappers().empty())

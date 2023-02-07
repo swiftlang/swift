@@ -5799,6 +5799,9 @@ public:
   /// that has an external effect on the function.
   bool hasExternalPropertyWrapper() const;
 
+  /// Whether this property has any attached runtime metadata attributes.
+  bool hasRuntimeMetadataAttributes() const;
+
   /// Whether all of the attached property wrappers have an init(wrappedValue:)
   /// initializer.
   bool allAttachedPropertyWrappersHaveWrappedValueInit() const;
