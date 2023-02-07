@@ -2382,6 +2382,24 @@ CanPackType OpenPackElementInst::getOpenedShapeClass() const {
   return cast<PackType>(pack->getCanonicalType());
 }
 
+PackElementGetInst *PackElementGetInst::create(SILFunction &F,
+                                               SILDebugLocation debugLoc,
+                                               SILValue indexOperand,
+                                               SILValue packOperand,
+                                               SILType elementType) {
+  assert(indexOperand->getType().is<BuiltinPackIndexType>());
+  assert(packOperand->getType().is<SILPackType>());
+
+  SmallVector<SILValue, 8> allOperands;
+  allOperands.push_back(indexOperand);
+  allOperands.push_back(packOperand);
+  collectTypeDependentOperands(allOperands, F, elementType);
+
+  auto size = totalSizeToAlloc<swift::Operand>(allOperands.size());
+  auto buffer = F.getModule().allocateInst(size, alignof(PackElementGetInst));
+  return ::new (buffer) PackElementGetInst(debugLoc, allOperands, elementType);
+}
+
 BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,
                                SILValue operand,
                                ArrayRef<SILType> resultTypes,

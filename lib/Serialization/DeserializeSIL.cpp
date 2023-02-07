@@ -1280,6 +1280,20 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILInstHasSymbolLayout::readRecord(scratch, ValID, ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::HasSymbolInst;
     break;
+  case SIL_PACK_ELEMENT_GET:
+    SILPackElementGetLayout::readRecord(scratch,
+                                        TyID, TyCategory,
+                                        TyID2, TyCategory2, ValID2,
+                                        ValID3);
+    RawOpCode = (unsigned)SILInstructionKind::PackElementGetInst;
+    break;
+  case SIL_PACK_ELEMENT_SET:
+    SILPackElementSetLayout::readRecord(scratch,
+                                        TyID, TyCategory, ValID,
+                                        TyID2, TyCategory2, ValID2,
+                                        ValID3);
+    RawOpCode = (unsigned)SILInstructionKind::PackElementSetInst;
+    break;
   }
 
   // FIXME: validate
@@ -1403,6 +1417,31 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto env = MF->getGenericEnvironmentChecked(Attr);
     if (!env) MF->fatal(env.takeError());
     ResultInst = Builder.createOpenPackElement(Loc, index, *env);
+    break;
+  }
+  case SILInstructionKind::PackElementGetInst: {
+    assert(RecordKind == SIL_PACK_ELEMENT_GET);
+    auto elementType = getSILType(MF->getType(TyID),
+                                  (SILValueCategory) TyCategory, Fn);
+    auto packType = getSILType(MF->getType(TyID2),
+                               (SILValueCategory) TyCategory2, Fn);
+    auto pack = getLocalValue(ValID2, packType);
+    auto indexType = SILType::getPackIndexType(MF->getContext());
+    auto index = getLocalValue(ValID3, indexType);
+    ResultInst = Builder.createPackElementGet(Loc, index, pack, elementType);
+    break;
+  }
+  case SILInstructionKind::PackElementSetInst: {
+    assert(RecordKind == SIL_PACK_ELEMENT_SET);
+    auto elementType = getSILType(MF->getType(TyID),
+                                  (SILValueCategory) TyCategory, Fn);
+    auto value = getLocalValue(ValID, elementType);
+    auto packType = getSILType(MF->getType(TyID2),
+                               (SILValueCategory) TyCategory2, Fn);
+    auto pack = getLocalValue(ValID2, packType);
+    auto indexType = SILType::getPackIndexType(MF->getContext());
+    auto index = getLocalValue(ValID3, indexType);
+    ResultInst = Builder.createPackElementSet(Loc, value, index, pack);
     break;
   }
 

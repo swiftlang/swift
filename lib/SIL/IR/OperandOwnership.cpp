@@ -197,6 +197,8 @@ OPERAND_OWNERSHIP(TrivialUse, UncheckedTakeEnumDataAddr)
 OPERAND_OWNERSHIP(TrivialUse, UnconditionalCheckedCastAddr)
 OPERAND_OWNERSHIP(TrivialUse, DynamicPackIndex)
 OPERAND_OWNERSHIP(TrivialUse, PackPackIndex)
+OPERAND_OWNERSHIP(TrivialUse, PackElementGet)
+OPERAND_OWNERSHIP(TrivialUse, PackElementSet)
 
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).
