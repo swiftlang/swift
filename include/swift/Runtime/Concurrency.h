@@ -729,13 +729,6 @@ void swift_task_enqueueGlobalWithDeadline(long long sec, long long nsec,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
 
-/// Return true if the caller is running in a Task on the passed Executor.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_isOnExecutor(
-    HeapObject * executor,
-    const Metadata *selfType,
-    const SerialExecutorWitnessTable *wtable);
-
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 
 /// Enqueue the given job on the main executor.
