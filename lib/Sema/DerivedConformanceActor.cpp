@@ -34,42 +34,11 @@
 
 using namespace swift;
 
-static VarDecl*
-lookupActorProperty(NominalTypeDecl *decl, DeclName name) {
-  assert(decl && "decl was null");
-  auto &C = decl->getASTContext();
-
-  auto clazz = dyn_cast<ClassDecl>(decl);
-  if (!clazz)
-    return nullptr;
-
-  auto refs = decl->lookupDirect(name);
-  if (refs.size() != 1)
-    return nullptr;
-
-  auto var = dyn_cast<VarDecl>(refs.front());
-  if (!var)
-    return nullptr;
-
-  Type expectedType = C.getUnownedSerialExecutorDecl()->getDeclaredInterfaceType();
-  if (!expectedType)
-    return nullptr;
-
-  if (!var->getInterfaceType()->isEqual(expectedType))
-    return nullptr;
-
-  return var;
-}
-
 bool DerivedConformance::canDeriveActor(DeclContext *dc,
                                         NominalTypeDecl *nominal) {
-  auto &C = nominal->getASTContext();
   auto classDecl = dyn_cast<ClassDecl>(nominal);
-  return classDecl && classDecl->isActor() && dc == nominal
-      && !lookupActorProperty(nominal, C.Id_unownedExecutor)
-      ;
-//                &&
-//                !classDecl->getUnownedExecutorProperty();
+  return classDecl && classDecl->isActor() && dc == nominal &&
+        !classDecl->getUnownedExecutorProperty();
 }
 
 /// Turn a Builtin.Executor value into an UnownedSerialExecutor.
