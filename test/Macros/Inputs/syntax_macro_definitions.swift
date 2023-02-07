@@ -758,3 +758,48 @@ public struct ObservablePropertyMacro: AccessorMacro {
     return [getAccessor, setAccessor]
   }
 }
+
+extension DeclModifierSyntax {
+  fileprivate var isNeededAccessLevelModifier: Bool {
+    switch self.name.tokenKind {
+    case .keyword(.public): return true
+    default: return false
+    }
+  }
+}
+
+extension SyntaxStringInterpolation {
+  fileprivate mutating func appendInterpolation<Node: SyntaxProtocol>(_ node: Node?) {
+    if let node {
+      appendInterpolation(node)
+    }
+  }
+}
+
+public struct NewTypeMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let type = node.attributeName.as(SimpleTypeIdentifierSyntax.self),
+          let genericArguments = type.genericArgumentClause?.arguments,
+          genericArguments.count == 1,
+          let rawType = genericArguments.first
+    else {
+      throw CustomError.message(#"@NewType requires the raw type as an argument, in the form "<RawType>"."#)
+    }
+
+    guard let declaration = declaration.as(StructDeclSyntax.self) else {
+      throw CustomError.message("@NewType can only be applied to a struct declarations.")
+    }
+
+    let access = declaration.modifiers?.first(where: \.isNeededAccessLevelModifier)
+
+    return [
+      "\(access)typealias RawValue = \(rawType)",
+      "\(access)var rawValue: RawValue",
+      "\(access)init(_ rawValue: RawValue) { self.rawValue = rawValue }",
+    ]
+  }
+}
