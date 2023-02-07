@@ -434,8 +434,15 @@ public:
   void print(raw_ostream &OS) const;
 
   inline bool operator==(const SILLocation& R) const {
-    return kindAndFlags.packedKindAndFlags == R.kindAndFlags.packedKindAndFlags
-           && storage.filePositionLoc == R.storage.filePositionLoc;
+    if (kindAndFlags.packedKindAndFlags != R.kindAndFlags.packedKindAndFlags)
+      return false;
+
+    if (isFilenameAndLocation()) {
+      assert(R.isFilenameAndLocation());
+      return *getFilenameAndLocation() == *R.getFilenameAndLocation();
+    }
+
+    return storage.filePositionLoc == R.storage.filePositionLoc;
   }
 
   inline bool operator!=(const SILLocation &R) const { return !(*this == R); }
