@@ -598,6 +598,9 @@ void ModuleDecl::updateSourceFileLocationMap() {
   std::sort(sourceFileLocationMap->allSourceFiles.begin(),
             sourceFileLocationMap->allSourceFiles.end(),
             SourceFileRangeComparison{&getASTContext().SourceMgr});
+
+  sourceFileLocationMap->numFiles = files.size();
+  sourceFileLocationMap->numAuxiliaryFiles = AuxiliaryFiles.size();
 }
 
 SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
