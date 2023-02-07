@@ -24,10 +24,10 @@
 // CHECK:   typealias RawIterator = UnsafePointer<Int32>?
 // CHECK: }
 
-// CHECK: struct HasMutatingBeginEnd : CxxConvertibleToCollection {
-// CHECK:   typealias Element = ConstIterator.Pointee
-// CHECK:   typealias Iterator = CxxIterator<HasMutatingBeginEnd>
-// CHECK:   typealias RawIterator = ConstIterator
+// CHECK: struct HasMutatingBeginEnd {
+// CHECK-NOT:   typealias Element = ConstIterator.Pointee
+// CHECK-NOT:   typealias Iterator = CxxIterator<HasMutatingBeginEnd>
+// CHECK-NOT:   typealias RawIterator = ConstIterator
 // CHECK: }
 
 // CHECK: struct HasNoBeginMethod {
