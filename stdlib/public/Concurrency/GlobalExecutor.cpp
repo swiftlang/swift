@@ -125,6 +125,10 @@ void swift::swift_task_enqueueGlobalWithDeadline(
     swift_task_enqueueGlobalWithDeadlineImpl(sec, nsec, tsec, tnsec, clock, job);
 }
 
+/*****************************************************************************/
+/****************************** MAIN EXECUTOR  *******************************/
+/*****************************************************************************/
+
 void swift::swift_task_enqueueMainExecutor(Job *job) {
   concurrency::trace::job_enqueue_main_executor(job);
   if (swift_task_enqueueMainExecutor_hook)
