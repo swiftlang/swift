@@ -590,17 +590,32 @@ llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
   return result;
 }
 
-llvm::Value *
-irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
-                                      llvm::Value *index,
-                                      DynamicMetadataRequest request) {
-  // If the pack has already been materialized, just gep into it.
-  if (auto pack = tryGetLocalPackTypeMetadata(IGF, packType, request)) {
-    auto *gep = IGF.Builder.CreateInBoundsGEP(IGF.IGM.TypeMetadataPtrTy,
-                                              pack.getMetadata(), index);
+llvm::Value *irgen::emitTypeMetadataPackElementRef(
+    IRGenFunction &IGF, CanPackType packType,
+    ArrayRef<ProtocolDecl *> protocols, llvm::Value *index,
+    DynamicMetadataRequest request,
+    llvm::SmallVectorImpl<llvm::Value *> &wtables) {
+  // If the packs have already been materialized, just gep into it.
+  auto materializedMetadataPack =
+      tryGetLocalPackTypeMetadata(IGF, packType, request);
+  llvm::SmallVector<llvm::Value *> materializedWtablePacks;
+  for (auto protocol : protocols) {
+    auto wtable = IGF.tryGetLocalTypeData(
+        packType, LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol));
+    materializedWtablePacks.push_back(wtable);
+  }
+  if (materializedMetadataPack &&
+      llvm::all_of(materializedWtablePacks,
+                   [](auto *wtable) { return wtable; })) {
+    auto *gep = IGF.Builder.CreateInBoundsGEP(
+        IGF.IGM.TypeMetadataPtrTy, materializedMetadataPack.getMetadata(),
+        index);
     auto addr =
         Address(gep, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment());
     auto *metadata = IGF.Builder.CreateLoad(addr);
+    for (auto *wtable : materializedWtablePacks) {
+      wtables.push_back(wtable);
+    }
     return metadata;
   }
 
@@ -619,6 +634,11 @@ irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
     auto ty = packType.getElementType(index);
     auto response = IGF.emitTypeMetadataRef(ty, request);
     auto *metadata = response.getMetadata();
+    for (auto protocol : protocols) {
+      auto *wtable = emitWitnessTableRef(IGF, ty, /*srcMetadataCache=*/nullptr,
+                                         ProtocolConformanceRef(protocol));
+      wtables.push_back(wtable);
+    }
     return metadata;
   }
 
@@ -657,8 +677,8 @@ irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
   //      ----%inner---> ^^^
   //
   // In fact, we won't ever materialize %outer into any register.  Instead, we
-  // can just brach to materializing the metadata once we've determined which
-  // outer element's range contains %index.
+  // can just brach to materializing the metadata (and witness tables) once
+  // we've determined which outer element's range contains %index.
   //
   // As for %inner, it will only be materialized in those blocks corresponding
   // to pack expansions.
@@ -678,6 +698,8 @@ irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
   //               |emit_1:   |           |emit_N:                |
   //               | %inner=0 |           | %inner = %index - %lN |
   //               | %m_1 =   |           | %m_N =                |
+  //               | %wt_1_1= |           | %wt_1_N =             |
+  //               | %wt_k_1= |           | %wt_k_N =             |
   //               +----------+           +-----------------------+
   //                    |                      |
   //                    V                      V
@@ -686,10 +708,17 @@ irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
   //               | %m = phi [ %m_1, %emit_1 ],
   //               |                 ...
   //               |          [ %m_N, %emit_N ]
+  //               | %wt_1 = phi [ %wt_1_1, %emit_1 ],
+  //               |                 ...
+  //               |             [ %m_1_N, %emit_N ]
+  //               | ...
+  //               | %wt_k = phi [ %wt_k_1, %emit_1 ],
+  //               |                 ...
+  //               |             [ %m_k_N, %emit_N ]
   auto *current = IGF.Builder.GetInsertBlock();
 
-  // Terminate the block that branches to continue checking or metadata emission
-  // depending on whether the index is in the pack expansion's bounds.
+  // Terminate the block that branches to continue checking or metadata/wtable
+  // emission depending on whether the index is in the pack expansion's bounds.
   auto emitCheckBranch = [&IGF](llvm::Value *condition,
                                 llvm::BasicBlock *inBounds,
                                 llvm::BasicBlock *outOfBounds) {
@@ -697,25 +726,32 @@ irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
       IGF.Builder.CreateCondBr(condition, inBounds, outOfBounds);
     } else {
       assert(!inBounds &&
-             "no condition to check but a metadata materialization block!?");
+             "no condition to check but a materialization block!?");
       IGF.Builder.CreateBr(outOfBounds);
     }
   };
 
-  // The block which emission will continue in after we finish emitting metadata
-  // for this element.
+  // The block which emission will continue in after we finish emitting
+  // metadata/wtables for this element.
   auto *exit = IGF.createBasicBlock("pack-index-element-exit");
   IGF.Builder.emitBlock(exit);
   auto *metadataPhi = IGF.Builder.CreatePHI(IGF.IGM.TypeMetadataPtrTy,
                                             packType.getElementTypes().size());
+  llvm::SmallVector<llvm::PHINode *, 2> wtablePhis;
+  wtablePhis.reserve(protocols.size());
+  for (auto idx : indices(protocols)) {
+    (void)idx;
+    wtablePhis.push_back(IGF.Builder.CreatePHI(
+        IGF.IGM.WitnessTablePtrTy, packType.getElementTypes().size()));
+  }
 
   IGF.Builder.SetInsertPoint(current);
   // The previous checkBounds' block's comparision of %index.  Use it to emit a
-  // branch to the current block or the previous block's metadata emission
-  // block.
+  // branch to the current block or the previous block's metadata/wtable
+  // emission block.
   llvm::Value *previousCondition = nullptr;
-  // The previous type's materializeMetadata block.  Use it as the inBounds
-  // target when branching from the previous block.
+  // The previous type's materialize block.  Use it as the inBounds target when
+  // branching from the previous block.
   llvm::BasicBlock *previousInBounds = nullptr;
   // The lower bound of indices for the current pack expansion.  Inclusive.
   llvm::Value *lowerBound = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
@@ -726,7 +762,7 @@ irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
     // Finish emitting the previous block, either entry or check_i-1.
     //
     // Branch from the previous bounds-check block either to this bounds-check
-    // block or to the previous metadata-emission block.
+    // block or to the previous metadata/wtable emission block.
     emitCheckBranch(previousCondition, previousInBounds, checkBounds);
 
     // (1) Emit check_i {{
@@ -758,23 +794,40 @@ irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
     //    available.
 
     // (2) Emit emit_i {{
-    // The block within which the metadata corresponding to %inner will be
-    // materialized.
-    auto *materializeMetadata =
-        IGF.createBasicBlock("pack-index-element-metadata");
-    IGF.Builder.emitBlock(materializeMetadata);
+    // The block within which the metadata/wtables corresponding to %inner will
+    // be materialized.
+    auto *materialize = IGF.createBasicBlock("pack-index-element-metadata");
+    IGF.Builder.emitBlock(materialize);
 
     llvm::Value *metadata = nullptr;
+    llvm::SmallVector<llvm::Value *, 2> wtables;
+    wtables.reserve(protocols.size());
     if (auto expansionTy = dyn_cast<PackExpansionType>(elementTy)) {
       // Actually materialize %inner.  Then use it to get the metadata from the
       // pack expansion at that index.
       auto *relativeIndex = IGF.Builder.CreateSub(index, lowerBound);
       metadata = emitPackExpansionElementMetadata(IGF, expansionTy,
                                                   relativeIndex, request);
+      for (auto protocol : protocols) {
+        auto *wtable = emitPackExpansionElementWitnessTable(
+            IGF, expansionTy, ProtocolConformanceRef(protocol), relativeIndex);
+        wtables.push_back(wtable);
+      }
     } else {
       metadata = IGF.emitTypeMetadataRef(elementTy, request).getMetadata();
+      for (auto protocol : protocols) {
+        auto *wtable =
+            emitWitnessTableRef(IGF, elementTy, /*srcMetadataCache=*/nullptr,
+                                ProtocolConformanceRef(protocol));
+        wtables.push_back(wtable);
+      }
     }
-    metadataPhi->addIncoming(metadata, materializeMetadata);
+    metadataPhi->addIncoming(metadata, materialize);
+    for (auto i : indices(wtables)) {
+      auto *wtable = wtables[i];
+      auto *wtablePhi = wtablePhis[i];
+      wtablePhi->addIncoming(wtable, materialize);
+    }
     IGF.Builder.CreateBr(exit);
     // }} Finished emitting emit_i.
 
@@ -783,7 +836,7 @@ irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
     IGF.Builder.SetInsertPoint(checkBounds);
 
     // Set up the values for the next iteration.
-    previousInBounds = materializeMetadata;
+    previousInBounds = materialize;
     previousCondition = condition;
     lowerBound = upperBound;
   }
@@ -795,6 +848,9 @@ irgen::emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
                /*EmitUnreachable=*/true);
 
   IGF.Builder.SetInsertPoint(exit);
+  for (auto *wtablePhi : wtablePhis) {
+    wtables.push_back(wtablePhi);
+  }
   return metadataPhi;
 }
 

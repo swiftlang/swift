@@ -6876,10 +6876,13 @@ void IRGenSILFunction::visitOpenPackElementInst(swift::OpenPackElementInst *i) {
 
   i->getOpenedGenericEnvironment()->forEachPackElementBinding(
       [&](auto *archetype, auto *pack) {
+        auto protocols = archetype->getConformsTo();
+        llvm::SmallVector<llvm::Value *, 2> wtables;
         auto *metadata = emitTypeMetadataPackElementRef(
-            *this, CanPackType(pack), index, MetadataState::Complete);
-        this->bindArchetype(CanElementArchetypeType(archetype), metadata,
-                            MetadataState::Complete, {});
+            *this, CanPackType(pack), protocols, index, MetadataState::Complete,
+            wtables);
+        bindArchetype(CanElementArchetypeType(archetype), metadata,
+                      MetadataState::Complete, wtables);
       });
 
   // The result is just used for type dependencies.
