@@ -401,18 +401,13 @@ appendSymbolicInterfaceToIndexStorePath(SmallVectorImpl<char> &resultingPath) {
   llvm::sys::path::append(resultingPath, "interfaces");
 }
 
-static bool initSymbolicInterfaceStorePath(StringRef storePath,
-                                           std::string &error) {
-  using namespace llvm::sys;
+static llvm::Error initSymbolicInterfaceStorePath(StringRef storePath) {
   SmallString<128> subPath = storePath;
   appendSymbolicInterfaceToIndexStorePath(subPath);
-  std::error_code ec = fs::create_directories(subPath);
-  if (ec) {
-    llvm::raw_string_ostream err(error);
-    err << "failed to create directory '" << subPath << "': " << ec.message();
-    return true;
-  }
-  return false;
+  std::error_code ec = llvm::sys::fs::create_directories(subPath);
+  if (ec)
+    return llvm::errorCodeToError(ec);
+  return llvm::Error::success();
 }
 
 static void appendSymbolicInterfaceClangModuleFilename(
@@ -423,32 +418,29 @@ static void appendSymbolicInterfaceClangModuleFilename(
 }
 
 // FIXME (Alex): Share code with IndexUnitWriter in LLVM after refactoring it.
-static Optional<bool>
-isFileUpToDateForOutputFile(StringRef filePath,
-                            Optional<StringRef> timeCompareFilePath,
-                            std::string &error) {
+static llvm::Expected<bool>
+isFileUpToDateForOutputFile(StringRef filePath, StringRef timeCompareFilePath) {
+  auto makeError = [](StringRef path, std::error_code ec) -> llvm::Error {
+    std::string error;
+    llvm::raw_string_ostream(error)
+        << "could not access path '" << path << "': " << ec.message();
+    return llvm::createStringError(ec, error.c_str());
+  };
   llvm::sys::fs::file_status unitStat;
   if (std::error_code ec = llvm::sys::fs::status(filePath, unitStat)) {
-    if (ec != std::errc::no_such_file_or_directory) {
-      llvm::raw_string_ostream err(error);
-      err << "could not access path '" << filePath << "': " << ec.message();
-      return {};
-    }
+    if (ec != std::errc::no_such_file_or_directory)
+      return makeError(filePath, ec);
     return false;
   }
 
-  if (!timeCompareFilePath)
+  if (timeCompareFilePath.empty())
     return true;
 
   llvm::sys::fs::file_status compareStat;
   if (std::error_code ec =
-          llvm::sys::fs::status(*timeCompareFilePath, compareStat)) {
-    if (ec != std::errc::no_such_file_or_directory) {
-      llvm::raw_string_ostream err(error);
-      err << "could not access path '" << *timeCompareFilePath
-          << "': " << ec.message();
-      return {};
-    }
+          llvm::sys::fs::status(timeCompareFilePath, compareStat)) {
+    if (ec != std::errc::no_such_file_or_directory)
+      return makeError(timeCompareFilePath, ec);
     return true;
   }
 
@@ -477,9 +469,11 @@ static void emitSymbolicInterfaceForClangModule(
     return;
 
   // Make sure the `interfaces` directory is created.
-  std::string error;
-  if (initSymbolicInterfaceStorePath(indexStorePath, error)) {
-    diags.diagnose(SourceLoc(), diag::error_create_index_dir, error);
+  if (auto err = initSymbolicInterfaceStorePath(indexStorePath)) {
+    llvm::handleAllErrors(std::move(err), [&](const llvm::ECError &ec) {
+      diags.diagnose(SourceLoc(), diag::error_create_symbolic_interfaces_dir,
+                     ec.convertToErrorCode().message());
+    });
     return;
   }
 
@@ -494,10 +488,16 @@ static void emitSymbolicInterfaceForClangModule(
                                              interfaceOutputPath);
 
   // Check if the symbolic interface file is already up to date.
-  auto upToDate = isFileUpToDateForOutputFile(
-      interfaceOutputPath, StringRef(ModFile->FileName), error);
+  std::string error;
+  auto upToDate =
+      isFileUpToDateForOutputFile(interfaceOutputPath, ModFile->FileName);
   if (!upToDate) {
-    diags.diagnose(SourceLoc(), diag::error_index_failed_status_check, error);
+    llvm::handleAllErrors(
+        upToDate.takeError(), [&](const llvm::StringError &ec) {
+          diags.diagnose(SourceLoc(),
+                         diag::error_symbolic_interfaces_failed_status_check,
+                         ec.getMessage());
+        });
     return;
   }
   if (M->getASTContext().LangOpts.EnableIndexingSystemModuleRemarks) {
@@ -508,43 +508,44 @@ static void emitSymbolicInterfaceForClangModule(
     return;
 
   // Output the interface to a temporary file first.
-  SmallString<128> tempOutputPath;
-  tempOutputPath = llvm::sys::path::parent_path(interfaceOutputPath);
-  llvm::sys::path::append(tempOutputPath,
-                          llvm::sys::path::filename(interfaceOutputPath));
+  SmallString<128> tempOutputPath = interfaceOutputPath;
   tempOutputPath += "-%%%%%%%%";
   int tempFD;
   if (llvm::sys::fs::createUniqueFile(tempOutputPath.str(), tempFD,
                                       tempOutputPath)) {
     llvm::raw_string_ostream errOS(error);
     errOS << "failed to create temporary file: " << tempOutputPath;
-    diags.diagnose(SourceLoc(), diag::error_write_index_record, errOS.str());
+    diags.diagnose(SourceLoc(), diag::error_write_symbolic_interface,
+                   errOS.str());
     return;
   }
 
   llvm::raw_fd_ostream os(tempFD, /*shouldClose=*/true);
-  std::unique_ptr<ASTPrinter> printer;
-  printer.reset(new StreamPrinter(os));
-  ide::printSymbolicSwiftClangModuleInterface(M, *printer, clangModule);
+  StreamPrinter printer(os);
+  ide::printSymbolicSwiftClangModuleInterface(M, printer, clangModule);
   os.close();
 
   if (os.has_error()) {
     llvm::raw_string_ostream errOS(error);
     errOS << "failed to write '" << tempOutputPath
           << "': " << os.error().message();
-    diags.diagnose(SourceLoc(), diag::error_write_index_record, errOS.str());
+    diags.diagnose(SourceLoc(), diag::error_write_symbolic_interface,
+                   errOS.str());
     os.clear_error();
+    llvm::sys::fs::remove(tempOutputPath);
     return;
   }
 
   // Move the resulting output to the destination symbolic interface file.
   std::error_code ec = llvm::sys::fs::rename(
-      /*from=*/tempOutputPath.c_str(), /*to=*/interfaceOutputPath.c_str());
+      /*from=*/tempOutputPath, /*to=*/interfaceOutputPath);
   if (ec) {
     llvm::raw_string_ostream errOS(error);
     errOS << "failed to rename '" << tempOutputPath << "' to '"
           << interfaceOutputPath << "': " << ec.message();
-    diags.diagnose(SourceLoc(), diag::error_write_index_record, errOS.str());
+    diags.diagnose(SourceLoc(), diag::error_write_symbolic_interface,
+                   errOS.str());
+    llvm::sys::fs::remove(tempOutputPath);
     return;
   }
 }
@@ -637,8 +638,10 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                 clang::index::emitIndexDataForModuleFile(clangMod,
                                                          clangCI, unitWriter);
               // Emit the symbolic interface file in addition to index data.
-              emitSymbolicInterfaceForClangModule(
-                  clangModUnit, mod, clangMod, indexStorePath, clangCI, diags);
+              if (indexClangModules)
+                emitSymbolicInterfaceForClangModule(clangModUnit, mod, clangMod,
+                                                    indexStorePath, clangCI,
+                                                    diags);
             }
           } else {
             // Serialized AST file.
@@ -673,8 +676,9 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
               SmallVector<ImportedModule, 4> imports;
               mod->getImportedModules(imports,
                                       ModuleDecl::ImportFilterKind::Exported);
-              emitTransitiveClangSymbolicInterfacesForSwiftModuleImports(
-                  imports, indexStorePath, clangCI, diags);
+              if (indexClangModules)
+                emitTransitiveClangSymbolicInterfacesForSwiftModuleImports(
+                    imports, indexStorePath, clangCI, diags);
             }
           }
           clang::index::writer::OpaqueModule opaqMod =

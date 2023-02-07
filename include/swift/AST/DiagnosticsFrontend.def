@@ -270,6 +270,13 @@ REMARK(remark_indexing_system_module,none,
        "indexing system module at %0"
        "%select{|; skipping because of a broken swiftinterface}1",
        (StringRef, bool))
+
+ERROR(error_create_symbolic_interfaces_dir,none,
+      "creating symbolic interfaces directory: %0", (StringRef))
+ERROR(error_symbolic_interfaces_failed_status_check,none,
+      "failed file status check: %0", (StringRef))
+ERROR(error_write_symbolic_interface,none,
+      "writing symbolic interface file: %0", (StringRef))
 REMARK(remark_emitting_symbolic_interface_module,none,
        "emitting symbolic interface at %0"
        "%select{|; skipping because it's up to date}1",

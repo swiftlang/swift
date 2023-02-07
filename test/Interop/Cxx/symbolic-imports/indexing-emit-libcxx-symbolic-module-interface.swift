@@ -3,7 +3,9 @@
 
 // Verify that symbolic interfaces are emitted.
 //
-// RUN: %target-swift-frontend %t/test.swift -I %t -c -index-system-modules -index-store-path %t/store -enable-experimental-cxx-interop -Rindexing-system-module 2>&1 | %FileCheck --check-prefix=REMARK_NEW %s
+// RUN: %target-swift-frontend %t/test.swift -I %t -c -index-system-modules -index-store-path %t/store -enable-experimental-cxx-interop -Rindexing-system-module 2>%t/remarks
+// RUN: echo "EOF" >> %t/remarks
+// RUN: cat %t/remarks | %FileCheck --check-prefix=REMARK_NEW %s
 // RUN: ls %t/store/interfaces | %FileCheck --check-prefix=FILES %s
 // RUN: cat %t/store/interfaces/std* | %FileCheck --check-prefix=CHECK %s
 
@@ -30,7 +32,8 @@ import CxxStdlib
 import CxxModule
 
 // REMARK_NEW: remark: emitting symbolic interface at {{.*}}/interfaces/std-{{.*}}.pcm.symbolicswiftinterface{{$}}
-// REMARK_NEW: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface{{$}}
+// REMARK_NEW-NEXT: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface{{$}}
+// REMARK_NEW-NEXT: EOF
 
 // REMARK_NO_UPDATE: remark: emitting symbolic interface at {{.*}}/interfaces/std-{{.*}}.pcm.symbolicswiftinterface; skipping because it's up to date{{$}}
 // REMARK_NO_UPDATE: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface; skipping because it's up to date{{$}}
