@@ -7,6 +7,9 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+
+// Commit afc5116ef0de added support for the error check
+// UNSUPPORTED: back_deploy_concurrency
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
 
