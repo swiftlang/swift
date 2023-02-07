@@ -60,8 +60,6 @@ class BorrowToDestructureTransform {
   IntervalMapAllocator &allocator;
   MarkMustCheckInst *mmci;
   DiagnosticEmitter &diagnosticEmitter;
-  // Temporarily optional as this code is refactored.
-  Optional<FieldSensitiveSSAPrunedLiveRange> liveness;
   SmallVector<Operand *, 8> destructureNeedingUses;
   PostOrderAnalysis *poa;
   PostOrderFunctionInfo *pofi = nullptr;
@@ -78,19 +76,13 @@ class BorrowToDestructureTransform {
   SmallFrozenMultiMap<SILInstruction *, Operand *, 8>
       instToInterestingOperandIndexMap;
 
-  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-
 public:
   BorrowToDestructureTransform(IntervalMapAllocator &allocator,
                                MarkMustCheckInst *mmci,
                                DiagnosticEmitter &diagnosticEmitter,
                                PostOrderAnalysis *poa)
       : allocator(allocator), mmci(mmci), diagnosticEmitter(diagnosticEmitter),
-        liveness(), poa(poa) {
-    liveness.emplace(mmci->getFunction(), &discoveredBlocks);
-    liveness->init(mmci);
-    liveness->initializeDef(mmci, TypeTreeLeafTypeRange(mmci));
-  }
+        poa(poa) {}
 
   bool transform();
 

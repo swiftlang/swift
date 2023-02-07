@@ -137,8 +137,18 @@ struct borrowtodestructure::Implementation {
 
   Optional<AvailableValueStore> blockToAvailableValues;
 
-  Implementation(BorrowToDestructureTransform &interface)
-      : interface(interface) {}
+  // Temporarily optional as this code is refactored.
+  FieldSensitiveSSAPrunedLiveRange liveness;
+
+  Implementation(BorrowToDestructureTransform &interface,
+                 SmallVectorImpl<SILBasicBlock *> &discoveredBlocks)
+      : interface(interface),
+        liveness(interface.mmci->getFunction(), &discoveredBlocks) {}
+
+  void init(SILValue rootAddress) {
+    liveness.init(rootAddress);
+    liveness.initializeDef(rootAddress, TypeTreeLeafTypeRange(rootAddress));
+  }
 
   bool gatherUses(SILValue value);
 
@@ -236,8 +246,8 @@ bool Implementation::gatherUses(SILValue value) {
       interface.blocksToUses.insert(
           nextUse->getParentBlock(),
           {nextUse, {*leafRange, false /*is lifetime ending*/}});
-      interface.liveness->updateForUse(nextUse->getUser(), *leafRange,
-                                       false /*is lifetime ending*/);
+      liveness.updateForUse(nextUse->getUser(), *leafRange,
+                            false /*is lifetime ending*/);
       interface.instToInterestingOperandIndexMap.insert(nextUse->getUser(),
                                                         nextUse);
       continue;
@@ -263,8 +273,8 @@ bool Implementation::gatherUses(SILValue value) {
       interface.blocksToUses.insert(
           nextUse->getParentBlock(),
           {nextUse, {*leafRange, true /*is lifetime ending*/}});
-      interface.liveness->updateForUse(nextUse->getUser(), *leafRange,
-                                       true /*is lifetime ending*/);
+      liveness.updateForUse(nextUse->getUser(), *leafRange,
+                            true /*is lifetime ending*/);
       interface.instToInterestingOperandIndexMap.insert(nextUse->getUser(),
                                                         nextUse);
       continue;
@@ -304,7 +314,7 @@ void Implementation::checkForErrorsOnSameInstruction() {
   // check if any of our consuming uses that are on the boundary are used by the
   // same instruction as a different consuming or non-consuming use.
   interface.instToInterestingOperandIndexMap.setFrozen();
-  SmallBitVector usedBits(interface.liveness->getNumSubElements());
+  SmallBitVector usedBits(liveness.getNumSubElements());
 
   for (auto instRangePair :
        interface.instToInterestingOperandIndexMap.getRange()) {
@@ -423,8 +433,7 @@ void Implementation::checkDestructureUsesOnBoundary() const {
 
     auto destructureUseSpan =
         *TypeTreeLeafTypeRange::get(use->get(), getRootValue());
-    if (!interface.liveness->isWithinBoundary(use->getUser(),
-                                              destructureUseSpan)) {
+    if (!liveness.isWithinBoundary(use->getUser(), destructureUseSpan)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "        On boundary or within boundary! No error!\n");
       continue;
@@ -439,9 +448,8 @@ void Implementation::checkDestructureUsesOnBoundary() const {
     // TODO: Fix diagnostic to use destructure needing use and boundary
     // uses.
     LLVM_DEBUG(llvm::dbgs() << "        Within boundary! Emitting error!\n");
-    FieldSensitivePrunedLivenessBoundary boundary(
-        interface.liveness->getNumSubElements());
-    interface.liveness->computeBoundary(boundary);
+    FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
+    liveness.computeBoundary(boundary);
     getDiagnostics().emitObjectDestructureNeededWithinBorrowBoundary(
         getMarkedValue(), use->getUser(), destructureUseSpan, boundary);
   }
@@ -1096,7 +1104,7 @@ void Implementation::rewriteUses() {
              << "Performing BorrowToDestructureTransform::rewriteUses()!\n");
 
   llvm::SmallPtrSet<Operand *, 8> seenOperands;
-  SmallBitVector bitsNeededInBlock(interface.liveness->getNumSubElements());
+  SmallBitVector bitsNeededInBlock(liveness.getNumSubElements());
   IntervalMapAllocator::Map typeSpanToValue(getAllocator());
 
   auto *fn = getMarkedValue()->getFunction();
@@ -1590,7 +1598,9 @@ bool BorrowToDestructureTransform::transform() {
 
   // Attempt to gather uses. Return false if we saw something that we did not
   // understand.
-  Implementation impl(*this);
+  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+  Implementation impl(*this, discoveredBlocks);
+  impl.init(mmci);
   for (auto *bbi : borrowWorklist) {
     if (!impl.gatherUses(bbi))
       return false;
@@ -1623,7 +1633,7 @@ bool BorrowToDestructureTransform::transform() {
 
   // At this point, we know that all of our destructure requiring uses are on
   // the boundary of our live range. Now we need to do the rewriting.
-  impl.blockToAvailableValues.emplace(*liveness);
+  impl.blockToAvailableValues.emplace(impl.liveness);
   impl.rewriteUses();
 
   // Now that we have done our rewritting, we need to do a few cleanups.
