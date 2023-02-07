@@ -810,7 +810,7 @@ namespace swift {
 
     /// If true, the compiler will link forward declarations in Objective-C
     /// that represent an @objc exposed Swift definition to their definition.
-    bool ResolveObjCForwardDeclarationsOfSwiftTypes = false;
+    bool ResolveObjCForwardDeclarationsOfSwiftTypes = true;
 
     /// If true ignore the swift bridged attribute.
     bool DisableSwiftBridgeAttr = false;
