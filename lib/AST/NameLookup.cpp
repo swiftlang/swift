@@ -662,37 +662,56 @@ static void recordShadowedDeclsAfterTypeMatch(
         }
       }
 
-      // The Foundation overlay introduced Data.withUnsafeBytes, which is
-      // treated as being ambiguous with SwiftNIO's Data.withUnsafeBytes
-      // extension. Apply a special-case name shadowing rule to use the
-      // latter rather than the former, which be the consequence of a more
-      // significant change to name shadowing in the future.
-      if (auto owningStruct1
-            = firstDecl->getDeclContext()->getSelfStructDecl()) {
-        if (auto owningStruct2
-              = secondDecl->getDeclContext()->getSelfStructDecl()) {
-          if (owningStruct1 == owningStruct2 &&
-              owningStruct1->getName().is("Data") &&
-              isa<FuncDecl>(firstDecl) && isa<FuncDecl>(secondDecl) &&
-              firstDecl->getName() == secondDecl->getName() &&
-              firstDecl->getBaseName().userFacingName() == "withUnsafeBytes") {
-            // If the second module is the Foundation module and the first
-            // is the NIOFoundationCompat module, the second is shadowed by the
-            // first.
-            if (firstDecl->getModuleContext()->getName()
-                  .is("NIOFoundationCompat") &&
-                secondDecl->getModuleContext()->getName().is("Foundation")) {
+      if (ctx.LangOpts.hasFeature(Feature::ShadowFoundation)) {
+        // If `ShadowFoundation` is enabled, allow all types from Foundation
+        // to be implicitly shadowed.
+        if (auto foundationModule = ctx.getLoadedModule(ctx.Id_Foundation)) {
+          if ((firstModule == foundationModule) !=
+              (secondModule == foundationModule)) {
+            // If second module is Foundation, then it is shadowed by first
+            if (secondModule == foundationModule) {
               shadowed.insert(secondDecl);
               continue;
             }
 
-            // If it's the other way around, the first declaration is shadowed
-            // by the second.
-            if (secondDecl->getModuleContext()->getName()
-                  .is("NIOFoundationCompat") &&
-                firstDecl->getModuleContext()->getName().is("Foundation")) {
-              shadowed.insert(firstDecl);
-              break;
+            // Otherwise, the first declaration is shadowed by the second.
+            shadowed.insert(firstDecl);
+            break;
+          }
+        }
+      } else {
+        // The Foundation overlay introduced Data.withUnsafeBytes, which is
+        // treated as being ambiguous with SwiftNIO's Data.withUnsafeBytes
+        // extension. Apply a special-case name shadowing rule to use the
+        // latter rather than the former, which be the consequence of a more
+        // significant change to name shadowing in the future.
+        if (auto owningStruct1
+              = firstDecl->getDeclContext()->getSelfStructDecl()) {
+          if (auto owningStruct2
+                = secondDecl->getDeclContext()->getSelfStructDecl()) {
+            if (owningStruct1 == owningStruct2 &&
+                owningStruct1->getName().is("Data") &&
+                isa<FuncDecl>(firstDecl) && isa<FuncDecl>(secondDecl) &&
+                firstDecl->getName() == secondDecl->getName() &&
+                firstDecl->getBaseName().userFacingName() == "withUnsafeBytes") {
+              // If the second module is the Foundation module and the first
+              // is the NIOFoundationCompat module, the second is shadowed by the
+              // first.
+              if (firstDecl->getModuleContext()->getName()
+                    .is("NIOFoundationCompat") &&
+                  secondDecl->getModuleContext()->getName().is("Foundation")) {
+                shadowed.insert(secondDecl);
+                continue;
+              }
+
+              // If it's the other way around, the first declaration is shadowed
+              // by the second.
+              if (secondDecl->getModuleContext()->getName()
+                    .is("NIOFoundationCompat") &&
+                  firstDecl->getModuleContext()->getName().is("Foundation")) {
+                shadowed.insert(firstDecl);
+                break;
+              }
             }
           }
         }
