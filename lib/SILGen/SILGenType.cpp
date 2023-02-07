@@ -1237,11 +1237,6 @@ public:
   void visitMacroDecl(MacroDecl *md) {
     llvm_unreachable("macros aren't allowed in types");
   }
-
-  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-    for (auto *rewritten : med->getRewritten())
-      visit(rewritten);
-  }
 };
 
 } // end anonymous namespace
@@ -1414,11 +1409,6 @@ public:
 
   void visitMacroDecl(MacroDecl *md) {
     llvm_unreachable("macros aren't allowed in extensions");
-  }
-
-  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
-    for (auto *rewritten : med->getRewritten())
-      visit(rewritten);
   }
 };
 

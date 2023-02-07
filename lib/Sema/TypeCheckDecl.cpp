@@ -1611,10 +1611,13 @@ TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
   UnqualifiedLookupDescriptor descriptor(macroName, moduleScopeDC);
   auto lookup = evaluateOrDefault(
       ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
-  for (const auto &found : lookup.allResults())
-    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl()))
-      if (roles.contains(macro->getMacroRoles()))
+  for (const auto &found : lookup.allResults()) {
+    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+      auto foundRoles = macro->getMacroRoles();
+      if (foundRoles && roles.contains(foundRoles))
         choices.push_back(macro);
+    }
+  }
   return choices;
 }
 
