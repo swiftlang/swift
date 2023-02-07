@@ -156,6 +156,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include "MoveOnlyBorrowToDestructure.h"
 #include "MoveOnlyDiagnostics.h"
 #include "MoveOnlyObjectChecker.h"
 
@@ -866,9 +867,15 @@ struct MoveOnlyChecker {
   /// Information about destroys that we use when inserting destroys.
   ConsumeInfo consumes;
 
+  /// Allocator used by the BorrowToDestructureTransform.
+  borrowtodestructure::IntervalMapAllocator allocator;
+
+  /// PostOrderAnalysis used by the BorrowToDestructureTransform.
+  PostOrderAnalysis *poa;
+
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks,
-                  DominanceInfo *domTree)
-      : fn(fn), deleter(), canonicalizer(), diagnosticEmitter() {
+                  DominanceInfo *domTree, PostOrderAnalysis *poa)
+      : fn(fn), deleter(), canonicalizer(), diagnosticEmitter(), poa(poa) {
     deleter.setCallbacks(std::move(
         InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
           if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
@@ -1120,6 +1127,31 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy ||
         li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
       SWIFT_DEFER { moveChecker.canonicalizer.clear(); };
+
+      // Before we do anything, run the borrow to destructure transform in case
+      // we have a switch_enum user.
+      unsigned numDiagnostics =
+          moveChecker.diagnosticEmitter.getDiagnosticCount();
+      BorrowToDestructureTransform borrowToDestructure(
+          moveChecker.allocator, markedValue, li, moveChecker.diagnosticEmitter,
+          moveChecker.poa);
+      if (!borrowToDestructure.transform()) {
+        assert(moveChecker.diagnosticEmitter
+                   .didEmitCheckerDoesntUnderstandDiagnostic());
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Failed to perform borrow to destructure transform!\n");
+        emittedEarlyDiagnostic = true;
+        return false;
+      }
+
+      // If we emitted an error diagnostic, do not transform further and instead
+      // mark that we emitted an early diagnostic and return true.
+      if (numDiagnostics !=
+          moveChecker.diagnosticEmitter.getDiagnosticCount()) {
+        LLVM_DEBUG(llvm::dbgs() << "Emitting borrow to destructure error!\n");
+        emittedEarlyDiagnostic = true;
+        return true;
+      }
 
       // Canonicalize the lifetime of the load [take], load [copy].
       moveChecker.changed |= moveChecker.canonicalizer.canonicalize(li);
@@ -1558,6 +1590,19 @@ void MoveOnlyChecker::cleanupAfterEmittingDiagnostic() {
           changed = true;
         }
       }
+
+      // Convert any copy_value of move_only type to explicit copy value.
+      if (auto *cvi = dyn_cast<CopyValueInst>(inst)) {
+        if (!cvi->getOperand()->getType().isMoveOnly())
+          continue;
+        SILBuilderWithScope b(cvi);
+        auto *expCopy =
+            b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
+        cvi->replaceAllUsesWith(expCopy);
+        cvi->eraseFromParent();
+        changed = true;
+        continue;
+      }
     }
   }
 }
@@ -1982,8 +2027,10 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
+    auto *poa = getAnalysis<PostOrderAnalysis>();
 
-    if (MoveOnlyChecker(getFunction(), deAnalysis, domTree).checkFunction()) {
+    if (MoveOnlyChecker(getFunction(), deAnalysis, domTree, poa)
+            .checkFunction()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
 

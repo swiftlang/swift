@@ -59,6 +59,7 @@ class BorrowToDestructureTransform {
 
   IntervalMapAllocator &allocator;
   MarkMustCheckInst *mmci;
+  SILValue rootValue;
   DiagnosticEmitter &diagnosticEmitter;
   PostOrderAnalysis *poa;
   PostOrderFunctionInfo *pofi = nullptr;
@@ -67,11 +68,11 @@ class BorrowToDestructureTransform {
 
 public:
   BorrowToDestructureTransform(IntervalMapAllocator &allocator,
-                               MarkMustCheckInst *mmci,
+                               MarkMustCheckInst *mmci, SILValue rootValue,
                                DiagnosticEmitter &diagnosticEmitter,
                                PostOrderAnalysis *poa)
-      : allocator(allocator), mmci(mmci), diagnosticEmitter(diagnosticEmitter),
-        poa(poa) {}
+      : allocator(allocator), mmci(mmci), rootValue(rootValue),
+        diagnosticEmitter(diagnosticEmitter), poa(poa) {}
 
   bool transform();
 

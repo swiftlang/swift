@@ -55,8 +55,8 @@ static bool runTransform(SILFunction *fn,
     auto *mmci = moveIntroducersToProcess.back();
     moveIntroducersToProcess = moveIntroducersToProcess.drop_back();
 
-    BorrowToDestructureTransform transform(allocator, mmci, diagnosticEmitter,
-                                           poa);
+    BorrowToDestructureTransform transform(allocator, mmci, mmci,
+                                           diagnosticEmitter, poa);
     transform.transform();
     madeChange = true;
   }

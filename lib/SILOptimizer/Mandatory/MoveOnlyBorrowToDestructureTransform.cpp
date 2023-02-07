@@ -1523,7 +1523,7 @@ void Implementation::cleanup() {
 ///
 /// Returns false if we found an escape and thus cannot process. It is assumed
 /// that the caller will fail in such a case.
-static bool gatherBorrows(MarkMustCheckInst *mmci,
+static bool gatherBorrows(SILValue rootValue,
                           StackList<BeginBorrowInst *> &borrowWorklist) {
   // If we have a no implicit copy mark_must_check, we do not run the borrow to
   // destructure transform since:
@@ -1534,15 +1534,16 @@ static bool gatherBorrows(MarkMustCheckInst *mmci,
   // 2. If we do not have a move only type, then we know that all fields that we
   //    access directly and would cause a need to destructure must be copyable,
   //    so no transformation/error is needed.
-  if (mmci->getType().isMoveOnlyWrapped()) {
-    LLVM_DEBUG(llvm::dbgs() << "Skipping move only wrapped inst: " << *mmci);
+  if (rootValue->getType().isMoveOnlyWrapped()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Skipping move only wrapped inst: " << *rootValue);
     return true;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "Searching for borrows for inst: " << *mmci);
+  LLVM_DEBUG(llvm::dbgs() << "Searching for borrows for inst: " << *rootValue);
 
-  StackList<Operand *> worklist(mmci->getFunction());
-  for (auto *op : mmci->getUses())
+  StackList<Operand *> worklist(rootValue->getFunction());
+  for (auto *op : rootValue->getUses())
     worklist.push_back(op);
 
   while (!worklist.empty()) {
@@ -1728,8 +1729,10 @@ bool BorrowToDestructureTransform::transform() {
 
   // If we failed to gather borrows due to the transform not understanding part
   // of the SIL, fail and return false.
-  if (!gatherBorrows(mmci, borrowWorklist))
+  if (!gatherBorrows(rootValue, borrowWorklist)) {
+    diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
     return false;
+  }
 
   // If we do not have any borrows to process, return true early to show we
   // succeeded in processing.
@@ -1742,8 +1745,10 @@ bool BorrowToDestructureTransform::transform() {
   SmallVector<SwitchEnumInst *, 8> switchEnumWorklist;
   for (auto *borrow : borrowWorklist) {
     // Attempt to gather the switch enums and if we fail, return false.
-    if (!gatherSwitchEnum(borrow, switchEnumWorklist))
+    if (!gatherSwitchEnum(borrow, switchEnumWorklist)) {
+      diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
       return false;
+    }
   }
 
   // Now perform the checking of our switch_enum, working in stack order.
@@ -1863,15 +1868,23 @@ bool BorrowToDestructureTransform::transform() {
     }
   }
 
+  // At this point, we have correct OSSA SIL for our switch_enums. Check if for
+  // any of our switch_enum we emitted a we don't understand diagnostic... in
+  // such a case, exit before we do further work.
+  if (diagnosticEmitter.didEmitCheckerDoesntUnderstandDiagnostic())
+    return false;
+
   // Now that we have handled our switch_enum we need to handle our
   // borrows... begin by gathering uses. Return false if we saw something that
   // we did not understand.
   SmallVector<SILBasicBlock *, 8> discoveredBlocks;
   Implementation impl(*this, discoveredBlocks);
-  impl.init(mmci);
+  impl.init(rootValue);
   for (auto *bbi : borrowWorklist) {
-    if (!impl.gatherUses(bbi))
+    if (!impl.gatherUses(bbi)) {
+      diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
       return false;
+    }
   }
 
   // Next make sure that any destructure needing instructions are on the

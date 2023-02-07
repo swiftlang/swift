@@ -423,8 +423,8 @@ struct MoveOnlyChecker {
 bool MoveOnlyChecker::convertBorrowExtractsToOwnedDestructures(
     MarkMustCheckInst *mmci, DiagnosticEmitter &diagnosticEmitter,
     DominanceInfo *domTree, PostOrderAnalysis *poa) {
-  BorrowToDestructureTransform transform(allocator, mmci, diagnosticEmitter,
-                                         poa);
+  BorrowToDestructureTransform transform(allocator, mmci, mmci,
+                                         diagnosticEmitter, poa);
   if (!transform.transform()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Failed to perform borrow to destructure transform!\n");
