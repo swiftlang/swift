@@ -90,9 +90,13 @@ struct AvailableValueStore {
   }
 };
 
+struct Implementation;
+
 } // namespace borrowtodestructure
 
 class BorrowToDestructureTransform {
+  friend borrowtodestructure::Implementation;
+
   using IntervalMapAllocator = borrowtodestructure::IntervalMapAllocator;
   using AvailableValueStore = borrowtodestructure::AvailableValueStore;
   using AvailableValues = borrowtodestructure::AvailableValues;
@@ -148,11 +152,6 @@ private:
   /// that the caller will fail in such a case.
   static bool gatherBorrows(MarkMustCheckInst *mmci,
                             StackList<BeginBorrowInst *> &borrowWorklist);
-
-  /// Walk through our borrow's uses recursively and find uses that require only
-  /// a subset of the bits of our type. These are uses that are consuming uses
-  /// that are destructure uses.
-  bool gatherUses(StackList<BeginBorrowInst *> &borrowWorklist);
 
   /// Once we have gathered up all of our destructure uses and liveness
   /// requiring uses, validate that all of our destructure uses are on our

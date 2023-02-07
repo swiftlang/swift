@@ -79,18 +79,25 @@ static SILLocation getSafeLoc(SILInstruction *inst) {
 }
 
 //===----------------------------------------------------------------------===//
-//            MARK: Convert Borrow Extracts To Owned Destructures
+//                        MARK: Private Implementation
 //===----------------------------------------------------------------------===//
 
-bool BorrowToDestructureTransform::gatherUses(
-    StackList<BeginBorrowInst *> &borrowWorklist) {
-  LLVM_DEBUG(llvm::dbgs() << "Gathering uses!\n");
-  StackList<Operand *> useWorklist(mmci->getFunction());
+struct borrowtodestructure::Implementation {
+  BorrowToDestructureTransform &interface;
 
-  for (auto *borrow : borrowWorklist) {
-    for (auto *use : borrow->getUses()) {
-      useWorklist.push_back(use);
-    }
+  bool gatherUses(SILValue value);
+
+  /// Returns mark_must_check if we are processing borrows or the enum argument
+  /// if we are processing switch_enum.
+  SILValue getRootValue() const { return interface.mmci; }
+};
+
+bool Implementation::gatherUses(SILValue value) {
+  LLVM_DEBUG(llvm::dbgs() << "Gathering uses!\n");
+  StackList<Operand *> useWorklist(value->getFunction());
+
+  for (auto *use : value->getUses()) {
+    useWorklist.push_back(use);
   }
 
   while (!useWorklist.empty()) {
@@ -131,19 +138,21 @@ bool BorrowToDestructureTransform::gatherUses(
         // normal use, so we fall through.
       }
 
-      auto leafRange = TypeTreeLeafTypeRange::get(nextUse->get(), mmci);
+      auto leafRange =
+          TypeTreeLeafTypeRange::get(nextUse->get(), getRootValue());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
         return false;
       }
 
       LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
-      blocksToUses.insert(
+      interface.blocksToUses.insert(
           nextUse->getParentBlock(),
           {nextUse, {*leafRange, false /*is lifetime ending*/}});
-      liveness->updateForUse(nextUse->getUser(), *leafRange,
-                             false /*is lifetime ending*/);
-      instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
+      interface.liveness->updateForUse(nextUse->getUser(), *leafRange,
+                                       false /*is lifetime ending*/);
+      interface.instToInterestingOperandIndexMap.insert(nextUse->getUser(),
+                                                        nextUse);
       continue;
     }
 
@@ -155,19 +164,22 @@ bool BorrowToDestructureTransform::gatherUses(
         continue;
       }
 
-      auto leafRange = TypeTreeLeafTypeRange::get(nextUse->get(), mmci);
+      auto leafRange =
+          TypeTreeLeafTypeRange::get(nextUse->get(), getRootValue());
       if (!leafRange) {
         LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
         return false;
       }
 
       LLVM_DEBUG(llvm::dbgs() << "        Found lifetime ending use!\n");
-      destructureNeedingUses.push_back(nextUse);
-      blocksToUses.insert(nextUse->getParentBlock(),
-                          {nextUse, {*leafRange, true /*is lifetime ending*/}});
-      liveness->updateForUse(nextUse->getUser(), *leafRange,
-                             true /*is lifetime ending*/);
-      instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
+      interface.destructureNeedingUses.push_back(nextUse);
+      interface.blocksToUses.insert(
+          nextUse->getParentBlock(),
+          {nextUse, {*leafRange, true /*is lifetime ending*/}});
+      interface.liveness->updateForUse(nextUse->getUser(), *leafRange,
+                                       true /*is lifetime ending*/);
+      interface.instToInterestingOperandIndexMap.insert(nextUse->getUser(),
+                                                        nextUse);
       continue;
     }
 
@@ -199,6 +211,10 @@ bool BorrowToDestructureTransform::gatherUses(
   }
   return true;
 }
+
+//===----------------------------------------------------------------------===//
+//            MARK: Convert Borrow Extracts To Owned Destructures
+//===----------------------------------------------------------------------===//
 
 void BorrowToDestructureTransform::checkForErrorsOnSameInstruction() {
   // At this point, we have emitted all boundary checks. We also now need to
@@ -1476,8 +1492,11 @@ bool BorrowToDestructureTransform::transform() {
 
   // Attempt to gather uses. Return false if we saw something that we did not
   // understand.
-  if (!gatherUses(borrowWorklist))
-    return false;
+  Implementation impl{*this};
+  for (auto *bbi : borrowWorklist) {
+    if (!impl.gatherUses(bbi))
+      return false;
+  }
 
   // Next make sure that any destructure needing instructions are on the
   // boundary in a per bit field sensitive manner.
