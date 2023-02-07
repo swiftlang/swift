@@ -245,8 +245,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     if (paramContext != ParameterContextKind::EnumElement) {
       auto AttrStatus = parseDeclAttributeList(param.Attrs);
       if (AttrStatus.hasCodeCompletion()) {
-        if (IDECallbacks)
-          IDECallbacks->setAttrTargetDeclKind(DeclKind::Param);
+        if (CodeCompletionCallbacks)
+          CodeCompletionCallbacks->setAttrTargetDeclKind(DeclKind::Param);
         status.setHasCodeCompletionAndIsError();
       }
     }
@@ -987,9 +987,9 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
     // Code completion.
     if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine() &&
         !existingArrowLoc.isValid()) {
-      if (IDECallbacks)
-        IDECallbacks->completeEffectsSpecifier(asyncLoc.isValid(),
-                                                 throwsLoc.isValid());
+      if (CodeCompletionCallbacks)
+        CodeCompletionCallbacks->completeEffectsSpecifier(asyncLoc.isValid(),
+                                                          throwsLoc.isValid());
       consumeToken(tok::code_complete);
       status.setHasCodeCompletionAndIsError();
       continue;

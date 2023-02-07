@@ -41,7 +41,8 @@ namespace llvm {
 
 namespace swift {
   class IdentTypeRepr;
-  class IDEInspectionCallbacks;
+  class CodeCompletionCallbacks;
+  class DoneParsingCallback;
   class IDEInspectionCallbacksFactory;
   class DefaultArgumentInitializer;
   class DiagnosticEngine;
@@ -129,7 +130,8 @@ public:
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
   ASTContext &Context;
-  IDEInspectionCallbacks *IDECallbacks = nullptr;
+  CodeCompletionCallbacks *CodeCompletionCallbacks = nullptr;
+  DoneParsingCallback *DoneParsingCallback = nullptr;
   std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
   /// The current token hash, or \c None if the parser isn't computing a hash
@@ -163,12 +165,16 @@ public:
   /// the #if decl.
   bool shouldEvaluatePoundIfDecls() const;
 
-  void setIDECallbacks(IDEInspectionCallbacks *Callbacks) {
-    IDECallbacks = Callbacks;
+  void setCodeCompletionCallbacks(class CodeCompletionCallbacks *Callbacks) {
+    CodeCompletionCallbacks = Callbacks;
+  }
+
+  void setDoneParsingCallback(class DoneParsingCallback *Callback) {
+    this->DoneParsingCallback = Callback;
   }
 
   bool isIDEInspectionFirstPass() const {
-    return SourceMgr.hasIDEInspectionTargetBuffer() && !IDECallbacks;
+    return SourceMgr.hasIDEInspectionTargetBuffer() && !DoneParsingCallback;
   }
 
   bool allowTopLevelCode() const;
