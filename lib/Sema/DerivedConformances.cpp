@@ -87,10 +87,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveHashable(Nominal);
   }
 
-  if (*derivableKind == KnownDerivableProtocolKind::Actor) {
-    fprintf(stderr, "[%s:%d](%s) call can derive\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  if (*derivableKind == KnownDerivableProtocolKind::Actor)
     return canDeriveActor(DC, Nominal);
-  }
 
   if (*derivableKind == KnownDerivableProtocolKind::Identifiable)
     return canDeriveIdentifiable(Nominal, DC);
@@ -294,11 +292,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
     auto conformance = nominal->getParentModule()->lookupConformance(
         nominal->getDeclaredInterfaceType(), proto);
-
     if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
-    fprintf(stderr, "[%s:%d](%s) call derivesProtocolConformance\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))
         return nullptr;
     }
@@ -338,10 +334,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
     // Actor.unownedExecutor
-    if (name.isSimpleName(ctx.Id_unownedExecutor)) {
-      fprintf(stderr, "[%s:%d](%s) get actor unowned executor !!!!!!!!!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    if (name.isSimpleName(ctx.Id_unownedExecutor))
       return getRequirement(KnownProtocolKind::Actor);
-    }
 
     // DistributedActor.id
     if (name.isSimpleName(ctx.Id_id))

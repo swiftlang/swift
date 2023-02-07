@@ -55,10 +55,8 @@ actor MyActor: WithSpecifiedExecutor {
 
   nonisolated let executor: SpecifiedExecutor
 
-//  /// FIXME: Compiler should not require us to restate this here. We'll fix it.
-//  nonisolated var unownedExecutor: UnownedSerialExecutor {
-//    executor.asUnownedSerialExecutor()
-//  }
+  // Note that we don't have to provide the unownedExecutor in the actor itself.
+  // We obtain it from the extension on `WithSpecifiedExecutor`.
 
   init(executor: SpecifiedExecutor) {
     self.executor = executor

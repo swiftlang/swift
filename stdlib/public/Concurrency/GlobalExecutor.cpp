@@ -125,6 +125,17 @@ void swift::swift_task_enqueueGlobalWithDeadline(
     swift_task_enqueueGlobalWithDeadlineImpl(sec, nsec, tsec, tnsec, clock, job);
 }
 
+bool swift::swift_task_isOnExecutor(HeapObject *executor,
+                                    const Metadata *selfType,
+                                    const SerialExecutorWitnessTable *wtable) {
+  // TODO(ktoso): the _hook dance here
+  return swift_task_isCurrentExecutor(ExecutorRef::forOrdinary(executor, wtable));
+}
+
+/*****************************************************************************/
+/****************************** MAIN EXECUTOR  *******************************/
+/*****************************************************************************/
+
 void swift::swift_task_enqueueMainExecutor(Job *job) {
   concurrency::trace::job_enqueue_main_executor(job);
   if (swift_task_enqueueMainExecutor_hook)
