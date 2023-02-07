@@ -541,6 +541,16 @@ bool SILType_isFunction(BridgedType type) {
   return castToSILType(type).is<SILFunctionType>();
 }
 
+bool SILType_isMetatype(BridgedType type) {
+  return castToSILType(type).is<MetatypeType>();
+}
+
+BridgedType SILType_instanceTypeOfMetatype(BridgedType type) {
+  auto metaType = castToSILType(type).castTo<MetatypeType>();
+  SILType instanceTy = SILType::getPrimitiveObjectType(metaType.getInstanceType());
+  return {instanceTy.getOpaqueValue()};
+}
+
 BridgedDecl SILType_getNominal(BridgedType type) {
   return castToSILType(type).getNominalOrBoundGenericNominal();
 }

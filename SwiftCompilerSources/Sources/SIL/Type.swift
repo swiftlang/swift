@@ -40,6 +40,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isTuple: Bool { SILType_isTuple(bridged) != 0 }
   public var isEnum: Bool { SILType_isEnum(bridged) != 0 }
   public var isFunction: Bool { SILType_isFunction(bridged) }
+  public var isMetatype: Bool { SILType_isMetatype(bridged) }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
   public var nominal: Decl { Decl(bridged: SILType_getNominal(bridged)) }
@@ -51,6 +52,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public func getNominalFields(in function: Function) -> NominalFieldsArray {
     NominalFieldsArray(type: self, function: function)
   }
+
+  public var instanceTypeOfMetatype: Type { SILType_instanceTypeOfMetatype(bridged).type }
 
   public var isCalleeConsumedFunction: Bool { SILType_isCalleeConsumedFunction(bridged) }
   
