@@ -24,3 +24,18 @@ let s = S()
 // CHECK: synthesized method
 // CHECK: Storage
 s.useSynthesized()
+
+@attached(
+  member,
+  names: named(RawValue), named(rawValue), named(`init`)
+)
+public macro NewType<T>() = #externalMacro(module: "MacroDefinition", type: "NewTypeMacro")
+
+@NewType<String>
+public struct MyString {}
+
+// CHECK: String
+// CHECK: hello
+let myString = MyString("hello")
+print(MyString.RawValue.self)
+print(myString.rawValue)
