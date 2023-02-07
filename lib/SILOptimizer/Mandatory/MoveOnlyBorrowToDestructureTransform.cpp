@@ -87,9 +87,41 @@ struct borrowtodestructure::Implementation {
 
   bool gatherUses(SILValue value);
 
+  /// Once we have gathered up all of our destructure uses and liveness
+  /// requiring uses, validate that all of our destructure uses are on our
+  /// boundary. Once we have done this, we know that it is safe to perform our
+  /// transform.
+  void checkDestructureUsesOnBoundary() const;
+
+  /// Check for cases where we have two consuming uses on the same instruction
+  /// or a consuming/non-consuming use on the same instruction.
+  void checkForErrorsOnSameInstruction();
+
+  /// Rewrite all of the uses of our borrow on our borrow operand, performing
+  /// destructures as appropriate.
+  void rewriteUses();
+
+  AvailableValues &computeAvailableValues(SILBasicBlock *block);
+
   /// Returns mark_must_check if we are processing borrows or the enum argument
   /// if we are processing switch_enum.
   SILValue getRootValue() const { return interface.mmci; }
+
+  DiagnosticEmitter &getDiagnostics() const {
+    return interface.diagnosticEmitter;
+  }
+
+  /// Always returns the actual root mark_must_check for both switch_enum args
+  /// and normal borrow user checks.
+  MarkMustCheckInst *getMarkedValue() const { return interface.mmci; }
+
+  PostOrderFunctionInfo *getPostOrderFunctionInfo() {
+    return interface.getPostOrderFunctionInfo();
+  }
+
+  IntervalMapAllocator::Allocator &getAllocator() {
+    return interface.allocator.get();
+  }
 };
 
 bool Implementation::gatherUses(SILValue value) {
@@ -212,18 +244,15 @@ bool Implementation::gatherUses(SILValue value) {
   return true;
 }
 
-//===----------------------------------------------------------------------===//
-//            MARK: Convert Borrow Extracts To Owned Destructures
-//===----------------------------------------------------------------------===//
-
-void BorrowToDestructureTransform::checkForErrorsOnSameInstruction() {
+void Implementation::checkForErrorsOnSameInstruction() {
   // At this point, we have emitted all boundary checks. We also now need to
   // check if any of our consuming uses that are on the boundary are used by the
   // same instruction as a different consuming or non-consuming use.
-  instToInterestingOperandIndexMap.setFrozen();
-  SmallBitVector usedBits(liveness->getNumSubElements());
+  interface.instToInterestingOperandIndexMap.setFrozen();
+  SmallBitVector usedBits(interface.liveness->getNumSubElements());
 
-  for (auto instRangePair : instToInterestingOperandIndexMap.getRange()) {
+  for (auto instRangePair :
+       interface.instToInterestingOperandIndexMap.getRange()) {
     SWIFT_DEFER { usedBits.reset(); };
 
     // First loop through our uses and handle any consuming twice errors. We
@@ -234,7 +263,8 @@ void BorrowToDestructureTransform::checkForErrorsOnSameInstruction() {
       if (!use->isConsuming())
         continue;
 
-      auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use->get(), mmci);
+      auto destructureUseSpan =
+          *TypeTreeLeafTypeRange::get(use->get(), getRootValue());
       for (unsigned index : destructureUseSpan.getRange()) {
         if (usedBits[index]) {
           // If we get that we used the same bit twice, we have an error. We set
@@ -261,7 +291,8 @@ void BorrowToDestructureTransform::checkForErrorsOnSameInstruction() {
         if (use->isConsuming())
           continue;
 
-        auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use->get(), mmci);
+        auto destructureUseSpan =
+            *TypeTreeLeafTypeRange::get(use->get(), getRootValue());
         for (unsigned index : destructureUseSpan.getRange()) {
           if (!usedBits[index])
             continue;
@@ -301,18 +332,19 @@ void BorrowToDestructureTransform::checkForErrorsOnSameInstruction() {
       if (!use->isConsuming())
         continue;
 
-      auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use->get(), mmci);
+      auto destructureUseSpan =
+          *TypeTreeLeafTypeRange::get(use->get(), getRootValue());
       bool emittedError = false;
       for (unsigned index : destructureUseSpan.getRange()) {
         if (!usedBits[index])
           continue;
 
         if (badOperand->isConsuming())
-          diagnosticEmitter.emitObjectInstConsumesValueTwice(mmci, use,
-                                                             badOperand);
+          getDiagnostics().emitObjectInstConsumesValueTwice(getMarkedValue(),
+                                                            use, badOperand);
         else
-          diagnosticEmitter.emitObjectInstConsumesAndUsesValue(mmci, use,
-                                                               badOperand);
+          getDiagnostics().emitObjectInstConsumesAndUsesValue(getMarkedValue(),
+                                                              use, badOperand);
         emittedError = true;
       }
 
@@ -323,19 +355,21 @@ void BorrowToDestructureTransform::checkForErrorsOnSameInstruction() {
   }
 }
 
-void BorrowToDestructureTransform::checkDestructureUsesOnBoundary() const {
+void Implementation::checkDestructureUsesOnBoundary() const {
   LLVM_DEBUG(llvm::dbgs() << "Checking destructure uses on boundary!\n");
 
   // Now that we have found all of our destructure needing uses and liveness
   // needing uses, make sure that none of our destructure needing uses are
   // within our boundary. If so, we have an automatic error since we have a
   // use-after-free.
-  for (auto *use : destructureNeedingUses) {
+  for (auto *use : interface.destructureNeedingUses) {
     LLVM_DEBUG(llvm::dbgs()
                << "    DestructureNeedingUse: " << *use->getUser());
 
-    auto destructureUseSpan = *TypeTreeLeafTypeRange::get(use->get(), mmci);
-    if (!liveness->isWithinBoundary(use->getUser(), destructureUseSpan)) {
+    auto destructureUseSpan =
+        *TypeTreeLeafTypeRange::get(use->get(), getRootValue());
+    if (!interface.liveness->isWithinBoundary(use->getUser(),
+                                              destructureUseSpan)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "        On boundary or within boundary! No error!\n");
       continue;
@@ -351,10 +385,10 @@ void BorrowToDestructureTransform::checkDestructureUsesOnBoundary() const {
     // uses.
     LLVM_DEBUG(llvm::dbgs() << "        Within boundary! Emitting error!\n");
     FieldSensitivePrunedLivenessBoundary boundary(
-        liveness->getNumSubElements());
-    liveness->computeBoundary(boundary);
-    diagnosticEmitter.emitObjectDestructureNeededWithinBorrowBoundary(
-        mmci, use->getUser(), destructureUseSpan, boundary);
+        interface.liveness->getNumSubElements());
+    interface.liveness->computeBoundary(boundary);
+    getDiagnostics().emitObjectDestructureNeededWithinBorrowBoundary(
+        getMarkedValue(), use->getUser(), destructureUseSpan, boundary);
   }
 }
 
@@ -613,15 +647,14 @@ static void dumpSmallestTypeAvailable(
 /// ensures that we match at the source level the assumption by users that they
 /// can use entire valid parts as late as possible. If we were to do it earlier
 /// we would emit errors too early.
-AvailableValues &
-BorrowToDestructureTransform::computeAvailableValues(SILBasicBlock *block) {
+AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
   LLVM_DEBUG(llvm::dbgs() << "    Computing Available Values For bb"
                           << block->getDebugID() << '\n');
 
   // First grab our block. If we already have state for the block, just return
   // its available values. We already computed the available values and
   // potentially updated it with new destructured values for our block.
-  auto pair = blockToAvailableValues->get(block);
+  auto pair = interface.blockToAvailableValues->get(block);
   if (!pair.second) {
     LLVM_DEBUG(llvm::dbgs()
                << "        Already have values! Returning them!\n");
@@ -641,11 +674,11 @@ BorrowToDestructureTransform::computeAvailableValues(SILBasicBlock *block) {
   // ensure that from an OSSA perspective any any destructures we insert are
   // independent of any other copies. We assume that OSSA canonicalization will
   // remove the extra copy later after we run or emit an error if it can't.
-  if (block == mmci->getParent()) {
+  if (block == getRootValue()->getParentBlock()) {
     LLVM_DEBUG(llvm::dbgs()
                << "        In initial block, setting to initial value!\n");
     for (unsigned i : indices(newValues))
-      newValues[i] = initialValue;
+      newValues[i] = interface.initialValue;
     LLVM_DEBUG(newValues.print(llvm::dbgs(), "        "));
     return newValues;
   }
@@ -745,7 +778,7 @@ BorrowToDestructureTransform::computeAvailableValues(SILBasicBlock *block) {
       for (unsigned i : range(predAvailableValues.size())) {
         if (predAvailableValues[i])
           smallestTypeAvailable.push_back(
-              {{TypeOffsetSizePair(predAvailableValues[i], mmci),
+              {{TypeOffsetSizePair(predAvailableValues[i], getRootValue()),
                 predAvailableValues[i]->getType()}});
         else
           smallestTypeAvailable.emplace_back(None);
@@ -779,7 +812,8 @@ BorrowToDestructureTransform::computeAvailableValues(SILBasicBlock *block) {
         // the NOTE above), we know that if subElt has a smaller size than our
         // accumulator, then it must be further down the type tree from our
         // accumulator.
-        auto offsetSize = TypeOffsetSizePair(predAvailableValues[i], mmci);
+        auto offsetSize =
+            TypeOffsetSizePair(predAvailableValues[i], getRootValue());
         if (smallestTypeAvailable[i]->first.size > offsetSize.size)
           smallestTypeAvailable[i] = {offsetSize,
                                       predAvailableValues[i]->getType()};
@@ -800,7 +834,7 @@ BorrowToDestructureTransform::computeAvailableValues(SILBasicBlock *block) {
       << "    Destructuring available values in preds to smallest size for bb"
       << block->getDebugID() << '\n');
   auto *fn = block->getFunction();
-  IntervalMapAllocator::Map typeSpanToValue(allocator.get());
+  IntervalMapAllocator::Map typeSpanToValue(getAllocator());
   for (auto *predBlock : predsSkippingBackEdges) {
     SWIFT_DEFER { typeSpanToValue.clear(); };
 
@@ -843,7 +877,7 @@ BorrowToDestructureTransform::computeAvailableValues(SILBasicBlock *block) {
       auto iter = typeSpanToValue.find(i);
       assert(iter != typeSpanToValue.end());
       auto iterValue = iter.value();
-      auto iterOffsetSize = TypeOffsetSizePair(iterValue, mmci);
+      auto iterOffsetSize = TypeOffsetSizePair(iterValue, getRootValue());
       if (smallestOffsetSize->first.size == iterOffsetSize.size) {
         // Our value should already be in the interval map.
         assert(iter.start() == iterOffsetSize.startOffset &&
@@ -954,7 +988,7 @@ BorrowToDestructureTransform::computeAvailableValues(SILBasicBlock *block) {
       SILType offsetType = smallestTypeAvailable[i]->second;
       auto *phi = block->createPhiArgument(offsetType, OwnershipKind::Owned);
       newValues[i] = phi;
-      createdPhiArguments.push_back(phi);
+      interface.createdPhiArguments.push_back(phi);
     }
 
     for (auto *predBlock : predsSkippingBackEdges) {
@@ -1000,28 +1034,30 @@ dumpIntervalMap(IntervalMapAllocator::Map &map) {
 }
 #endif
 
-void BorrowToDestructureTransform::rewriteUses() {
-  blocksToUses.setFrozen();
+void Implementation::rewriteUses() {
+  interface.blocksToUses.setFrozen();
 
   LLVM_DEBUG(llvm::dbgs()
              << "Performing BorrowToDestructureTransform::rewriteUses()!\n");
 
   llvm::SmallPtrSet<Operand *, 8> seenOperands;
-  SmallBitVector bitsNeededInBlock(liveness->getNumSubElements());
-  IntervalMapAllocator::Map typeSpanToValue(allocator.get());
+  SmallBitVector bitsNeededInBlock(interface.liveness->getNumSubElements());
+  IntervalMapAllocator::Map typeSpanToValue(getAllocator());
 
-  auto *fn = mmci->getFunction();
-  assert(!initialValue);
+  auto *fn = getMarkedValue()->getFunction();
+  assert(!interface.initialValue);
   {
-    auto *next = mmci->getNextInstruction();
+    // We are always going to copy our root value.
+    auto *next = getRootValue()->getNextInstruction();
     SILBuilderWithScope builder(next);
-    initialValue = builder.createCopyValue(getSafeLoc(next), mmci);
+    interface.initialValue =
+        builder.createCopyValue(getSafeLoc(next), getRootValue());
   }
-  assert(initialValue);
+  assert(interface.initialValue);
 
   // Walking each block in RPO order.
-  for (auto *block :
-       getPostOrderFunctionInfo()->getReversePostOrder(mmci->getParent())) {
+  for (auto *block : getPostOrderFunctionInfo()->getReversePostOrder(
+           getRootValue()->getParentBlock())) {
     SWIFT_DEFER {
       bitsNeededInBlock.reset();
       seenOperands.clear();
@@ -1031,7 +1067,7 @@ void BorrowToDestructureTransform::rewriteUses() {
                << "Visiting block bb" << block->getDebugID() << '\n');
 
     // See if we have any operands that we need to process...
-    if (auto operandList = blocksToUses.find(block)) {
+    if (auto operandList = interface.blocksToUses.find(block)) {
       // If we do, gather up the bits that we need.
       for (auto operand : *operandList) {
         auto &subEltSpan = operand.second.subEltSpan;
@@ -1068,7 +1104,7 @@ void BorrowToDestructureTransform::rewriteUses() {
         if (!seenOperands.count(&operand))
           continue;
 
-        auto span = *TypeTreeLeafTypeRange::get(operand.get(), mmci);
+        auto span = *TypeTreeLeafTypeRange::get(operand.get(), getRootValue());
 
         // All available values in our span should have the same value
         // associated with it.
@@ -1150,8 +1186,8 @@ void BorrowToDestructureTransform::rewriteUses() {
 
         // Compute the location in the type of first's type and operand.get()'s
         // type.
-        TypeOffsetSizePair firstValueOffsetSize(first, mmci);
-        TypeOffsetSizePair useOffsetSize(operand.get(), mmci);
+        TypeOffsetSizePair firstValueOffsetSize(first, getRootValue());
+        TypeOffsetSizePair useOffsetSize(operand.get(), getRootValue());
 
         LLVM_DEBUG(llvm::dbgs() << "    FirstValueTypeOffsetSize: "
                                 << firstValueOffsetSize << '\n');
@@ -1227,7 +1263,8 @@ void BorrowToDestructureTransform::rewriteUses() {
         LLVM_DEBUG(
             llvm::dbgs()
             << "    Consuming Operand! Extracting using destructures!\n");
-        SILBuilderWithScope consumeBuilder(inst, &createdDestructures);
+        SILBuilderWithScope consumeBuilder(inst,
+                                           &interface.createdDestructures);
         auto loc = getSafeLoc(inst);
         auto iterOffsetSize = firstValueOffsetSize;
         SILValue iterValue = first;
@@ -1507,7 +1544,7 @@ bool BorrowToDestructureTransform::transform() {
   // Next make sure that any destructure needing instructions are on the
   // boundary in a per bit field sensitive manner.
   unsigned diagnosticCount = diagnosticEmitter.getDiagnosticCount();
-  checkDestructureUsesOnBoundary();
+  impl.checkDestructureUsesOnBoundary();
 
   // If we emitted any diagnostic, break out. We return true since we actually
   // succeeded in our processing by finding the error. We only return false if
@@ -1519,7 +1556,7 @@ bool BorrowToDestructureTransform::transform() {
 
   // Then check if we had two consuming uses on the same instruction or a
   // consuming/non-consuming use on the same isntruction.
-  checkForErrorsOnSameInstruction();
+  impl.checkForErrorsOnSameInstruction();
 
   // If we emitted any diagnostic, break out. We return true since we actually
   // succeeded in our processing by finding the error. We only return false if
@@ -1532,7 +1569,7 @@ bool BorrowToDestructureTransform::transform() {
   // At this point, we know that all of our destructure requiring uses are on
   // the boundary of our live range. Now we need to do the rewriting.
   blockToAvailableValues.emplace(*liveness);
-  rewriteUses();
+  impl.rewriteUses();
 
   // Now that we have done our rewritting, we need to do a few cleanups.
   cleanup(borrowWorklist);

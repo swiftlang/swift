@@ -146,25 +146,9 @@ private:
     return pofi;
   }
 
-  /// Once we have gathered up all of our destructure uses and liveness
-  /// requiring uses, validate that all of our destructure uses are on our
-  /// boundary. Once we have done this, we know that it is safe to perform our
-  /// transform.
-  void checkDestructureUsesOnBoundary() const;
-
-  /// Check for cases where we have two consuming uses on the same instruction
-  /// or a consuming/non-consuming use on the same instruction.
-  void checkForErrorsOnSameInstruction();
-
-  /// Rewrite all of the uses of our borrow on our borrow operand, performing
-  /// destructures as appropriate.
-  void rewriteUses();
-
   /// After we have rewritten uses, cleanup the IR by deleting the original
   /// borrow/struct_extract/copies and inserting compensating destroy_values.
   void cleanup(StackList<BeginBorrowInst *> &borrowWorklist);
-
-  AvailableValues &computeAvailableValues(SILBasicBlock *block);
 };
 
 } // namespace siloptimizer
