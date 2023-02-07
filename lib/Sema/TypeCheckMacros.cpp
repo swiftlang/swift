@@ -713,7 +713,6 @@ bool swift::expandFreestandingDeclarationMacro(
       return false;
     }
     decl->setDeclContext(dc);
-    TypeChecker::typeCheckDecl(decl);
     results.push_back(decl);
   }
   return true;

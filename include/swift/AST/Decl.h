@@ -8440,6 +8440,9 @@ public:
   /// Determine the contexts in which this macro can be applied.
   MacroRoles getMacroRoles() const;
 
+  /// Retrieve the attribute that declared the given macro role.
+  const MacroRoleAttr *getMacroRoleAttr(MacroRole role) const;
+
   /// Retrieve the definition of this macro.
   MacroDefinition getDefinition() const;
 
