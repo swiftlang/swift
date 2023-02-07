@@ -63,7 +63,6 @@ class BorrowToDestructureTransform {
   SmallVector<Operand *, 8> destructureNeedingUses;
   PostOrderAnalysis *poa;
   PostOrderFunctionInfo *pofi = nullptr;
-  SILValue initialValue;
   SmallVector<SILInstruction *, 8> createdDestructures;
   SmallVector<SILPhiArgument *, 8> createdPhiArguments;
 
@@ -92,10 +91,6 @@ private:
       pofi = poa->get(mmci->getFunction());
     return pofi;
   }
-
-  /// After we have rewritten uses, cleanup the IR by deleting the original
-  /// borrow/struct_extract/copies and inserting compensating destroy_values.
-  void cleanup(StackList<BeginBorrowInst *> &borrowWorklist);
 };
 
 } // namespace siloptimizer

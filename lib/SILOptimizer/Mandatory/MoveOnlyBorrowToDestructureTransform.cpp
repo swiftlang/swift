@@ -60,6 +60,53 @@ static SILLocation getSafeLoc(SILInstruction *inst) {
   return inst->getLoc();
 }
 
+static void addCompensatingDestroys(SSAPrunedLiveness &liveness,
+                                    PrunedLivenessBoundary &boundary,
+                                    SILValue value) {
+  InstructionSet consumingInsts(value->getFunction());
+  liveness.initializeDef(value);
+  for (auto *use : value->getUses()) {
+    if (use->isConsuming())
+      consumingInsts.insert(use->getUser());
+    liveness.updateForUse(use->getUser(), use->isConsuming());
+    if (auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser())) {
+      for (auto *ebi : bbi->getEndBorrows()) {
+        liveness.updateForUse(ebi, false /*use is consuming*/);
+      }
+    }
+  }
+  liveness.computeBoundary(boundary);
+  for (auto *user : boundary.lastUsers) {
+    // If this is a consuming inst, just continue.
+    if (consumingInsts.contains(user))
+      continue;
+    // Otherwise, we need to insert a destroy_value afterwards.
+    auto *next = user->getNextInstruction();
+    SILBuilderWithScope builder(next);
+    builder.createDestroyValue(getSafeLoc(next), value);
+  }
+
+  // Insert destroy_value along all boundary edges.
+  for (auto *edge : boundary.boundaryEdges) {
+    SILBuilderWithScope builder(edge->begin());
+    builder.createDestroyValue(getSafeLoc(&*edge->begin()), value);
+  }
+
+  // If we have a dead def, insert the destroy_value immediately at the def.
+  for (auto *deadDef : boundary.deadDefs) {
+    SILInstruction *nextInst = nullptr;
+    if (auto *inst = dyn_cast<SILInstruction>(deadDef)) {
+      nextInst = inst->getNextInstruction();
+    } else if (auto *arg = dyn_cast<SILArgument>(deadDef)) {
+      nextInst = arg->getNextInstruction();
+    } else {
+      llvm_unreachable("Unhandled dead def?!");
+    }
+    SILBuilderWithScope builder(nextInst);
+    builder.createDestroyValue(getSafeLoc(nextInst), value);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                           MARK: Available Values
 //===----------------------------------------------------------------------===//
@@ -137,15 +184,26 @@ struct borrowtodestructure::Implementation {
 
   Optional<AvailableValueStore> blockToAvailableValues;
 
-  // Temporarily optional as this code is refactored.
+  /// The liveness that we use for all borrows or for individual switch_enum
+  /// arguments.
   FieldSensitiveSSAPrunedLiveRange liveness;
+
+  /// The copy_value we insert upon our mark_must_check or switch_enum argument
+  /// so that we have an independent owned value.
+  SILValue initialValue;
 
   Implementation(BorrowToDestructureTransform &interface,
                  SmallVectorImpl<SILBasicBlock *> &discoveredBlocks)
       : interface(interface),
         liveness(interface.mmci->getFunction(), &discoveredBlocks) {}
 
+  void clear() {
+    liveness.clear();
+    initialValue = SILValue();
+  }
+
   void init(SILValue rootAddress) {
+    clear();
     liveness.init(rootAddress);
     liveness.initializeDef(rootAddress, TypeTreeLeafTypeRange(rootAddress));
   }
@@ -165,6 +223,8 @@ struct borrowtodestructure::Implementation {
   /// Rewrite all of the uses of our borrow on our borrow operand, performing
   /// destructures as appropriate.
   void rewriteUses();
+
+  void cleanup();
 
   AvailableValues &computeAvailableValues(SILBasicBlock *block);
 
@@ -741,7 +801,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
     LLVM_DEBUG(llvm::dbgs()
                << "        In initial block, setting to initial value!\n");
     for (unsigned i : indices(newValues))
-      newValues[i] = interface.initialValue;
+      newValues[i] = initialValue;
     LLVM_DEBUG(newValues.print(llvm::dbgs(), "        "));
     return newValues;
   }
@@ -1108,15 +1168,14 @@ void Implementation::rewriteUses() {
   IntervalMapAllocator::Map typeSpanToValue(getAllocator());
 
   auto *fn = getMarkedValue()->getFunction();
-  assert(!interface.initialValue);
+  assert(!initialValue);
   {
     // We are always going to copy our root value.
     auto *next = getRootValue()->getNextInstruction();
     SILBuilderWithScope builder(next);
-    interface.initialValue =
-        builder.createCopyValue(getSafeLoc(next), getRootValue());
+    initialValue = builder.createCopyValue(getSafeLoc(next), getRootValue());
   }
-  assert(interface.initialValue);
+  assert(initialValue);
 
   // Walking each block in RPO order.
   for (auto *block : getPostOrderFunctionInfo()->getReversePostOrder(
@@ -1397,71 +1456,15 @@ void Implementation::rewriteUses() {
   }
 }
 
-static void addCompensatingDestroys(SSAPrunedLiveness &liveness,
-                                    PrunedLivenessBoundary &boundary,
-                                    SILValue value) {
-  InstructionSet consumingInsts(value->getFunction());
-  liveness.initializeDef(value);
-  for (auto *use : value->getUses()) {
-    if (use->isConsuming())
-      consumingInsts.insert(use->getUser());
-    liveness.updateForUse(use->getUser(), use->isConsuming());
-    if (auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser())) {
-      for (auto *ebi : bbi->getEndBorrows()) {
-        liveness.updateForUse(ebi, false /*use is consuming*/);
-      }
-    }
-  }
-  liveness.computeBoundary(boundary);
-  for (auto *user : boundary.lastUsers) {
-    // If this is a consuming inst, just continue.
-    if (consumingInsts.contains(user))
-      continue;
-    // Otherwise, we need to insert a destroy_value afterwards.
-    auto *next = user->getNextInstruction();
-    SILBuilderWithScope builder(next);
-    builder.createDestroyValue(getSafeLoc(next), value);
-  }
-
-  // Insert destroy_value along all boundary edges.
-  for (auto *edge : boundary.boundaryEdges) {
-    SILBuilderWithScope builder(edge->begin());
-    builder.createDestroyValue(getSafeLoc(&*edge->begin()), value);
-  }
-
-  // If we have a dead def, insert the destroy_value immediately at the def.
-  for (auto *deadDef : boundary.deadDefs) {
-    SILInstruction *nextInst = nullptr;
-    if (auto *inst = dyn_cast<SILInstruction>(deadDef)) {
-      nextInst = inst->getNextInstruction();
-    } else if (auto *arg = dyn_cast<SILArgument>(deadDef)) {
-      nextInst = arg->getNextInstruction();
-    } else {
-      llvm_unreachable("Unhandled dead def?!");
-    }
-    SILBuilderWithScope builder(nextInst);
-    builder.createDestroyValue(getSafeLoc(nextInst), value);
-  }
-}
-
-void BorrowToDestructureTransform::cleanup(
-    StackList<BeginBorrowInst *> &borrowWorklist) {
-  // First clean up all of our borrows/copies/struct_extracts which no longer
-  // have any uses...
-  InstructionDeleter deleter;
-  while (!borrowWorklist.empty()) {
-    deleter.recursivelyForceDeleteUsersAndFixLifetimes(
-        borrowWorklist.pop_back_val());
-  }
-
+void Implementation::cleanup() {
   // Then add destroys for any destructure elements that we inserted that we did
   // not actually completely consume.
-  auto *fn = mmci->getFunction();
+  auto *fn = getMarkedValue()->getFunction();
   SmallVector<SILBasicBlock *, 8> discoveredBlocks;
   SSAPrunedLiveness liveness(&discoveredBlocks);
   PrunedLivenessBoundary boundary;
-  while (!createdDestructures.empty()) {
-    auto *inst = createdDestructures.pop_back_val();
+  while (!interface.createdDestructures.empty()) {
+    auto *inst = interface.createdDestructures.pop_back_val();
     assert(isa<DestructureStructInst>(inst) || isa<DestructureTupleInst>(inst));
     for (auto result : inst->getResults()) {
       if (result->getType().isTrivial(*fn))
@@ -1476,8 +1479,8 @@ void BorrowToDestructureTransform::cleanup(
   }
 
   // Then do this for our inserted phis.
-  while (!createdPhiArguments.empty()) {
-    auto *arg = createdPhiArguments.pop_back_val();
+  while (!interface.createdPhiArguments.empty()) {
+    auto *arg = interface.createdPhiArguments.pop_back_val();
 
     // If we have a trivial argument, we do not ened to add any compensating
     // destroys.
@@ -1636,8 +1639,18 @@ bool BorrowToDestructureTransform::transform() {
   impl.blockToAvailableValues.emplace(impl.liveness);
   impl.rewriteUses();
 
-  // Now that we have done our rewritting, we need to do a few cleanups.
-  cleanup(borrowWorklist);
+  // Now that we have done our rewritting, we need to do a few cleanups starting
+  // by inserting compensating destroys for all of our inserted
+  // phis/destructures/initial value copy.
+  impl.cleanup();
+
+  // Then clean up all of our borrows/copies/struct_extracts which no longer
+  // have any uses...
+  InstructionDeleter deleter;
+  while (!borrowWorklist.empty()) {
+    deleter.recursivelyForceDeleteUsersAndFixLifetimes(
+        borrowWorklist.pop_back_val());
+  }
 
   return true;
 }
