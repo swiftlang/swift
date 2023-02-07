@@ -214,7 +214,7 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
         """
 
         struct \(raw: prefix) {
-          func \(context.createUniqueName("method"))() { return 1 }
+          func \(context.createUniqueName("method"))() { return 0 }
           func \(context.createUniqueName("method"))() { return 1 }
         }
         """
@@ -230,6 +230,47 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
       }
       """
     }
+  }
+}
+
+public struct DefineDeclsWithKnownNamesMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+
+      struct A {
+        func \(context.createUniqueName("method"))() { }
+        func \(context.createUniqueName("method"))() { }
+      }
+      """,
+      """
+
+      struct B {
+        func \(context.createUniqueName("method"))() { }
+        func \(context.createUniqueName("method"))() { }
+      }
+      """,
+      """
+
+      var foo: Int {
+          1
+      }
+      """,
+      """
+
+      var addOne: (Int) -> Int { { $0 + 1 } }
+      """
+
+      // FIXME:
+      // 1. Stored properties are not visited in IRGen
+      //    let addTwo: (Int) -> Int = { $0 + 2 }
+      // 2. Curry thunk at call sites
+      //    func foo()
+      //    Foo2.foo // AutoClosureExpr with invalid discriminator
+    ]
   }
 }
 

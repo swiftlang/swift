@@ -24,10 +24,10 @@ protocol Q { associatedtype Assoc }
 // expected-error @+1 {{macro 'm8' must declare its applicable roles}}
 @freestanding(abc) macro m8(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm8'; the type must be public and provided via '-load-plugin-library'}}
-@freestanding(declaration) macro m9(_: String) = #externalMacro(module: "A", type: "M4")
+@freestanding(declaration, names: arbitrary) macro m9(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm9'; the type must be public and provided via '-load-plugin-library'}}
 
-@freestanding(expression) @freestanding(declaration) @attached(accessor)
+@freestanding(expression) @freestanding(declaration, names: named(Foo)) @attached(accessor)
 macro m10(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm10'; the type must be public and provided via '-load-plugin-library'}}
 

@@ -2390,23 +2390,26 @@ bool CustomAttr::isAttachedMacro(const Decl *decl) const {
 }
 
 MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,
-                             MacroSyntax syntax, MacroRole role,
+                             MacroSyntax syntax, SourceLoc lParenLoc,
+                             MacroRole role,
                              ArrayRef<MacroIntroducedDeclName> names,
-                             bool implicit)
+                             SourceLoc rParenLoc, bool implicit)
     : DeclAttribute(DAK_MacroRole, atLoc, range, implicit),
-      syntax(syntax), role(role), numNames(names.size()) {
+      syntax(syntax), role(role), numNames(names.size()), lParenLoc(lParenLoc),
+      rParenLoc(rParenLoc) {
   auto *trailingNamesBuffer = getTrailingObjects<MacroIntroducedDeclName>();
   std::uninitialized_copy(names.begin(), names.end(), trailingNamesBuffer);
 }
 
 MacroRoleAttr *
 MacroRoleAttr::create(ASTContext &ctx, SourceLoc atLoc, SourceRange range,
-                      MacroSyntax syntax, MacroRole role,
+                      MacroSyntax syntax, SourceLoc lParenLoc, MacroRole role,
                       ArrayRef<MacroIntroducedDeclName> names,
-                      bool implicit) {
+                      SourceLoc rParenLoc, bool implicit) {
   unsigned size = totalSizeToAlloc<MacroIntroducedDeclName>(names.size());
   auto *mem = ctx.Allocate(size, alignof(MacroRoleAttr));
-  return new (mem) MacroRoleAttr(atLoc, range, syntax, role, names, implicit);
+  return new (mem) MacroRoleAttr(atLoc, range, syntax, lParenLoc, role, names,
+                                 rParenLoc, implicit);
 }
 
 ArrayRef<MacroIntroducedDeclName> MacroRoleAttr::getNames() const {
@@ -2416,6 +2419,11 @@ ArrayRef<MacroIntroducedDeclName> MacroRoleAttr::getNames() const {
   };
 }
 
+bool MacroRoleAttr::hasNameKind(MacroIntroducedDeclNameKind kind) const {
+  return llvm::find_if(getNames(), [kind](MacroIntroducedDeclName name) {
+    return name.getKind() == kind;
+  }) != getNames().end();
+}
 
 const DeclAttribute *
 DeclAttributes::getEffectiveSendableAttr() const {

@@ -2391,7 +2391,8 @@ Parser::parseMacroRoleAttribute(
 
   SourceRange range(Loc, argList->getEndLoc());
   return makeParserResult(MacroRoleAttr::create(
-      Context, AtLoc, range, syntax, *role, names, /*isImplicit*/ false));
+      Context, AtLoc, range, syntax, argList->getLParenLoc(), *role, names,
+      argList->getRParenLoc(), /*isImplicit*/ false));
 }
 
 /// Guts of \c parseSingleAttrOption and \c parseSingleAttrOptionIdentifier.
@@ -3750,8 +3751,8 @@ ParserStatus Parser::parseDeclAttribute(
       .fixItReplace(SourceRange(AtLoc, attrLoc), "@freestanding(expression)");
     auto attr = MacroRoleAttr::create(
         Context, AtLoc, SourceRange(AtLoc, attrLoc),
-        MacroSyntax::Freestanding, MacroRole::Expression, { },
-        /*isImplicit*/ false);
+        MacroSyntax::Freestanding, SourceLoc(), MacroRole::Expression, { },
+        SourceLoc(), /*isImplicit*/ false);
     Attributes.add(attr);
     return makeParserSuccess();
   }
