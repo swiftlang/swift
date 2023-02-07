@@ -115,10 +115,10 @@ class VJPCloner::Implementation final
     // Get linear map struct size.
     auto *returnBB = &*original->findReturnBB();
     auto pullbackTupleType =
-        remapType(pullbackInfo.getLinearMapTupleLoweredType(returnBB));
+      remapASTType(pullbackInfo.getLinearMapTupleType(returnBB)->getCanonicalType());
     Builder.setInsertionPoint(vjp->getEntryBlock());
     auto topLevelSubcontextSize = emitMemoryLayoutSize(
-        Builder, original->getLocation(), pullbackTupleType.getASTType());
+        Builder, original->getLocation(), pullbackTupleType);
     // Create an context.
     pullbackContextValue = Builder.createBuiltin(
         original->getLocation(),
@@ -130,7 +130,8 @@ class VJPCloner::Implementation final
         original->getLocation(), pullbackContextValue);
     LLVM_DEBUG(getADDebugStream()
                << "Context object initialized because there are loops\n"
-               << *vjp->getEntryBlock() << '\n');
+               << *vjp->getEntryBlock() << '\n'
+               << "pullback tuple type: " << pullbackTupleType << '\n');
   }
 
   /// Get the lowered SIL type of the given AST type.
@@ -1044,21 +1045,23 @@ EnumInst *VJPCloner::Implementation::buildPredecessorEnumValue(
   if (loopInfo->getLoopFor(predBB)) {
     auto rawPtrType = SILType::getRawPointerType(getASTContext());
     assert(enumEltType == rawPtrType);
-    auto pbTupleType = pbTupleVal->getType();
+    auto pbTupleType =
+      remapASTType(pullbackInfo.getLinearMapTupleType(predBB)->getCanonicalType());
     SILValue pbTupleSize =
-        emitMemoryLayoutSize(Builder, loc, pbTupleType.getASTType());
+        emitMemoryLayoutSize(Builder, loc, pbTupleType);
     auto rawBufferValue = builder.createBuiltin(
         loc,
         getASTContext().getIdentifier(
             getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontext)),
         rawPtrType, SubstitutionMap(),
         {borrowedPullbackContextValue, pbTupleSize});
-    auto typedBufferValue = builder.createPointerToAddress(
-        loc, rawBufferValue, pbTupleType.getAddressType(),
+    auto typedBufferValue =
+      builder.createPointerToAddress(
+        loc, rawBufferValue, pbTupleVal->getType().getAddressType(),
         /*isStrict*/ true);
     builder.createStore(
         loc, pbTupleVal, typedBufferValue,
-        pbTupleType.isTrivial(*pullback) ?
+        pbTupleVal->getType().isTrivial(*pullback) ?
             StoreOwnershipQualifier::Trivial : StoreOwnershipQualifier::Init);
     return builder.createEnum(loc, rawBufferValue, enumEltDecl, enumLoweredTy);
   }
