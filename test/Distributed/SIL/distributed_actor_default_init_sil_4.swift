@@ -4,6 +4,8 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+// REQUIRES: swift_in_compiler
+
 /// The convention in this test is that the Swift declaration comes before its FileCheck lines.
 
 import Distributed
@@ -37,16 +39,13 @@ distributed actor MyDistActor {
   // CHECK:   hop_to_executor {{%[0-9]+}}
   // CHECK:   [[READY_FN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10actorReadyyyx0B00bC0RzAA0C7AddressV2IDRtzlF : $@convention(method) <τ_0_0 where τ_0_0 : DistributedActor, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @guaranteed FakeActorSystem) -> ()
   // CHECK:   = apply [[READY_FN]]
-  // CHECK:   br [[RET_BB:bb[0-9]+]]
+  // CHECK:   return
 
   // CHECK: [[FAIL_BB]]:
   // CHECK:   [[RESIGN_FN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV8resignIDyyAA0C7AddressVF : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
   // CHECK:   = apply [[RESIGN_FN]]
   // CHECK:   builtin "destroyDefaultActor"
   // CHECK:   throw {{%[0-9]+}} : $any Error
-
-  // CHECK: [[RET_BB]]:
-  // CHECK:   return
   // CHECK: } // end sil function '$s14default_deinit11MyDistActorC24system_async_fail_throws4condACSg015FakeDistributedE7Systems0kE6SystemV_SbtYaKcfc'
 
 }

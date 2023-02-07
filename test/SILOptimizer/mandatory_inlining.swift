@@ -157,7 +157,6 @@ func class_constrained_generic<T : C>(_ o: T) -> AnyClass? {
 func invoke(_ c: C) {
   // CHECK-NOT: function_ref @$s18mandatory_inlining25class_constrained_generic{{[_0-9a-zA-Z]*}}F
   // CHECK-NOT: apply
-  // CHECK: init_existential_metatype
   _ = class_constrained_generic(c)
   // CHECK: return
 }

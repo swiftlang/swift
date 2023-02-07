@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=WMO --check-prefix=CHECK
-// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s --check-prefix=PRIMARY --check-prefix=CHECK
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -emit-ir %s | %FileCheck %s --check-prefix=WMO --check-prefix=CHECK
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -emit-ir -primary-file %s | %FileCheck %s --check-prefix=PRIMARY --check-prefix=CHECK
 
 sil_stage canonical
 

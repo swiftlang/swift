@@ -38,7 +38,6 @@ target_sources(swiftSILOptimizer PRIVATE
   RawSILInstLowering.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
-  MandatoryCombine.cpp
   OSLogOptimization.cpp
   MoveOnlyWrappedTypeEliminator.cpp
   OwnershipModelEliminator.cpp)

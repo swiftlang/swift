@@ -1,13 +1,13 @@
 // This line tests that IRGen is properly turning the unspecialized builtins
 // into traps.
 //
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -parse-stdlib -Xllvm -sil-disable-pass=Simplification %s | %FileCheck %s
 
 // Make sure we are not eliminating these builtins before IRGen runs. As part of
 // the builtin's contract, we expect IRGen to convert them to traps, not
 // anything before.
 //
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -parse-stdlib %s | %FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -parse-stdlib -Xllvm -sil-disable-pass=Simplification %s | %FileCheck --check-prefix=SIL %s
 
 import Swift
 

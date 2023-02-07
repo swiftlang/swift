@@ -23,7 +23,7 @@ func basic(_ x: Float) -> Float { x }
 
 @_silgen_name("test_differentiable_function")
 func testDifferentiableFunction() {
-  let _: @differentiable(reverse) (Float) -> Float = basic
+  let a: @differentiable(reverse) (Float) -> Float = basic
 }
 
 // CHECK-SILGEN-LABEL: sil hidden [ossa] @test_differentiable_function : $@convention(thin) () -> () {
