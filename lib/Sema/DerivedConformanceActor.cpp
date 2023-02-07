@@ -34,15 +34,45 @@
 
 using namespace swift;
 
+static VarDecl*
+lookupActorProperty(NominalTypeDecl *decl, DeclName name) {
+  assert(decl && "decl was null");
+  auto &C = decl->getASTContext();
+
+  auto clazz = dyn_cast<ClassDecl>(decl);
+  if (!clazz)
+    return nullptr;
+
+  auto refs = decl->lookupDirect(name);
+  if (refs.size() != 1)
+    return nullptr;
+
+  auto var = dyn_cast<VarDecl>(refs.front());
+  if (!var)
+    return nullptr;
+
+  Type expectedType = C.getUnownedSerialExecutorDecl()->getDeclaredInterfaceType();
+  if (!expectedType) {
+    return nullptr;
+
+  if (!var->getInterfaceType()->isEqual(expectedType))
+    return nullptr;
+
+  return var;
+}
+
 bool DerivedConformance::canDeriveActor(DeclContext *dc,
                                         NominalTypeDecl *nominal) {
+  auto &C = nominal->getASTContext();
   auto classDecl = dyn_cast<ClassDecl>(nominal);
-  auto result = classDecl && classDecl->isActor() && dc == nominal;
-  ; // NOTE: we always synthesize, but we may find an existing member
-//  &&
+  auto result = classDecl && classDecl->isActor() && dc == nominal
+      && lookupActorProperty(nominal, C.Id_unownedExecutor) == nullptr
+                  ;
+  // NOTE: we always synthesize, but we may find an existing member
+//                &&
+//                !classDecl->getUnownedExecutorProperty();
   fprintf(stderr, "[%s:%d](%s) can derive actor? [%s]: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__, nominal->getName().str().str().c_str(),
           result ? "yes" : "no");
-//        !classDecl->getUnownedExecutorProperty();
   return result;
 }
 
@@ -178,38 +208,13 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   return property;
 }
 
-static ValueDecl* checkUserDeclared(DerivedConformance &derived, ValueDecl *requirement) {
-  auto proto = derived.Protocol;
-  auto *classDecl = dyn_cast<ClassDecl>(derived.Nominal);
-
-  DeclName memberName = requirement->getName();
-  fprintf(stderr, "[%s:%d](%s) member name:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-  memberName.dump();
-  auto unownedExecutorDecl = derived.Context.getUnownedSerialExecutorDecl();
-  auto result = TypeChecker::lookupMember(classDecl, unownedExecutorDecl->getDeclaredInterfaceType(),
-                                          DeclNameRef(memberName));
-
-  if (result.empty()) {
-    return nullptr;
-  }
-
-  return result.front().getValueDecl();
-}
-
 ValueDecl *DerivedConformance::deriveActor(ValueDecl *requirement) {
   auto var = dyn_cast<VarDecl>(requirement);
   if (!var)
     return nullptr;
 
   if (var->getName() == Context.Id_unownedExecutor) {
-//    fprintf(stderr, "[%s:%d](%s) check if we can derive\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    if (auto value = checkUserDeclared(*this, requirement)) {
-//      fprintf(stderr, "[%s:%d](%s) found existing\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      return value;
-//    } else {
-//      fprintf(stderr, "[%s:%d](%s) call deriveActor_unownedExecutor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-      return deriveActor_unownedExecutor(*this);
-//    }
+    return deriveActor_unownedExecutor(*this);
   }
 
   return nullptr;

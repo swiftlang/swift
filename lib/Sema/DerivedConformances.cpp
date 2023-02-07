@@ -294,8 +294,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
     auto conformance = nominal->getParentModule()->lookupConformance(
         nominal->getDeclaredInterfaceType(), proto);
-    fprintf(stderr, "[%s:%d](%s) getRequirement...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    conformance.dump();
 
     if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
