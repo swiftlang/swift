@@ -1654,6 +1654,47 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         addValueRef(operand2));
     break;
   }
+  case SILInstructionKind::PackElementGetInst: {
+    auto PEGI = cast<PackElementGetInst>(&SI);
+    auto elementType = PEGI->getElementType();
+    auto elementTypeRef = S.addTypeRef(elementType.getASTType());
+    auto pack = PEGI->getPack();
+    auto packType = pack->getType();
+    auto packTypeRef = S.addTypeRef(packType.getASTType());
+    auto packRef = addValueRef(pack);
+    auto indexRef = addValueRef(PEGI->getIndex());
+    SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILPackElementGetLayout::Code],
+        elementTypeRef,
+        (unsigned) elementType.getCategory(),
+        packTypeRef,
+        (unsigned) packType.getCategory(),
+        packRef,
+        indexRef);
+    break;
+  }
+  case SILInstructionKind::PackElementSetInst: {
+    auto PESI = cast<PackElementSetInst>(&SI);
+    auto value = PESI->getValue();
+    auto valueType = value->getType();
+    auto valueTypeRef = S.addTypeRef(valueType.getASTType());
+    auto valueRef = addValueRef(value);
+    auto pack = PESI->getPack();
+    auto packType = pack->getType();
+    auto packTypeRef = S.addTypeRef(packType.getASTType());
+    auto packRef = addValueRef(pack);
+    auto indexRef = addValueRef(PESI->getIndex());
+    SILPackElementSetLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILPackElementSetLayout::Code],
+        valueTypeRef,
+        (unsigned) valueType.getCategory(),
+        valueRef,
+        packTypeRef,
+        (unsigned) packType.getCategory(),
+        packRef,
+        indexRef);
+    break;
+  }
   case SILInstructionKind::TailAddrInst: {
     const TailAddrInst *TAI = cast<TailAddrInst>(&SI);
     SILTailAddrLayout::emitRecord(Out, ScratchRecord,

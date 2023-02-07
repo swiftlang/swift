@@ -888,6 +888,12 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ScalarPackIndexInst:
     return InlineCost::Free;
 
+  // Pack element get/set are a GEP plus a load/store.
+  // Cheap, but not free.
+  case SILInstructionKind::PackElementGetInst:
+  case SILInstructionKind::PackElementSetInst:
+    return InlineCost::Expensive;
+
   // Aggregates are exploded at the IR level; these are effectively no-ops.
   case SILInstructionKind::TupleInst:
   case SILInstructionKind::StructInst:
