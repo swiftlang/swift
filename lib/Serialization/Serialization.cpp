@@ -3192,7 +3192,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     // Note: There's likely room to report some of these as unsafe to prevent
     //       failures.
     if (isa<GenericTypeParamDecl>(decl) ||
-        isa<OpaqueTypeDecl>(decl) ||
         isa<ParamDecl>(decl) ||
         isa<EnumCaseDecl>(decl) ||
         isa<EnumElementDecl>(decl))
@@ -3215,7 +3214,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     // Write a human readable name to an identifier.
     SmallString<64> out;
     llvm::raw_svector_ostream outStream(out);
-    if (auto val = dyn_cast<ValueDecl>(decl)) {
+    if (auto opaque = dyn_cast<OpaqueTypeDecl>(decl)) {
+      outStream << "opaque ";
+      outStream << opaque->getOpaqueReturnTypeIdentifier();
+    } else if (auto val = dyn_cast<ValueDecl>(decl)) {
       outStream << val->getName();
     } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
       outStream << "extension ";
