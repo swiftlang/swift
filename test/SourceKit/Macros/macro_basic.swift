@@ -14,9 +14,10 @@ func testStringify(a: Int, b: Int) {
 // RUN: %empty-directory(%t)
 
 //##-- Prepare the macro plugin.
-// RUN: %target-build-swift -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %target-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // RUN: COMPILER_ARGS=( \
+// RUN:   -swift-version 5 \
 // RUN:   -enable-experimental-feature Macros \
 // RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
 // RUN:   -I %swift-host-lib-dir \
