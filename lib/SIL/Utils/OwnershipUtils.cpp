@@ -142,6 +142,8 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 //
 // FIXME: handle inner reborrows, which aren't dominated by
 // guaranteedValue. Audit all users to handle reborrows.
+//
+// TODO: Replace this with OwnershipUseVisitor.
 bool swift::findInnerTransitiveGuaranteedUses(
   SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints) {
 
@@ -1797,252 +1799,13 @@ bool swift::visitForwardedGuaranteedOperands(
   return false;
 }
 
-/// Visit the phis in the same block as \p phi which are reborrows of a borrow
-/// of one of the values reaching \p phi.
-///
-/// If the visitor returns false, stops visiting and returns false.  Otherwise,
-/// returns true.
-///
-///
-/// When an owned value is passed as a phi argument, it is consumed.  So any
-/// open scope borrowing that owned value must be ended no later than in that
-/// branch instruction.  Either such a borrow scope is ended beforehand
-///     %lifetime = begin_borrow %value
-///     ...
-///     end_borrow %lifetime <-- borrow scope ended here
-///     br block(%value)        <-- before consume
-/// or the borrow scope is ended in the same instruction as the owned value is
-/// consumed
-///     %lifetime = begin_borrow %value
-///     ...
-///     end_borrow %lifetime
-///     br block(%value, %lifetime)         <-- borrow scope ended here
-///                                         <-- in same instruction as consume
-/// In particular, the following is invalid
-///         %lifetime = begin_borrow %value
-///         ...
-///         br block(%value)
-///     block(%value_2 : @owned):
-///         end_borrow %lifetime
-///         destroy_value %value_2
-/// because %lifetime was guaranteed by %value but value is consumed at
-/// `br two`.
-///
-/// Similarly, when a guaranteed value is passed as a phi argument, its borrow
-/// scope ends and a new borrow scope is begun.  And so any open nested borrow
-/// of the original outer borrow must be ended no later than in that branch
-/// instruction.
-///
-///
-/// Given an phi argument
-///     block(..., %value : @owned, ...)
-/// this function finds the adjacent reborrow phis
-///     block(..., %lifetime : @guaranteed, ..., %value : @owned, ...)
-///                ^^^^^^^^^^^^^^^^^^^^^^^
-/// one of whose reaching values is a borrow of a reaching value of %value.
-///
-/// In both cases, finding an adjacent phi may be more complicated than merely
-/// looking for guaranteed operands adjacent to the incoming operands to phi
-/// and which are borrows of the value whose lifetime ends there. The reason is
-/// that they might not be borrows of that incoming value _directly_ but rather
-/// reborrows of some other reborrow:
-///
-///         %lifetime = begin_borrow %value
-///         br one(%value, %lifetime)
-///     one(%value_1 : @owned, %lifetime_1 : @guaranteed)
-///         br two(%value_1, %lifetime_1)
-///     two(%value_2 : @owned, %lifetime_2 : @guaranteed)
-///         end_borrow %lifetime_2
-///         destroy_value %value_2
-///
-/// When called with %value_2, \p visitor is invoked with:
-///     two(%value_2 : @owned, %lifetime_2 : @guaranteed)
-///                            ^^^^^^^^^^^^^^^^^^^^^^^^^
-///
-/// FIXME: this does not correctly handle dominated phis:
-///
-///         %value = ...
-///         %borrow = begin_borrow %value
-///         br one(%borrow)
-///     one(%reborrow_1 : @guaranteed)
-///         br two(%value, %reborrow_1)
-///     two(%phi_2 : @owned, %reborrow_2 : @guaranteed)
-///         br three(%value, %reborrow_1)
-///
-/// Instead, just call findEnclosingDefs for each guaranteed phi in the same
-/// block and visit any that match.
-///
-/// FIXME: this does not correctly handle guaranteed phis
-///
-///         %borrow = begin_borrow %value
-///         %field = struct_extract %borrow
-///         br one(%borrow, %field)
-///     one(%reborrow : @guaranteed, %forwardingphi : @guaranteed)
-///
-bool swift::visitAdjacentReborrowsOfPhi(
-    SILPhiArgument *phi, function_ref<bool(SILPhiArgument *)> visitor) {
-  assert(phi->isPhi());
-
-  // First, collect all the values that reach \p phi, that is:
-  // - operands to the phi
-  // - operands to phis which are operands to the phi
-  // - and so forth.
-  SmallPtrSet<SILValue, 8> reachingValues;
-  // At the same time, record all the phis in \p phi's phi web: the phis which
-  // are transitively operands to \p phi.  This is the subset of \p
-  // reachingValues that are phis.
-  SmallVector<SILPhiArgument *, 4> phis;
-  phi->visitTransitiveIncomingPhiOperands(
-      [&](auto *phi, auto *operand) -> bool {
-        phis.push_back(phi);
-        reachingValues.insert(phi);
-        reachingValues.insert(operand->get());
-        return true;
-      });
-
-  // Second, find all the guaranteed phis one of whose operands _could_ (by
-  // dint of being adjacent to a phi in the phi web with the appropriate
-  // ownership and type) be a reborrow of a reaching value of \p phi.
-  SmallVector<SILPhiArgument *, 4> candidates;
-  for (auto *phi : phis) {
-    SILBasicBlock *block = phi->getParentBlock();
-    for (auto *uncastAdjacent : block->getArguments()) {
-      auto *adjacent = cast<SILPhiArgument>(uncastAdjacent);
-      if (adjacent == phi)
-        continue;
-      if (adjacent->getType() != phi->getType())
-        continue;
-      if (adjacent->getOwnershipKind() != OwnershipKind::Guaranteed)
-        continue;
-      candidates.push_back(adjacent);
-    }
-  }
-
-  // Finally, look through \p candidates to find those one of whose incoming
-  // operands either
-  // (1) borrow one of reaching values of \p phi
-  // or (2) is itself a guaranteed phi which does so.
-  // Because we may discover a reborrow R1 of type (1) after visiting another
-  // R2 of type (2) which reborrows R1, we need to iterate to a fixed point.
-  //
-  // Record all the phis that we see which are borrows or reborrows of a
-  // reaching value \p so that we can check for case (2) above.
-  //
-  // Visit those phis which are both reborrows of a reaching value AND are in
-  // the same block as \phi.
-  //
-  // For example, given
-  //
-  //         %lifetime = begin_borrow %value
-  //         br one(%value, %lifetime)
-  //     one(%value_1 : @owned, %lifetime_1 : @guaranteed)
-  //         br two(%value_1, %lifetime_1)
-  //     two(%value_2 : @owned, %lifetime_2 : @guaranteed)
-  //         end_borrow %lifetime_2
-  //         destroy_value %value_2
-  //
-  // when visiting the reborrow phis adjacent to %value_2, The following steps
-  // would be taken:
-  //
-  // (1) Look at the first candidate:
-  //   two(%value_2 : @owned, %lifetime_2 : @guaranteed)
-  //                          ^^^^^^^^^^^^^^^^^^^^^^^^^
-  // but see that its one incoming value
-  //   br two(%value_1, %lifetime_1)
-  //                    ^^^^^^^^^^^
-  // although a phi argument itself, is not known (yet!) to be a reborrow phi.
-  // So the first candidate is NOT (yet!) added to reborrowPhis.
-  //
-  // (2) Look at the second candidate:
-  //     one(%value_1 : @owned, %lifetime_1 : @guaranteed)
-  //                            ^^^^^^^^^^^^^^^^^^^^^^^^^
-  // and see that one of its incoming values
-  //   br one(%value, %lifetime)
-  //                  ^^^^^^^^^
-  // is a borrow
-  //   %lifetime = begin_borrow %value
-  // of %value, one of the values reaching %value_2.
-  // So the second candidate IS added to reborrowPhis.
-  // AND changed is set to true, so we will repeat the outer loop.
-  // But this candidate is not adjacent to our phi %value_2, so it is not
-  // visited.
-  //
-  // (4.5) Changed is true: repeat the outer loop.  Set changed to false.
-  //
-  // (3) Look at the first candidate:
-  //   two(%value_2 : @owned, %lifetime_2 : @guaranteed)
-  //                          ^^^^^^^^^^^^^^^^^^^^^^^^^
-  // and see that one of its incoming values
-  //   br two(%value_1, %lifetime_1)
-  //                    ^^^^^^^^^^^
-  // is itself a phi
-  //   one(%value_1 : @owned, %lifetime_1 : @guaranteed)
-  //                          ^^^^^^^^^^^^^^^^^^^^^^^^^
-  // which was added to reborrowPhis in (2).
-  // So the first candidate IS added to reborrowPhis.
-  // AND changed is set to true.
-  // ALSO, see that the first candidate IS adjacent to our phi %value_2, so our
-  // visitor is invoked with the first candidate.
-  //
-  // (4) Look at the second candidate.
-  // See that it is already a member of reborrowPhis.
-  //
-  // (4.5) Changed is true: repeat the outer loop.  Set changed to false.
-  //
-  // (5) Look at the first candidate.
-  // See that it is already a member of reborrowPhis.
-  //
-  // (6) Look at the second candidate.
-  // See that it is already a member of reborrowPhis.
-  //
-  // (6.5) Changed is false: exit the outer loop.
-  bool changed = false;
-  SmallSetVector<SILPhiArgument *, 4> reborrowPhis;
-  do {
-    changed = false;
-    for (auto *candidate : candidates) {
-      if (reborrowPhis.contains(candidate))
-        continue;
-      auto success = candidate->visitIncomingPhiOperands([&](auto *operand) {
-        // If the value being reborrowed is itself a reborrow of a value
-        // reaching \p phi, then visit it.
-        SILPhiArgument *forwarded;
-        if ((forwarded = dyn_cast<SILPhiArgument>(operand->get()))) {
-          if (!reborrowPhis.contains(forwarded))
-            return true;
-          changed = true;
-          reborrowPhis.insert(candidate);
-          if (candidate->getParentBlock() == phi->getParentBlock())
-            return visitor(candidate);
-          return true;
-        }
-        BeginBorrowInst *bbi;
-        if (!(bbi = dyn_cast<BeginBorrowInst>(operand->get())))
-          return true;
-        auto borrowee = bbi->getOperand();
-        if (!reachingValues.contains(borrowee))
-          return true;
-        changed = true;
-        reborrowPhis.insert(candidate);
-        if (candidate->getParentBlock() == phi->getParentBlock())
-          return visitor(candidate);
-        return true;
-      });
-      if (!success)
-        return false;
-    }
-  } while (changed);
-
-  return true;
-}
-
 namespace {
 
 // Find the definitions of the scopes that enclose guaranteed values, handling
 // all combinations of aggregation, guaranteed forwarding phis, and reborrows.
 class FindEnclosingDefs {
   // A separately allocated set-vector is used for each level of recursion
-  // across block boudndaries (NodeSet cannot be used recursively).
+  // across block boundaries (NodeSet cannot be used recursively).
   using LocalValueSetVector = SmallPtrSetVector<SILValue, 8>;
 
   SILFunction *function;
@@ -2392,6 +2155,108 @@ bool swift::visitBorrowIntroducers(SILValue value,
                                    function_ref<bool(SILValue)> visitor) {
   return FindEnclosingDefs(value->getFunction())
     .visitBorrowIntroducers(value, visitor);
+}
+
+/// Return true of the lifetime of \p innerPhiVal depends on \p outerPhiVal.
+///
+/// This handles SIL values with nested lifetimes that cross a control flow
+/// merge.
+///
+/// When an owned value is passed to a phi, it is consumed. So any
+/// "inner" scope borrowing that owned value must end no later than that
+/// branch instruction. Either such a borrow scope ends before the branch that
+/// represents the owned phi operand:
+///     %lifetime = begin_borrow %value
+///     ...
+///     end_borrow %lifetime    <-- borrow scope ends here
+///     br block(%value)        <-- owned value consumed here
+/// or the borrow scope ends in another phi in the same block as (adjacent to)
+/// the owned phi:
+///     %lifetime = begin_borrow %value
+///     ...
+///     end_borrow %lifetime
+///     br block(%value, %lifetime)         <-- borrow scope ends here
+///                                         <-- adjacent to the consume
+/// A phi corresponding to a value nested within another phi's lifetime is an
+/// "inner adjacent phi".
+///
+/// A guaranteed phi that ends a borrow scope is a special kind of phi called a
+/// "reborrow". In the above example, the reborrow is an inner adjacent to the
+/// owned phi and the owned phi is outer adjacent to the reborrow.
+///
+/// Note that an inner lifetime cannot extend beyond the outer lifetime's scope,
+/// even of the outer value is forwarded. In particular, the following is
+/// invalid:
+///         %lifetime = begin_borrow %value
+///         ...
+///         br block(%value)
+///     block(%value_2 : @owned):
+///         end_borrow %lifetime
+///         destroy_value %value_2
+/// because %lifetime depends on %value but %value is consumed at `br two`.
+///
+/// Similarly, a reborrow ends its borrow scope and begins a new borrow
+/// scope. So any open nested borrow of the original outer borrow must end no
+/// later than in that branch instruction.
+///
+/// This extends to guaranteed forwarding phis, whose lifetimes are nested
+/// within a borrow scope.
+///
+/// Currently, an owned phi's inner adjacent phi must be a reborrow. A
+/// reborrow's adjacent phi may be either a nested reborrow, or a guaranteed
+/// forwarding phi. In the future, we remove the requirement that all guaranteed
+/// values have borrow scopes; then an owned phi's inner adjacent phi may be a
+/// guaranteed forwarding phi.
+///
+/// Given a phi, 'outerPhi', it can be determined to have an inner adjacent phi,
+/// 'innerPhi' if and only if: on any path, the operand of 'outerPhi' is the
+/// enclosing definition of the operand of 'innerPhi' on the same path.
+///      
+bool swift::isInnerAdjacentPhi(SILArgument *innerPhiVal,
+                               SILArgument *outerPhiVal) {
+  auto innerPhi = PhiValue(innerPhiVal);
+  auto outerPhi = PhiValue(outerPhiVal);
+  assert(innerPhi.phiBlock == outerPhi.phiBlock && "precondition");
+
+  for (SILBasicBlock *predBlock : innerPhi.phiBlock->getPredecessorBlocks()) {
+    SILValue innerValue = innerPhi.getOperand(predBlock)->get();
+    SILValue outerValue = outerPhi.getOperand(predBlock)->get();
+    // Visitor returns false to stop visiting when a match is found.
+    if (!visitEnclosingDefs(innerValue, [&](SILValue def) {
+      // If innerValue's enclosing 'def' is 'outerValue', then we found an inner
+      // adjacent phi.
+      return def != outerValue;
+    })) {
+      // outerPhi ends the lifetime of an enclosing def for this predecessor.
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Visit the phis in the same block as \p phi whose lifetime depends on \p
+/// phi.
+///
+/// See isInnerAdjacentPhi() comments.
+///
+/// If the visitor returns false, stops visiting and returns false.  Otherwise,
+/// returns true.
+bool swift::visitInnerAdjacentPhis(SILArgument *phi,
+                                   function_ref<bool(SILArgument *)> visitor) {
+  SILBasicBlock *block = phi->getParentBlock();
+  if (block->pred_empty())
+    return true;
+
+  for (auto *adjacentPhi : block->getArguments()) {
+    if (adjacentPhi == phi)
+      continue;
+
+    if (isInnerAdjacentPhi(adjacentPhi, phi)) {
+      if (!visitor(adjacentPhi))
+        return false;
+    }
+  }
+  return true;
 }
 
 void swift::visitTransitiveEndBorrows(
