@@ -485,6 +485,7 @@ void FieldSensitivePrunedLiveBlocks::computeScalarUseBlockLiveness(
 void FieldSensitivePrunedLiveBlocks::updateForUse(
     SILInstruction *user, unsigned startBitNo, unsigned endBitNo,
     SmallVectorImpl<IsLive> &resultingLivenessInfo) {
+  assert(isInitialized());
   resultingLivenessInfo.clear();
 
   SWIFT_ASSERT_ONLY(seenUse = true);

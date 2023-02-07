@@ -208,7 +208,8 @@ struct BorrowToDestructureTransform {
       DiagnosticEmitter &diagnosticEmitter, PostOrderAnalysis *poa,
       SmallVectorImpl<SILBasicBlock *> &discoveredBlocks)
       : allocator(allocator), mmci(mmci), diagnosticEmitter(diagnosticEmitter),
-        liveness(mmci->getFunction(), mmci, &discoveredBlocks), poa(poa) {
+        liveness(mmci->getFunction(), &discoveredBlocks), poa(poa) {
+    liveness.init(mmci);
     liveness.initializeDef(mmci, TypeTreeLeafTypeRange(mmci));
   }
 
