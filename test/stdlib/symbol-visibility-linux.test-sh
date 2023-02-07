@@ -138,7 +138,6 @@
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE2atEm \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE3endEv \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE4backEv \
-// RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE4nposE \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE4rendEv \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE4swapERS4_ \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE5beginEv \
@@ -240,7 +239,6 @@
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEpLERKS4_ \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEpLESt16initializer_listIcE \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEpLEc \
-// RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE4nposE \
 // RUN:             -e _ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EES5_RKS8_ \
 // RUN:             -e _ZStplIcSt11char_traitsIcESaIcEESbIT_T0_T1_ERKS6_S8_ \
 // RUN:   > %t/swiftCore-all.txt
@@ -373,7 +371,6 @@
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE2atEm \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE3endEv \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE4backEv \
-// RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE4nposE \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE4rendEv \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE4swapERS4_ \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE5beginEv \
@@ -475,7 +472,6 @@
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEpLERKS4_ \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEpLESt16initializer_listIcE \
 // RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEpLEc \
-// RUN:             -e _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE4nposE \
 // RUN:             -e _ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EES5_RKS8_ \
 // RUN:             -e _ZStplIcSt11char_traitsIcESaIcEESbIT_T0_T1_ERKS6_S8_ \
 // RUN:   > %t/swiftRemoteMirror-all.txt
