@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature Macros
 protocol P { }
 protocol Q { associatedtype Assoc }
 
