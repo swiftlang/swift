@@ -39,6 +39,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/Consumption.h"
@@ -508,6 +509,8 @@ namespace {
 
     RValue visitAssignExpr(AssignExpr *E, SGFContext C);
     RValue visitEnumIsCaseExpr(EnumIsCaseExpr *E, SGFContext C);
+
+    RValue visitSingleValueStmtExpr(SingleValueStmtExpr *E, SGFContext C);
 
     RValue visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C);
     RValue visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
@@ -2120,6 +2123,39 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
   }
   
   return emitBoolLiteral(SGF, E, selected, C);
+}
+
+RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
+                                               SGFContext C) {
+  // A void SingleValueStmtExpr either only has Void expression branches, or
+  // we've decided that it should have purely statement semantics. In either
+  // case, we can just emit the statement as-is, and produce the void rvalue.
+  if (E->getType()->isVoid()) {
+    SGF.emitStmt(E->getStmt());
+    return SGF.emitEmptyTupleRValue(E, C);
+  }
+  auto &lowering = SGF.getTypeLowering(E->getType());
+  auto resultAddr = SGF.emitTemporaryAllocation(E, lowering.getLoweredType());
+
+  // This won't give us a useful diagnostic if the result doesn't end up
+  // initialized ("variable '<unknown>' used before being initialized"), but it
+  // will at least catch a potential miscompile when the SIL verifier is
+  // disabled.
+  resultAddr = SGF.B.createMarkUninitialized(
+      E, resultAddr, MarkUninitializedInst::Kind::Var);
+  KnownAddressInitialization init(resultAddr);
+
+  // Collect the target exprs that will be used for initialization.
+  SmallVector<Expr *, 4> scratch;
+  SILGenFunction::SingleValueStmtInitialization initInfo(&init);
+  for (auto *E : E->getSingleExprBranches(scratch))
+    initInfo.Exprs.insert(E);
+
+  // Push the initialization for branches of the statement to initialize into.
+  SGF.SingleValueStmtInitStack.push_back(std::move(initInfo));
+  SWIFT_DEFER { SGF.SingleValueStmtInitStack.pop_back(); };
+  SGF.emitStmt(E->getStmt());
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
 }
 
 RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {

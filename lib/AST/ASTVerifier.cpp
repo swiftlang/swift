@@ -33,6 +33,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Subsystems.h"
@@ -1182,6 +1183,31 @@ public:
       
       checkSameType(DestTy, srcObj, "object types for InOutExpr");
       verifyCheckedBase(E);
+    }
+
+    void verifyChecked(SingleValueStmtExpr *E) {
+      using Kind = IsSingleValueStmtResult::Kind;
+      switch (E->getStmt()->mayProduceSingleValue(Ctx).getKind()) {
+      case Kind::NoExpressionBranches:
+        // These are allowed as long as the type is Void.
+        checkSameType(
+            E->getType(), Ctx.getVoidType(),
+            "SingleValueStmtExpr with no expression branches must be Void");
+        break;
+      case Kind::UnterminatedBranches:
+      case Kind::NonExhaustiveIf:
+      case Kind::UnhandledStmt:
+      case Kind::CircularReference:
+      case Kind::HasLabel:
+      case Kind::InvalidJumps:
+        // These should have been diagnosed.
+        Out << "invalid SingleValueStmtExpr should be been diagnosed:\n";
+        E->dump(Out);
+        Out << "\n";
+        abort();
+      case Kind::Valid:
+        break;
+      }
     }
 
     void verifyParsed(AbstractClosureExpr *E) {

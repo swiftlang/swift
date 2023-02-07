@@ -28,7 +28,8 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
     Contexts.push_back({ContextKind::StringInterpolation, E});
   }
 
-  if (isa<ApplyExpr>(E) || isa<SequenceExpr>(E)) {
+  if (isa<ApplyExpr>(E) || isa<SequenceExpr>(E) ||
+      isa<SingleValueStmtExpr>(E)) {
     Contexts.push_back({ContextKind::FallbackExpression, E});
   }
 
@@ -63,7 +64,8 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
 ASTWalker::PostWalkResult<Expr *>
 CompletionContextFinder::walkToExprPost(Expr *E) {
   if (isa<ClosureExpr>(E) || isa<InterpolatedStringLiteralExpr>(E) ||
-      isa<ApplyExpr>(E) || isa<SequenceExpr>(E) || isa<ErrorExpr>(E)) {
+      isa<ApplyExpr>(E) || isa<SequenceExpr>(E) || isa<ErrorExpr>(E) ||
+      isa<SingleValueStmtExpr>(E)) {
     assert(Contexts.back().E == E);
     Contexts.pop_back();
   }

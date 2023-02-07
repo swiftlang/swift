@@ -1219,6 +1219,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
+  Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+    if (auto *S = doIt(E->getStmt())) {
+      E->setStmt(S);
+    } else {
+      return nullptr;
+    }
+    return E;
+  }
+
   Expr *visitOneWayExpr(OneWayExpr *E) {
     if (auto oldSubExpr = E->getSubExpr()) {
       if (auto subExpr = doIt(oldSubExpr)) {
@@ -1260,10 +1269,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitTypeJoinExpr(TypeJoinExpr *E) {
-    if (auto *newVar = dyn_cast<DeclRefExpr>(doIt(E->getVar()))) {
-      E->setVar(newVar);
-    } else {
-      return nullptr;
+    if (auto *var = E->getVar()) {
+      if (auto *newVar = dyn_cast<DeclRefExpr>(doIt(var))) {
+        E->setVar(newVar);
+      } else {
+        return nullptr;
+      }
     }
 
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {

@@ -499,6 +499,20 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   // First check to see if we have the start of a regex literal `/.../`.
   tryLexRegexLiteral(/*forUnappliedOperator*/ false);
 
+  // Try parse an 'if' or 'switch' as an expression. Note we do this here in
+  // parseExprUnary as we don't allow postfix syntax to hang off such
+  // expressions to avoid ambiguities such as postfix '.member', which can
+  // currently be parsed as a static dot member for a result builder.
+  if (Tok.isAny(tok::kw_if, tok::kw_switch)) {
+    auto Result = parseStmt();
+    Expr *E = nullptr;
+    if (Result.isNonNull()) {
+      E = SingleValueStmtExpr::createWithWrappedBranches(
+          Context, Result.get(), CurDeclContext, /*mustBeExpr*/ true);
+    }
+    return makeParserResult(ParserStatus(Result), E);
+  }
+
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
@@ -1027,6 +1041,10 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
   // If this is the start of a get/set accessor, then it isn't a trailing
   // closure.
   if (P.isStartOfGetSetAccessor())
+    return false;
+
+  // If this is the start of a switch body, this isn't a trailing closure.
+  if (P.peekToken().is(tok::kw_case))
     return false;
 
   // If this is a normal expression (not an expr-basic) then trailing closures
