@@ -52,6 +52,64 @@ using namespace swift::siloptimizer::borrowtodestructure;
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
 
+/// Return a loc that can be used regardless if \p inst is a terminator or not.
+static SILLocation getSafeLoc(SILInstruction *inst) {
+  if (isa<TermInst>(inst))
+    return RegularLocation::getDiagnosticsOnlyLocation(inst->getLoc(),
+                                                       inst->getModule());
+  return inst->getLoc();
+}
+
+//===----------------------------------------------------------------------===//
+//                           MARK: Available Values
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// We reserve more bits that we need at the beginning so that we can avoid
+// reallocating and potentially breaking our internal mutable array ref
+// points into the data store.
+struct AvailableValues {
+  MutableArrayRef<SILValue> values;
+
+  SILValue operator[](unsigned index) const { return values[index]; }
+  SILValue &operator[](unsigned index) { return values[index]; }
+  unsigned size() const { return values.size(); }
+
+  AvailableValues() : values() {}
+  AvailableValues(MutableArrayRef<SILValue> values) : values(values) {}
+
+  void print(llvm::raw_ostream &os, const char *prefix = nullptr) const;
+  SWIFT_DEBUG_DUMP;
+};
+
+struct AvailableValueStore {
+  std::vector<SILValue> dataStore;
+  llvm::DenseMap<SILBasicBlock *, AvailableValues> blockToValues;
+  unsigned nextOffset = 0;
+  unsigned numBits;
+
+  AvailableValueStore(const FieldSensitivePrunedLiveness &liveness)
+      : dataStore(liveness.getDiscoveredBlocks().size() *
+                  liveness.getNumSubElements()),
+        numBits(liveness.getNumSubElements()) {}
+
+  std::pair<AvailableValues *, bool> get(SILBasicBlock *block) {
+    auto iter = blockToValues.try_emplace(block, AvailableValues());
+
+    if (!iter.second) {
+      return {&iter.first->second, false};
+    }
+
+    iter.first->second.values =
+        MutableArrayRef<SILValue>(&dataStore[nextOffset], numBits);
+    nextOffset += numBits;
+    return {&iter.first->second, true};
+  }
+};
+
+} // namespace
+
 void AvailableValues::print(llvm::raw_ostream &os, const char *prefix) const {
   if (prefix)
     os << prefix;
@@ -70,20 +128,17 @@ void AvailableValues::print(llvm::raw_ostream &os, const char *prefix) const {
 
 void AvailableValues::dump() const { print(llvm::dbgs(), nullptr); }
 
-/// Return a loc that can be used regardless if \p inst is a terminator or not.
-static SILLocation getSafeLoc(SILInstruction *inst) {
-  if (isa<TermInst>(inst))
-    return RegularLocation::getDiagnosticsOnlyLocation(inst->getLoc(),
-                                                       inst->getModule());
-  return inst->getLoc();
-}
-
 //===----------------------------------------------------------------------===//
 //                        MARK: Private Implementation
 //===----------------------------------------------------------------------===//
 
 struct borrowtodestructure::Implementation {
   BorrowToDestructureTransform &interface;
+
+  Optional<AvailableValueStore> blockToAvailableValues;
+
+  Implementation(BorrowToDestructureTransform &interface)
+      : interface(interface) {}
 
   bool gatherUses(SILValue value);
 
@@ -654,7 +709,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
   // First grab our block. If we already have state for the block, just return
   // its available values. We already computed the available values and
   // potentially updated it with new destructured values for our block.
-  auto pair = interface.blockToAvailableValues->get(block);
+  auto pair = blockToAvailableValues->get(block);
   if (!pair.second) {
     LLVM_DEBUG(llvm::dbgs()
                << "        Already have values! Returning them!\n");
@@ -1535,7 +1590,7 @@ bool BorrowToDestructureTransform::transform() {
 
   // Attempt to gather uses. Return false if we saw something that we did not
   // understand.
-  Implementation impl{*this};
+  Implementation impl(*this);
   for (auto *bbi : borrowWorklist) {
     if (!impl.gatherUses(bbi))
       return false;
@@ -1568,7 +1623,7 @@ bool BorrowToDestructureTransform::transform() {
 
   // At this point, we know that all of our destructure requiring uses are on
   // the boundary of our live range. Now we need to do the rewriting.
-  blockToAvailableValues.emplace(*liveness);
+  impl.blockToAvailableValues.emplace(*liveness);
   impl.rewriteUses();
 
   // Now that we have done our rewritting, we need to do a few cleanups.
