@@ -427,9 +427,17 @@ AnyFunctionType *adjustFunctionTypeForConcurrency(
     llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency,
     llvm::function_ref<Type(Type)> openType);
 
+/// Classifies known dispatch queue operations.
+enum class DispatchQueueOperation {
+  /// This is a dispatch operation we know about.
+  Normal,
+  /// The closure passed to this dispatch queue operation should be Sendable.
+  Sendable,
+};
+
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.
-bool isDispatchQueueOperationName(StringRef name);
+Optional<DispatchQueueOperation> isDispatchQueueOperationName(StringRef name);
 
 /// Check the correctness of the given Sendable conformance.
 ///
