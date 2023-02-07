@@ -374,7 +374,7 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
             expansion.dyn_cast<Decl *>())) {
       // FIXME: Update once MacroExpansionDecl has a proper macro reference
       // in it.
-      if (expansionDecl->getMacro().getFullName() == macro->getName())
+      if (expansionDecl->getMacroName().getFullName() == macro->getName())
         return true;
     } else if (auto *macroAttr = sourceFile->getAttachedMacroAttribute()) {
       auto *decl = expansion.dyn_cast<Decl *>();

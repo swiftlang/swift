@@ -1328,7 +1328,7 @@ std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
       } else {
         auto expansionDecl =
             cast<MacroExpansionDecl>(expansionNode.get<Decl *>());
-        macroName = expansionDecl->getMacro().getFullName();
+        macroName = expansionDecl->getMacroName().getFullName();
       }
 
       Diagnostic expansionNote(diag::in_macro_expansion, macroName);

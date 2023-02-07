@@ -8467,12 +8467,11 @@ public:
 
 class MacroExpansionDecl : public Decl {
   SourceLoc PoundLoc;
-  DeclNameRef Macro;
-  DeclNameLoc MacroLoc;
+  DeclNameRef MacroName;
+  DeclNameLoc MacroNameLoc;
   SourceLoc LeftAngleLoc, RightAngleLoc;
   ArrayRef<TypeRepr *> GenericArgs;
   ArgumentList *ArgList;
-  ArrayRef<Decl *> Rewritten;
 
   /// The referenced macro.
   ConcreteDeclRef macroRef;
@@ -8487,9 +8486,9 @@ public:
                      SourceLoc rightAngleLoc,
                      ArgumentList *args)
       : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
-        Macro(macro), MacroLoc(macroLoc),
+        MacroName(macro), MacroNameLoc(macroLoc),
         LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-        GenericArgs(genericArgs), ArgList(args), Rewritten({}) {
+        GenericArgs(genericArgs), ArgList(args) {
     Bits.MacroExpansionDecl.Discriminator = InvalidDiscriminator;
   }
 
@@ -8502,11 +8501,10 @@ public:
   SourceRange getSourceRange() const;
   SourceLoc getLocFromSource() const { return PoundLoc; }
   SourceLoc getPoundLoc() const { return PoundLoc; }
-  DeclNameLoc getMacroLoc() const { return MacroLoc; }
-  DeclNameRef getMacro() const { return Macro; }
+  DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
+  DeclNameRef getMacroName() const { return MacroName; }
   ArgumentList *getArgs() const { return ArgList; }
-  ArrayRef<Decl *> getRewritten() const { return Rewritten; }
-  void setRewritten(ArrayRef<Decl *> rewritten) { Rewritten = rewritten; }
+  ArrayRef<Decl *> getRewritten() const;
   ConcreteDeclRef getMacroRef() const { return macroRef; }
   void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
 

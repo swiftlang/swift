@@ -3738,11 +3738,11 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   auto &ctx = MED->getASTContext();
   auto *dc = MED->getDeclContext();
   auto foundMacros = TypeChecker::lookupMacros(
-      MED->getDeclContext(), MED->getMacro(),
+      MED->getDeclContext(), MED->getMacroName(),
       MED->getLoc(), MacroRole::Declaration);
   if (foundMacros.empty()) {
-    MED->diagnose(diag::macro_undefined, MED->getMacro().getBaseIdentifier())
-        .highlight(MED->getMacroLoc().getSourceRange());
+    MED->diagnose(diag::macro_undefined, MED->getMacroName().getBaseIdentifier())
+        .highlight(MED->getMacroNameLoc().getSourceRange());
     return {};
   }
   // Resolve macro candidates.
@@ -3754,8 +3754,8 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   }
   else {
     if (foundMacros.size() > 1) {
-      MED->diagnose(diag::ambiguous_decl_ref, MED->getMacro())
-          .highlight(MED->getMacroLoc().getSourceRange());
+      MED->diagnose(diag::ambiguous_decl_ref, MED->getMacroName())
+          .highlight(MED->getMacroNameLoc().getSourceRange());
       for (auto *candidate : foundMacros)
         candidate->diagnose(diag::found_candidate);
       return {};
@@ -3770,7 +3770,5 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   SmallVector<Decl *, 2> expandedTemporary;
   if (!expandFreestandingDeclarationMacro(MED, expandedTemporary))
     return {};
-  auto expanded = ctx.AllocateCopy(expandedTemporary);
-  MED->setRewritten(expanded);
-  return expanded;
+  return ctx.AllocateCopy(expandedTemporary);
 }

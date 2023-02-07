@@ -4600,7 +4600,7 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
 }
 
 void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
-  Printer << '#' << decl->getMacro();
+  Printer << '#' << decl->getMacroName();
   if (decl->getArgs()) {
     Printer << '(';
     auto args = decl->getArgs()->getOriginalArgs();
