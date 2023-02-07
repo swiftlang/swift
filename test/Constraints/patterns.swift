@@ -540,3 +540,20 @@ func f60503() {
   let (key, _) = settings.enumerate() // expected-error{{cannot find 'settings' in scope}}
   let (_, _) = settings.enumerate() // expected-error{{cannot find 'settings' in scope}}
 }
+
+// rdar://105089074
+enum EWithIdent<Id> where Id: P { // expected-note 2 {{where 'Id' = 'Int'}}
+case test(Id)
+}
+
+extension [EWithIdent<Int>] {
+  func test() {
+    sorted { lhs, rhs in
+      switch (rhs, rhs) {
+      case let (.test(x), .test(y)): break
+        // expected-error@-1 2 {{generic enum 'EWithIdent' requires that 'Int' conform to 'P'}}
+      case (_, _): break
+      }
+    }
+  }
+}

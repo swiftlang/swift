@@ -496,6 +496,15 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     }
   }
 
+  {
+    // Pattern match is always a callee regardless of what comes after it.
+    auto iter = path.rbegin();
+    if (locator->findLast<LocatorPathElt::PatternMatch>(iter)) {
+      auto newPath = path.drop_back(iter - path.rbegin());
+      return getConstraintLocator(anchor, newPath);
+    }
+  }
+
   if (locator->findLast<LocatorPathElt::DynamicCallable>()) {
     return getConstraintLocator(anchor, LocatorPathElt::ApplyFunction());
   }
