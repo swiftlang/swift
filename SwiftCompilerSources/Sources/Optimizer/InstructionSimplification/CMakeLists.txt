@@ -13,4 +13,5 @@ swift_compiler_sources(Optimizer
   SimplifyBuiltin.swift
   SimplifyCondBranch.swift
   SimplifyGlobalValue.swift
-  SimplifyStrongRetainRelease.swift)
+  SimplifyStrongRetainRelease.swift
+  SimplifyUncheckedEnumData.swift)
