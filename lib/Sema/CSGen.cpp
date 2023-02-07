@@ -1351,6 +1351,13 @@ namespace {
     Type visitDeclRefExpr(DeclRefExpr *E) {
       auto locator = CS.getConstraintLocator(E);
 
+      auto invalidateReference = [&]() -> Type {
+        auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
+        (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
+        CS.setType(E, hole);
+        return hole;
+      };
+
       Type knownType;
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
@@ -1358,13 +1365,19 @@ namespace {
           knownType = CS.getVarType(VD);
 
         if (knownType) {
+          // An out-of-scope type variable could be a type of a declaration
+          // only in diagnostic mode when invalid variable declaration is
+          // recursively referenced inside of a multi-statement closure
+          // located somewhere within its initializer e.g.:
+          // `let x = [<call>] { ... print(x) }`
+          if (auto *typeVar = knownType->getAs<TypeVariableType>()) {
+            if (!CS.isActiveTypeVariable(typeVar))
+              return invalidateReference();
+          }
+
           // If the known type has an error, bail out.
           if (knownType->hasError()) {
-            auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
-            (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
-            if (!CS.hasType(E))
-              CS.setType(E, hole);
-            return hole;
+            return invalidateReference();
           }
 
           if (!knownType->hasPlaceholder()) {
@@ -1381,10 +1394,7 @@ namespace {
       // (in getTypeOfReference) so we can match non-error param types.
       if (!knownType && E->getDecl()->isInvalid() &&
           !CS.isForCodeCompletion()) {
-        auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
-        (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
-        CS.setType(E, hole);
-        return hole;
+        return invalidateReference();
       }
 
       // Create an overload choice referencing this declaration and immediately
