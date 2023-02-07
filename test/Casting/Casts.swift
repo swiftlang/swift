@@ -1037,7 +1037,10 @@ CastsTests.test("Do not overuse __SwiftValue (non-ObjC)") {
 }
 
 CastsTests.test("Don't put AnyHashable inside AnyObject") {
-  class C: Hashable {}
+  class C: Hashable {
+    func hash(into hasher: inout Hasher) {}
+    static func ==(lhs: C, rhs: C) -> Bool { true }
+  }
   let a = C()
   let b = AnyHashable(a)
   let c = a as! AnyObject
