@@ -390,7 +390,7 @@ struct MoveOnlyChecker {
   /// A set of mark_must_check that we are actually going to process.
   SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
 
-  BorrowToDestructureTransform::IntervalMapAllocator allocator;
+  borrowtodestructure::IntervalMapAllocator allocator;
 
   MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks) : fn(fn) {}
 

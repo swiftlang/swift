@@ -38,6 +38,7 @@
 
 using namespace swift;
 using namespace swift::siloptimizer;
+using namespace swift::siloptimizer::borrowtodestructure;
 
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
@@ -47,7 +48,7 @@ static bool runTransform(SILFunction *fn,
                          ArrayRef<MarkMustCheckInst *> moveIntroducersToProcess,
                          PostOrderAnalysis *poa,
                          DiagnosticEmitter &diagnosticEmitter) {
-  BorrowToDestructureTransform::IntervalMapAllocator allocator;
+  IntervalMapAllocator allocator;
   bool madeChange = false;
   while (!moveIntroducersToProcess.empty()) {
     auto *mmci = moveIntroducersToProcess.back();

@@ -45,10 +45,7 @@
 
 using namespace swift;
 using namespace swift::siloptimizer;
-
-namespace {
-using AvailableValues = BorrowToDestructureTransform::AvailableValues;
-}
+using namespace swift::siloptimizer::borrowtodestructure;
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
@@ -1053,7 +1050,7 @@ BorrowToDestructureTransform::computeAvailableValues(SILBasicBlock *block) {
 
 #ifndef NDEBUG
 static LLVM_ATTRIBUTE_USED void
-dumpIntervalMap(BorrowToDestructureTransform::IntervalMapAllocator::Map &map) {
+dumpIntervalMap(IntervalMapAllocator::Map &map) {
   llvm::dbgs() << "Dumping Interval Map!\n";
   for (auto bi = map.begin(), be = map.end(); bi != be; ++bi) {
     llvm::dbgs() << "Entry. Start: " << bi.start() << " End: " << bi.stop()

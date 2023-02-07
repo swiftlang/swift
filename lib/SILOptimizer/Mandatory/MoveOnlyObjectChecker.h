@@ -118,72 +118,78 @@ struct OSSACanonicalizer {
 
 class DiagnosticEmitter;
 
-class BorrowToDestructureTransform {
+namespace borrowtodestructure {
+
+class IntervalMapAllocator {
 public:
-  class IntervalMapAllocator {
-  public:
-    using Map = llvm::IntervalMap<
-        unsigned, SILValue,
-        llvm::IntervalMapImpl::NodeSizer<unsigned, SILValue>::LeafSize,
-        llvm::IntervalMapHalfOpenInfo<unsigned>>;
+  using Map = llvm::IntervalMap<
+      unsigned, SILValue,
+      llvm::IntervalMapImpl::NodeSizer<unsigned, SILValue>::LeafSize,
+      llvm::IntervalMapHalfOpenInfo<unsigned>>;
 
-    using Allocator = Map::Allocator;
-
-  private:
-    /// Lazily initialized allocator.
-    Optional<Allocator> allocator;
-
-  public:
-    Allocator &get() {
-      if (!allocator)
-        allocator.emplace();
-      return *allocator;
-    }
-  };
-
-  // We reserve more bits that we need at the beginning so that we can avoid
-  // reallocating and potentially breaking our internal mutable array ref
-  // points into the data store.
-  struct AvailableValues {
-    MutableArrayRef<SILValue> values;
-
-    SILValue operator[](unsigned index) const { return values[index]; }
-    SILValue &operator[](unsigned index) { return values[index]; }
-    unsigned size() const { return values.size(); }
-
-    AvailableValues() : values() {}
-    AvailableValues(MutableArrayRef<SILValue> values) : values(values) {}
-
-    void print(llvm::raw_ostream &os, const char *prefix = nullptr) const;
-    SWIFT_DEBUG_DUMP;
-  };
-
-  struct AvailableValueStore {
-    std::vector<SILValue> dataStore;
-    llvm::DenseMap<SILBasicBlock *, AvailableValues> blockToValues;
-    unsigned nextOffset = 0;
-    unsigned numBits;
-
-    AvailableValueStore(const FieldSensitivePrunedLiveness &liveness)
-        : dataStore(liveness.getDiscoveredBlocks().size() *
-                    liveness.getNumSubElements()),
-          numBits(liveness.getNumSubElements()) {}
-
-    std::pair<AvailableValues *, bool> get(SILBasicBlock *block) {
-      auto iter = blockToValues.try_emplace(block, AvailableValues());
-
-      if (!iter.second) {
-        return {&iter.first->second, false};
-      }
-
-      iter.first->second.values =
-          MutableArrayRef<SILValue>(&dataStore[nextOffset], numBits);
-      nextOffset += numBits;
-      return {&iter.first->second, true};
-    }
-  };
+  using Allocator = Map::Allocator;
 
 private:
+  /// Lazily initialized allocator.
+  Optional<Allocator> allocator;
+
+public:
+  Allocator &get() {
+    if (!allocator)
+      allocator.emplace();
+    return *allocator;
+  }
+};
+
+// We reserve more bits that we need at the beginning so that we can avoid
+// reallocating and potentially breaking our internal mutable array ref
+// points into the data store.
+struct AvailableValues {
+  MutableArrayRef<SILValue> values;
+
+  SILValue operator[](unsigned index) const { return values[index]; }
+  SILValue &operator[](unsigned index) { return values[index]; }
+  unsigned size() const { return values.size(); }
+
+  AvailableValues() : values() {}
+  AvailableValues(MutableArrayRef<SILValue> values) : values(values) {}
+
+  void print(llvm::raw_ostream &os, const char *prefix = nullptr) const;
+  SWIFT_DEBUG_DUMP;
+};
+
+struct AvailableValueStore {
+  std::vector<SILValue> dataStore;
+  llvm::DenseMap<SILBasicBlock *, AvailableValues> blockToValues;
+  unsigned nextOffset = 0;
+  unsigned numBits;
+
+  AvailableValueStore(const FieldSensitivePrunedLiveness &liveness)
+      : dataStore(liveness.getDiscoveredBlocks().size() *
+                  liveness.getNumSubElements()),
+        numBits(liveness.getNumSubElements()) {}
+
+  std::pair<AvailableValues *, bool> get(SILBasicBlock *block) {
+    auto iter = blockToValues.try_emplace(block, AvailableValues());
+
+    if (!iter.second) {
+      return {&iter.first->second, false};
+    }
+
+    iter.first->second.values =
+        MutableArrayRef<SILValue>(&dataStore[nextOffset], numBits);
+    nextOffset += numBits;
+    return {&iter.first->second, true};
+  }
+};
+
+} // namespace borrowtodestructure
+
+class BorrowToDestructureTransform {
+  using IntervalMapAllocator = borrowtodestructure::IntervalMapAllocator;
+  using AvailableValueStore = borrowtodestructure::AvailableValueStore;
+  using AvailableValues = borrowtodestructure::AvailableValues;
+
   IntervalMapAllocator &allocator;
   MarkMustCheckInst *mmci;
   DiagnosticEmitter &diagnosticEmitter;
