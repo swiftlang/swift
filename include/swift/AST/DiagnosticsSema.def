@@ -6681,6 +6681,8 @@ ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
       "'@_noImplicitCopy' has no effect when applied to a move only type", ())
 ERROR(moveonly_enums_do_not_support_indirect,none,
       "move-only enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
+ERROR(moveonly_cast,none,
+      "move-only types cannot be conditionally cast", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
