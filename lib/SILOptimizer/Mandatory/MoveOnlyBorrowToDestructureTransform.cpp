@@ -358,83 +358,6 @@ void BorrowToDestructureTransform::checkDestructureUsesOnBoundary() const {
   }
 }
 
-bool BorrowToDestructureTransform::gatherBorrows(
-    MarkMustCheckInst *mmci, StackList<BeginBorrowInst *> &borrowWorklist) {
-  // If we have a no implicit copy mark_must_check, we do not run the borrow to
-  // destructure transform since:
-  //
-  // 1. If we have a move only type, we should have emitted an earlier error
-  //    saying that move only types should not be marked as no implicit copy.
-  //
-  // 2. If we do not have a move only type, then we know that all fields that we
-  //    access directly and would cause a need to destructure must be copyable,
-  //    so no transformation/error is needed.
-  if (mmci->getType().isMoveOnlyWrapped()) {
-    LLVM_DEBUG(llvm::dbgs() << "Skipping move only wrapped inst: " << *mmci);
-    return true;
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "Performing BorrowToDestructureTramsform!\n"
-                             "Searching for borrows for inst: "
-                          << *mmci);
-
-  StackList<Operand *> worklist(mmci->getFunction());
-  for (auto *op : mmci->getUses())
-    worklist.push_back(op);
-
-  while (!worklist.empty()) {
-    auto *use = worklist.pop_back_val();
-    switch (use->getOperandOwnership()) {
-    case OperandOwnership::NonUse:
-    case OperandOwnership::TrivialUse:
-      continue;
-
-    // Conservatively treat a conversion to an unowned value as a pointer
-    // escape. Is it legal to canonicalize ForwardingUnowned?
-    case OperandOwnership::ForwardingUnowned:
-    case OperandOwnership::PointerEscape:
-      return false;
-
-    case OperandOwnership::InstantaneousUse:
-    case OperandOwnership::UnownedInstantaneousUse:
-    case OperandOwnership::BitwiseEscape:
-      // We don't care about these types of uses.
-      continue;
-
-    case OperandOwnership::ForwardingConsume:
-      // Skip if our type is not move only.
-      if (!use->get()->getType().isMoveOnly())
-        continue;
-
-      // Search through forwarding consumes.
-      ForwardingOperand(use).visitForwardedValues([&](SILValue value) -> bool {
-        for (auto *use : value->getUses())
-          worklist.push_back(use);
-        return true;
-      });
-      continue;
-    case OperandOwnership::DestroyingConsume:
-      // We don't care about destroying consume.
-      continue;
-    case OperandOwnership::Borrow:
-      if (auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser())) {
-        LLVM_DEBUG(llvm::dbgs() << "    Found borrow: " << *bbi);
-        borrowWorklist.push_back(bbi);
-      }
-      continue;
-    case OperandOwnership::InteriorPointer:
-      // We don't care about these.
-      continue;
-    case OperandOwnership::GuaranteedForwarding:
-    case OperandOwnership::EndBorrow:
-    case OperandOwnership::Reborrow:
-      llvm_unreachable("Visiting an owned value!\n");
-    }
-  }
-
-  return true;
-}
-
 static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
   auto structDecl = ktypeTy.getStructOrBoundGenericStruct();
   if (!structDecl || structDecl->hasUnreferenceableStorage())
@@ -1474,6 +1397,89 @@ void BorrowToDestructureTransform::cleanup(
 }
 
 //===----------------------------------------------------------------------===//
+//                   MARK: Borrow and SwitchEnum Gathering
+//===----------------------------------------------------------------------===//
+
+/// Visit all of the uses of \p mmci and find all begin_borrows.
+///
+/// Returns false if we found an escape and thus cannot process. It is assumed
+/// that the caller will fail in such a case.
+static bool gatherBorrows(MarkMustCheckInst *mmci,
+                          StackList<BeginBorrowInst *> &borrowWorklist) {
+  // If we have a no implicit copy mark_must_check, we do not run the borrow to
+  // destructure transform since:
+  //
+  // 1. If we have a move only type, we should have emitted an earlier error
+  //    saying that move only types should not be marked as no implicit copy.
+  //
+  // 2. If we do not have a move only type, then we know that all fields that we
+  //    access directly and would cause a need to destructure must be copyable,
+  //    so no transformation/error is needed.
+  if (mmci->getType().isMoveOnlyWrapped()) {
+    LLVM_DEBUG(llvm::dbgs() << "Skipping move only wrapped inst: " << *mmci);
+    return true;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "Searching for borrows for inst: " << *mmci);
+
+  StackList<Operand *> worklist(mmci->getFunction());
+  for (auto *op : mmci->getUses())
+    worklist.push_back(op);
+
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::NonUse:
+    case OperandOwnership::TrivialUse:
+      continue;
+
+    // Conservatively treat a conversion to an unowned value as a pointer
+    // escape. Is it legal to canonicalize ForwardingUnowned?
+    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::PointerEscape:
+      return false;
+
+    case OperandOwnership::InstantaneousUse:
+    case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::BitwiseEscape:
+      // We don't care about these types of uses.
+      continue;
+
+    case OperandOwnership::ForwardingConsume:
+      // Skip if our type is not move only.
+      if (!use->get()->getType().isMoveOnly())
+        continue;
+
+      // Search through forwarding consumes.
+      ForwardingOperand(use).visitForwardedValues([&](SILValue value) -> bool {
+        for (auto *use : value->getUses())
+          worklist.push_back(use);
+        return true;
+      });
+      continue;
+    case OperandOwnership::DestroyingConsume:
+      // We don't care about destroying consume.
+      continue;
+    case OperandOwnership::Borrow:
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser())) {
+        LLVM_DEBUG(llvm::dbgs() << "    Found borrow: " << *bbi);
+        borrowWorklist.push_back(bbi);
+      }
+      continue;
+    case OperandOwnership::InteriorPointer:
+      // We don't care about these.
+      continue;
+    case OperandOwnership::GuaranteedForwarding:
+    case OperandOwnership::EndBorrow:
+    case OperandOwnership::Reborrow:
+      llvm_unreachable("Visiting an owned value!\n");
+    }
+  }
+
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 //                        MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
@@ -1482,7 +1488,7 @@ bool BorrowToDestructureTransform::transform() {
 
   // If we failed to gather borrows due to the transform not understanding part
   // of the SIL, fail and return false.
-  if (!BorrowToDestructureTransform::gatherBorrows(mmci, borrowWorklist))
+  if (!gatherBorrows(mmci, borrowWorklist))
     return false;
 
   // If we do not have any borrows to process, return true early to show we

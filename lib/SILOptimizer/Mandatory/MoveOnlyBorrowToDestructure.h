@@ -146,13 +146,6 @@ private:
     return pofi;
   }
 
-  /// Visit all of the uses of \p mmci and find all begin_borrows.
-  ///
-  /// Returns false if we found an escape and thus cannot process. It is assumed
-  /// that the caller will fail in such a case.
-  static bool gatherBorrows(MarkMustCheckInst *mmci,
-                            StackList<BeginBorrowInst *> &borrowWorklist);
-
   /// Once we have gathered up all of our destructure uses and liveness
   /// requiring uses, validate that all of our destructure uses are on our
   /// boundary. Once we have done this, we know that it is safe to perform our
