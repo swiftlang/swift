@@ -9,36 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-///
-/// Terminology:
-///
-/// Simple liveness:
-/// - Ends at lifetime-ending operations.
-/// - Transitively follows guaranteed forwarding operations and address uses
-///   within the current scope.
-/// - Assumes inner scopes are complete, including borrow and address scopes
-/// - Rarely returns AddressUseKind::PointerEscape.
-/// - Per-definition dominance holds
-/// - Insulates outer scopes from inner scope details. Maintains the
-///   invariant that inlining cannot pessimize optimization.
-///
-/// Transitive liveness
-/// - Transitively follows uses within inner scopes, including forwarding
-///   operations and address uses.
-/// - Much more likely to returns AddressUseKind::PointerEscape
-/// - Per-definition dominance holds
-/// - Does not assume that any scopes are complete.
-///
-/// Extended liveness (copy-extension and reborrow-extension)
-/// - Extends a live range across lifetime-ending operations
-/// - Depending on context: owned values are extended across copies or
-///   guaranteed values are extended across reborrows
-/// - Copy-extension is used to canonicalize an OSSA lifetime
-/// - Reborrow-extension is used to check borrow scopes relative to its inner
-///   uses and outer lifetime
-/// - Per-definition dominance does not hold
-///
-//===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_OWNERSHIPUTILS_H
 #define SWIFT_SIL_OWNERSHIPUTILS_H
@@ -254,6 +224,10 @@ bool findUsesOfSimpleValue(SILValue value,
 /// reborrows.
 bool visitGuaranteedForwardingPhisForSSAValue(
     SILValue value, function_ref<bool(Operand *)> func);
+
+//===----------------------------------------------------------------------===//
+//                                Abstractions
+//===----------------------------------------------------------------------===//
 
 /// An operand that forwards ownership to one or more results.
 class ForwardingOperand {
@@ -1312,13 +1286,16 @@ void visitExtendedGuaranteedForwardingPhiBaseValuePairs(
 bool visitForwardedGuaranteedOperands(
   SILValue value, function_ref<void(Operand *)> visitOperand);
 
-/// Visit the phis in the same block as \p phi which are reborrows of a borrow
-/// of one of the values reaching \p phi.
+
+/// Return true of the lifetime of \p innerPhiVal depends on \p outerPhiVal.
+bool isInnerAdjacentPhi(SILArgument *innerPhiVal, SILArgument *outerPhiVal);
+
+/// Visit the phis in the same block as \p phi whose lifetime depends on \p phi.
 ///
 /// If the visitor returns false, stops visiting and returns false.  Otherwise,
 /// returns true.
-bool visitAdjacentReborrowsOfPhi(SILPhiArgument *phi,
-                                 function_ref<bool(SILPhiArgument *)> visitor);
+bool visitInnerAdjacentPhis(SILArgument *phi,
+                            function_ref<bool(SILArgument *)> visitor);
 
 /// Visit each definition of a scope that immediately encloses a guaranteed
 /// value. The guaranteed value effectively keeps these scopes alive.
