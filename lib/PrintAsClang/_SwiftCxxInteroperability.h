@@ -39,7 +39,7 @@
 #define SWIFT_SYMBOL_MODULE(moduleValue)                                       \
   __attribute__((external_source_symbol(                                       \
       language = "Swift", defined_in = moduleValue, generated_declaration)))
-#if __has_attribute(external_source_symbol_with_usr)
+#if __has_attribute(external_source_symbol) > 1
 #define SWIFT_SYMBOL_MODULE_USR(moduleValue, usrValue)                         \
   __attribute__((                                                              \
       external_source_symbol(language = "Swift", defined_in = moduleValue,     \
