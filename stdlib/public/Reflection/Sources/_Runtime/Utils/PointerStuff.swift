@@ -11,35 +11,41 @@
 
 import Swift
 
-@available(SwiftStdlib 5.9, *)
-@inlinable
-public func unsafeBitCast<T, U>(_ x: T, to type: U.Type = U.self) -> U {
+@_alwaysEmitIntoClient
+func unsafeBitCast<T, U>(_ x: T, to type: U.Type = U.self) -> U {
   Swift.unsafeBitCast(x, to: type)
 }
 
 extension UnsafePointer {
-  @inlinable
+  @_alwaysEmitIntoClient
   var raw: UnsafeRawPointer {
     UnsafeRawPointer(self)
   }
 }
 
 extension UnsafeMutablePointer {
-  @inlinable
+  @_alwaysEmitIntoClient
   var raw: UnsafeMutableRawPointer {
     UnsafeMutableRawPointer(self)
   }
 }
 
+extension UnsafeBufferPointer {
+  @_alwaysEmitIntoClient
+  var raw: UnsafeRawBufferPointer {
+    UnsafeRawBufferPointer(self)
+  }
+}
+
 extension UnsafeRawPointer {
-  @inlinable
+  @_alwaysEmitIntoClient
   var bitPattern: UInt64 {
     UInt64(truncatingIfNeeded: UInt(bitPattern: self))
   }
 }
 
 extension UInt64 {
-  @inlinable
+  @_alwaysEmitIntoClient
   var rawPointer: UnsafeRawPointer {
     let pointer = UnsafeRawPointer(bitPattern: UInt(truncatingIfNeeded: self))
     
@@ -48,15 +54,14 @@ extension UInt64 {
 }
 
 extension UnsafeRawPointer {
-  @inlinable
+  @_alwaysEmitIntoClient
   var mutable: UnsafeMutableRawPointer {
     UnsafeMutableRawPointer(mutating: self)
   }
 }
 
 extension UnsafeRawPointer {
-  @inlinable
-  @inline(__always)
+  @_alwaysEmitIntoClient
   var binaryString: String {
 //    let length = strlen(UnsafePointer(_rawValue))
 //
@@ -71,12 +76,13 @@ extension UnsafeRawPointer {
 }
 
 extension UnsafeRawPointer {
-  @inlinable
+  @_alwaysEmitIntoClient
   func offset(of count: Int) -> UnsafeRawPointer {
     advanced(by: count * MemoryLayout<UnsafeRawPointer>.size)
   }
 }
 
+@_alwaysEmitIntoClient
 func getSymbolicMangledNameLength(_ base: UnsafeRawPointer) -> Int {
   var end = base
   while let current = Optional(end.load(as: UInt8.self)), current != 0 {

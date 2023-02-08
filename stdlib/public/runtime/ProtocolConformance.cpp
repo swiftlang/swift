@@ -1273,6 +1273,13 @@ static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
                                       });
 }
 
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+bool swift::_swift_class_isSubclass(const Metadata *subclass,
+                                    const Metadata *superclass) {
+  return isSubclass(subclass, superclass);
+}
+
 llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
     llvm::ArrayRef<GenericRequirementDescriptor> requirements,
     llvm::SmallVectorImpl<const void *> &extraArguments,

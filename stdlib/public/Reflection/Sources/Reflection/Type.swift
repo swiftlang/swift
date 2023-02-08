@@ -65,8 +65,8 @@ extension Type {
 @available(SwiftStdlib 5.9, *)
 extension Type {
   @inlinable
-  public var swiftType: Any.Type {
-    unsafeBitCast(metadata)
+  public var swiftType: any Any.Type {
+    unsafeBitCast(metadata, to: Any.Type.self)
   }
 }
 
@@ -117,7 +117,7 @@ extension Type {
 extension Type: CustomStringConvertible {
   @inlinable
   public var description: String {
-    _typeName(unsafeBitCast(metadata.ptr), qualified: false)
+    _typeName(swiftType, qualified: false)
   }
 }
 

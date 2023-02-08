@@ -14,7 +14,7 @@ import Swift
 @available(SwiftStdlib 5.9, *)
 @frozen
 public struct ClassMetadata: PublicLayout {
-#if canImport(ObjectiveC)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   public typealias Layout = (
     base: Metadata.Layout,
     superclass: Metadata?,
