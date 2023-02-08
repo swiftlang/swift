@@ -35,30 +35,20 @@ struct ExpectedFixIt {
 };
 } // end namespace swift
 
-constexpr unsigned LineColumnRange::NoValue;
-
 const LineColumnRange &
 CapturedFixItInfo::getLineColumnRange(const SourceManager &SM,
-                                      unsigned BufferID,
-                                      bool ComputeStartLocLine,
-                                      bool ComputeEndLocLine) const {
-  if (LineColRange.StartLine == LineColumnRange::NoValue &&
-      ComputeStartLocLine) {
-    std::tie(LineColRange.StartLine, LineColRange.StartCol) =
-        SM.getPresumedLineAndColumnForLoc(getSourceRange().getStart(),
-                                          BufferID);
-  } else if (LineColRange.StartCol == LineColumnRange::NoValue) {
-    LineColRange.StartCol =
-        SM.getColumnInBuffer(getSourceRange().getStart(), BufferID);
+                                      unsigned BufferID) const {
+  if (LineColRange.StartLine != 0) {
+    // Already computed.
+    return LineColRange;
   }
 
-  if (LineColRange.EndLine == LineColumnRange::NoValue && ComputeEndLocLine) {
-    std::tie(LineColRange.EndLine, LineColRange.EndCol) =
-        SM.getPresumedLineAndColumnForLoc(FixIt.getRange().getEnd(), BufferID);
-  } else if (LineColRange.EndCol == LineColumnRange::NoValue) {
-    LineColRange.EndCol =
-        SM.getColumnInBuffer(getSourceRange().getEnd(), BufferID);
-  }
+  auto SrcRange = FixIt.getRange();
+
+  std::tie(LineColRange.StartLine, LineColRange.StartCol) =
+      SM.getPresumedLineAndColumnForLoc(SrcRange.getStart(), BufferID);
+  std::tie(LineColRange.EndLine, LineColRange.EndCol) =
+      SM.getPresumedLineAndColumnForLoc(SrcRange.getEnd(), BufferID);
 
   return LineColRange;
 }
@@ -293,23 +283,11 @@ bool DiagnosticVerifier::checkForFixIt(
       if (ActualFixIt.getText() != Expected.Text)
         continue;
 
-      LineColumnRange ActualRange = ActualFixIt.getLineColumnRange(
-          SM, BufferID,
-          // Don't compute line numbers unless we have to.
-          /*ComputeStartLocLine=*/Expected.Range.StartLine !=
-              LineColumnRange::NoValue,
-          /*ComputeEndLocLine=*/Expected.Range.EndLine !=
-              LineColumnRange::NoValue);
+      auto &ActualRange = ActualFixIt.getLineColumnRange(SM, BufferID);
 
       if (Expected.Range.StartCol != ActualRange.StartCol ||
-          Expected.Range.EndCol != ActualRange.EndCol) {
-        continue;
-      }
-      if (Expected.Range.StartLine != LineColumnRange::NoValue &&
-          Expected.Range.StartLine != ActualRange.StartLine) {
-        continue;
-      }
-      if (Expected.Range.EndLine != LineColumnRange::NoValue &&
+          Expected.Range.EndCol != ActualRange.EndCol ||
+          Expected.Range.StartLine != ActualRange.StartLine ||
           Expected.Range.EndLine != ActualRange.EndLine) {
         continue;
       }
@@ -329,10 +307,7 @@ DiagnosticVerifier::renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
   interleave(
       ActualFixIts,
       [&](const CapturedFixItInfo &ActualFixIt) {
-        LineColumnRange ActualRange =
-            ActualFixIt.getLineColumnRange(SM, BufferID,
-                                           /*ComputeStartLocLine=*/true,
-                                           /*ComputeEndLocLine=*/true);
+        auto &ActualRange = ActualFixIt.getLineColumnRange(SM, BufferID);
         OS << "{{";
 
         if (ActualRange.StartLine != DiagnosticLineNo)
@@ -372,19 +347,23 @@ static Optional<LineColumnRange> parseExpectedFixItRange(
     llvm::function_ref<void(const char *, const Twine &)> diagnoseError) {
   assert(!Str.empty());
 
-  const auto parseLineAndColumn =
-      [&]() -> Optional<std::pair<unsigned, unsigned>> {
-    enum class LineOffsetKind : uint8_t { None, Plus, Minus };
+  struct ParsedLineAndColumn {
+    Optional<unsigned> Line;
+    unsigned Column;
+  };
 
-    LineOffsetKind lineOffsetKind = LineOffsetKind::None;
+  const auto parseLineAndColumn = [&]() -> Optional<ParsedLineAndColumn> {
+    enum class OffsetKind : uint8_t { None, Plus, Minus };
+
+    OffsetKind LineOffsetKind = OffsetKind::None;
     if (!Str.empty()) {
       switch (Str.front()) {
       case '+':
-        lineOffsetKind = LineOffsetKind::Plus;
+        LineOffsetKind = OffsetKind::Plus;
         Str = Str.drop_front();
         break;
       case '-':
-        lineOffsetKind = LineOffsetKind::Minus;
+        LineOffsetKind = OffsetKind::Minus;
         Str = Str.drop_front();
         break;
       default:
@@ -392,63 +371,61 @@ static Optional<LineColumnRange> parseExpectedFixItRange(
       }
     }
 
-    unsigned firstNumber = LineColumnRange::NoValue;
-    if (Str.consumeInteger(10, firstNumber)) {
-      if (lineOffsetKind > LineOffsetKind::None) {
+    unsigned FirstVal = 0;
+    if (Str.consumeInteger(10, FirstVal)) {
+      if (LineOffsetKind == OffsetKind::None) {
+        diagnoseError(Str.data(),
+                      "expected line or column number in fix-it verification");
+      } else {
         diagnoseError(Str.data(),
                       "expected line offset after leading '+' or '-' in fix-it "
                       "verification");
-      } else {
-        diagnoseError(Str.data(),
-                      "expected line or column number in fix-it verification");
       }
       return None;
     }
 
-    unsigned secondNumber = LineColumnRange::NoValue;
-    if (!Str.empty() && Str.front() == ':') {
-      Str = Str.drop_front();
-
-      if (Str.consumeInteger(10, secondNumber)) {
-        diagnoseError(
-            Str.data(),
-            "expected column number after ':' in fix-it verification");
-        return None;
+    // If the first value is not followed by a colon, it is either a column or a
+    // line offset that is missing a column.
+    if (Str.empty() || Str.front() != ':') {
+      if (LineOffsetKind == OffsetKind::None) {
+        return ParsedLineAndColumn{None, FirstVal};
       }
-    } else if (lineOffsetKind > LineOffsetKind::None) {
+
       diagnoseError(Str.data(),
                     "expected colon-separated column number after line offset "
                     "in fix-it verification");
       return None;
     }
 
-    if (secondNumber == LineColumnRange::NoValue) {
-      // If only one value is specified, it's a column number;
-      return std::make_pair(LineColumnRange::NoValue, firstNumber);
+    unsigned Column = 0;
+    Str = Str.drop_front();
+    if (Str.consumeInteger(10, Column)) {
+      diagnoseError(Str.data(),
+                    "expected column number after ':' in fix-it verification");
+      return None;
     }
 
-    unsigned lineNo = DiagnosticLineNo;
-    switch (lineOffsetKind) {
-    case LineOffsetKind::None:
-      lineNo = firstNumber;
+    // Apply the offset relative to the line of the expected diagnostic.
+    switch (LineOffsetKind) {
+    case OffsetKind::None:
       break;
-    case LineOffsetKind::Plus:
-      lineNo += firstNumber;
+    case OffsetKind::Plus:
+      FirstVal += DiagnosticLineNo;
       break;
-    case LineOffsetKind::Minus:
-      lineNo -= firstNumber;
+    case OffsetKind::Minus:
+      FirstVal = DiagnosticLineNo - FirstVal;
       break;
     }
 
-    return std::make_pair(lineNo, secondNumber);
+    return ParsedLineAndColumn{FirstVal, Column};
   };
 
   LineColumnRange Range;
 
-  if (const auto lineAndCol = parseLineAndColumn()) {
-    std::tie(Range.StartLine, Range.StartCol) = lineAndCol.value();
-    if (Range.StartLine == LineColumnRange::NoValue)
-      Range.StartLine = DiagnosticLineNo;
+  if (const auto LineAndCol = parseLineAndColumn()) {
+    // The start line defaults to the line of the expected diagnostic.
+    Range.StartLine = LineAndCol->Line.value_or(DiagnosticLineNo);
+    Range.StartCol = LineAndCol->Column;
   } else {
     return None;
   }
@@ -461,10 +438,10 @@ static Optional<LineColumnRange> parseExpectedFixItRange(
     return None;
   }
 
-  if (const auto lineAndCol = parseLineAndColumn()) {
-    std::tie(Range.EndLine, Range.EndCol) = lineAndCol.value();
-    if (Range.EndLine == LineColumnRange::NoValue)
-      Range.EndLine = Range.StartLine;
+  if (const auto LineAndCol = parseLineAndColumn()) {
+    // The end line defaults to the start line.
+    Range.EndLine = LineAndCol->Line.value_or(Range.StartLine);
+    Range.EndCol = LineAndCol->Column;
   } else {
     return None;
   }
