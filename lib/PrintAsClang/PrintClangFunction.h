@@ -113,14 +113,15 @@ public:
                          const NominalTypeDecl *typeDeclContext,
                          const ModuleDecl *moduleContext, Type resultTy,
                          const ParameterList *params, bool hasThrows = false,
-                         const AnyFunctionType *funcType = nullptr);
+                         const AnyFunctionType *funcType = nullptr,
+                         bool isStaticMethod = false);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
   void printCxxMethod(const NominalTypeDecl *typeDeclContext,
                       const AbstractFunctionDecl *FD,
                       const LoweredFunctionSignature &signature,
-                      StringRef swiftSymbolName, Type resultTy,
+                      StringRef swiftSymbolName, Type resultTy, bool isStatic,
                       bool isDefinition);
 
   /// Print the C++ getter/setter method signature.
