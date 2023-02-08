@@ -265,6 +265,33 @@ PointerAuthInfo::emit(IRGenFunction &IGF,
   return PointerAuthInfo(key, discriminator);
 }
 
+PointerAuthInfo PointerAuthInfo::emit(IRGenFunction &IGF,
+                                      const PointerAuthSchema &schema,
+                                      llvm::Value *storageAddress,
+                                      llvm::ConstantInt *otherDiscriminator) {
+  if (!schema)
+    return PointerAuthInfo();
+
+  unsigned key = schema.getKey();
+
+  llvm::Value *discriminator = otherDiscriminator;
+
+  // Factor in the address.
+  if (schema.isAddressDiscriminated()) {
+    assert(storageAddress &&
+           "no storage address for address-discriminated schema");
+
+    if (!otherDiscriminator->isZero()) {
+      discriminator = emitPointerAuthBlend(IGF, storageAddress, discriminator);
+    } else {
+      discriminator =
+          IGF.Builder.CreatePtrToInt(storageAddress, IGF.IGM.Int64Ty);
+    }
+  }
+
+  return PointerAuthInfo(key, discriminator);
+}
+
 llvm::ConstantInt *
 PointerAuthInfo::getOtherDiscriminator(IRGenModule &IGM,
                                        const PointerAuthSchema &schema,
