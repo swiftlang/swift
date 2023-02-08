@@ -75,6 +75,7 @@ private func registerSwiftPasses() {
   registerPass(simplificationPass, { simplificationPass.run($0) })
   registerPass(ononeSimplificationPass, { ononeSimplificationPass.run($0) })
   registerPass(lateOnoneSimplificationPass, { lateOnoneSimplificationPass.run($0) })
+  registerPass(cleanupDebugStepsPass, { cleanupDebugStepsPass.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })

@@ -8,6 +8,7 @@
 
 swift_compiler_sources(Optimizer
   AssumeSingleThreaded.swift
+  CleanupDebugSteps.swift
   ComputeEscapeEffects.swift
   ComputeSideEffects.swift
   ObjCBridgingOptimization.swift

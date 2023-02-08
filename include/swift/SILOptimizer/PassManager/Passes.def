@@ -395,6 +395,8 @@ SWIFT_FUNCTION_PASS(OnoneSimplification, "onone-simplification",
     "Peephole simplifications which runs at -Onone")
 SWIFT_FUNCTION_PASS(LateOnoneSimplification, "late-onone-simplification",
     "Peephole simplifications which can only run late in the -Onone pipeline")
+SWIFT_FUNCTION_PASS(CleanupDebugSteps, "cleanup-debug-steps",
+    "Cleanup debug_step instructions for Onone")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",
