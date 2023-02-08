@@ -1444,6 +1444,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createPackElementSet(Loc, value, index, pack);
     break;
   }
+  case SILInstructionKind::TuplePackElementAddrInst: {
+    assert(RecordKind == SIL_PACK_ELEMENT_GET);
+    auto elementType = getSILType(MF->getType(TyID),
+                                  (SILValueCategory) TyCategory, Fn);
+    auto tupleType = getSILType(MF->getType(TyID2),
+                               (SILValueCategory) TyCategory2, Fn);
+    auto tuple = getLocalValue(ValID2, tupleType);
+    auto indexType = SILType::getPackIndexType(MF->getContext());
+    auto index = getLocalValue(ValID3, indexType);
+    ResultInst = Builder.createTuplePackElementAddr(Loc, index, tuple,
+                                                    elementType);
+    break;
+  }
 
 #define ONEOPERAND_ONETYPE_INST(ID)                                            \
   case SILInstructionKind::ID##Inst:                                           \

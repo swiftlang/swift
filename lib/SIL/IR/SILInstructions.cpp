@@ -2400,6 +2400,28 @@ PackElementGetInst *PackElementGetInst::create(SILFunction &F,
   return ::new (buffer) PackElementGetInst(debugLoc, allOperands, elementType);
 }
 
+TuplePackElementAddrInst *
+TuplePackElementAddrInst::create(SILFunction &F,
+                                 SILDebugLocation debugLoc,
+                                 SILValue indexOperand,
+                                 SILValue tupleOperand,
+                                 SILType elementType) {
+  assert(indexOperand->getType().is<BuiltinPackIndexType>());
+  assert(tupleOperand->getType().isAddress() &&
+         tupleOperand->getType().is<TupleType>());
+
+  SmallVector<SILValue, 8> allOperands;
+  allOperands.push_back(indexOperand);
+  allOperands.push_back(tupleOperand);
+  collectTypeDependentOperands(allOperands, F, elementType);
+
+  auto size = totalSizeToAlloc<swift::Operand>(allOperands.size());
+  auto buffer =
+    F.getModule().allocateInst(size, alignof(TuplePackElementAddrInst));
+  return ::new (buffer) TuplePackElementAddrInst(debugLoc, allOperands,
+                                                 elementType);
+}
+
 BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,
                                SILValue operand,
                                ArrayRef<SILType> resultTypes,

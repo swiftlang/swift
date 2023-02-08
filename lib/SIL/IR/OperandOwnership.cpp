@@ -199,6 +199,7 @@ OPERAND_OWNERSHIP(TrivialUse, DynamicPackIndex)
 OPERAND_OWNERSHIP(TrivialUse, PackPackIndex)
 OPERAND_OWNERSHIP(TrivialUse, PackElementGet)
 OPERAND_OWNERSHIP(TrivialUse, PackElementSet)
+OPERAND_OWNERSHIP(TrivialUse, TuplePackElementAddr)
 
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).

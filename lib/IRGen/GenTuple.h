@@ -19,6 +19,10 @@
 
 #include "swift/Basic/LLVM.h"
 
+namespace llvm {
+  class Value;
+}
+
 namespace swift {
   class CanType;
 
@@ -33,6 +37,13 @@ namespace irgen {
                                      Address base,
                                      SILType tupleType,
                                      unsigned fieldNo);
+
+  /// Project the address of a tuple element, given a dynamic index.
+  Address projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
+                                                   Address base,
+                                                   SILType tupleType,
+                                                   llvm::Value *index,
+                                                   SILType elementType);
 
   /// Project a tuple element rvalue from an already-exploded tuple rvalue.
   void projectTupleElementFromExplosion(IRGenFunction &IGF,

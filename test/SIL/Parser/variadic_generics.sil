@@ -76,3 +76,15 @@ bb0(%i : $Builtin.Word):
   %ret = tuple ()
   return %ret : $()
 }
+
+// CHECK-LABEL: sil @test6
+// CHECK: [[INDEX:%.*]] = dynamic_pack_index
+// CHECK: tuple_pack_element_addr [[INDEX]] of %0 : $*(String, repeat each T, Int) as $*@pack_element("01234567-89AB-CDEF-0123-000000000004") U
+sil @test6 :  $<T...> (@inout (String, repeat each T, Int), Builtin.Word) -> () {
+bb0(%tuple : $*(String, repeat each T, Int), %i : $Builtin.Word):
+  %index = dynamic_pack_index %i of $Pack{Float, repeat each T, Float}
+  %0 = open_pack_element %index of <U...> at <Pack{String, repeat each T, Int}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000004"
+  %elt = tuple_pack_element_addr %index of %tuple : $*(String, repeat each T, Int) as $*@pack_element("01234567-89AB-CDEF-0123-000000000004") U
+  %ret = tuple ()
+  return %ret : $()
+}
