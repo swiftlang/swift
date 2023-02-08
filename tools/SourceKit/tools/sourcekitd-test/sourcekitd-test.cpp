@@ -461,6 +461,8 @@ static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
 }
 
 static int performShellExecution(ArrayRef<const char *> Args) {
+  llvm::outs().flush();
+  llvm::errs().flush();
   auto Program = llvm::sys::findProgramByName(Args[0]);
   if (std::error_code ec = Program.getError()) {
     llvm::errs() << "command not found: " << Args[0] << "\n";
@@ -1993,6 +1995,9 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OS << "-----\n";
   }
   OS << "SECONDARY SYMBOLS END\n";
+  OS << "DID REUSE AST CONTEXT: "
+     << sourcekitd_variant_dictionary_get_bool(Info, KeyReusingASTContext)
+     << '\n';
 }
 
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
@@ -2653,8 +2658,6 @@ static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
   exit(1);
 }
 
-static llvm::StringMap<llvm::MemoryBuffer*> Buffers;
-
 /// Opens \p Filename, first checking \p VFSFiles and then falling back to the
 /// filesystem otherwise. If the file could not be opened and \p ExitOnError is
 /// true, the process exits with an error message. Otherwise a buffer
@@ -2666,10 +2669,6 @@ getBufferForFilename(StringRef Filename,
   auto VFSFileIt = VFSFiles.find(Filename);
   auto MappedFilename =
       VFSFileIt == VFSFiles.end() ? Filename : StringRef(VFSFileIt->second.path);
-
-  auto It = Buffers.find(MappedFilename);
-  if (It != Buffers.end())
-    return It->second;
 
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(MappedFilename);
   std::unique_ptr<llvm::MemoryBuffer> Buffer;
@@ -2685,5 +2684,5 @@ getBufferForFilename(StringRef Filename,
     Buffer = std::move(FileBufOrErr.get());
   }
 
-  return Buffers[MappedFilename] = Buffer.release();
+  return Buffer.release();
 }

@@ -2165,7 +2165,7 @@ static bool isDirectToStorageAccess(const DeclContext *UseDC,
   if (!var->hasStorage())
     return false;
 
-  auto *AFD = dyn_cast<AbstractFunctionDecl>(UseDC);
+  auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(UseDC);
   if (AFD == nullptr)
     return false;
 
@@ -9866,6 +9866,13 @@ MacroRoles MacroDecl::getMacroRoles() const {
   return contexts;
 }
 
+const MacroRoleAttr *MacroDecl::getMacroRoleAttr(MacroRole role) const {
+  for (auto attr : getAttrs().getAttributes<MacroRoleAttr>())
+    if (attr->getMacroRole() == role)
+      return attr;
+  llvm_unreachable("Macro role not declared for this MacroDecl");
+}
+
 MacroDefinition MacroDecl::getDefinition() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
@@ -9887,7 +9894,7 @@ SourceRange MacroExpansionDecl::getSourceRange() const {
   else if (RightAngleLoc.isValid())
     endLoc = RightAngleLoc;
   else
-    endLoc = MacroLoc.getEndLoc();
+    endLoc = MacroNameLoc.getEndLoc();
 
   return SourceRange(PoundLoc, endLoc);
 }
@@ -9903,10 +9910,17 @@ unsigned MacroExpansionDecl::getDiscriminator() const {
       MacroDiscriminatorContext::getParentOf(mutableThis);
   mutableThis->setDiscriminator(
       ctx.getNextMacroDiscriminator(
-          discriminatorContext, getMacro().getBaseName()));
+          discriminatorContext, getMacroName().getBaseName()));
 
   assert(getRawDiscriminator() != InvalidDiscriminator);
   return getRawDiscriminator();
+}
+
+ArrayRef<Decl *> MacroExpansionDecl::getRewritten() const {
+  auto mutableThis = const_cast<MacroExpansionDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      ExpandMacroExpansionDeclRequest{mutableThis}, {});
 }
 
 NominalTypeDecl *

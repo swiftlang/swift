@@ -45,6 +45,31 @@ SourceLoc SourceManager::getIDEInspectionTargetLoc() const {
       .getAdvancedLoc(IDEInspectionTargetOffset);
 }
 
+bool SourceManager::containsRespectingReplacedRanges(SourceRange Range,
+                                                     SourceLoc Loc) const {
+  if (Loc.isInvalid() || Range.isInvalid()) {
+    return false;
+  }
+
+  if (Range.contains(Loc)) {
+    return true;
+  }
+  for (const auto &pair : getReplacedRanges()) {
+    auto OriginalRange = pair.first;
+    auto NewRange = pair.second;
+    if (NewRange.contains(Loc) && Range.overlaps(OriginalRange)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool SourceManager::rangeContainsRespectingReplacedRanges(
+    SourceRange Enclosing, SourceRange Inner) const {
+  return containsRespectingReplacedRanges(Enclosing, Inner.Start) &&
+         containsRespectingReplacedRanges(Enclosing, Inner.End);
+}
+
 StringRef SourceManager::getDisplayNameForLoc(SourceLoc Loc, bool ForceGeneratedSourceToDisk) const {
   // Respect #line first
   if (auto VFile = getVirtualFile(Loc))

@@ -214,7 +214,7 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
         """
 
         struct \(raw: prefix) {
-          func \(context.createUniqueName("method"))() { return 1 }
+          func \(context.createUniqueName("method"))() { return 0 }
           func \(context.createUniqueName("method"))() { return 1 }
         }
         """
@@ -230,6 +230,47 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
       }
       """
     }
+  }
+}
+
+public struct DefineDeclsWithKnownNamesMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+
+      struct A {
+        func \(context.createUniqueName("method"))() { }
+        func \(context.createUniqueName("method"))() { }
+      }
+      """,
+      """
+
+      struct B {
+        func \(context.createUniqueName("method"))() { }
+        func \(context.createUniqueName("method"))() { }
+      }
+      """,
+      """
+
+      var foo: Int {
+          1
+      }
+      """,
+      """
+
+      var addOne: (Int) -> Int { { $0 + 1 } }
+      """
+
+      // FIXME:
+      // 1. Stored properties are not visited in IRGen
+      //    let addTwo: (Int) -> Int = { $0 + 2 }
+      // 2. Curry thunk at call sites
+      //    func foo()
+      //    Foo2.foo // AutoClosureExpr with invalid discriminator
+    ]
   }
 }
 
@@ -299,7 +340,7 @@ public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo parent: some DeclGroupSyntax,
-    providingAttributesFor member: DeclSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext
   ) throws -> [AttributeSyntax] {
     guard member.is(VariableDeclSyntax.self) else {
@@ -329,7 +370,7 @@ extension TypeWrapperMacro: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo decl: some DeclGroupSyntax,
-    providingAttributesFor member: DeclSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext
   ) throws -> [AttributeSyntax] {
     guard let varDecl = member.as(VariableDeclSyntax.self),
@@ -451,7 +492,7 @@ public struct WrapStoredPropertiesMacro: MemberAttributeMacro {
   >(
     of node: AttributeSyntax,
     attachedTo decl: Declaration,
-    providingAttributesFor member: DeclSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
     in context: Context
   ) throws -> [AttributeSyntax] {
     guard let property = member.as(VariableDeclSyntax.self),
@@ -567,5 +608,198 @@ public enum LeftHandOperandFinderMacro: ExpressionMacro {
     visitor.walk(node)
 
     return node.argumentList.first!.expression
+  }
+}
+
+private extension DeclSyntaxProtocol {
+  var isObservableStoredProperty: Bool {
+    if let property = self.as(VariableDeclSyntax.self),
+          let binding = property.bindings.first,
+          let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
+          identifier.text != "_registrar", identifier.text != "_storage",
+          binding.accessor == nil {
+      return true
+    }
+
+    return false
+  }
+}
+
+public struct ObservableMacro: MemberMacro, MemberAttributeMacro {
+
+  // MARK: - MemberMacro
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let identified = declaration.asProtocol(IdentifiedDeclSyntax.self) else {
+      return []
+    }
+
+    let parentName = identified.identifier
+
+    let registrar: DeclSyntax =
+      """
+      let _registrar = ObservationRegistrar<\(parentName)>()
+      """
+
+    let addObserver: DeclSyntax =
+      """
+      public nonisolated func addObserver(_ observer: some Observer<\(parentName)>) {
+        _registrar.addObserver(observer)
+      }
+      """
+
+    let removeObserver: DeclSyntax =
+      """
+      public nonisolated func removeObserver(_ observer: some Observer<\(parentName)>) {
+        _registrar.removeObserver(observer)
+      }
+      """
+
+    let withTransaction: DeclSyntax =
+      """
+      private func withTransaction<T>(_ apply: () throws -> T) rethrows -> T {
+        _registrar.beginAccess()
+        defer { _registrar.endAccess() }
+        return try apply()
+      }
+      """
+
+    let memberList = MemberDeclListSyntax(
+      declaration.members.members.filter {
+        $0.decl.isObservableStoredProperty
+      }
+    )
+
+    let storageStruct: DeclSyntax =
+      """
+      private struct Storage {
+      \(memberList)
+      }
+      """
+
+    let storage: DeclSyntax =
+      """
+      private var _storage = Storage()
+      """
+
+    return [
+      registrar,
+      addObserver,
+      removeObserver,
+      withTransaction,
+      storageStruct,
+      storage,
+    ]
+  }
+
+  // MARK: - MemberAttributeMacro
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [SwiftSyntax.AttributeSyntax] {
+    guard member.isObservableStoredProperty else {
+      return []
+    }
+
+    return [
+      AttributeSyntax(
+        attributeName: SimpleTypeIdentifierSyntax(
+          name: .identifier("ObservableProperty")
+        )
+      )
+    ]
+  }
+
+}
+
+public struct ObservablePropertyMacro: AccessorMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingAccessorsOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [AccessorDeclSyntax] {
+    guard let property = declaration.as(VariableDeclSyntax.self),
+      let binding = property.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
+      binding.accessor == nil
+    else {
+      return []
+    }
+
+    let getAccessor: AccessorDeclSyntax =
+      """
+      get {
+        _registrar.beginAccess(\\.\(identifier))
+        defer { _registrar.endAccess() }
+        return _storage.\(identifier)
+      }
+      """
+
+    let setAccessor: AccessorDeclSyntax =
+      """
+      set {
+        _registrar.beginAccess(\\.\(identifier))
+        _registrar.register(observable: self, willSet: \\.\(identifier), to: newValue)
+        defer {
+          _registrar.register(observable: self, didSet: \\.\(identifier))
+          _registrar.endAccess()
+        }
+        _storage.\(identifier) = newValue
+      }
+      """
+
+    return [getAccessor, setAccessor]
+  }
+}
+
+extension DeclModifierSyntax {
+  fileprivate var isNeededAccessLevelModifier: Bool {
+    switch self.name.tokenKind {
+    case .keyword(.public): return true
+    default: return false
+    }
+  }
+}
+
+extension SyntaxStringInterpolation {
+  fileprivate mutating func appendInterpolation<Node: SyntaxProtocol>(_ node: Node?) {
+    if let node {
+      appendInterpolation(node)
+    }
+  }
+}
+
+public struct NewTypeMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let type = node.attributeName.as(SimpleTypeIdentifierSyntax.self),
+          let genericArguments = type.genericArgumentClause?.arguments,
+          genericArguments.count == 1,
+          let rawType = genericArguments.first
+    else {
+      throw CustomError.message(#"@NewType requires the raw type as an argument, in the form "<RawType>"."#)
+    }
+
+    guard let declaration = declaration.as(StructDeclSyntax.self) else {
+      throw CustomError.message("@NewType can only be applied to a struct declarations.")
+    }
+
+    let access = declaration.modifiers?.first(where: \.isNeededAccessLevelModifier)
+
+    return [
+      "\(access)typealias RawValue = \(rawType)",
+      "\(access)var rawValue: RawValue",
+      "\(access)init(_ rawValue: RawValue) { self.rawValue = rawValue }",
+    ]
   }
 }

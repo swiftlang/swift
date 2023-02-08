@@ -2884,8 +2884,9 @@ bool usePrespecialized(
 
         if (!erased || !layout || !layout->isClass()) {
           newSubs.push_back(entry.value());
-        } else if (!entry.value()->isAnyClassReferenceType()) {
-          // non-reference type can't be applied
+        } else if (!entry.value()->isAnyClassReferenceType() ||
+                   entry.value()->isAnyExistentialType()) {
+          // non-reference or existential type can't be applied
           break;
         } else if (!specializedSig->getRequiredProtocols(genericParam)
                         .empty()) {

@@ -2409,6 +2409,8 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
     }
   }
 
+  Elem.setBool(KeyReusingASTContext, Info.DidReuseAST);
+
   return Rec(RespBuilder.createResponse());
 }
 

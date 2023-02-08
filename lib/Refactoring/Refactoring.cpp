@@ -52,9 +52,11 @@ class ContextFinder : public SourceEntityWalker {
   std::function<bool(ASTNode)> IsContext;
   SmallVector<ASTNode, 4> AllContexts;
   bool contains(ASTNode Enclosing) {
-    auto Result = SM.rangeContains(Enclosing.getSourceRange(), Target);
-    if (Result && IsContext(Enclosing))
+    auto Result = SM.rangeContainsRespectingReplacedRanges(
+        Enclosing.getSourceRange(), Target);
+    if (Result && IsContext(Enclosing)) {
       AllContexts.push_back(Enclosing);
+    }
     return Result;
   }
 public:

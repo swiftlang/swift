@@ -1321,7 +1321,7 @@ namespace {
 
     void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
       printCommon(MED, "macro_expansion_decl ");
-      OS << MED->getMacro();
+      OS << MED->getMacroName();
       if (MED->getArgs()) {
         OS << '\n';
         OS.indent(Indent + 2);

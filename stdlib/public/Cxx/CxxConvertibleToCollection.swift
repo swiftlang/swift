@@ -17,23 +17,21 @@ public protocol CxxConvertibleToCollection<Element> {
     where RawIterator.Pointee == Element
 
   /// Do not implement this function manually in Swift.
-  mutating func __beginUnsafe() -> RawIterator
+  func __beginUnsafe() -> RawIterator
 
   /// Do not implement this function manually in Swift.
-  mutating func __endUnsafe() -> RawIterator
+  func __endUnsafe() -> RawIterator
 }
 
 extension CxxConvertibleToCollection {
   @inlinable
   internal func forEach(_ body: (RawIterator.Pointee) -> Void) {
-    var mutableSelf = self
-    var rawIterator = mutableSelf.__beginUnsafe()
-    let endIterator = mutableSelf.__endUnsafe()
+    var rawIterator = __beginUnsafe()
+    let endIterator = __endUnsafe()
     while rawIterator != endIterator {
       body(rawIterator.pointee)
       rawIterator = rawIterator.successor()
     }
-    withExtendedLifetime(mutableSelf) {}
   }
 }
 

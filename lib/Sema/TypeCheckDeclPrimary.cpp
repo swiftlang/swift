@@ -542,7 +542,8 @@ static void checkRedeclaration(PrecedenceGroupDecl *group) {
 
 /// Check whether \c current is a redeclaration.
 evaluator::SideEffect
-CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
+CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
+                                    NominalTypeDecl *SelfNominalType) const {
   // Ignore invalid and anonymous declarations.
   if (current->isInvalid() || !current->hasName())
     return std::make_tuple<>();
@@ -1872,8 +1873,11 @@ public:
       // Force some requests, which can produce diagnostics.
 
       // Check redeclaration.
-      (void) evaluateOrDefault(Context.evaluator,
-                               CheckRedeclarationRequest{VD}, {});
+      (void)evaluateOrDefault(
+          Context.evaluator,
+          CheckRedeclarationRequest{
+              VD, VD->getDeclContext()->getSelfNominalTypeDecl()},
+          {});
 
       // Compute access level.
       (void) VD->getFormalAccess();
@@ -2007,7 +2011,7 @@ public:
       MD->diagnose(diag::macro_experimental);
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
-    if (!MD->getMacroRoles())
+    if (!MD->getAttrs().hasAttribute<MacroRoleAttr>(/*AllowInvalid*/ true))
       MD->diagnose(diag::macro_without_role, MD->getName());
 
     // Check the macro definition.
@@ -2029,7 +2033,7 @@ public:
       };
       auto externalDef = evaluateOrDefault(
           Ctx.evaluator, request, ExternalMacroDefinition()
-                                           );
+      );
       if (!externalDef.opaqueHandle) {
         MD->diagnose(
             diag::external_macro_not_found,
@@ -2048,8 +2052,11 @@ public:
     // Assign a discriminator.
     (void)MED->getDiscriminator();
 
-    (void)evaluateOrDefault(
+    auto rewritten = evaluateOrDefault(
         Ctx.evaluator, ExpandMacroExpansionDeclRequest{MED}, {});
+
+    for (auto *decl : rewritten)
+      visit(decl);
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -2922,6 +2929,16 @@ public:
     maybeDiagnoseClassWithoutInitializers(CD);
 
     diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(CD);
+
+    // Ban non-final classes from having move only fields.
+    if (!CD->isFinal()) {
+      for (auto *field : CD->getStoredProperties()) {
+        if (field->getType()->isPureMoveOnly()) {
+          field->diagnose(
+              diag::moveonly_non_final_class_cannot_contain_moveonly_field);
+        }
+      }
+    }
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -3721,11 +3738,11 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   auto &ctx = MED->getASTContext();
   auto *dc = MED->getDeclContext();
   auto foundMacros = TypeChecker::lookupMacros(
-      MED->getDeclContext(), MED->getMacro(),
+      MED->getDeclContext(), MED->getMacroName(),
       MED->getLoc(), MacroRole::Declaration);
   if (foundMacros.empty()) {
-    MED->diagnose(diag::macro_undefined, MED->getMacro().getBaseIdentifier())
-        .highlight(MED->getMacroLoc().getSourceRange());
+    MED->diagnose(diag::macro_undefined, MED->getMacroName().getBaseIdentifier())
+        .highlight(MED->getMacroNameLoc().getSourceRange());
     return {};
   }
   // Resolve macro candidates.
@@ -3737,8 +3754,8 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   }
   else {
     if (foundMacros.size() > 1) {
-      MED->diagnose(diag::ambiguous_decl_ref, MED->getMacro())
-          .highlight(MED->getMacroLoc().getSourceRange());
+      MED->diagnose(diag::ambiguous_decl_ref, MED->getMacroName())
+          .highlight(MED->getMacroNameLoc().getSourceRange());
       for (auto *candidate : foundMacros)
         candidate->diagnose(diag::found_candidate);
       return {};
@@ -3753,12 +3770,5 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   SmallVector<Decl *, 2> expandedTemporary;
   if (!expandFreestandingDeclarationMacro(MED, expandedTemporary))
     return {};
-  auto expanded = ctx.AllocateCopy(expandedTemporary);
-  // FIXME: Handle this in name lookup instead of `addMember`.
-  // MED->setRewritten(expanded);
-  if (auto *parentDecl = MED->getDeclContext()->getAsDecl())
-    if (auto *idc = dyn_cast<IterableDeclContext>(parentDecl))
-      for (auto *decl : expanded)
-        idc->addMember(decl);
-  return expanded;
+  return ctx.AllocateCopy(expandedTemporary);
 }

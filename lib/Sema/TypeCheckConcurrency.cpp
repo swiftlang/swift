@@ -4767,14 +4767,15 @@ static Type applyUnsafeConcurrencyToParameterType(
 
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.
-bool swift::isDispatchQueueOperationName(StringRef name) {
-  return llvm::StringSwitch<bool>(name)
-    .Case("sync", true)
-    .Case("async", true)
-    .Case("asyncAndWait", true)
-    .Case("asyncAfter", true)
-    .Case("concurrentPerform", true)
-    .Default(false);
+Optional<DispatchQueueOperation>
+swift::isDispatchQueueOperationName(StringRef name) {
+  return llvm::StringSwitch<Optional<DispatchQueueOperation>>(name)
+    .Case("sync", DispatchQueueOperation::Normal)
+    .Case("async", DispatchQueueOperation::Sendable)
+    .Case("asyncAndWait", DispatchQueueOperation::Normal)
+    .Case("asyncAfter", DispatchQueueOperation::Sendable)
+    .Case("concurrentPerform", DispatchQueueOperation::Sendable)
+    .Default(None);
 }
 
 /// Determine whether this function is implicitly known to have its
@@ -4792,7 +4793,17 @@ static bool hasKnownUnsafeSendableFunctionParams(AbstractFunctionDecl *func) {
   auto nominalName = nominal->getName().str();
   if (nominalName == "DispatchQueue") {
     auto name = func->getBaseName().userFacingName();
-    return isDispatchQueueOperationName(name);
+    auto operation = isDispatchQueueOperationName(name);
+    if (!operation)
+      return false;
+
+    switch (*operation) {
+    case DispatchQueueOperation::Normal:
+      return false;
+
+    case DispatchQueueOperation::Sendable:
+      return true;
+    }
   }
 
   return false;

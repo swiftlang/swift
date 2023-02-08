@@ -50,6 +50,13 @@ void typeCheckDeclAndParentClosures(ValueDecl *VD) {
   typeCheckASTNodeAtLoc(
       TypeCheckASTNodeAtLocContext::declContext(VD->getDeclContext()),
       VD->getLoc());
+  if (auto VarD = dyn_cast<VarDecl>(VD)) {
+    // Type check any attached property wrappers so the annotated declaration
+    // can refer to their USRs.
+    (void)VarD->getPropertyWrapperBackingPropertyType();
+    // Visit emitted accessors so we generated accessors from property wrappers.
+    VarD->visitEmittedAccessors([&](AccessorDecl *accessor) {});
+  }
 }
 
 // MARK: - NodeFinderResults
@@ -133,7 +140,7 @@ private:
   DeclContext *getCurrentDeclContext() { return DeclContextStack.back(); }
 
   bool rangeContainsLocToResolve(SourceRange Range) const {
-    return Range.contains(LocToResolve);
+    return getSourceMgr().containsRespectingReplacedRanges(Range, LocToResolve);
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
@@ -150,7 +157,10 @@ private:
     }
 
     if (auto VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->hasName()) {
+      // FIXME: ParamDecls might be closure parameters that can have ambiguous
+      // types. The current infrastructure of just asking for the VD's type
+      // doesn't work here. We need to inspect the constraints system solution.
+      if (VD->hasName() && !isa<ParamDecl>(D)) {
         assert(Result == nullptr);
         Result = std::make_unique<NodeFinderDeclResult>(VD);
         return Action::Stop();

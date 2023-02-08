@@ -250,11 +250,16 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
      ```
      If you installed and want to use Sccache, include the `--sccache` option in
      the invocation as well.
+   <!-- FIXME: Without this "hard" line break, the note doesn’t get properly spaced from the bullet -->
+   <br />
 
    > **Note**  
-   > If you aren't planning to edit the parts of the compiler that are written
-   > in Swift, pass `--bootstrapping=hosttools` to speed up local development.
-   > This requires a recent Xcode and/or swift toolchain to be installed.
+   > If you are planning to work on the compiler, but not the parts that are
+   > written in Swift, pass `--bootstrapping=hosttools` to speed up local
+   > development. Note that on Linux — unlike macOS, where the toolchain already
+   > comes with Xcode — this option additionally requires
+   > [a recent Swift toolchain](https://www.swift.org/download/) to be
+   > installed.
 
    This will create a directory `swift-project/build/Ninja-RelWithDebInfoAssert`
    containing the Swift compiler and standard library and clang/LLVM build artifacts.
@@ -271,9 +276,8 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    on Linux, add the `--xctest` flag to `build-script`.
 
 In the following sections, for simplicity, we will assume that you are using a
-`Ninja-RelWithDebInfoAssert` build on macOS running on an Intel-based Mac,
-unless explicitly mentioned otherwise. You will need to slightly tweak the paths
-for other build configurations.
+`Ninja-RelWithDebInfoAssert` build on macOS, unless explicitly mentioned otherwise.
+You will need to slightly tweak the paths for other build configurations.
 
 ### Troubleshooting build issues
 
@@ -360,13 +364,13 @@ several more steps are necessary to set up this environment:
 * Create a new Xcode workspace.
 * Add the generated Xcode projects or Swift packages that are relevant to your
   tasks to your workspace. All the Xcode projects can be found among the
-  build artifacts under `build/Xcode-ReleaseAssert`. For example:
-  * If you are aiming for the compiler, add `build/Xcode-ReleaseAssert/swift-macosx-*/Swift.xcodeproj`.
+  build artifacts under `build/Xcode-*/`. For example:
+  * If you are aiming for the compiler, add `build/Xcode-*/swift-macosx-*/Swift.xcodeproj`.
     This project also includes the standard library and runtime sources. If you
     need the parts of the compiler that are implemented in Swift itself, add the
     `swift/SwiftCompilerSources/Package.swift` package as well.
   * If you are aiming for just the standard library or runtime, add
-    `build/Xcode-ReleaseAssert/swift-macosx-*/stdlib/Swift-stdlib.xcodeproj`.
+    `build/Xcode-*/swift-macosx-*/stdlib/Swift-stdlib.xcodeproj`.
   <!-- FIXME: Without this "hard" line break, the note doesn’t get properly spaced from the bullet -->
   <br />
 

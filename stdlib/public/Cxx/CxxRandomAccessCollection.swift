@@ -36,12 +36,6 @@ public protocol CxxRandomAccessCollection<Element>: CxxSequence, RandomAccessCol
   override associatedtype Index = Int
   override associatedtype Indices = Range<Int>
   override associatedtype SubSequence = Slice<Self>
-
-  /// Do not implement this function manually in Swift.
-  func __beginUnsafe() -> RawIterator
-
-  /// Do not implement this function manually in Swift.
-  func __endUnsafe() -> RawIterator
 }
 
 extension CxxRandomAccessCollection {

@@ -1324,7 +1324,7 @@ void CheckRedeclarationRequest::writeDependencySink(
     return;
 
   if (currentDC->isTypeContext()) {
-    if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
+    if (auto nominal = std::get<1>(getStorage())) {
       tracker.addUsedMember(nominal, current->getBaseName());
     }
   } else {
@@ -1664,7 +1664,7 @@ void swift::simple_display(
 
 DeclNameRef UnresolvedMacroReference::getMacroName() const {
   if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
-    return med->getMacro();
+    return med->getMacroName();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getMacroName();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
@@ -1688,7 +1688,7 @@ SourceLoc UnresolvedMacroReference::getSigilLoc() const {
 
 DeclNameLoc UnresolvedMacroReference::getMacroNameLoc() const {
   if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
-    return med->getMacroLoc();
+    return med->getMacroNameLoc();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getMacroNameLoc();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
@@ -1705,8 +1705,16 @@ SourceRange UnresolvedMacroReference::getGenericArgsRange() const {
     return med->getGenericArgsRange();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getGenericArgsRange();
-  if (auto *attr = pointer.dyn_cast<CustomAttr *>())
-    return SourceRange();
+
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
+    auto *typeRepr = attr->getTypeRepr();
+    auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(typeRepr);
+    if (!genericTypeRepr)
+      return SourceRange();
+
+    return genericTypeRepr->getAngleBrackets();
+  }
+
   llvm_unreachable("Unhandled case");
 }
 
@@ -1715,8 +1723,16 @@ ArrayRef<TypeRepr *> UnresolvedMacroReference::getGenericArgs() const {
     return med->getGenericArgs();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getGenericArgs();
-  if (auto *attr = pointer.dyn_cast<CustomAttr *>())
-    return {};
+
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
+    auto *typeRepr = attr->getTypeRepr();
+    auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(typeRepr);
+    if (!genericTypeRepr)
+      return {};
+
+    return genericTypeRepr->getGenericArgs();
+  }
+
   llvm_unreachable("Unhandled case");
 }
 

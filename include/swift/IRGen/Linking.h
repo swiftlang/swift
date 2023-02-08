@@ -1268,8 +1268,7 @@ public:
 
     case LinkEntity::Kind::DistributedAccessor: {
       entity.Data = LINKENTITY_SET_FIELD(
-          Kind,
-          unsigned(LinkEntity::Kind::DistributedAccessorAsyncPointer));
+          Kind, unsigned(LinkEntity::Kind::DistributedAccessorAsyncPointer));
       break;
     }
 

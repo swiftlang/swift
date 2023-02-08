@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -module-name MacrosTest
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature Macros -module-name MacrosTest
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 // expected-note@-1 2{{'stringify' declared here}}
@@ -67,11 +67,19 @@ func overloaded1(_ p: Any) { }
 // expected-note@-1{{'intIdentity(value:_:)' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 
-@freestanding(declaration) macro unaryDeclMacro(_ x: String)
+// FIXME: #63376
+// @freestanding(expression) macro usesAssocType<T: BinaryInteger>: T.Magnitude = #externalMacro(module: "MissingModule", type: "MissingType")
+
+@freestanding(declaration) macro justProducesDiags(_ x: String) // okay
+// expected-error @-1 {{macro 'justProducesDiags' requires a definition}}
+@freestanding(declaration, names: arbitrary)
+macro unaryDeclMacro(_ x: String)
 // expected-error @-1 {{macro 'unaryDeclMacro' requires a definition}}
-@freestanding(declaration) macro unaryDeclMacro(_ x: String, blah: Bool)
+@freestanding(declaration, names: arbitrary)
+macro unaryDeclMacro(_ x: String, blah: Bool)
 // expected-error @-1 {{macro 'unaryDeclMacro(_:blah:)' requires a definition}}
-@freestanding(declaration) macro genericDeclMacro<T: Numeric, U: Numeric>(_ x: T, _ y: U)
+@freestanding(declaration, names: arbitrary)
+macro genericDeclMacro<T: Numeric, U: Numeric>(_ x: T, _ y: U)
 // expected-error @-1 {{macro 'genericDeclMacro' requires a definition}}
 // expected-note @-2 {{where 'U' = 'String'}}
 
