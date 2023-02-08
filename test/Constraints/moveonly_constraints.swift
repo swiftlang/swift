@@ -139,7 +139,7 @@ func checkMethodCalls() {
   takeMaybe(true ? .none : .just(MO())) // expected-error 3{{move-only type 'MO' cannot be used with generics yet}}
 }
 
-func checkCasting(_ b: any Box, _ mo: MO) {
+func checkCasting(_ b: any Box, _ mo: MO, _ a: Any) {
   // casting dynamically is allowed, but should always fail since you can't
   // construct such a type.
   let box = b as! ValBox<MO> // expected-error {{move-only type 'MO' cannot be used with generics yet}}
@@ -159,26 +159,65 @@ func checkCasting(_ b: any Box, _ mo: MO) {
   _ = MO() as Any // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   _ = MO() as MO
   _ = MO() as AnyObject // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  _ = 5 as MO // expected-error {{cannot convert value of type 'Int' to type 'MO' in coercion}}
+  _ = a as MO // expected-error {{cannot convert value of type 'Any' to type 'MO' in coercion}}
+  _ = b as MO // expected-error {{cannot convert value of type 'any Box' to type 'MO' in coercion}}
 
   // FIXME(kavon): make sure at runtime these casts actually fail, or just make them errors? (rdar://104900293)
 
   _ = MO() is AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() is AnyObject // expected-warning {{cast from 'MO' to unrelated type 'AnyObject' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() is Any // expected-warning {{cast from 'MO' to unrelated type 'Any' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() is P // expected-warning {{cast from 'MO' to unrelated type 'any P' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() is MO // expected-warning {{'is' test is always true}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+
+  _ = 5 is MO // expected-warning {{cast from 'Int' to unrelated type 'MO' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  _ = a is MO // expected-warning {{cast from 'Any' to unrelated type 'MO' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  _ = b is MO // expected-warning {{cast from 'any Box' to unrelated type 'MO' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
 
   _ = MO() as! AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() as! AnyObject // expected-warning {{cast from 'MO' to unrelated type 'AnyObject' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() as! Any // expected-warning {{cast from 'MO' to unrelated type 'Any' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() as! P // expected-warning {{cast from 'MO' to unrelated type 'any P' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() as! MO // expected-warning {{forced cast of 'MO' to same type has no effect}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+
+  _ = 5 as! MO // expected-warning {{cast from 'Int' to unrelated type 'MO' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  _ = a as! MO // expected-warning {{cast from 'Any' to unrelated type 'MO' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  _ = b as! MO // expected-warning {{cast from 'any Box' to unrelated type 'MO' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
 
   _ = MO() as? AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() as? AnyObject // expected-warning {{cast from 'MO' to unrelated type 'AnyObject' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() as? Any // expected-warning {{cast from 'MO' to unrelated type 'Any' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() as? P // expected-warning {{cast from 'MO' to unrelated type 'any P' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
   _ = MO() as? MO // expected-warning {{conditional cast from 'MO' to 'MO' always succeeds}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+
+  _ = 5 as? MO // expected-warning {{cast from 'Int' to unrelated type 'MO' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  _ = a as? MO // expected-warning {{cast from 'Any' to unrelated type 'MO' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  _ = b as? MO // expected-warning {{cast from 'any Box' to unrelated type 'MO' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
 
 }
 

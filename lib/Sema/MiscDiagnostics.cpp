@@ -336,7 +336,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                 tupleExpr->getElementNames());
       }
 
-      // Diagnose checked casts that involve marker protocols.
+      // Specially diagnose some checked casts that are illegal.
       if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
         checkCheckedCastExpr(cast);
       }
@@ -384,16 +384,39 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkCheckedCastExpr(CheckedCastExpr *cast) {
+      Type castType = cast->getCastType();
+      if (!castType)
+        return;
+
+      if (castType->isPureMoveOnly()) {
+        // can't cast anything to move-only; there should be no valid ones.
+        Ctx.Diags.diagnose(cast->getLoc(), diag::moveonly_cast);
+        return;
+      }
+
+      // no support for runtime casts from move-only types.
+      // as of now there is no type it could be cast to except itself, so
+      // there's no reason for it to happen at runtime.
+      if (auto fromType = cast->getSubExpr()->getType()) {
+        if (fromType->isPureMoveOnly()) {
+          // can't cast move-only to anything.
+          Ctx.Diags.diagnose(cast->getLoc(), diag::moveonly_cast);
+          return;
+        }
+      }
+
+      // now, look for conditional casts to marker protocols.
+
       if (!isa<ConditionalCheckedCastExpr>(cast) && !isa<IsExpr>(cast))
         return;
 
-      Type castType = cast->getCastType();
-      if (!castType || !castType->isExistentialType())
+      if(!castType->isExistentialType())
         return;
 
       auto layout = castType->getExistentialLayout();
       for (auto proto : layout.getProtocols()) {
         if (proto->isMarkerProtocol()) {
+          // can't conditionally cast to a marker protocol
           Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
                              proto->getName());
         }
