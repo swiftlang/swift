@@ -550,6 +550,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(TupleElementAddrInst, tuple_element_addr,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(TuplePackElementAddrInst, tuple_pack_element_addr,
+                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(PackElementGetInst, pack_element_get,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(StructInst, struct,

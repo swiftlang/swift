@@ -349,6 +349,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::HasSymbolInst:
   case SILInstructionKind::PackElementGetInst:
   case SILInstructionKind::PackElementSetInst:
+  case SILInstructionKind::TuplePackElementAddrInst:
     // Handle by operand and result check.
     break;
 

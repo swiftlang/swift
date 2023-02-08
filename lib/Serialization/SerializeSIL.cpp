@@ -1695,6 +1695,25 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         indexRef);
     break;
   }
+  case SILInstructionKind::TuplePackElementAddrInst: {
+    auto TPEAI = cast<TuplePackElementAddrInst>(&SI);
+    auto elementType = TPEAI->getElementType();
+    auto elementTypeRef = S.addTypeRef(elementType.getASTType());
+    auto tuple = TPEAI->getTuple();
+    auto tupleType = tuple->getType();
+    auto tupleTypeRef = S.addTypeRef(tupleType.getASTType());
+    auto tupleRef = addValueRef(tuple);
+    auto indexRef = addValueRef(TPEAI->getIndex());
+    SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILPackElementGetLayout::Code],
+        elementTypeRef,
+        (unsigned) elementType.getCategory(),
+        tupleTypeRef,
+        (unsigned) tupleType.getCategory(),
+        tupleRef,
+        indexRef);
+    break;
+  }
   case SILInstructionKind::TailAddrInst: {
     const TailAddrInst *TAI = cast<TailAddrInst>(&SI);
     SILTailAddrLayout::emitRecord(Out, ScratchRecord,
