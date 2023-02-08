@@ -789,6 +789,8 @@ NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
                SILInstruction, None, DoesNotRelease)
 NON_VALUE_INST(DebugValueInst, debug_value,
                SILInstruction, None, DoesNotRelease)
+NON_VALUE_INST(DebugStepInst, debug_step,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(TestSpecificationInst, test_specification,
                SILInstruction, None, DoesNotRelease)
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \

@@ -1216,6 +1216,12 @@ BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder b,
                                      castToSILValue(op))};
 }
 
+BridgedInstruction SILBuilder_createDebugStep(BridgedBuilder b) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     b.loc.getScope());
+  return {builder.createDebugStep(RegularLocation(b.loc.getLocation()))};
+}
+
 BridgedInstruction SILBuilder_createApply(BridgedBuilder b,
                                           BridgedValue function,
                                           SubstitutionMap subMap,
