@@ -98,6 +98,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &CGO = Importer->getClangCodeGenOpts();
   if (CGO.OpaquePointers)
     LLVMContext.setOpaquePointers(true);
+  CGO.UnwindTables = 1; // UWTable::Sync
 
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
@@ -1340,6 +1341,7 @@ void IRGenModule::constructInitialFnAttributes(
     Attrs.addAttribute(llvm::Attribute::StackProtectReq);
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
   }
+  Attrs.addUWTableAttr(llvm::UWTableKind::Sync);
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {

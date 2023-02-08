@@ -47,5 +47,5 @@ func test_ospeed(_ a: A) -> Int {
 }
 
 
-// CHECK-IR-DAG: attributes [[SIZE_ATTR]] = { minsize optsize "
-// CHECK-IR-DAG: attributes [[NOSIZE_ATTR]] = { "
+// CHECK-IR-DAG: attributes [[SIZE_ATTR]] = { minsize optsize uwtable(sync) "
+// CHECK-IR-DAG: attributes [[NOSIZE_ATTR]] = { uwtable(sync) "
