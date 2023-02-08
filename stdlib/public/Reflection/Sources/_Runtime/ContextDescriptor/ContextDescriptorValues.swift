@@ -443,6 +443,41 @@ extension FieldDescriptor.Element {
 
 @available(SwiftStdlib 5.9, *)
 extension GenericSignature {
+  @available(SwiftStdlib 5.9, *)
+  @frozen
+  public struct LayoutKind {
+    @usableFromInline
+    let value: UInt32
+
+    @available(SwiftStdlib 5.9, *)
+    @inlinable
+    init(_ value: UInt32) {
+      self.value = value
+    }
+
+    @available(SwiftStdlib 5.9, *)
+    @inline(__always)
+    @inlinable
+    public static var `class`: LayoutKind {
+      LayoutKind(0x0)
+    }
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension GenericSignature.LayoutKind: Equatable {
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  public static func ==(
+    lhs: GenericSignature.LayoutKind,
+    rhs: GenericSignature.LayoutKind
+  ) -> Bool {
+    lhs.value == rhs.value
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension GenericSignature {
   @frozen
   public struct ParameterDescriptor {
     @frozen
@@ -542,7 +577,22 @@ extension GenericSignature.RequirementDescriptor {
       Kind(value: 0x1F)
     }
   }
-  
+}
+
+@available(SwiftStdlib 5.9, *)
+extension GenericSignature.RequirementDescriptor.Kind: Equatable {
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  public static func ==(
+    lhs: GenericSignature.RequirementDescriptor.Kind,
+    rhs: GenericSignature.RequirementDescriptor.Kind
+  ) -> Bool {
+    lhs.value == rhs.value
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension GenericSignature.RequirementDescriptor {
   @frozen
   public struct Flags {
     @usableFromInline
