@@ -125,6 +125,81 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   %4 = integer_literal $Builtin.Word, 4
   %5 = integer_literal $Builtin.Word, 5
 
+
+
+  %two_archetypes_from_two_params_no_singles = function_ref @two_archetypes_from_two_params_no_singles : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ---0--> ^
+  // CHECK: A
+  // U_2 -> {D, E, F, A, B, C}
+  // ---0--> ^
+  // CHECK: D
+  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%0) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ----1----> ^
+  // CHECK: B
+  // U_2 -> {D, E, F, A, B, C}
+  // ----1----> ^
+  // CHECK: E
+  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%1) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ------2-----> ^
+  // CHECK: C
+  // U_2 -> {D, E, F, A, B, C}
+  // ------2-----> ^
+  // CHECK: F
+  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%2) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // -------3-------> ^
+  // CHECK: D
+  // U_2 -> {D, E, F, A, B, C}
+  // -------3-------> ^
+  // CHECK: A
+  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%3) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ---------4--------> ^
+  // CHECK: E
+  // U_2 -> {D, E, F, A, B, C}
+  // ---------4--------> ^
+  // CHECK: B
+  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%4) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // -----------5---------> ^
+  // CHECK: F
+  // U_2 -> {D, E, F, A, B, C}
+  // -----------5---------> ^
+  // CHECK: C
+  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%5) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+
+
+  %direct_access_from_parameter = function_ref @direct_access_from_parameter : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // --0---> ^
+  // CHECK: A
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%0) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ----1----> ^
+  // CHECK: B
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%1) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // -----2------> ^
+  // CHECK: C
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%2) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // -------3-------> ^
+  // CHECK: D
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%3) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // --------4---------> ^
+  // CHECK: E
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%4) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ----------5----------> ^
+  // CHECK: F
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%5) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+
+
+
   %two_archetypes_from_two_params_no_singles_with_conformance = function_ref @two_archetypes_from_two_params_no_singles_with_conformance : $@convention(thin) <T_1... : P, T_2... : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // ---0--> ^
@@ -181,74 +256,6 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   // CHECK: C
   apply %two_archetypes_from_two_params_no_singles_with_conformance<Pack{A, B, C}, Pack{D, E, F}>(%5) : $@convention(thin) <T_1... : P, T_2... : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
 
-  %direct_access_from_parameter = function_ref @direct_access_from_parameter : $@convention(thin) <T_1...> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // --0---> ^
-  // CHECK: A
-  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%0) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // ----1----> ^
-  // CHECK: B
-  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%1) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // -----2------> ^
-  // CHECK: C
-  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%2) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // -------3-------> ^
-  // CHECK: D
-  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%3) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // --------4---------> ^
-  // CHECK: E
-  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%4) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // ----------5----------> ^
-  // CHECK: F
-  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%5) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
-  %two_archetypes_from_two_params_no_singles = function_ref @two_archetypes_from_two_params_no_singles : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // ---0--> ^
-  // CHECK: A
-  // U_2 -> {D, E, F, A, B, C}
-  // ---0--> ^
-  // CHECK: D
-  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%0) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // ----1----> ^
-  // CHECK: B
-  // U_2 -> {D, E, F, A, B, C}
-  // ----1----> ^
-  // CHECK: E
-  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%1) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // ------2-----> ^
-  // CHECK: C
-  // U_2 -> {D, E, F, A, B, C}
-  // ------2-----> ^
-  // CHECK: F
-  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%2) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // -------3-------> ^
-  // CHECK: D
-  // U_2 -> {D, E, F, A, B, C}
-  // -------3-------> ^
-  // CHECK: A
-  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%3) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // ---------4--------> ^
-  // CHECK: E
-  // U_2 -> {D, E, F, A, B, C}
-  // ---------4--------> ^
-  // CHECK: B
-  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%4) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
-  // U_1 -> {A, B, C, D, E, F}
-  // -----------5---------> ^
-  // CHECK: F
-  // U_2 -> {D, E, F, A, B, C}
-  // -----------5---------> ^
-  // CHECK: C
-  apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%5) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
 
   %direct_access_from_parameter_with_conformance = function_ref @direct_access_from_parameter_with_conformance : $@convention(thin) <T_1...: P> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
