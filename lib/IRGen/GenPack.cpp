@@ -882,3 +882,42 @@ Size irgen::getPackElementSize(IRGenModule &IGM, CanSILPackType ty) {
   assert(ty->isElementAddress() && "not implemented for direct packs");
   return IGM.getPointerSize();
 }
+
+StackAddress irgen::allocatePack(IRGenFunction &IGF, CanSILPackType packType) {
+  auto *shape = IGF.emitPackShapeExpression(packType);
+
+  auto elementSize = getPackElementSize(IGF.IGM, packType);
+
+  if (auto *constantInt = dyn_cast<llvm::ConstantInt>(shape)) {
+    assert(packType->getNumElements() == constantInt->getValue());
+    (void)constantInt;
+    assert(!packType->containsPackExpansionType());
+    unsigned elementCount = packType->getNumElements();
+    auto allocType = llvm::ArrayType::get(
+        IGF.IGM.OpaquePtrTy, elementCount);
+
+    auto addr = IGF.createAlloca(allocType, IGF.IGM.getPointerAlignment());
+    IGF.Builder.CreateLifetimeStart(addr,
+                                elementSize * elementCount);
+    return addr;
+  }
+
+  assert(packType->containsPackExpansionType());
+  auto addr = IGF.emitDynamicAlloca(IGF.IGM.OpaquePtrTy, shape,
+                                    IGF.IGM.getPointerAlignment(),
+                                    /*allowTaskAlloc=*/true);
+
+  return addr;
+}
+
+void irgen::deallocatePack(IRGenFunction &IGF, StackAddress addr, CanSILPackType packType) {
+  if (packType->containsPackExpansionType()) {
+    IGF.emitDeallocateDynamicAlloca(addr);
+    return;
+  } 
+
+  auto elementSize = getPackElementSize(IGF.IGM, packType);
+  auto elementCount = packType->getNumElements();
+  IGF.Builder.CreateLifetimeEnd(addr.getAddress(),
+                                elementSize * elementCount);
+}

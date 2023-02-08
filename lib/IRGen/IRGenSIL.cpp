@@ -5502,7 +5502,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 }
 
 void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
-  IGM.unimplemented(i->getLoc().getSourceLoc(), "alloc_pack");
+  auto addr = allocatePack(*this, i->getPackType());
+  setLoweredStackAddress(i, addr);
 }
 
 static void
@@ -5605,7 +5606,9 @@ void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocPackInst(swift::DeallocPackInst *i) {
-  IGM.unimplemented(i->getLoc().getSourceLoc(), "dealloc_pack");
+  auto allocatedType = cast<SILPackType>(i->getOperand()->getType().getASTType());
+  StackAddress stackAddr = getLoweredStackAddress(i->getOperand());
+  deallocatePack(*this, stackAddr, allocatedType);
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {

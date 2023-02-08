@@ -91,6 +91,10 @@ Address emitStorageAddressOfPackElement(IRGenFunction &IGF, Address pack,
 
 Size getPackElementSize(IRGenModule &, CanSILPackType ty);
 
+StackAddress allocatePack(IRGenFunction &IGF, CanSILPackType packType);
+
+void deallocatePack(IRGenFunction &IGF, StackAddress addr, CanSILPackType packType);
+
 } // end namespace irgen
 } // end namespace swift
 

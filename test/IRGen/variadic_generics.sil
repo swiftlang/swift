@@ -88,8 +88,8 @@ bb0(%pack : $*Pack{Int, repeat each T, Int}):
   %elementAddr = pack_element_get %index of %pack : $*Pack{Int, repeat each T, Int} as $*Int
   %value = load %elementAddr : $*Int
   return %value : $Int
-}
-
+ }
+ 
 // CHECK-LABEL: define{{.*}} @test_pack_element_set_1(
 // CHECK: [[INDEX:%.*]] = add [[INT]] %2, 1
 // CHECK: [[ELT_STORAGE:%.*]] = getelementptr inbounds %swift.opaque*, %swift.opaque** %0, [[INT]] [[INDEX]]
@@ -103,6 +103,38 @@ bb0(%pack : $*Pack{Int, repeat each T, Int}, %value : $Int):
   %index = scalar_pack_index 2 of $Pack{Int, repeat each T, Int}
   %elementAddr = pack_element_get %index of %pack : $*Pack{Int, repeat each T, Int} as $*Int
   store %value to %elementAddr : $*Int
+   %ret = tuple ()
+   return %ret : $()
+ }
+
+// CHECK-LABEL: define {{.*}}@test_pack_alloc_1_dynamic(
+// CHECK-SAME:       i{{(32|64)}} [[PACK_SIZE:%[^,]+]]
+// CHECK:        [[SIZE:%[^,]+]] = add i64 [[PACK_SIZE]], [[PACK_SIZE]]
+// CHECK:        [[SP_SAVE:%[^,]+]] = call i8* @llvm.stacksave()
+// CHECK:        alloca %swift.opaque*, i{{(32|64)}} [[SIZE]]
+// CHECK:        call void @llvm.stackrestore(i8* [[SP_SAVE]])
+sil @test_pack_alloc_1_dynamic : $<T...> () -> () {
+// Control flow so that stack saving/restoring is emitted
+entry:
+  cond_br undef, left, right
+left:
+  br exit
+right:
+  br exit
+exit:
+  %addr = alloc_pack $Pack{repeat each T, repeat each T}
+  dealloc_pack %addr : $*Pack{repeat each T, repeat each T}
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_pack_alloc_2_static
+// CHECK:         [[STACK:%[^,]+]] = alloca [2 x %swift.opaque*]
+// CHECK:         call void @llvm.lifetime.start.p0i8
+// CHECK:         call void @llvm.lifetime.end.p0i8
+sil @test_pack_alloc_2_static : $<T...> () -> () {
+  %addr = alloc_pack $Pack{Int, Int}
+  dealloc_pack %addr : $*Pack{Int, Int}
   %ret = tuple ()
   return %ret : $()
 }
