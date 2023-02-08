@@ -185,6 +185,10 @@ def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules implicitly by the compiler">;
 
+def swift_module_file: Joined<["-"], "swift-module-file=">,
+  MetaVarName<"<name>=<path>">,
+  HelpText<"Specify Swift module input explicitly built from textual interface">;
+
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
