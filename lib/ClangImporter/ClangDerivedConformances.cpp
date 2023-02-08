@@ -396,7 +396,7 @@ void swift::conformToCxxSequenceIfNeeded(
   if (!cxxIteratorProto || !cxxSequenceProto)
     return;
 
-  // Check if present: `mutating func __beginUnsafe() -> RawIterator`
+  // Check if present: `func __beginUnsafe() -> RawIterator`
   auto beginId = ctx.getIdentifier("__beginUnsafe");
   auto begins = lookupDirectWithoutExtensions(decl, beginId);
   if (begins.size() != 1)
@@ -406,13 +406,17 @@ void swift::conformToCxxSequenceIfNeeded(
     return;
   auto rawIteratorTy = begin->getResultInterfaceType();
 
-  // Check if present: `mutating func __endUnsafe() -> RawIterator`
+  // Check if present: `func __endUnsafe() -> RawIterator`
   auto endId = ctx.getIdentifier("__endUnsafe");
   auto ends = lookupDirectWithoutExtensions(decl, endId);
   if (ends.size() != 1)
     return;
   auto end = dyn_cast<FuncDecl>(ends.front());
   if (!end)
+    return;
+
+  // Check if `begin()` and `end()` are non-mutating.
+  if (begin->isMutating() || end->isMutating())
     return;
 
   // Check if `__beginUnsafe` and `__endUnsafe` have the same return type.
@@ -466,10 +470,6 @@ void swift::conformToCxxSequenceIfNeeded(
         ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
     if (!cxxRAIteratorProto ||
         !ctx.getProtocol(KnownProtocolKind::CxxRandomAccessCollection))
-      return false;
-
-    // Check if `begin()` and `end()` are non-mutating.
-    if (begin->isMutating() || end->isMutating())
       return false;
 
     // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
