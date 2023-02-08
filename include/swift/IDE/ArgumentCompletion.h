@@ -30,7 +30,7 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     /// The FuncDecl or SubscriptDecl associated with the call.
     ValueDecl *FuncD;
     /// The type of the function being called.
-    Type FuncTy;
+    AnyFunctionType *FuncTy;
     /// The index of the argument containing the completion location
     unsigned ArgIdx;
     /// The index of the parameter corresponding to the completion argument.
