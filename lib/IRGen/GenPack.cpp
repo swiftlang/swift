@@ -865,15 +865,20 @@ void irgen::cleanupTypeMetadataPack(IRGenFunction &IGF,
   }
 }
 
-Address irgen::emitStorageAddressOfPackElement(IRGenFunction &IGF,
-                                               Address pack,
+Address irgen::emitStorageAddressOfPackElement(IRGenFunction &IGF, Address pack,
                                                llvm::Value *index,
-                                               SILType elementType) {
+                                               SILType elementType,
+                                               CanSILPackType packType) {
   // When we have an indirect pack, the elements are pointers, so we can
   // simply index into that flat array.
   assert(elementType.isAddress() && "direct packs not currently supported");
-  auto elementSize = IGF.IGM.getPointerSize();
+  auto elementSize = getPackElementSize(IGF.IGM, packType);
   auto elementAddress = IGF.Builder.CreateArrayGEP(pack, index, elementSize);
   return IGF.Builder.CreateElementBitCast(elementAddress,
                                  IGF.IGM.getStoragePointerType(elementType));
+}
+
+Size irgen::getPackElementSize(IRGenModule &IGM, CanSILPackType ty) {
+  assert(ty->isElementAddress() && "not implemented for direct packs");
+  return IGM.getPointerSize();
 }

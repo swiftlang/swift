@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_GENPACK_H
 #define SWIFT_IRGEN_GENPACK_H
 
+#include "IRGen.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -32,6 +33,7 @@ namespace swift {
 namespace irgen {
 class Address;
 class IRGenFunction;
+class IRGenModule;
 class DynamicMetadataRequest;
 class MetadataResponse;
 class StackAddress;
@@ -83,9 +85,11 @@ llvm::Value *emitIndexOfStructuralPackComponent(IRGenFunction &IGF,
 ///
 /// For indirect packs, note that this is the address of the pack
 /// array element, not the address stored in the pack array element.
-Address emitStorageAddressOfPackElement(IRGenFunction &IGF,
-                                        Address pack, llvm::Value *index,
-                                        SILType elementType);
+Address emitStorageAddressOfPackElement(IRGenFunction &IGF, Address pack,
+                                        llvm::Value *index, SILType elementType,
+                                        CanSILPackType packType);
+
+Size getPackElementSize(IRGenModule &, CanSILPackType ty);
 
 } // end namespace irgen
 } // end namespace swift

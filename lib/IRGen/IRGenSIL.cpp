@@ -6897,8 +6897,8 @@ void IRGenSILFunction::visitPackElementGetInst(PackElementGetInst *i) {
   auto elementType = i->getElementType();
   auto &elementTI = getTypeInfo(elementType);
 
-  auto elementStorageAddr =
-    emitStorageAddressOfPackElement(*this, pack, index, elementType);
+  auto elementStorageAddr = emitStorageAddressOfPackElement(
+      *this, pack, index, elementType, i->getPackType());
 
   assert(elementType.isAddress() &&
          i->getPackType()->isElementAddress() &&
@@ -6913,8 +6913,8 @@ void IRGenSILFunction::visitPackElementSetInst(PackElementSetInst *i) {
   llvm::Value *index = getLoweredSingletonExplosion(i->getIndex());
 
   auto elementType = i->getElementType();
-  auto elementStorageAddress =
-    emitStorageAddressOfPackElement(*this, pack, index, elementType);
+  auto elementStorageAddress = emitStorageAddressOfPackElement(
+      *this, pack, index, elementType, i->getPackType());
 
   assert(elementType.isAddress() &&
          i->getPackType()->isElementAddress() &&
