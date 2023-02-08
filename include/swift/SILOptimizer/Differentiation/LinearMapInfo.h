@@ -69,8 +69,8 @@ private:
   /// Differentiation indices of the function.
   const AutoDiffConfig config;
 
-  /// Mapping from original basic blocks to linear map structs.
-  llvm::DenseMap<SILBasicBlock *, StructDecl *> linearMapStructs;
+  /// Mapping from original basic blocks to linear map tuple types.
+  llvm::DenseMap<SILBasicBlock *, TupleType *> linearMapTuples;
 
   /// Mapping from original basic blocks to branching trace enums.
   /// For pullbacks: these are predecessor enums.
@@ -78,16 +78,13 @@ private:
   llvm::DenseMap<SILBasicBlock *, EnumDecl *> branchingTraceDecls;
 
   /// Mapping from `apply` instructions in the original function to the
-  /// corresponding linear map field declaration in the linear map struct.
-  llvm::DenseMap<ApplyInst *, VarDecl *> linearMapFieldMap;
+  /// corresponding linear map tuple type index.
+  llvm::DenseMap<ApplyInst *, unsigned> linearMapIndexMap;
 
   /// Mapping from predecessor-successor basic block pairs in the original
   /// function to the corresponding branching trace enum case.
   llvm::DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, EnumElementDecl *>
       branchingTraceEnumCases;
-
-  /// Mapping from linear map structs to their branching trace enum fields.
-  llvm::DenseMap<StructDecl *, VarDecl *> linearMapStructEnumFields;
 
   /// Blocks in a loop.
   llvm::SmallSetVector<SILBasicBlock *, 4> blocksInLoop;
@@ -102,37 +99,21 @@ private:
   /// Remaps the given type into the derivative function's context.
   SILType remapTypeInDerivative(SILType ty);
 
-  /// Adds a `VarDecl` member with the given name and type to the given nominal
-  /// declaration.
-  VarDecl *addVarDecl(NominalTypeDecl *nominal, StringRef name, Type type);
-
   /// Retrieves the file unit that contains implicit declarations in the
   /// current Swift module.
   SynthesizedFileUnit &getSynthesizedFile() { return synthesizedFile; }
-
-  /// Computes and sets the access level for the given nominal type, given the
-  /// original function linkage.
-  void computeAccessLevel(NominalTypeDecl *nominal, SILLinkage originalLinkage);
 
   /// Creates an enum declaration with the given JVP/VJP generic signature,
   /// whose cases represent the predecessors/successors of the given original
   /// block.
   EnumDecl *createBranchingTraceDecl(SILBasicBlock *originalBB,
-                                     CanGenericSignature genericSig,
-                                     SILLoopInfo *loopInfo);
+                                     CanGenericSignature genericSig);
+  void populateBranchingTraceDecl(SILBasicBlock *originalBB,
+                                  SILLoopInfo *loopInfo);
 
-  /// Creates a struct declaration with the given JVP/VJP generic signature, for
-  /// storing the linear map values and predecessor/successor basic block of the
-  /// given original block.
-  StructDecl *createLinearMapStruct(SILBasicBlock *originalBB,
-                                    CanGenericSignature genericSig);
-
-  /// Adds a linear map field to the linear map struct.
-  VarDecl *addLinearMapDecl(ApplyInst *ai, SILType linearMapType);
-
-  /// Given an `apply` instruction, conditionally adds a linear map struct field
-  /// for its linear map function if it is active.
-  void addLinearMapToStruct(ADContext &context, ApplyInst *ai);
+  /// Given an `apply` instruction, conditionally gets a linear map tuple field
+  /// AST type for its linear map function if it is active.
+  Type getLinearMapType(ADContext &context, ApplyInst *ai);
 
   /// Generates linear map struct and branching enum declarations for the given
   /// function. Linear map structs are populated with linear map fields and a
@@ -153,22 +134,20 @@ public:
                          const DifferentiableActivityInfo &activityInfo,
                          SILLoopInfo *loopInfo);
 
-  /// Returns the linear map struct associated with the given original block.
-  StructDecl *getLinearMapStruct(SILBasicBlock *origBB) const {
-    return linearMapStructs.lookup(origBB);
+  /// Returns the linear map tuple associated with the given original block.
+  TupleType *getLinearMapTupleType(SILBasicBlock *origBB) const {
+    return linearMapTuples.lookup(origBB);
   }
 
-  /// Returns the lowered SIL type of the linear map struct associated with the
+  /// Returns the lowered SIL type of the linear map tuple associated with the
   /// given original block.
-  SILType getLinearMapStructLoweredType(SILBasicBlock *origBB) const {
+  SILType getLinearMapTupleLoweredType(SILBasicBlock *origBB) const {
     auto derivativeGenSig =
         derivative->getLoweredFunctionType()->getSubstGenericSignature();
-    auto *linMapStruct = getLinearMapStruct(origBB);
-    auto linMapStructType =
-        linMapStruct->getDeclaredInterfaceType()->getReducedType(
-            derivativeGenSig);
-    Lowering::AbstractionPattern pattern(derivativeGenSig, linMapStructType);
-    return typeConverter.getLoweredType(pattern, linMapStructType,
+    auto linMapTupleType =
+      getLinearMapTupleType(origBB)->getReducedType(derivativeGenSig);
+    Lowering::AbstractionPattern pattern(derivativeGenSig, linMapTupleType);
+    return typeConverter.getLoweredType(pattern, linMapTupleType,
                                         TypeExpansionContext::minimal());
   }
 
@@ -199,27 +178,19 @@ public:
     return branchingTraceEnumCases.lookup({origPredBB, origSuccBB});
   }
 
-  /// Returns the mapping from linear map structs to their branching trace enum
-  /// fields.
-  llvm::DenseMap<StructDecl *, VarDecl *> &getLinearMapStructEnumFields() {
-    return linearMapStructEnumFields;
-  }
-
-  /// Returns the branching trace enum field for the linear map struct of the
-  /// given original block.
-  VarDecl *lookUpLinearMapStructEnumField(SILBasicBlock *origBB) const {
-    auto *linearMapStruct = getLinearMapStruct(origBB);
-    return linearMapStructEnumFields.lookup(linearMapStruct);
-  }
-
-  /// Finds the linear map declaration in the pullback struct for the given
+  /// Finds the linear map index in the pullback tuple for the given
   /// `apply` instruction in the original function.
-  VarDecl *lookUpLinearMapDecl(ApplyInst *ai) const {
+  unsigned lookUpLinearMapIndex(ApplyInst *ai) const {
     assert(ai->getFunction() == original);
-    auto lookup = linearMapFieldMap.find(ai);
-    assert(lookup != linearMapFieldMap.end() &&
+    auto lookup = linearMapIndexMap.find(ai);
+    assert(lookup != linearMapIndexMap.end() &&
            "No linear map field corresponding to the given `apply`");
     return lookup->getSecond();
+  }
+
+  Type lookUpLinearMapType(ApplyInst *ai) const {
+    unsigned idx = lookUpLinearMapIndex(ai);
+    return getLinearMapTupleType(ai->getParentBlock())->getElement(idx).getType();
   }
 
   bool hasLoops() const {

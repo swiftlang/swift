@@ -3449,6 +3449,36 @@ static void printSILDifferentiabilityWitnesses(
     dw->print(Ctx.OS(), Ctx.printVerbose());
 }
 
+static void printSILLinearMapTypes(SILPrintContext &Ctx,
+                                   const ModuleDecl *M) {
+  auto &OS = Ctx.OS();
+
+  PrintOptions Options = PrintOptions::printSIL();
+  Options.TypeDefinitions = true;
+  Options.VarInitializers = true;
+  Options.ExplodePatternBindingDecls = true;
+  Options.SkipImplicit = false;
+  Options.PrintGetSetOnRWProperties = true;
+  Options.PrintInSILBody = false;
+
+  SmallVector<Decl *, 32> topLevelDecls;
+  M->getTopLevelDecls(topLevelDecls);
+  for (const Decl *D : topLevelDecls) {
+    if (D->getDeclContext() == M)
+      continue;
+
+    if (!isa<StructDecl>(D) && !isa<EnumDecl>(D))
+      continue;
+
+    StringRef Name = cast<TypeDecl>(D)->getNameStr();
+    if (!Name.startswith("_AD__"))
+      continue;
+
+    D->print(OS, Options);
+    OS << "\n\n";
+  }
+}
+
 static void
 printSILCoverageMaps(SILPrintContext &Ctx,
                      const SILModule::CoverageMapCollectionType &CoverageMaps) {
@@ -3624,6 +3654,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILGlobals(PrintCtx, getSILGlobalList());
   printSILDifferentiabilityWitnesses(PrintCtx,
                                      getDifferentiabilityWitnessList());
+  printSILLinearMapTypes(PrintCtx, getSwiftModule());
   printSILFunctions(PrintCtx, getFunctionList());
   printSILVTables(PrintCtx, getVTables());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
