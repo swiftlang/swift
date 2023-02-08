@@ -7125,6 +7125,15 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
+clang::PointerAuthQualifier VarDecl::getPointerAuthQualifier() const {
+  if (auto *clangDecl = getClangDecl()) {
+    if (auto *valueDecl = dyn_cast<clang::ValueDecl>(clangDecl)) {
+      return valueDecl->getType().getPointerAuth();
+    }
+  }
+  return clang::PointerAuthQualifier();
+}
+
 ParamDecl::ParamDecl(SourceLoc specifierLoc,
                      SourceLoc argumentNameLoc, Identifier argumentName,
                      SourceLoc parameterNameLoc, Identifier parameterName,
