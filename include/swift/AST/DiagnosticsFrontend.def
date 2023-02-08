@@ -110,6 +110,8 @@ ERROR(error_cannot_direct_cc1_pcm_build_in_mode,none,
       "'-direct-clang-cc1-module-build' only supported when building a PCM ('-emit-pcm')'", ())
 ERROR(error_unsupported_option_argument,none,
       "unsupported argument '%1' to option '%0'", (StringRef, StringRef))
+ERROR(error_swift_module_file_requires_delimeter,none,
+      "-swift-module-file= argument requires format <name>=<path>, got: '%0'", (StringRef))
 ERROR(error_immediate_mode_missing_stdlib,none,
       "could not load the swift standard library", ())
 ERROR(error_immediate_mode_missing_library,none,

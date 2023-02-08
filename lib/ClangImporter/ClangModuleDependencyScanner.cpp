@@ -153,14 +153,14 @@ void ClangImporter::recordModuleDependencies(
     // We are using Swift frontend mode.
     swiftArgs.push_back("-frontend");
 
-    // We pass the entire argument list via -Xcc, so the invocation should
-    // use extra clang options alone.
-    swiftArgs.push_back("-only-use-extra-clang-opts");
-
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
     swiftArgs.push_back(clangModuleDep.ID.ModuleName);
+
+    // We pass the entire argument list via -Xcc, so the invocation should
+    // use extra clang options alone.
+    swiftArgs.push_back("-only-use-extra-clang-opts");
 
     auto pcmPath = moduleCacheRelativeLookupModuleOutput(
         clangModuleDep.ID, ModuleOutputKind::ModuleFile,
