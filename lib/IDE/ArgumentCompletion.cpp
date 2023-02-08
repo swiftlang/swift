@@ -37,7 +37,9 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
   }
 
   ArrayRef<AnyFunctionType::Param> ParamsToPass =
-      Res.FuncTy->getAs<AnyFunctionType>()->getParams();
+      Res.FuncTy->lookThroughAllOptionalTypes()
+          ->getAs<AnyFunctionType>()
+          ->getParams();
 
   ParameterList *PL = nullptr;
   if (Res.FuncD) {
