@@ -130,7 +130,7 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
                    "memcpy(&result._3, value + 8, 4);\n"
                    "#endif\n"
                    "return result;\n"
-                   "};\n";
+                   "}\n";
     cPrologueOS << "SWIFT_EXTERN void *_Nonnull "
                    "$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(swift_interop_stub_"
                    "Swift_String) SWIFT_NOEXCEPT SWIFT_CALL;\n";
