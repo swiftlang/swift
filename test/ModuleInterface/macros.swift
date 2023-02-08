@@ -6,12 +6,12 @@
 // RUN: %FileCheck %s < %t/Macros.swiftinterface --check-prefix CHECK
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Macros.swiftinterface -o %t/Macros.swiftmodule
 
-// CHECK: #if compiler(>=5.3) && $Macros
+// CHECK: #if compiler(>=5.3) && $FreestandingExpressionMacros && $Macros
 // CHECK-NEXT: @freestanding(expression) public macro publicStringify<T>(_ value: T) -> (T, Swift.String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")
 // CHECK-NEXT: #endif
 @freestanding(expression) public macro publicStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")
 
-// CHECK: #if compiler(>=5.3) && $Macros
+// CHECK: #if compiler(>=5.3) && $FreestandingExpressionMacros && $Macros
 // CHECK: @freestanding(expression) public macro publicLine<T>: T = #externalMacro(module: "SomeModule", type: "Line") where T : Swift.ExpressibleByIntegerLiteral
 // CHECK-NEXT: #endif
 @freestanding(expression) public macro publicLine<T: ExpressibleByIntegerLiteral>: T = #externalMacro(module: "SomeModule", type: "Line")
