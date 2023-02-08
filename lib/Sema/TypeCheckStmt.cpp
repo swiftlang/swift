@@ -2493,21 +2493,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
       }
     }
   } else if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
-    // If this is user-defined constructor that requires `_storage`
-    // variable injection, do so now so now.
-    if (auto *storageVar = ctor->getLocalTypeWrapperStorageVar()) {
-      SmallVector<ASTNode, 8> Elts;
-
-      Elts.push_back(storageVar->getParentPatternBinding());
-      Elts.push_back(storageVar);
-
-      Elts.append(body->getElements().begin(),
-                  body->getElements().end());
-
-      body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
-                               body->getRBraceLoc(), body->isImplicit());
-    }
-
     if (body->empty() ||
         !isKnownEndOfConstructor(body->getLastElement())) {
       // For constructors, we make sure that the body ends with a "return" stmt,

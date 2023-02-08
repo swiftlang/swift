@@ -1186,16 +1186,6 @@ void PrintAST::printAttributes(const Decl *D) {
 
   D->getAttrs().print(Printer, Options, D);
 
-  // We need to check whether this is a type with an inferred
-  // type wrapper attribute and if so print it explicitly.
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-    auto typeWrapperInfo = NTD->getTypeWrapper();
-    // The attribute has been inferred and we have to print it.
-    if (typeWrapperInfo && typeWrapperInfo->IsInferred) {
-      typeWrapperInfo->Attr->print(Printer, Options, D);
-    }
-  }
-
   // Print the implicit 'final' attribute.
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     auto VarD = dyn_cast<VarDecl>(D);
@@ -2972,10 +2962,6 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
         return true;
     }
   }
-  return false;
-}
-
-static bool usesFeatureTypeWrappers(Decl *decl) {
   return false;
 }
 
