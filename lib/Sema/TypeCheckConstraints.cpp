@@ -1678,7 +1678,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   //
   //
   // Thus, right now, a move-only type is only a subtype of itself.
-  if (fromType->isPureMoveOnly())
+  if (fromType->isPureMoveOnly() || toType->isPureMoveOnly())
     return CheckedCastKind::Unresolved;
   
   // Check for a bridging conversion.

@@ -260,6 +260,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
                                        /*request*/ MetadataState::Complete,
                                        nullptr).getMetadata();
 
+  IGF.setScopedLocalTypeData(archetype, localDataKind, wtable);
   return wtable;
 }
 

@@ -13,3 +13,9 @@ func f2<T..., U...>(t: repeat each T, u: repeat each U) {}
 
 // CHECK-LABEL: define hidden swiftcc void @"$s26variadic_generic_functions2f31t1uyxxQp_q_xQptq_Rhzr0_lF"(%swift.opaque** noalias nocapture %0, %swift.opaque** noalias nocapture %1, i64 %2, %swift.type** %T, %swift.type** %U)
 func f3<T..., U...>(t: repeat each T, u: repeat each U) where (repeat (each T, each U)): Any {}
+
+protocol P {}
+
+// CHECK-LABEL: define {{.*}}void @f4(%swift.opaque** noalias nocapture %0, i64 %1, %swift.type** %T, i8*** %T.P)
+@_silgen_name("f4")
+func f4<T... : P>(t: repeat each T) {}
