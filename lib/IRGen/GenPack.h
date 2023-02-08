@@ -59,6 +59,15 @@ void cleanupTypeMetadataPack(IRGenFunction &IGF,
                              StackAddress pack,
                              Optional<unsigned> elementCount);
 
+StackAddress emitWitnessTablePack(IRGenFunction &IGF, CanPackType packType,
+                                  PackConformance *conformance);
+
+llvm::Value *emitWitnessTablePackRef(IRGenFunction &IGF, CanPackType packType,
+                                     PackConformance *conformance);
+
+void cleanupWitnessTablePack(IRGenFunction &IGF, StackAddress pack,
+                             Optional<unsigned> elementCount);
+
 /// Emit the dynamic index of a particular structural component
 /// of the given pack type.  If the component is a pack expansion, this
 /// is the index of the first element of the pack (or where it would be
