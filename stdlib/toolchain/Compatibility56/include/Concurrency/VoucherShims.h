@@ -20,6 +20,9 @@
 #include <cstdint>
 #include "swift/Runtime/Config.h"
 
+#include "swift/Basic/Lazy.h"
+#include <dlfcn.h>
+
 // swift-corelibs-libdispatch has os/voucher_private.h but it doesn't work for
 // us yet, so only look for it on Apple platforms.
 #if __APPLE__ && __has_include(<os/voucher_private.h>)
@@ -42,7 +45,7 @@
 
 #if SWIFT_HAS_VOUCHER_HEADER
 
-#else
+#else // SWIFT_HAS_VOUCHER_HEADER
 
 // If the header isn't available, declare the necessary calls here.
 
@@ -92,8 +95,14 @@ static inline bool voucher_needs_adopt(void * _Nullable voucher) {
 
 static inline bool swift_voucher_needs_adopt(voucher_t _Nullable voucher) {
 #if __APPLE__
-  if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *))
-    return voucher_needs_adopt(voucher);
+  // _Z19voucher_needs_adoptP9voucher_s
+  const auto voucherNeedsAdopt =
+      reinterpret_cast<bool(*)(voucher_t)>(SWIFT_LAZY_CONSTANT(
+          dlsym(RTLD_DEFAULT, "_Z19voucher_needs_adoptP9voucher_s")));
+
+  if (voucherNeedsAdopt) {
+    return voucherNeedsAdopt(voucher);
+  }
   return true;
 #else
   return voucher_needs_adopt(voucher);

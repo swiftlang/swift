@@ -159,6 +159,7 @@ public:
 };
 
 /// Return the current thread's active task reference.
+__attribute__((visibility("hidden")))
 SWIFT_CC(swift)
 AsyncTask *swift_task_getCurrent(void);
 } // namespace swift
