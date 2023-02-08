@@ -1057,7 +1057,8 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
       slot = SGF.B.createStructElementAddr(pattern, self.forward(SGF), field,
                                            fieldTy.getAddressType());
     } else {
-      assert(isa<ClassDecl>(field->getDeclContext()));
+      assert(isa<ClassDecl>(field->getDeclContext()->
+                                getImplementedObjCContext()));
       slot = SGF.B.createRefElementAddr(pattern, self.forward(SGF), field,
                                         fieldTy.getAddressType());
     }
@@ -1154,7 +1155,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                             NominalTypeDecl *nominal) {
   auto subs = getSubstitutionsForPropertyInitializer(dc, nominal);
 
-  for (auto member : nominal->getMembers()) {
+  for (auto member : nominal->getImplementationContext()->getMembers()) {
     // Find instance pattern binding declarations that have initializers.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->isStatic()) continue;
