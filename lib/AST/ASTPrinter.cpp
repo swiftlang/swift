@@ -3171,6 +3171,14 @@ static bool usesFeatureBuiltinMacros(Decl *decl) {
 
 static bool usesFeatureImportSymbolicCXXDecls(Decl *decl) { return false; }
 
+static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
+  auto macro = dyn_cast<MacroDecl>(decl);
+  if (!macro)
+    return false;
+
+  return macro->getMacroRoles().contains(MacroRole::Expression);
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
