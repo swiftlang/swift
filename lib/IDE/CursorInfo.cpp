@@ -48,9 +48,14 @@ void typeCheckDeclAndParentClosures(ValueDecl *VD) {
     DC = DC->getParent();
   }
 
-  typeCheckASTNodeAtLoc(
-      TypeCheckASTNodeAtLocContext::declContext(VD->getDeclContext()),
-      VD->getLoc());
+  if (!VD->getInterfaceType()) {
+    // The decl has an interface time if it came from another module. In that
+    // case, there's nothing to do. Otherwise, type check the decl to get its
+    // type.
+    typeCheckASTNodeAtLoc(
+        TypeCheckASTNodeAtLocContext::declContext(VD->getDeclContext()),
+        VD->getLoc());
+  }
   if (auto VarD = dyn_cast<VarDecl>(VD)) {
     if (VarD->hasAttachedPropertyWrapper()) {
       // Type check any attached property wrappers so the annotated declaration
