@@ -2342,8 +2342,11 @@ public:
     switch (BAI->getAccessKind()) {
     case SILAccessKind::Init:
     case SILAccessKind::Deinit:
-      require(BAI->getEnforcement() == SILAccessEnforcement::Static,
-              "init/deinit accesses cannot use non-static enforcement");
+      // A signed access preserves the access marker until IRGen
+      require(
+          BAI->getEnforcement() == SILAccessEnforcement::Static ||
+              BAI->getEnforcement() == SILAccessEnforcement::Signed,
+          "init/deinit accesses cannot use non-static/non-signed enforcement");
       break;
 
     case SILAccessKind::Read:
@@ -3286,7 +3289,10 @@ public:
                 EI->getForwardingOwnershipKind() == OwnershipKind::Guaranteed,
             "invalid forwarding ownership kind on tuple_extract instruction");
 
-    require(!EI->getStructDecl()->isNonTrivialPtrAuth(),
+    require(!EI->getModule()
+                    .getOptions()
+                    .EnableImportPtrauthFieldFunctionPointers ||
+                !EI->getField()->getPointerAuthQualifier().isPresent(),
             "Imported structs with ptrauth qualified fields should not be "
             "promoted to a value");
 
@@ -3337,7 +3343,8 @@ public:
     require(EI->getField()->getDeclContext() == sd,
             "struct_element_addr field is not a member of the struct");
 
-    if (EI->getStructDecl()->isNonTrivialPtrAuth()) {
+    if (EI->getModule().getOptions().EnableImportPtrauthFieldFunctionPointers &&
+        EI->getField()->getPointerAuthQualifier().isPresent()) {
       for (auto *use : EI->getUses()) {
         auto *bai = dyn_cast<BeginAccessInst>(use->getUser());
         require(bai && bai->getEnforcement() == SILAccessEnforcement::Signed,
@@ -5434,14 +5441,22 @@ public:
   }
   void verifySameShape(CanPackType left, CanPackType right,
                        unsigned rightBegin, unsigned rightEnd) {
-    assert(rightBegin <= rightEnd && rightEnd <= right->getNumElements());
-    require(left->getNumElements() == rightEnd - rightBegin,
-            "packs must agree in length");
-    for (unsigned i = 0, e = left->getNumElements(); i != e; ++i) {
-      auto leftComponent = left.getElementType(i);
-      auto rightComponent = right.getElementType(rightBegin + i);
-      auto leftExpansion = dyn_cast<PackExpansionType>(leftComponent);
-      auto rightExpansion = dyn_cast<PackExpansionType>(rightComponent);
+    auto rightElements = right.getElementTypes();
+    require(rightBegin <= rightEnd && rightEnd <= rightElements.size(),
+            "slice out of range");
+    _verifySameShape(left.getElementTypes(),
+                     rightElements.slice(rightBegin, rightEnd - rightBegin));
+  }
+  void verifySameShape(CanPackType left, ArrayRef<CanType> right) {
+    _verifySameShape(left.getElementTypes(), right);
+  }
+  template <class LeftArray, class RightArray>
+  void _verifySameShape(LeftArray left, RightArray right) {
+    require(left.size() == right.size(), "packs must agree in length");
+
+    for (size_t i : indices(left)) {
+      auto leftExpansion = dyn_cast<PackExpansionType>(left[i]);
+      auto rightExpansion = dyn_cast<PackExpansionType>(right[i]);
       if (leftExpansion && rightExpansion) {
         require(leftExpansion.getCountType()->getReducedShape() ==
                 rightExpansion.getCountType()->getReducedShape(),
@@ -5451,6 +5466,216 @@ public:
         require(!leftExpansion && !rightExpansion,
                 "packs must have same shape: must agree in whether "
                 "corresponding components are expansions");
+      }
+    }
+  }
+
+  /// Given that we're indexing into the given pack, verify that the
+  /// element type is a valid type for the element at the given index.
+  void verifyPackElementType(CanSILPackType packType,
+                             AnyPackIndexInst *packIndex,
+                             SILType elementType) {
+    require(elementType.isAddress() == packType->isElementAddress(),
+            "pack element address-ness must match pack");
+
+    verifyPackElementType(packType->getElementTypes(),
+                          packIndex,
+                          elementType.getASTType(),
+                          /*SILType*/ true);
+  }
+
+  /// Verify that the element type is the right type for a particular
+  /// index of a pack with the given components.  This implements the
+  /// structural type matching for pack indexing algorithm described
+  /// in the specification for the SIL pack indexing instructions.
+  void verifyPackElementType(ArrayRef<CanType> indexedPack,
+                             AnyPackIndexInst *packIndex,
+                             CanType targetElementType,
+                            bool typesAreSILTypes) {
+    verifySameShape(packIndex->getIndexedPackType(), indexedPack);
+
+    if (auto spi = dyn_cast<ScalarPackIndexInst>(packIndex)) {
+      requireSameType(targetElementType,
+                      indexedPack[spi->getComponentIndex()],
+                      "scalar pack index must match exactly");
+    } else if (auto ppi = dyn_cast<PackPackIndexInst>(packIndex)) {
+      auto start = ppi->getComponentStartIndex();
+      auto end = ppi->getComponentEndIndex();
+      verifyPackElementType(indexedPack.slice(start, end - start),
+                            ppi->getSliceIndexOperand(),
+                            targetElementType,
+                            typesAreSILTypes);
+    } else {
+      auto dpi = cast<DynamicPackIndexInst>(packIndex);
+      verifyDynamicPackIndexStructuralEquality(indexedPack, dpi,
+                                               targetElementType,
+                                               typesAreSILTypes);
+    }
+  }
+
+  /// Collect the opened element archetypes in the named type that
+  /// are opened by an instruction using the given pack-indexing
+  /// instruction.
+  llvm::DenseMap<CanType, CanPackType>
+  collectOpenedElementArchetypeBindings(CanType type,
+                                        AnyPackIndexInst *indexedBy) {
+    llvm::DenseMap<CanType, CanPackType> result;
+
+    type.visit([&](CanType type) {
+      auto opened = dyn_cast<ElementArchetypeType>(type);
+      if (!opened) return;
+      opened = opened.getRoot();
+
+      // Don't repeat this work if the same archetype is named twice.
+      if (result.count(opened)) return;
+
+      // Ignore archetypes defined by open_pack_elements not based on the
+      // same pack_index instruction.
+      auto openingInst =
+        F.getModule().getRootLocalArchetypeDef(opened,
+                                               const_cast<SILFunction*>(&F));
+      auto opi = dyn_cast<OpenPackElementInst>(openingInst);
+      if (!opi || opi->getIndexOperand() != indexedBy) return;
+
+      // Map each root opened element archetype to its pack substitution.
+      // FIXME: remember conformances?
+      auto openedEnv = opi->getOpenedGenericEnvironment();
+      openedEnv->forEachPackElementBinding(
+          [&](ElementArchetypeType *elementArchetype, PackType *substitution) {
+        auto subPack = cast<PackType>(substitution->getCanonicalType());
+        result.insert({elementArchetype->getCanonicalType(), subPack});
+      });
+    });
+
+    return result;
+  }
+
+  /// Verify that the lowered element type is a valid type for a
+  /// particular dynamic_pack_index into a pack operand with the given
+  /// components.
+  ///
+  /// This implements part of the structural type matching algorithm
+  /// for pack indexing:
+  ///
+  /// Let S be the set of opened pack element archetypes in the element
+  /// type that were opened by open_pack_element instructions based on
+  /// the same dynamic_pack_index instruction.  By construction,
+  /// the pack substitutions given to open_pack_element for the opened
+  /// type parameter packs must all have the same shape as the indexed
+  /// pack type of the open_pack_element's index operand.  That index
+  /// operand is the given dynamic_pack_index instruction, which is being
+  /// used to index into a pack with the given pack components, so the
+  /// components must have the same shape as the pack substitutions.
+  /// The lowered element type is a valid type for this index if, for
+  /// each component of this shape, there is a substitution which
+  /// (optionally) replaces archetypes in S with the correponding
+  /// component type (pattern types for expansions) of the pack
+  /// substitution to get the corresponding component type (pattern
+  /// type for expansions) of the pack operand.
+  ///
+  /// That is, suppose we have:
+  ///   open_pack_element %index of <each P0, each P1 where (P0,P1):Any>
+  ///                            at <Pack{A0, repeat each B0, C0},
+  ///                                Pack{A1, repeat each B1, C1}>,
+  ///                            shape $P0, uuid "01234"
+  ///
+  /// And suppose we're indexing into this pack (recalling that the
+  /// pack shape rules require this to have the same shape as the pack
+  /// substitutions):
+  ///   $Pack{Ap, repeat each Bp, Cp},
+  ///
+  /// Finally, suppose that the expected element type of this index is E,
+  /// a type expression in terms of @pack_element("01234") P0 and
+  /// @pack_element("01234") P1.
+  ///
+  /// Then applying this substitution to E:
+  ///   @pack_element("01234") P0   =>   A0
+  ///   @pack_element("01234") P1   =>   A1
+  /// should yield the type expression Ap, and so on for each component
+  /// of the shape.
+  void verifyDynamicPackIndexStructuralEquality(
+                                          ArrayRef<CanType> indexedPack,
+                                          DynamicPackIndexInst *dpi,
+                                          CanType targetElementType,
+                                          bool typesAreSILTypes) {
+    // If there are no pack components, this code must be unreachable.
+    if (indexedPack.empty()) return;
+
+    // Collect the set S of opened pack archetypes based on the given
+    // pack index instruction, mapping them to their pack substitution
+    // types.
+    auto allOpened =
+      collectOpenedElementArchetypeBindings(targetElementType, dpi);
+
+    // Expand each of the pack components.
+    for (unsigned componentIndex : indices(indexedPack)) {
+      CanType indexedElementType = indexedPack[componentIndex];
+      CanType indexedShape;
+      if (auto exp = dyn_cast<PackExpansionType>(indexedElementType)) {
+        indexedShape = exp.getCountType();
+        indexedElementType = exp.getPatternType();
+      }
+
+      // If we have an exact match without substitution, that's great.
+      if (targetElementType == indexedElementType) continue;
+
+      // If we don't have any substitutions, this must be a case where the
+      // expansion is invariant to the archetypes.
+      if (allOpened.empty()) {
+        // This condition is always false.
+        requireSameType(targetElementType, indexedElementType,
+                        "no opened archetypes based on a matching pack index "
+                        "instruction; element type must be invariant");
+        continue;
+      }
+
+      // Otherwise, we expect lanewise substitution to turn the expected
+      // element type into the lanewise component of the original pack.
+
+      // Provide substitution functions that replace the pack archetypes
+      // we found above with the corresponding lane of the pack substitution.
+      auto substTypes = [&](SubstitutableType *type) -> Type {
+        auto it = allOpened.find(type->getCanonicalType());
+        if (it == allOpened.end()) return Type();
+        auto pack = it->second;
+        auto packElementType = pack.getElementType(componentIndex);
+        if (auto exp = dyn_cast<PackExpansionType>(packElementType)) {
+          assert(indexedShape && "pack substitution doesn't match in shape");
+          packElementType = exp.getPatternType();
+        } else {
+          assert(!indexedShape && "pack substitution doesn't match in shape");
+        }
+        return packElementType;
+      };
+      auto substConformances = [&](CanType dependentType,
+                                   Type conformingType,
+                                   ProtocolDecl *protocol) -> ProtocolConformanceRef {
+        // FIXME: substitute back to the pack context to get the
+        // corresponding conformance pack, then project out the
+        // appropriate lane.
+        llvm_unreachable("unimplemented");
+      };
+
+      // If the pack components and expected element types are SIL types,
+      // we need to perform SIL substitution.
+      if (typesAreSILTypes) {
+        auto targetElementSILType =
+          SILType::getPrimitiveObjectType(targetElementType);
+        auto indexedElementSILType =
+          SILType::getPrimitiveObjectType(indexedElementType);
+        auto substTargetElementSILType =
+          targetElementSILType.subst(F.getModule(),
+                                     substTypes, substConformances);
+        requireSameType(indexedElementSILType, substTargetElementSILType,
+                        "lanewise-substituted pack element type didn't "
+                        "match expected element type");
+      } else {
+        auto substTargetElementType =
+          targetElementType.subst(substTypes, substConformances)
+                           ->getCanonicalType();
+        requireSameType(indexedElementType, substTargetElementType,
+                        "lanewise-substituted pack element type didn't "
+                        "match expected element type");
       }
     }
   }
@@ -5485,6 +5710,22 @@ public:
     if (!index) return;
 
     verifySameShape(index->getIndexedPackType(), i->getOpenedShapeClass());
+  }
+
+  void checkPackElementGetInst(PackElementGetInst *i) {
+    auto index = requireValueKind<AnyPackIndexInst>(i->getIndex(),
+            "pack index operand must be one of the pack_index instructions");
+    if (!index) return;
+
+    verifyPackElementType(i->getPackType(), index, i->getElementType());
+  }
+
+  void checkPackElementSetInst(PackElementSetInst *i) {
+    auto index = requireValueKind<AnyPackIndexInst>(i->getIndex(),
+            "pack index operand must be one of the pack_index instructions");
+    if (!index) return;
+
+    verifyPackElementType(i->getPackType(), index, i->getElementType());
   }
 
   // This verifies that the entry block of a SIL function doesn't have

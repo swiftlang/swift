@@ -222,6 +222,19 @@ public:
                    base.getAlignment().alignmentAtOffset(eltSize * index));
   }
 
+  /// Given a pointer to an array element, GEP to the array element
+  /// N elements past it.  The type is not changed.
+  Address CreateArrayGEP(Address base, llvm::Value *index, Size eltSize,
+                         const llvm::Twine &name = "") {
+    auto addr = CreateInBoundsGEP(base.getElementType(),
+                                  base.getAddress(), index, name);
+    // Given that Alignment doesn't remember offset alignment,
+    // the alignment at index 1 should be conservatively correct for
+    // any element in the array.
+    return Address(addr, base.getElementType(),
+                   base.getAlignment().alignmentAtOffset(eltSize));
+  }
+
   /// Given an i8*, GEP to N bytes past it.
   Address CreateConstByteArrayGEP(Address base, Size offset,
                                   const llvm::Twine &name = "") {

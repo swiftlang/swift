@@ -2173,6 +2173,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   if (auto classTemplateSpecDecl =
           dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
+    /// Symbolic specializations get imported as the symbolic class template
+    /// type.
+    if (importSymbolicCXXDecls)
+      return importNameImpl(classTemplateSpecDecl->getSpecializedTemplate(),
+                            version, givenName);
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
 
       auto &astContext = classTemplateSpecDecl->getASTContext();

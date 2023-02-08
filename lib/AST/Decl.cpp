@@ -7125,6 +7125,15 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
+clang::PointerAuthQualifier VarDecl::getPointerAuthQualifier() const {
+  if (auto *clangDecl = getClangDecl()) {
+    if (auto *valueDecl = dyn_cast<clang::ValueDecl>(clangDecl)) {
+      return valueDecl->getType().getPointerAuth();
+    }
+  }
+  return clang::PointerAuthQualifier();
+}
+
 ParamDecl::ParamDecl(SourceLoc specifierLoc,
                      SourceLoc argumentNameLoc, Identifier argumentName,
                      SourceLoc parameterNameLoc, Identifier parameterName,
@@ -9356,38 +9365,26 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 }
 
 const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
-  auto &ctx = getASTContext();
+  auto &C = getASTContext();
 
-  auto hasUnownedSerialExecutorType = [&](VarDecl *property) {
-    if (auto type = property->getInterfaceType())
-      if (auto td = type->getAnyNominal())
-        if (td == ctx.getUnownedSerialExecutorDecl())
-          return true;
-    return false;
-  };
+  if (!isAnyActor())
+    return nullptr;
 
-  VarDecl *candidate = nullptr;
-  for (auto member: getMembers()) {
-    // Instance properties called unownedExecutor.
-    if (auto property = dyn_cast<VarDecl>(member)) {
-      if (property->getName() == ctx.Id_unownedExecutor &&
-          !property->isStatic()) {
-        if (!candidate) {
-          candidate = property;
-          continue;
-        }
+  llvm::SmallVector<ValueDecl *, 2> results;
+  this->lookupQualified(getSelfNominalTypeDecl(),
+                        DeclNameRef(C.Id_unownedExecutor),
+                        NL_ProtocolMembers,
+                        results);
 
-        bool oldHasRightType = hasUnownedSerialExecutorType(candidate);
-        if (oldHasRightType == hasUnownedSerialExecutorType(property)) {
-          // just ignore the new property, we should diagnose this eventually
-        } else if (!oldHasRightType) {
-          candidate = property;
-        }
-      }
-    }
+  for (auto candidate: results) {
+    if (isa<ProtocolDecl>(candidate->getDeclContext()))
+      continue;
+
+    if (VarDecl *var = dyn_cast<VarDecl>(candidate))
+      return var;
   }
 
-  return candidate;
+  return nullptr;
 }
 
 bool ClassDecl::isRootDefaultActor() const {

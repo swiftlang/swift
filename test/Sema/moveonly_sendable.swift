@@ -106,12 +106,22 @@ func tryToCastIt(_ fd: FileDescriptor) {
   let _ = fd as Sendable // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
 
   let _ = fd as? Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
-                          // expected-error@-1 {{marker protocol 'Sendable' cannot be used in a conditional cast}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
 
   let _ = fd as! Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
 
   let _ = fd is Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
-                         // expected-error@-1 {{marker protocol 'Sendable' cannot be used in a conditional cast}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+
+  let sendy = mkSendable()
+  let _ = sendy as FileDescriptor // expected-error {{cannot convert value of type 'any Sendable' to type 'FileDescriptor' in coercion}}
+  let _ = sendy is FileDescriptor // expected-warning {{cast from 'any Sendable' to unrelated type 'FileDescriptor' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  let _ = sendy as! FileDescriptor // expected-warning {{cast from 'any Sendable' to unrelated type 'FileDescriptor' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
+  let _ = sendy as? FileDescriptor// expected-warning {{cast from 'any Sendable' to unrelated type 'FileDescriptor' always fails}}
+  // expected-error@-1 {{move-only types cannot be conditionally cast}}
 }
 
 protocol GiveSendable<T> {

@@ -1,0 +1,4 @@
+framework module FactoryInit {
+  header "FactoryInit.h"
+  export *
+}

@@ -189,7 +189,27 @@ bool useLegacyOptionalNilInjectionInCasting() {
 // by that protocol.
 bool useLegacyObjCBoxingInCasting() {
 #if BINARY_COMPATIBILITY_APPLE
-  return true; // For now, continue using the legacy behavior on Apple OSes
+  return false; // For now, always use the new behavior on Apple OSes
+#else
+  return false; // Always use the new behavior on non-Apple OSes
+#endif
+}
+
+// Should casting be strict about protocol conformance when
+// unboxing values that were boxed for Obj-C use?
+
+// Similar to `useLegacyObjCBoxingInCasting()`, but
+// this applies to the case where you have already boxed
+// some Swift non-reference-type into a `__SwiftValue`
+// and are now casting to a protocol.
+
+// For example, this cast
+// `x as! AnyObject as? NSCopying`
+// always succeeded with the legacy semantics.
+
+bool useLegacySwiftValueUnboxingInCasting() {
+#if BINARY_COMPATIBILITY_APPLE
+  return false; // For now, always use the new behavior on Apple OSes
 #else
   return false; // Always use the new behavior on non-Apple OSes
 #endif

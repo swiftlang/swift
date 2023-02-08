@@ -7654,6 +7654,99 @@ public:
   }
 };
 
+/// Get the value previously stored in a pack by pack_element_set.
+class PackElementGetInst final
+  : public InstructionBaseWithTrailingOperands<
+                           SILInstructionKind::PackElementGetInst,
+                           PackElementGetInst, SingleValueInstruction> {
+public:
+  enum {
+    IndexOperand = 0,
+    PackOperand = 1
+  };
+
+private:
+  friend SILBuilder;
+
+  PackElementGetInst(SILDebugLocation debugLoc,
+                     ArrayRef<SILValue> allOperands,
+                     SILType elementType)
+      : InstructionBaseWithTrailingOperands(allOperands, debugLoc,
+                                            elementType) {}
+
+  static PackElementGetInst *create(SILFunction &F,
+                                    SILDebugLocation debugLoc,
+                                    SILValue indexOperand,
+                                    SILValue packOperand,
+                                    SILType elementType);
+
+public:
+  SILValue getIndex() const {
+    return getAllOperands()[IndexOperand].get();
+  }
+
+  SILValue getPack() const {
+    return getAllOperands()[PackOperand].get();
+  }
+
+  CanSILPackType getPackType() const {
+    return getPack()->getType().castTo<SILPackType>();
+  }
+
+  SILType getElementType() const {
+    return getType();
+  }
+};
+
+/// Set the value stored in a pack.
+class PackElementSetInst
+  : public InstructionBase<SILInstructionKind::PackElementSetInst,
+                           NonValueInstruction> {
+public:
+  enum {
+    ValueOperand = 0,
+    IndexOperand = 1,
+    PackOperand = 2
+  };
+
+private:
+  friend SILBuilder;
+
+  FixedOperandList<3> Operands;
+
+  PackElementSetInst(SILDebugLocation debugLoc,
+                     SILValue valueOperand, SILValue indexOperand,
+                     SILValue packOperand)
+      : InstructionBase(debugLoc),
+        Operands(this, valueOperand, indexOperand, packOperand) {
+    assert(packOperand->getType().is<SILPackType>());
+  }
+
+public:
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  SILValue getValue() const {
+    return getAllOperands()[ValueOperand].get();
+  }
+
+  SILValue getIndex() const {
+    return getAllOperands()[IndexOperand].get();
+  }
+
+  SILValue getPack() const {
+    return getAllOperands()[PackOperand].get();
+  }
+
+  CanSILPackType getPackType() const {
+    return getPack()->getType().castTo<SILPackType>();
+  }
+
+  SILType getElementType() const {
+    return getValue()->getType();
+  }
+};
+
 /// Projects the capture storage address from a @block_storage address.
 class ProjectBlockStorageInst
   : public UnaryInstructionBase<SILInstructionKind::ProjectBlockStorageInst,

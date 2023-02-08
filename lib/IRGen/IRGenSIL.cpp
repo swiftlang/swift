@@ -1279,6 +1279,8 @@ public:
   void visitDynamicPackIndexInst(DynamicPackIndexInst *i);
   void visitPackPackIndexInst(PackPackIndexInst *i);
   void visitScalarPackIndexInst(ScalarPackIndexInst *i);
+  void visitPackElementGetInst(PackElementGetInst *i);
+  void visitPackElementSetInst(PackElementSetInst *i);
 
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
@@ -5835,7 +5837,8 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
       setLoweredAddress(access, temp.getAddress());
       return;
     }
-    if (access->getAccessKind() == SILAccessKind::Modify) {
+    if (access->getAccessKind() == SILAccessKind::Modify ||
+        access->getAccessKind() == SILAccessKind::Init) {
       // When we see a signed modify access, create a shadow stack location and
       // set the lowered address of the access to this stack location.
       auto temp = ti.allocateStack(*this, access->getType(), "ptrauth.temp");
@@ -5926,7 +5929,8 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
   }
 
   case SILAccessEnforcement::Signed: {
-    if (access->getAccessKind() != SILAccessKind::Modify) {
+    if (access->getAccessKind() != SILAccessKind::Modify ||
+        access->getAccessKind() != SILAccessKind::Init) {
       // nothing to do.
       return;
     }
@@ -6876,13 +6880,49 @@ void IRGenSILFunction::visitOpenPackElementInst(swift::OpenPackElementInst *i) {
 
   i->getOpenedGenericEnvironment()->forEachPackElementBinding(
       [&](auto *archetype, auto *pack) {
+        auto protocols = archetype->getConformsTo();
+        llvm::SmallVector<llvm::Value *, 2> wtables;
         auto *metadata = emitTypeMetadataPackElementRef(
-            *this, CanPackType(pack), index, MetadataState::Complete);
-        this->bindArchetype(CanElementArchetypeType(archetype), metadata,
-                            MetadataState::Complete, {});
+            *this, CanPackType(pack), protocols, index, MetadataState::Complete,
+            wtables);
+        bindArchetype(CanElementArchetypeType(archetype), metadata,
+                      MetadataState::Complete, wtables);
       });
 
   // The result is just used for type dependencies.
+}
+
+void IRGenSILFunction::visitPackElementGetInst(PackElementGetInst *i) {
+  Address pack = getLoweredAddress(i->getPack());
+  llvm::Value *index = getLoweredSingletonExplosion(i->getIndex());
+
+  auto elementType = i->getElementType();
+  auto &elementTI = getTypeInfo(elementType);
+
+  auto elementStorageAddr =
+    emitStorageAddressOfPackElement(*this, pack, index, elementType);
+
+  assert(elementType.isAddress() &&
+         i->getPackType()->isElementAddress() &&
+         "direct packs not currently supported");
+  auto ptr = Builder.CreateLoad(elementStorageAddr);
+  auto elementAddr = elementTI.getAddressForPointer(ptr);
+  setLoweredAddress(i, elementAddr);
+}
+
+void IRGenSILFunction::visitPackElementSetInst(PackElementSetInst *i) {
+  Address pack = getLoweredAddress(i->getPack());
+  llvm::Value *index = getLoweredSingletonExplosion(i->getIndex());
+
+  auto elementType = i->getElementType();
+  auto elementStorageAddress =
+    emitStorageAddressOfPackElement(*this, pack, index, elementType);
+
+  assert(elementType.isAddress() &&
+         i->getPackType()->isElementAddress() &&
+         "direct packs not currently supported");
+  auto elementValue = getLoweredAddress(i->getValue());
+  Builder.CreateStore(elementValue.getAddress(), elementStorageAddress);
 }
 
 void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){

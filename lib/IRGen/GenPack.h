@@ -19,6 +19,7 @@
 
 #include "swift/AST/Types.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
 
@@ -50,13 +51,24 @@ emitTypeMetadataPackRef(IRGenFunction &IGF,
                         CanPackType packType,
                         DynamicMetadataRequest request);
 
-llvm::Value *emitTypeMetadataPackElementRef(IRGenFunction &IGF,
-                                            CanPackType packType,
-                                            llvm::Value *index,
-                                            DynamicMetadataRequest request);
+llvm::Value *
+emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
+                               ArrayRef<ProtocolDecl *> protocols,
+                               llvm::Value *index,
+                               DynamicMetadataRequest request,
+                               llvm::SmallVectorImpl<llvm::Value *> &wtables);
 
 void cleanupTypeMetadataPack(IRGenFunction &IGF,
                              StackAddress pack,
+                             Optional<unsigned> elementCount);
+
+StackAddress emitWitnessTablePack(IRGenFunction &IGF, CanPackType packType,
+                                  PackConformance *conformance);
+
+llvm::Value *emitWitnessTablePackRef(IRGenFunction &IGF, CanPackType packType,
+                                     PackConformance *conformance);
+
+void cleanupWitnessTablePack(IRGenFunction &IGF, StackAddress pack,
                              Optional<unsigned> elementCount);
 
 /// Emit the dynamic index of a particular structural component
@@ -66,6 +78,14 @@ void cleanupTypeMetadataPack(IRGenFunction &IGF,
 llvm::Value *emitIndexOfStructuralPackComponent(IRGenFunction &IGF,
                                                 CanPackType packType,
                                                 unsigned componentIndex);
+
+/// Emit the address that stores the given pack element.
+///
+/// For indirect packs, note that this is the address of the pack
+/// array element, not the address stored in the pack array element.
+Address emitStorageAddressOfPackElement(IRGenFunction &IGF,
+                                        Address pack, llvm::Value *index,
+                                        SILType elementType);
 
 } // end namespace irgen
 } // end namespace swift
