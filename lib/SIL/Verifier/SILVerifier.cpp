@@ -5728,6 +5728,27 @@ public:
     verifyPackElementType(i->getPackType(), index, i->getElementType());
   }
 
+  void checkTuplePackElementAddrInst(TuplePackElementAddrInst *i) {
+    auto index = requireValueKind<AnyPackIndexInst>(i->getIndex(),
+            "pack index operand must be one of the pack_index instructions");
+    if (!index) return;
+
+    // Remove the extra tuple element type structure.
+    SmallVector<CanType, 8> tupleElements; {
+      auto tupleType = requireAddressType(TupleType, i->getTuple()->getType(),
+                                  "tuple operand of tuple_pack_element_addr");
+      auto eltTypes = tupleType.getElementTypes();
+      tupleElements.append(eltTypes.begin(), eltTypes.end());
+    }
+
+    require(i->getElementType().isAddress(),
+            "result of tuple_pack_element_addr must be an address");
+
+    verifyPackElementType(tupleElements, index,
+                          i->getElementType().getASTType(),
+                          /*types are SIL types*/ true);
+  }
+
   // This verifies that the entry block of a SIL function doesn't have
   // any predecessors and also verifies the entry point arguments.
   void verifyEntryBlock(SILBasicBlock *entry) {

@@ -1991,6 +1991,14 @@ public:
                               elementValue, packIndex, pack));
   }
 
+  TuplePackElementAddrInst *
+  createTuplePackElementAddr(SILLocation loc, SILValue packIndex,
+                             SILValue tupleAddr, SILType elementType) {
+    return insert(TuplePackElementAddrInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              packIndex, tupleAddr, elementType));
+  }
+
   ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,
                                                      SILValue Storage) {
     auto CaptureTy = Storage->getType()
