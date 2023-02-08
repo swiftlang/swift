@@ -1234,13 +1234,11 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
 }
 
 AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
-                                         AssignByWrapperInst::Originator origin,
                                          SILValue Src, SILValue Dest,
                                          SILValue Initializer, SILValue Setter,
                                          AssignByWrapperInst::Mode mode)
-    : AssignInstBase(Loc, Src, Dest, Initializer, Setter), originator(origin) {
-  assert(Initializer->getType().is<SILFunctionType>() ||
-         (isa<SILUndef>(Initializer) && originator == Originator::TypeWrapper));
+    : AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
+  assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
 }
 
