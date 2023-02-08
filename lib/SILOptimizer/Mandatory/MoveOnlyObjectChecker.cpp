@@ -806,6 +806,9 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     if (checker.changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
+
+    // NOTE: We validate in the MoveOnlyAddressChecker (which runs after this)
+    // that we eliminated all copy_value and emit errors otherwise.
   }
 };
 
