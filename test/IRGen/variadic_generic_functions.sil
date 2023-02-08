@@ -1,0 +1,47 @@
+// RUN: %target-swift-frontend -parse-sil -emit-ir -primary-file %s -enable-experimental-feature VariadicGenerics | %FileCheck %s
+
+// Because of -enable-experimental-feature VariadicGenerics
+// REQUIRES: asserts
+
+import Builtin
+import Swift
+
+protocol P {}
+struct S : P {}
+sil_witness_table S : P module main {}
+struct S_2 : P {}
+sil_witness_table S_2 : P module main {}
+struct S_3 : P {}
+sil_witness_table S_3 : P module main {}
+
+// CHECK-LABEL: define {{.*}}void @c()
+// CHECK:       entry:
+// CHECK:         [[METADATA_PACK:%[^,]+]] = alloca [1 x %swift.type*]
+// CHECK:         [[WTABLE_PACK:%[^,]+]] = alloca [1 x i8**]
+// CHECK:         [[METADATA_ELEMENT_0:%[^,]+]] = getelementptr inbounds [1 x %swift.type*], [1 x %swift.type*]* [[METADATA_PACK]]
+// CHECK:         store %swift.type* bitcast {{.*}}$s26variadic_generic_functions3S_2VMf{{.*}}, %swift.type** [[METADATA_ELEMENT_0]]
+// CHECK:         [[WTABLE_ELEMENT_0:%[^,]+]] = getelementptr inbounds [1 x i8**], [1 x i8**]* [[WTABLE_PACK]]
+// CHECK:         store i8** getelementptr inbounds {{.*}}$s26variadic_generic_functions3S_2VAA1PAAWP{{.*}}, i8*** [[WTABLE_ELEMENT_0]]
+// CHECK:         [[METADATA_PACK_PTR:%[^,]+]] = bitcast [1 x %swift.type*]* [[METADATA_PACK]] to %swift.type**
+// CHECK:         [[WTABLE_PACK_ADDR:%[^,]+]] = bitcast [1 x i8**]* [[WTABLE_PACK]] to i8***
+// CHECK:         call swiftcc void @g(i64 1, %swift.type** [[METADATA_PACK_PTR]], i8*** [[WTABLE_PACK_ADDR]])
+sil @c : $() -> () {
+  %g = function_ref @g : $@convention(thin) <T... : P> () -> ()
+  apply %g<Pack{S_2}>() : $@convention(thin) <T... : P> () -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK: define {{.*}}void @f(i64 %0, %swift.type** %T, i8*** %T.P)
+sil @f : $<T... : P> () -> () {
+    %ret = tuple ()
+    return %ret : $()
+}
+
+// CHECK: define {{.*}}void @g(i64 %0, %swift.type** %T, i8*** %T.P)
+sil @g : $<T... : P> () -> () {
+    %f = function_ref @f : $@convention(thin) <T... : P> () -> ()
+    apply %f<Pack{repeat each T, S, repeat each T, repeat each T}>() : $@convention(thin) <T... : P> () -> ()
+    %ret = tuple ()
+    return %ret : $()
+}

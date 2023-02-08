@@ -25,6 +25,7 @@
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 
@@ -705,12 +706,20 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
     out << "AbstractConformance("
         << getAbstractProtocolConformance()->getName()
         << ")";
+  } else if (isPackProtocolConformance()) {
+    out << "PackConformance("
+        << getPackProtocolConformance()->getType()
+        << ":"
+        << getPackProtocolConformance()->getProtocol()->getName()
+        << ")";
   } else if (Value == FormalTypeMetadata) {
     out << "FormalTypeMetadata";
   } else if (Value == RepresentationTypeMetadata) {
     out << "RepresentationTypeMetadata";
   } else if (Value == ValueWitnessTable) {
     out << "ValueWitnessTable";
+  } else if (Value == Shape) {
+    out << "Shape";
   } else {
     assert(isSingletonKind());
     if (Value >= ValueWitnessDiscriminatorBase) {
