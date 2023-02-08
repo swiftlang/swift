@@ -150,7 +150,7 @@ public:
 
   /// The Swift frontend invocation arguments to build the Swift module from the
   /// interface.
-  const std::vector<std::string> buildCommandLine;
+  std::vector<std::string> buildCommandLine;
 
   /// The hash value that will be used for the generated module
   const std::string contextHash;
@@ -185,6 +185,10 @@ public:
 
   static bool classof(const ModuleDependencyInfoStorageBase *base) {
     return base->dependencyKind == ModuleDependencyKind::SwiftInterface;
+  }
+
+  void updateCommandLine(const std::vector<std::string> &newCommandLine) {
+    buildCommandLine = newCommandLine;
   }
 };
 
@@ -431,6 +435,11 @@ public:
     assert(!storage->resolved && "Resolving an already-resolved dependency");
     storage->resolved = true;
     storage->resolvedModuleDependencies.assign(dependencyIDs.begin(), dependencyIDs.end());
+  }
+
+  void updateCommandLine(const std::vector<std::string> &newCommandLine) {
+    assert(isSwiftInterfaceModule() && "Can only update command line on Swift interface dependency");
+    cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())->updateCommandLine(newCommandLine);
   }
 
   bool isResolved() const {
@@ -751,5 +760,18 @@ public:
 };
 
 } // namespace swift
+
+namespace std {
+template <>
+struct hash<swift::ModuleDependencyID> {
+  using UnderlyingKindType = std::underlying_type<swift::ModuleDependencyKind>::type;
+  std::size_t operator()(const swift::ModuleDependencyID &id) const {
+    auto underlyingKindValue = static_cast<UnderlyingKindType>(id.second);
+
+    return (hash<string>()(id.first) ^
+            (hash<UnderlyingKindType>()(underlyingKindValue)));
+  }
+};
+} // namespace std
 
 #endif /* SWIFT_AST_MODULE_DEPENDENCIES_H */

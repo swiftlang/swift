@@ -112,21 +112,38 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
                                               StringRef(),
                                               SourceLoc(),
                 [&](ASTContext &Ctx, ModuleDecl *mainMod,
-                    ArrayRef<StringRef> Args,
+                    ArrayRef<StringRef> BaseArgs,
                     ArrayRef<StringRef> PCMArgs, StringRef Hash) {
     assert(mainMod);
     std::string InPath = moduleInterfacePath.str();
     auto compiledCandidates = getCompiledCandidates(Ctx, realModuleName.str(),
                                                     InPath);
+    std::vector<std::string> Args(BaseArgs.begin(), BaseArgs.end());
 
+    // Add explicit Swift dependency compilation flags
+    Args.push_back("-explicit-interface-module-build");
+    Args.push_back("-disable-implicit-swift-modules");
+    Args.push_back("-Xcc"); Args.push_back("-fno-implicit-modules");
+    Args.push_back("-Xcc"); Args.push_back("-fno-implicit-module-maps");
+    for (const auto &candidate : compiledCandidates) {
+      Args.push_back("-candidate-module-file");
+      Args.push_back(candidate);
+    }
+
+    // Compute the output path and add it to the command line
     SmallString<128> outputPathBase(moduleCachePath);
     llvm::sys::path::append(
         outputPathBase,
         moduleName.str() + "-" + Hash + "." +
             file_types::getExtension(file_types::TY_SwiftModuleFile));
+    Args.push_back("-o");
+    Args.push_back(outputPathBase.str().str());
+
+    std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());
     Result = ModuleDependencyInfo::forSwiftInterfaceModule(
-        outputPathBase.str().str(), InPath, compiledCandidates, Args, PCMArgs,
+        outputPathBase.str().str(), InPath, compiledCandidates, ArgsRefs, PCMArgs,
         Hash, isFramework);
+
     // Open the interface file.
     auto &fs = *Ctx.SourceMgr.getFileSystem();
     auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
