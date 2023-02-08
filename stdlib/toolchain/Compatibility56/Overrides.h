@@ -23,6 +23,13 @@ struct OpaqueValue;
 class AsyncContext;
 class AsyncTask;
 
+using TaskCreateCommon_t = SWIFT_CC(swift) AsyncTaskAndContext(
+    size_t rawTaskCreateFlags,
+    TaskOptionRecord *options,
+    const Metadata *futureResultType,
+    TaskContinuationFunction *function, void *closureContext,
+    size_t initialContextSize);
+
 using TaskFutureWait_t = SWIFT_CC(swiftasync) void(
                               OpaqueValue *result,
                               SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
@@ -54,4 +61,17 @@ void SWIFT_CC(swiftasync) swift56override_swift_task_future_wait_throwing(
                                             ThrowingTaskFutureWaitContinuationFunction *,
                                             AsyncContext *,
                                             TaskFutureWaitThrowing_t *original);
+
+#if __POINTER_WIDTH__ == 64
+__attribute__((weak, visibility("hidden")))
+AsyncTaskAndContext SWIFT_CC(swift)
+swift56override_swift_task_create_common(
+    size_t rawTaskCreateFlags,
+    TaskOptionRecord *options,
+    const Metadata *futureResultType,
+    TaskContinuationFunction *function, void *closureContext,
+    size_t initialContextSize,
+    TaskCreateCommon_t *original);
+#endif
+
 } // namespace swift
