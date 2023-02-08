@@ -81,6 +81,11 @@ const std::function<bool(const ExtensionDecl *)>
 void PrintOptions::setBaseType(Type T) {
   if (T->is<ErrorType>())
     return;
+  if (auto DynamicSelf = T->getAs<DynamicSelfType>()) {
+    // TypeTransformContext requires `T` to have members. Look through dynamic
+    // Self.
+    T = DynamicSelf->getSelfType();
+  }
   TransformContext = TypeTransformContext(T);
 }
 
