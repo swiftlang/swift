@@ -377,13 +377,16 @@ static bool precompileBridgingHeader(const CompilerInstance &Instance) {
       Instance.getASTContext().getClangModuleLoader());
   auto &ImporterOpts = Invocation.getClangImporterOptions();
   auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
+  auto OutputBackend = Instance.getOutputBackend().clone();
   if (!PCHOutDir.empty()) {
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
-    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
+    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash,
+                                             OutputBackend);
     return !PCH.has_value();
   }
   return clangImporter->emitBridgingPCH(
+      OutputBackend,
       opts.InputsAndOutputs.getFilenameOfFirstInput(),
       opts.InputsAndOutputs.getSingleOutputFilename());
 }
@@ -393,6 +396,7 @@ static bool precompileClangModule(const CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
   return clangImporter->emitPrecompiledModule(
+      Instance.getOutputBackend().clone(),
       opts.InputsAndOutputs.getFilenameOfFirstInput(), opts.ModuleName,
       opts.InputsAndOutputs.getSingleOutputFilename());
 }
@@ -402,6 +406,7 @@ static bool dumpPrecompiledClangModule(const CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
   return clangImporter->dumpPrecompiledModule(
+      Instance.getOutputBackend().clone(),
       opts.InputsAndOutputs.getFilenameOfFirstInput(),
       opts.InputsAndOutputs.getSingleOutputFilename());
 }

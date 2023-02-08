@@ -7,8 +7,10 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 
@@ -81,10 +83,11 @@ TEST(ClangImporterTest, emitPCHInMemory) {
       ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts, options,
                       symbolGraphOpts, sourceMgr, diags));
   auto importer = ClangImporter::create(*context);
+  auto backend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
 
   std::string PCH = createFilename(cache, "bridging.h.pch");
   ASSERT_FALSE(importer->canReadPCH(PCH));
-  ASSERT_FALSE(importer->emitBridgingPCH(options.BridgingHeader, PCH));
+  ASSERT_FALSE(importer->emitBridgingPCH(backend, options.BridgingHeader, PCH));
   ASSERT_TRUE(importer->canReadPCH(PCH));
 
   // Overwrite the PCH with garbage.  We should still be able to read it from

@@ -36,6 +36,8 @@
 #include "swift/IDE/APIDigesterData.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/ParseVersion.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include <functional>
 
 using namespace swift;
@@ -1895,8 +1897,9 @@ static bool readBreakageAllowlist(SDKContext &Ctx, llvm::StringSet<> &lines,
     "breakage-allowlist-", "txt", preprocessedFilePath)) {
     return 1;
   }
-  if (importer->runPreprocessor(BreakageAllowlistPath,
-                                preprocessedFilePath.str())) {
+  if (importer->runPreprocessor(
+          llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>(),
+          BreakageAllowlistPath, preprocessedFilePath.str())) {
     return 1;
   }
   return readFileLineByLine(preprocessedFilePath, lines);
