@@ -2539,6 +2539,21 @@ void SILCloner<ImplClass>::visitPackElementSetInst(PackElementSetInst *Inst) {
                                               newIndex, newPack));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitTuplePackElementAddrInst(
+                                             TuplePackElementAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto loc = getOpLocation(Inst->getLoc());
+  auto newIndex = getOpValue(Inst->getIndex());
+  auto newTuple = getOpValue(Inst->getTuple());
+  auto newElementType = getOpType(Inst->getElementType());
+  // FIXME: do we need to rewrite when substitution removes the
+  // tuple-ness of the type?  If so, what do we rewrite to?
+  recordClonedInstruction(
+      Inst, getBuilder().createTuplePackElementAddr(loc, newIndex, newTuple,
+                                                    newElementType));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitCopyBlockInst(CopyBlockInst *Inst) {

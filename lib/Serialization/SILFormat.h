@@ -160,7 +160,7 @@ namespace sil_block {
     SIL_MOVEONLY_DEINIT,
     SIL_INST_HAS_SYMBOL,
     SIL_PACK_ELEMENT_GET,
-    SIL_PACK_ELEMENT_SET,    
+    SIL_PACK_ELEMENT_SET,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -474,7 +474,7 @@ namespace sil_block {
     SILTypeCategoryField,   // element type category
     TypeIDField,            // pack type
     SILTypeCategoryField,   // pack type category
-    ValueIDField,           // pack value 
+    ValueIDField,           // pack value
     ValueIDField            // index value
   >;
 
@@ -486,7 +486,7 @@ namespace sil_block {
     ValueIDField,           // element value
     TypeIDField,            // pack type
     SILTypeCategoryField,   // pack type category
-    ValueIDField,           // pack value 
+    ValueIDField,           // pack value
     ValueIDField            // index value
   >;
 

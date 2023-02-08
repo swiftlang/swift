@@ -2318,6 +2318,11 @@ public:
           << Ctx.getID(I->getIndex()) << " of "
           << getIDAndType(I->getPack());
   }
+  void visitTuplePackElementAddrInst(TuplePackElementAddrInst *I) {
+    *this << Ctx.getID(I->getIndex()) << " of "
+          << getIDAndType(I->getTuple()) << " as "
+          << I->getElementType();
+  }
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
     *this << getIDAndType(PBSI->getOperand());
   }

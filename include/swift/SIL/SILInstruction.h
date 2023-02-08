@@ -7747,6 +7747,53 @@ public:
   }
 };
 
+/// Projects a tuple element as appropriate for the given
+/// pack element index.  The pack index must index into a pack with
+/// the same shape as the tuple element type list.
+class TuplePackElementAddrInst final
+  : public InstructionBaseWithTrailingOperands<
+                           SILInstructionKind::TuplePackElementAddrInst,
+                           TuplePackElementAddrInst,
+                           SingleValueInstruction> {
+public:
+  enum {
+    IndexOperand = 0,
+    TupleOperand = 1
+  };
+
+private:
+  friend SILBuilder;
+
+  TuplePackElementAddrInst(SILDebugLocation debugLoc,
+                           ArrayRef<SILValue> allOperands,
+                           SILType elementType)
+      : InstructionBaseWithTrailingOperands(allOperands, debugLoc,
+                                            elementType) {}
+
+  static TuplePackElementAddrInst *create(SILFunction &F,
+                                          SILDebugLocation debugLoc,
+                                          SILValue indexOperand,
+                                          SILValue tupleOperand,
+                                          SILType elementType);
+
+public:
+  SILValue getIndex() const {
+    return getAllOperands()[IndexOperand].get();
+  }
+
+  SILValue getTuple() const {
+    return getAllOperands()[TupleOperand].get();
+  }
+
+  CanTupleType getTupleType() const {
+    return getTuple()->getType().castTo<TupleType>();
+  }
+
+  SILType getElementType() const {
+    return getType();
+  }
+};
+
 /// Projects the capture storage address from a @block_storage address.
 class ProjectBlockStorageInst
   : public UnaryInstructionBase<SILInstructionKind::ProjectBlockStorageInst,

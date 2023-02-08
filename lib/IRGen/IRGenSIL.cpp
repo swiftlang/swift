@@ -1281,6 +1281,7 @@ public:
   void visitScalarPackIndexInst(ScalarPackIndexInst *i);
   void visitPackElementGetInst(PackElementGetInst *i);
   void visitPackElementSetInst(PackElementSetInst *i);
+  void visitTuplePackElementAddrInst(TuplePackElementAddrInst *i);
 
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
@@ -6923,6 +6924,19 @@ void IRGenSILFunction::visitPackElementSetInst(PackElementSetInst *i) {
          "direct packs not currently supported");
   auto elementValue = getLoweredAddress(i->getValue());
   Builder.CreateStore(elementValue.getAddress(), elementStorageAddress);
+}
+
+void IRGenSILFunction::visitTuplePackElementAddrInst(
+                                                  TuplePackElementAddrInst *i) {
+  Address tuple = getLoweredAddress(i->getTuple());
+  llvm::Value *index = getLoweredSingletonExplosion(i->getIndex());
+
+  auto elementType = i->getElementType();
+  auto elementAddr =
+    projectTupleElementAddressByDynamicIndex(*this, tuple,
+                                             i->getTuple()->getType(),
+                                             index, elementType);
+  setLoweredAddress(i, elementAddr);
 }
 
 void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){
