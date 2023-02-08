@@ -5,4 +5,4 @@ struct S: P {}
 
 class C: _Copyable {}
 
-@_moveOnly struct MOStruct: _Copyable {} // expected-error {{move-only struct 'MOStruct' cannot conform to protocol '_Copyable'}}
+@_moveOnly struct MOStruct: _Copyable {} // expected-error {{move-only struct 'MOStruct' cannot conform to '_Copyable'}}

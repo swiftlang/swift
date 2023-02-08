@@ -141,15 +141,32 @@ struct UnsafePointerWithOwner<T> {
 // Make sure we error whenever we attempt to conform a move only type to a
 // protocol.
 protocol P {}
+protocol Q {}
 @_moveOnly class ProtocolCheckMoveOnlyKlass {}
 @_moveOnly struct ProtocolCheckMoveOnlyStruct {
     var k: MoveOnlyKlass
 }
 @_moveOnly enum ProtocolCheckMoveOnlyEnum {}
 
-extension ProtocolCheckMoveOnlyKlass : P {} // expected-error {{move-only class 'ProtocolCheckMoveOnlyKlass' cannot conform yet to any protocols}}
-extension ProtocolCheckMoveOnlyStruct : P {} // expected-error {{move-only struct 'ProtocolCheckMoveOnlyStruct' cannot conform yet to any protocols}}
-extension ProtocolCheckMoveOnlyEnum : P {} // expected-error {{move-only enum 'ProtocolCheckMoveOnlyEnum' cannot conform yet to any protocols}}
+extension ProtocolCheckMoveOnlyKlass : P {} // expected-error {{move-only class 'ProtocolCheckMoveOnlyKlass' cannot conform to 'P'}}
+extension ProtocolCheckMoveOnlyStruct : P, Q {}
+// expected-error@-1 {{move-only struct 'ProtocolCheckMoveOnlyStruct' cannot conform to 'P'}}
+// expected-error@-2 {{move-only struct 'ProtocolCheckMoveOnlyStruct' cannot conform to 'Q'}}
+// expected-note@-3 {{'ProtocolCheckMoveOnlyStruct' declares conformance to protocol 'P' here}}
+
+extension ProtocolCheckMoveOnlyStruct: P {}
+// expected-error@-1 {{redundant conformance of 'ProtocolCheckMoveOnlyStruct' to protocol 'P'}}
+// expected-error@-2 {{move-only struct 'ProtocolCheckMoveOnlyStruct' cannot conform to 'P'}}
+
+extension ProtocolCheckMoveOnlyEnum : P & Q, Sendable {}
+// expected-error@-1 {{move-only enum 'ProtocolCheckMoveOnlyEnum' cannot conform to 'P & Q'}}
+
+extension ProtocolCheckMoveOnlyEnum : Any {}
+// expected-error@-1 {{move-only enum 'ProtocolCheckMoveOnlyEnum' cannot conform to 'Any'}}
+
+extension ProtocolCheckMoveOnlyEnum : AnyHashable {}
+// expected-error@-1 {{move-only enum 'ProtocolCheckMoveOnlyEnum' cannot conform to 'AnyHashable'}}
+// expected-error@-2 {{inheritance from non-protocol type 'AnyHashable'}}
 
 // But a normal extension is ok.
 extension ProtocolCheckMoveOnlyKlass {}
@@ -158,10 +175,10 @@ extension ProtocolCheckMoveOnlyEnum {}
 
 // Check if we define a move only type and make it conform on the base type
 @_moveOnly
-class MoveOnlyKlassP : P {} // expected-error {{move-only class 'MoveOnlyKlassP' cannot conform to protocol 'P'}}
+class MoveOnlyKlassP : P {} // expected-error {{move-only class 'MoveOnlyKlassP' cannot conform to 'P'}}
 @_moveOnly
-struct MoveOnlyStructP : P { // expected-error {{move-only struct 'MoveOnlyStructP' cannot conform to protocol 'P'}}
+struct MoveOnlyStructP : P { // expected-error {{move-only struct 'MoveOnlyStructP' cannot conform to 'P'}}
     var mv: MoveOnlyKlass
 }
 @_moveOnly
-enum MoveOnlyEnumP : P {} // expected-error {{move-only enum 'MoveOnlyEnumP' cannot conform to protocol 'P'}}
+enum MoveOnlyEnumP : P {} // expected-error {{move-only enum 'MoveOnlyEnumP' cannot conform to 'P'}}
