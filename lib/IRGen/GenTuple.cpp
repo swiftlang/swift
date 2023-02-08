@@ -509,14 +509,12 @@ Address irgen::projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
                                                         SILType tupleType,
                                                         llvm::Value *index,
                                                         SILType elementType) {
-  // TODO: retrieve type metadata (ForLayout) for the tuple type
-  // and retrieve the field offset for the given index.  Consider
-  // special-casing constant indices if we can reason statically
-  // about the prior elements.  It's probably not necessary to try
-  // to handle fixed-size tuples specially, because the optimizer
-  // should ideally be lowering this operation to something static
-  // in that case.
-  llvm_unreachable("unimplemented");
+  auto *metadata = IGF.emitTypeMetadataRefForLayout(tupleType);
+
+  llvm::Value *offset = loadTupleOffsetFromMetadata(IGF, metadata, index);
+  auto *gep =
+      IGF.emitByteOffsetGEP(tuple.getAddress(), offset, IGF.IGM.OpaqueTy);
+  return Address(gep, IGF.IGM.OpaqueTy, IGF.IGM.getPointerAlignment());
 }
 
 Optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
