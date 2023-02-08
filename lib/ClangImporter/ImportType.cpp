@@ -66,6 +66,10 @@ bool ClangImporter::Implementation::isOverAligned(const clang::TypeDecl *decl) {
 }
 
 bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
+  // Do not check type layout for a clang type in symbolic mode as the
+  // type could be a dependent type.
+  if (importSymbolicCXXDecls)
+    return false;
   auto align = getClangASTContext().getTypeAlignInChars(type);
   return align > clang::CharUnits::fromQuantity(MaximumAlignment);
 }
