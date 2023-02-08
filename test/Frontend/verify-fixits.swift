@@ -235,6 +235,14 @@ func testDefaultedLineNumbers() {
   // CHECK: [[@LINE+1]]:83: error: expected fix-it not seen; actual fix-it seen: {{{{}}17-[[@LINE+2]]:5=}}
   unlabeledFunc(aa: // expected-error {{extraneous argument label 'aa:' in call}} {{+0:17-5=}}
     1)
+
+  // Fix-it start line defaults to diagnostic line.
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{+1:15-+1:18=bb}}
+              bbx: 1)
+  // CHECK: [[@LINE+1]]:113: error: expected fix-it not seen; actual fix-it seen: {{{{}}[[@LINE+2]]:15-18=bb}}
+  labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{15-+1:18=bb}}
+              bbx: 1)
 }
 
 func test2Fixits() {

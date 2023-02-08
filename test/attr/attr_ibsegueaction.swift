@@ -103,12 +103,12 @@ protocol CP2 : class { }
   @objc(newProblematicScreen:)
   @IBSegueAction func problematicScreen(_: AnyObject) -> AnyObject {fatalError()}
   // expected-error@-1{{@IBSegueAction method cannot have selector 'newProblematicScreen:' because it has special memory management behavior}}
-  // expected-note@-2{{change Objective-C selector to 'makeProblematicScreen:'}} {{9-30=makeProblematicScreen:}}
+  // expected-note@-2{{change Objective-C selector to 'makeProblematicScreen:'}} {{-1:9-30=makeProblematicScreen:}}
 
   @objc(newProblematicScreen:secondArg:)
   @IBSegueAction func problematicScreen(_: AnyObject, secondArg: AnyObject) -> AnyObject {fatalError()}
   // expected-error@-1{{@IBSegueAction method cannot have selector 'newProblematicScreen:secondArg:' because it has special memory management behavior}}
-  // expected-note@-2{{change Objective-C selector to 'makeProblematicScreen:secondArg:'}} {{9-40=makeProblematicScreen:secondArg:}}
+  // expected-note@-2{{change Objective-C selector to 'makeProblematicScreen:secondArg:'}} {{-1:9-40=makeProblematicScreen:secondArg:}}
 }
 
 // Check which argument types @IBSegueAction can take.

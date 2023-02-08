@@ -152,11 +152,11 @@ struct AmbigTupleMe: Tupled, OtherTupled {
   var condition: Bool
 
   // Ambiguous
+  // expected-note@+4{{add an explicit 'return' statement to not use a result builder}}{{+3:3-3=return <#expr#>\n}}
+  // expected-note@+3{{apply result builder 'TupleBuilder' (inferred from protocol 'Tupled')}}{{-1:3-3=@TupleBuilder }}
+  // expected-note@+2{{apply result builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}{{-1:3-3=@OtherTupleBuilder }}
   internal
   var tuple: Void { // expected-error{{ambiguous result builder inferred for 'tuple': 'TupleBuilder' or 'OtherTupleBuilder'}}
-    // expected-note@-1{{add an explicit 'return' statement to not use a result builder}}{{3-3=return <#expr#>\n}}
-    // expected-note@-2{{apply result builder 'TupleBuilder' (inferred from protocol 'Tupled')}}{{3-3=@TupleBuilder }}
-    // expected-note@-3{{apply result builder 'OtherTupleBuilder' (inferred from protocol 'OtherTupled')}}{{3-3=@OtherTupleBuilder }}
     "hello" // expected-warning{{string literal is unused}}
     "world" // expected-warning{{string literal is unused}}
   }

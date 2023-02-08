@@ -6,15 +6,15 @@ enum E {
 }
 
 func foo1(e : E) {
+  // expected-note@+1{{do you want to add missing cases?}}{{+2:3-3=case .e2:\n<#code#>\n}}
   switch e { // expected-error{{switch must be exhaustive}}
-  // expected-note@-1{{do you want to add missing cases?}}{{3-3=case .e2:\n<#code#>\n}}
   case .e1: return
   }
 }
 
 func foo2(i : Int) {
+  // expected-note@+1{{do you want to add a default clause?}}{{+2:3-3=default:\n<#code#>\n}}
   switch i { // expected-error{{switch must be exhaustive}}
-  // expected-note@-1{{do you want to add a default clause?}}{{3-3=default:\n<#code#>\n}}
   case 1: return
   }
 }

@@ -13,7 +13,7 @@
 
 @objc class C1 : P1 {
   @objc(method1renamed)
-  func method1() { // expected-error{{Objective-C method 'method1renamed' provided by method 'method1()' does not match the requirement's selector ('method1')}}{{9-23=method1}}
+  func method1() { // expected-error{{Objective-C method 'method1renamed' provided by method 'method1()' does not match the requirement's selector ('method1')}}{{-1:9-23=method1}}
   }
 
   var property1: ObjCClass {

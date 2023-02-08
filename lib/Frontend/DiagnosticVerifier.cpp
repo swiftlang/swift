@@ -447,6 +447,8 @@ static Optional<LineColumnRange> parseExpectedFixItRange(
 
   if (const auto lineAndCol = parseLineAndColumn()) {
     std::tie(Range.StartLine, Range.StartCol) = lineAndCol.value();
+    if (Range.StartLine == LineColumnRange::NoValue)
+      Range.StartLine = DiagnosticLineNo;
   } else {
     return None;
   }
