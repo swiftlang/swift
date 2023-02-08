@@ -19,13 +19,102 @@ import PrintShims
 
 sil public_external @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
 
-struct A {}
-struct B {}
-struct C {}
-struct D {}
-struct E {}
-struct F {}
-struct G {}
+protocol P {
+  static func static_member_fn()
+}
+
+struct A : P {
+  static func static_member_fn()
+}
+struct B : P {
+  static func static_member_fn()
+}
+struct C : P {
+  static func static_member_fn()
+}
+struct D : P {
+  static func static_member_fn()
+}
+struct E : P {
+  static func static_member_fn()
+}
+struct F : P {
+  static func static_member_fn()
+}
+struct G : P {
+  static func static_member_fn()
+}
+
+sil private @A_static_member_fn : $@convention(witness_method: P) (@thick A.Type) -> () {
+bb0(%0 : $@thick A.Type):
+  %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<A>(%0) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+sil_witness_table A : P module main {
+  method #P.static_member_fn: <Self where Self : P> (Self.Type) -> () -> () : @A_static_member_fn
+}
+sil private @B_static_member_fn : $@convention(witness_method: P) (@thick B.Type) -> () {
+bb0(%0 : $@thick B.Type):
+  %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<B>(%0) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+sil_witness_table B : P module main {
+  method #P.static_member_fn: <Self where Self : P> (Self.Type) -> () -> () : @B_static_member_fn
+}
+sil private @C_static_member_fn : $@convention(witness_method: P) (@thick C.Type) -> () {
+bb0(%0 : $@thick C.Type):
+  %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<C>(%0) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+sil_witness_table C : P module main {
+  method #P.static_member_fn: <Self where Self : P> (Self.Type) -> () -> () : @C_static_member_fn
+}
+sil private @D_static_member_fn : $@convention(witness_method: P) (@thick D.Type) -> () {
+bb0(%0 : $@thick D.Type):
+  %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<D>(%0) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+sil_witness_table D : P module main {
+  method #P.static_member_fn: <Self where Self : P> (Self.Type) -> () -> () : @D_static_member_fn
+}
+sil private @E_static_member_fn : $@convention(witness_method: P) (@thick E.Type) -> () {
+bb0(%0 : $@thick E.Type):
+  %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<E>(%0) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+sil_witness_table E : P module main {
+  method #P.static_member_fn: <Self where Self : P> (Self.Type) -> () -> () : @E_static_member_fn
+}
+sil private @F_static_member_fn : $@convention(witness_method: P) (@thick F.Type) -> () {
+bb0(%0 : $@thick F.Type):
+  %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<F>(%0) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+sil_witness_table F : P module main {
+  method #P.static_member_fn: <Self where Self : P> (Self.Type) -> () -> () : @F_static_member_fn
+}
+sil private @G_static_member_fn : $@convention(witness_method: P) (@thick G.Type) -> () {
+bb0(%0 : $@thick G.Type):
+  %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<G>(%0) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+sil_witness_table G : P module main {
+  method #P.static_member_fn: <Self where Self : P> (Self.Type) -> () -> () : @G_static_member_fn
+}
 
 sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
@@ -36,6 +125,87 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   %4 = integer_literal $Builtin.Word, 4
   %5 = integer_literal $Builtin.Word, 5
 
+  %two_archetypes_from_two_params_no_singles_with_conformance = function_ref @two_archetypes_from_two_params_no_singles_with_conformance : $@convention(thin) <T_1... : P, T_2... : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ---0--> ^
+  // CHECK: A
+  // CHECK: A
+  // U_2 -> {D, E, F, A, B, C}
+  // ---0--> ^
+  // CHECK: D
+  // CHECK: D
+  apply %two_archetypes_from_two_params_no_singles_with_conformance<Pack{A, B, C}, Pack{D, E, F}>(%0) : $@convention(thin) <T_1... : P, T_2... : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ----1----> ^
+  // CHECK: B
+  // CHECK: B
+  // U_2 -> {D, E, F, A, B, C}
+  // ----1----> ^
+  // CHECK: E
+  // CHECK: E
+  apply %two_archetypes_from_two_params_no_singles_with_conformance<Pack{A, B, C}, Pack{D, E, F}>(%1) : $@convention(thin) <T_1... : P, T_2... : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ------2-----> ^
+  // CHECK: C
+  // CHECK: C
+  // U_2 -> {D, E, F, A, B, C}
+  // ------2-----> ^
+  // CHECK: F
+  // CHECK: F
+  apply %two_archetypes_from_two_params_no_singles_with_conformance<Pack{A, B, C}, Pack{D, E, F}>(%2) : $@convention(thin) <T_1... : P, T_2... : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // -------3-------> ^
+  // CHECK: D
+  // CHECK: D
+  // U_2 -> {D, E, F, A, B, C}
+  // -------3-------> ^
+  // CHECK: A
+  // CHECK: A
+  apply %two_archetypes_from_two_params_no_singles_with_conformance<Pack{A, B, C}, Pack{D, E, F}>(%3) : $@convention(thin) <T_1... : P, T_2... : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ---------4--------> ^
+  // CHECK: E
+  // CHECK: E
+  // U_2 -> {D, E, F, A, B, C}
+  // ---------4--------> ^
+  // CHECK: B
+  // CHECK: B
+  apply %two_archetypes_from_two_params_no_singles_with_conformance<Pack{A, B, C}, Pack{D, E, F}>(%4) : $@convention(thin) <T_1... : P, T_2... : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // -----------5---------> ^
+  // CHECK: F
+  // CHECK: F
+  // U_2 -> {D, E, F, A, B, C}
+  // -----------5---------> ^
+  // CHECK: C
+  // CHECK: C
+  apply %two_archetypes_from_two_params_no_singles_with_conformance<Pack{A, B, C}, Pack{D, E, F}>(%5) : $@convention(thin) <T_1... : P, T_2... : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
+
+  %direct_access_from_parameter = function_ref @direct_access_from_parameter : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // --0---> ^
+  // CHECK: A
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%0) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ----1----> ^
+  // CHECK: B
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%1) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // -----2------> ^
+  // CHECK: C
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%2) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // -------3-------> ^
+  // CHECK: D
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%3) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // --------4---------> ^
+  // CHECK: E
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%4) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ----------5----------> ^
+  // CHECK: F
+  apply %direct_access_from_parameter<Pack{A, B, C, D, E, F}>(%5) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
   %two_archetypes_from_two_params_no_singles = function_ref @two_archetypes_from_two_params_no_singles : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // ---0--> ^
@@ -80,25 +250,37 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   // CHECK: C
   apply %two_archetypes_from_two_params_no_singles<Pack{A, B, C}, Pack{D, E, F}>(%5) : $@convention(thin) <T_1..., T_2... where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> ()
 
-  %direct_access_from_parameter = function_ref @direct_access_from_parameter : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  %direct_access_from_parameter_with_conformance = function_ref @direct_access_from_parameter_with_conformance : $@convention(thin) <T_1...: P> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // --0---> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%0) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: A
+  // CHECK: A
+  apply %direct_access_from_parameter_with_conformance<Pack{A, B, C, D, E, F}>(%0) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // ----1----> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%1) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: B
+  // CHECK: B
+  apply %direct_access_from_parameter_with_conformance<Pack{A, B, C, D, E, F}>(%1) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // -----2------> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%2) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: C
+  // CHECK: C
+  apply %direct_access_from_parameter_with_conformance<Pack{A, B, C, D, E, F}>(%2) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // -------3-------> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%3) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: D
+  // CHECK: D
+  apply %direct_access_from_parameter_with_conformance<Pack{A, B, C, D, E, F}>(%3) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // --------4---------> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%4) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: E
+  // CHECK: E
+  apply %direct_access_from_parameter_with_conformance<Pack{A, B, C, D, E, F}>(%4) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
   // U_1 -> {A, B, C, D, E, F}
   // ----------5----------> ^
-  apply %direct_access_from_parameter<Pack{A, B, C, E, F, G}>(%5) : $@convention(thin) <T_1...> (Builtin.Word) -> ()
+  // CHECK: F
+  // CHECK: F
+  apply %direct_access_from_parameter_with_conformance<Pack{A, B, C, D, E, F}>(%5) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
 
   %outb = integer_literal $Builtin.Int32, 0
   %out = struct $Int32 (%outb : $Builtin.Int32)
@@ -120,6 +302,25 @@ entry(%intIndex : $Builtin.Word):
   return %retval : $()
 }
 
+sil @two_archetypes_from_two_params_no_singles_with_conformance : $<T_1... : P, T_2... : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> () {
+entry(%intIndex : $Builtin.Word):
+  %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T_1, repeat each T_2}
+  %token = open_pack_element %innerIndex of <U_1... : P, U_2... : P where (repeat (each U_1, each U_2)): Any> at <Pack{repeat each T_1, repeat each T_2}, Pack{repeat each T_2, repeat each T_1}>, shape $U_2, uuid "01234567-89AB-CDEF-0123-000000000003"
+  %metatype_1 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000003") U_1).Type
+  %metatype_2 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000003") U_2).Type
+  %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
+  %static_member_fn_1 = witness_method $(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_1), #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  %static_member_fn_2 = witness_method $(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_2), #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  // Print the first archetype that is bound.
+  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %static_member_fn_1<(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_1)>(%metatype_1) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  // Print the second archetype that is bound.
+  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_2)>(%metatype_2) : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %static_member_fn_2<(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_2)>(%metatype_2) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // Verify that we just gep into a parameter pack when that's all that the pack consists of.
 // CHECK-LL: define {{.*}}void @direct_access_from_parameter(i{{(32|64)}} [[INDEX:%[^,]+]], i{{(32|64)}} {{%[^,]+}}, %swift.type** [[PACK:%[^,]+]])
 // CHECK-LL:   [[ELEMENT_ADDRESS:%[^,]+]] = getelementptr inbounds %swift.type*, %swift.type** [[PACK]], i{{(32|64)}} [[INDEX]]
@@ -132,6 +333,19 @@ entry(%intIndex : $Builtin.Word):
   %metatype_1 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000001") U_1).Type
   %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
   apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000001") U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @direct_access_from_parameter_with_conformance : $<T_1... : P> (Builtin.Word) -> () {
+entry(%intIndex : $Builtin.Word):
+  %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T_1}
+  %token = open_pack_element %innerIndex of <U_1... : P> at <Pack{repeat each T_1}>, shape $U_1, uuid "01234567-89AB-CDEF-0123-000000000002"
+  %metatype_1 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1).Type
+  %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %static_member_fn = witness_method $(@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1), #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  apply %static_member_fn<(@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1)>(%metatype_1) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
   %t = tuple ()
   return %t : $()
 }

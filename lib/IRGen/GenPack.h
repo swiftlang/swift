@@ -19,6 +19,7 @@
 
 #include "swift/AST/Types.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
 
@@ -50,10 +51,12 @@ emitTypeMetadataPackRef(IRGenFunction &IGF,
                         CanPackType packType,
                         DynamicMetadataRequest request);
 
-llvm::Value *emitTypeMetadataPackElementRef(IRGenFunction &IGF,
-                                            CanPackType packType,
-                                            llvm::Value *index,
-                                            DynamicMetadataRequest request);
+llvm::Value *
+emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
+                               ArrayRef<ProtocolDecl *> protocols,
+                               llvm::Value *index,
+                               DynamicMetadataRequest request,
+                               llvm::SmallVectorImpl<llvm::Value *> &wtables);
 
 void cleanupTypeMetadataPack(IRGenFunction &IGF,
                              StackAddress pack,
