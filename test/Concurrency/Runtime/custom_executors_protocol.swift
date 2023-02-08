@@ -63,6 +63,7 @@ actor MyActor: WithSpecifiedExecutor {
   }
 
   func test(expectedExecutor: some SerialExecutor) {
+    precondition(_taskIsOnExecutor(expectedExecutor), "Expected to be on: \(expectedExecutor)")
     checkIfMainQueue(expectedAnswer: true)
     print("\(Self.self): on executor \(expectedExecutor)")
   }

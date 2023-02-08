@@ -9357,7 +9357,6 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 
 const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   auto &C = getASTContext();
-  auto module = getParentModule();
 
   if (!isAnyActor())
     return nullptr;
