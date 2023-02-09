@@ -468,12 +468,26 @@ createDesignatedInitOverrideGenericParams(ASTContext &ctx,
                                   ArrayRef<RequirementRepr>(), SourceLoc());
 }
 
+/// True if the type has an opaque clang implementation, meaning it is imported
+/// and doesn't have an \c \@objcImplementation extension.
+static bool hasClangImplementation(const NominalTypeDecl *decl) {
+  return decl->hasClangNode() && !decl->getObjCImplementationDecl();
+}
+
+/// True if \p member is in the main body of \p ty, where the "main body" is
+/// either the type itself (the usual case) or its \c \@objcImplementation
+/// extension (if one is present).
+static bool isInMainBody(ValueDecl *member, NominalTypeDecl *ty) {
+  return member->getDeclContext() ==
+              ty->getImplementationContext()->getAsGenericContext();
+}
+
 static void
 configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
                                            ConstructorDecl *ctor,
                                            ConstructorDecl *superclassCtor,
                                            ASTContext &ctx) {
-  assert(ctor->getDeclContext() == classDecl);
+  assert(isInMainBody(ctor, classDecl));
 
   AccessLevel access = classDecl->getFormalAccess();
   access = std::max(access, AccessLevel::Internal);
@@ -705,6 +719,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
 
   // Create the initializer declaration, inheriting the name,
   // failability, and throws from the superclass initializer.
+  auto implCtx = classDecl->getImplementationContext()->getAsGenericContext();
   auto ctor =
     new (ctx) ConstructorDecl(superclassCtor->getName(),
                               classDecl->getBraces().Start,
@@ -714,8 +729,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                               /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
-                              bodyParams, genericParams,
-                              classDecl);
+                              bodyParams, genericParams, implCtx);
 
   ctor->setImplicit();
 
@@ -837,9 +851,9 @@ static void diagnoseMissingRequiredInitializer(
 
 bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *decl) const {
-  assert(!decl->hasClangNode());
+  assert(!hasClangImplementation(decl));
 
-  for (auto member : decl->getMembers()) {
+  for (auto member : decl->getImplementationContext()->getMembers()) {
     // If a stored property lacks an initial value and if there is no way to
     // synthesize an initial value (e.g. for an optional) then we suppress
     // generation of the default initializer.
@@ -880,7 +894,7 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
 
 static bool areAllStoredPropertiesDefaultInitializable(Evaluator &eval,
                                                        NominalTypeDecl *decl) {
-  if (decl->hasClangNode())
+  if (hasClangImplementation(decl))
     return true;
 
   return evaluateOrDefault(
@@ -890,11 +904,11 @@ static bool areAllStoredPropertiesDefaultInitializable(Evaluator &eval,
 bool
 HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
                                               NominalTypeDecl *decl) const {
-  assert(!decl->hasClangNode());
+  assert(!hasClangImplementation(decl));
 
   auto results = decl->lookupDirect(DeclBaseName::createConstructor());
   for (auto *member : results) {
-    if (isa<ExtensionDecl>(member->getDeclContext()))
+    if (!isInMainBody(member, decl))
       continue;
 
     auto *ctor = cast<ConstructorDecl>(member);
@@ -908,7 +922,7 @@ HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
 static bool hasUserDefinedDesignatedInit(Evaluator &eval,
                                          NominalTypeDecl *decl) {
   // Imported decls don't have a designated initializer defined by the user.
-  if (decl->hasClangNode())
+  if (hasClangImplementation(decl))
     return false;
 
   return evaluateOrDefault(eval, HasUserDefinedDesignatedInitRequest{decl},
@@ -935,7 +949,7 @@ static void collectNonOveriddenSuperclassInits(
 
   auto ctors = subclass->lookupDirect(DeclBaseName::createConstructor());
   for (auto *member : ctors) {
-    if (isa<ExtensionDecl>(member->getDeclContext()))
+    if (!isInMainBody(member, subclass))
       continue;
 
     auto *ctor = cast<ConstructorDecl>(member);
@@ -1038,7 +1052,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
     auto results = decl->lookupDirect(DeclBaseName::createConstructor());
     for (auto *member : results) {
-      if (isa<ExtensionDecl>(member->getDeclContext()))
+      if (!isInMainBody(member, decl))
         continue;
 
       auto *ctor = cast<ConstructorDecl>(member);
@@ -1066,7 +1080,7 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
     if (auto ctor = createDesignatedInitOverride(
                       decl, superclassCtor, kind, ctx)) {
-      decl->addMember(ctor);
+      decl->getImplementationContext()->addMember(ctor);
     }
   }
 }
@@ -1107,7 +1121,7 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
 
 static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
   // Don't synthesize initializers for imported decls.
-  if (decl->hasClangNode())
+  if (hasClangImplementation(decl))
     return false;
 
   // Don't add implicit constructors in module interfaces.
