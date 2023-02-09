@@ -50,6 +50,8 @@ class DiagnosticEmitter {
   /// diagnosics while running a callee.
   unsigned diagnosticCount = 0;
 
+  bool emittedCheckerDoesntUnderstandDiagnostic = false;
+
 public:
   void init(SILFunction *inputFn, OSSACanonicalizer *inputCanonicalizer) {
     fn = inputFn;
@@ -65,6 +67,9 @@ public:
   }
 
   unsigned getDiagnosticCount() const { return diagnosticCount; }
+  bool didEmitCheckerDoesntUnderstandDiagnostic() const {
+    return emittedCheckerDoesntUnderstandDiagnostic;
+  }
 
   void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectGuaranteedDiagnostic(MarkMustCheckInst *markedValue);

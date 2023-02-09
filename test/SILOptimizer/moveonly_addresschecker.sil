@@ -283,10 +283,8 @@ bb0(%arg : @owned $Klass):
   %21 = move_value [lexical] %19 : $Klass
   %22 = mark_must_check [no_implicit_copy] %21 : $Klass
   debug_value %22 : $Klass, let, name "k2"
-  %24 = copy_value %22 : $Klass
-  %25 = move_value %24 : $Klass
+  %25 = move_value %22 : $Klass
   destroy_value %25 : $Klass
-  destroy_value %22 : $Klass
   destroy_addr %1 : $*Klass
   dealloc_stack %0 : $*Klass
   %30 = tuple ()
