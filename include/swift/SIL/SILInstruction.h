@@ -4929,6 +4929,19 @@ public:
   }
 };
 
+/// This instruction is inserted by Onone optimizations as a replacement for deleted
+/// instructions to ensure that it's possible to set a breakpoint on its location.
+class DebugStepInst final
+    : public InstructionBase<SILInstructionKind::DebugStepInst, NonValueInstruction> {
+  friend SILBuilder;
+
+  DebugStepInst(SILDebugLocation debugLoc) : InstructionBase(debugLoc) {}
+
+public:
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+};
+
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final

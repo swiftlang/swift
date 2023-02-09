@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-sil -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 // CHECK: // clang name: WithStaticMember::staticMember
 // CHECK: sil_global public_external @{{_ZN16WithStaticMember12staticMemberE|\?staticMember@WithStaticMember@@2HA}} : $Int32
 // CHECK: // clang name: WithIncompleteStaticMember::selfMember
@@ -22,7 +24,8 @@ func writeStaticMember() {
 
 // CHECK: sil hidden @$s4main17writeStaticMemberyyF : $@convention(thin) () -> ()
 // CHECK: [[ADDR:%.*]] = global_addr @{{_ZN16WithStaticMember12staticMemberE|\?staticMember@WithStaticMember@@2HA}} : $*Int32
-// CHECK: [[INT:%.*]] = struct $Int32 (%2 : $Builtin.Int32)
+// CHECK: [[LIT:%.*]] = integer_literal $Builtin.Int32, -1
+// CHECK: [[INT:%.*]] = struct $Int32 ([[LIT]] : $Builtin.Int32)
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*Int32
 // CHECK: store [[INT]] to [[ACCESS]] : $*Int32
 

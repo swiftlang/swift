@@ -1315,6 +1315,11 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitDebugStepInst(DebugStepInst *Inst) {
+  recordClonedInstruction(Inst, getBuilder().createDebugStep(Inst->getLoc()));
+}
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                    \
   template <typename ImplClass>                                                \

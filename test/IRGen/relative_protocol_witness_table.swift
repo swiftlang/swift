@@ -54,7 +54,7 @@ struct CStruct : WithAssoc {
 }
 
 func requireWitness3<T: WithAssoc> (_ t: T) {
-    _ = T.self.AssocType
+    let a = T.self.AssocType
 }
 
 protocol WithAssocConformance {

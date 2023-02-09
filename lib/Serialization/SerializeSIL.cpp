@@ -915,8 +915,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 
   case SILInstructionKind::DebugValueInst:
-    // Currently we don't serialize debug variable infos, so it doesn't make
-    // sense to write the instruction at all.
+  case SILInstructionKind::DebugStepInst:
+    // Currently we don't serialize debug info, so it doesn't make
+    // sense to write those instructions at all.
     // TODO: decide if we want to serialize those instructions.
     return;
   case SILInstructionKind::TestSpecificationInst:
