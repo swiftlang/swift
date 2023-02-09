@@ -129,6 +129,7 @@ public:
   SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
                     llvm::vfs::getRealFileSystem())
     : FileSystem(FS) {}
+  ~SourceManager();
 
   llvm::SourceMgr &getLLVMSourceMgr() {
     return LLVMSourceMgr;
