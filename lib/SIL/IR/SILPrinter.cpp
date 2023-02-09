@@ -1998,6 +1998,9 @@ public:
     case CheckKind::NoConsumeOrAssign:
       *this << "[no_consume_or_assign] ";
       break;
+    case CheckKind::AssignableButNotConsumable:
+      *this << "[assignable_but_not_consumable] ";
+      break;
     }
     *this << getIDAndType(I->getOperand());
   }
