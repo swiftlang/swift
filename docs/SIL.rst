@@ -2660,7 +2660,7 @@ which codegens to the following SIL::
   bb0(%0 : @noImplicitCopy $Klass):
     %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $@moveOnly Klass
     %2 = copy_value %1 : $@moveOnly Klass
-    %3 = mark_must_check [no_copy] %2 : $@moveOnly Klass
+    %3 = mark_must_check [no_consume_or_assign] %2 : $@moveOnly Klass
     debug_value %3 : $@moveOnly Klass, let, name "x", argno 1
     %4 = begin_borrow %3 : $@moveOnly Klass
     %5 = function_ref @$s4test5KlassC11doSomethingyyF : $@convention(method) (@guaranteed Klass) -> ()
@@ -7824,7 +7824,7 @@ mark_must_check
                       '[' sil-optimizer-analysis-marker ']'
 
   sil-optimizer-analysis-marker ::= 'no_implicit_copy'
-                                ::= 'no_copy'
+                                ::= 'no_consume_or_assign'
 
 A canary value inserted by a SIL generating frontend to signal to the move
 checker to check a specific value.  Valid only in Raw SIL. The relevant checkers
@@ -7835,8 +7835,8 @@ instruction by varying the kind.
 
 If the sil optimizer analysis marker is ``no_implicit_copy`` then the move
 checker is told to check that the result of this instruction is consumed at most
-once. If the marker is ``no_copy``, then the move checker will validate that the
-result of this instruction is never consumed.
+once. If the marker is ``no_consume_or_assign``, then the move checker will
+validate that the result of this instruction is never consumed or assigned over.
 
 No Implicit Copy and No Escape Value Instructions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1995,8 +1995,8 @@ public:
     case CheckKind::NoImplicitCopy:
       *this << "[no_implicit_copy] ";
       break;
-    case CheckKind::NoCopy:
-      *this << "[no_copy] ";
+    case CheckKind::NoConsumeOrAssign:
+      *this << "[no_consume_or_assign] ";
       break;
     }
     *this << getIDAndType(I->getOperand());

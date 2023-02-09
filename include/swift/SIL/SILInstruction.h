@@ -8213,10 +8213,11 @@ public:
     // consumed at most once.
     NoImplicitCopy,
 
-    // A signal to the move only checker ot perform no copy checking. This
-    // forces the result of this instruction owned value to never be consumed
-    // (still allowing for non-consuming uses of course).
-    NoCopy,
+    // A signal to the move only checker to perform no consume or assign
+    // checking. This forces the result of this instruction owned value to never
+    // be consumed (for let/var semantics) or assigned over (for var
+    // semantics). Of course, we still allow for non-consuming uses.
+    NoConsumeOrAssign,
   };
 
 private:
@@ -8240,7 +8241,7 @@ public:
     case CheckKind::Invalid:
       return false;
     case CheckKind::NoImplicitCopy:
-    case CheckKind::NoCopy:
+    case CheckKind::NoConsumeOrAssign:
       return true;
     }
   }

@@ -17,7 +17,7 @@ sil @classUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed Klass) ->
 sil [ossa] @chainErrorTest : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1 = copy_value %0 : $Klass
-  %2 = mark_must_check [no_copy] %1 : $Klass
+  %2 = mark_must_check [no_consume_or_assign] %1 : $Klass
   debug_value %2 : $Klass, let, name "x", argno 1
   %4 = copy_value %2 : $Klass
   %5 = move_value [lexical] %4 : $Klass

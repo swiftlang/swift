@@ -89,7 +89,7 @@ public func consumeVal(_ s: __owned NonTrivialStruct2) {}
 // CHECK-LABEL: sil [ossa] @$s8moveonly8useKlassyyAA0C0CF : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Klass):
 // CHECK:   [[OWNED_ARG:%.*]] = copy_value [[ARG]]
-// CHECK:   [[MARKED_OWNED_ARG:%.*]] = mark_must_check [no_copy] [[OWNED_ARG]]
+// CHECK:   [[MARKED_OWNED_ARG:%.*]] = mark_must_check [no_consume_or_assign] [[OWNED_ARG]]
 // CHECK: } // end sil function '$s8moveonly8useKlassyyAA0C0CF'
 public func useKlass(_ k: Klass) {
     borrowVal(k)
@@ -114,7 +114,7 @@ public func useKlassConsume(_ k: __owned Klass) {
 // CHECK-LABEL: sil [ossa] @$s8moveonly19useNonTrivialStructyyAA0cdE0VF : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonTrivialStruct):
 // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[ARG]]
-// CHECK:   mark_must_check [no_copy] [[COPIED_ARG]]
+// CHECK:   mark_must_check [no_consume_or_assign] [[COPIED_ARG]]
 // CHECK: } // end sil function '$s8moveonly19useNonTrivialStructyyAA0cdE0VF'
 public func useNonTrivialStruct(_ s: NonTrivialStruct) {
     borrowVal(s)
@@ -142,7 +142,7 @@ public func useNonTrivialOwnedStruct(_ s: __owned NonTrivialStruct) {
 // CHECK-LABEL: sil [ossa] @$s8moveonly17useNonTrivialEnumyyAA0cdE0OF : $@convention(thin) (@guaranteed NonTrivialEnum) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonTrivialEnum):
 // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[ARG]]
-// CHECK:   mark_must_check [no_copy] [[COPIED_ARG]]
+// CHECK:   mark_must_check [no_consume_or_assign] [[COPIED_ARG]]
 // CHECK: } // end sil function '$s8moveonly17useNonTrivialEnumyyAA0cdE0OF'
 public func useNonTrivialEnum(_ s: NonTrivialEnum) {
     borrowVal(s)
@@ -183,7 +183,7 @@ extension Klass {
     // CHECK-LABEL: sil hidden [ossa] @$s8moveonly5KlassC13testNoUseSelfyyF : $@convention(method) (@guaranteed Klass) -> () {
     // CHECK: bb0([[ARG:%.*]] : @guaranteed $Klass):
     // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[ARG]]
-    // CHECK:   mark_must_check [no_copy] [[COPIED_ARG]]
+    // CHECK:   mark_must_check [no_consume_or_assign] [[COPIED_ARG]]
     // CHECK: } // end sil function '$s8moveonly5KlassC13testNoUseSelfyyF'
     func testNoUseSelf() {
         let x = self
@@ -195,7 +195,7 @@ extension NonTrivialStruct {
     // CHECK-LABEL: sil hidden [ossa] @$s8moveonly16NonTrivialStructV13testNoUseSelfyyF : $@convention(method) (@guaranteed NonTrivialStruct) -> () {
     // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonTrivialStruct):
     // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[ARG]]
-    // CHECK:   mark_must_check [no_copy] [[COPIED_ARG]]
+    // CHECK:   mark_must_check [no_consume_or_assign] [[COPIED_ARG]]
     // CHECK: } // end sil function '$s8moveonly16NonTrivialStructV13testNoUseSelfyyF'
     func testNoUseSelf() {
         let x = self
@@ -207,7 +207,7 @@ extension NonTrivialEnum {
     // CHECK-LABEL: sil hidden [ossa] @$s8moveonly14NonTrivialEnumO13testNoUseSelfyyF : $@convention(method) (@guaranteed NonTrivialEnum) -> () {
     // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonTrivialEnum):
     // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[ARG]]
-    // CHECK:   mark_must_check [no_copy] [[COPIED_ARG]]
+    // CHECK:   mark_must_check [no_consume_or_assign] [[COPIED_ARG]]
     // CHECK: } // end sil function '$s8moveonly14NonTrivialEnumO13testNoUseSelfyyF'
     func testNoUseSelf() {
         let x = self
@@ -612,7 +612,7 @@ var booleanGuard2: Bool { false }
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly15enumSwitchTest1yyAA04EnumC5TestsO1EOF : $@convention(thin) (@guaranteed EnumSwitchTests.E) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_copy] [[COPY_ARG]]
+// CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_consume_or_assign] [[COPY_ARG]]
 // CHECK:   [[BORROWED_VALUE:%.*]] = begin_borrow [[MARKED_VALUE]]
 // CHECK:   switch_enum [[BORROWED_VALUE]] : $EnumSwitchTests.E, case #EnumSwitchTests.E.first!enumelt: [[BB_E_1:bb[0-9]+]], case #EnumSwitchTests.E.second!enumelt: [[BB_E_2:bb[0-9]+]], case #EnumSwitchTests.E.third!enumelt: [[BB_E_3:bb[0-9]+]], case #EnumSwitchTests.E.fourth!enumelt: [[BB_E_4:bb[0-9]+]]
 //

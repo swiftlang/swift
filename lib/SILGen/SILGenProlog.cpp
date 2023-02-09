@@ -330,7 +330,7 @@ struct ArgumentInitHelper {
       assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
       value = SGF.B.createCopyValue(loc, value);
       value = SGF.B.createMarkMustCheckInst(
-          loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+          loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
       SGF.emitManagedRValueWithCleanup(value);
       return value;
     }
@@ -341,7 +341,7 @@ struct ArgumentInitHelper {
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
-      auto kind = MarkMustCheckInst::CheckKind::NoCopy;
+      auto kind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
       if (pd->isOwned())
         kind = MarkMustCheckInst::CheckKind::NoImplicitCopy;
       value = SGF.B.createMarkMustCheckInst(loc, value, kind);
@@ -353,7 +353,7 @@ struct ArgumentInitHelper {
       value = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(loc, value);
       value = SGF.B.createCopyValue(loc, value);
       value = SGF.B.createMarkMustCheckInst(
-          loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+          loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
       SGF.emitManagedRValueWithCleanup(value);
       return value;
     }
@@ -547,14 +547,14 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       val = addr->getManagedAddress();
     }
 
-    // If this constant is a move only type, we need to add no_copy checking to
+    // If this constant is a move only type, we need to add no_consume_or_assign checking to
     // ensure that we do not consume this captured value in the function. This
     // is because closures can be invoked multiple times which is inconsistent
     // with consuming the move only type.
     if (val.getType().isMoveOnly()) {
       val = val.ensurePlusOne(SGF, Loc);
-      val = SGF.B.createMarkMustCheckInst(Loc, val,
-                                          MarkMustCheckInst::CheckKind::NoCopy);
+      val = SGF.B.createMarkMustCheckInst(
+          Loc, val, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
     }
 
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(val.getValue());
