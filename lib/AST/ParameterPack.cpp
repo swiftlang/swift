@@ -340,6 +340,11 @@ CanType TypeBase::getReducedShape() {
   if (auto *expansionType = getAs<PackExpansionType>())
     return expansionType->getReducedShape();
 
+  if (auto *silPackType = getAs<SILPackType>()) {
+    auto can = cast<SILPackType>(silPackType->getCanonicalType());
+    return can->getReducedShape();
+  }
+
   SmallVector<Type, 2> rootParameterPacks;
   getTypeParameterPacks(rootParameterPacks);
 
