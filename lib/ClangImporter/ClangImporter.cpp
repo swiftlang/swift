@@ -5183,20 +5183,20 @@ findImplsGivenInterface(ClassDecl *classDecl, Identifier categoryName) {
   return impls;
 }
 
-static Identifier getCategoryName(ExtensionDecl *ext) {
+Identifier ExtensionDecl::getObjCCategoryName() const {
   // Could it be an imported category?
-  if (!ext || !ext->hasClangNode())
+  if (!hasClangNode())
     // Nope, not imported.
     return Identifier();
 
-  auto category = dyn_cast<clang::ObjCCategoryDecl>(ext->getClangDecl());
+  auto category = dyn_cast<clang::ObjCCategoryDecl>(getClangDecl());
   if (!category)
     // Nope, not a category.
     return Identifier();
 
   // We'll look for an implementation with this category name.
   auto clangCategoryName = category->getName();
-  return ext->getASTContext().getIdentifier(clangCategoryName);
+  return getASTContext().getIdentifier(clangCategoryName);
 }
 
 static IterableDeclContext *
@@ -5246,7 +5246,7 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
 
     // Is this an imported category? If so, extract its name so we can look for
     // implementations of that category.
-    categoryName = getCategoryName(ext);
+    categoryName = ext->getObjCCategoryName();
     if (categoryName.empty())
       return {};
 
