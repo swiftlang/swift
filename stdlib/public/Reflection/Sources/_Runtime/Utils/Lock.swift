@@ -43,6 +43,8 @@ class Lock<T> {
       UnsafeRawPointer.self
     )
 
+    lock.value = initialValue
+
     _lockInit(lock.mutex)
 
     return lock
