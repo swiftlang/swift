@@ -2843,14 +2843,28 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   // Inline constructor for subject.
   auto subject = ([&]() -> ConsumableManagedValue {
-    // If we have a move only value, ensure plus one and convert it. Switches
-    // always consume move only values.
+    // If we have a noImplicitCopy value, ensure plus one and convert
+    // it. Switches always consume move only values.
+    //
+    // NOTE: We purposely do not do this for pure move only types since for them
+    // we emit everything at +0 and then run the BorrowToDestructure transform
+    // upon them. The reason that we do this is that internally to
+    // SILGenPattern, we always attempt to move from +1 -> +0 meaning that even
+    // if we start at +1, we will go back to +0 given enough patterns to go
+    // through. It is simpler to just let SILGenPattern do what it already wants
+    // to do, rather than fight it or try to resusitate the "fake owned borrow"
+    // path that we still use for address only types (and that we want to delete
+    // once we have opaque values).
     if (subjectMV.getType().isMoveOnly() && subjectMV.getType().isObject()) {
       if (subjectMV.getType().isMoveOnlyWrapped()) {
         subjectMV = B.createOwnedMoveOnlyWrapperToCopyableValue(
             S, subjectMV.ensurePlusOne(*this, S));
       } else {
-        subjectMV = B.createMoveValue(S, subjectMV.ensurePlusOne(*this, S));
+        // If we have a pure move only type and it is owned, borrow it so that
+        // BorrowToDestructure can handle it.
+        if (subjectMV.getOwnershipKind() == OwnershipKind::Owned) {
+          subjectMV = subjectMV.borrow(*this, S);
+        }
       }
     }
 
