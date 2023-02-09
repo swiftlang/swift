@@ -1,4 +1,3 @@
-
 // RUN: %empty-directory(%t)
 //
 // Compile the external swift module.
@@ -15,4 +14,4 @@ public struct S<T> : OtherResilientProtocol  {
 }
 
 // Test that this type has no size (instead of an incorrect size of 0).
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "S", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, flags: DIFlagFwdDecl, runtimeLang: DW_LANG_Swift, templateParams: !{{[0-9]+}}, identifier: "$s13ResilientSize1SVyxGD")
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$s13ResilientSize1SVyxGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, flags: DIFlagFwdDecl, runtimeLang: DW_LANG_Swift, templateParams: !{{[0-9]+}})
