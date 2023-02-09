@@ -9502,9 +9502,8 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
   } else {
     // Parameter list.
     SmallVector<Identifier, 2> namePieces;
-    DefaultArgumentInfo defaultArgs;
     auto parameterResult = parseSingleParameterClause(
-        ParameterContextKind::Macro, &namePieces, &defaultArgs);
+        ParameterContextKind::Macro, &namePieces, nullptr);
     status |= parameterResult;
     parameterList = parameterResult.getPtrOrNull();
 
