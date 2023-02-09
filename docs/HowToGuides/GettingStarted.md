@@ -386,15 +386,16 @@ several more steps are necessary to set up this environment:
 
 * Create an empty Xcode project in the workspace, using the
   _External Build System_ template.
-* For a Ninja target that you want to build (e.g. `swift-frontend`), add a
-  target to the empty project, using the _External Build System_ template.
+* Add a target to the empty project, using the _External Build System_ template,
+  and name it after the Ninja target that you want to build (e.g. `swift-frontend`
+  is the compiler).
 * In the _Info_ pane of the target settings, set
   * _Build Tool_ to the absolute path of the `ninja` executable (the output of
     `which ninja` on the command line)
-  * _Arguments_ to the Ninja target name (e.g. `swift-frontend`)
-  * _Directory_ to the absolute path of the directory where the Ninja target
-    lives. For Swift targets (the compiler, standard library, runtime, and
-    related tooling), this is the `build/Ninja-*/swift-macosx-*` directory.
+  * _Arguments_ to the Ninja target (e.g. `bin/swift-frontend`)
+  * _Directory_ to the absolute path of the build directory where the Ninja
+    target lives. For Swift targets such as the compiler or standard library,
+    this is the `build/Ninja-*/swift-macosx-*` directory.
 * Add a scheme for the target. In the drop-down menu, be careful not to mistake
   your target for a similar one that belongs to a generated Xcode project.
 * > **Note**  
@@ -406,7 +407,7 @@ several more steps are necessary to set up this environment:
     the appropriate `bin` directory (e.g. `build/Ninja-*/swift-macosx-*/bin/swift-frontend`).
   * In the _Arguments_ pane, add the command line arguments that you want to
     pass to the executable on launch (e.g. `path/to/file.swift -typecheck` for
-    `swift-frontend`).
+    `bin/swift-frontend`).
   * You can optionally set the working directory for debugging in the
     _Options_ pane.
 * Configure as many more target-scheme pairs as you need.
