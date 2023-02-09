@@ -16,8 +16,9 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILValue.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 
 using namespace swift;
 
