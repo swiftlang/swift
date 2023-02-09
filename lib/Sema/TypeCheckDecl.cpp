@@ -2739,7 +2739,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     return ctx.AllocateCopy(result);
   }
 
-  auto nominal = dyn_cast<NominalTypeDecl>(idc);
+  auto nominal = dyn_cast<NominalTypeDecl>(dc->getImplementedObjCContext());
 
   if (nominal) {
     // We need to add implicit initializers because they
