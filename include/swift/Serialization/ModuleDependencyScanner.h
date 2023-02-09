@@ -57,6 +57,7 @@ namespace swift {
           ImportPath::Element ModuleID,
           const SerializedModuleBaseName &BaseName,
           SmallVectorImpl<char> *ModuleInterfacePath,
+          SmallVectorImpl<char> *ModuleInterfaceSourcePath,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
@@ -118,6 +119,7 @@ namespace swift {
       virtual bool
       findModule(ImportPath::Element moduleID,
                  SmallVectorImpl<char> *moduleInterfacePath,
+                 SmallVectorImpl<char> *moduleInterfaceSourcePath,
                  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
