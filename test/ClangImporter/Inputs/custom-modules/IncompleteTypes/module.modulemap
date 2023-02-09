@@ -1,0 +1,23 @@
+module CompleteTypes {
+    header "complete-types.h"
+}
+
+module IncompleteTypeLibrary1 {
+    header "incomplete-type-library-1.h"
+}
+
+module IncompleteTypeLibrary2 {
+    header "incomplete-type-library-2.h"
+}
+
+module IncompleteNSProxyLibrary {
+    header "incomplete-nsproxy-library.h"
+}
+
+module IncompleteNoRootTypeProtocolLibrary {
+    header "incomplete-noroottype-protocol-library.h"
+}   
+
+module ObjCLibraryForwardDeclaringCompleteSwiftTypes {
+    header "objc-library-forward-declaring-complete-swift-types.h"
+}

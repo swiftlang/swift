@@ -215,8 +215,27 @@ NOTE(invoked_func_not_imported, none, "function %0 not imported", (const clang::
 NOTE(record_method_not_imported, none, "method %0 not imported", (const clang::NamedDecl*))
 NOTE(objc_property_not_imported, none, "property %0 not imported", (const clang::NamedDecl*))
 
-NOTE(forward_declared_interface_label, none, "interface %0 forward declared here", (const clang::NamedDecl*))
-NOTE(forward_declared_protocol_label, none, "protocol %0 forward declared here", (const clang::NamedDecl*))
+NOTE(placeholder_for_forward_declared_interface_member_access_failure, none,
+     "class '%0' will be imported as an opaque placeholder class and may be "
+     "missing members; import the definition to access the complete "
+     "interface", (StringRef))
+NOTE(placeholder_for_forward_declared_protocol_member_access_failure, none,
+     "protocol '%0' will be imported as an opaque placeholder protocol "
+     "and may be missing members; import the definition to access the "
+     "complete protocol", (StringRef))
+NOTE(forward_declared_interface_label, none,
+     "interface %0 forward declared here", (const clang::NamedDecl*))
+NOTE(forward_declared_protocol_label, none,
+     "protocol %0 forward declared here", (const clang::NamedDecl*))
+
+NOTE(forward_declared_interface_shadows_imported_objc_Swift_interface, none,
+     "incomplete interface %0 shadows an imported @objc Swift class from module '%1'; "
+     "import the generated Swift header for module '%1' in this header to realize this declaration",
+     (const clang::NamedDecl*, StringRef))
+NOTE(forward_declared_protocol_shadows_imported_objc_Swift_protocol, none,
+     "incomplete protocol %0 shadows an imported @objc Swift protocol from module '%1'; "
+     "import the generated Swift header for module '%1' in this header to realize this declaration",
+     (const clang::NamedDecl*, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

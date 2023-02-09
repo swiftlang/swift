@@ -6200,7 +6200,15 @@ void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
 
 void ClangImporter::diagnoseMemberValue(const DeclName &name,
                                         const Type &baseType) {
-  if (!baseType->getAnyNominal())
+
+  // Return early for any type that namelookup::extractDirectlyReferencedNominalTypes
+  // does not know how to handle.
+  if (!(baseType->getAnyNominal() ||
+        baseType->is<ExistentialType>() ||
+        baseType->is<UnboundGenericType>() ||
+        baseType->is<ArchetypeType>() ||
+        baseType->is<ProtocolCompositionType>() ||
+        baseType->is<TupleType>()))
     return;
 
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
@@ -6211,6 +6219,45 @@ void ClangImporter::diagnoseMemberValue(const DeclName &name,
     if (clangContainerDecl && isa<clang::DeclContext>(clangContainerDecl)) {
       Impl.diagnoseMemberValue(name,
                                cast<clang::DeclContext>(clangContainerDecl));
+    }
+
+    if (Impl.ImportForwardDeclarations) {
+      const clang::Decl *clangContainerDecl = containerDecl->getClangDecl();
+      if (const clang::ObjCInterfaceDecl *objCInterfaceDecl =
+              llvm::dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                  clangContainerDecl)) {
+        if (!objCInterfaceDecl->hasDefinition()) {
+          // Emit a diagnostic about how the base type represents a forward
+          // declared ObjC interface and is in all likelihood missing members.
+          // We only attach this diagnostic in diagnoseMemberValue rather than
+          // in SwiftDeclConverter because it is only relevant when the user
+          // tries to access an unavailable member.
+          Impl.addImportDiagnostic(
+              objCInterfaceDecl,
+              Diagnostic(
+                  diag::
+                      placeholder_for_forward_declared_interface_member_access_failure,
+                  objCInterfaceDecl->getName()),
+              objCInterfaceDecl->getSourceRange().getBegin());
+          // Emit any diagnostics attached to the source Clang node (ie. forward
+          // declaration here note)
+          Impl.diagnoseTargetDirectly(clangContainerDecl);
+        }
+      } else if (const clang::ObjCProtocolDecl *objCProtocolDecl =
+                     llvm::dyn_cast_or_null<clang::ObjCProtocolDecl>(
+                         clangContainerDecl)) {
+        if (!objCProtocolDecl->hasDefinition()) {
+          // Same as above but for protocols
+          Impl.addImportDiagnostic(
+              objCProtocolDecl,
+              Diagnostic(
+                  diag::
+                      placeholder_for_forward_declared_protocol_member_access_failure,
+                  objCProtocolDecl->getName()),
+              objCProtocolDecl->getSourceRange().getBegin());
+          Impl.diagnoseTargetDirectly(clangContainerDecl);
+        }
+      }
     }
   }
 }

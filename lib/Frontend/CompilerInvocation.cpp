@@ -1218,10 +1218,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   return HadError;
 }
 
-static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
-                                   ArgList &Args,
+static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
                                    DiagnosticEngine &Diags,
-                                   StringRef workingDirectory) {
+                                   StringRef workingDirectory,
+                                   const LangOptions &LangOpts,
+                                   const FrontendOptions &FrontendOpts) {
   using namespace options;
 
   if (const Arg *a = Args.getLastArg(OPT_tools_directory)) {
@@ -1288,6 +1289,15 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   }
 
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
+
+  // When the repl is invoked directly (ie. `lldb --repl="..."`) the action
+  // type seems to be NoneAction.
+  if (FrontendOpts.RequestedAction != FrontendOptions::ActionType::REPL &&
+      FrontendOpts.RequestedAction != FrontendOptions::ActionType::NoneAction &&
+      (Args.hasArg(OPT_enable_import_objc_forward_declarations) ||
+       LangOpts.isSwiftVersionAtLeast(6))) {
+    Opts.ImportForwardDeclarations = true;
+  }
 
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.Mode = ClangImporterOptions::Modes::EmbedBitcode;
@@ -2656,7 +2666,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseClangImporterArgs(ClangImporterOpts, ParsedArgs, Diags,
-                             workingDirectory)) {
+                             workingDirectory, LangOpts, FrontendOpts)) {
     return true;
   }
 

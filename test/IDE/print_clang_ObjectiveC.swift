@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=ObjectiveC.NSObject -function-definitions=false > %t/ObjectiveC.NSObject.printed.txt
+// RUN: %target-swift-ide-test -swift-version 5 -print-module -source-filename %s -module-to-print=ObjectiveC.NSObject -function-definitions=false > %t/ObjectiveC.NSObject.printed.txt
 // RUN: %FileCheck -input-file %t/ObjectiveC.NSObject.printed.txt %s
 // RUN: %FileCheck -input-file %t/ObjectiveC.NSObject.printed.txt -check-prefix=NEGATIVE -check-prefix=NEGATIVE-WITHOUT-FORWARD-DECLS %s
 
