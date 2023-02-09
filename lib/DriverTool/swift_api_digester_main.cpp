@@ -549,8 +549,7 @@ namespace {
 
 static bool isMissingDeclAcceptable(const SDKNodeDecl *D) {
   // Don't complain about removing importation of SwiftOnoneSupport.
-  if (D->getKind() == SDKNodeKind::DeclImport &&
-      D->getName() == "SwiftOnoneSupport") {
+  if (D->getKind() == SDKNodeKind::DeclImport) {
     return true;
   }
   return false;
