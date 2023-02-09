@@ -639,6 +639,25 @@ static void printDirectReturnOrParamCType(
   });
 }
 
+/// Make adjustments to the Swift parameter name in generated C++, to
+/// avoid things like additional warnings.
+static void renameCxxParameterIfNeeded(const AbstractFunctionDecl *FD,
+                                       std::string &paramName) {
+  if (paramName.empty())
+    return;
+  const auto *enumDecl = FD->getDeclContext()->getSelfEnumDecl();
+  if (!enumDecl)
+    return;
+  // Rename a parameter in an enum method that shadows an existing case name,
+  // to avoid a -Wshadow warning in Clang.
+  for (const auto *Case : enumDecl->getAllElements()) {
+    if (Case->getNameStr() == paramName) {
+      paramName = (llvm::Twine(paramName) + "_").str();
+      return;
+    }
+  }
+}
+
 ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
     StringRef name, Type resultTy, FunctionSignatureKind kind,
@@ -895,6 +914,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
               param, param->getInterfaceType());
       std::string paramName =
           param->getName().empty() ? "" : param->getName().str().str();
+      renameCxxParameterIfNeeded(FD, paramName);
       // Always emit a named parameter for the C++ inline thunk to ensure it
       // can be referenced in the body.
       if (kind == FunctionSignatureKind::CxxInlineThunk && paramName.empty()) {
@@ -1113,6 +1133,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         paramOS << "_" << paramIndex;
       } else {
         paramName = param.getName().str().str();
+        renameCxxParameterIfNeeded(FD, paramName);
       }
       ++paramIndex;
       printCxxToCFunctionParameterUse(param.getInterfaceType(), paramName,
