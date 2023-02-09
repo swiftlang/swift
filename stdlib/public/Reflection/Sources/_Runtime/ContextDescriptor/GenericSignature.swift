@@ -119,7 +119,7 @@ extension GenericSignature.RequirementDescriptor {
   @available(SwiftStdlib 5.9, *)
   @inlinable
   public var layoutKind: GenericSignature.LayoutKind {
-    address(for: \.requirement).loadUnaligned(
+    address(for: \.requirement).unprotectedLoad(
       as: GenericSignature.LayoutKind.self
     )
   }
@@ -140,7 +140,7 @@ extension GenericSignature.RequirementDescriptor {
   ) -> Any.Type? {
     _getTypeByMangledNameInContext(
       UnsafePointer(parameter.ptr._rawValue),
-      UInt(parameter.length),
+      UInt(truncatingIfNeeded: parameter.length),
       genericContext: context.ptr,
       genericArguments: argPtr
     )
@@ -269,7 +269,7 @@ extension GenericSignature.RequirementDescriptor {
 func getGenericSignature(at address: UnsafeRawPointer) -> GenericSignature {
   var address = address
 
-  let header = address.loadUnaligned(as: GenericSignature.Header.self)
+  let header = address.unprotectedLoad(as: GenericSignature.Header.self)
   address += MemoryLayout<GenericSignature.Header>.size
 
   let parameters = BufferView<GenericSignature.ParameterDescriptor>(

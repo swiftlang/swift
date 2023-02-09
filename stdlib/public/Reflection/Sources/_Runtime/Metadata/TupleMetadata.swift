@@ -85,7 +85,7 @@ extension TupleMetadata.Elements.Element {
     // string
     address -= MemoryLayout<Int>.size
     
-    guard let cString = address.loadUnaligned(
+    guard let cString = address.unprotectedLoad(
       as: UnsafePointer<CChar>?.self
     ) else {
       return ""

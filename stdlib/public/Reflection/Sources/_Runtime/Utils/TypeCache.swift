@@ -42,8 +42,8 @@ extension TypeCache.Key: Equatable {
     
     var isGeneric = false
     
-  loop: while let lhsCurrent = Optional(lhsEnd.loadUnaligned(as: UInt8.self)),
-              let rhsCurrent = Optional(rhsEnd.loadUnaligned(as: UInt8.self)) {
+  loop: while let lhsCurrent = Optional(lhsEnd.unprotectedLoad(as: UInt8.self)),
+              let rhsCurrent = Optional(rhsEnd.unprotectedLoad(as: UInt8.self)) {
       lhsEnd += 1
       rhsEnd += 1
       
@@ -113,7 +113,7 @@ extension TypeCache.Key: Hashable {
     
     var end = typeRef.ptr
     
-    while let current = Optional(end.loadUnaligned(as: UInt8.self)), current != 0 {
+    while let current = Optional(end.unprotectedLoad(as: UInt8.self)), current != 0 {
       end += 1
       
       switch current {
@@ -190,10 +190,10 @@ extension TypeCache {
 @available(SwiftStdlib 5.9, *)
 var typeCache: TypeCache = {
   var result = TypeCache()
-  
+
   result.cache.withLock {
     $0.reserveCapacity(50)
   }
-  
+
   return result
 }()

@@ -80,7 +80,7 @@ extension ClassDescriptor {
     // 'TargetStoredClassMetadataBounds', by the time we access this it will
     // have already been initialized way before for us. Thus, it is safe to
     // access this value non-atomically.
-    return storedBounds.load(as: Int.self)
+    return storedBounds.unprotectedLoad(as: Int.self)
   }
   
   @inlinable

@@ -34,19 +34,19 @@ extension MangledTypeReference {
   @available(SwiftStdlib 5.9, *)
   @inlinable
   var standardSubstitution: Any.Type? {
-    let byte1 = ptr.loadUnaligned(fromByteOffset: 1, as: UInt8.self)
+    let byte1 = ptr.unprotectedLoad(fromByteOffset: 1, as: UInt8.self)
     
     guard byte1 != 0 else {
       return nil
     }
     
-    let byte2 = ptr.loadUnaligned(fromByteOffset: 2, as: UInt8.self)
+    let byte2 = ptr.unprotectedLoad(fromByteOffset: 2, as: UInt8.self)
     
     guard byte2 == 0 else {
       return nil
     }
     
-    let byte0 = ptr.loadUnaligned(as: UInt8.self)
+    let byte0 = ptr.unprotectedLoad(as: UInt8.self)
     
     switch (byte0, byte1) {
     // Stdlib types

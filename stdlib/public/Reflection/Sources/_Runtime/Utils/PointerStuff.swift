@@ -39,8 +39,42 @@ extension UnsafeBufferPointer {
 
 extension UnsafeRawPointer {
   @_alwaysEmitIntoClient
+  var binaryString: String {
+    // FIXME: Use 'StaticString's description when it makes an immortal string.
+    String(cString: UnsafePointer<CChar>(_rawValue))
+  }
+
+  @_alwaysEmitIntoClient
   var bitPattern: UInt64 {
     UInt64(truncatingIfNeeded: UInt(bitPattern: self))
+  }
+
+  @_alwaysEmitIntoClient
+  var mutable: UnsafeMutableRawPointer {
+    UnsafeMutableRawPointer(mutating: self)
+  }
+
+  @_alwaysEmitIntoClient
+  func offset(of count: Int) -> UnsafeRawPointer {
+    advanced(by: count * MemoryLayout<UnsafeRawPointer>.size)
+  }
+
+  @_alwaysEmitIntoClient
+  public func unprotectedLoad<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    UnsafePointer<T>((self + offset)._rawValue).pointee
+  }
+}
+
+extension UnsafeMutableRawPointer {
+  @_alwaysEmitIntoClient
+  public func unprotectedLoad<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    UnsafePointer<T>((self + offset)._rawValue).pointee
   }
 }
 
@@ -50,35 +84,6 @@ extension UInt64 {
     let pointer = UnsafeRawPointer(bitPattern: UInt(truncatingIfNeeded: self))
     
     return pointer.unsafelyUnwrapped
-  }
-}
-
-extension UnsafeRawPointer {
-  @_alwaysEmitIntoClient
-  var mutable: UnsafeMutableRawPointer {
-    UnsafeMutableRawPointer(mutating: self)
-  }
-}
-
-extension UnsafeRawPointer {
-  @_alwaysEmitIntoClient
-  var binaryString: String {
-//    let length = strlen(UnsafePointer(_rawValue))
-//
-//    // This is a hack to make an immortal string.
-//    return String(
-//      _builtinStringLiteral: _rawValue,
-//      utf8CodeUnitCount: length._builtinWordValue,
-//      isASCII: Builtin.trunc_Word_Int1(0._builtinWordValue)
-//    )
-    String(cString: UnsafePointer<CChar>(_rawValue))
-  }
-}
-
-extension UnsafeRawPointer {
-  @_alwaysEmitIntoClient
-  func offset(of count: Int) -> UnsafeRawPointer {
-    advanced(by: count * MemoryLayout<UnsafeRawPointer>.size)
   }
 }
 

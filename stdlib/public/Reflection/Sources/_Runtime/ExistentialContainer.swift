@@ -67,15 +67,14 @@ extension AnyExistentialContainer {
       }
     }
     
-    let alignMask = UInt(metadata.vwt.flags.alignmentMask)
+    let alignMask = UInt(truncatingIfNeeded:metadata.vwt.flags.alignmentMask)
     let heapObjSize = UInt(MemoryLayout<Int>.size * 2)
     let byteOffset = (heapObjSize + alignMask) & ~alignMask
     
     return try withUnsafeMutablePointer(to: &self) {
-      let raw = UnsafeMutableRawPointer($0)
-      let heap = raw.loadUnaligned(as: UnsafeMutableRawPointer.self)
+      let heap = $0.raw.unprotectedLoad(as: UnsafeMutableRawPointer.self)
       
-      return try body(heap + Int(byteOffset))
+      return try body(heap + Int(truncatingIfNeeded: byteOffset))
     }
   }
 }
