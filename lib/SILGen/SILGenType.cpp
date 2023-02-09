@@ -1115,14 +1115,6 @@ public:
       if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
         SGM.getWitnessTable(normal);
     }
-
-    // Emit `init(for:storage)` initializer as it would be used
-    // by DI and IRGen later on.
-    if (auto typeWrapperInfo = theType->getTypeWrapper()) {
-      auto *ctor = typeWrapperInfo->Wrapper->getTypeWrapperInitializer();
-      assert(ctor);
-      (void)SGM.getFunction(SILDeclRef(ctor), NotForDefinition);
-    }
   }
 
   //===--------------------------------------------------------------------===//
