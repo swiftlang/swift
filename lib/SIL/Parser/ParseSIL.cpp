@@ -3610,6 +3610,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::DebugStepInst:
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDebugStep(InstLoc);
+    break;
+
   case SILInstructionKind::TestSpecificationInst: {
     // Parse the specification string.
     if (P.Tok.getKind() != tok::string_literal) {

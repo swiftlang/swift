@@ -135,6 +135,11 @@ public struct Builder {
   }
 
   @discardableResult
+  public func createDebugStep() -> DebugStepInst {
+    return notifyNew(SILBuilder_createDebugStep(bridged).getAs(DebugStepInst.self))
+  }
+
+  @discardableResult
   public func createApply(
     function: Value,
     _ substitutionMap: SubstitutionMap,

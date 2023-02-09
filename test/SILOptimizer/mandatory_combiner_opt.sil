@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -optimized-mandatory-combine -sil-mandatory-combine-enable-canon-and-simple-dce %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-combine %s | %FileCheck %s
 
 // Tests for when the mandatory combiner is running with optimizations
 // enabled. Only put tests here for functionality that only occurs when the

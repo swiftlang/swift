@@ -985,6 +985,10 @@ public:
                                        bool wasMoved = false,
                                        bool trace = false);
 
+  DebugStepInst *createDebugStep(SILLocation Loc) {
+    return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
+  }
+
   /// Create a debug_value according to the type of \p src
   SILInstruction *emitDebugDescription(SILLocation Loc, SILValue src,
                                        SILDebugVariable Var) {

@@ -576,7 +576,7 @@ static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
 #endif
 
   P.addForEachLoopUnroll();
-  P.addOptimizedMandatoryCombine();
+  P.addSimplification();
   P.addAccessMarkerElimination();
 }
 
@@ -975,7 +975,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // in the editor.
   P.startPipeline("Non-Diagnostic Mandatory Optimizations");
   P.addForEachLoopUnroll();
-  P.addMandatoryCombine();
+  P.addOnoneSimplification();
 
   // TODO: MandatoryARCOpts should be subsumed by CopyPropagation. There should
   // be no need to run another analysis of copies at -Onone.
@@ -1014,6 +1014,12 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // In Onone builds, do a function-local analysis in a function pass.
   P.addFunctionStackProtection();
+
+  // This is mainly there to optimize `Builtin.isConcrete`, which must not be
+  // constant folded before any generic specialization.
+  P.addLateOnoneSimplification();
+
+  P.addCleanupDebugSteps();
 
   // Has only an effect if the -sil-based-debuginfo option is specified.
   P.addSILDebugInfoGenerator();

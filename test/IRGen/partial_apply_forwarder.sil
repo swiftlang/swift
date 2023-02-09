@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-objc-interop  -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
-// RUN: %target-swift-frontend -disable-objc-interop -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -enable-objc-interop  -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -disable-objc-interop -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
 sil_stage canonical
 
 import Builtin
