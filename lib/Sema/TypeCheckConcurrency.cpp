@@ -3452,13 +3452,12 @@ static Optional<ActorIsolation> getIsolationFromWrappers(
 
   ASTContext &ctx = nominal->getASTContext();
   if (ctx.isSwiftVersionAtLeast(6)) {
-    // In Swift 6, we no longer infer isolation of a nominal type based
-    // on property wrappers used in its stored properties
+    // In Swift 6, we no longer infer isolation of a nominal type
+    // based on the property wrappers used in its stored properties
     return None;
   }
 
-  Optional<std::pair<ActorIsolation, Type>> foundIsolationAndType;
-
+  Optional<ActorIsolation> foundIsolation;
   for (auto member : nominal->getMembers()) {
     auto var = dyn_cast<VarDecl>(member);
     if (!var || !var->isInstanceMember())
@@ -3483,36 +3482,19 @@ static Optional<ActorIsolation> getIsolationFromWrappers(
 
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe:
-      if (!foundIsolationAndType) {
-        if (auto propertyWrapperType = var->getAttachedPropertyWrapperType(0)) {
-          foundIsolationAndType = { isolation, propertyWrapperType };
-          continue;
-        }
+      if (!foundIsolation) {
+        foundIsolation = isolation;
+        continue;
       }
 
-      if (foundIsolationAndType->first != isolation)
+      if (*foundIsolation != isolation)
         return None;
 
       break;
     }
   }
 
-  if (foundIsolationAndType) {
-    // We are inferring isolation for the type because
-    // it contains an actor-isolated property wrapper.
-    // Warn that this inferrence will be going away in
-    // Swift 6
-    const ActorIsolation isolation = foundIsolationAndType->first;
-    const Type type = foundIsolationAndType->second;
-
-    nominal->diagnose(diag::actor_isolation_inferred_from_property_wrapper,
-                      nominal->getName(), isolation, "'@"+type->getString()+"'")
-      .fixItInsert(nominal->getAttributeInsertionLoc(false), "@" + isolation.getGlobalActor().getString());
-    return isolation;
-  }
-  else {
-    return None;
-  }
+  return foundIsolation;
 }
 
 namespace {
