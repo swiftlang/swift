@@ -5930,7 +5930,7 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
   }
 
   case SILAccessEnforcement::Signed: {
-    if (access->getAccessKind() != SILAccessKind::Modify ||
+    if (access->getAccessKind() != SILAccessKind::Modify &&
         access->getAccessKind() != SILAccessKind::Init) {
       // nothing to do.
       return;
