@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let StringRepeating = [
+public let benchmarks = [
   BenchmarkInfo(name: "StringRepeatingSingleAsciiCharacterCount10",
                 runFunction: run_singleAsciiCharacterCount10,
                 tags: [.validation, .api, .String]),
