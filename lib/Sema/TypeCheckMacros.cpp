@@ -386,6 +386,9 @@ static std::string adjustMacroExpansionBufferName(StringRef name) {
 
 bool ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
                                            Decl *decl) const {
+  if (decl->isImplicit())
+    return false;
+
   auto *parentDecl = decl->getDeclContext()->getAsDecl();
   if (!parentDecl)
     return false;

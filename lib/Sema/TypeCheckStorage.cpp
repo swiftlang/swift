@@ -117,6 +117,12 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
   // Just walk over the members of the type, forcing backing storage
   // for lazy properties and property wrappers to be synthesized.
   for (auto *member : implDecl->getMembers()) {
+    // Expand peer macros.
+    (void)evaluateOrDefault(
+        ctx.evaluator,
+        ExpandPeerMacroRequest{member},
+        false);
+
     auto *var = dyn_cast<VarDecl>(member);
     if (!var || var->isStatic())
       continue;

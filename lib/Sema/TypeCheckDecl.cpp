@@ -2802,6 +2802,12 @@ static ArrayRef<Decl *> evaluateMembersRequest(
       nullptr);
 
   for (auto *member : idc->getMembers()) {
+    // Expand peer macros.
+    (void)evaluateOrDefault(
+        ctx.evaluator,
+        ExpandPeerMacroRequest{member},
+        false);
+
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have
       // dynamically-dispatched accessors, so force them to be synthesized.
