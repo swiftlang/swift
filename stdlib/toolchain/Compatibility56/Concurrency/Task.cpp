@@ -244,3 +244,59 @@ void SWIFT_CC(swiftasync) swift::swift56override_swift_task_future_wait_throwing
   }
   }
 }
+
+//===--- swift_task_create_common -----------------------------------------===//
+
+// NOTE: this function is currently only installed as an override on
+// 64-bit targets.  The fix in it has been written to work correctly
+// on any target, though, so if you need to use it for a more general
+// fix, you should be able to just define and install it unconditionally.
+#if __POINTER_WIDTH__ == 64
+
+AsyncTaskAndContext SWIFT_CC(swift)
+swift::swift56override_swift_task_create_common(
+    size_t rawTaskCreateFlags,
+    TaskOptionRecord *options,
+    const Metadata *futureResultType,
+    TaskContinuationFunction *function, void *closureContext,
+    size_t initialContextSize,
+    TaskCreateCommon_t *original) {
+
+  // The <=5.6 versions of this function pointlessly initialize the
+  // defunct Flags field in the initial context.  This initialization
+  // is mostly harmless because the initial function has no expectations
+  // about the non-header contents of the initial context on entry.
+  // However, if the initial context doesn't include space for the Flags
+  // field, and it ends up at the end of an allocation, this write can
+  // go past the end of the allocation.
+  //
+  // The initial context is always at the end of the allocation for
+  // Tasks that lack a preallocated buffer, i.e. any Task that is not
+  // an async let.
+  //
+  // On 32-bit targets, the Flags field was at offset 8.  Since context
+  // sizes are always rounded up to a multiple of MaximumAlignment,
+  // initialContextSize is guaranteed to be >= 16, so the store to
+  // Flags will always fall within it.  On 64-bit targets, however,
+  // Flags was at offset 16.  We therefore need to ensure the initial
+  // context is large enough for the unnecessary write to Flags.
+  //
+  // We could handle this in the compiler by ensuring that all
+  // functions request at least 32 bytes of context, but that would
+  // introduce a permanent overhead on thunks and other functions that
+  // don't need any temporary scratch space.  We really only need to work
+  // around this one store when creating tasks, and fortunately, that
+  // always flows through this one function.  Since this hook receives
+  // the initial function and context size directly instead of as an
+  // async function pointer, it's painless for us to just change the
+  // requested initial context size.
+#if __POINTER_WIDTH__ == 64
+  if (initialContextSize < 32) initialContextSize = 32;
+#endif
+
+  return original(rawTaskCreateFlags, options,
+                  futureResultType, function, closureContext,
+                  initialContextSize);
+}
+
+#endif
