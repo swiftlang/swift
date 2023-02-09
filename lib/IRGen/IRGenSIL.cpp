@@ -5515,7 +5515,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 }
 
 void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
-  IGM.unimplemented(i->getLoc().getSourceLoc(), "alloc_pack");
+  auto addr = allocatePack(*this, i->getPackType());
+  setLoweredStackAddress(i, addr);
 }
 
 static void
@@ -5618,7 +5619,9 @@ void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocPackInst(swift::DeallocPackInst *i) {
-  IGM.unimplemented(i->getLoc().getSourceLoc(), "dealloc_pack");
+  auto allocatedType = cast<SILPackType>(i->getOperand()->getType().getASTType());
+  StackAddress stackAddr = getLoweredStackAddress(i->getOperand());
+  deallocatePack(*this, stackAddr, allocatedType);
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
@@ -6913,8 +6916,8 @@ void IRGenSILFunction::visitPackElementGetInst(PackElementGetInst *i) {
   auto elementType = i->getElementType();
   auto &elementTI = getTypeInfo(elementType);
 
-  auto elementStorageAddr =
-    emitStorageAddressOfPackElement(*this, pack, index, elementType);
+  auto elementStorageAddr = emitStorageAddressOfPackElement(
+      *this, pack, index, elementType, i->getPackType());
 
   assert(elementType.isAddress() &&
          i->getPackType()->isElementAddress() &&
@@ -6929,8 +6932,8 @@ void IRGenSILFunction::visitPackElementSetInst(PackElementSetInst *i) {
   llvm::Value *index = getLoweredSingletonExplosion(i->getIndex());
 
   auto elementType = i->getElementType();
-  auto elementStorageAddress =
-    emitStorageAddressOfPackElement(*this, pack, index, elementType);
+  auto elementStorageAddress = emitStorageAddressOfPackElement(
+      *this, pack, index, elementType, i->getPackType());
 
   assert(elementType.isAddress() &&
          i->getPackType()->isElementAddress() &&
