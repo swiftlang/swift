@@ -413,6 +413,24 @@ bool ExpandSynthesizedMemberMacroRequest::evaluate(Evaluator &evaluator,
   return synthesizedMembers;
 }
 
+bool ExpandPeerMacroRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
+  SmallVector<Decl *, 2> peers;
+  decl->forEachAttachedMacro(MacroRole::Peer,
+      [&](CustomAttr *attr, MacroDecl *macro) {
+        expandPeers(attr, macro, decl, peers);
+      });
+
+  // Expand all peers that have attached peer macros.
+  for (auto *peer : peers) {
+    (void)evaluateOrDefault(
+        evaluator,
+        ExpandPeerMacroRequest{peer},
+        false);
+  }
+
+  return !peers.empty();
+}
+
 /// Determine whether the given source file is from an expansion of the given
 /// macro.
 static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
@@ -1063,6 +1081,34 @@ bool swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   }
 
   return synthesizedMembers;
+}
+
+void swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl,
+                        SmallVectorImpl<Decl *> &peers) {
+  auto macroSourceFile = evaluateAttachedMacro(macro, decl, attr,
+                                               /*passParentContext*/false,
+                                               MacroRole::Peer);
+  if (!macroSourceFile)
+    return;
+
+  PrettyStackTraceDecl debugStack("applying expanded peer macro", decl);
+
+  auto *parent = decl->getDeclContext();
+  auto topLevelDecls = macroSourceFile->getTopLevelDecls();
+  for (auto peer : topLevelDecls) {
+    peer->setDeclContext(parent);
+
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(parent)) {
+      nominal->addMember(peer);
+    } else if (auto *extension = dyn_cast<ExtensionDecl>(parent)) {
+      extension->addMember(peer);
+    } else {
+      // TODO: Add peers to global or local contexts.
+      continue;
+    }
+
+    peers.push_back(peer);
+  }
 }
 
 MacroDecl *

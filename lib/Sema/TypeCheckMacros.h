@@ -64,6 +64,13 @@ bool expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member);
 /// otherwise.
 bool expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 
+/// Expand the peer declarations for the given declaration based on
+/// the custom attribute that references the given macro.
+///
+/// Populates the \c peers vector with the expanded peer declarations.
+void expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl,
+                 SmallVectorImpl<Decl *> &peers);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKMACROS_H */
