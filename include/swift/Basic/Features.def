@@ -135,11 +135,6 @@ EXPERIMENTAL_FEATURE(SendableCompletionHandlers, false)
 /// Enables opaque type erasure without also enabling implict dynamic
 EXPERIMENTAL_FEATURE(OpaqueTypeErasure, false)
 
-/// Whether to enable experimental @typeWrapper feature which allows to
-/// declare a type that controls access to all stored properties of the
-/// wrapped type.
-EXPERIMENTAL_FEATURE(TypeWrappers, false)
-
 /// Whether to perform round-trip testing of the Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 
