@@ -472,6 +472,14 @@ public:
     return visitPart(ds->getSelfType(), optionalKind, isInOutParam);
   }
 
+  ClangRepresentation visitMetatypeType(MetatypeType *mt,
+                                        Optional<OptionalTypeKind> optionalKind,
+                                        bool isInOutParam) {
+    if (typeUseKind == FunctionSignatureTypeUse::TypeReference)
+      return visitPart(mt->getInstanceType(), optionalKind, isInOutParam);
+    return ClangRepresentation::unsupported;
+  }
+
   ClangRepresentation visitPart(Type Ty,
                                 Optional<OptionalTypeKind> optionalKind,
                                 bool isInOutParam) {
@@ -1056,7 +1064,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
     StringRef swiftSymbolName, const NominalTypeDecl *typeDeclContext,
     const ModuleDecl *moduleContext, Type resultTy, const ParameterList *params,
-    bool hasThrows, const AnyFunctionType *funcType) {
+    bool hasThrows, const AnyFunctionType *funcType, bool isStaticMethod) {
   if (typeDeclContext)
     ClangSyntaxPrinter(os).printNominalTypeOutsideMemberDeclInnerStaticAssert(
         typeDeclContext);
@@ -1085,7 +1093,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       emitNewParam();
       std::string paramName;
       if (param.isSelfParameter()) {
-        bool needsStaticSelf = isa<ConstructorDecl>(FD);
+        bool needsStaticSelf = isa<ConstructorDecl>(FD) || isStaticMethod;
         if (needsStaticSelf) {
           os << "swift::TypeMetadataTrait<";
           CFunctionSignatureTypePrinter typePrinter(
@@ -1093,7 +1101,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
               interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
               moduleContext, declPrinter,
               FunctionSignatureTypeUse::TypeReference);
-          auto result = typePrinter.visit(param.getType(), OTK_None,
+          auto result = typePrinter.visit(param.getInterfaceType(), OTK_None,
                                           /*isInOutParam=*/false);
           assert(!result.isUnsupported());
           os << ">::getTypeMetadata()";
@@ -1285,7 +1293,6 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           });
     }
   }
-
 }
 
 static StringRef getConstructorName(const AbstractFunctionDecl *FD) {
@@ -1301,19 +1308,19 @@ static StringRef getConstructorName(const AbstractFunctionDecl *FD) {
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
-    Type resultTy, bool isDefinition) {
+    Type resultTy, bool isStatic, bool isDefinition) {
   bool isConstructor = isa<ConstructorDecl>(FD);
   os << "  ";
 
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
-  modifiers.isStatic = isConstructor && !isDefinition;
+  modifiers.isStatic = (isStatic || isConstructor) && !isDefinition;
   modifiers.isInline = true;
   bool isMutating =
       isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
-  modifiers.isConst =
-      !isa<ClassDecl>(typeDeclContext) && !isMutating && !isConstructor;
+  modifiers.isConst = !isa<ClassDecl>(typeDeclContext) && !isMutating &&
+                      !isConstructor && !isStatic;
   modifiers.hasSymbolUSR = !isDefinition;
   auto result = printFunctionSignature(
       FD, signature,
@@ -1329,10 +1336,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
 
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(FD, signature, swiftSymbolName, typeDeclContext,
-                    FD->getModuleContext(), resultTy, FD->getParameters(),
-                    FD->hasThrows(),
-                    FD->getInterfaceType()->castTo<AnyFunctionType>());
+  printCxxThunkBody(
+      FD, signature, swiftSymbolName, typeDeclContext, FD->getModuleContext(),
+      resultTy, FD->getParameters(), FD->hasThrows(),
+      FD->getInterfaceType()->castTo<AnyFunctionType>(), isStatic);
   os << "  }\n";
 }
 

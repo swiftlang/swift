@@ -977,6 +977,10 @@ private:
         getForeignResultType(AFD, methodTy, asyncConvention, errorConvention);
 
     if (outputLang == OutputLanguageMode::Cxx) {
+      // FIXME: Support operators.
+      if (AFD->isOperator() || (AFD->isStatic() && AFD->isImplicit()))
+        return;
+
       auto *typeDeclContext = dyn_cast<NominalTypeDecl>(AFD->getParent());
       if (!typeDeclContext) {
         typeDeclContext =
@@ -1013,6 +1017,7 @@ private:
         declPrinter.printCxxMethod(typeDeclContext, AFD,
                                    funcABI->getSignature(),
                                    funcABI->getSymbolName(), resultTy,
+                                   /*isStatic=*/isClassMethod,
                                    /*isDefinition=*/false);
       }
 
@@ -1035,6 +1040,7 @@ private:
       } else {
         defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
                                   funcABI->getSymbolName(), resultTy,
+                                  /*isStatic=*/isClassMethod,
                                   /*isDefinition=*/true);
       }
 
@@ -1652,9 +1658,6 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
-      // FIXME: Support static methods.
-      if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
-        return;
       if (FD->getDeclContext()->isTypeContext())
         return printAbstractFunctionAsMethod(FD, FD->isStatic());
 
