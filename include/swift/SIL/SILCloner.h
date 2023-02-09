@@ -204,7 +204,8 @@ public:
       }
     }
 
-    return asImpl().remapSubstitutionMap(Subs).getCanonical();
+    return asImpl().remapSubstitutionMap(Subs)
+                   .getCanonical(/*canonicalizeSignature*/false);
   }
 
   SILType getTypeInClonedContext(SILType Ty) {
@@ -261,12 +262,80 @@ public:
       if (auto origExpansionType =
             dyn_cast<PackExpansionType>(origComponentType)) {
         auto newShapeClass = getOpASTType(origExpansionType.getCountType());
-        newIndex += cast<PackType>(newShapeClass)->getNumElements();
+        if (auto newShapePack = dyn_cast<PackType>(newShapeClass))
+          newIndex += newShapePack->getNumElements();
+        else
+          newIndex++;
       } else {
         newIndex++;
       }
     }
     return newIndex;
+  }
+
+  /// Does type substitution make the given tuple type no longer a tuple?
+  bool doesOpTupleDisappear(CanTupleType type) {
+    // Fast-path the empty tuple.
+    if (type->getNumElements() == 0) return false;
+
+    // Do a first pass over the tuple elements to check out the
+    // non-expansions.  If there's more than one of them, or any of them
+    // is labeled, we definitely stay a tuple and don't need to substitute
+    // any of the expansions.
+    unsigned numScalarElements = 0;
+    for (auto index : indices(type->getElements())) {
+      auto eltType = type.getElementType(index);
+      // Ignore pack expansions in this pass.
+      if (isa<PackExpansionType>(eltType)) continue;
+
+      // If there's a labeled scalar element, we'll stay a tuple.
+      if (type->getElement(index).hasName()) return false;
+
+      // If there are multiple scalar elements, we'll stay a tuple.
+      if (++numScalarElements > 1) return false;
+    }
+
+    assert(numScalarElements <= 1);
+
+    // We must have expansions if we got here: if all the elements were
+    // scalar, and none of them were labelled, and there wasn't more than
+    // one of them, and there was at least one of them, then somehow
+    // we had a tuple with a single unlabeled element.
+
+    // Okay, we need to substitute the count types for the expansions.
+    for (auto index : indices(type->getElements())) {
+      // Ignore non-expansions because we've already counted them.
+      auto expansion = dyn_cast<PackExpansionType>(type.getElementType(index));
+      if (!expansion) continue;
+
+      // Substitute the shape class of the expansion.
+      auto newShapeClass = getOpASTType(expansion.getCountType());
+      auto newShapePack = dyn_cast<PackType>(newShapeClass);
+
+      // If the element has a name, then the tuple sticks around unless
+      // the expansion disappears completely.
+      if (type->getElement(index).hasName()) {
+        if (newShapePack && newShapePack->getNumElements() == 0)
+          continue;
+        return false;
+      }
+
+      // Otherwise, walk the substituted shape components.
+      for (auto newShapeElement : newShapePack.getElementTypes()) {
+        // If there's an expansion in the shape, we'll have an expansion
+        // in the tuple elements, which forces the tuple structure to remain.
+        if (isa<PackExpansionType>(newShapeElement)) return false;
+
+        // Otherwise, add another scalar element.
+        if (++numScalarElements > 1) return false;
+      }
+    }
+
+    // All of the packs expanded to scalars.  We should've short-circuited
+    // if we ever saw a second or labeled scalar, so all we need to test
+    // is whether we have exactly one scalar.
+    assert(numScalarElements <= 1);
+    return numScalarElements == 1;
   }
 
   void remapRootOpenedType(CanOpenedArchetypeType archetypeTy) {
@@ -2487,13 +2556,15 @@ void SILCloner<ImplClass>::visitOpenPackElementInst(
   auto newContextSubs =
     getOpSubstitutionMap(origEnv->getPackElementContextSubstitutions());
 
-  // Substitute the shape class.
-  auto newShapeClass = getOpASTType(origEnv->getOpenedElementShapeClass());
+  // The opened shape class is a parameter of the original signature,
+  // which is unchanged.
+  auto openedShapeClass = origEnv->getOpenedElementShapeClass();
 
   // Build the new environment.
   auto newEnv =
     GenericEnvironment::forOpenedElement(origEnv->getGenericSignature(),
-                                         UUID::fromTime(), newShapeClass,
+                                         UUID::fromTime(),
+                                         openedShapeClass,
                                          newContextSubs);
 
   // Associate the old opened archetypes with the new ones.
@@ -2547,8 +2618,17 @@ void SILCloner<ImplClass>::visitTuplePackElementAddrInst(
   auto newIndex = getOpValue(Inst->getIndex());
   auto newTuple = getOpValue(Inst->getTuple());
   auto newElementType = getOpType(Inst->getElementType());
-  // FIXME: do we need to rewrite when substitution removes the
-  // tuple-ness of the type?  If so, what do we rewrite to?
+
+  // If the tuple-ness of the operand disappears due to substitution,
+  // replace this instruction with an unchecked_addr_cast.
+  // FIXME: use type_refine_addr instead
+  if (doesOpTupleDisappear(Inst->getTupleType())) {
+    recordClonedInstruction(
+        Inst, getBuilder().createUncheckedAddrCast(loc, newTuple,
+                                                   newElementType));
+    return;
+  }
+
   recordClonedInstruction(
       Inst, getBuilder().createTuplePackElementAddr(loc, newIndex, newTuple,
                                                     newElementType));
