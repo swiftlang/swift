@@ -48,7 +48,7 @@ y.g()
 // Here we have three types, all named $s1a6ResultOyxGD (---> a.Result<A>),
 // but with different storage sizes:
 //
-//   0. Unsized from the subroutine tupe of map<U>.
+//   0. Unsized from the subroutine type of map<U>.
 //   1. Enum wrapping a pointer-sized object [map() and f()].
 //   2. Enum wrapping a 4x64-bit tuple.
 //
@@ -59,16 +59,10 @@ y.g()
 // CASE_0-DAG: !DISubprogram(name: "map", {{.*}}line: 11, type: ![[SBTY:[0-9]+]]
 // CASE_0-DAG: ![[SBTY]] = !DISubroutineType(types: ![[SBTYS:[0-9]+]])
 // CASE_0-DAG: ![[SBTYS]] = !{!{{[0-9]+}}, !{{[0-9]+}}, ![[SELFTY:[0-9]+]]}
-// CASE_0-DAG: ![[SELFTY]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}elements: ![[UNSIZED_ELTS:[0-9]+]]
-// CASE_0-DAG: ![[UNSIZED_ELTS]] = !{![[UNSIZED_MEM:[0-9]+]]}
-// CASE_0-DAG: ![[UNSIZED_MEM]] = !DIDerivedType(tag: DW_TAG_member, {{.*}} baseType: ![[UNIQ:[0-9]+]]
+// CASE_0-DAG: ![[SELFTY]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}DIFlagFwdDecl
 
 // The unique unsized type.
-// CASE_0: ![[UNIQ]] = !DICompositeType(
-// CASE_0-SAME:            tag: DW_TAG_structure_type, name: "Result",
-// CASE_0-NOT:             size:
-// CASE_0-SAME:            runtimeLang: DW_LANG_Swift,
-// CASE_0-SAME:            identifier: "$s1a6ResultOyxGD")
+// CASE_0-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "$s1a6ResultOyxGD", {{.*}}DIFlagFwdDecl
 
 // (1)
 // CASE_1-DAG: ![[F:[0-9]+]] = distinct !DISubprogram(name: "f", 

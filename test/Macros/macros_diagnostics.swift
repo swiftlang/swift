@@ -134,3 +134,8 @@ func testExternalMacroOutOfPlace() {
   let _: Int = #externalMacro(module: "A", type: "B")
   // expected-error@-1{{macro 'externalMacro' can only be used to define another macro}}
 }
+
+@freestanding(expression)
+public macro macroWithDefaults(_: Int = 17) = #externalMacro(module: "A", type: "B")
+// expected-error@-1{{default arguments are not allowed in macros}}
+// expected-warning@-2{{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'}}

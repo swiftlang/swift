@@ -1919,10 +1919,11 @@ IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {
   if (GenModules.size() == 1 || !ctxt) {
     return getPrimaryIGM();
   }
-  SourceFile *SF = ctxt->getParentSourceFile();
+  SourceFile *SF = ctxt->getOutermostParentSourceFile();
   if (!SF) {
     return getPrimaryIGM();
   }
+
   IRGenModule *IGM = GenModules[SF];
   assert(IGM);
   return IGM;
