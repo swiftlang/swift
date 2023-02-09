@@ -5122,6 +5122,12 @@ ERROR(async_unavailable_decl,none,
       "%0 %1 is unavailable from asynchronous contexts%select{|; %2}2",
       (DescriptiveDeclKind, DeclBaseName, StringRef))
 
+WARNING(actor_isolation_inferred_from_property_wrapper,none,
+        "%0 is implicitly %1 because it uses %2. This implicit isolation "
+        "will no longer happen in Swift 6.",
+        (DeclName, ActorIsolation, StringRef))
+
+
 //------------------------------------------------------------------------------
 // MARK: String Processing
 //------------------------------------------------------------------------------

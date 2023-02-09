@@ -3449,8 +3449,16 @@ static Optional<ActorIsolation> getIsolationFromWrappers(
 
   if (!nominal->getParentSourceFile())
     return None;
-  
-  Optional<ActorIsolation> foundIsolation;
+
+  ASTContext &ctx = nominal->getASTContext();
+  if (ctx.isSwiftVersionAtLeast(6)) {
+    // In Swift 6, we no longer infer isolation of a nominal type based
+    // on property wrappers used in its stored properties
+    return None;
+  }
+
+  Optional<std::pair<ActorIsolation, Type>> foundIsolationAndType;
+
   for (auto member : nominal->getMembers()) {
     auto var = dyn_cast<VarDecl>(member);
     if (!var || !var->isInstanceMember())
@@ -3475,19 +3483,36 @@ static Optional<ActorIsolation> getIsolationFromWrappers(
 
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe:
-      if (!foundIsolation) {
-        foundIsolation = isolation;
-        continue;
+      if (!foundIsolationAndType) {
+        if (auto propertyWrapperType = var->getAttachedPropertyWrapperType(0)) {
+          foundIsolationAndType = { isolation, propertyWrapperType };
+          continue;
+        }
       }
 
-      if (*foundIsolation != isolation)
+      if (foundIsolationAndType->first != isolation)
         return None;
 
       break;
     }
   }
 
-  return foundIsolation;
+  if (foundIsolationAndType) {
+    // We are inferring isolation for the type because
+    // it contains an actor-isolated property wrapper.
+    // Warn that this inferrence will be going away in
+    // Swift 6
+    const ActorIsolation isolation = foundIsolationAndType->first;
+    const Type type = foundIsolationAndType->second;
+
+    nominal->diagnose(diag::actor_isolation_inferred_from_property_wrapper,
+                      nominal->getName(), isolation, "'@"+type->getString()+"'")
+      .fixItInsert(nominal->getAttributeInsertionLoc(false), "@" + isolation.getGlobalActor().getString());
+    return isolation;
+  }
+  else {
+    return None;
+  }
 }
 
 namespace {
@@ -4063,8 +4088,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
         if (auto inferred = inferredIsolation(*conformanceIsolation))
           return inferred;
 
-      // If the declaration is a nominal type and any property wrappers on
-      // its stored properties require isolation, use that.
+      // Before Swift 6: If the declaration is a nominal type and any property
+      // wrappers on its stored properties require isolation, use that.
       if (auto wrapperIsolation = getIsolationFromWrappers(nominal)) {
         if (auto inferred = inferredIsolation(*wrapperIsolation))
           return inferred;
