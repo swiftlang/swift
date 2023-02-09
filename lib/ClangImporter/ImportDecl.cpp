@@ -2613,6 +2613,8 @@ namespace {
         conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
         conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
         conformToCxxSetIfNeeded(Impl, nominalDecl, decl);
+        conformToCxxDictionaryIfNeeded(Impl, nominalDecl, decl);
+        conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
       }
 
       if (auto *ntd = dyn_cast<NominalTypeDecl>(result))
