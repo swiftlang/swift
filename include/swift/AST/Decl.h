@@ -1633,6 +1633,10 @@ public:
   /// \c isObjCImplementation() returns \c true.
   Optional<Identifier> getCategoryNameForObjCImplementation() const;
 
+  /// If this extension represents an imported Objective-C category, returns the
+  /// category's name. Otherwise returns the empty identifier.
+  Identifier getObjCCategoryName() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Extension;
