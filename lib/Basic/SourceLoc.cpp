@@ -212,10 +212,18 @@ SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
   return It->second;
 }
 
+SourceManager::~SourceManager() {
+  for (auto &generated : GeneratedSourceInfos) {
+    free((void*)generated.second.onDiskBufferCopyFileName.data());
+  }
+}
+
 /// Dump the contents of the given memory buffer to a file, returning the
 /// name of that file (when successful) and \c None otherwise.
 static Optional<std::string>
-dumpBufferToFile(const llvm::MemoryBuffer *buffer) {
+dumpBufferToFile(const llvm::MemoryBuffer *buffer,
+                 const SourceManager &sourceMgr,
+                 SourceRange originalSourceRange) {
   // Create file in the system temporary directory.
   SmallString<128> outputFileName;
   llvm::sys::path::system_temp_directory(true, outputFileName);
@@ -232,9 +240,30 @@ dumpBufferToFile(const llvm::MemoryBuffer *buffer) {
        auto contents = buffer->getBuffer();
        out << contents;
 
-      // Make sure we have a trailing newline.
-      if (contents.empty() || contents.back() != '\n')
-        out << "\n";
+        // Make sure we have a trailing newline.
+        if (contents.empty() || contents.back() != '\n')
+          out << "\n";
+
+        // If we know the source range this comes from, append it later in
+        // the file so one can trace.
+        if (originalSourceRange.isValid()) {
+          out << "\n";
+
+          auto originalFilename =
+            sourceMgr.getDisplayNameForLoc(originalSourceRange.Start, true);
+          unsigned startLine, startColumn, endLine, endColumn;
+          std::tie(startLine, startColumn) =
+              sourceMgr.getPresumedLineAndColumnForLoc(
+                originalSourceRange.Start);
+          std::tie(endLine, endColumn) =
+              sourceMgr.getPresumedLineAndColumnForLoc(
+                originalSourceRange.End);
+          out << "// original-source-range: "
+              << originalFilename
+              << ":" << startLine << ":" << startColumn
+              << "-" << endLine << ":" << endColumn
+              << "\n";
+      }
     });
   if (ec)
     return None;
@@ -258,7 +287,8 @@ StringRef SourceManager::getIdentifierForBuffer(
         return buffer->getBufferIdentifier();
 
       if (generatedInfo->onDiskBufferCopyFileName.empty()) {
-        if (auto newFileNameOpt = dumpBufferToFile(buffer)) {
+        if (auto newFileNameOpt = dumpBufferToFile(
+                buffer, *this,  generatedInfo->originalSourceRange)) {
           generatedInfo->onDiskBufferCopyFileName =
               strdup(newFileNameOpt->c_str());
         }
