@@ -30,3 +30,12 @@
 - (void)noImplMethod:(int)param;
 
 @end
+
+@interface NoInitImplClass: NSObject
+
+@property (readonly, strong, nonnull) NSString *s1;
+@property (strong, nonnull) NSString *s2;
+@property (readonly, strong, nonnull) NSString *s3;
+@property (strong, nonnull) NSString *s4;
+
+@end

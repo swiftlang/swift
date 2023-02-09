@@ -1,4 +1,5 @@
-// REQUIRES: rdar101543397
+// Test doesn't pass on all platforms (rdar://101543397)
+// REQUIRES: OS=macosx
 
 //
 // Build objc_implementation.framework
