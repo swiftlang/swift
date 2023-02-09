@@ -123,7 +123,7 @@ bb0(%0 : @guaranteed $AggStruct):
 
 // CHECK-LABEL: sil [ossa] @test_ref_element_addr : $@convention(thin) (@owned MoveOnlyKlass) -> @owned MoveOnlyKlass {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [no_implicit_copy] [[ARG]]
+// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
 // CHECK:   [[COPY_MARKED_ARG:%.*]] = copy_value [[MARKED_ARG]]
 // CHECK:   [[BORROW_MARKED_ARG:%.*]] = begin_borrow [[COPY_MARKED_ARG]]
 // CHECK:   ref_element_addr [[BORROW_MARKED_ARG]]
@@ -133,7 +133,7 @@ bb0(%0 : @guaranteed $AggStruct):
 // CHECK: } // end sil function 'test_ref_element_addr'
 sil [ossa] @test_ref_element_addr : $@convention(thin) (@owned MoveOnlyKlass) -> @owned MoveOnlyKlass {
 bb0(%0 : @owned $MoveOnlyKlass):
-  %1 = mark_must_check [no_implicit_copy] %0 : $MoveOnlyKlass
+  %1 = mark_must_check [consumable_and_assignable] %0 : $MoveOnlyKlass
   %2 = begin_borrow %1 : $MoveOnlyKlass
   %3 = ref_element_addr %2 : $MoveOnlyKlass, #MoveOnlyKlass.value
   %4 = integer_literal $Builtin.Int32, 1
@@ -179,7 +179,7 @@ bb0(%0 : @guaranteed $SingleIntContainingStruct):
 sil [ossa] @phis_are_cleaned_up : $@convention(thin) (@owned AggStruct2) -> () {
 bb0(%0 : @owned $AggStruct2):
   %1 = move_value [lexical] %0 : $AggStruct2
-  %2 = mark_must_check [no_implicit_copy] %1 : $AggStruct2
+  %2 = mark_must_check [consumable_and_assignable] %1 : $AggStruct2
   debug_value %2 : $AggStruct2, let, name "x2", argno 1
   cond_br undef, bb1, bb2
 
@@ -539,7 +539,7 @@ bb1:
   %9 = struct_extract %8 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.first
   %10 = copy_value %9 : $MoveOnlyKlass
   %11 = move_value [lexical] %10 : $MoveOnlyKlass
-  %12 = mark_must_check [no_implicit_copy] %11 : $MoveOnlyKlass
+  %12 = mark_must_check [consumable_and_assignable] %11 : $MoveOnlyKlass
   debug_value %12 : $MoveOnlyKlass, let, name "x"
   end_borrow %8 : $GrandParentMultiFieldStruct
   %15 = copy_value %12 : $MoveOnlyKlass
@@ -592,7 +592,7 @@ bb3:
 //
 // CHECK: bb3([[CONT_ARG:%.*]] : @owned
 // CHECK:   [[MOVED_CONT_ARG:%.*]] = move_value [lexical] [[CONT_ARG]]
-// CHECK-NEXT:   mark_must_check [no_implicit_copy] [[MOVED_CONT_ARG]]
+// CHECK-NEXT:   mark_must_check [consumable_and_assignable] [[MOVED_CONT_ARG]]
 // CHECK-NEXT:   debug_value
 // CHECK-NEXT:   destroy_value
 // CHECK-NEXT:   destroy_value [[MARKED_ARG]]
@@ -611,7 +611,7 @@ bb1:
   %9 = struct_extract %8 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.first
   %10 = copy_value %9 : $MoveOnlyKlass
   %11 = move_value [lexical] %10 : $MoveOnlyKlass
-  %12 = mark_must_check [no_implicit_copy] %11 : $MoveOnlyKlass
+  %12 = mark_must_check [consumable_and_assignable] %11 : $MoveOnlyKlass
   debug_value %12 : $MoveOnlyKlass, let, name "x"
   end_borrow %8 : $GrandParentMultiFieldStruct
   destroy_value %12 : $MoveOnlyKlass
@@ -622,7 +622,7 @@ bb2:
   %18 = struct_extract %17 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.second
   %19 = copy_value %18 : $SingleFieldParentOfMultiFieldChild
   %20 = move_value [lexical] %19 : $SingleFieldParentOfMultiFieldChild
-  %21 = mark_must_check [no_implicit_copy] %20 : $SingleFieldParentOfMultiFieldChild
+  %21 = mark_must_check [consumable_and_assignable] %20 : $SingleFieldParentOfMultiFieldChild
   debug_value %21 : $SingleFieldParentOfMultiFieldChild, let, name "x"
   end_borrow %17 : $GrandParentMultiFieldStruct
   destroy_value %21 : $SingleFieldParentOfMultiFieldChild
@@ -633,7 +633,7 @@ bb3:
   %27 = struct_extract %26 : $GrandParentMultiFieldStruct, #GrandParentMultiFieldStruct.third
   %28 = copy_value %27 : $MoveOnlyKlass
   %29 = move_value [lexical] %28 : $MoveOnlyKlass
-  %30 = mark_must_check [no_implicit_copy] %29 : $MoveOnlyKlass
+  %30 = mark_must_check [consumable_and_assignable] %29 : $MoveOnlyKlass
   debug_value %30 : $MoveOnlyKlass, let, name "x"
   end_borrow %26 : $GrandParentMultiFieldStruct
   destroy_value %30 : $MoveOnlyKlass

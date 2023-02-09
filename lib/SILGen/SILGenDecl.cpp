@@ -380,7 +380,7 @@ public:
     if (Addr->getType().isMoveOnly()) {
       // TODO: Handle no implicit copy here.
       Addr = SGF.B.createMarkMustCheckInst(
-          decl, Addr, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+          decl, Addr, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
     }
 
     // Push a cleanup to destroy the local variable.  This has to be
@@ -580,7 +580,8 @@ public:
       if (value->getType().isPureMoveOnly()) {
         value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
         return SGF.B.createMarkMustCheckInst(
-            PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+            PrologueLoc, value,
+            MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
       }
 
       // Otherwise, if we don't have a no implicit copy trivial type, just
@@ -594,7 +595,8 @@ public:
           SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
       value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
       return SGF.B.createMarkMustCheckInst(
-          PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+          PrologueLoc, value,
+          MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
     }
 
     // Then if we don't have move only, just perform a lexical borrow if the
@@ -636,7 +638,8 @@ public:
         !value->getType().isMoveOnlyWrapped()) {
       value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
       return SGF.B.createMarkMustCheckInst(
-          PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+          PrologueLoc, value,
+          MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
     }
 
     // Otherwise, if we do not have a no implicit copy variable, just follow
@@ -655,7 +658,8 @@ public:
     value = SGF.B.createCopyValue(PrologueLoc, value);
     value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
     return SGF.B.createMarkMustCheckInst(
-        PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+        PrologueLoc, value,
+        MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
   }
 
   void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne) {

@@ -8208,10 +8208,12 @@ public:
   enum class CheckKind : unsigned {
     Invalid = 0,
 
-    // A signal to the move only checker to perform no implicit copy checking on
-    // the result of this instruction. This implies that the result can be
-    // consumed at most once.
-    NoImplicitCopy,
+    // A signal to the move only checker to perform checking that allows for
+    // this value to be consumed along its boundary (in the case of let/var
+    // semantics) and also written over in the case of var semantics. NOTE: Of
+    // course this still implies the value cannot be copied and can be consumed
+    // only once along all program paths.
+    ConsumableAndAssignable,
 
     // A signal to the move only checker to perform no consume or assign
     // checking. This forces the result of this instruction owned value to never
@@ -8240,7 +8242,7 @@ public:
     switch (kind) {
     case CheckKind::Invalid:
       return false;
-    case CheckKind::NoImplicitCopy:
+    case CheckKind::ConsumableAndAssignable:
     case CheckKind::NoConsumeOrAssign:
       return true;
     }

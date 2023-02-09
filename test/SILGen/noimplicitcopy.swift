@@ -46,7 +46,7 @@ func print2(_ x: Int) {
 // CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy8printIntyyF : $@convention(thin) () -> () {
 // CHECK:   [[X_MOVEONLY:%.*]] = copyable_to_moveonlywrapper [owned] {{%.*}} : $Int
 // CHECK:   [[X:%.*]] = move_value [lexical] [[X_MOVEONLY]]
-// CHECK:   [[X_MOVEONLYWRAPPED_MARKED:%.*]] = mark_must_check [no_implicit_copy] [[X]]
+// CHECK:   [[X_MOVEONLYWRAPPED_MARKED:%.*]] = mark_must_check [consumable_and_assignable] [[X]]
 // CHECK:   [[BORROWED_X_MOVEONLYWRAPPED_MARKED_1:%.*]] = begin_borrow [[X_MOVEONLYWRAPPED_MARKED]]
 // CHECK:   [[BORROWED_X_MOVEONLYWRAPPED_MARKED_2:%.*]] = begin_borrow [[X_MOVEONLYWRAPPED_MARKED]]
 // CHECK:   [[FUNC:%.*]] = function_ref @$sSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
@@ -120,7 +120,7 @@ func callPrintIntArg() {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy $Int):
 // CHECK:   [[ARG_WRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[ARG]]
 // CHECK:   [[LEXICAL_ARG:%.*]] = move_value [lexical] [[ARG_WRAPPED]]
-// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [no_implicit_copy] [[LEXICAL_ARG]]
+// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [consumable_and_assignable] [[LEXICAL_ARG]]
 // CHECK:   [[BORROWED_MARKED_ARG_1:%.*]] = begin_borrow [[MARKED_ARG]]
 // CHECK:   [[BORROWED_MARKED_ARG_2:%.*]] = begin_borrow [[MARKED_ARG]]
 // CHECK:   [[FUNC:%.*]] = function_ref @$sSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
@@ -296,7 +296,7 @@ func callClosureInt() {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy $Int):
 // CHECK:   [[WRAPPED_ARG:%.*]] = copyable_to_moveonlywrapper [owned] [[ARG]]
 // CHECK:   [[MOVED_ARG:%.*]] = move_value [lexical] [[WRAPPED_ARG]]
-// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [no_implicit_copy] [[MOVED_ARG]]
+// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [consumable_and_assignable] [[MOVED_ARG]]
 // CHECK:   [[BORROWED_ARG_MARKED_1:%.*]] = begin_borrow [[MARKED_ARG]]
 // CHECK:   [[BORROWED_ARG_MARKED_2:%.*]] = begin_borrow [[MARKED_ARG]]
 // CHECK:   [[FUNC:%.*]] = function_ref @$sSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
@@ -336,7 +336,7 @@ func callClosureIntOwned() {
 // CHECK:   [[X:%.*]] = begin_borrow [lexical] {{%[0-9]+}} : $Klass
 // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
 // CHECK:   [[X_MOVEONLYWRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[X_COPY]]
-// CHECK:   [[X_MOVEONLYWRAPPED_MARKED:%.*]] = mark_must_check [no_implicit_copy] [[X_MOVEONLYWRAPPED]]
+// CHECK:   [[X_MOVEONLYWRAPPED_MARKED:%.*]] = mark_must_check [consumable_and_assignable] [[X_MOVEONLYWRAPPED]]
 // CHECK:   [[BORROWED_X_MOVEONLYWRAPPED_MARKED:%.*]] = begin_borrow [[X_MOVEONLYWRAPPED_MARKED]]
 // CHECK:   [[FUNC:%.*]] = class_method [[BORROWED_X_MOVEONLYWRAPPED_MARKED]]
 // CHECK:   [[GUARANTEED_ESCAPED_X:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[BORROWED_X_MOVEONLYWRAPPED_MARKED]]
@@ -393,7 +393,7 @@ func callPrintKlassArg() {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @owned $Klass):
 // CHECK:   [[WRAPPED_ARG:%.*]] = copyable_to_moveonlywrapper [owned] [[ARG]]
 // CHECK:   [[MOVED_ARG:%.*]] = move_value [lexical] [[WRAPPED_ARG]]
-// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [no_implicit_copy] [[MOVED_ARG]]
+// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [consumable_and_assignable] [[MOVED_ARG]]
 // CHECK: } // end sil function '$s14noimplicitcopy18printKlassOwnedArgyyAA0C0CnF'
 //
 // SIL-LABEL: sil hidden @$s14noimplicitcopy18printKlassOwnedArgyyAA0C0CnF : $@convention(thin) (@owned Klass) -> () {
@@ -447,7 +447,7 @@ func callPrintKlassArgThrows() throws {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @owned $Klass):
 // CHECK:   [[WRAPPED_ARG:%.*]] = copyable_to_moveonlywrapper [owned] [[ARG]]
 // CHECK:   [[MOVED_ARG:%.*]] = move_value [lexical] [[WRAPPED_ARG]]
-// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [no_implicit_copy] [[MOVED_ARG]]
+// CHECK:   [[MARKED_ARG:%.*]] = mark_must_check [consumable_and_assignable] [[MOVED_ARG]]
 // CHECK:   [[BORROWED_MARKED_ARG:%.*]] = begin_borrow [[MARKED_ARG]]
 // CHECK:   [[UNWRAPPED_ARG:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[BORROWED_MARKED_ARG]]
 // CHECK:   apply {{%.*}}([[UNWRAPPED_ARG]]) :
@@ -479,7 +479,7 @@ func callPrintKlassOwnedOwnedArgThrows() throws {
 // CHECK: bb0([[ARG:%.*]] : $Trivial):
 // CHECK:   [[WRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[ARG]]
 // CHECK:   [[MV_WRAPPED:%.*]] = move_value [lexical] [[WRAPPED]]
-// CHECK:   [[MARKED:%.*]] = mark_must_check [no_implicit_copy] [[MV_WRAPPED]]
+// CHECK:   [[MARKED:%.*]] = mark_must_check [consumable_and_assignable] [[MV_WRAPPED]]
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[MARKED]]
 // CHECK:   [[EXT:%.*]] = struct_extract [[BORROW]]
 // CHECK:   [[UNWRAPPED:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[EXT]]

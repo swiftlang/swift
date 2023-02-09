@@ -94,7 +94,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       // This is forming a let or an argument.
       // bb0:
       //   %1 = move_value [lexical] %0
-      //   %2 = mark_must_check [no_implicit_copy] %1
+      //   %2 = mark_must_check [consumable_and_assignable] %1
       //
       // This occurs when SILGen materializes a temporary move only value?
       // bb0:
@@ -170,7 +170,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       // bb0(%0 : $Trivial):
       //  %1 = copyable_to_moveonlywrapper [owned] %0
       //  %2 = move_value [lexical] %1
-      //  %3 = mark_must_check [no_implicit_copy] %2
+      //  %3 = mark_must_check [consumable_and_assignable] %2
       //
       // *OR*
       //
@@ -202,7 +202,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       // bb0(%0 : @owned $T):
       //   %1 = copyable_to_moveonlywrapper [owned] %0
       //   %2 = move_value [lexical] %1
-      //   %3 = mark_must_check [no_implicit_copy_owned] %2
+      //   %3 = mark_must_check [consumable_and_assignable_owned] %2
       if (auto *mvi = dyn_cast<MoveValueInst>(mmci->getOperand())) {
         if (mvi->isLexical()) {
           if (auto *cvt = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
@@ -224,7 +224,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       //  %1 = begin_borrow [lexical] %0
       //  %2 = copy_value %1
       //  %3 = copyable_to_moveonlywrapper [owned] %2
-      //  %4 = mark_must_check [no_implicit_copy]
+      //  %4 = mark_must_check [consumable_and_assignable]
       //
       // Or for a move only type, we look for a move_value [lexical].
       if (auto *mvi = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
@@ -245,7 +245,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       //
       // %1 = copyable_to_moveonlywrapper [owned] %0
       // %2 = move_value [lexical] %1
-      // %3 = mark_must_check [no_implicit_copy] %2
+      // %3 = mark_must_check [consumable_and_assignable] %2
       if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mmci->getOperand())) {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
           if (bbi->isLexical()) {

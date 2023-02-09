@@ -129,11 +129,11 @@ bb0(%0 : @guaranteed $AggStruct2):
 sil [ossa] @test_loop_error : $@convention(thin) (@owned AggStruct2) -> () {
 bb0(%0 : @owned $AggStruct2):
   %1 = move_value [lexical] %0 : $AggStruct2
-  %2 = mark_must_check [no_implicit_copy] %1 : $AggStruct2
+  %2 = mark_must_check [consumable_and_assignable] %1 : $AggStruct2
   debug_value %2 : $AggStruct2, let, name "x", argno 1
   %4 = copy_value %2 : $AggStruct2
   %5 = move_value [lexical] %4 : $AggStruct2
-  %6 = mark_must_check [no_implicit_copy] %5 : $AggStruct2
+  %6 = mark_must_check [consumable_and_assignable] %5 : $AggStruct2
   // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
   // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
   debug_value %6 : $AggStruct2, let, name "x2"

@@ -71,7 +71,7 @@ sil @copyableClassUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed C
 sil hidden [ossa] @initWithSplitStores : $@convention(thin) (Int) -> @owned AggStruct {
 bb0(%0 : $Int):
   %2 = alloc_stack [lexical] $AggStruct, var, name "self", implicit
-  %3 = mark_must_check [no_implicit_copy] %2 : $*AggStruct // expected-error {{'self' consumed more than once}}
+  %3 = mark_must_check [consumable_and_assignable] %2 : $*AggStruct // expected-error {{'self' consumed more than once}}
   debug_value %0 : $Int, let, name "myInit3", argno 1
   %5 = function_ref @get_aggstruct : $@convention(thin) () -> @owned AggStruct
   %6 = apply %5() : $@convention(thin) () -> @owned AggStruct
@@ -85,7 +85,7 @@ bb0(%0 : $Int):
   %14 = load [copy] %13 : $*Klass // expected-note {{consuming use here}}
   end_access %12 : $*AggStruct
   %16 = move_value [lexical] %14 : $Klass
-  %17 = mark_must_check [no_implicit_copy] %16 : $Klass
+  %17 = mark_must_check [consumable_and_assignable] %16 : $Klass
   debug_value %17 : $Klass, let, name "x"
   %19 = copy_value %17 : $Klass
   %20 = move_value %19 : $Klass
@@ -100,7 +100,7 @@ bb0(%0 : $Int):
 sil [ossa] @aggStructConsumeGrandField : $@convention(thin) (@owned AggStruct) -> () {
 bb0(%arg : @owned $AggStruct):
   %0 = alloc_stack [lexical] $AggStruct, var, name "x2"
-  %1 = mark_must_check [no_implicit_copy] %0 : $*AggStruct
+  %1 = mark_must_check [consumable_and_assignable] %0 : $*AggStruct
   // expected-error @-1 {{'x2' consumed more than once}}
   // expected-error @-2 {{'x2' consumed by a use in a loop}}
   %9 = begin_access [modify] [static] %1 : $*AggStruct
@@ -140,7 +140,7 @@ bb3:
 sil hidden [ossa] @copyableKlassInAMoveOnlyStruct2 : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> () {
 bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
   %0 = alloc_stack [lexical] $NonTrivialStruct, var, name "a"
-  %1 = mark_must_check [no_implicit_copy] %0 : $*NonTrivialStruct
+  %1 = mark_must_check [consumable_and_assignable] %0 : $*NonTrivialStruct
   store %arg to [init] %1 : $*NonTrivialStruct
   %9 = begin_access [modify] [static] %1 : $*NonTrivialStruct
   store %arg1 to [assign] %9 : $*NonTrivialStruct
@@ -173,7 +173,7 @@ bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
 sil [ossa] @moveOnlyKlassInAMoveOnlyStruct2 : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> () {
 bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
   %0 = alloc_stack [lexical] $NonTrivialStruct, var, name "a"
-  %1 = mark_must_check [no_implicit_copy] %0 : $*NonTrivialStruct // expected-error {{'a' consumed more than once}}
+  %1 = mark_must_check [consumable_and_assignable] %0 : $*NonTrivialStruct // expected-error {{'a' consumed more than once}}
   store %arg to [init] %1 : $*NonTrivialStruct
   %9 = begin_access [modify] [static] %1 : $*NonTrivialStruct
   store %arg1 to [assign] %9 : $*NonTrivialStruct
