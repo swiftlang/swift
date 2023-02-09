@@ -692,11 +692,6 @@ DECL_ATTR_KINDS = [
                   ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIStableToRemove,
                   code=133),
 
-    SimpleDeclAttribute('typeWrapper', 'TypeWrapper',
-                        OnStruct, OnClass, OnEnum,
-                        ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIStableToRemove,  # noqa: E501
-                        code=134),
-
     SimpleDeclAttribute('_spiOnly', 'SPIOnly',
                         OnImport, UserInaccessible,
                         ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIStableToRemove,  # noqa: E501
@@ -705,11 +700,6 @@ DECL_ATTR_KINDS = [
                   OnAnyDecl, UserInaccessible,
                   APIBreakingToAdd, APIStableToRemove, ABIStableToAdd, ABIStableToRemove,  # noqa: E501
                   code=136),
-
-    SimpleDeclAttribute('typeWrapperIgnored', 'TypeWrapperIgnored',
-                        OnVar,
-                        ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIStableToRemove,  # noqa: E501
-                        code=137),
 
     SimpleDeclAttribute('_noMetadata', 'NoMetadata',
                         OnGenericTypeParam,

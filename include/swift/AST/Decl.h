@@ -35,7 +35,6 @@
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
-#include "swift/AST/TypeWrappers.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
@@ -3978,35 +3977,6 @@ public:
     return getGlobalActorInstance() != nullptr;
   }
 
-  /// Returns true if this type has a type wrapper custom attribute.
-  bool hasTypeWrapper() const { return bool(getTypeWrapper()); }
-
-  /// Return a type wrapper (if any) associated with this type.
-  Optional<TypeWrapperInfo> getTypeWrapper() const;
-
-  /// If this declaration has a type wrapper return a property that
-  /// is used for all type wrapper related operations (mainly for
-  /// applicable property access routing).
-  VarDecl *getTypeWrapperProperty() const;
-
-  /// If this declaration has a type wrapper, return `$Storage`
-  /// declaration that contains all the stored properties managed
-  /// by the wrapper. Note that if this type is a protocol them
-  /// this method returns an associated type for $Storage.
-  TypeDecl *getTypeWrapperStorageDecl() const;
-
-  /// If this declaration is a type wrapper, retrieve
-  /// its required initializer - `init(storageWrapper:)`.
-  ConstructorDecl *getTypeWrapperInitializer() const;
-
-  /// Get an initializer that accepts a type wrapper instance to
-  /// initialize the wrapped type.
-  ConstructorDecl *getTypeWrappedTypeStorageInitializer() const;
-
-  /// Get a memberwise initializer that could be used to instantiate a
-  /// type wrapped type.
-  ConstructorDecl *getTypeWrappedTypeMemberwiseInitializer() const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
@@ -5872,17 +5842,6 @@ public:
   /// wrapper that has storage.
   bool hasStorageOrWrapsStorage() const;
 
-  /// Whether this property belongs to a type wrapped type and has
-  /// all access to it routed through a type wrapper.
-  bool isAccessedViaTypeWrapper() const;
-
-  /// For type wrapped properties (see \c isAccessedViaTypeWrapper)
-  /// all access is routed through a type wrapper.
-  ///
-  /// \returns an underlying type wrapper property which is a
-  /// storage endpoint for all access to this property.
-  VarDecl *getUnderlyingTypeWrapperStorage() const;
-
   /// Visit all auxiliary declarations to this VarDecl.
   ///
   /// An auxiliary declaration is a declaration synthesized by the compiler to support
@@ -5959,11 +5918,6 @@ public:
   /// as the moment) to the backing storage property. Otherwise, the stored
   /// backing property will be treated as the member-initialized property.
   bool isMemberwiseInitialized(bool preferDeclaredProperties) const;
-
-  /// Check whether this variable presents a local storage synthesized
-  /// by the compiler in a user-defined designated initializer to
-  /// support initialization of type wrapper managed properties.
-  bool isTypeWrapperLocalStorageForInitializer() const;
 
   /// Return the range of semantics attributes attached to this VarDecl.
   auto getSemanticsAttrs() const
@@ -7909,12 +7863,6 @@ public:
   /// @objc init(forMemory: ())
   /// \endcode
   bool isObjCZeroParameterWithLongSelector() const;
-
-  /// If this is a user-defined constructor that belongs to
-  /// a type wrapped type return a local `_storage` variable
-  /// injected by the compiler for aid with type wrapper
-  /// initialization.
-  VarDecl *getLocalTypeWrapperStorageVar() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;

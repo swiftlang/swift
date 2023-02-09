@@ -1539,10 +1539,6 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
     out << "property-wrapper";
     return;
 
-  case CustomAttrTypeKind::TypeWrapper:
-    out << "type-wrapper";
-    return;
-
   case CustomAttrTypeKind::GlobalActor:
     out << "global-actor";
     return;

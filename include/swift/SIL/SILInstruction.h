@@ -4782,9 +4782,6 @@ class AssignByWrapperInst
   USE_SHARED_UINT8;
 
 public:
-  /// The kind of a wrapper that is being applied.
-  enum class Originator : uint8_t { TypeWrapper, PropertyWrapper };
-
   enum Mode {
     /// The mode is not decided yet (by DefiniteInitialization).
     Unknown,
@@ -4804,17 +4801,13 @@ public:
   };
 
 private:
-  Originator originator;
-
-  AssignByWrapperInst(SILDebugLocation DebugLoc, Originator origin,
+  AssignByWrapperInst(SILDebugLocation DebugLoc,
                       SILValue Src, SILValue Dest, SILValue Initializer,
                       SILValue Setter, Mode mode);
 
 public:
   SILValue getInitializer() { return Operands[2].get(); }
   SILValue getSetter() { return  Operands[3].get(); }
-
-  Originator getOriginator() const { return originator; }
 
   Mode getMode() const {
     return Mode(sharedUInt8().AssignByWrapperInst.mode);
