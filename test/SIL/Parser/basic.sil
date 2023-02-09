@@ -1314,6 +1314,16 @@ bb0(%0 : $Int, %1 : $*P, %2 : $AnyObject):
   unreachable
 }
 
+// CHECK-LABEL: sil @debug_step
+// CHECK:       bb0:
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    unreachable
+sil @debug_step : $@convention(thin) () -> () {
+bb0:
+  debug_step
+  unreachable
+}
+
 // CHECK-LABEL: sil @block_storage_type
 sil @block_storage_type : $@convention(thin)  (Int) -> @convention(block) () -> () {
 entry(%0 : $Int):

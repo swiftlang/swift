@@ -65,7 +65,7 @@
 #define SWIFT_FUNCTION_PASS(Id, Tag, Description) PASS(Id, Tag, Description)
 #endif
 
-/// SWIFT_SILCOMBINE_PASS(Inst, Tag)
+/// SWIFT_SILCOMBINE_PASS(Inst)
 ///   Similar to SWIFT_FUNCTION_PASS, but defines an instruction pass which is
 ///   implemented in swift and is run by the SILCombiner.
 ///   The \p Inst argument specifies the instruction class.
@@ -389,8 +389,14 @@ PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
      "Scalar Replacement of Aggregate SIL Block Arguments")
-SWIFT_FUNCTION_PASS(Simplify, "simplify",
-     "Simplify instructions via peephole optimizations")
+SWIFT_FUNCTION_PASS(Simplification, "simplification",
+    "Peephole simplifications")
+SWIFT_FUNCTION_PASS(OnoneSimplification, "onone-simplification",
+    "Peephole simplifications which runs at -Onone")
+SWIFT_FUNCTION_PASS(LateOnoneSimplification, "late-onone-simplification",
+    "Peephole simplifications which can only run late in the -Onone pipeline")
+SWIFT_FUNCTION_PASS(CleanupDebugSteps, "cleanup-debug-steps",
+    "Cleanup debug_step instructions for Onone")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",
@@ -428,10 +434,6 @@ PASS(YieldOnceCheck, "yield-once-check",
 PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")
 PASS(ForEachLoopUnroll, "for-each-loop-unroll",
      "Unroll forEach loops over array literals")
-PASS(MandatoryCombine, "mandatory-combine",
-    "Perform mandatory peephole combines")
-PASS(OptimizedMandatoryCombine, "optimized-mandatory-combine",
-    "Perform -O level mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS(AssemblyVisionRemarkGenerator, "assembly-vision-remark-generator",

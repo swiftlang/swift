@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend %clang-importer-sdk -I %S/../Inputs/clang-importer-sdk/swift-modules -emit-module -Xfrontend -disable-diagnostic-passes -whole-module-optimization -o %t/def_basic_objc.swiftmodule %S/Inputs/def_basic_objc.sil
+// RUN: %target-build-swift -Xllvm -sil-disable-pass=simplification -Xfrontend %clang-importer-sdk -I %S/../Inputs/clang-importer-sdk/swift-modules -emit-module -Xfrontend -disable-diagnostic-passes -whole-module-optimization -o %t/def_basic_objc.swiftmodule %S/Inputs/def_basic_objc.sil
 // RUN: llvm-bcanalyzer %t/def_basic_objc.swiftmodule | %FileCheck %s
 
 // RUN: %target-build-swift -Xfrontend %clang-importer-sdk -emit-sil -I %t %s -o %t/basic_sil_objc.sil

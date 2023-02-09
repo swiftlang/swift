@@ -1789,6 +1789,10 @@ public:
                   &DVI->getModule().getASTContext().SourceMgr);
   }
 
+  void visitDebugStepInst(DebugStepInst *dsi) {
+    // nothing to print other than the instruction name
+  }
+
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   void visitLoad##Name##Inst(Load##Name##Inst *LI) { \
     if (LI->isTake()) \

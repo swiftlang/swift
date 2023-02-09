@@ -78,6 +78,138 @@ extension Value {
   }
 }
 
+private extension Instruction {
+  var isTriviallyDead: Bool {
+    if results.contains(where: { !$0.uses.isEmpty }) {
+      return false
+    }
+    return self.canBeRemovedIfNotUsed
+  }
+
+  var isTriviallyDeadIgnoringDebugUses: Bool {
+    if results.contains(where: { !$0.uses.isEmptyIgnoringDebugUses }) {
+      return false
+    }
+    return self.canBeRemovedIfNotUsed
+  }
+
+  private var canBeRemovedIfNotUsed: Bool {
+    // TODO: it is horrible to hard-code exceptions here, but currently there is no Instruction API for this.
+    switch self {
+    case is TermInst, is MarkUninitializedInst, is DebugValueInst:
+      return false
+    case let bi as BuiltinInst:
+      if bi.id == .OnFastPath {
+        return false
+      }
+    default:
+      break
+    }
+    return !mayReadOrWriteMemory && !hasUnspecifiedSideEffects
+  }
+}
+
+extension UseList {
+  var singleNonDebugUse: Operand? {
+    var singleUse: Operand?
+    for use in self {
+      if use.instruction is DebugValueInst {
+        continue
+      }
+      if singleUse != nil {
+        return nil
+      }
+      singleUse = use
+    }
+    return singleUse
+  }
+
+  var isEmptyIgnoringDebugUses: Bool {
+    for use in self {
+      if !(use.instruction is DebugValueInst) {
+        return false
+      }
+    }
+    return true
+  }
+}
+
+extension FunctionPassContext {
+  /// Returns true if any blocks were removed.
+  func removeDeadBlocks(in function: Function) -> Bool {
+    var reachableBlocks = ReachableBlocks(function: function, self)
+    defer { reachableBlocks.deinitialize() }
+
+    var blocksRemoved = false
+    for block in function.blocks {
+      if !reachableBlocks.isReachable(block: block) {
+        block.dropAllReferences(self)
+        erase(block: block)
+        blocksRemoved = true
+      }
+    }
+    return blocksRemoved
+  }
+
+  func removeTriviallyDeadInstructionsPreservingDebugInfo(in function: Function) {
+    for inst in function.reversedInstructions {
+      if inst.isTriviallyDead {
+        erase(instruction: inst)
+      }
+    }
+  }
+
+  func removeTriviallyDeadInstructionsIgnoringDebugUses(in function: Function) {
+    for inst in function.reversedInstructions {
+      if inst.isTriviallyDeadIgnoringDebugUses {
+        erase(instructionIncludingDebugUses: inst)
+      }
+    }
+  }
+}
+
+extension BasicBlock {
+  func dropAllReferences(_ context: FunctionPassContext) {
+    for arg in arguments {
+      arg.uses.replaceAll(with: Undef.get(type: arg.type, context), context)
+    }
+    for inst in instructions.reversed() {
+      for result in inst.results {
+        result.uses.replaceAll(with: Undef.get(type: result.type, context), context)
+      }
+      context.erase(instruction: inst)
+    }
+  }
+}
+
+extension SimplifyContext {
+
+  /// Replaces a pair of redudant instructions, like
+  /// ```
+  ///   %first = enum $E, #E.CaseA!enumelt, %replacement
+  ///   %second = unchecked_enum_data %first : $E, #E.CaseA!enumelt
+  /// ```
+  /// Replaces `%second` with `%replacement` and deletes the instructions if possible - or required.
+  /// The operation is not done if it would require to insert a copy due to keep ownership correct.
+  func tryReplaceRedundantInstructionPair(first: SingleValueInstruction, second: SingleValueInstruction,
+                                          with replacement: Value) {
+    let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.singleNonDebugUse
+    let canEraseFirst = singleUse?.instruction == second
+
+    if !canEraseFirst && first.parentFunction.hasOwnership && replacement.ownership == .owned {
+      // We cannot add more uses to `replacement` without inserting a copy.
+      return
+    }
+
+    second.uses.replaceAll(with: replacement, self)
+    erase(instruction: second)
+
+    if canEraseFirst {
+      erase(instructionIncludingDebugUses: first)
+    }
+  }
+}
+
 extension ProjectedValue {
   /// Returns true if the address can alias with `rhs`.
   ///

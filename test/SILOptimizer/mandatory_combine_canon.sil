@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -mandatory-combine -sil-mandatory-combine-enable-canon-and-simple-dce %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-combine %s | %FileCheck %s
 
 sil_stage canonical
 
