@@ -18,6 +18,7 @@
 #include "GenericRequirement.h"
 #include "IRGen.h"
 #include "IRGenModule.h"
+#include "MetadataLayout.h"
 #include "NativeConventionSchema.h"
 
 // FIXME: This include should removed once getFunctionLoweredSignature() is
@@ -200,6 +201,40 @@ public:
       return None;
 
     return result;
+  }
+
+  using MethodDispatchInfo = IRABIDetailsProvider::MethodDispatchInfo;
+
+  Optional<MethodDispatchInfo>
+  getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl) {
+    if (funcDecl->isSemanticallyFinal())
+      return MethodDispatchInfo::direct();
+    // If this is an override of an existing method, then lookup
+    // its base method in its base class.
+    if (auto *overridenDecl = funcDecl->getOverriddenDecl())
+      funcDecl = overridenDecl;
+    auto *parentClass = dyn_cast<ClassDecl>(funcDecl->getDeclContext());
+    if (!parentClass)
+      return MethodDispatchInfo::direct();
+    auto &layout = IGM.getMetadataLayout(parentClass);
+    if (!isa<ClassMetadataLayout>(layout))
+      return {};
+    auto &classLayout = cast<ClassMetadataLayout>(layout);
+    auto *mi = classLayout.getStoredMethodInfoIfPresent(
+        SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl)));
+    if (!mi)
+      return {};
+    switch (mi->TheKind) {
+    case ClassMetadataLayout::MethodInfo::Kind::DirectImpl:
+      return MethodDispatchInfo::direct();
+    case ClassMetadataLayout::MethodInfo::Kind::Offset:
+      if (mi->TheOffset.isStatic()) {
+        return MethodDispatchInfo::indirectVTableStaticOffset(
+            /*bitOffset=*/mi->TheOffset.getStaticOffset().getValue());
+      }
+      return {};
+    }
+    llvm_unreachable("invalid kind");
   }
 
   Lowering::TypeConverter typeConverter;
@@ -404,4 +439,10 @@ IRABIDetailsProvider::getTypeMetadataAccessFunctionGenericRequirementParameters(
 llvm::MapVector<EnumElementDecl *, IRABIDetailsProvider::EnumElementInfo>
 IRABIDetailsProvider::getEnumTagMapping(const EnumDecl *ED) {
   return impl->getEnumTagMapping(ED);
+}
+
+Optional<IRABIDetailsProvider::MethodDispatchInfo>
+IRABIDetailsProvider::getMethodDispatchInfo(
+    const AbstractFunctionDecl *funcDecl) {
+  return impl->getMethodDispatchInfo(funcDecl);
 }

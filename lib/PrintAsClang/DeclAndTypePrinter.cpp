@@ -995,6 +995,13 @@ private:
                              /*selfTypeDeclContext=*/typeDeclContext);
       if (!funcABI)
         return;
+      Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo;
+      if (!isa<ConstructorDecl>(AFD)) {
+        dispatchInfo = owningPrinter.interopContext.getIrABIDetails()
+                           .getMethodDispatchInfo(AFD);
+        if (!dispatchInfo)
+          return;
+      }
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
       printDocumentationComment(AFD);
@@ -1018,7 +1025,7 @@ private:
                                    funcABI->getSignature(),
                                    funcABI->getSymbolName(), resultTy,
                                    /*isStatic=*/isClassMethod,
-                                   /*isDefinition=*/false);
+                                   /*isDefinition=*/false, dispatchInfo);
       }
 
       DeclAndTypeClangFunctionPrinter defPrinter(
@@ -1041,7 +1048,7 @@ private:
         defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
                                   funcABI->getSymbolName(), resultTy,
                                   /*isStatic=*/isClassMethod,
-                                  /*isDefinition=*/true);
+                                  /*isDefinition=*/true, dispatchInfo);
       }
 
       // FIXME: SWIFT_WARN_UNUSED_RESULT
