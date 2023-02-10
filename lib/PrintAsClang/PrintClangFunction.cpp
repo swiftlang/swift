@@ -1084,7 +1084,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
     StringRef swiftSymbolName, const NominalTypeDecl *typeDeclContext,
     const ModuleDecl *moduleContext, Type resultTy, const ParameterList *params,
-    bool hasThrows, const AnyFunctionType *funcType, bool isStaticMethod) {
+    bool hasThrows, const AnyFunctionType *funcType, bool isStaticMethod,
+    Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo) {
   if (typeDeclContext)
     ClangSyntaxPrinter(os).printNominalTypeOutsideMemberDeclInnerStaticAssert(
         typeDeclContext);
@@ -1096,9 +1097,29 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     os << "  void* opaqueError = nullptr;\n";
     os << "  void* _ctx = nullptr;\n";
   }
+  Optional<StringRef> indirectFunctionVar;
+  if (dispatchInfo &&
+      dispatchInfo->getKind() !=
+          IRABIDetailsProvider::MethodDispatchInfo::Kind::Direct) {
+    assert(dispatchInfo->getKind() == IRABIDetailsProvider::MethodDispatchInfo::
+                                          Kind::IndirectVTableStaticOffset);
+    auto vtableBitOffset = dispatchInfo->getStaticBitOffset();
+
+    os << "void ***selfPtr_ = reinterpret_cast<void ***>( "
+          "::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));\n";
+    os << "void **vtable_ = *selfPtr_;\n";
+    os << "using FType = decltype(" << cxx_synthesis::getCxxImplNamespaceName()
+       << "::" << swiftSymbolName << ");\n";
+    os << "FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + "
+       << (vtableBitOffset / 8) << "));\n"; // FIXME: not 8
+    indirectFunctionVar = StringRef("fptr_");
+  }
   auto printCallToCFunc = [&](Optional<StringRef> additionalParam) {
-    os << cxx_synthesis::getCxxImplNamespaceName() << "::" << swiftSymbolName
-       << '(';
+    if (indirectFunctionVar)
+      os << "(* " << *indirectFunctionVar << ')';
+    else
+      os << cxx_synthesis::getCxxImplNamespaceName() << "::" << swiftSymbolName;
+    os << '(';
 
     bool needsComma = false;
     size_t paramIndex = 1;
@@ -1329,7 +1350,8 @@ static StringRef getConstructorName(const AbstractFunctionDecl *FD) {
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
-    Type resultTy, bool isStatic, bool isDefinition) {
+    Type resultTy, bool isStatic, bool isDefinition,
+    Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo) {
   bool isConstructor = isa<ConstructorDecl>(FD);
   os << "  ";
 
@@ -1357,10 +1379,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
 
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(
-      FD, signature, swiftSymbolName, typeDeclContext, FD->getModuleContext(),
-      resultTy, FD->getParameters(), FD->hasThrows(),
-      FD->getInterfaceType()->castTo<AnyFunctionType>(), isStatic);
+  printCxxThunkBody(FD, signature, swiftSymbolName, typeDeclContext,
+                    FD->getModuleContext(), resultTy, FD->getParameters(),
+                    FD->hasThrows(),
+                    FD->getInterfaceType()->castTo<AnyFunctionType>(), isStatic,
+                    dispatchInfo);
   os << "  }\n";
 }
 

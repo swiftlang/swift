@@ -18,6 +18,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/GenericRequirement.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
@@ -107,22 +108,21 @@ public:
 
   /// Print the body of the inline C++ function thunk that calls the underlying
   /// Swift function.
-  void printCxxThunkBody(const AbstractFunctionDecl *FD,
-                         const LoweredFunctionSignature &signature,
-                         StringRef swiftSymbolName,
-                         const NominalTypeDecl *typeDeclContext,
-                         const ModuleDecl *moduleContext, Type resultTy,
-                         const ParameterList *params, bool hasThrows = false,
-                         const AnyFunctionType *funcType = nullptr,
-                         bool isStaticMethod = false);
+  void printCxxThunkBody(
+      const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
+      StringRef swiftSymbolName, const NominalTypeDecl *typeDeclContext,
+      const ModuleDecl *moduleContext, Type resultTy,
+      const ParameterList *params, bool hasThrows = false,
+      const AnyFunctionType *funcType = nullptr, bool isStaticMethod = false,
+      Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo = None);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
-  void printCxxMethod(const NominalTypeDecl *typeDeclContext,
-                      const AbstractFunctionDecl *FD,
-                      const LoweredFunctionSignature &signature,
-                      StringRef swiftSymbolName, Type resultTy, bool isStatic,
-                      bool isDefinition);
+  void printCxxMethod(
+      const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
+      const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
+      Type resultTy, bool isStatic, bool isDefinition,
+      Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print the C++ getter/setter method signature.
   void printCxxPropertyAccessorMethod(const NominalTypeDecl *typeDeclContext,
