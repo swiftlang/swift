@@ -49,7 +49,7 @@ struct S4 : P, P { }
 // expected-error@-1{{redundant conformance of 'S4' to protocol 'P'}}
 // expected-note@-2{{'S4' declares conformance to protocol 'P' here}}
 struct S6 : P & { }      // expected-error {{expected identifier for type name}}
-struct S7 : protocol<P, Q> { }  // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}
+struct S7 : protocol<P, Q> { }  // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}}
                                 // expected-error @-1 {{non-class type 'S7' cannot conform to class protocol 'Q'}}
 
 class GenericBase<T> {}
