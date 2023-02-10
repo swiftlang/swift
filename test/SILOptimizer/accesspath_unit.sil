@@ -1,0 +1,50 @@
+// RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+import Swift
+
+struct S {}
+
+class Klass {
+  var f: S
+}
+
+// CHECK-LABEL: begin running test 1 of 2 on testRefElement: accesspath-base with: @trace[0]
+// CHECK: [[P1:%.*]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[P1]] : $*S
+// CHECK: [[P2:%.*]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK: [[A2:%.*]] = begin_access [read] [dynamic] [[P2]] : $*S
+// CHECK: Access path base:  [[P1]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK-NEXT: Exact Use:   %{{.*}} = load [trivial] [[A1]] : $*S
+// CHECK-NEXT: Exact Use:   end_access [[A1]] : $*S
+// CHECK-LABEL: end running test 1 of 2 on testRefElement: accesspath-base with: @trace[0]
+
+// CHECK-LABEL: begin running test 2 of 2 on testRefElement: accesspath-base with: @trace[1]
+// CHECK: [[P1:%.*]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[P1]] : $*S
+// CHECK: [[P2:%.*]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK: [[A2:%.*]] = begin_access [read] [dynamic] [[P2]] : $*S
+// CHECK: Access path base:  [[P2]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK-NEXT: Exact Use:   %{{.*}} = load [trivial] [[A2]] : $*S
+// CHECK-NEXT: Exact Use:   end_access [[A2]] : $*S
+// CHECK-LABEL: end running test 2 of 2 on testRefElement: accesspath-base with: @trace[1]
+sil hidden [ossa] @testRefElement : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  test_specification "accesspath-base @trace[0]"
+  %p1 = ref_element_addr %0 : $Klass, #Klass.f
+  debug_value [trace] %p1 : $*S
+  %a1 = begin_access [read] [dynamic] %p1 : $*S
+  %l1 = load [trivial] %a1 : $*S
+  end_access %a1 : $*S
+  test_specification "accesspath-base @trace[1]"
+  %p2 = ref_element_addr %0 : $Klass, #Klass.f
+  debug_value [trace] %p2 : $*S
+  %a2 = begin_access [read] [dynamic] %p2 : $*S
+  %l2 = load [trivial] %a2 : $*S
+  end_access %a2 : $*S
+  %99 = tuple ()
+  return %99 : $()
+}
