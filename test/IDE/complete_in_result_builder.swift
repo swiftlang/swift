@@ -302,3 +302,30 @@ func testCompleteGlobalInResultBuilderIf() {
   // GLOBAL_IN_RESULT_BUILDER_IF-DAG: Decl[Struct]/Local/TypeRelation[Convertible]: MyView[#MyView#]; name=MyView
   // GLOBAL_IN_RESULT_BUILDER_IF: End completions
 }
+
+func testInStringLiteralInResultBuilder() {
+  func buildResult<Content>(@MyResultBuilder content: () -> Content) {}
+
+  @resultBuilder
+  struct MyResultBuilder {
+    static func buildBlock(_ components: String) -> String {
+      components
+    }
+  }
+
+  struct Foo {
+    var bar: Int
+  }
+
+  func withClosure(_ x: () -> Bool) -> String { return "" }
+
+  func test(foo: Foo) {
+    buildResult {
+      "\(withClosure { foo.#^IN_STRING_LITERAL_IN_RESULT_BUILDER^# })"
+    }
+  }
+// IN_STRING_LITERAL_IN_RESULT_BUILDER: Begin completions, 2 items
+// IN_STRING_LITERAL_IN_RESULT_BUILDER-DAG: Keyword[self]/CurrNominal:          self[#Foo#]; name=self
+// IN_STRING_LITERAL_IN_RESULT_BUILDER-DAG: Decl[InstanceVar]/CurrNominal:      bar[#Int#]; name=bar
+// IN_STRING_LITERAL_IN_RESULT_BUILDER: End completions
+}
