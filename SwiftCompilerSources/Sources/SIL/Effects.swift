@@ -499,7 +499,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
       case .directGuaranteed:
         // Note that `directGuaranteed` still has a "destroy" effect, because an object stored in
         // a class property could be destroyed.
-        if argument.path.hasNoClassProjection {
+        if !argument.path.mayHaveClassProjection {
           result.ownership.destroy = false
         }
         fallthrough
