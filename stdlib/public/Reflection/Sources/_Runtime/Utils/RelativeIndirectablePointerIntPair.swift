@@ -49,7 +49,7 @@ public struct RelativeIndirectablePointerIntPair<
     let address = ptr + (unresolved & ~1)
     
     if unresolved & 1 != 0 {
-      return address.loadUnaligned(as: UnsafeRawPointer.self)
+      return address.unprotectedLoad(as: UnsafeRawPointer.self)
     } else {
       return address
     }
@@ -64,7 +64,7 @@ extension UnsafeRawPointer {
     and type2: U.Type
   ) -> UnsafeRawPointer {
     let relativePointer = RelativeIndirectablePointerIntPair<T, U>(
-      offset: loadUnaligned(as: Int32.self)
+      offset: unprotectedLoad(as: Int32.self)
     )
     
     return relativePointer.address(from: self)

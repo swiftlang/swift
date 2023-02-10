@@ -4,11 +4,13 @@
 
 // RUN: %target-swift-frontend -emit-module %s \
 // RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-deserialization-safety \
 // RUN:   -Xllvm -debug-only=Serialization 2>&1 \
 // RUN:   | %FileCheck --check-prefixes=SAFETY-PRIVATE,SAFETY-INTERNAL %s
 
 // RUN: %target-swift-frontend -emit-module %s \
 // RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-deserialization-safety \
 // RUN:   -Xllvm -debug-only=Serialization \
 // RUN:   -enable-testing 2>&1 \
 // RUN:   | %FileCheck --check-prefixes=DISABLED %s
@@ -16,13 +18,14 @@
 /// Don't mark decls as unsafe when private import is enabled.
 // RUN: %target-swift-frontend -emit-module %s \
 // RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-deserialization-safety \
 // RUN:   -Xllvm -debug-only=Serialization \
 // RUN:   -enable-private-imports 2>&1 \
 // RUN:   | %FileCheck --check-prefixes=DISABLED %s
 
 /// Don't mark decls as unsafe without library evolution.
 // RUN: %target-swift-frontend -emit-module %s \
-// RUN:   -swift-version 5 \
+// RUN:   -enable-deserialization-safety -swift-version 5 \
 // RUN:   -Xllvm -debug-only=Serialization 2>&1 \
 // RUN:   | %FileCheck --check-prefixes=DISABLED %s
 

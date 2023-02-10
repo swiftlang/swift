@@ -42,8 +42,7 @@ extension Field {
   @inlinable
   public var name: String {
     guard parent.kind != .tuple else {
-      //return TupleMetadata(parent.ptr).elements[index].
-      return "hello"
+      return parent.tuple.elements[index].label
     }
     
     return parent.type.descriptor.fields[index].name

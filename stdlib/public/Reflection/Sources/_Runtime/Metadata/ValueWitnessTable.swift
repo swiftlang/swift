@@ -128,7 +128,7 @@ extension ValueWitnessTable {
     _ dest: UnsafeMutableRawPointer,
     _ src: UnsafeRawPointer
   ) -> UnsafeMutableRawPointer {
-    let address = layout.raw
+    let address = address(for: \.initializeBufferWithCopyOfBuffer)
 
     return address.signedVWTInitializeBufferWithCopyOfBuffer(
       dest,
@@ -139,17 +139,7 @@ extension ValueWitnessTable {
   
   @inlinable
   public func destroy(_ src: UnsafeMutableRawPointer) {
-    // rdar://103834325
-    // FIXME: There's currently a compiler bug preventing me from doing:
-    // 'address(of: \.destroy)'
-    // or even
-    // 'MemoryLayout<ValueWitnessTable.Layout.Pointee>.offset(of: \.destroy)'
-    //
-    // The same goes for everything else in this file
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-    
-    address.signedVWTDestroy(src, trailing)
+    address(for: \.destroy).signedVWTDestroy(src, trailing)
   }
   
   @inlinable
@@ -158,9 +148,7 @@ extension ValueWitnessTable {
     _ dest: UnsafeMutableRawPointer,
     _ src: UnsafeRawPointer
   ) -> UnsafeMutableRawPointer {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
+    let address = address(for: \.initializeWithCopy)
     
     return address.signedVWTInitializeWithCopy(dest, src, trailing)
   }
@@ -171,10 +159,7 @@ extension ValueWitnessTable {
     _ dest: UnsafeMutableRawPointer,
     _ src: UnsafeRawPointer
   ) -> UnsafeMutableRawPointer {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-                  + MemoryLayout<InitializeWithCopy>.size
+    let address = address(for: \.assignWithCopy)
     
     return address.signedVWTAssignWithCopy(dest, src, trailing)
   }
@@ -185,11 +170,7 @@ extension ValueWitnessTable {
     _ dest: UnsafeMutableRawPointer,
     _ src: UnsafeMutableRawPointer
   ) -> UnsafeMutableRawPointer {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-                  + MemoryLayout<InitializeWithCopy>.size
-                  + MemoryLayout<AssignWithCopy>.size
+    let address = address(for: \.initializeWithTake)
     
     return address.signedVWTInitializeWithTake(dest, src, trailing)
   }
@@ -200,12 +181,7 @@ extension ValueWitnessTable {
     _ dest: UnsafeMutableRawPointer,
     _ src: UnsafeMutableRawPointer
   ) -> UnsafeMutableRawPointer {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-                  + MemoryLayout<InitializeWithCopy>.size
-                  + MemoryLayout<AssignWithCopy>.size
-                  + MemoryLayout<InitializeWithTake>.size
+    let address = address(for: \.assignWithTake)
     
     return address.signedVWTAssignWithTake(dest, src, trailing)
   }
@@ -216,13 +192,7 @@ extension ValueWitnessTable {
     _ src: UnsafeRawPointer,
     _ numberOfEmptyCases: UInt32
   ) -> UInt32 {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-                  + MemoryLayout<InitializeWithCopy>.size
-                  + MemoryLayout<AssignWithCopy>.size
-                  + MemoryLayout<InitializeWithTake>.size
-                  + MemoryLayout<AssignWithTake>.size
+    let address = address(for: \.getEnumTagSinglePayload)
     
     return address.signedVWTGetEnumTagSinglePayload(
       src,
@@ -237,14 +207,7 @@ extension ValueWitnessTable {
     _ tag: UInt32,
     _ numberOfEmptyCases: UInt32
   ) -> () {
-    let address = layout.raw
-                  + MemoryLayout<InitializeBufferWithCopyOfBuffer>.size
-                  + MemoryLayout<Destroy>.size
-                  + MemoryLayout<InitializeWithCopy>.size
-                  + MemoryLayout<AssignWithCopy>.size
-                  + MemoryLayout<InitializeWithTake>.size
-                  + MemoryLayout<AssignWithTake>.size
-                  + MemoryLayout<GetEnumTagSinglePayload>.size
+    let address = address(for: \.storeEnumTagSinglePayload)
     
     return address.signedVWTStoreEnumTagSinglePayload(
       src,
