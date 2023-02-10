@@ -39,7 +39,7 @@ internal final class Linux64RemoteProcess: RemoteProcess {
             default:
                 return 0
             }
-        }        
+        }
     }
 
     static var Free: FreeFunction {
