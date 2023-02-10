@@ -541,6 +541,7 @@ void UseState::initializeLiveness(
     FieldSensitiveMultiDefPrunedLiveRange &liveness) {
   // We begin by initializing all of our init uses.
   for (auto initInstAndValue : initInsts) {
+    LLVM_DEBUG(llvm::dbgs() << "Found def: " << *initInstAndValue.first);
     liveness.initializeDef(initInstAndValue.first, initInstAndValue.second);
   }
 
@@ -548,9 +549,11 @@ void UseState::initializeLiveness(
   // into a simple init, add it as an init. We are going to consider the rest of
   // our reinit uses to be liveness uses.
   for (auto reinitInstAndValue : reinitInsts) {
-    if (isReinitToInitConvertibleInst(reinitInstAndValue.first))
+    if (isReinitToInitConvertibleInst(reinitInstAndValue.first)) {
+      LLVM_DEBUG(llvm::dbgs() << "Found def: " << *reinitInstAndValue.first);
       liveness.initializeDef(reinitInstAndValue.first,
                              reinitInstAndValue.second);
+    }
   }
 
   // Then check if our markedValue is from an argument that is in,
@@ -601,6 +604,15 @@ void UseState::initializeLiveness(
         liveness.initializeDef(address, liveness.getTopLevelSpan());
       }
     }
+  }
+
+  // Check if our address is from a ref_element_addr. In such a case, we treat
+  // the mark_must_check as the initialization.
+  if (auto *refEltAddr = dyn_cast<RefElementAddrInst>(address->getOperand())) {
+    LLVM_DEBUG(llvm::dbgs() << "Found ref_element_addr use... "
+                               "adding mark_must_check as init!\n");
+    initInsts.insert({address, liveness.getTopLevelSpan()});
+    liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
 
   // Now that we have finished initialization of defs, change our multi-maps
@@ -1157,15 +1169,17 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
       // Canonicalize the lifetime of the load [take], load [copy].
       moveChecker.changed |= moveChecker.canonicalizer.canonicalize(li);
 
-      // If we are asked to perform guaranteed checking, emit an error if we
-      // have /any/ consuming uses. This is a case that can always be converted
-      // to a load_borrow if we pass the check.
+      // If we are asked to perform no_consume_or_assign checking or
+      // assignable_but_not_consumable checking, if we found any consumes of our
+      // load, then we need to emit an error.
       if (markedValue->getCheckKind() ==
-          MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
-        if (!moveChecker.canonicalizer.foundAnyConsumingUses()) {
+              MarkMustCheckInst::CheckKind::NoConsumeOrAssign ||
+          markedValue->getCheckKind() ==
+              MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
+        if (moveChecker.canonicalizer.foundAnyConsumingUses()) {
           LLVM_DEBUG(llvm::dbgs()
                      << "Found mark must check [nocopy] error: " << *user);
-          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+          moveChecker.diagnosticEmitter.emitAddressInstLoadedAndConsumed(
               markedValue);
           emittedEarlyDiagnostic = true;
           return true;
@@ -1856,14 +1870,18 @@ void MoveOnlyChecker::rewriteUses(
         // destroy_value and use then to create a new load_borrow scope.
         SILBuilderWithScope builder(li);
         auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
-
+        // We use this auxillary list to avoid iterator invalidation of
+        // li->getConsumingUse();
+        StackList<DestroyValueInst *> toDelete(lbi->getFunction());
         for (auto *consumeUse : li->getConsumingUses()) {
           auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
           SILBuilderWithScope destroyBuilder(dvi);
           destroyBuilder.createEndBorrow(dvi->getLoc(), lbi);
-          dvi->eraseFromParent();
+          toDelete.push_back(dvi);
           changed = true;
         }
+        while (!toDelete.empty())
+          toDelete.pop_back_val()->eraseFromParent();
 
         li->replaceAllUsesWith(lbi);
         li->eraseFromParent();
@@ -1903,7 +1921,7 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
                             diagnosticEmitter, gatherUsesLiveness);
   SWIFT_DEFER { visitor.clear(); };
   visitor.reset(markedAddress);
-  if (!visitAccessPathUses(visitor, accessPath, fn)) {
+  if (!visitAccessPathBaseUses(visitor, accessPathWithBase, fn)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed access path visit: " << *markedAddress);
     return false;
   }

@@ -91,13 +91,6 @@ static void getVariableNameForValue(MarkMustCheckInst *mmci,
       continue;
     }
 
-    // Single value instructions we should look through.
-    if (isa<BeginBorrowInst>(value) || isa<LoadInst>(value) ||
-        isa<BeginAccessInst>(value) || isa<MarkMustCheckInst>(value)) {
-      value = cast<SingleValueInstruction>(value)->getOperand(0);
-      continue;
-    }
-
     // If we do not do an exact match, see if we can find a debug_var inst. If
     // we do, we always break since we have a root value.
     if (auto *use = getSingleDebugUse(value)) {
@@ -106,6 +99,14 @@ static void getVariableNameForValue(MarkMustCheckInst *mmci,
         variableNamePath.push_back(use->getUser());
         break;
       }
+    }
+
+    // Otherwise, try to see if we have a single value instruction we can look
+    // through.
+    if (isa<BeginBorrowInst>(value) || isa<LoadInst>(value) ||
+        isa<BeginAccessInst>(value) || isa<MarkMustCheckInst>(value)) {
+      value = cast<SingleValueInstruction>(value)->getOperand(0);
+      continue;
     }
 
     // If we do not pattern match successfully, just set resulting string to
@@ -617,5 +618,47 @@ void DiagnosticEmitter::emitObjectInstConsumesAndUsesValue(
            varName);
   diagnose(astContext, consumingUse->getUser(),
            diag::sil_moveonlychecker_consuming_and_non_consuming_uses_here);
+  registerDiagnosticEmitted(markedValue);
+}
+
+void DiagnosticEmitter::emitAddressInstLoadedAndConsumed(
+    MarkMustCheckInst *markedValue) {
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
+
+  using DiagType =
+      decltype(diag::
+                   sil_moveonlychecker_notconsumable_but_assignable_was_consumed_classfield_let);
+  Optional<DiagType> diag;
+  if (auto *reai = dyn_cast<RefElementAddrInst>(markedValue->getOperand())) {
+    auto *field = reai->getField();
+    if (field->isLet()) {
+      diag = diag::
+          sil_moveonlychecker_notconsumable_but_assignable_was_consumed_classfield_let;
+    } else {
+      diag = diag::
+          sil_moveonlychecker_notconsumable_but_assignable_was_consumed_classfield_var;
+    }
+  } else if (auto *globalAddr =
+                 dyn_cast<GlobalAddrInst>(markedValue->getOperand())) {
+    auto inst = VarDeclCarryingInst(globalAddr);
+    if (auto *decl = inst.getDecl()) {
+      if (decl->isLet()) {
+        diag = diag::
+            sil_moveonlychecker_notconsumable_but_assignable_was_consumed_global_let;
+      } else {
+        diag = diag::
+            sil_moveonlychecker_notconsumable_but_assignable_was_consumed_global_var;
+      }
+    }
+  }
+
+  if (!diag) {
+    llvm::report_fatal_error(
+        "Unknown address assignable but not consumable case!");
+  }
+
+  diagnose(markedValue->getModule().getASTContext(), markedValue, *diag,
+           varName);
   registerDiagnosticEmitted(markedValue);
 }
