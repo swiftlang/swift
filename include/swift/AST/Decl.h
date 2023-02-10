@@ -8358,12 +8358,11 @@ public:
   /// The location of the 'macro' keyword.
   SourceLoc macroLoc;
 
-  /// The parameter list for a function-like macro.
+  /// The parameter list.
   ParameterList *parameterList;
 
-  /// Where the '->' or ':' is located, for a function- or value-like macro,
-  /// respectively.
-  SourceLoc arrowOrColonLoc;
+  /// Where the '->' is located, if present.
+  SourceLoc arrowLoc;
 
   /// The result type.
   TypeLoc resultType;
@@ -8375,7 +8374,7 @@ public:
   MacroDecl(SourceLoc macroLoc, DeclName name, SourceLoc nameLoc,
             GenericParamList *genericParams,
             ParameterList *parameterList,
-            SourceLoc arrowOrColonLoc,
+            SourceLoc arrowLoc,
             TypeRepr *resultType,
             Expr *definition,
             DeclContext *parent);

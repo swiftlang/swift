@@ -9487,39 +9487,29 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
 
   // Parse the macro signature.
   ParameterList *parameterList = nullptr;
-  SourceLoc arrowOrColonLoc;
+  SourceLoc arrowLoc;
   TypeRepr *resultType = nullptr;
   DeclName macroFullName;
-  if (consumeIf(tok::colon, arrowOrColonLoc)) {
-    // Value-like macros.
-    auto type = parseType(diag::expected_macro_value_type);
-    status |= type;
+
+  // Parameter list.
+  SmallVector<Identifier, 2> namePieces;
+  auto parameterResult = parseSingleParameterClause(
+      ParameterContextKind::Macro, &namePieces, nullptr);
+  status |= parameterResult;
+  parameterList = parameterResult.getPtrOrNull();
+
+  // ->
+  if (consumeIf(tok::arrow, arrowLoc)) {
+    // Result type.
+    auto parsedResultType =
+        parseDeclResultType(diag::expected_type_macro_result);
+    resultType = parsedResultType.getPtrOrNull();
+    status |= parsedResultType;
     if (status.isErrorOrHasCompletion())
       return status;
-
-    resultType = type.getPtrOrNull();
-    macroFullName = macroName;
-  } else {
-    // Parameter list.
-    SmallVector<Identifier, 2> namePieces;
-    auto parameterResult = parseSingleParameterClause(
-        ParameterContextKind::Macro, &namePieces, nullptr);
-    status |= parameterResult;
-    parameterList = parameterResult.getPtrOrNull();
-
-    // ->
-    if (consumeIf(tok::arrow, arrowOrColonLoc)) {
-      // Result type.
-      auto parsedResultType =
-          parseDeclResultType(diag::expected_type_macro_result);
-      resultType = parsedResultType.getPtrOrNull();
-      status |= parsedResultType;
-      if (status.isErrorOrHasCompletion())
-        return status;
-    }
-
-    macroFullName = DeclName(Context, macroName, namePieces);
   }
+
+  macroFullName = DeclName(Context, macroName, namePieces);
 
   // Parse '=' <expression>
   Expr *definition = nullptr;
@@ -9534,7 +9524,7 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
   // Create the macro declaration.
   auto *macro = new (Context) MacroDecl(
       macroLoc, macroFullName, macroNameLoc, genericParams, parameterList,
-      arrowOrColonLoc, resultType, definition, CurDeclContext);
+      arrowLoc, resultType, definition, CurDeclContext);
   macro->getAttrs() = attributes;
 
   // Parse a 'where' clause if present.
