@@ -1303,6 +1303,19 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   if (subExpr.isNull())
     return status;
 
+  if (isa<CodeCompletionExpr>(subExpr.get()) && Tok.isFollowingLParen()) {
+    // We are in the case like the following of parsing a pattern with the code
+    // completion token as base and associated value matches:
+    // #^COMPLETE^#(let a)
+    // We will have not consumed the `(let a)` in `parseExprPostfixSuffix`
+    // because usually suffixes don't influence the code completion's type and
+    // the suffix might be unrelated. But the trailing `(let a)` that is left
+    // prevents us from forming a valid pattern.
+    // Consume and discard the `(let a)`, which just leaves us with the base
+    // of the pattern.
+    (void)parseExprCallSuffix(subExpr, isExprBasic);
+  }
+
   // The most common case here is to parse something that was a lexically
   // obvious pattern, which will come back wrapped in an immediate
   // UnresolvedPatternExpr.  Transform this now to simplify later code.
