@@ -860,6 +860,9 @@ Expr *swift::ide::getBase(ArrayRef<Expr *> ExprStack) {
 
   Expr *CurrentE = ExprStack.back();
   Expr *ParentE = getContainingExpr(ExprStack, 1);
+  if (ParentE && isa<FunctionConversionExpr>(ParentE)) {
+    ParentE = getContainingExpr(ExprStack, 2);
+  }
   Expr *Base = nullptr;
 
   if (auto DSE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
@@ -925,6 +928,8 @@ bool swift::ide::isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(
   if (!isDeclOverridable(D))
     return false;
 
+  Base = Base->getSemanticsProvidingExpr();
+
   // super.method()
   // TODO: Should be dynamic if `D` is marked as dynamic and @objc, but in
   //       that case we really need to change the role the index outputs as
@@ -956,11 +961,9 @@ void swift::ide::getReceiverType(Expr *Base,
   if (!ReceiverTy)
     return;
 
-  if (auto LVT = ReceiverTy->getAs<LValueType>())
-    ReceiverTy = LVT->getObjectType();
-  else if (auto MetaT = ReceiverTy->getAs<MetatypeType>())
-    ReceiverTy = MetaT->getInstanceType();
-  else if (auto SelfT = ReceiverTy->getAs<DynamicSelfType>())
+  ReceiverTy = ReceiverTy->getWithoutSpecifierType();
+  ReceiverTy = ReceiverTy->getMetatypeInstanceType();
+  if (auto SelfT = ReceiverTy->getAs<DynamicSelfType>())
     ReceiverTy = SelfT->getSelfType();
 
   // TODO: Handle generics and composed protocols
