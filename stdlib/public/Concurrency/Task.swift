@@ -287,10 +287,10 @@ extension Task where Success == Never, Failure == Never {
   /// If the system can't provide a priority,
   /// this property's value is `Priority.default`.
   public static var currentPriority: TaskPriority {
-    withUnsafeCurrentTask { task in
+    withUnsafeCurrentTask { unsafeTask in
       // If we are running on behalf of a task, use that task's priority.
-      if let unsafeTask = task {
-         return TaskPriority(rawValue: _taskCurrentPriority(unsafeTask._task))
+      if let unsafeTask {
+         return unsafeTask.priority
       }
 
       // Otherwise, query the system.
@@ -311,6 +311,7 @@ extension Task where Success == Never, Failure == Never {
       return nil
     }
   }
+
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -818,6 +819,15 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `Task.currentPriority`
   public var priority: TaskPriority {
     TaskPriority(rawValue: _taskCurrentPriority(_task))
+  }
+
+  /// The current task's base priority.
+  ///
+  /// - SeeAlso: `TaskPriority`
+  /// - SeeAlso: `Task.currentBasePriority`
+  @available(SwiftStdlib 5.9, *)
+  public var basePriority: TaskPriority {
+    TaskPriority(rawValue: _taskBasePriority(_task))
   }
 
   /// Cancel the current task.
