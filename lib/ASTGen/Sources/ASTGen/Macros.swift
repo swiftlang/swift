@@ -437,7 +437,10 @@ func expandAttachedMacro(
           customAttrNode,
           foldingWith: OperatorTable.standardOperators
         ),
-        providingPeersOf: sourceManager.detach(declarationNode),
+        providingPeersOf: sourceManager.detach(
+          declarationNode,
+          foldingWith: OperatorTable.standardOperators
+        ),
         in: context
       )
 
