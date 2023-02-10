@@ -54,7 +54,7 @@ extension BufferView: RandomAccessCollection {
   
   @inlinable
   public subscript(position: Int) -> Element {
-    start.loadUnaligned(
+    start.unprotectedLoad(
       fromByteOffset: position * MemoryLayout<Element>.size,
       as: Element.self
     )

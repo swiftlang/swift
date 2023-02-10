@@ -29,17 +29,19 @@ public struct Case {
   
   @inlinable
   public init?(from instance: Any) {
-    guard Type(instance).isEnum else {
+    let instanceTy = type(of: instance)
+
+    guard Type(instanceTy).isEnum else {
       return nil
     }
     
     var container = unsafeBitCast(instance, to: AnyExistentialContainer.self)
     
     let tag = container.projectValue {
-      Metadata(type(of: instance)).enum.enumVWT.getEnumTag($0)
+      Metadata(instanceTy).enum.enumVWT.getEnumTag($0)
     }
     
-    self.parent = Metadata(type(of: instance)).enum
+    self.parent = Metadata(instanceTy).enum
     self.tag = Int(truncatingIfNeeded: tag)
   }
 }
