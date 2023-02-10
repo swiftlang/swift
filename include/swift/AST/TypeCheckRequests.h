@@ -3860,6 +3860,30 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Load a plugin module with the given name.
+///
+///
+class CompilerPluginLoadRequest
+  : public SimpleRequest<CompilerPluginLoadRequest,
+                         void *(ASTContext *, Identifier),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  void *evaluate(
+      Evaluator &evaluator, ASTContext *ctx, Identifier moduleName
+  ) const;
+
+public:
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); }
+
+  bool isCached() const { return true; }
+};
+
 /// Resolve an external macro given its module and type name.
 class ExternalMacroDefinitionRequest
     : public SimpleRequest<ExternalMacroDefinitionRequest,

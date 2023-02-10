@@ -339,6 +339,10 @@ public:
   /// preference.
   std::vector<std::string> RuntimeLibraryPaths;
 
+  /// Paths that contain compiler plugins loaded on demand for, e.g.,
+  /// macro implementations.
+  std::vector<std::string> PluginSearchPaths;
+
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;
 
