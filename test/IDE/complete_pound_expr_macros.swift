@@ -5,8 +5,8 @@
 
 import ObjectiveC
 
-macro myLine: Int = A.B
-macro myFilename<T: ExpressiblyByStringLiteral>: T = A.B
+macro myLine() -> Int = A.B
+macro myFilename<T: ExpressiblyByStringLiteral>() -> T = A.B
 macro myStringify<T>(_: T) -> (T, String) = A.B
 
 struct Color { }
