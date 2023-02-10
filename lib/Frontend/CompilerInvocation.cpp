@@ -1413,6 +1413,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   Opts.setFrameworkSearchPaths(FrameworkSearchPaths);
 
+  for (const Arg *A : Args.filtered(OPT_plugin_path)) {
+    Opts.PluginSearchPaths.push_back(resolveSearchPath(A->getValue()));
+  }
+
   for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
