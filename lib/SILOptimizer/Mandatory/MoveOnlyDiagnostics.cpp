@@ -59,30 +59,76 @@ static void diagnose(ASTContext &context, SILInstruction *inst, Diag<T...> diag,
   context.Diags.diagnose(loc.getSourceLoc(), diag, std::forward<U>(args)...);
 }
 
-static StringRef getVariableNameForValue(MarkMustCheckInst *mmci) {
-  if (auto *allocInst = dyn_cast<AllocationInst>(mmci->getOperand())) {
-    DebugVarCarryingInst debugVar(allocInst);
-    if (auto varInfo = debugVar.getVarInfo()) {
-      return varInfo->Name;
-    } else {
-      if (auto *decl = debugVar.getDecl()) {
-        return decl->getBaseName().userFacingName();
-      }
-    }
-  }
-
+static void getVariableNameForValue(MarkMustCheckInst *mmci,
+                                    SmallString<64> &resultingString) {
+  // Before we do anything, lets see if we have an exact debug_value on our
+  // mmci. In such a case, we can end early and are done.
   if (auto *use = getSingleDebugUse(mmci)) {
-    DebugVarCarryingInst debugVar(use->getUser());
-    if (auto varInfo = debugVar.getVarInfo()) {
-      return varInfo->Name;
-    } else {
-      if (auto *decl = debugVar.getDecl()) {
-        return decl->getBaseName().userFacingName();
-      }
+    if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
+      assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
+      resultingString += debugVar.getName();
+      return;
     }
   }
 
-  return "unknown";
+  // Otherwise, we need to look at our mark_must_check's operand.
+  StackList<SILInstruction *> variableNamePath(mmci->getFunction());
+  SILValue value = mmci->getOperand();
+  while (true) {
+    if (auto *allocInst = dyn_cast<AllocationInst>(value)) {
+      variableNamePath.push_back(allocInst);
+      break;
+    }
+
+    if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(value)) {
+      variableNamePath.push_back(globalAddrInst);
+      break;
+    }
+
+    if (auto *rei = dyn_cast<RefElementAddrInst>(value)) {
+      variableNamePath.push_back(rei);
+      value = rei->getOperand();
+      continue;
+    }
+
+    // Single value instructions we should look through.
+    if (isa<BeginBorrowInst>(value) || isa<LoadInst>(value) ||
+        isa<BeginAccessInst>(value) || isa<MarkMustCheckInst>(value)) {
+      value = cast<SingleValueInstruction>(value)->getOperand(0);
+      continue;
+    }
+
+    // If we do not do an exact match, see if we can find a debug_var inst. If
+    // we do, we always break since we have a root value.
+    if (auto *use = getSingleDebugUse(value)) {
+      if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
+        assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
+        variableNamePath.push_back(use->getUser());
+        break;
+      }
+    }
+
+    // If we do not pattern match successfully, just set resulting string to
+    // unknown and return early.
+    resultingString += "unknown";
+    return;
+  }
+
+  // Walk backwards, constructing our string.
+  while (true) {
+    auto *next = variableNamePath.pop_back_val();
+
+    if (auto i = DebugVarCarryingInst(next)) {
+      resultingString += i.getName();
+    } else if (auto i = VarDeclCarryingInst(next)) {
+      resultingString += i.getName();
+    }
+
+    if (variableNamePath.empty())
+      return;
+
+    resultingString += '.';
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -113,7 +159,8 @@ void DiagnosticEmitter::emitCheckerDoesntUnderstandDiagnostic(
 void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
     MarkMustCheckInst *markedValue) {
   auto &astContext = fn->getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
 
   // See if we have any closure capture uses and emit a better diagnostic.
   if (getCanonicalizer().hasPartialApplyConsumingUse()) {
@@ -153,7 +200,8 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
 void DiagnosticEmitter::emitObjectOwnedDiagnostic(
     MarkMustCheckInst *markedValue) {
   auto &astContext = fn->getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
 
   // Ok we know that we are going to emit an error. Lets use a little more
   // compile time to emit a nice error.
@@ -323,7 +371,8 @@ void DiagnosticEmitter::emitAddressExclusivityHazardDiagnostic(
   registerDiagnosticEmitted(markedValue);
 
   auto &astContext = markedValue->getFunction()->getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
 
   LLVM_DEBUG(llvm::dbgs() << "Emitting error for exclusivity!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
@@ -345,7 +394,8 @@ void DiagnosticEmitter::emitAddressDiagnostic(MarkMustCheckInst *markedValue,
   registerDiagnosticEmitted(markedValue);
 
   auto &astContext = markedValue->getFunction()->getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
 
   LLVM_DEBUG(llvm::dbgs() << "Emitting error!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
@@ -434,7 +484,8 @@ void DiagnosticEmitter::emitInOutEndOfFunctionDiagnostic(
          "Expected markedValue to be on an inout");
 
   auto &astContext = markedValue->getFunction()->getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
 
   LLVM_DEBUG(llvm::dbgs() << "Emitting inout error error!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
@@ -468,7 +519,8 @@ void DiagnosticEmitter::emitAddressDiagnosticNoCopy(
     return;
 
   auto &astContext = markedValue->getFunction()->getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
 
   LLVM_DEBUG(llvm::dbgs() << "Emitting no copy error!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
@@ -491,7 +543,8 @@ void DiagnosticEmitter::emitObjectDestructureNeededWithinBorrowBoundary(
     return;
 
   auto &astContext = markedValue->getFunction()->getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
 
   LLVM_DEBUG(llvm::dbgs() << "Emitting destructure can't be created error!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
@@ -531,7 +584,8 @@ void DiagnosticEmitter::emitObjectInstConsumesValueTwice(
                           << secondUse->getOperandNumber() << '\n');
 
   auto &astContext = markedValue->getModule().getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
   diagnose(astContext, markedValue,
            diag::sil_moveonlychecker_owned_value_consumed_more_than_once,
            varName);
@@ -556,7 +610,8 @@ void DiagnosticEmitter::emitObjectInstConsumesAndUsesValue(
                           << nonConsumingUse->getOperandNumber() << '\n');
 
   auto &astContext = markedValue->getModule().getASTContext();
-  StringRef varName = getVariableNameForValue(markedValue);
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
   diagnose(astContext, markedValue,
            diag::sil_moveonlychecker_owned_value_consumed_and_used_at_same_time,
            varName);
