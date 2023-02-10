@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -enable-experimental-move-only -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -39,6 +39,12 @@ final class InlineExecutor: SpecifiedExecutor, Swift.CustomStringConvertible {
   public func enqueue(_ job: UnownedJob) {
     print("\(self): enqueue")
     job._runSynchronously(on: self.asUnownedSerialExecutor())
+    print("\(self): after run")
+  }
+
+  public func enqueueJob(_ job: __owned Job) {
+    print("\(self): enqueue")
+    runJobSynchronously(job)
     print("\(self): after run")
   }
 

@@ -15,22 +15,42 @@ import Swift
 /// A service that can execute jobs.
 @available(SwiftStdlib 5.1, *)
 public protocol Executor: AnyObject, Sendable {
+  // This requirement is repeated here as a non-override so that we
+  // get a redundant witness-table entry for it.  This allows us to
+  // avoid drilling down to the base conformance just for the basic
+  // work-scheduling operation.
+  @available(*, deprecated, message: "Implement enqueueJob instead")
   func enqueue(_ job: UnownedJob)
+
+  @available(SwiftStdlib 5.9, *)
+  func enqueueJob(_ job: __owned Job) // FIXME: figure out how to introduce in compatible way
 }
 
 /// A service that executes jobs.
 @available(SwiftStdlib 5.1, *)
 public protocol SerialExecutor: Executor {
-  // This requirement is repeated here as a non-override so that we
-  // get a redundant witness-table entry for it.  This allows us to
-  // avoid drilling down to the base conformance just for the basic
-  // work-scheduling operation.
+
   @_nonoverride
+  @available(*, deprecated, message: "Implement enqueueJob instead")
   func enqueue(_ job: UnownedJob)
+
+  @_nonoverride
+  @available(SwiftStdlib 5.9, *)
+  func enqueueJob(_ job: __owned Job) // FIXME: figure out how to introduce in compatible way
 
   /// Convert this executor value to the optimized form of borrowed
   /// executor references.
   func asUnownedSerialExecutor() -> UnownedSerialExecutor
+}
+
+@available(SwiftStdlib 5.9, *)
+extension Executor {
+  public func enqueue(_ job: UnownedJob) { // FIXME: this is bad; how could we deploy this nicely
+    fatalError("Please implement \(Self.self).enqueueJob(_:)")
+  }
+  public func enqueueJob(_ job: __owned Job) {
+    self.enqueue(UnownedJob(job))
+  }
 }
 
 /// An unowned reference to a serial executor (a `SerialExecutor`
@@ -88,12 +108,26 @@ public struct UnownedSerialExecutor: Sendable {
 @_silgen_name("swift_task_isOnExecutor")
 public func _taskIsOnExecutor<Executor: SerialExecutor>(_ executor: Executor) -> Bool
 
+/// Primarily a debug utility.
+///
+/// If the passed in Job is a Task, returns the complete 64bit TaskId,
+/// otherwise returns only the job's 32bit Id.
+///
+/// - Returns: the Id stored in this Job or Task, for purposes of debug printing
+@available(SwiftStdlib 5.9, *)
+@_silgen_name("swift_task_getJobTaskId")
+internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
+
 // Used by the concurrency runtime
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("_swift_task_enqueueOnExecutor")
-internal func _enqueueOnExecutor<E>(job: UnownedJob, executor: E)
+internal func _enqueueOnExecutor<E>(job unownedJob: UnownedJob, executor: E)
 where E: SerialExecutor {
-  executor.enqueue(job)
+  if #available(SwiftStdlib 5.9, *) {
+    executor.enqueueJob(Job(context: unownedJob.context))
+  } else {
+    executor.enqueue(unownedJob)
+  }
 }
 
 @available(SwiftStdlib 5.1, *)

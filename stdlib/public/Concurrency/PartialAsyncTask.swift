@@ -26,7 +26,18 @@ internal func _swiftJobRun(_ job: UnownedJob,
 @available(SwiftStdlib 5.1, *)
 @frozen
 public struct UnownedJob: Sendable {
-  private var context: Builtin.Job
+  internal var context: Builtin.Job
+
+  @usableFromInline
+  internal init(context: Builtin.Job) {
+    self.context = context
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @usableFromInline
+  internal init(_ job: __owned Job) {
+    self.context = job.context
+  }
 
   /// The priority of this job.
   @available(SwiftStdlib 5.9, *)
@@ -41,6 +52,13 @@ public struct UnownedJob: Sendable {
   public func _runSynchronously(on executor: UnownedSerialExecutor) {
       _swiftJobRun(self, executor)
   }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension UnownedJob {
+  public struct Priority {
+    public typealias RawValue = UInt8
+    public var rawValue: RawValue
 
   @_alwaysEmitIntoClient
   @inlinable
