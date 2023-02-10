@@ -1393,13 +1393,10 @@ handleRequestCursorInfo(const RequestDict &Req,
       Req.getInt64(KeyRetrieveRefactorActions, Actionables, /*isOptional=*/true);
       int64_t SymbolGraph = false;
       Req.getInt64(KeyRetrieveSymbolGraph, SymbolGraph, /*isOptional=*/true);
-      int64_t VerifySolverBasedCursorInfo = false;
-      Req.getInt64(KeyVerifySolverBasedCursorInfo, VerifySolverBasedCursorInfo,
-                   /*isOptional=*/true);
       return Lang.getCursorInfo(
           *SourceFile, Offset, Length, Actionables, SymbolGraph,
           CancelOnSubsequentRequest, Args, std::move(vfsOptions),
-          CancellationToken, VerifySolverBasedCursorInfo,
+          CancellationToken,
           [Rec](const RequestResult<CursorInfoData> &Result) {
             reportCursorInfo(Result, Rec);
           });

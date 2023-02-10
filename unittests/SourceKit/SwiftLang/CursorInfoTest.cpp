@@ -166,7 +166,6 @@ public:
         DocName, Offset, /*Length=*/0, /*Actionables=*/false,
         /*SymbolGraph=*/false, CancelOnSubsequentRequest, Args,
         /*vfsOptions=*/None, CancellationToken,
-        /*VerifySolverBasedCursorInfo=*/true,
         [&](const RequestResult<CursorInfoData> &Result) {
           assert(!Result.isCancelled());
           if (Result.isError()) {
@@ -452,7 +451,6 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
       SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/true, ArgsForSlow,
       /*vfsOptions=*/None, /*CancellationToken=*/nullptr,
-      /*VerifySolverBasedCursorInfo=*/true,
       [&](const RequestResult<CursorInfoData> &Result) {
         EXPECT_TRUE(Result.isCancelled());
         FirstCursorInfoSema.signal();
@@ -496,7 +494,6 @@ TEST_F(CursorInfoTest, CursorInfoCancellation) {
       SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/false, ArgsForSlow,
       /*vfsOptions=*/None, /*CancellationToken=*/CancellationToken,
-      /*VerifySolverBasedCursorInfo=*/true,
       [&](const RequestResult<CursorInfoData> &Result) {
         EXPECT_TRUE(Result.isCancelled());
         CursorInfoSema.signal();

@@ -592,11 +592,7 @@ struct CursorInfoData {
   /// Whether the ASTContext was reused for this cursor info.
   bool DidReuseAST = false;
 
-  /// If \p ForSolverBasedCursorInfoVerification is \c true, fields that are
-  /// acceptable to differ between the AST-based and the solver-based result,
-  /// will be excluded.
-  void print(llvm::raw_ostream &OS, std::string Indentation,
-             bool ForSolverBasedCursorInfoVerification = false) const {
+  void print(llvm::raw_ostream &OS, std::string Indentation) const {
     OS << Indentation << "CursorInfoData" << '\n';
     OS << Indentation << "  Symbols:" << '\n';
     for (auto Symbol : Symbols) {
@@ -606,9 +602,7 @@ struct CursorInfoData {
     for (auto AvailableAction : AvailableActions) {
       AvailableAction.print(OS, Indentation + "    ");
     }
-    if (!ForSolverBasedCursorInfoVerification) {
-      OS << Indentation << "DidReuseAST: " << DidReuseAST << '\n';
-    }
+    OS << Indentation << "DidReuseAST: " << DidReuseAST << '\n';
   }
 
   SWIFT_DEBUG_DUMP { print(llvm::errs(), ""); }
@@ -965,7 +959,6 @@ public:
       bool SymbolGraph, bool CancelOnSubsequentRequest,
       ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
-      bool VerifySolverBasedCursorInfo,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void
