@@ -10,24 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Bridged C++ iterator that allows computing the distance between two of its
-/// instances, and advancing an instance by a given number of elements.
-///
-/// Mostly useful for conforming a type to the `CxxRandomAccessCollection`
-/// protocol and should not generally be used directly.
-///
-/// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator
-public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
-  associatedtype Distance: BinaryInteger
-
-  static func -(lhs: Self, rhs: Self) -> Distance
-  static func +=(lhs: inout Self, rhs: Distance)
-}
-
-extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
-
-extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
-
 public protocol CxxRandomAccessCollection<Element>: CxxSequence, RandomAccessCollection {
   override associatedtype Element
   override associatedtype RawIterator: UnsafeCxxRandomAccessIterator
