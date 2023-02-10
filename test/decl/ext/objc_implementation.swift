@@ -178,6 +178,35 @@
   }
 }
 
+@_objcImplementation(SwiftNameTests) extension ObjCClass {
+  func methodSwiftName1() {
+    // OK, infers `@objc(methodObjCName1)`
+  }
+
+  @objc(methodObjCName2) func methodSwiftName2() {
+    // OK
+  }
+
+  func methodObjCName3() {
+    // expected-error@-1 {{instance method 'methodObjCName3()' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?}}
+    // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible instance method not declared in the header}}
+    // expected-note@-3 {{add 'final' to define a Swift instance method that cannot be overridden}}
+    // FIXME: provide a specialized fix-it for this situation
+  }
+
+  @objc(methodWrongObjCName4) func methodSwiftName4() {
+    // expected-error@-1 {{selector 'methodWrongObjCName4' for instance method 'methodSwiftName4()' not found in header; did you mean 'methodObjCName4'?}} {{9-29=methodObjCName4}}
+  }
+
+  @objc(methodObjCName5) func methodWrongSwiftName5() {
+    // expected-error@-1 {{selector 'methodObjCName5' used in header by an instance method with a different name; did you mean 'methodSwiftName5()'?}} {{31-52=methodSwiftName5}}
+  }
+
+  @objc(methodObjCName6A) func methodSwiftName6B() {
+    // expected-error@-1 {{selector 'methodObjCName6A' used in header by an instance method with a different name; did you mean 'methodSwiftName6A()'?}} {{32-49=methodSwiftName6A}}
+  }
+}
+
 @_objcImplementation extension ObjCClass {}
 // expected-error@-1 {{duplicate implementation of Objective-C class 'ObjCClass'}}
 
