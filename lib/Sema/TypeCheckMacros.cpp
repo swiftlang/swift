@@ -32,6 +32,15 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
+#include "llvm/Config/config.h"
+
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 
 using namespace swift;
 
@@ -100,7 +109,9 @@ static std::string mangledNameForTypeMetadataAccessor(
 #if SWIFT_SWIFT_PARSER
 /// Look for macro's type metadata given its external module and type name.
 static void const *lookupMacroTypeMetadataByExternalName(
-    ASTContext &ctx, StringRef moduleName, StringRef typeName) {
+    ASTContext &ctx, StringRef moduleName, StringRef typeName,
+    void *libraryHint = nullptr
+) {
   // Look up the type metadata accessor as a struct, enum, or class.
   const Demangle::Node::Kind typeKinds[] = {
     Demangle::Node::Kind::Structure,
@@ -111,8 +122,8 @@ static void const *lookupMacroTypeMetadataByExternalName(
   void *accessorAddr = nullptr;
   for (auto typeKind : typeKinds) {
     auto symbolName = mangledNameForTypeMetadataAccessor(
-                                                         moduleName, typeName, typeKind);
-    accessorAddr = ctx.getAddressOfSymbol(symbolName.c_str());
+        moduleName, typeName, typeKind);
+    accessorAddr = ctx.getAddressOfSymbol(symbolName.c_str(), libraryHint);
     if (accessorAddr)
       break;
   }
@@ -289,20 +300,43 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   return MacroDefinition::forExternal(*moduleName, *typeName);
 }
 
-ExternalMacroDefinition
-ExternalMacroDefinitionRequest::evaluate(
-    Evaluator &evaluator, ASTContext *ctx,
-    Identifier moduleName, Identifier typeName
+/// Load a plugin library based on a module name.
+static void *loadPluginByName(StringRef searchPath, StringRef moduleName) {
+  SmallString<128> fullPath(searchPath);
+  llvm::sys::path::append(fullPath, "lib" + moduleName + LTDL_SHLIB_EXT);
+#if defined(_WIN32)
+  return LoadLibraryA(fullPath.c_str());
+#else
+  return dlopen(fullPath.c_str(), RTLD_LAZY);
+#endif
+}
+
+void *CompilerPluginLoadRequest::evaluate(
+    Evaluator &evaluator, ASTContext *ctx, Identifier moduleName
 ) const {
+  auto &searchPathOpts = ctx->SearchPathOpts;
+  for (const auto &path : searchPathOpts.PluginSearchPaths) {
+    if (auto found = loadPluginByName(path, moduleName.str()))
+      return found;
+  }
+
+  return nullptr;
+}
+
+static Optional<ExternalMacroDefinition>
+resolveInProcessMacro(
+    ASTContext &ctx, Identifier moduleName, Identifier typeName,
+    void *libraryHint = nullptr
+) {
 #if SWIFT_SWIFT_PARSER
   /// Look for the type metadata given the external module and type names.
   auto macroMetatype = lookupMacroTypeMetadataByExternalName(
-      *ctx, moduleName.str(), typeName.str());
+      ctx, moduleName.str(), typeName.str(), libraryHint);
   if (macroMetatype) {
     // Check whether the macro metatype is in-process.
     if (auto inProcess = swift_ASTGen_resolveMacroType(macroMetatype)) {
       // Make sure we clean up after the macro.
-      ctx->addCleanup([inProcess]() {
+      ctx.addCleanup([inProcess]() {
         swift_ASTGen_destroyMacro(inProcess);
       });
 
@@ -310,6 +344,28 @@ ExternalMacroDefinitionRequest::evaluate(
     }
   }
 #endif
+
+  return None;
+}
+
+ExternalMacroDefinition
+ExternalMacroDefinitionRequest::evaluate(
+    Evaluator &evaluator, ASTContext *ctx,
+    Identifier moduleName, Identifier typeName
+) const {
+  // Try to load a plugin module from the plugin search paths. If it
+  // succeeds, resolve in-process from that plugin
+  CompilerPluginLoadRequest loadRequest{ctx, moduleName};
+  if (auto loadedLibrary = evaluateOrDefault(
+          evaluator, loadRequest, nullptr)) {
+    if (auto inProcess = resolveInProcessMacro(
+            *ctx, moduleName, typeName, loadedLibrary))
+      return *inProcess;
+  }
+
+  // Try to resolve in-process.
+  if (auto inProcess = resolveInProcessMacro(*ctx, moduleName, typeName))
+    return *inProcess;
 
   return ExternalMacroDefinition{nullptr};
 }
