@@ -182,3 +182,33 @@ struct MoveOnlyStructP : P { // expected-error {{move-only struct 'MoveOnlyStruc
 }
 @_moveOnly
 enum MoveOnlyEnumP : P {} // expected-error {{move-only enum 'MoveOnlyEnumP' cannot conform to 'P'}}
+
+// ensure there is no auto-synthesis of Equatable, Hashable, etc, for this move-only enum,
+// because it normally would be synthesized since it only has cases without associated values.
+@_moveOnly
+enum Color {
+    case red
+    case green
+    case blue
+
+    static func same(_ c1: __shared Color, c2: __shared Color) -> Bool {
+        return c1 == c2
+        // expected-error@-1 {{binary operator '==' cannot be applied to two 'Color' operands}}
+    }
+}
+
+@_moveOnly
+enum StrengthLevel: Int { // ensure move-only raw enums do not conform to RawRepresentable
+    case none = 0
+    case low
+    case high
+
+    static func lowEnergy() {
+        _ = StrengthLevel(rawValue: 1)
+        // expected-error@-1 {{'StrengthLevel' cannot be constructed because it has no accessible initializers}}
+    }
+}
+
+
+
+
