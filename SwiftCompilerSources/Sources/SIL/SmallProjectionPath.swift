@@ -268,6 +268,18 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
     return !matches(pattern: Self(.anyValueFields))
   }
 
+  /// Returns true if the path may have a class projection.
+  /// For example:
+  /// returns false for `v**`
+  /// returns false for `c0`
+  /// returns true for `c0.c1`
+  /// returns true for `c0.**` (because '**' can have any number of class projections)
+  /// returns true for `**` (because '**' can have any number of class projections)
+  public var mayHaveTwoClassProjections: Bool {
+    return !matches(pattern: Self(.anyValueFields)) &&
+           !matches(pattern: Self(.anyValueFields).push(.anyClassField).push(.anyValueFields))
+  }
+
   /// Pops all value field components from the beginning of the path.
   /// For example:
   ///    `s0.e2.3.c4.s1` -> `c4.s1`
@@ -691,6 +703,12 @@ extension SmallProjectionPath {
       testPredicate("1",   \.mayHaveClassProjection, expect: false)
       testPredicate("**",  \.mayHaveClassProjection, expect: true)
 
+      testPredicate("v**", \.mayHaveTwoClassProjections, expect: false)
+      testPredicate("c0",  \.mayHaveTwoClassProjections, expect: false)
+      testPredicate("**",  \.mayHaveTwoClassProjections, expect: true)
+      testPredicate("v**.c*.s2.1.c0",   \.mayHaveTwoClassProjections, expect: true)
+      testPredicate("c*.s2.1.c0.v**",   \.mayHaveTwoClassProjections, expect: true)
+      testPredicate("v**.c*.**",        \.mayHaveTwoClassProjections, expect: true)
     }
 
     func testPredicate(_ pathStr: String, _ property: (SmallProjectionPath) -> Bool, expect: Bool) {
