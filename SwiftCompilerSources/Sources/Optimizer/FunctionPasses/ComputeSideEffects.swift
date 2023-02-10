@@ -299,7 +299,7 @@ private struct CollectedEffects {
           if let calleePath = calleeEffect.destroy { addEffects(.destroy, to: argument, fromInitialPath: calleePath) }
         } else {
           let convention = callee.getArgumentConvention(for: calleeArgIdx)
-          let wholeArgument = argument.at(SmallProjectionPath(.anything))
+          let wholeArgument = argument.at(defaultPath(for: argument))
           let calleeEffects = callee.getSideEffects(forArgument: wholeArgument,
                                                     atIndex: calleeArgIdx,
                                                     withConvention: convention)
@@ -313,8 +313,12 @@ private struct CollectedEffects {
   ///
   /// If the value comes from an argument (or mutliple arguments), then the effects are added
   /// to the corrseponding `argumentEffects`. Otherwise they are added to the `global` effects.
+  private mutating func addEffects(_ effects: SideEffects.GlobalEffects, to value: Value) {
+    addEffects(effects, to: value, fromInitialPath: defaultPath(for: value))
+  }
+
   private mutating func addEffects(_ effects: SideEffects.GlobalEffects, to value: Value,
-                                   fromInitialPath: SmallProjectionPath? = nil) {
+                                   fromInitialPath: SmallProjectionPath) {
 
     /// Collects the (non-address) roots of a value.
     struct GetRootsWalker : ValueUseDefWalker {
@@ -346,10 +350,7 @@ private struct CollectedEffects {
 
     var findRoots = GetRootsWalker(context)
     if value.type.isAddress {
-      // If there is no initial path provided, select all value fields.
-      let path = fromInitialPath ?? SmallProjectionPath(.anyValueFields)
-
-      let accessPath = value.getAccessPath(fromInitialPath: path)
+      let accessPath = value.getAccessPath(fromInitialPath: fromInitialPath)
       switch accessPath.base {
         case .stack:
           // We don't care about read and writes from/to stack locations (because they are
@@ -369,16 +370,7 @@ private struct CollectedEffects {
           }
       }
     } else {
-      // Handle non-address `value`s which are projections from a direct arguments.
-      let path: SmallProjectionPath
-      if let fromInitialPath = fromInitialPath {
-        path = fromInitialPath
-      } else if value.type.isClass {
-        path = SmallProjectionPath(.anyValueFields).push(.anyClassField)
-      } else {
-        path = SmallProjectionPath(.anyValueFields).push(.anyClassField).push(.anyValueFields)
-      }
-      _ = findRoots.walkUp(value: value, path: path)
+      _ = findRoots.walkUp(value: value, path: fromInitialPath)
     }
     // Because of phi-arguments, a single (non-address) `value` can come from multiple arguments.
     while let (arg, path) = findRoots.roots.pop() {
@@ -389,6 +381,16 @@ private struct CollectedEffects {
       globalEffects.merge(with: effects)
     }
   }
+}
+
+private func defaultPath(for value: Value) -> SmallProjectionPath {
+  if value.type.isAddress {
+    return SmallProjectionPath(.anyValueFields)
+  }
+  if value.type.isClass {
+    return SmallProjectionPath(.anyValueFields).push(.anyClassField)
+  }
+  return SmallProjectionPath(.anyValueFields).push(.anyClassField).push(.anyValueFields)
 }
 
 /// Checks if an argument escapes to some unknown user.
