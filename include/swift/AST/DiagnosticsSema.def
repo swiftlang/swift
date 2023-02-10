@@ -1587,13 +1587,19 @@ ERROR(member_of_objc_implementation_not_objc_or_final,none,
       "%0 %1 does not match any %0 declared in the headers for %2; did you use "
       "the %0's Swift name?",
       (DescriptiveDeclKind, ValueDecl *, ValueDecl *))
-NOTE(fixit_add_objc_for_objc_implementation,none,
-     "add '@objc' to define an Objective-C-compatible %0 not declared in "
-     "the header",
+NOTE(fixit_add_private_for_objc_implementation,none,
+     "add 'private' or 'fileprivate' to define an Objective-C-compatible %0 "
+     "not declared in the header",
      (DescriptiveDeclKind))
 NOTE(fixit_add_final_for_objc_implementation,none,
      "add 'final' to define a Swift %0 that cannot be overridden",
      (DescriptiveDeclKind))
+
+ERROR(objc_implementation_wrong_category,none,
+      "%0 %1 should be implemented in extension for "
+      "%select{main class interface|category %2}2, not "
+      "%select{main class interface|category %3}3",
+      (DescriptiveDeclKind, ValueDecl *, Identifier, Identifier))
 
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())

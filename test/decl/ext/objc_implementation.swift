@@ -6,10 +6,7 @@
   // expected-note@-1 {{previously implemented by extension here}}
 
   func method(fromHeader1: CInt) {
-    // FIXME: OK, provides an implementation for the header's method.
-    // expected-error@-2 {{instance method 'method(fromHeader1:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?}}
-    // expected-note@-3 {{add '@objc' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=@objc }}
-    // expected-note@-4 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
+    // OK, provides an implementation for the header's method.
   }
 
   @objc func method(fromHeader2: CInt) {
@@ -17,10 +14,7 @@
   }
 
   func categoryMethod(fromHeader3: CInt) {
-    // FIXME: Should complain about the wrong category
-    // expected-error@-2 {{instance method 'categoryMethod(fromHeader3:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?}}
-    // expected-note@-3 {{add '@objc' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=@objc }}
-    // expected-note@-4 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
+    // expected-error@-1 {{instance method 'categoryMethod(fromHeader3:)' should be implemented in extension for category 'PresentAdditions', not main class interface}}
   }
 
   @objc fileprivate func methodNot(fromHeader1: CInt) {
@@ -33,24 +27,18 @@
 
   func methodNot(fromHeader3: CInt) {
     // expected-error@-1 {{instance method 'methodNot(fromHeader3:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?}}
-    // expected-note@-2 {{add '@objc' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=@objc }}
+    // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=private }}
     // expected-note@-3 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
   }
 
   var propertyFromHeader1: CInt
-  // FIXME: OK, provides an implementation with a stored property
-  // expected-error@-2 {{property 'propertyFromHeader1' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?}}
-  // expected-note@-3 {{add '@objc' to define an Objective-C-compatible property not declared in the header}} {{3-3=@objc }}
-  // expected-note@-4 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
+  // OK, provides an implementation with a stored property
 
   @objc var propertyFromHeader2: CInt
   // OK, provides an implementation with a stored property
 
   var propertyFromHeader3: CInt {
-    // FIXME: OK, provides an implementation with a computed property
-    // expected-error@-2 {{property 'propertyFromHeader3' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?}}
-    // expected-note@-3 {{add '@objc' to define an Objective-C-compatible property not declared in the header}} {{3-3=@objc }}
-    // expected-note@-4 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
+    // OK, provides an implementation with a computed property
     get { return 1 }
     set {}
   }
@@ -73,19 +61,13 @@
   // FIXME: Should complain about final not fulfilling the @objc requirement
 
   var readonlyPropertyFromHeader1: CInt
-  // FIXME: OK, provides an implementation with a stored property that's nonpublicly settable
-  // expected-error@-2 {{property 'readonlyPropertyFromHeader1' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?}}
-  // expected-note@-3 {{add '@objc' to define an Objective-C-compatible property not declared in the header}} {{3-3=@objc }}
-  // expected-note@-4 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
+  // OK, provides an implementation with a stored property that's nonpublicly settable
 
   @objc var readonlyPropertyFromHeader2: CInt
   // OK, provides an implementation with a stored property that's nonpublicly settable
 
   var readonlyPropertyFromHeader3: CInt {
-    // FIXME: OK, provides an implementation with a computed property
-    // expected-error@-2 {{property 'readonlyPropertyFromHeader3' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?}}
-    // expected-note@-3 {{add '@objc' to define an Objective-C-compatible property not declared in the header}} {{3-3=@objc }}
-    // expected-note@-4 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
+    // OK, provides an implementation with a computed property
     get { return 1 }
     set {}
   }
@@ -104,15 +86,15 @@
     get { return 1 }
   }
 
-  var propertyNotFromHeader1: CInt
+  internal var propertyNotFromHeader1: CInt
   // expected-error@-1 {{property 'propertyNotFromHeader1' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?}}
-  // expected-note@-2 {{add '@objc' to define an Objective-C-compatible property not declared in the header}} {{3-3=@objc }}
+  // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible property not declared in the header}} {{3-3=private }}
   // expected-note@-3 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
 
-  @objc var propertyNotFromHeader2: CInt
+  @objc private var propertyNotFromHeader2: CInt
   // OK, provides a nonpublic but ObjC-compatible stored property
 
-  @objc var propertyNotFromHeader3: CInt {
+  @objc fileprivate var propertyNotFromHeader3: CInt {
     // OK, provides a nonpublic but ObjC-compatible computed property
     get { return 1 }
     set {}
@@ -147,25 +129,16 @@
   // expected-note@-1 {{previously implemented by extension here}}
 
   func method(fromHeader3: CInt) {
-    // FIXME: Should complain about wrong category
-    // expected-error@-2 {{instance method 'method(fromHeader3:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?}}
-    // expected-note@-3 {{add '@objc' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=@objc }}
-    // expected-note@-4 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
+    // expected-error@-1 {{instance method 'method(fromHeader3:)' should be implemented in extension for main class interface, not category 'PresentAdditions'}}
   }
 
   var propertyFromHeader7: CInt {
-    // FIXME: Should complain about wrong category
-    // expected-error@-2 {{property 'propertyFromHeader7' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?}}
-    // expected-note@-3 {{add '@objc' to define an Objective-C-compatible property not declared in the header}} {{3-3=@objc }}
-    // expected-note@-4 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
+    // expected-error@-1 {{property 'propertyFromHeader7' should be implemented in extension for main class interface, not category 'PresentAdditions'}}
     get { return 1 }
   }
 
   func categoryMethod(fromHeader1: CInt) {
-    // FIXME: OK, provides an implementation for the header's method.
-    // expected-error@-2 {{instance method 'categoryMethod(fromHeader1:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?}}
-    // expected-note@-3 {{add '@objc' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=@objc }}
-    // expected-note@-4 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
+    // OK, provides an implementation for the header's method.
   }
 
   @objc func categoryMethod(fromHeader2: CInt) {
@@ -182,24 +155,18 @@
 
   func categoryMethodNot(fromHeader3: CInt) {
     // expected-error@-1 {{instance method 'categoryMethodNot(fromHeader3:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?}}
-    // expected-note@-2 {{add '@objc' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=@objc }}
+    // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=private }}
     // expected-note@-3 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
   }
 
   var categoryPropertyFromHeader1: CInt
   // expected-error@-1 {{extensions must not contain stored properties}}
-  // FIXME: expected-error@-2 {{property 'categoryPropertyFromHeader1' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?}}
-  // FIXME: expected-note@-3 {{add '@objc' to define an Objective-C-compatible property not declared in the header}} {{3-3=@objc }}
-  // FIXME: expected-note@-4 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
 
   @objc var categoryPropertyFromHeader2: CInt
   // expected-error@-1 {{extensions must not contain stored properties}}
 
   var categoryPropertyFromHeader3: CInt {
-    // FIXME: OK, provides an implementation with a computed property
-    // expected-error@-2 {{property 'categoryPropertyFromHeader3' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?}}
-    // expected-note@-3 {{add '@objc' to define an Objective-C-compatible property not declared in the header}} {{3-3=@objc }}
-    // expected-note@-4 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
+    // OK, provides an implementation with a computed property
     get { return 1 }
     set {}
   }

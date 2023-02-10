@@ -1243,24 +1243,96 @@ static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
   if (!VD->isObjCMemberImplementation())
     return;
 
-  if (VD->isObjC()) {
-    assert(isa<DestructorDecl>(VD) || VD->isDynamic() &&
-           "@objc decls in @_objcImplementations should be dynamic!");
+  auto isNotRelevantInterfaceMember = [&](ValueDecl *member) -> bool {
+    return !member->hasClangNode()
+             || VD->isInstanceMember() != member->isInstanceMember();
+  };
+  assert(!VD->hasClangNode() &&
+            "we assumed VD could not be in sameNameMembers!");
+
+  auto &diags = VD->getASTContext().Diags;
+  auto extendedType = ED->getSelfClassDecl();
+  auto objcAttr = VD->getSemanticAttrs().getAttribute<ObjCAttr>();
+  TinyPtrVector<ValueDecl *> sameNameMembers;
+
+  // Look up by @objc(<selector>), if present
+  if (objcAttr && objcAttr->getName()) {
+    auto selectorLookup = extendedType->lookupDirect(*objcAttr->getName(),
+                                                     VD->isInstanceMember());
+    // Loop upcasts from AbstractFunctionDecl to ValueDecl
+    for (ValueDecl *member : selectorLookup) {
+      if (auto accessor = dyn_cast<AccessorDecl>(member))
+        member = accessor->getStorage();
+
+      if (!isNotRelevantInterfaceMember(member)
+            && !llvm::is_contained(sameNameMembers, member))
+        sameNameMembers.push_back(member);
+    }
+  }
+
+  // Fallback: Look up by Swift name
+  // If we tried the selector lookup but it failed, this will find near-matches
+  // we can suggest.
+  if (sameNameMembers.empty()) {
+    sameNameMembers = extendedType->lookupDirect(VD->getName());
+  }
+
+  // Filter matches down to only imported members of the same instance-ness.
+  if (!sameNameMembers.empty()) {
+    sameNameMembers.erase(llvm::remove_if(sameNameMembers,
+                                          isNotRelevantInterfaceMember),
+                          sameNameMembers.end());
+  }
+
+  // If we didn't find any methods, diagnose.
+  if (sameNameMembers.empty()) {
+    diags.diagnose(VD, diag::member_of_objc_implementation_not_objc_or_final,
+                   VD->getDescriptiveKind(), VD, ED->getExtendedNominal());
+
+    if (canBeRepresentedInObjC(VD))
+      diags.diagnose(VD, diag::fixit_add_private_for_objc_implementation,
+                     VD->getDescriptiveKind())
+          .fixItInsert(VD->getAttributeInsertionLoc(true), "private ");
+
+    diags.diagnose(VD, diag::fixit_add_final_for_objc_implementation,
+                   VD->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(true), "final ");
     return;
   }
 
-  auto &diags = VD->getASTContext().Diags;
-  diags.diagnose(VD, diag::member_of_objc_implementation_not_objc_or_final,
-                 VD->getDescriptiveKind(), VD, ED->getExtendedNominal());
+  // FIXME: Diagnose multiple matches?
 
-  if (canBeRepresentedInObjC(VD))
-    diags.diagnose(VD, diag::fixit_add_objc_for_objc_implementation,
-                   VD->getDescriptiveKind())
-        .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+  // If we only found methods in the wrong extensions, diagnose.
+  auto expectedInterfaceDC = ED->getImplementedObjCContext();
+  auto selectedMethodIter = llvm::find_if(sameNameMembers,
+                                          [&](ValueDecl *member) {
+    return expectedInterfaceDC == member->getDeclContext();
+  });
+  if (selectedMethodIter == sameNameMembers.end()) {
+    Identifier expectedInterfaceName;
+    if (auto ED = dyn_cast<ExtensionDecl>(expectedInterfaceDC)) {
+      expectedInterfaceName = ED->getObjCCategoryName();
+    }
 
-  diags.diagnose(VD, diag::fixit_add_final_for_objc_implementation,
-                 VD->getDescriptiveKind())
-      .fixItInsert(VD->getAttributeInsertionLoc(true), "final ");
+    // Arbitarily assume sameNameMethods.front() is the correct declaration.
+    auto actualInterfaceDC = sameNameMembers.front()->getDeclContext();
+    Identifier actualInterfaceName;
+    if (auto ED = dyn_cast<ExtensionDecl>(actualInterfaceDC)) {
+      actualInterfaceName = ED->getObjCCategoryName();
+    }
+
+    diags.diagnose(VD, diag::objc_implementation_wrong_category,
+                   VD->getDescriptiveKind(), VD,
+                   actualInterfaceName, expectedInterfaceName);
+
+    // FIXME: Add fix-it to move implementation
+
+    return;
+  }
+
+  assert(VD->isObjC());
+  assert(isa<DestructorDecl>(VD) || VD->isDynamic() &&
+         "@objc decls in @_objcImplementations should be dynamic!");
 }
 
 /// Build a default initializer string for the given pattern.
