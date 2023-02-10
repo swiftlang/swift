@@ -58,6 +58,9 @@ getClosureActorIsolation(const Solution &S, AbstractClosureExpr *ACE) {
         return Ty;
       }
     }
+    if (!S.hasType(E)) {
+      return Type();
+    }
     return getTypeForCompletion(S, E);
   };
   auto getClosureActorIsolationThunk = [&S](AbstractClosureExpr *ACE) {
