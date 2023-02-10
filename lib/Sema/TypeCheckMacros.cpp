@@ -1064,7 +1064,6 @@ bool swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
     // Note that synthesized members are not considered implicit. They have
     // proper source ranges that should be validated, and ASTScope does not
     // expand implicit scopes to the parent scope tree.
-    member->setDeclContext(decl->getInnermostDeclContext());
 
     if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
       nominal->addMember(member);
@@ -1091,8 +1090,6 @@ bool swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   auto *parent = decl->getDeclContext();
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto peer : topLevelDecls) {
-    peer->setDeclContext(parent);
-
     if (auto *nominal = dyn_cast<NominalTypeDecl>(parent)) {
       nominal->addMember(peer);
     } else if (auto *extension = dyn_cast<ExtensionDecl>(parent)) {
