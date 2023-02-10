@@ -1056,7 +1056,7 @@ class ClassExistentialTypeInfo final
           ScalarKind::POD));
     }
 
-    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(alignedGroup, 0);
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(alignedGroup, T, getBestKnownAlignment().getValue());
   }
 
   /// Given an explosion with multiple pointer elements in them, pack them

@@ -260,10 +260,10 @@ namespace {
         fields.push_back(
             field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
       }
-      if (fields.size() == 1) {
-        return fields[0];
-      }
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      // if (fields.size() == 1) {
+      //   return fields[0];
+      // }
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -305,11 +305,11 @@ namespace {
         fields.push_back(
             field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
       }
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -374,11 +374,11 @@ namespace {
         return IGM.typeLayoutCache.getEmptyEntry();
       }
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,

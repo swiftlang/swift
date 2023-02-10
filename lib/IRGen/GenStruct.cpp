@@ -381,11 +381,11 @@ namespace {
       assert(!fields.empty() &&
              "Empty structs should not be LoadableClangRecordTypeInfo");
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1 && getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -665,11 +665,12 @@ namespace {
       assert(!fields.empty() &&
              "Empty structs should not be AddressOnlyRecordTypeInfo");
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1 && getBestKnownAlignment() ==
+      // *fields[0]->fixedAlignment(IGM)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -794,11 +795,12 @@ namespace {
             field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
       }
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1 && isFixedSize() &&
+      //     getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -854,11 +856,11 @@ namespace {
       assert(!fields.empty() &&
              "Empty structs should not be FixedStructTypeInfo");
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1  && getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -940,11 +942,11 @@ namespace {
       assert(!fields.empty() &&
              "Empty structs should not be NonFixedStructTypeInfo");
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1 && getBestKnownAlignment() > Alignment(1)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     // We have an indirect schema.

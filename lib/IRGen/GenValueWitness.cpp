@@ -440,8 +440,8 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
 
 static const TypeLayoutEntry *
 conditionallyGetTypeLayoutEntry(IRGenModule &IGM, SILType concreteType) {
-  if (!IGM.getOptions().UseTypeLayoutValueHandling)
-    return nullptr;
+  // if (!IGM.getOptions().UseTypeLayoutValueHandling)
+  return nullptr;
 
   auto &typeLayoutEntry = IGM.getTypeLayoutEntry(concreteType);
 

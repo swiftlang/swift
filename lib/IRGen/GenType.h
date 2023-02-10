@@ -370,9 +370,9 @@ TypeLayoutEntry *buildTypeLayoutEntryForFields(IRGenModule &IGM, SILType T,
     return IGM.typeLayoutCache.getEmptyEntry();
   }
 
-  if (fields.size() == 1 && minFieldAlignment >= minimumAlignment) {
-    return fields[0];
-  }
+  // if (fields.size() == 1 && minFieldAlignment >= minimumAlignment) {
+  //   return fields[0];
+  // }
   if (minimumAlignment < minFieldAlignment)
     minimumAlignment = minFieldAlignment;
   return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(

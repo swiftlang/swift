@@ -211,6 +211,31 @@ public struct SinglePayloadEnumWrapper2<T: P> {
     }
 }
 
+public enum Enum2 {
+    case a
+    case b
+}
+
+public enum Enum1 {
+    case a(AnyObject, Int)
+    case b(Int, Enum2)
+}
+
+public enum Enum0 {
+    case a(String, AnyObject)
+    case b(Int, Bool)
+}
+
+public struct EnumWrapper {
+    let x: Enum0
+    let y: Enum1
+
+    public init(x: Enum0, y: Enum1) {
+        self.x = x
+        self.y = y
+    }
+}
+
 public class Level3<T> {
     let x: T? = nil
 }

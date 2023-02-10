@@ -59,7 +59,9 @@ public:
     Resilient = 0x0f,
     SinglePayloadEnum = 0x10,
 
-    Alignment = 0x7f,
+    Alignment = 0x7d,
+    DynamicAlignmentStart = 0x7e,
+    DynamicAlignmentEnd = 0x7f,
     Skip = 0x80,
     // We may use the MSB as flag that a count follows,
     // so all following values are reserved
@@ -82,6 +84,7 @@ private:
       Copy = 1,
       Param = 2,
       Resilient = 3,
+      DynamicAlignment = 4,
     };
 
     Type type;
@@ -95,28 +98,47 @@ private:
         size_t offset;
         llvm::Function *metaTypeRef;
       } resilient;
+      struct {
+        size_t offset;
+        llvm::Function *metaTypeRef;
+      } alignment;
     };
   };
 
   std::vector<RefCounting> refCountings;
-  bool containsGenerics = false;
+  bool isInstantiationPattern = false;
 
 public:
   LayoutStringBuilder() = default;
   ~LayoutStringBuilder() = default;
 
   void addRefCount(RefCountingKind kind, size_t size) {
-    if (kind == RefCountingKind::Skip) {
-      if (refCountings.empty() ||
-          refCountings.back().kind != RefCountingKind::Skip) {
-        refCountings.push_back({kind, {0}});
-      }
-      auto &refCounting = refCountings.back();
+    RefCounting op;
+    op.kind = kind;
+    op.size = size;
+    refCountings.push_back(op);
+  }
 
-      refCounting.size += size;
-    } else {
-      refCountings.push_back({kind, {size}});
+  void addSkip(size_t size) {
+    if (refCountings.empty() ||
+        refCountings.back().kind != RefCountingKind::Skip) {
+      RefCounting op;
+      op.kind = RefCountingKind::Skip;
+      op.size = 0;
+      refCountings.push_back(op);
     }
+    auto &refCounting = refCountings.back();
+
+    refCounting.size += size;
+  }
+
+  // TODO: this is a stopgap solution until we can
+  // actually support enums
+  void addFixedEnumRefCount(llvm::Function *metaTypeRef) {
+    RefCounting op;
+    op.kind = RefCountingKind::Resilient;
+    op.metaTypeRef = metaTypeRef;
+    refCountings.push_back(op);
   }
 
   void addResilientRefCount(llvm::Function *metaTypeRef) {
@@ -124,14 +146,7 @@ public:
     op.kind = RefCountingKind::Resilient;
     op.metaTypeRef = metaTypeRef;
     refCountings.push_back(op);
-  }
-
-  void addGenericResilientRefCount(llvm::Function *metaTypeRef) {
-    RefCounting op;
-    op.kind = RefCountingKind::Resilient;
-    op.metaTypeRef = metaTypeRef;
-    refCountings.push_back(op);
-    containsGenerics = true;
+    isInstantiationPattern = true;
   }
 
   void addGenericRefCount(uint32_t genericIdx) {
@@ -139,7 +154,7 @@ public:
     op.kind = RefCountingKind::Generic;
     op.genericIdx = genericIdx;
     refCountings.push_back(op);
-    containsGenerics = true;
+    isInstantiationPattern = true;
   }
 
   void addAlignment(uint64_t alignment) {
@@ -149,26 +164,98 @@ public:
     refCountings.push_back(op);
   }
 
-  void result(IRGenModule &IGM, ConstantStructBuilder &B) const {
+  void startDynamicAlignment() {
+    RefCounting op;
+    op.kind = RefCountingKind::DynamicAlignmentStart;
+    refCountings.push_back(op);
+  }
+
+  void endDynamicAlignment() {
+    RefCounting op;
+    op.kind = RefCountingKind::DynamicAlignmentEnd;
+    refCountings.push_back(op);
+  }
+
+private:
+  void generateStatic(IRGenModule &IGM, ConstantStructBuilder &B) const {
     auto sizePlaceholder = B.addPlaceholderWithSize(IGM.SizeTy);
     size_t skip = 0;
-    std::vector<GenericInstOp> genericInstOps;
-    size_t instCopyBytes = 0;
     size_t refCountBytes = 0;
     for (auto &refCounting : refCountings) {
-      if (refCounting.kind == RefCountingKind::Skip) {
+      switch (refCounting.kind) {
+      case RefCountingKind::Skip:
         skip += refCounting.size;
-        continue;
+        break;
+
+      case RefCountingKind::Alignment: {
+        break;
       }
 
-      if (refCounting.kind == RefCountingKind::Alignment) {
-        skip += refCounting.alignment;
+      case RefCountingKind::Resilient: {
+        uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
+        B.addInt64(op);
+        B.addCompactFunctionReference(refCounting.metaTypeRef);
+        refCountBytes += sizeof(uint64_t) + sizeof(uint32_t);
+
+        skip = 0;
+        break;
+      }
+
+      case RefCountingKind::DynamicAlignmentStart:
+      case RefCountingKind::DynamicAlignmentEnd:
+      case RefCountingKind::Generic: {
+        llvm_unreachable("Found dynamic operations in a static layout");
+        break;
+      }
+
+      default: {
+        uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
+        B.addInt64(op);
+        refCountBytes += sizeof(uint64_t);
+
+        skip = refCounting.size;
+        break;
+      }
+      }
+    }
+
+    // size of ref counting ops in bytes
+    B.fillPlaceholderWithInt(sizePlaceholder, IGM.SizeTy, refCountBytes);
+
+    B.addSize(Size(skip));
+  }
+
+  void generateDynamic(IRGenModule &IGM, ConstantStructBuilder &B) const {
+    auto sizePlaceholder = B.addPlaceholderWithSize(IGM.SizeTy);
+    size_t instCopyBytes = 0;
+    std::vector<GenericInstOp> genericInstOps;
+    size_t skip = 0;
+    size_t refCountBytes = 0;
+    for (auto &refCounting : refCountings) {
+      switch (refCounting.kind) {
+      case RefCountingKind::Skip:
+        skip += refCounting.size;
+        break;
+
+      case RefCountingKind::Alignment: {
         auto alignmentMask = refCounting.alignment - 1;
+        skip += alignmentMask;
         skip &= ~alignmentMask;
-        continue;
+        break;
       }
 
-      if (refCounting.kind == RefCountingKind::Generic) {
+      case RefCountingKind::DynamicAlignmentStart:
+      case RefCountingKind::DynamicAlignmentEnd: {
+        // GenericInstOp op;
+        // op.type = GenericInstOp::Type::DynamicAlignment;
+        // op.alignment = { skip, refCounting.metaTypeRef };
+
+        // genericInstOps.push_back(op);
+        // skip = 0;
+        break;
+      }
+
+      case RefCountingKind::Generic: {
         if (instCopyBytes > 0) {
           genericInstOps.push_back({GenericInstOp::Type::Copy, {instCopyBytes}});
           instCopyBytes = 0;
@@ -181,28 +268,25 @@ public:
         genericInstOps.push_back(op);
 
         skip = 0;
-      } else if (refCounting.kind == RefCountingKind::Resilient) {
-        if (containsGenerics) {
-          if (instCopyBytes > 0) {
-            genericInstOps.push_back(
-                {GenericInstOp::Type::Copy, {instCopyBytes}});
-            instCopyBytes = 0;
-          }
-          GenericInstOp op;
-          op.type = GenericInstOp::Type::Resilient;
-          op.resilient = {skip, refCounting.metaTypeRef};
-
-          genericInstOps.push_back(op);
-        } else {
-          uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
-          B.addInt64(op);
-          B.addCompactFunctionReference(refCounting.metaTypeRef);
-          instCopyBytes += sizeof(uint64_t) + sizeof(uint32_t);
-          refCountBytes += sizeof(uint64_t) + sizeof(uint32_t);
+        break;
+      }
+      case RefCountingKind::Resilient: {
+        if (instCopyBytes > 0) {
+          genericInstOps.push_back(
+              {GenericInstOp::Type::Copy, {instCopyBytes}});
+          instCopyBytes = 0;
         }
+        GenericInstOp op;
+        op.type = GenericInstOp::Type::Resilient;
+        op.resilient = {skip, refCounting.metaTypeRef};
+
+        genericInstOps.push_back(op);
 
         skip = 0;
-      } else {
+        break;
+      }
+
+      default: {
         uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
         B.addInt64(op);
 
@@ -210,6 +294,8 @@ public:
         refCountBytes += 8;
 
         skip = refCounting.size;
+        break;
+      }
       }
     }
 
@@ -242,8 +328,24 @@ public:
           B.addCompactFunctionReference(genOp.resilient.metaTypeRef);
           break;
         }
+        case GenericInstOp::Type::DynamicAlignment: {
+          uint64_t op = ((uint64_t)genOp.type << 56) | genOp.alignment.offset;
+          B.addInt64(op);
+          B.addCompactFunctionReference(genOp.alignment.metaTypeRef);
+          break;
+        }
         }
       }
+    }
+  }
+
+public:
+
+  void result(IRGenModule &IGM, ConstantStructBuilder &B) const {
+    if (isInstantiationPattern) {
+      generateDynamic(IGM, B);
+    } else {
+      generateStatic(IGM, B);
     }
 
     // NUL terminator
@@ -342,9 +444,6 @@ llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty,
               MetadataState::Complete, [&](CanType t) {
                 return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
               });
-          auto substTy =
-              genericEnv->mapTypeIntoContext(fieldType->mapTypeOutOfContext())
-                  ->getCanonicalType();
         }
 
         auto ret = IGF.emitTypeMetadataRefForLayout(ty);
@@ -1136,13 +1235,12 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
     B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, size);
     break;
   case ScalarKind::ThickFunc:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip,
-                  IGM.getPointerSize().getValue());
+    B.addSkip(IGM.getPointerSize().getValue());
     B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong,
                   IGM.getPointerSize().getValue());
     break;
   case ScalarKind::POD:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip, size);
+    B.addSkip(size);
     break;
   case ScalarKind::ExistentialReference:
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Existential, size);
@@ -1483,7 +1581,7 @@ AlignedGroupEntry::fixedAlignment(IRGenModule &IGM) const {
   if (_fixedAlignment.has_value())
     return *_fixedAlignment;
 
-  Alignment currentAlignment = Alignment(1);
+  Alignment currentAlignment = Alignment(std::max(1llu, minimumAlignment));
   for (auto *entry : entries) {
     if (!entry->fixedAlignment(IGM)) {
       return *(_fixedAlignment =
@@ -1563,13 +1661,35 @@ AlignedGroupEntry::layoutString(IRGenModule &IGM,
 
 bool AlignedGroupEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                                        GenericSignature genericSig) const {
-  for (auto *entry : entries) {
-    if (!entry->refCountString(IGM, B, genericSig)) {
-      return false;
+  if (isFixedSize(IGM)) {
+    uint64_t offset = 0;
+    for (auto *entry : entries) {
+      if (offset) {
+        uint64_t alignmentMask = entry->fixedAlignment(IGM)->getMaskValue();
+        uint64_t alignedOffset = offset + alignmentMask;
+        alignedOffset &= ~alignmentMask;
+        if (alignedOffset > offset) {
+          B.addSkip(alignedOffset - offset);
+          offset = alignedOffset;
+        }
+      }
+      if (!entry->refCountString(IGM, B, genericSig)) {
+        return false;
+      }
+      offset += entry->fixedSize(IGM)->getValue();
     }
-  }
-  if (auto alignment = fixedAlignment(IGM)) {
-    B.addAlignment(alignment->getValue());
+  } else {
+    return false;
+    B.startDynamicAlignment();
+    for (auto *entry : entries) {
+      if (entry->isFixedSize(IGM)) {
+        B.addAlignment(entry->fixedAlignment(IGM)->getValue());
+      }
+      if (!entry->refCountString(IGM, B, genericSig)) {
+        return false;
+      }
+    }
+    B.endDynamicAlignment();
   }
 
   return true;
@@ -1942,7 +2062,7 @@ bool ArchetypeLayoutEntry::refCountString(IRGenModule &IGM,
     B.addGenericRefCount(param->getIndex());
   }
 
-  return true;
+  return false;
 }
 
 void ArchetypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
@@ -2080,28 +2200,28 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
 bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                          LayoutStringBuilder &B,
                                          GenericSignature genericSig) const {
-  switch (copyDestroyKind(IGM)) {
-  case CopyDestroyStrategy::POD: {
-    auto size = fixedSize(IGM);
-    assert(size && "POD should not have dynamic size");
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::Skip, size->getValue());
-    return true;
-    break;
-  }
-  case CopyDestroyStrategy::NullableRefcounted:
-  case CopyDestroyStrategy::ForwardToPayload:
-    return cases[0]->refCountString(IGM, B, genericSig);
-    break;
-  case CopyDestroyStrategy::Normal:
+  // switch (copyDestroyKind(IGM)) {
+  // case CopyDestroyStrategy::POD: {
+  //   auto size = fixedSize(IGM);
+  //   assert(size && "POD should not have dynamic size");
+  //   B.addSkip(size->getValue());
+  //   return true;
+  // }
+  // case CopyDestroyStrategy::NullableRefcounted:
+  // case CopyDestroyStrategy::ForwardToPayload:
+  //   return cases[0]->refCountString(IGM, B, genericSig);
+  // case CopyDestroyStrategy::Normal:
     auto *accessor = createMetatypeAccessorFunction(IGM, ty, genericSig);
-    if (genericSig) {
-      B.addGenericResilientRefCount(accessor);
-    } else {
+    if (genericSig || !isFixedSize(IGM)) {
       B.addResilientRefCount(accessor);
+      return false;
+    } else {
+      B.addFixedEnumRefCount(accessor);
+      B.addSkip(fixedSize(IGM)->getValue());
     }
 
     return true;
-  }
+  // }
 }
 
 void EnumTypeLayoutEntry::computeProperties() {
@@ -2278,7 +2398,7 @@ llvm::Optional<Alignment>
 EnumTypeLayoutEntry::fixedAlignment(IRGenModule &IGM) const {
   if (_fixedAlignment)
     return *_fixedAlignment;
-  Alignment maxAlign(1);
+  Alignment maxAlign(minimumAlignment);
   for (auto payload : cases) {
     auto caseAlign = payload->fixedAlignment(IGM);
     if (!caseAlign) {
@@ -3266,12 +3386,10 @@ bool ResilientTypeLayoutEntry::refCountString(
     IRGenModule &IGM, LayoutStringBuilder &B,
     GenericSignature genericSig) const {
   auto *accessor = createMetatypeAccessorFunction(IGM, ty, genericSig);
-  if (genericSig) {
-    B.addGenericResilientRefCount(accessor);
-  } else {
-    B.addResilientRefCount(accessor);
-  }
-  return true;
+  B.addResilientRefCount(accessor);
+  return false;
+  
+  //return true;
 }
 
 void ResilientTypeLayoutEntry::computeProperties() {
@@ -3579,6 +3697,7 @@ TypeLayoutCache::getOrCreateArchetypeEntry(SILType archetype) {
 
 AlignedGroupEntry *TypeLayoutCache::getOrCreateAlignedGroupEntry(
     const std::vector<TypeLayoutEntry *> &entries,
+    SILType ty,
     Alignment::int_type minimumAlignment) {
   llvm::FoldingSetNodeID id;
   AlignedGroupEntry::Profile(id, entries, minimumAlignment);
@@ -3588,7 +3707,7 @@ AlignedGroupEntry *TypeLayoutCache::getOrCreateAlignedGroupEntry(
   }
   auto bytes = sizeof(AlignedGroupEntry);
   auto mem = bumpAllocator.Allocate(bytes, alignof(AlignedGroupEntry));
-  auto newEntry = new (mem) AlignedGroupEntry(entries, minimumAlignment);
+  auto newEntry = new (mem) AlignedGroupEntry(entries, ty, minimumAlignment);
   alignedGroupEntries.InsertNode(newEntry, insertPos);
   newEntry->computeProperties();
   return newEntry;
@@ -3598,7 +3717,7 @@ TypeLayoutEntry *TypeLayoutCache::getEmptyEntry() { return &emptyEntry; }
 
 EnumTypeLayoutEntry *TypeLayoutCache::getOrCreateEnumEntry(
     unsigned numEmptyCases, const std::vector<TypeLayoutEntry *> &nonEmptyCases,
-    SILType ty) {
+    SILType ty, Alignment::int_type minimumAlignment) {
 
   llvm::FoldingSetNodeID id;
   EnumTypeLayoutEntry::Profile(id, numEmptyCases, nonEmptyCases);
@@ -3608,8 +3727,8 @@ EnumTypeLayoutEntry *TypeLayoutCache::getOrCreateEnumEntry(
   }
   auto bytes = sizeof(EnumTypeLayoutEntry);
   auto mem = bumpAllocator.Allocate(bytes, alignof(EnumTypeLayoutEntry));
-  auto newEntry =
-      new (mem) EnumTypeLayoutEntry(numEmptyCases, nonEmptyCases, ty);
+  auto newEntry = new (mem)
+      EnumTypeLayoutEntry(numEmptyCases, nonEmptyCases, ty, minimumAlignment);
   enumEntries.InsertNode(newEntry, insertPos);
   newEntry->computeProperties();
   return newEntry;

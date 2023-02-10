@@ -104,8 +104,11 @@ void skipDestroy(void* ignore) { }
 
 void existential_destroy(OpaqueValue* object) {
   auto* metadata = getExistentialTypeMetadata(object);
-
-  metadata->vw_destroy(object);
+  if (metadata->getValueWitnesses()->isValueInline()) {
+    metadata->vw_destroy(object);
+  } else {
+    swift_release(*(HeapObject**)object);
+  }
 }
 
 const DestroyFuncAndMask destroyTable[] = {
@@ -142,7 +145,6 @@ swift_generic_destroy(void *address, void *metadata) {
 
   const uint8_t *typeLayout = typedMetadata->getLayoutString();
 
-  // fixed data is 32 bytes
   size_t offset = layoutStringHeaderSize;
   uintptr_t addrOffset = 0;
 
@@ -162,12 +164,12 @@ swift_generic_destroy(void *address, void *metadata) {
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
       auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
       type->vw_destroy((OpaqueValue *)(addr + addrOffset));
-      addrOffset += type->vw_size();
+      //addrOffset += type->vw_size();
     } else {
       const auto &destroyFunc = destroyTable[static_cast<uint8_t>(tag)];
       if (SWIFT_LIKELY(destroyFunc.isIndirect)) {
         destroyFunc.fn(
-            (void *)((*(uintptr_t *)(addr + addrOffset)) & destroyFunc.mask));
+            (void *)((*(uintptr_t *)(addr + addrOffset))));// & destroyFunc.mask));
       } else {
         destroyFunc.fn(((void *)(addr + addrOffset)));
       }
@@ -192,8 +194,8 @@ typedef void* (*CopyInitFn)(void*, void*);
 void* skipRetain(void* ignore) { return nullptr; }
 void* existential_initializeWithCopy(OpaqueValue* dest, OpaqueValue* src) {
   auto* metadata = getExistentialTypeMetadata(src);
-
-  return metadata->vw_initializeWithCopy(dest, src);
+  metadata->vw_initializeBufferWithCopyOfBuffer((ValueBuffer *)dest,
+                                                (ValueBuffer *)src);
 }
 
 const RetainFuncAndMask retainTable[] = {
@@ -245,17 +247,16 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
       auto *type = reinterpret_cast<Metadata*>(typePtr);
       type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
-      addrOffset += type->vw_size();
+      //addrOffset += type->vw_size();
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
       auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
       type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
-      addrOffset += type->vw_size();
+      //addrOffset += type->vw_size();
     } else {
       const auto &retainFunc = retainTable[static_cast<uint8_t>(tag)];
       if (SWIFT_LIKELY(retainFunc.isSingle)) {
-        ((RetainFn)retainFunc.fn)(
-            *(void **)(((uintptr_t)dest + addrOffset) & retainFunc.mask));
+        ((RetainFn)retainFunc.fn)(*(void**)(((uintptr_t)dest + addrOffset))); // & retainFunc.mask));
       } else {
         ((CopyInitFn)retainFunc.fn)((void*)((uintptr_t)dest + addrOffset), (void*)((uintptr_t)src + addrOffset));
       }
@@ -300,7 +301,7 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
         type->vw_initializeWithTake((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                     (OpaqueValue*)((uintptr_t)src + addrOffset));
       }
-      addrOffset += type->vw_size();
+      // addrOffset += type->vw_size();
       break;
     }
     case RefCountingKind::Existential: {
@@ -317,7 +318,7 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
         type->vw_initializeWithTake((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                     (OpaqueValue*)((uintptr_t)src + addrOffset));
       }
-      addrOffset += type->vw_size();
+      // addrOffset += type->vw_size();
       break;
     }
     case RefCountingKind::End:
@@ -356,7 +357,7 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
 
     if (tag == 0) {
       break;
-    } else if (tag == 1) {
+    } else if (tag == 1 || tag == 4) {
       continue;
     } else {
       const Metadata *genericType;
@@ -410,6 +411,13 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
 
       layoutStrOffset += sizeOrOffset;
       instancedLayoutStrOffset += sizeOrOffset;
+    } else if (tag == 4) {
+      auto *alignmentType = getResilientTypeMetadata(type, layoutStr, offset);
+      auto alignment = alignmentType->vw_alignment();
+      auto alignmentMask = alignment - 1;
+      skipBytes += sizeOrOffset;
+      skipBytes += alignmentMask;
+      skipBytes &= ~alignmentMask;
     } else {
       skipBytes += sizeOrOffset;
       const Metadata *genericType;

@@ -361,13 +361,14 @@ public:
 
 class AlignedGroupEntry : public TypeLayoutEntry, public llvm::FoldingSetNode {
   std::vector<TypeLayoutEntry *> entries;
+  SILType ty;
   Alignment::int_type minimumAlignment;
 
 public:
   AlignedGroupEntry(const std::vector<TypeLayoutEntry *> &entries,
-                    Alignment::int_type minimumAlignment)
+                    SILType ty, Alignment::int_type minimumAlignment)
       : TypeLayoutEntry(TypeLayoutEntryKind::AlignedGroup), entries(entries),
-        minimumAlignment(minimumAlignment) {}
+        ty(ty), minimumAlignment(minimumAlignment) {}
 
   ~AlignedGroupEntry();
 
@@ -481,10 +482,11 @@ public:
   SILType ty;
 
   EnumTypeLayoutEntry(unsigned numEmptyCases,
-                      const std::vector<TypeLayoutEntry *> &cases, SILType ty)
+                      const std::vector<TypeLayoutEntry *> &cases, SILType ty,
+                      Alignment::int_type minimumAlignment)
       : TypeLayoutEntry(TypeLayoutEntryKind::Enum),
-        numEmptyCases(numEmptyCases), minimumAlignment(1), cases(cases),
-        ty(ty) {}
+        numEmptyCases(numEmptyCases), minimumAlignment(minimumAlignment),
+        cases(cases), ty(ty) {}
 
   ~EnumTypeLayoutEntry();
 
@@ -712,12 +714,13 @@ public:
 
   AlignedGroupEntry *
   getOrCreateAlignedGroupEntry(const std::vector<TypeLayoutEntry *> &entries,
+                               SILType ty,
                                Alignment::int_type minimumAlignment);
 
   EnumTypeLayoutEntry *
   getOrCreateEnumEntry(unsigned numEmptyCase,
                        const std::vector<TypeLayoutEntry *> &nonEmptyCases,
-                       SILType ty);
+                       SILType ty, Alignment::int_type minimumAlignment);
 
   TypeInfoBasedTypeLayoutEntry *
   getOrCreateTypeInfoBasedEntry(const TypeInfo &ti, SILType representative);
