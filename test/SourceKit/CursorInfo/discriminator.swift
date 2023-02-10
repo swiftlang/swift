@@ -35,8 +35,8 @@ func testNestedClosures() {
 }
 
 func testReuseAST(bytes: Int) {
-  // RUN: %sourcekitd-test -req=cursor -pos=%(line + 2):7 -req-opts=verifysolverbasedcursorinfo=1 %s -- %s == \
-  // RUN:   -req=cursor -pos=%(line + 2):7 -req-opts=verifysolverbasedcursorinfo=1 %s -- %s | %FileCheck %s --check-prefix=REUSE_AST
+  // RUN: %sourcekitd-test -req=cursor -pos=%(line + 2):7 %s -- %s == \
+  // RUN:   -req=cursor -pos=%(line + 2):7 %s -- %s | %FileCheck %s --check-prefix=REUSE_AST
   let size = 3
   var bytes = 6
   // REUSE_AST: source.lang.swift.decl.var.local (40:7-40:11)

@@ -36,6 +36,9 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
     if (Result.BaseTy) {
       Result.BaseTy = S.simplifyType(Result.BaseTy)->getRValueType();
     }
+    if (Result.BaseTy && Result.BaseTy->is<ModuleType>()) {
+      Result.BaseTy = nullptr;
+    }
 
     Result.Value = SelectedOverload->choice.getDeclOrNull();
     Result.ValueTy =
