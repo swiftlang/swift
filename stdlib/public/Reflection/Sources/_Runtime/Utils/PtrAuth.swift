@@ -336,49 +336,49 @@ extension UnsafeRawPointer {
   @available(SwiftStdlib 5.9, *)
   @inlinable
   var signedVWTInitializeBufferWithCopyOfBuffer: ValueWitnessTable.InitializeBufferWithCopyOfBuffer {
-    unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
+    unsafeBitCast(unprotectedLoad(as: UnsafeRawPointer.self))
   }
   
   @available(SwiftStdlib 5.9, *)
   @inlinable
   var signedVWTDestroy: ValueWitnessTable.Destroy {
-    unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
+    unsafeBitCast(unprotectedLoad(as: UnsafeRawPointer.self))
   }
   
   @available(SwiftStdlib 5.9, *)
   @inlinable
   var signedVWTInitializeWithCopy: ValueWitnessTable.InitializeWithCopy {
-    unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
+    unsafeBitCast(unprotectedLoad(as: UnsafeRawPointer.self))
   }
   
   @available(SwiftStdlib 5.9, *)
   @inlinable
   var signedVWTAssignWithCopy: ValueWitnessTable.AssignWithCopy {
-    unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
+    unsafeBitCast(unprotectedLoad(as: UnsafeRawPointer.self))
   }
   
   @available(SwiftStdlib 5.9, *)
   @inlinable
   var signedVWTInitializeWithTake: ValueWitnessTable.InitializeWithTake {
-    unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
+    unsafeBitCast(unprotectedLoad(as: UnsafeRawPointer.self))
   }
   
   @available(SwiftStdlib 5.9, *)
   @inlinable
   var signedVWTAssignWithTake: ValueWitnessTable.AssignWithTake {
-    unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
+    unsafeBitCast(unprotectedLoad(as: UnsafeRawPointer.self))
   }
   
   @available(SwiftStdlib 5.9, *)
   @inlinable
   var signedVWTGetEnumTagSinglePayload: ValueWitnessTable.GetEnumTagSinglePayload {
-    unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
+    unsafeBitCast(unprotectedLoad(as: UnsafeRawPointer.self))
   }
   
   @available(SwiftStdlib 5.9, *)
   @inlinable
   var signedVWTStoreEnumTagSinglePayload: ValueWitnessTable.StoreEnumTagSinglePayload {
-    unsafeBitCast(loadUnaligned(as: UnsafeRawPointer.self))
+    unsafeBitCast(unprotectedLoad(as: UnsafeRawPointer.self))
   }
 #endif
 }

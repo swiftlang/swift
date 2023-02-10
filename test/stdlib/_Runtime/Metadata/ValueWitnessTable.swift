@@ -1,154 +1,157 @@
-import XCTest
+// RUN: %target-run-simple-swift
+// REQUIRES: executable_test
+
+// UNSUPPORTED: freestanding
+
+import StdlibUnittest
 import _Runtime
 
-enum ValueWitnessTableTests {
-  struct Dog: Equatable {
-    let name: String
-    let age: Int
-  }
+let suite = TestSuite("ValueWitnessTable")
+
+struct Dog: Equatable {
+  let name: String
+  let age: Int
 }
 
-extension RuntimeTests {
-  func testValueWitnessTable() throws {
-    let meta = Metadata(ValueWitnessTableTests.Dog.self).struct
+if #available(SwiftStdlib 5.9, *) {
+  suite.test("Basic") {
+    let meta = Metadata(Dog.self).struct
     let vwt = meta.vwt
-    
+
 //===----------------------------------------------------------------------===//
 // Property API
 //===----------------------------------------------------------------------===//
-    
-    XCTAssertEqual(vwt.size, 24)
-    XCTAssertEqual(vwt.stride, 24)
-    XCTAssertEqual(vwt.flags.alignment, 8)
-    XCTAssertEqual(vwt.flags.alignmentMask, 7)
-    XCTAssert(vwt.flags.isValueInline)
-    XCTAssertFalse(vwt.flags.isPOD)
-    XCTAssertFalse(vwt.flags.hasSpareBits)
-    XCTAssert(vwt.flags.isBitwiseTakable)
-    XCTAssertFalse(vwt.flags.hasEnumWitnesses)
-    XCTAssertFalse(vwt.flags.isIncomplete)
-    
+
+    expectEqual(vwt.size, 24)
+    expectEqual(vwt.stride, 24)
+    expectEqual(vwt.flags.alignment, 8)
+    expectEqual(vwt.flags.alignmentMask, 7)
+    expectTrue(vwt.flags.isValueInline)
+    expectFalse(vwt.flags.isPOD)
+    expectFalse(vwt.flags.hasSpareBits)
+    expectTrue(vwt.flags.isBitwiseTakable)
+    expectFalse(vwt.flags.hasEnumWitnesses)
+    expectFalse(vwt.flags.isIncomplete)
+
 //===----------------------------------------------------------------------===//
 // InitializeBufferWithCopyOfBuffer
 //===----------------------------------------------------------------------===//
-    
-    let anySopie: Any = ValueWitnessTableTests.Dog(name: "Sophie", age: 11)
+
+    let anySopie: Any = Dog(name: "Sophie", age: 11)
     var anySophiev2 = AnyExistentialContainer(
-      type: ValueWitnessTableTests.Dog.self
+      type: Dog.self
     )
-    
+
     withUnsafePointer(to: anySopie) {
       let src = $0
-      
+
       anySophiev2.projectValue {
         let dest = $0
-        
+
         vwt.initializeBufferWithCopyOfBuffer(dest, src)
       }
     }
-    
-    let concreteSophie = anySopie as! ValueWitnessTableTests.Dog
-    let concreteSophiev2 = unsafeBitCast(anySophiev2, to: Any.self) as! ValueWitnessTableTests.Dog
-    
-    XCTAssertEqual(concreteSophie, concreteSophiev2)
-    
+
+    let concreteSophie = anySopie as! Dog
+    let concreteSophiev2 = unsafeBitCast(anySophiev2, to: Any.self) as! Dog
+
+    expectEqual(concreteSophie, concreteSophiev2)
+
 //===----------------------------------------------------------------------===//
 // Destroy
 //===----------------------------------------------------------------------===//
-    
+
     withUnsafeTemporaryAllocation(
-      of: ValueWitnessTableTests.Dog.self,
+      of: Dog.self,
       capacity: 1
     ) {
       $0.initializeElement(at: 0, to: .init(name: "Sparky", age: 25))
-      
+
       vwt.destroy(UnsafeMutableRawPointer($0.baseAddress!))
     }
-    
+
 //===----------------------------------------------------------------------===//
 // InitializeWithCopy
 //===----------------------------------------------------------------------===//
-    
-    let sophie = ValueWitnessTableTests.Dog(name: "Sophie", age: 11)
+
+    let sophie = Dog(name: "Sophie", age: 11)
     let sophiev2 = withUnsafeTemporaryAllocation(
-      of: ValueWitnessTableTests.Dog.self,
+      of: Dog.self,
       capacity: 1
     ) {
       let destPtr = UnsafeMutableRawPointer($0.baseAddress!)
-      
+
       withUnsafePointer(to: sophie) {
         let srcPtr = UnsafeRawPointer($0)
-        
+
         vwt.initializeWithCopy(destPtr, srcPtr)
       }
-      
+
       return $0[0]
     }
-    
-    XCTAssertEqual(sophie, sophiev2)
-    
+
+    expectEqual(sophie, sophiev2)
+
 //===----------------------------------------------------------------------===//
 // AssignWithCopy
 //===----------------------------------------------------------------------===//
-    
-    var assignSparky = ValueWitnessTableTests.Dog(name: "Sparky", age: 25)
-    
+
+    var assignSparky = Dog(name: "Sparky", age: 25)
+
     withUnsafePointer(to: sophie) {
       let src = UnsafeRawPointer($0)
-      
+
       withUnsafeMutablePointer(to: &assignSparky) {
         let dest = UnsafeMutableRawPointer($0)
-        
+
         vwt.assignWithCopy(dest, src)
       }
     }
-    
-    XCTAssertEqual(sophie, assignSparky)
-    
+
+    expectEqual(sophie, assignSparky)
+
 //===----------------------------------------------------------------------===//
 // InitializeWithTake
 //===----------------------------------------------------------------------===//
-    
-    var takenSophie = ValueWitnessTableTests.Dog(name: "Sophie", age: 11)
-    
+
+    var takenSophie = Dog(name: "Sophie", age: 11)
+
     let newSophie = withUnsafeTemporaryAllocation(
-      of: ValueWitnessTableTests.Dog.self,
+      of: Dog.self,
       capacity: 1
     ) {
       let dest = UnsafeMutableRawPointer($0.baseAddress!)
-      
+
       withUnsafeMutablePointer(to: &takenSophie) {
         let src = UnsafeMutableRawPointer($0)
-        
+
         vwt.initializeWithTake(dest, src)
       }
-      
+
       return $0[0]
     }
-    
-    XCTAssertEqual(newSophie, sophie)
-    
+
+    expectEqual(newSophie, sophie)
+
 //===----------------------------------------------------------------------===//
 // AssignWithTake
 //===----------------------------------------------------------------------===//
-    
-    takenSophie = ValueWitnessTableTests.Dog(name: "Sophie", age: 11)
-    assignSparky = ValueWitnessTableTests.Dog(name: "Sparky", age: 25)
-    
+
+    takenSophie = Dog(name: "Sophie", age: 11)
+    assignSparky = Dog(name: "Sparky", age: 25)
+
     withUnsafeMutablePointer(to: &takenSophie) {
       let src = $0
-      
+
       withUnsafeMutablePointer(to: &assignSparky) {
         let dest = $0
-        
+
         vwt.assignWithTake(dest, src)
       }
     }
-    
-    XCTAssertEqual(assignSparky, sophie)
-  }
-  
-  func testEnumValueWitnessTable() throws {
-    
+
+    expectEqual(assignSparky, sophie)
   }
 }
+
+runAllTests()

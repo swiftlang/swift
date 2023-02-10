@@ -34,6 +34,6 @@ extension RelativePointer {
       return nil
     }
     
-    return address(from: ptr).loadUnaligned(as: Pointee.self)
+    return address(from: ptr).unprotectedLoad(as: Pointee.self)
   }
 }

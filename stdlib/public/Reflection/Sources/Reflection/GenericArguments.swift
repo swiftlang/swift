@@ -51,7 +51,7 @@ extension GenericArguments: RandomAccessCollection {
     
     let start = argumentPointer.unsafelyUnwrapped
     let address = start + position * MemoryLayout<Type>.size
-    return address.loadUnaligned(as: Type.self)
+    return address.unprotectedLoad(as: Type.self)
   }
 }
 

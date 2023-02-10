@@ -25,7 +25,7 @@ extension PublicLayout {
   @inline(__always)
   @inlinable
   public var layout: Layout {
-    ptr.loadUnaligned(as: Layout.self)
+    ptr.unprotectedLoad(as: Layout.self)
   }
   
   @inline(__always)
@@ -74,7 +74,7 @@ protocol PrivateLayout {
 @available(SwiftStdlib 5.9, *)
 extension PrivateLayout {
   var layout: Layout {
-    ptr.loadUnaligned(as: Layout.self)
+    ptr.unprotectedLoad(as: Layout.self)
   }
   
   var trailing: UnsafeRawPointer {

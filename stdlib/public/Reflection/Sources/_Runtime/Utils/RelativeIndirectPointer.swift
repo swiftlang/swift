@@ -23,7 +23,7 @@ public struct RelativeIndirectPointer<Pointee>: RelativePointer {
   
   @inlinable
   public func address(from ptr: UnsafeRawPointer) -> UnsafeRawPointer {
-    (ptr + Int(offset)).loadUnaligned(as: UnsafeRawPointer.self)
+    (ptr + Int(offset)).unprotectedLoad(as: UnsafeRawPointer.self)
   }
 }
 
@@ -32,7 +32,7 @@ extension UnsafeRawPointer {
   @inlinable
   public func relativeIndirectAddress<T>(as type: T.Type) -> UnsafeRawPointer {
     let relativePointer = RelativeIndirectPointer<T>(
-      offset: loadUnaligned(as: Int32.self)
+      offset: unprotectedLoad(as: Int32.self)
     )
     
     return relativePointer.address(from: self)

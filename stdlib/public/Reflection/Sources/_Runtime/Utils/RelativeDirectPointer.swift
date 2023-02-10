@@ -32,7 +32,7 @@ extension UnsafeRawPointer {
   @inlinable
   public func relativeDirectAddress<T>(as type: T.Type) -> UnsafeRawPointer {
     let relativePointer = RelativeDirectPointer<T>(
-      offset: loadUnaligned(as: Int32.self)
+      offset: unprotectedLoad(as: Int32.self)
     )
     
     return relativePointer.address(from: self)
