@@ -1451,6 +1451,11 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
   }
 
+  // A member implementation of an @objcImplementation extension is @objc.
+  if (VD->isObjCMemberImplementation())
+    // FIXME: New ObjCReason::Kind?
+    return ObjCReason(ObjCReason::ImplicitlyObjC);
+
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
