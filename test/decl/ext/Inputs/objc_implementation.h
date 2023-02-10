@@ -11,12 +11,11 @@
 @end
 
 @interface ObjCClass : ObjCBaseClass
+
 - (void)methodFromHeader1:(int)param;
 - (void)methodFromHeader2:(int)param;
 - (void)methodFromHeader3:(int)param;
 - (void)methodFromHeader4:(int)param;
-
-// FIXME: test case involving swift_name
 
 @property int propertyFromHeader1;
 @property int propertyFromHeader2;
@@ -38,17 +37,28 @@
 @end
 
 @interface ObjCClass (PresentAdditions)
+
 - (void)categoryMethodFromHeader1:(int)param;
 - (void)categoryMethodFromHeader2:(int)param;
 - (void)categoryMethodFromHeader3:(int)param;
 - (void)categoryMethodFromHeader4:(int)param;
 
-// FIXME: test case involving swift_name
-
 @property int categoryPropertyFromHeader1;
 @property int categoryPropertyFromHeader2;
 @property int categoryPropertyFromHeader3;
 @property int categoryPropertyFromHeader4;
+
+@end
+
+@interface ObjCClass (SwiftNameTests)
+
+- (void)methodObjCName1 __attribute__((swift_name("methodSwiftName1()")));
+- (void)methodObjCName2 __attribute__((swift_name("methodSwiftName2()")));
+- (void)methodObjCName3 __attribute__((swift_name("methodSwiftName3()")));
+- (void)methodObjCName4 __attribute__((swift_name("methodSwiftName4()")));
+- (void)methodObjCName5 __attribute__((swift_name("methodSwiftName5()")));
+- (void)methodObjCName6A __attribute__((swift_name("methodSwiftName6A()")));
+- (void)methodObjCName6B __attribute__((swift_name("methodSwiftName6B()")));
 
 @end
 

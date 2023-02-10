@@ -1245,6 +1245,7 @@ static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
 
   auto isNotRelevantInterfaceMember = [&](ValueDecl *member) -> bool {
     return !member->hasClangNode()
+             || member->getAttrs().isUnavailable(VD->getASTContext())
              || VD->isInstanceMember() != member->isInstanceMember();
   };
   assert(!VD->hasClangNode() &&
@@ -1328,6 +1329,32 @@ static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
     // FIXME: Add fix-it to move implementation
 
     return;
+  }
+
+  auto selectedMethod = *selectedMethodIter;
+  // If the Swift names don't match, suggest correcting the implementation
+  if (selectedMethod->getName() != VD->getName()) {
+    auto diag = diags.diagnose(VD, diag::objc_implementation_wrong_swift_name,
+                               *selectedMethod->getObjCRuntimeName(),
+                               selectedMethod->getDescriptiveKind(),
+                               selectedMethod->getName());
+    fixDeclarationName(diag, VD, selectedMethod->getName());
+  }
+  // If there was no @objc, add one with the implementation's @objc name.
+  else if (!objcAttr) {
+    objcAttr = ObjCAttr::create(VD->getASTContext(),
+                                selectedMethod->getObjCRuntimeName(),
+                                true);
+    VD->getAttrs().add(objcAttr);
+  }
+  // If there was an @objc with the wrong name, diagnose.
+  else if (objcAttr->hasName()
+             && objcAttr->getName() != selectedMethod->getObjCRuntimeName()) {
+    auto diag = diags.diagnose(VD, diag::objc_implementation_wrong_objc_name,
+                               *objcAttr->getName(), VD->getDescriptiveKind(),
+                               VD, *selectedMethod->getObjCRuntimeName());
+    fixDeclarationObjCName(diag, VD, objcAttr->getName(),
+                           selectedMethod->getObjCRuntimeName());
   }
 
   assert(VD->isObjC());

@@ -1601,6 +1601,15 @@ ERROR(objc_implementation_wrong_category,none,
       "%select{main class interface|category %3}3",
       (DescriptiveDeclKind, ValueDecl *, Identifier, Identifier))
 
+ERROR(objc_implementation_wrong_objc_name,none,
+      "selector %0 for %1 %2 not found in header; did you mean %3?",
+      (ObjCSelector, DescriptiveDeclKind, ValueDecl *, ObjCSelector))
+
+ERROR(objc_implementation_wrong_swift_name,none,
+      "selector %0 used in header by an %1 with a different name; did you "
+      "mean %2?",
+      (ObjCSelector, DescriptiveDeclKind, DeclName))
+
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())
 ERROR(cdecl_empty_name,none,
