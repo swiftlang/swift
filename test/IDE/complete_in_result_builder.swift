@@ -329,3 +329,39 @@ func testInStringLiteralInResultBuilder() {
 // IN_STRING_LITERAL_IN_RESULT_BUILDER-DAG: Decl[InstanceVar]/CurrNominal:      bar[#Int#]; name=bar
 // IN_STRING_LITERAL_IN_RESULT_BUILDER: End completions
 }
+
+func testSwitchInResultBuilder() {
+  @resultBuilder
+  enum ReducerBuilder2<Action> {
+    static func buildBlock(_ r: Reduce2<Action>) -> Reduce2<Action> { r }
+    static func buildBlock(_ r0: Reduce2<Action>, _ r1: Reduce2<Action>) -> Reduce2<Action> { r0 }
+    static func buildExpression(_ r: Reduce2<Action>) -> Reduce2<Action> { r }
+  }
+
+  enum Action {
+    case alertDismissed
+  }
+
+  struct Reduce2<Action> {
+    init() {}
+
+    init(_ reduce: (Action) -> Int) {}
+  }
+
+  struct Login2 {
+    @ReducerBuilder2<Action>
+    var body: Reduce2<Action> {
+      Reduce2()
+      Reduce2 { action in
+        switch action {
+        case .#^SWITCH_IN_RESULT_BUILDER^# alertDismissed:
+          return 0
+        }
+      }
+    }
+  }
+// SWITCH_IN_RESULT_BUILDER: Begin completions, 2 items
+// SWITCH_IN_RESULT_BUILDER-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: alertDismissed[#Action#];
+// SWITCH_IN_RESULT_BUILDER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Action#})[#(into: inout Hasher) -> Void#];
+// SWITCH_IN_RESULT_BUILDER: End completions
+}
