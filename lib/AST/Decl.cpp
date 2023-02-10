@@ -9820,14 +9820,14 @@ MacroDecl::MacroDecl(
     SourceLoc macroLoc, DeclName name, SourceLoc nameLoc,
     GenericParamList *genericParams,
     ParameterList *parameterList,
-    SourceLoc arrowOrColonLoc,
+    SourceLoc arrowLoc,
     TypeRepr *resultType,
     Expr *definition,
     DeclContext *parent
 ) : GenericContext(DeclContextKind::MacroDecl, parent, genericParams),
     ValueDecl(DeclKind::Macro, parent, name, nameLoc),
     macroLoc(macroLoc), parameterList(parameterList),
-    arrowOrColonLoc(arrowOrColonLoc),
+    arrowLoc(arrowLoc),
     resultType(resultType),
     definition(definition) {
 
@@ -9849,6 +9849,8 @@ SourceRange MacroDecl::getSourceRange() const {
   SourceLoc endLoc = getNameLoc();
   if (parameterList)
     endLoc = parameterList->getEndLoc();
+  if (resultType.getSourceRange().isValid())
+    endLoc = resultType.getSourceRange().End;
   if (definition)
     endLoc = definition->getEndLoc();
   if (auto trailing = getTrailingWhereClause())
