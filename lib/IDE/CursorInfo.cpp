@@ -143,9 +143,17 @@ private:
     return getSourceMgr().containsRespectingReplacedRanges(Range, LocToResolve);
   }
 
+  PreWalkResult<ArgumentList *>
+  walkToArgumentListPre(ArgumentList *ArgList) override {
+    if (!rangeContainsLocToResolve(ArgList->getSourceRange())) {
+      return Action::SkipChildren(ArgList);
+    }
+    return Action::Continue(ArgList);
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (!rangeContainsLocToResolve(D->getSourceRangeIncludingAttrs())) {
-      return PreWalkAction::SkipChildren;
+      return Action::SkipChildren();
     }
 
     if (auto *newDC = dyn_cast<DeclContext>(D)) {
@@ -192,6 +200,10 @@ private:
       }
     }
 
+    if (!rangeContainsLocToResolve(E->getSourceRange())) {
+      return Action::SkipChildren(E);
+    }
+
     return Action::Continue(E);
   }
 
@@ -203,6 +215,20 @@ private:
     return Action::Continue(E);
   }
 
+  PreWalkAction walkToParameterListPre(ParameterList *PL) override {
+    if (!rangeContainsLocToResolve(PL->getSourceRange())) {
+      return Action::SkipChildren();
+    }
+    return Action::Continue();
+  }
+
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+    if (!rangeContainsLocToResolve(P->getSourceRange())) {
+      return Action::SkipChildren(P);
+    }
+    return Action::Continue(P);
+  }
+
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto CondStmt = dyn_cast<LabeledConditionalStmt>(S)) {
       for (auto ShorthandShadow :
@@ -211,7 +237,16 @@ private:
         ShorthandShadowedDecls[ShorthandShadow.first] = ShorthandShadow.second;
       }
     }
+
+    if (!rangeContainsLocToResolve(S->getSourceRange())) {
+      return Action::SkipChildren(S);
+    }
+
     return Action::Continue(S);
+  }
+
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    return Action::SkipChildren();
   }
 };
 
