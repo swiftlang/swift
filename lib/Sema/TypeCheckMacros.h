@@ -67,9 +67,8 @@ bool expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 /// Expand the peer declarations for the given declaration based on
 /// the custom attribute that references the given macro.
 ///
-/// Populates the \c peers vector with the expanded peer declarations.
-void expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl,
-                 SmallVectorImpl<Decl *> &peers);
+/// Returns \c true if the macro added new peers, \c false otherwise.
+bool expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 
 } // end namespace swift
 

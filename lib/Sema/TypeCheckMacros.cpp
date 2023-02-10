@@ -417,21 +417,13 @@ bool ExpandSynthesizedMemberMacroRequest::evaluate(Evaluator &evaluator,
 }
 
 bool ExpandPeerMacroRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
-  SmallVector<Decl *, 2> peers;
+  bool addedPeers = false;
   decl->forEachAttachedMacro(MacroRole::Peer,
       [&](CustomAttr *attr, MacroDecl *macro) {
-        expandPeers(attr, macro, decl, peers);
+        addedPeers |= expandPeers(attr, macro, decl);
       });
 
-  // Expand all peers that have attached peer macros.
-  for (auto *peer : peers) {
-    (void)evaluateOrDefault(
-        evaluator,
-        ExpandPeerMacroRequest{peer},
-        false);
-  }
-
-  return !peers.empty();
+  return addedPeers;
 }
 
 /// Determine whether the given source file is from an expansion of the given
@@ -1086,16 +1078,16 @@ bool swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   return synthesizedMembers;
 }
 
-void swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl,
-                        SmallVectorImpl<Decl *> &peers) {
+bool swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   auto macroSourceFile = evaluateAttachedMacro(macro, decl, attr,
                                                /*passParentContext*/false,
                                                MacroRole::Peer);
   if (!macroSourceFile)
-    return;
+    return false;
 
   PrettyStackTraceDecl debugStack("applying expanded peer macro", decl);
 
+  bool addedPeers = false;
   auto *parent = decl->getDeclContext();
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto peer : topLevelDecls) {
@@ -1110,8 +1102,10 @@ void swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl,
       continue;
     }
 
-    peers.push_back(peer);
+    addedPeers = true;
   }
+
+  return addedPeers;
 }
 
 MacroDecl *
