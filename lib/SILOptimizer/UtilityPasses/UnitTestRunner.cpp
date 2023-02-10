@@ -68,6 +68,7 @@
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/TaggedUnion.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -621,6 +622,44 @@ struct SimplifyCFGTryJumpThreading : UnitTest {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// MARK: AccessPath Unit Tests
+//===----------------------------------------------------------------------===//
+
+struct AccessUseTestVisitor : public AccessUseVisitor {
+  AccessUseTestVisitor()
+    : AccessUseVisitor(AccessUseType::Overlapping,
+                       NestedAccessType::IgnoreAccessBegin) {}
+
+  bool visitUse(Operand *op, AccessUseType useTy) override {
+    switch (useTy) {
+    case AccessUseType::Exact:
+      llvm::errs() << "Exact Use: ";
+      break;
+    case AccessUseType::Inner:
+      llvm::errs() << "Inner Use: ";
+      break;
+    case AccessUseType::Overlapping:
+      llvm::errs() << "Overlapping Use ";
+      break;
+    }
+    llvm::errs() << *op->getUser();
+    return true;
+  }
+};
+
+struct AccessPathBaseTest : UnitTest {
+  AccessPathBaseTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto value = arguments.takeValue();
+    getFunction()->dump();
+    llvm::outs() << "Access path base: " << value;
+    auto accessPathWithBase = AccessPathWithBase::compute(value);
+    AccessUseTestVisitor visitor;
+    visitAccessPathBaseUses(visitor, accessPathWithBase, getFunction());
+  }
+};
+
 /// [new_tests] Add the new UnitTest subclass above this line. 
 
 //===----------------------------------------------------------------------===//
@@ -637,6 +676,7 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
   }
 
     // Alphabetical mapping from string to unit test subclass.
+    ADD_UNIT_TEST_SUBCLASS("accesspath-base", AccessPathBaseTest)
     ADD_UNIT_TEST_SUBCLASS("canonicalize-ossa-lifetime", CanonicalizeOSSALifetimeTest)
     ADD_UNIT_TEST_SUBCLASS("canonicalize-borrow-scope",
                            CanonicalizeBorrowScopeTest)
