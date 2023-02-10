@@ -4301,14 +4301,7 @@ namespace {
         SmallVector<Decl *, 4> matchingTopLevelDecls;
 
         // Get decls with a matching @objc attribute
-        module->getTopLevelDeclsWhereAttributesMatch(
-          matchingTopLevelDecls,
-          [&name](const DeclAttributes attrs) -> bool {
-            if (auto objcAttr = attrs.getAttribute<ObjCAttr>())
-              if (auto objcName = objcAttr->getName())
-                return objcName->getSimpleName() == name;
-            return false;
-          });
+        module->lookupTopLevelDeclsByObjCName(matchingTopLevelDecls, name);
 
         // Filter by decl kind
         for (auto result : matchingTopLevelDecls) {
