@@ -92,5 +92,64 @@ int main() {
     derivedDerived.methodInDerivedDerived();
 // CHECK-NEXT: DerivedDerivedClass.methodInDerivedDerived
   }
+
+  {
+    swift::Int x;
+    x = base.getVirtualComputedProp();
+    assert(x == 21);
+
+    x = derived.getVirtualComputedProp();
+    assert(x == -75);
+    x = derivedAsBase.getVirtualComputedProp();
+    assert(x == -75);
+
+    x = derivedDerived.getVirtualComputedProp();
+    assert(x == -75);
+    x = derivedDerivedAsBase.getVirtualComputedProp();
+    assert(x == -75);
+  }
+
+  {
+    int64_t x;
+    x = base.getVirtualComputedGetSet();
+    assert(x == 0);
+    base.setVirtualComputedGetSet(45);
+    x = base.getVirtualComputedGetSet();
+    assert(x == 45);
+
+    x = derived.getVirtualComputedGetSet();
+    assert(x == 0);
+    derivedAsBase.setVirtualComputedGetSet(9);
+    x = derivedAsBase.getVirtualComputedGetSet();
+    assert(x == 18);
+    derived.setVirtualComputedGetSet(-1);
+    x = derived.getVirtualComputedGetSet();
+    assert(x == -2);
+
+    x = derivedDerived.getVirtualComputedGetSet();
+    assert(x == 0);
+    derivedDerivedAsBase.setVirtualComputedGetSet(3);
+    x = derivedDerivedAsBase.getVirtualComputedGetSet();
+    assert(x == 6);
+  }
+
+  {
+    swift::Int x;
+    x = base.getStoredProp();
+    assert(x == 0);
+
+    derivedAsBase.setStoredProp(39);
+    x = derivedAsBase.getStoredProp();
+    assert(x == -39);
+
+    x = derivedDerivedAsBase.getStoredProp();
+    assert(x == 0);
+    derivedDerivedAsBase.setStoredProp(843);
+    x = derivedDerivedAsBase.getStoredProp();
+    assert(x == 844);
+
+    x = derivedDerived.getComputedPropInDerivedDerived();
+    assert(x == 11);
+  }
   return 0;
 }

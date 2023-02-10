@@ -125,11 +125,11 @@ public:
       Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print the C++ getter/setter method signature.
-  void printCxxPropertyAccessorMethod(const NominalTypeDecl *typeDeclContext,
-                                      const AccessorDecl *accessor,
-                                      const LoweredFunctionSignature &signature,
-                                      StringRef swiftSymbolName, Type resultTy,
-                                      bool isStatic, bool isDefinition);
+  void printCxxPropertyAccessorMethod(
+      const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
+      const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
+      Type resultTy, bool isStatic, bool isDefinition,
+      Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print the C++ subscript method.
   void printCxxSubscriptAccessorMethod(

@@ -1019,7 +1019,7 @@ private:
               typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
               /*isStatic=*/isClassMethod,
-              /*isDefinition=*/false);
+              /*isDefinition=*/false, dispatchInfo);
       } else {
         declPrinter.printCxxMethod(typeDeclContext, AFD,
                                    funcABI->getSignature(),
@@ -1043,7 +1043,7 @@ private:
               typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
               /*isStatic=*/isClassMethod,
-              /*isDefinition=*/true);
+              /*isDefinition=*/true, dispatchInfo);
       } else {
         defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
                                   funcABI->getSymbolName(), resultTy,

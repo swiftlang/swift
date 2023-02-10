@@ -19,6 +19,19 @@ public class BaseClass {
   public final func finalMethodInBase(_ x: Int) -> Int {
     return x * 2
   }
+
+  public var virtualComputedProp: Int {
+    return 21
+  }
+  public var virtualComputedGetSet: Int64 {
+      get {
+          return field
+      }
+      set {
+          field = newValue
+      }
+  }
+  public var storedProp: Int = 0
 }
 
 public class DerivedClass: BaseClass {
@@ -33,6 +46,26 @@ public class DerivedClass: BaseClass {
   }
   public func virtualMethodInDerived(_ x: BaseClass) -> BaseClass {
     return x
+  }
+
+  override public var virtualComputedProp: Int {
+    return -75
+  }
+  override public var virtualComputedGetSet: Int64 {
+    get {
+      super.virtualComputedGetSet
+    }
+    set {
+      super.virtualComputedGetSet = newValue * 2
+    }
+  }
+  override public var storedProp: Int {
+    get {
+      return -super.storedProp
+    }
+    set {
+      super.storedProp = newValue
+    }
   }
 }
 
@@ -49,6 +82,16 @@ public final class DerivedDerivedClass: DerivedClass {
   public func methodInDerivedDerived() {
     print("DerivedDerivedClass.methodInDerivedDerived")
   }
+  override public var storedProp: Int {
+    get {
+      return -super.storedProp
+    }
+    set {
+      super.storedProp = newValue + 1
+    }
+  }
+  public var storedPropInDerivedDerived: Int = 0
+  public var computedPropInDerivedDerived: Int { return 11 }
 }
 
 public func returnBaseClass() -> BaseClass {
@@ -83,6 +126,46 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:   return _impl::$s5Class04BaseA0C013finalMethodInB0yS2iF(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
+// CHECK:        swift::Int BaseClass::getVirtualComputedProp() {
+// CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   void **vtable_ = *selfPtr_;
+// CHECK-NEXT:   using FType = decltype(_impl::$s5Class04BaseA0C19virtualComputedPropSivg);
+// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 2]]));
+// CHECK-NEXT:   return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   }
+
+// CHECK:        int64_t BaseClass::getVirtualComputedGetSet() {
+// CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   void **vtable_ = *selfPtr_;
+// CHECK-NEXT:   using FType = decltype(_impl::$s5Class04BaseA0C21virtualComputedGetSets5Int64Vvg);
+// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 3]]));
+// CHECK-NEXT:   return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   }
+
+// CHECK:        void BaseClass::setVirtualComputedGetSet(int64_t newValue) {
+// CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   void **vtable_ = *selfPtr_;
+// CHECK-NEXT:   using FType = decltype(_impl::$s5Class04BaseA0C21virtualComputedGetSets5Int64Vvs);
+// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 4]]));
+// CHECK-NEXT:   return (* fptr_)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   }
+
+// CHECK:        swift::Int BaseClass::getStoredProp() {
+// CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   void **vtable_ = *selfPtr_;
+// CHECK-NEXT:   using FType = decltype(_impl::$s5Class04BaseA0C10storedPropSivg);
+// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 6]]));
+// CHECK-NEXT:   return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   }
+
+// CHECK:        void BaseClass::setStoredProp(swift::Int value) {
+// CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   void **vtable_ = *selfPtr_;
+// CHECK-NEXT:   using FType = decltype(_impl::$s5Class04BaseA0C10storedPropSivs);
+// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 7]]));
+// CHECK-NEXT:   return (* fptr_)(value, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   }
+
 // CHECK:        void DerivedClass::virtualMethod() {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   void **vtable_ = *selfPtr_;
@@ -103,8 +186,48 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   void **vtable_ = *selfPtr_;
 // CHECK-NEXT:   using FType = decltype(_impl::$s5Class07DerivedA0C015virtualMethodInB0yAA04BaseA0CAFF);
-// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 2]]));
+// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 9]]));
 // CHECK-NEXT:     return _impl::_impl_BaseClass::makeRetained((* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
+// CHECK-NEXT:     }
+
+// CHECK:         swift::Int DerivedClass::getVirtualComputedProp() {
+// CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     void **vtable_ = *selfPtr_;
+// CHECK-NEXT:     using FType = decltype(_impl::$s5Class07DerivedA0C19virtualComputedPropSivg);
+// CHECK-NEXT:     FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 2]]));
+// CHECK-NEXT:     return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     }
+
+// CHECK:         int64_t DerivedClass::getVirtualComputedGetSet() {
+// CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     void **vtable_ = *selfPtr_;
+// CHECK-NEXT:     using FType = decltype(_impl::$s5Class07DerivedA0C21virtualComputedGetSets5Int64Vvg);
+// CHECK-NEXT:     FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 3]]));
+// CHECK-NEXT:     return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     }
+
+// CHECK:         void DerivedClass::setVirtualComputedGetSet(int64_t newValue) {
+// CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     void **vtable_ = *selfPtr_;
+// CHECK-NEXT:     using FType = decltype(_impl::$s5Class07DerivedA0C21virtualComputedGetSets5Int64Vvs);
+// CHECK-NEXT:     FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 4]]));
+// CHECK-NEXT:     return (* fptr_)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     }
+
+// CHECK:         swift::Int DerivedClass::getStoredProp() {
+// CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     void **vtable_ = *selfPtr_;
+// CHECK-NEXT:     using FType = decltype(_impl::$s5Class07DerivedA0C10storedPropSivg);
+// CHECK-NEXT:     FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 6]]));
+// CHECK-NEXT:     return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     }
+
+// CHECK:         void DerivedClass::setStoredProp(swift::Int newValue) {
+// CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     void **vtable_ = *selfPtr_;
+// CHECK-NEXT:     using FType = decltype(_impl::$s5Class07DerivedA0C10storedPropSivs);
+// CHECK-NEXT:     FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 7]]));
+// CHECK-NEXT:     return (* fptr_)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
 // CHECK:        void DerivedDerivedClass::virtualMethod() {
@@ -119,3 +242,10 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK-NEXT:     return _impl::$s5Class07DerivedbA0C08methodInbB0yyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
+// CHECK:          swift::Int DerivedDerivedClass::getStoredProp() {
+// CHECK-NEXT:     return _impl::$s5Class07DerivedbA0C10storedPropSivg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     }
+
+// CHECK:          swift::Int DerivedDerivedClass::getComputedPropInDerivedDerived() {
+// CHECK-NEXT:     return _impl::$s5Class07DerivedbA0C014computedPropInbB0Sivg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     }
