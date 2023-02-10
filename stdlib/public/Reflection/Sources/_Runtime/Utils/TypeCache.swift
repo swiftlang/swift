@@ -17,7 +17,7 @@ struct TypeCache {
   
   @available(SwiftStdlib 5.9, *)
   init() {
-    cache = Lock.create(with: [:])
+    cache = Lock<[Key: Any.Type?]>(initialValue: [:])
   }
 }
 
@@ -192,7 +192,7 @@ var typeCache: TypeCache = {
   var result = TypeCache()
 
   result.cache.withLock {
-    $0.reserveCapacity(50)
+    $0.reserveCapacity(25)
   }
 
   return result

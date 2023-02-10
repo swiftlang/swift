@@ -23,41 +23,29 @@ func _lockLock(_: UnsafeRawPointer)
 @_silgen_name("_swift_reflection_lock_unlock")
 func _lockUnlock(_: UnsafeRawPointer)
 
-class Lock<T> {
-  var value: T
+struct Lock<T> {
+  var storage: ManagedBuffer<T, UInt8>
 
-  var mutex: UnsafeRawPointer {
-    UnsafeRawPointer(
-      Builtin.projectTailElems(self, UnsafeRawPointer.self)
-    )
-  }
+  init(initialValue: T) {
+    storage = .create(minimumCapacity: _lockSize()) {
+      $0.withUnsafeMutablePointerToElements {
+        _lockInit(UnsafeRawPointer($0))
+      }
 
-  init(_ x: T) {
-    value = x
-  }
-
-  static func create(with initialValue: T) -> Lock<T> {
-    let lock = Builtin.allocWithTailElems_1(
-      Lock<T>.self,
-      _lockSize()._builtinWordValue,
-      UnsafeRawPointer.self
-    )
-
-    lock.value = initialValue
-
-    _lockInit(lock.mutex)
-
-    return lock
+      return initialValue
+    }
   }
 
   func withLock<U>(_ body: @Sendable (inout T) throws -> U) rethrows -> U {
-    _lockLock(mutex)
+    try storage.withUnsafeMutablePointers { header, elements in
+      _lockLock(UnsafeRawPointer(elements))
 
-    defer {
-      _lockUnlock(mutex)
+      defer {
+        _lockUnlock(UnsafeRawPointer(elements))
+      }
+
+      return try body(&header.pointee)
     }
-
-    return try body(&value)
   }
 }
 

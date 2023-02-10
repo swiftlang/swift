@@ -12,7 +12,7 @@
 import Swift
 
 @_alwaysEmitIntoClient
-func unsafeBitCast<T, U>(_ x: T, to type: U.Type = U.self) -> U {
+func unsafeBitCast<T, U>(_ x: T, toDefault type: U.Type = U.self) -> U {
   Swift.unsafeBitCast(x, to: type)
 }
 
