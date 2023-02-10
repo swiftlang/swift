@@ -135,7 +135,8 @@ public:
   void printCxxSubscriptAccessorMethod(
       const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
       const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
-      Type resultTy, bool isDefinition);
+      Type resultTy, bool isDefinition,
+      Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
   ClangRepresentation

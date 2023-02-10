@@ -1459,7 +1459,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
 void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
-    Type resultTy, bool isDefinition) {
+    Type resultTy, bool isDefinition,
+    Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo) {
   assert(accessor->isGetter());
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
@@ -1476,9 +1477,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
   }
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(accessor, signature, swiftSymbolName, typeDeclContext,
-                    accessor->getModuleContext(), resultTy,
-                    accessor->getParameters());
+  printCxxThunkBody(
+      accessor, signature, swiftSymbolName, typeDeclContext,
+      accessor->getModuleContext(), resultTy, accessor->getParameters(),
+      /*hasThrows=*/false, nullptr, /*isStatic=*/false, dispatchInfo);
   os << "  }\n";
 }
 

@@ -151,5 +151,16 @@ int main() {
     x = derivedDerived.getComputedPropInDerivedDerived();
     assert(x == 11);
   }
+
+  {
+    swift::Int x;
+    x = base[23];
+    assert(x == 23);
+
+    x = derivedAsBase[23];
+    assert(x == 46);
+    x = derivedDerivedAsBase[-11];
+    assert(x == -22);
+  }
   return 0;
 }

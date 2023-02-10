@@ -39,6 +39,9 @@
 // CHECK:         void BaseClass::setStoredProp(swift::Int value) {
 // CHECK-NEXT:    _impl::$s5Class04BaseA0C10storedPropSivsTj(value, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 
+// CHECK:           swift::Int BaseClass::operator [](swift::Int i) const
+// CHECK-NEXT:      return _impl::$s5Class04BaseA0CyS2icigTj(i, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+
 // CHECK:        void DerivedClass::virtualMethod() {
 // CHECK-NEXT:   return _impl::$s5Class04BaseA0C13virtualMethodyyFTj(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
