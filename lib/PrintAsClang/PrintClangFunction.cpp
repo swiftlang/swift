@@ -1098,21 +1098,27 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     os << "  void* _ctx = nullptr;\n";
   }
   Optional<StringRef> indirectFunctionVar;
-  if (dispatchInfo &&
-      dispatchInfo->getKind() !=
-          IRABIDetailsProvider::MethodDispatchInfo::Kind::Direct) {
-    assert(dispatchInfo->getKind() == IRABIDetailsProvider::MethodDispatchInfo::
-                                          Kind::IndirectVTableStaticOffset);
-    auto vtableBitOffset = dispatchInfo->getStaticBitOffset();
-
-    os << "void ***selfPtr_ = reinterpret_cast<void ***>( "
-          "::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));\n";
-    os << "void **vtable_ = *selfPtr_;\n";
-    os << "using FType = decltype(" << cxx_synthesis::getCxxImplNamespaceName()
-       << "::" << swiftSymbolName << ");\n";
-    os << "FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + "
-       << (vtableBitOffset / 8) << "));\n"; // FIXME: not 8
-    indirectFunctionVar = StringRef("fptr_");
+  using DispatchKindTy = IRABIDetailsProvider::MethodDispatchInfo::Kind;
+  if (dispatchInfo) {
+    switch (dispatchInfo->getKind()) {
+    case DispatchKindTy::Direct:
+      break;
+    case DispatchKindTy::IndirectVTableStaticOffset:
+      os << "void ***selfPtr_ = reinterpret_cast<void ***>( "
+            "::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));"
+            "\n";
+      os << "void **vtable_ = *selfPtr_;\n";
+      os << "using FType = decltype("
+         << cxx_synthesis::getCxxImplNamespaceName() << "::" << swiftSymbolName
+         << ");\n";
+      os << "FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + "
+         << (dispatchInfo->getStaticBitOffset() / 8) << "));\n";
+      indirectFunctionVar = StringRef("fptr_");
+      break;
+    case DispatchKindTy::Thunk:
+      swiftSymbolName = dispatchInfo->getThunkSymbolName();
+      break;
+    }
   }
   auto printCallToCFunc = [&](Optional<StringRef> additionalParam) {
     if (indirectFunctionVar)
