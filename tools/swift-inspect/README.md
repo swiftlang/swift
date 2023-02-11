@@ -24,9 +24,9 @@ swift build -Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror -Xlinker %SDKRO
 
 The process is a little bit more complicated on Linux. Some features available on macOS and Windows are not present on Linux and additional libraries are needed.
 
-In order to function correctly, `swift-inspect` needs the ability to enumerate memory allocated on the heap. This is not done simply under `Glibc` which is the C library by Swift. The ability to enumerate heap is made available via 3rd party tool called `memtool`. This tool was develop specifically for `swift-inspect`.
+In order to function correctly, `swift-inspect` needs the ability to enumerate memory allocated on the heap. This feature is not natively present in `Glibc` which is the C library used by Swift. The ability to enumerate heap is made available via 3rd party tool called `memtool`. This tool was developed with `swift-inspect` in mind.
 
-**However, `memtool` is not maintained by the Swift maintainers and should be used with caution and at your own risk.**
+**However, `memtool` is not maintained by the Swift maintainers and should be used with caution.**
 
 Before downloading, compiling and executing `memtool`, be sure you are familiar with [important considerations](https://github.com/mikolasstuchlik/memtool/#important-considerations).
 
@@ -55,7 +55,7 @@ swift build --package-path . \
             -Xlinker -rpath -Xlinker $MEMTOOL_REPO_ROOT/.build/x86_64-unknown-linux-gnu/debug
 ```
 
-This build command requires includes (lines with `-I`) from Memtool, but also from the Swift repository, since those includes are not shipped with toolcahin. It also needs to link `libswiftRemoteMirror.so` from the Swift toolchain and `libMemtoolCore.so` from the `memtool` build folder.
+This build command requires includes from Memtool, but also from the Swift repository, since required header files are not shipped with toolcahin. It also needs to link `libswiftRemoteMirror.so` from the Swift toolchain and `libMemtoolCore.so` from the `memtool` build folder.
 
 ### Using
 
@@ -114,7 +114,7 @@ _ = MyClass()
 
 _ = readLine()
 ```
-In order to trace it, we would need to compile it, run it and find the PID:
+In order to trace the program, we need to compile it, run it and find the PID:
 ```bash
 $ swiftc simple.swift
 $ ./simple
@@ -124,7 +124,7 @@ you    37034  0.0  0.0  20264  2360 pts/3    S+   21:17   0:00 grep --color=auto
 ```
 
 The PID is `14808`.
-Now enter the directory containing the `swift-inspect` package and execute (`sudo` may be required)
+Now enter the `swift-inspect` package directory and launch it (`sudo` may be required)
 
 ```
 $ .build/debug/swift-inspect dump-arrays 14808
