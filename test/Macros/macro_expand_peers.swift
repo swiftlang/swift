@@ -18,9 +18,24 @@ struct S {
   }
 
   // CHECK-DUMP: @__swiftmacro_18macro_expand_peers1SV1f1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_.swift
-  // CHECK-DUMP: func f(a: Int, for b: String, _ value: Double, completionHandler: (String) -> Void) {
+  // CHECK-DUMP: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
   // CHECK-DUMP:   Task {
   // CHECK-DUMP:     completionHandler(await f(a: a, for: b, value))
   // CHECK-DUMP:   }
   // CHECK-DUMP: }
 }
+
+@attached(peer)
+macro wrapInType() = #externalMacro(module: "MacroDefinition", type: "WrapInType")
+
+@wrapInType
+func global(a: Int, b: String) {
+  print(a, b)
+}
+
+// CHECK-DUMP: @__swiftmacro_18macro_expand_peers6global1a1bySi_SStF10wrapInTypefMp_.swift
+// CHECK-DUMP: struct Wrapper_6globalfMu0_ {
+// CHECK-DUMP:   func method_6globalfMu_(a: Int, b: String)  {
+// CHECK-DUMP:     global(a: a, b: b)
+// CHECK-DUMP:   }
+// CHECK-DUMP: }

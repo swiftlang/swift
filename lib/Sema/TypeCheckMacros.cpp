@@ -1194,9 +1194,6 @@ swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
       nominal->addMember(peer);
     } else if (auto *extension = dyn_cast<ExtensionDecl>(parent)) {
       extension->addMember(peer);
-    } else {
-      // TODO: Add peers to global or local contexts.
-      continue;
     }
   }
 

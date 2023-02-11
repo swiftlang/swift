@@ -441,7 +441,7 @@ SWIFT_REQUEST(TypeChecker, ExpandSynthesizedMemberMacroRequest,
               ArrayRef<unsigned>(Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandPeerMacroRequest,
-              bool(Decl *),
+              ArrayRef<unsigned>(Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeRuntimeMetadataAttrGenerator,
               Expr *(CustomAttr *, ValueDecl *),
