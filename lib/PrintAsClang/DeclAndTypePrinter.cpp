@@ -1013,13 +1013,13 @@ private:
           declPrinter.printCxxSubscriptAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
-              /*isDefinition=*/false);
+              /*isDefinition=*/false, dispatchInfo);
         else
           declPrinter.printCxxPropertyAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
               /*isStatic=*/isClassMethod,
-              /*isDefinition=*/false);
+              /*isDefinition=*/false, dispatchInfo);
       } else {
         declPrinter.printCxxMethod(typeDeclContext, AFD,
                                    funcABI->getSignature(),
@@ -1037,13 +1037,14 @@ private:
         if (SD)
           defPrinter.printCxxSubscriptAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
-              funcABI->getSymbolName(), resultTy, /*isDefinition=*/true);
+              funcABI->getSymbolName(), resultTy, /*isDefinition=*/true,
+              dispatchInfo);
         else
           defPrinter.printCxxPropertyAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
               /*isStatic=*/isClassMethod,
-              /*isDefinition=*/true);
+              /*isDefinition=*/true, dispatchInfo);
       } else {
         defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
                                   funcABI->getSymbolName(), resultTy,
