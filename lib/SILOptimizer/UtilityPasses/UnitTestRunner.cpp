@@ -69,6 +69,7 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -514,6 +515,77 @@ struct FindBorrowIntroducers : UnitTest {
   }
 };
 
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the computed pruned liveness
+// - the liveness boundary
+struct LinearLivenessTest : UnitTest {
+  LinearLivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    SILValue value = arguments.takeValue();
+    getFunction()->dump();
+    llvm::dbgs() << "Linear liveness: " << value;
+    LinearLiveness liveness(value);
+    liveness.compute();
+    liveness.print(llvm::outs());
+
+    PrunedLivenessBoundary boundary;
+    liveness.getLiveness().computeBoundary(boundary);
+    boundary.print(llvm::outs());
+  }
+};
+
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the computed pruned liveness
+// - the liveness boundary
+struct InteriorLivenessTest : UnitTest {
+  InteriorLivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    SILValue value = arguments.takeValue();
+    getFunction()->dump();
+    llvm::dbgs() << "Interior liveness: " << value;
+    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+    DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
+    InteriorLiveness liveness(value);
+    auto handleInnerScope = [](SILValue innerBorrow) {
+      llvm::outs() << "Inner scope: " << innerBorrow;
+    };
+    liveness.compute(domTree, handleInnerScope);
+    liveness.print(llvm::outs());
+
+    PrunedLivenessBoundary boundary;
+    liveness.getLiveness().computeBoundary(boundary);
+    boundary.print(llvm::outs());
+  }
+};
+
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the computed pruned liveness
+// - the liveness boundary
+struct ExtendedLinearLivenessTest : UnitTest {
+  ExtendedLinearLivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    SILValue value = arguments.takeValue();
+    getFunction()->dump();
+    llvm::dbgs() << "Extended liveness: " << value;
+    ExtendedLinearLiveness liveness(value);
+    liveness.compute();
+    liveness.print(llvm::outs());
+
+    PrunedLivenessBoundary boundary;
+    liveness.getLiveness().computeBoundary(boundary);
+    boundary.print(llvm::outs());
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // MARK: SimplifyCFG Unit Tests
 //===----------------------------------------------------------------------===//
@@ -681,10 +753,13 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("canonicalize-borrow-scope",
                            CanonicalizeBorrowScopeTest)
     ADD_UNIT_TEST_SUBCLASS("dump-function", DumpFunction)
+    ADD_UNIT_TEST_SUBCLASS("extended-liveness", ExtendedLinearLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("find-borrow-introducers", FindBorrowIntroducers)
     ADD_UNIT_TEST_SUBCLASS("find-enclosing-defs", FindEnclosingDefsTest)
     ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index", FunctionGetSelfArgumentIndex)
+    ADD_UNIT_TEST_SUBCLASS("interior-liveness", InteriorLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
+    ADD_UNIT_TEST_SUBCLASS("linear-liveness", LinearLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("multidef-liveness", MultiDefLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("pruned-liveness-boundary-with-list-of-last-users-insertion-points", PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
     ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
