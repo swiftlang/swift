@@ -11,6 +11,8 @@
 // FIXME: pointer signing support.
 // UNSUPPORTED: CPU=arm64e
 
+// REQUIRES: executable_test
+
 #include "class.h"
 #include <assert.h>
 #include <cstdio>
