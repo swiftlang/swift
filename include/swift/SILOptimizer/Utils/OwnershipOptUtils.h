@@ -35,6 +35,10 @@ inline bool requiresOSSACleanup(SILValue v) {
          v->getOwnershipKind() != OwnershipKind::Unowned;
 }
 
+//===----------------------------------------------------------------------===//
+//                   Basic scope and lifetime extension API
+//===----------------------------------------------------------------------===//
+
 /// Rewrite the lifetime of \p ownedValue to match \p lifetimeBoundary. This may
 /// insert copies at forwarding consumes, including phis.
 ///
