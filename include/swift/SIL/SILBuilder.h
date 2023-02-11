@@ -1777,6 +1777,24 @@ public:
   void emitDestructureAddressOperation(SILLocation loc, SILValue operand,
                                        SmallVectorImpl<SILValue> &result);
 
+  void emitDestructureAddressOperation(
+      SILLocation loc, SILValue operand,
+      function_ref<void(unsigned, SILValue)> result);
+
+  void emitDestructureOperation(SILLocation loc, SILValue operand,
+                                SmallVectorImpl<SILValue> &result) {
+    if (operand->getType().isAddress())
+      return emitDestructureAddressOperation(loc, operand, result);
+    return emitDestructureValueOperation(loc, operand, result);
+  }
+
+  void emitDestructureOperation(SILLocation loc, SILValue operand,
+                                function_ref<void(unsigned, SILValue)> result) {
+    if (operand->getType().isAddress())
+      return emitDestructureAddressOperation(loc, operand, result);
+    return emitDestructureValueOperation(loc, operand, result);
+  }
+
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
                                      SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ClassMethodInst(
