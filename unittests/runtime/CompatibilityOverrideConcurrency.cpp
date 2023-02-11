@@ -255,8 +255,4 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_escalate) {
   swift_task_escalate(nullptr, {});
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getNearestDeadline) {
-  swift_task_getNearestDeadline(nullptr);
-}
-
 #endif
