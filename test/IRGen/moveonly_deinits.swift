@@ -256,7 +256,7 @@ public func testKlassEnumPairWithoutDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits27testKlassEnumPairWithDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [no_implicit_copy] {{%.*}}
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:

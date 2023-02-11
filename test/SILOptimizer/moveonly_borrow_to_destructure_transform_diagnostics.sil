@@ -63,7 +63,7 @@ sil @klass_use : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @test_access_single_child_field_consume : $@convention(method) (@guaranteed AggStruct2) -> () {
 bb0(%0 : @guaranteed $AggStruct2):
   %1 = copy_value %0 : $AggStruct2
-  %2 = mark_must_check [no_copy] %1 : $AggStruct2 // expected-error {{'self' has a move only field that was consumed before later uses}}
+  %2 = mark_must_check [no_consume_or_assign] %1 : $AggStruct2 // expected-error {{'self' has a move only field that was consumed before later uses}}
   debug_value %2 : $AggStruct2, let, name "self", argno 1, implicit
   %4 = begin_borrow %2 : $AggStruct2
   %5 = struct_extract %4 : $AggStruct2, #AggStruct2.pair
@@ -86,7 +86,7 @@ bb0(%0 : @guaranteed $AggStruct2):
 sil [ossa] @test_access_single_child_field_consume2 : $@convention(method) (@guaranteed AggStruct2) -> @owned KlassPair2 {
 bb0(%0 : @guaranteed $AggStruct2):
   %1 = copy_value %0 : $AggStruct2
-  %2 = mark_must_check [no_copy] %1 : $AggStruct2 // expected-error {{'self' consumed more than once}}
+  %2 = mark_must_check [no_consume_or_assign] %1 : $AggStruct2 // expected-error {{'self' consumed more than once}}
   debug_value %2 : $AggStruct2, let, name "self", argno 1, implicit
   %4 = begin_borrow %2 : $AggStruct2
   %5 = struct_extract %4 : $AggStruct2, #AggStruct2.pair
@@ -106,7 +106,7 @@ bb0(%0 : @guaranteed $AggStruct2):
 sil [ossa] @test_access_single_child_field_consume3 : $@convention(method) (@guaranteed AggStruct2) -> () {
 bb0(%0 : @guaranteed $AggStruct2):
   %1 = copy_value %0 : $AggStruct2
-  %2 = mark_must_check [no_copy] %1 : $AggStruct2 // expected-error {{'self' consumed and used at the same time}}
+  %2 = mark_must_check [no_consume_or_assign] %1 : $AggStruct2 // expected-error {{'self' consumed and used at the same time}}
   debug_value %2 : $AggStruct2, let, name "self", argno 1, implicit
   %4 = begin_borrow %2 : $AggStruct2
   %5 = struct_extract %4 : $AggStruct2, #AggStruct2.pair
@@ -129,11 +129,11 @@ bb0(%0 : @guaranteed $AggStruct2):
 sil [ossa] @test_loop_error : $@convention(thin) (@owned AggStruct2) -> () {
 bb0(%0 : @owned $AggStruct2):
   %1 = move_value [lexical] %0 : $AggStruct2
-  %2 = mark_must_check [no_implicit_copy] %1 : $AggStruct2
+  %2 = mark_must_check [consumable_and_assignable] %1 : $AggStruct2
   debug_value %2 : $AggStruct2, let, name "x", argno 1
   %4 = copy_value %2 : $AggStruct2
   %5 = move_value [lexical] %4 : $AggStruct2
-  %6 = mark_must_check [no_implicit_copy] %5 : $AggStruct2
+  %6 = mark_must_check [consumable_and_assignable] %5 : $AggStruct2
   // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
   // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
   debug_value %6 : $AggStruct2, let, name "x2"

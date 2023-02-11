@@ -59,7 +59,7 @@ var value: Bool { false }
 //////////////////
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits24testIntPairWithoutDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [no_implicit_copy] {{%.*}}
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -101,7 +101,7 @@ public func testIntPairWithoutDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits21testIntPairWithDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [no_implicit_copy] {{%.*}}
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -144,7 +144,7 @@ public func testIntPairWithDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits26testKlassPairWithoutDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [no_implicit_copy] {{%.*}}
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -186,7 +186,7 @@ public func testKlassPairWithoutDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits23testKlassPairWithDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [no_implicit_copy] {{%.*}}
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -274,7 +274,7 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 ////////////////
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [no_implicit_copy] {{%.*}}
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -315,7 +315,7 @@ public func testIntEnumPairWithoutDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits25testIntEnumPairWithDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [no_implicit_copy] {{%.*}}
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -357,7 +357,7 @@ public func testIntEnumPairWithDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits30testKlassEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [no_implicit_copy] {{%.*}}
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -398,7 +398,7 @@ public func testKlassEnumPairWithoutDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits27testKlassEnumPairWithDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [no_implicit_copy] {{%.*}}
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:

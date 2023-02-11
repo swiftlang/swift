@@ -95,8 +95,9 @@ void DiagnosticEmitter::emitCheckerDoesntUnderstandDiagnostic(
   // that copy propagation did not understand. Emit a we did not understand
   // error.
   if (markedValue->getType().isMoveOnlyWrapped()) {
-    diagnose(fn->getASTContext(), markedValue,
-             diag::sil_moveonlychecker_not_understand_no_implicit_copy);
+    diagnose(
+        fn->getASTContext(), markedValue,
+        diag::sil_moveonlychecker_not_understand_consumable_and_assignable);
   } else {
     diagnose(fn->getASTContext(), markedValue,
              diag::sil_moveonlychecker_not_understand_moveonly);

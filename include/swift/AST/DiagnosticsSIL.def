@@ -767,7 +767,7 @@ NOTE(sil_moveonlychecker_nonconsuming_use_here, none,
 NOTE(sil_movekillscopyablevalue_value_cyclic_consumed_in_loop_here, none,
      "consuming in loop use here", ())
 
-ERROR(sil_moveonlychecker_not_understand_no_implicit_copy, none,
+ERROR(sil_moveonlychecker_not_understand_consumable_and_assignable, none,
       "Usage of @noImplicitCopy that the move checker does not know how to "
       "check!", ())
 ERROR(sil_moveonlychecker_not_understand_moveonly, none,
