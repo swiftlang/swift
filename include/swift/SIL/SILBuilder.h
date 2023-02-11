@@ -1928,6 +1928,13 @@ public:
         getSILDebugLocation(Loc), Existential));
   }
 
+  PackLengthInst *
+  createPackLength(SILLocation loc, CanPackType packType) {
+    return insert(PackLengthInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              packType));
+  }
+
   DynamicPackIndexInst *
   createDynamicPackIndex(SILLocation loc, SILValue indexValue,
                          CanPackType indexedPackType) {

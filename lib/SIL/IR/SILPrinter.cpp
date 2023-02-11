@@ -2271,6 +2271,9 @@ public:
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEI) {
     *this << getIDAndType(DEI->getOperand()) << ", $" << DEI->getConcreteType();
   }
+  void visitPackLengthInst(PackLengthInst *PLI) {
+    *this << "$" << PLI->getPackType();
+  }
   void visitDynamicPackIndexInst(DynamicPackIndexInst *DPII) {
     *this << Ctx.getID(DPII->getOperand()) << " of $"
           << DPII->getIndexedPackType();

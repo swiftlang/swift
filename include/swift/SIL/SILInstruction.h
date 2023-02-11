@@ -7451,6 +7451,36 @@ class DeinitExistentialValueInst
       : UnaryInstructionBase(DebugLoc, Existential) {}
 };
 
+/// Compute the length of a pack (as a Builtin.Word).
+class PackLengthInst final
+    : public NullaryInstructionWithTypeDependentOperandsBase<
+                  SILInstructionKind::PackLengthInst,
+                  PackLengthInst,
+                  SingleValueInstruction> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+  CanPackType ThePackType;
+
+  PackLengthInst(SILDebugLocation loc,
+                 ArrayRef<SILValue> typeDependentOperands,
+                 SILType resultType,
+                 CanPackType packType)
+    : NullaryInstructionWithTypeDependentOperandsBase(loc,
+                                                      typeDependentOperands,
+                                                      resultType),
+      ThePackType(packType) {}
+
+  static PackLengthInst *create(SILFunction &parent,
+                                SILDebugLocation loc,
+                                CanPackType packType);
+public:
+  /// Return the measured pack type.
+  CanPackType getPackType() const {
+    return ThePackType;
+  }
+};
+
 /// An abstract class for instructions which producing variadic
 /// pack indices.
 ///
