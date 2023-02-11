@@ -646,6 +646,21 @@ void TypeBase::getTypeVariables(
   }
 }
 
+static bool isLegalSILType(CanType type);
+
+static bool isLegalSILTypeOrPackExpansion(CanType type) {
+  // Pack expansions aren't legal in arbitrary positions in SIL;
+  // for example, we should never see a function parameter or result
+  // of pack-expansion type.  But they're allowed within SILPackTypes
+  // and SIL TupleTypes as long as their pattern types are legal.
+  // The count type should always be an AST type.
+  if (auto packExpansionType = dyn_cast<PackExpansionType>(type)) {
+    return isLegalSILType(packExpansionType.getPatternType());
+  }
+
+  return isLegalSILType(type);
+}
+
 static bool isLegalSILType(CanType type) {
   // L-values and inouts are not legal.
   if (!type->isMaterializable()) return false;
@@ -660,19 +675,13 @@ static bool isLegalSILType(CanType type) {
   // Tuples are legal if all their elements are legal.
   if (auto tupleType = dyn_cast<TupleType>(type)) {
     for (auto eltType : tupleType.getElementTypes()) {
-      if (!isLegalSILType(eltType)) return false;
+      if (!isLegalSILTypeOrPackExpansion(eltType)) return false;
     }
     return true;
   }
 
   // Packs must be lowered.
   if (isa<PackType>(type)) return false;
-
-  // Pack expansions are legal if all their pattern and count types are legal.
-  if (auto packExpansionType = dyn_cast<PackExpansionType>(type)) {
-    return (isLegalSILType(packExpansionType.getPatternType()) &&
-            isLegalSILType(packExpansionType.getCountType()));
-  }
 
   // Optionals are legal if their object type is legal.
   if (auto objectType = type.getOptionalObjectType()) {
