@@ -8470,21 +8470,91 @@ bool RefactoringActionAddAsyncWrapper::performChange() {
   return false;
 }
 
-static MacroExpansionExpr *
-findMacroExpansionTargetExpr(const ResolvedCursorInfo &Info) {
+/// Retrieve the macro expansion buffer for the given macro expansion
+/// expression.
+static Optional<unsigned> getMacroExpansionBuffer(
+    SourceManager &sourceMgr, MacroExpansionExpr *expansion) {
+  if (auto rewritten = expansion->getRewritten()) {
+    return sourceMgr.findBufferContainingLoc(rewritten->getStartLoc());
+  }
 
+  return None;
+}
+
+/// Retrieve the macro expansion buffers for the given attached macro reference.
+static llvm::SmallVector<unsigned, 2>
+getMacroExpansionBuffers(MacroDecl *macro, const CustomAttr *attr, Decl *decl) {
+  auto roles = macro->getMacroRoles() & getAttachedMacroRoles();
+  if (!roles)
+    return { };
+
+  ASTContext &ctx = macro->getASTContext();
+  llvm::SmallVector<unsigned, 2> allBufferIDs;
+  if (roles.contains(MacroRole::Accessor)) {
+    // FIXME: Need to requestify.
+  }
+
+  if (roles.contains(MacroRole::MemberAttribute)) {
+    if (auto idc = dyn_cast<IterableDeclContext>(decl)) {
+      for (auto memberDecl : idc->getAllMembers()) {
+        auto bufferIDs = evaluateOrDefault(
+            ctx.evaluator, ExpandMemberAttributeMacros{memberDecl}, { });
+        allBufferIDs.append(bufferIDs.begin(), bufferIDs.end());
+      }
+    }
+  }
+
+  if (roles.contains(MacroRole::Member)) {
+    auto bufferIDs = evaluateOrDefault(
+        ctx.evaluator, ExpandSynthesizedMemberMacroRequest{decl}, { });
+    allBufferIDs.append(bufferIDs.begin(), bufferIDs.end());
+  }
+
+  // Drop any buffers that come from other macros. We could eliminate this
+  // step by adding more fine-grained requests above, which only expand for a
+  // single custom attribute.
+  SourceManager &sourceMgr = ctx.SourceMgr;
+  auto removedAt = std::remove_if(
+      allBufferIDs.begin(), allBufferIDs.end(),
+      [&](unsigned bufferID) {
+        auto generatedInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
+        if (!generatedInfo)
+          return true;
+
+        return generatedInfo->attachedMacroCustomAttr != attr;
+      });
+  allBufferIDs.erase(removedAt, allBufferIDs.end());
+  return allBufferIDs;
+}
+
+/// Given a resolved cursor, determine whether it is for a macro expansion and
+/// return the list of macro expansion buffer IDs that are associated with the
+/// macro reference here.
+static llvm::SmallVector<unsigned, 2>
+getMacroExpansionBuffers(
+    SourceManager &sourceMgr, const ResolvedCursorInfo &Info
+) {
   // Handle '#' position in '#macroName(...)'.
   if (auto exprInfo = dyn_cast<ResolvedExprStartCursorInfo>(&Info)) {
     if (auto target =
-            dyn_cast_or_null<MacroExpansionExpr>(exprInfo->getTrailingExpr()))
-      if (target->getRewritten())
-        return target;
-    return nullptr;
+          dyn_cast_or_null<MacroExpansionExpr>(exprInfo->getTrailingExpr())) {
+      if (auto bufferID = getMacroExpansionBuffer(sourceMgr, target))
+        return { *bufferID };
+    }
+
+    return { };
   }
 
-  // Handle 'macroName' position in '#macroName(...)'.
   if (auto refInfo = dyn_cast<ResolvedValueRefCursorInfo>(&Info)) {
     if (refInfo->isRef() && isa_and_nonnull<MacroDecl>(refInfo->getValueD())) {
+      // Handle 'macroName' position in '@macroName(...)'.
+      if (auto customAttrRef = refInfo->getCustomAttrRef()) {
+        auto macro = cast<MacroDecl>(refInfo->getValueD());
+        return getMacroExpansionBuffers(
+            macro, customAttrRef->first, customAttrRef->second);
+      }
+
+      // Handle 'macroName' position in '#macroName(...)'.
       ContextFinder Finder(
           *Info.getSourceFile(), Info.getLoc(), [&](ASTNode N) {
             auto *expr =
@@ -8496,33 +8566,82 @@ findMacroExpansionTargetExpr(const ResolvedCursorInfo &Info) {
       if (!Finder.getContexts().empty()) {
         auto *target =
             dyn_cast<MacroExpansionExpr>(Finder.getContexts()[0].get<Expr *>());
-        if (target->getRewritten())
-          return target;
+        if (target) {
+          if (auto bufferID = getMacroExpansionBuffer(sourceMgr, target))
+            return { *bufferID };
+        }
       }
     }
-    return nullptr;
+
+    return { };
   }
 
   // TODO: handle MacroExpansionDecl.
-  return nullptr;
+  return { };
 }
 
 bool RefactoringActionExpandMacro::isApplicable(const ResolvedCursorInfo &Info,
                                                 DiagnosticEngine &Diag) {
-  return findMacroExpansionTargetExpr(Info) != nullptr;
+  return !getMacroExpansionBuffers(Diag.SourceMgr, Info).empty();
 }
 
 bool RefactoringActionExpandMacro::performChange() {
-  auto target = findMacroExpansionTargetExpr(CursorInfo);
-  if (!target)
+  auto bufferIDs = getMacroExpansionBuffers(SM, CursorInfo);
+  if (bufferIDs.empty())
     return true;
 
-  auto exprRange =
-      Lexer::getCharSourceRangeFromSourceRange(SM, target->getSourceRange());
-  auto rewrittenRange = Lexer::getCharSourceRangeFromSourceRange(
-      SM, target->getRewritten()->getSourceRange());
-  auto rewrittenBuffer = SM.extractText(rewrittenRange);
-  EditConsumer.accept(SM, exprRange, rewrittenBuffer);
+  // Send all of the rewritten buffer snippets.
+  CustomAttr *attachedMacroAttr = nullptr;
+  for (auto bufferID: bufferIDs) {
+    auto generatedInfo = SM.getGeneratedSourceInfo(bufferID);
+    if (!generatedInfo || generatedInfo->originalSourceRange.isInvalid())
+      continue;
+
+    auto rewrittenBuffer = SM.extractText(generatedInfo->generatedSourceRange);
+
+    // If there's no change, drop the edit entirely.
+    if (generatedInfo->originalSourceRange.getStart() ==
+          generatedInfo->originalSourceRange.getEnd() &&
+        rewrittenBuffer.empty())
+      continue;
+
+    auto originalSourceRange = generatedInfo->originalSourceRange;
+
+    // For member macros, adjust the source range from before-the-close-brace
+    // to after-the-open-brace.
+    if (generatedInfo->kind == GeneratedSourceInfo::MemberMacroExpansion) {
+      ASTNode node = ASTNode::getFromOpaqueValue(generatedInfo->astNode);
+      auto decl = node.dyn_cast<Decl *>();
+      if (!decl)
+        continue;
+
+      SourceLoc leftBraceLoc;
+      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+        leftBraceLoc = nominal->getBraces().Start;
+      } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+        leftBraceLoc = ext->getBraces().Start;
+      }
+      if (leftBraceLoc.isInvalid())
+        continue;
+
+      auto afterLeftBraceLoc = Lexer::getLocForEndOfToken(SM, leftBraceLoc);
+      originalSourceRange = CharSourceRange(afterLeftBraceLoc, 0);
+    }
+
+    EditConsumer.accept(SM, originalSourceRange, rewrittenBuffer);
+
+    if (generatedInfo->attachedMacroCustomAttr && !attachedMacroAttr)
+      attachedMacroAttr = generatedInfo->attachedMacroCustomAttr;
+  }
+
+  // For an attached macro, remove the custom attribute; it's been fully
+  // subsumed by its expansions.
+  if (attachedMacroAttr) {
+    SourceRange range = attachedMacroAttr->getRangeWithAt();
+    auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+    EditConsumer.accept(SM, charRange, StringRef());
+  }
+
   return false;
 }
 

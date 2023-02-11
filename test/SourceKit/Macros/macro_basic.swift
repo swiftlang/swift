@@ -4,6 +4,26 @@ func testStringify(a: Int, b: Int) {
   _ = #stringify(a + b)
 }
 
+@attached(memberAttribute)
+@attached(member)
+macro myTypeWrapper() = #externalMacro(module: "MacroDefinition", type: "TypeWrapperMacro")
+@attached(accessor) macro accessViaStorage() = #externalMacro(module: "MacroDefinition", type: "AccessViaStorageMacro")
+
+struct _Storage {
+  var x: Int = 0 {
+    willSet { print("setting \(newValue)") }
+  }
+  var y: Int = 0 {
+    willSet { print("setting \(newValue)") }
+  }
+}
+
+@myTypeWrapper
+struct S {
+  var x: Int
+  var y: Int
+}
+
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
@@ -54,3 +74,21 @@ func testStringify(a: Int, b: Int) {
 // EXPAND: source.edit.kind.active:
 // EXPAND-NEXT: 4:7-4:24 "(a + b, "a + b")"
 
+//##-- cursor-info at 'macro name' position following @.
+// RUN: %sourcekitd-test -req=cursor -pos=21:2 -cursor-action %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_ATTACHED_MACRO %s
+
+// CURSOR_ATTACHED_MACRO-LABEL: ACTIONS BEGIN
+// CURSOR_ATTACHED_MACRO: source.refactoring.kind.expand.macro
+// CURSOR_ATTACHED_MACRO-NEXT: Expand Macro
+// CURSOR_ATTACHED_MACRO: ACTIONS END
+
+//##-- Refactoring expanding the attached macro
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=21:2 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ATTACHED_EXPAND %s
+// ATTACHED_EXPAND: source.edit.kind.active:
+// ATTACHED_EXPAND:   23:3-23:3 "@accessViaStorage"
+// ATTACHED_EXPAND: source.edit.kind.active:
+// ATTACHED_EXPAND:   24:3-24:3 "@accessViaStorage"
+// ATTACHED_EXPAND: source.edit.kind.active:
+// ATTACHED_EXPAND:   22:11-22:11 "private var _storage = _Storage()"
+// ATTACHED_EXPAND: source.edit.kind.active:
+// ATTACHED_EXPAND:   21:1-21:15 ""
