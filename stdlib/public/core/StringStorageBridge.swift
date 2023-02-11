@@ -48,6 +48,9 @@ extension _AbstractStringStorage {
   ) {
     _precondition(aRange.location >= 0 && aRange.length >= 0,
                   "Range out of bounds")
+    // Note: `count` is counting UTF-8 code units, while `aRange` is measured in
+    // UTF-16 offsets. This precondition is a necessary, but not sufficient test
+    // for validity. (More precise checks are done in UTF16View._nativeCopy.)
     _precondition(aRange.location + aRange.length <= Int(count),
                   "Range out of bounds")
 

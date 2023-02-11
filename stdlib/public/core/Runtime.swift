@@ -131,8 +131,11 @@ func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject
 ) -> Bool {
+  // Note: this assumes that AnyObject? is layout-compatible with a RawPointer
+  // that simply points to the same memory.
   var expected: UnsafeRawPointer?
-  let desiredPtr = Unmanaged.passRetained(desired).toOpaque()
+  let unmanaged = Unmanaged.passRetained(desired)
+  let desiredPtr = unmanaged.toOpaque()
   let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
   let wonRace = _stdlib_atomicCompareExchangeStrongPtr(
@@ -140,7 +143,7 @@ func _stdlib_atomicInitializeARCRef(
   if !wonRace {
     // Some other thread initialized the value.  Balance the retain that we
     // performed on 'desired'.
-    Unmanaged.passUnretained(desired).release()
+    unmanaged.release()
   }
   return wonRace
 }
@@ -155,6 +158,44 @@ func _stdlib_atomicLoadARCRef(
     return Unmanaged<AnyObject>.fromOpaque(unwrapped).takeUnretainedValue()
   }
   return nil
+}
+
+@_transparent
+@_alwaysEmitIntoClient
+@discardableResult
+public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
+  object target: UnsafeMutablePointer<T?>,
+  desired: __owned T
+) -> Unmanaged<T> {
+  // Note: this assumes that AnyObject? is layout-compatible with a RawPointer
+  // that simply points to the same memory, and that `nil` is represented by an
+  // all-zero bit pattern.
+  let unmanaged = Unmanaged.passRetained(desired)
+  let desiredPtr = unmanaged.toOpaque()
+
+  let (value, won) = Builtin.cmpxchg_acqrel_acquire_Word(
+    target._rawValue,
+    0._builtinWordValue,
+    Builtin.ptrtoint_Word(desiredPtr._rawValue))
+
+  if Bool(won) { return unmanaged }
+
+  // Some other thread initialized the value before us. Balance the retain that
+  // we performed on 'desired', and return what we loaded.
+  unmanaged.release()
+  let ptr = UnsafeRawPointer(Builtin.inttoptr_Word(value))
+  return Unmanaged<T>.fromOpaque(ptr)
+}
+
+@_alwaysEmitIntoClient
+@_transparent
+public func _stdlib_atomicAcquiringLoadARCRef<T: AnyObject>(
+  object target: UnsafeMutablePointer<T?>
+) -> Unmanaged<T>? {
+  let value = Builtin.atomicload_acquire_Word(target._rawValue)
+  if Int(value) == 0 { return nil }
+  let opaque = UnsafeRawPointer(Builtin.inttoptr_Word(value))
+  return Unmanaged<T>.fromOpaque(opaque)
 }
 
 //===----------------------------------------------------------------------===//
