@@ -29,6 +29,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
@@ -216,6 +217,12 @@ public:
     auto *parentClass = dyn_cast<ClassDecl>(funcDecl->getDeclContext());
     if (!parentClass)
       return MethodDispatchInfo::direct();
+    // Resilient indirect calls should go through a thunk.
+    if (parentClass->hasResilientMetadata())
+      return MethodDispatchInfo::thunk(
+          LinkEntity::forDispatchThunk(
+              SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl)))
+              .mangleAsString());
     auto &layout = IGM.getMetadataLayout(parentClass);
     if (!isa<ClassMetadataLayout>(layout))
       return {};
