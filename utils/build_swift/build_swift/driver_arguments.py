@@ -1311,6 +1311,10 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift reflection.')
 
+    option('--enable-experimental-tutorial', toggle_true,
+           default=True,
+           help='Enable experimental Swift tutorial.')
+
     # -------------------------------------------------------------------------
     in_group('Unsupported options')
 

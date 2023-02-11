@@ -108,6 +108,8 @@ def create_parser():
                         help='Enable experimental string processing.')
     parser.add_argument('--enable-experimental-reflection', action='store_true',
                         help='Enable experimental reflection.')
+    parser.add_argument('--enable-experimental-tutorial', action='store_true',
+                        help='Enable experimental tutorial.')
     parser.add_argument('-swift-version', metavar='N',
                         help='the Swift version to use')
     parser.add_argument('-show-overlay', action='store_true',

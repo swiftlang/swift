@@ -569,6 +569,10 @@ option(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION
   "Enable build of the Swift reflection module"
   FALSE)
 
+option(SWIFT_ENABLE_EXPERIMENTAL_TUTORIAL
+  "Enable build of the Swift tutorial module"
+  FALSE)
+
 option(SWIFT_ENABLE_DISPATCH
   "Enable use of libdispatch"
   TRUE)
@@ -1115,6 +1119,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
   message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
   message(STATUS "Reflection Support:                 ${SWIFT_ENABLE_EXPERIMENTAL_REFLECTION}")
+  message(STATUS "Tutorial Support:                   ${SWIFT_ENABLE_EXPERIMENTAL_TUTORIAL}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
