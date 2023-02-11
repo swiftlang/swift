@@ -921,10 +921,10 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
   assert(record->getKind() == swift::TaskStatusRecordKind::TaskGroup);
 
   // ok, now that the group actually is initialized: attach it to the task
-  addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+  addStatusRecord(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     // If the task has already been cancelled, reflect that immediately in
     // the group's status.
-    if (parentStatus.isCancelled()) {
+    if (oldStatus.isCancelled()) {
       impl->statusCancel();
     }
     return true;
@@ -1656,7 +1656,7 @@ reevaluate_if_taskgroup_has_results:;
   while (true) {
     if (!hasSuspended) {
       hasSuspended = true;
-      waitingTask->flagAsSuspended();
+      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
     }
     // Put the waiting task at the beginning of the wait queue.
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "WATCH OUT, SET WAITER ONTO waitQueue.head = %p", waitQueue.load(std::memory_order_relaxed));
@@ -1811,7 +1811,7 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
   while (true) {
     if (!hasSuspended) {
       hasSuspended = true;
-      waitingTask->flagAsSuspended();
+      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
     }
     // Put the waiting task at the beginning of the wait queue.
     if (waitQueue.compare_exchange_strong(
