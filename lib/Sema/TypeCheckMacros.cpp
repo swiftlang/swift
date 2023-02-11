@@ -301,9 +301,12 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 }
 
 /// Load a plugin library based on a module name.
-static void *loadPluginByName(StringRef searchPath, StringRef moduleName) {
+static void *loadPluginByName(StringRef searchPath, StringRef moduleName, llvm::vfs::FileSystem &fs) {
   SmallString<128> fullPath(searchPath);
   llvm::sys::path::append(fullPath, "lib" + moduleName + LTDL_SHLIB_EXT);
+  if (fs.getRealPath(fullPath, fullPath))
+    return nullptr;
+
 #if defined(_WIN32)
   return LoadLibraryA(fullPath.c_str());
 #else
@@ -314,9 +317,10 @@ static void *loadPluginByName(StringRef searchPath, StringRef moduleName) {
 void *CompilerPluginLoadRequest::evaluate(
     Evaluator &evaluator, ASTContext *ctx, Identifier moduleName
 ) const {
+  auto fs = ctx->SourceMgr.getFileSystem();
   auto &searchPathOpts = ctx->SearchPathOpts;
   for (const auto &path : searchPathOpts.PluginSearchPaths) {
-    if (auto found = loadPluginByName(path, moduleName.str()))
+    if (auto found = loadPluginByName(path, moduleName.str(), *fs))
       return found;
   }
 
