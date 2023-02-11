@@ -998,7 +998,8 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
 
     // Synthesized member macros can add new members in a macro expansion buffer.
     auto *memberSourceFile = member->getInnermostDeclContext()->getParentSourceFile();
-    if (memberSourceFile->getFulfilledMacroRole() == MacroRole::Member)
+    if (memberSourceFile->getFulfilledMacroRole() == MacroRole::Member ||
+        memberSourceFile->getFulfilledMacroRole() == MacroRole::Peer)
       return;
 
     llvm::errs() << "Source ranges out of order in addMember():\n";

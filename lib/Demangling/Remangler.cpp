@@ -2904,6 +2904,14 @@ ManglingError Remangler::mangleMemberAttachedMacroExpansion(
   return mangleChildNode(node, 2, depth + 1);
 }
 
+ManglingError Remangler::manglePeerAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMp";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
 ManglingError Remangler::mangleMacroExpansionUniqueName(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));

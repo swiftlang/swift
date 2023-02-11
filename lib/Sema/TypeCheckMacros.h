@@ -64,6 +64,12 @@ bool expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member);
 /// otherwise.
 bool expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 
+/// Expand the peer declarations for the given declaration based on
+/// the custom attribute that references the given macro.
+///
+/// Returns \c true if the macro added new peers, \c false otherwise.
+bool expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKMACROS_H */

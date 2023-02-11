@@ -3884,6 +3884,23 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Expand peer macros attached to the given declaration.
+class ExpandPeerMacroRequest
+    : public SimpleRequest<ExpandPeerMacroRequest,
+                           bool(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Resolve an external macro given its module and type name.
 class ExternalMacroDefinitionRequest
     : public SimpleRequest<ExternalMacroDefinitionRequest,
