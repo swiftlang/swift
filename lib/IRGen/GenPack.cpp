@@ -33,6 +33,48 @@
 using namespace swift;
 using namespace irgen;
 
+static CanPackArchetypeType
+getForwardedPackArchetypeType(CanPackType packType) {
+  if (packType->getNumElements() != 1)
+    return CanPackArchetypeType();
+  auto uncastElement = packType.getElementType(0);
+  auto element = dyn_cast<PackExpansionType>(uncastElement);
+  if (!element)
+    return CanPackArchetypeType();
+  auto patternType = element.getPatternType();
+  auto packArchetype = dyn_cast<PackArchetypeType>(patternType);
+  return packArchetype;
+}
+
+static MetadataResponse
+tryGetLocalPackTypeMetadata(IRGenFunction &IGF, CanPackType packType,
+                            DynamicMetadataRequest request) {
+  if (auto result = IGF.tryGetLocalTypeMetadata(packType, request))
+    return result;
+
+  if (auto packArchetypeType = getForwardedPackArchetypeType(packType)) {
+    if (auto result = IGF.tryGetLocalTypeMetadata(packArchetypeType, request))
+      return result;
+  }
+
+  return MetadataResponse();
+}
+
+static llvm::Value *tryGetLocalPackTypeData(IRGenFunction &IGF,
+                                            CanPackType packType,
+                                            LocalTypeDataKind localDataKind) {
+  if (auto *wtable = IGF.tryGetLocalTypeData(packType, localDataKind))
+    return wtable;
+
+  if (auto packArchetypeType = getForwardedPackArchetypeType(packType)) {
+    if (auto *wtable =
+            IGF.tryGetLocalTypeData(packArchetypeType, localDataKind))
+      return wtable;
+  }
+
+  return nullptr;
+}
+
 static void accumulateSum(IRGenFunction &IGF, llvm::Value *&result,
                           llvm::Value *value) {
   if (result == nullptr) {
@@ -324,33 +366,6 @@ irgen::emitTypeMetadataPack(IRGenFunction &IGF,
   return pack;
 }
 
-static CanPackArchetypeType
-getForwardedPackArchetypeType(CanPackType packType) {
-  if (packType->getNumElements() != 1)
-    return CanPackArchetypeType();
-  auto uncastElement = packType.getElementType(0);
-  auto element = dyn_cast<PackExpansionType>(uncastElement);
-  if (!element)
-    return CanPackArchetypeType();
-  auto patternType = element.getPatternType();
-  auto packArchetype = dyn_cast<PackArchetypeType>(patternType);
-  return packArchetype;
-}
-
-static MetadataResponse
-tryGetLocalPackTypeMetadata(IRGenFunction &IGF, CanPackType packType,
-                            DynamicMetadataRequest request) {
-  if (auto result = IGF.tryGetLocalTypeMetadata(packType, request))
-    return result;
-
-  if (auto packArchetypeType = getForwardedPackArchetypeType(packType)) {
-    if (auto result = IGF.tryGetLocalTypeMetadata(packArchetypeType, request))
-      return result;
-  }
-
-  return MetadataResponse();
-}
-
 MetadataResponse
 irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
                                DynamicMetadataRequest request) {
@@ -563,21 +578,6 @@ void irgen::cleanupWitnessTablePack(IRGenFunction &IGF, StackAddress pack,
     IGF.Builder.CreateLifetimeEnd(pack.getAddress(),
                                   IGF.IGM.getPointerSize() * (*elementCount));
   }
-}
-
-static llvm::Value *tryGetLocalPackTypeData(IRGenFunction &IGF,
-                                            CanPackType packType,
-                                            LocalTypeDataKind localDataKind) {
-  if (auto *wtable = IGF.tryGetLocalTypeData(packType, localDataKind))
-    return wtable;
-
-  if (auto packArchetypeType = getForwardedPackArchetypeType(packType)) {
-    if (auto *wtable =
-            IGF.tryGetLocalTypeData(packArchetypeType, localDataKind))
-      return wtable;
-  }
-
-  return nullptr;
 }
 
 llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
