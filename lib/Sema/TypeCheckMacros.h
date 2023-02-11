@@ -70,8 +70,8 @@ expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 /// Expand the peer declarations for the given declaration based on
 /// the custom attribute that references the given macro.
 ///
-/// Returns \c true if the macro added new peers, \c false otherwise.
-bool expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
+/// If expansion occurred, returns the macro expansion buffer ID.
+Optional<unsigned> expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 
 } // end namespace swift
 

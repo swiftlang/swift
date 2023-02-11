@@ -34,6 +34,17 @@ struct S2 {
   var y: Int = 17
 }
 
+@attached(peer)
+macro addCompletionHandler() = #externalMacro(module: "MacroDefinition", type: "AddCompletionHandler")
+
+@available(macOS 10.15, *)
+struct S3 {
+  @addCompletionHandler
+  func f(a: Int, for b: String, _ value: Double) async -> String {
+    return b
+  }
+}
+
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
@@ -113,7 +124,7 @@ struct S2 {
 // ACCESSOR1_EXPAND: source.edit.kind.active:
 // ACCESSOR1_EXPAND:   30:3-30:20 ""
 
-//##-- Refactoring expanding the first accessor macro
+//##-- Refactoring expanding the second accessor macro
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=33:13 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ACCESSOR2_EXPAND %s
 // ACCESSOR2_EXPAND: source.edit.kind.active:
 // ACCESSOR2_EXPAND:   34:14-34:18 "{
@@ -122,3 +133,14 @@ struct S2 {
 // ACCESSOR2_EXPAND: }"
 // ACCESSOR2_EXPAND: source.edit.kind.active:
 // ACCESSOR2_EXPAND:   33:3-33:20 ""
+
+//##-- Refactoring expanding the second accessor macro
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=42:5 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=PEER_EXPAND %s
+// PEER_EXPAND: source.edit.kind.active:
+// PEER_EXPAND:   45:4-45:4 "func f(a: Int, for b: String, _ value: Double, completionHandler: (String) -> Void) {
+// PEER_EXPAND:  Task {
+// PEER_EXPAND:    completionHandler(await f(a: a, for: b, value))
+// PEER_EXPAND:  }
+// PEER_EXPAND: }"
+// PEER_EXPAND: source.edit.kind.active:
+// PEER_EXPAND:   42:3-42:24 ""

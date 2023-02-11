@@ -391,7 +391,7 @@ static std::string adjustMacroExpansionBufferName(StringRef name) {
 ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
                                                          Decl *decl) const {
   if (decl->isImplicit())
-    return { }};
+    return { };
 
   auto *parentDecl = decl->getDeclContext()->getAsDecl();
   if (!parentDecl)
@@ -423,14 +423,16 @@ ArrayRef<unsigned> ExpandSynthesizedMemberMacroRequest::evaluate(
   return decl->getASTContext().AllocateCopy(bufferIDs);
 }
 
-bool ExpandPeerMacroRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
-  bool addedPeers = false;
+ArrayRef<unsigned>
+ExpandPeerMacroRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
+  SmallVector<unsigned, 2> bufferIDs;
   decl->forEachAttachedMacro(MacroRole::Peer,
       [&](CustomAttr *attr, MacroDecl *macro) {
-        addedPeers |= expandPeers(attr, macro, decl);
+        if (auto bufferID = expandPeers(attr, macro, decl))
+          bufferIDs.push_back(*bufferID);
       });
 
-  return addedPeers;
+  return decl->getASTContext().AllocateCopy(bufferIDs);
 }
 
 /// Determine whether the given source file is from an expansion of the given
@@ -1034,7 +1036,7 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   case MacroRole::Peer: {
     generatedSourceKind = GeneratedSourceInfo::PeerMacroExpansion;
     SourceLoc afterDeclLoc =
-        Lexer::getLocForEndOfToken(sourceMgr, decl->getEndLoc());
+        Lexer::getLocForEndOfToken(sourceMgr, attachedTo->getEndLoc());
     generatedOriginalSourceRange = CharSourceRange(afterDeclLoc, 0);
     break;
   }
@@ -1175,16 +1177,16 @@ swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   return macroSourceFile->getBufferID();
 }
 
-bool swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
+Optional<unsigned>
+swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   auto macroSourceFile = evaluateAttachedMacro(macro, decl, attr,
                                                /*passParentContext*/false,
                                                MacroRole::Peer);
   if (!macroSourceFile)
-    return false;
+    return None;
 
   PrettyStackTraceDecl debugStack("applying expanded peer macro", decl);
 
-  bool addedPeers = false;
   auto *parent = decl->getDeclContext();
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto peer : topLevelDecls) {
@@ -1196,11 +1198,9 @@ bool swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
       // TODO: Add peers to global or local contexts.
       continue;
     }
-
-    addedPeers = true;
   }
 
-  return addedPeers;
+  return macroSourceFile->getBufferID();
 }
 
 MacroDecl *
