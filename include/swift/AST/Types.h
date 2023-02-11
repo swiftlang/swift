@@ -3951,6 +3951,10 @@ public:
     return getConvention() == ParameterConvention::Indirect_In_Guaranteed;
   }
 
+  bool isIndirectIn() const {
+    return getConvention() == ParameterConvention::Indirect_In;
+  }
+
   bool isIndirectInOut() const {
     return getConvention() == ParameterConvention::Indirect_Inout;
   }
