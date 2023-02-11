@@ -254,7 +254,9 @@ public:
       /// A direct call can be made to the underlying function.
       Direct,
       /// An indirect call that can be made via a static offset in a vtable.
-      IndirectVTableStaticOffset
+      IndirectVTableStaticOffset,
+      /// The call should be made via the provided thunk function.
+      Thunk
     };
 
     static MethodDispatchInfo direct() {
@@ -265,18 +267,27 @@ public:
       return MethodDispatchInfo(Kind::IndirectVTableStaticOffset, bitOffset);
     }
 
+    static MethodDispatchInfo thunk(std::string thunkName) {
+      return MethodDispatchInfo(Kind::Thunk, 0, thunkName);
+    }
+
     Kind getKind() const { return kind; }
     size_t getStaticBitOffset() const {
       assert(kind == Kind::IndirectVTableStaticOffset);
       return bitOffset;
     }
+    StringRef getThunkSymbolName() const {
+      assert(kind == Kind::Thunk);
+      return thunkName;
+    }
 
   private:
-    constexpr MethodDispatchInfo(Kind kind, size_t bitOffset)
-        : kind(kind), bitOffset(bitOffset) {}
+    MethodDispatchInfo(Kind kind, size_t bitOffset, std::string thunkName = "")
+        : kind(kind), bitOffset(bitOffset), thunkName(thunkName) {}
 
     Kind kind;
     size_t bitOffset;
+    std::string thunkName;
   };
 
   Optional<MethodDispatchInfo>
