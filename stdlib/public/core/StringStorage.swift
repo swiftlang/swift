@@ -719,8 +719,18 @@ extension __SharedStringStorage {
 
 // Get and populate breadcrumbs
 extension _StringGuts {
+  /// Atomically load and return breadcrumbs, populating them if necessary.
+  ///
+  /// This emits aquire/release barriers to avoid access reordering trouble.
+  ///
+  /// This returns an unmanaged +0 reference to allow accessing breadcrumbs
+  /// without incurring retain/release operations.
   @_effects(releasenone)
-  internal func getBreadcrumbsPtr() -> UnsafePointer<_StringBreadcrumbs> {
+  internal func loadUnmanagedBreadcrumbs() -> Unmanaged<_StringBreadcrumbs> {
+    // FIXME: Returning Unmanaged emulates the original implementation (that
+    // used to return a nonatomic pointer), but it may be an unnecessary
+    // complication. (UTF-16 transcoding seems expensive enough not to worry
+    // about retain overhead.)
     _internalInvariant(hasBreadcrumbs)
 
     let mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>
@@ -731,25 +741,12 @@ extension _StringGuts {
         Builtin.addressof(&_object.sharedStorage._breadcrumbs))
     }
 
-    if _slowPath(mutPtr.pointee == nil) {
-      populateBreadcrumbs(mutPtr)
+    if let breadcrumbs = _stdlib_atomicAcquiringLoadARCRef(object: mutPtr) {
+      return breadcrumbs
     }
-
-    _internalInvariant(mutPtr.pointee != nil)
-    // assuming optional class reference and class reference can alias
-    return UnsafeRawPointer(mutPtr).assumingMemoryBound(to: _StringBreadcrumbs.self)
-  }
-
-  @inline(never) // slow-path
-  @_effects(releasenone)
-  internal func populateBreadcrumbs(
-    _ mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>
-  ) {
-    // Thread-safe compare-and-swap
-    let crumbs = _StringBreadcrumbs(String(self))
-    _stdlib_atomicInitializeARCRef(
-      object: UnsafeMutableRawPointer(mutPtr).assumingMemoryBound(to: Optional<AnyObject>.self),
-      desired: crumbs)
+    let desired = _StringBreadcrumbs(String(self))
+    return _stdlib_atomicAcquiringInitializeARCRef(
+      object: mutPtr, desired: desired)
   }
 }
 
