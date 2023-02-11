@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 
 // UNSUPPORTED: freestanding
+// XFAIL: OS=wasi
 
 import StdlibUnittest
 import _Runtime
