@@ -18,7 +18,7 @@ sil [ossa] @test_remove_early_copyvalue : $@convention(thin) (@guaranteed Klass)
 bb0(%0 : @noImplicitCopy @guaranteed $Klass):
   %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $Klass
   %2 = copy_value %1 : $@moveOnly Klass
-  %3 = mark_must_check [no_copy] %2 : $@moveOnly Klass
+  %3 = mark_must_check [no_consume_or_assign] %2 : $@moveOnly Klass
   debug_value %3 : $@moveOnly Klass, let, name "x2", argno 1
   %5 = begin_borrow %3 : $@moveOnly Klass
   %6 = function_ref @classUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed Klass) -> ()

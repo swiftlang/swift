@@ -839,7 +839,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       if (selfArg.getType().isMoveOnly()) {
         assert(selfArg.getOwnershipKind() == OwnershipKind::Owned);
         selfArg = B.createMarkMustCheckInst(
-            selfDecl, selfArg, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+            selfDecl, selfArg,
+            MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
       }
       VarLocs[selfDecl] = VarLoc::get(selfArg.getValue());
     }

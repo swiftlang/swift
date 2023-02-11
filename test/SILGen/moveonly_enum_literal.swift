@@ -16,7 +16,7 @@ var value: Bool { false }
 // CHECK-LABEL: sil hidden [ossa] @$s21moveonly_enum_literal4testyyF : $@convention(thin) () -> () {
 // CHECK: [[VALUE:%.*]] = enum $MoveOnlyIntPair, #MoveOnlyIntPair.lhs!enumelt,
 // CHECK: [[MV:%.*]] = move_value [lexical] [[VALUE]]
-// CHECK: [[MARKED_VALUE:%.*]] = mark_must_check [no_implicit_copy] [[MV]]
+// CHECK: [[MARKED_VALUE:%.*]] = mark_must_check [consumable_and_assignable] [[MV]]
 // CHECK: debug_value [[MARKED_VALUE]]
 // CHECK: } // end sil function '$s21moveonly_enum_literal4testyyF'
 func test() {
