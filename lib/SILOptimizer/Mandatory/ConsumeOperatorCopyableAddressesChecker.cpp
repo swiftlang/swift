@@ -1508,7 +1508,7 @@ bool DataflowState::cleanupAllDestroyAddr(
           dbgValueInsertBuilder.setCurrentDebugScope(
               addressDebugInst->getDebugScope());
           dbgValueInsertBuilder.createDebugValue(
-              addressDebugInst.inst->getLoc(),
+              (*addressDebugInst)->getLoc(),
               SILUndef::get(address->getType(), dvi->getModule()), *varInfo,
               false,
               /*was moved*/ true);
@@ -1550,7 +1550,7 @@ bool DataflowState::cleanupAllDestroyAddr(
         // be defined before the value.
         SILBuilderWithScope reinitBuilder((*reinit)->getNextInstruction());
         reinitBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-        reinitBuilder.createDebugValue(addressDebugInst.inst->getLoc(), address,
+        reinitBuilder.createDebugValue((*addressDebugInst)->getLoc(), address,
                                        *varInfo, false,
                                        /*was moved*/ true);
       }
