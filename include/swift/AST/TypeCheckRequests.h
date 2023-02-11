@@ -3827,9 +3827,11 @@ public:
 
 /// Expand all member attribute macros attached to the given
 /// declaration.
+///
+/// Produces the set of macro expansion buffer IDs.
 class ExpandMemberAttributeMacros
     : public SimpleRequest<ExpandMemberAttributeMacros,
-                           bool(Decl *),
+                           ArrayRef<unsigned>(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3837,16 +3839,18 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  ArrayRef<unsigned> evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
 };
 
 /// Expand synthesized member macros attached to the given declaration.
+///
+/// Produces the set of macro expansion buffer IDs.
 class ExpandSynthesizedMemberMacroRequest
     : public SimpleRequest<ExpandSynthesizedMemberMacroRequest,
-                           bool(Decl *),
+                           ArrayRef<unsigned>(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3854,7 +3858,7 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  ArrayRef<unsigned> evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }

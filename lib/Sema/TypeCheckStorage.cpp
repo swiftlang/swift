@@ -110,9 +110,9 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
                                            IterableDeclContext *implDecl) {
   // Expand synthesized member macros.
   auto &ctx = decl->getASTContext();
-  evaluateOrDefault(ctx.evaluator,
-                    ExpandSynthesizedMemberMacroRequest{decl},
-                    false);
+  (void)evaluateOrDefault(ctx.evaluator,
+                          ExpandSynthesizedMemberMacroRequest{decl},
+                          false);
 
   // Just walk over the members of the type, forcing backing storage
   // for lazy properties and property wrappers to be synthesized.

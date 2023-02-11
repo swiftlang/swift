@@ -388,36 +388,39 @@ static std::string adjustMacroExpansionBufferName(StringRef name) {
   return result;
 }
 
-bool ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
-                                           Decl *decl) const {
+ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
+                                                         Decl *decl) const {
   if (decl->isImplicit())
-    return false;
+    return { }};
 
   auto *parentDecl = decl->getDeclContext()->getAsDecl();
   if (!parentDecl)
-    return false;
+    return { };
 
   if (isa<PatternBindingDecl>(decl))
-    return false;
+    return { };
 
-  bool addedAttributes = false;
+  SmallVector<unsigned, 2> bufferIDs;
   parentDecl->forEachAttachedMacro(MacroRole::MemberAttribute,
       [&](CustomAttr *attr, MacroDecl *macro) {
-        addedAttributes |= expandAttributes(attr, macro, decl);
+        if (auto bufferID = expandAttributes(attr, macro, decl))
+          bufferIDs.push_back(*bufferID);
       });
 
-  return addedAttributes;
+  return parentDecl->getASTContext().AllocateCopy(bufferIDs);
 }
 
-bool ExpandSynthesizedMemberMacroRequest::evaluate(Evaluator &evaluator,
-                                                   Decl *decl) const {
-  bool synthesizedMembers = false;
+ArrayRef<unsigned> ExpandSynthesizedMemberMacroRequest::evaluate(
+    Evaluator &evaluator, Decl *decl
+) const {
+  SmallVector<unsigned, 2> bufferIDs;
   decl->forEachAttachedMacro(MacroRole::Member,
       [&](CustomAttr *attr, MacroDecl *macro) {
-        synthesizedMembers |= expandMembers(attr, macro, decl);
+        if (auto bufferID = expandMembers(attr, macro, decl))
+          bufferIDs.push_back(*bufferID);
       });
 
-  return synthesizedMembers;
+  return decl->getASTContext().AllocateCopy(bufferIDs);
 }
 
 bool ExpandPeerMacroRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
@@ -1025,44 +1028,43 @@ void swift::expandAccessors(
   }
 }
 
-bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
+Optional<unsigned>
+swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   // Evaluate the macro.
   auto macroSourceFile = evaluateAttachedMacro(macro, member, attr,
                                                /*passParentContext*/true,
                                                MacroRole::MemberAttribute);
   if (!macroSourceFile)
-    return false;
+    return None;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", member);
 
-  bool addedAttributes = false;
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto decl : topLevelDecls) {
     // Add the new attributes to the semantic attribute list.
     SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
                                           decl->getAttrs().end());
     for (auto *attr : attrs) {
-      addedAttributes = true;
       member->getAttrs().add(attr);
     }
   }
 
-  return addedAttributes;
+  return macroSourceFile->getBufferID();
 }
 
-bool swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
+Optional<unsigned>
+swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   // Evaluate the macro.
   auto macroSourceFile = evaluateAttachedMacro(macro, decl, attr,
                                                /*passParentContext*/false,
                                                MacroRole::Member);
   if (!macroSourceFile)
-    return false;
+    return None;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", decl);
 
-  bool synthesizedMembers = false;
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto member : topLevelDecls) {
     // Note that synthesized members are not considered implicit. They have
@@ -1074,11 +1076,9 @@ bool swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
     } else if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
       extension->addMember(member);
     }
-
-    synthesizedMembers = true;
   }
 
-  return synthesizedMembers;
+  return macroSourceFile->getBufferID();
 }
 
 bool swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
