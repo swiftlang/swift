@@ -195,7 +195,7 @@ void retypeCheckFunctionBody(AbstractFunctionDecl *func,
         GeneratedSourceInfo::ReplacedFunctionBody,
         Lexer::getCharSourceRangeFromSourceRange(
           origSM, func->getOriginalBodySourceRange()),
-        Lexer::getCharSourceRangeFromSourceRange(newSM, newRange),
+        Lexer::getCharSourceRangeFromSourceRange(origSM, newRange),
         func,
         nullptr
       }
