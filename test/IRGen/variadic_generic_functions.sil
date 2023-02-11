@@ -32,12 +32,6 @@ sil @c : $() -> () {
   return %ret : $()
 }
 
-// CHECK: define {{.*}}void @f(i{{(64|32)}} %0, %swift.type** %T, i8*** %T.P)
-sil @f : $<T... : P> () -> () {
-    %ret = tuple ()
-    return %ret : $()
-}
-
 // CHECK: define {{.*}}void @g(i{{(64|32)}} %0, %swift.type** %T, i8*** %T.P)
 sil @g : $<T... : P> () -> () {
     %f = function_ref @f : $@convention(thin) <T... : P> () -> ()
@@ -45,3 +39,29 @@ sil @g : $<T... : P> () -> () {
     %ret = tuple ()
     return %ret : $()
 }
+
+// Verify that polymorphic parameters are just forwarded along.
+// CHECK-LABEL: define {{.*}}void @f(i{{(32|64)}} %0, %swift.type** %T, i8*** %T.P)
+// CHECK:         call swiftcc void @fc(i{{(32|64)}} %0, %swift.type** %T, i8*** %T.P)
+sil @f : $<T... : P> () -> () {
+    %fc = function_ref @fc : $@convention(thin) <T... : P> () -> ()
+    apply %fc<Pack{repeat each T}>() : $@convention(thin) <T... : P> () -> ()
+    %ret = tuple ()
+    return %ret : $()
+}
+sil @fc : $<T... : P> () -> () {}
+
+protocol PA {
+  associatedtype A
+}
+
+// CHECK-LABEL: define {{.*}}@f1(i{{(32|64)}} %0, %swift.type** %T, i8*** %T.PA, i8*** %T.A.P)
+// CHECK:         call swiftcc void @f1c(i{{(32|64)}} %0, %swift.type** %T, i8*** %T.PA, i8*** %T.A.P)
+sil @f1 : $<T... : PA where each T.A : P> () -> () {
+    %f1c = function_ref @f1c : $@convention(thin) <T... : PA where each T.A : P> () -> ()
+    apply %f1c<Pack{repeat each T}>() : $@convention(thin) <T... : PA where each T.A : P> () -> ()
+    %ret = tuple ()
+    return %ret : $()
+}
+
+sil @f1c : $<T... : PA where each T.A : P> () -> () {}
