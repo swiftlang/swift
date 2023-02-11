@@ -223,7 +223,7 @@ SourceManager::~SourceManager() {
 static Optional<std::string>
 dumpBufferToFile(const llvm::MemoryBuffer *buffer,
                  const SourceManager &sourceMgr,
-                 SourceRange originalSourceRange) {
+                 CharSourceRange originalSourceRange) {
   // Create file in the system temporary directory.
   SmallString<128> outputFileName;
   llvm::sys::path::system_temp_directory(true, outputFileName);
@@ -250,14 +250,15 @@ dumpBufferToFile(const llvm::MemoryBuffer *buffer,
           out << "\n";
 
           auto originalFilename =
-            sourceMgr.getDisplayNameForLoc(originalSourceRange.Start, true);
+            sourceMgr.getDisplayNameForLoc(originalSourceRange.getStart(),
+                                           true);
           unsigned startLine, startColumn, endLine, endColumn;
           std::tie(startLine, startColumn) =
               sourceMgr.getPresumedLineAndColumnForLoc(
-                originalSourceRange.Start);
+                originalSourceRange.getStart());
           std::tie(endLine, endColumn) =
               sourceMgr.getPresumedLineAndColumnForLoc(
-                originalSourceRange.End);
+                originalSourceRange.getEnd());
           out << "// original-source-range: "
               << originalFilename
               << ":" << startLine << ":" << startColumn
@@ -383,7 +384,11 @@ void SourceManager::setGeneratedSourceInfo(
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
     // Keep track of the replaced range.
-    ReplacedRanges[info.originalSourceRange] = info.generatedSourceRange;
+    SourceRange orig(info.originalSourceRange.getStart(),
+                     info.originalSourceRange.getEnd());
+    ReplacedRanges[orig] =
+        SourceRange(info.generatedSourceRange.getStart(),
+                    info.generatedSourceRange.getEnd());
     break;
   }
 }

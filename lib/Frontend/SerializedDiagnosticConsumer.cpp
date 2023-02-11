@@ -262,11 +262,10 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(
   // The source range that this buffer was generated from, expressed as
   // offsets into the original buffer.
   if (generatedInfo->originalSourceRange.isValid()) {
-    auto originalFilename = SM.getDisplayNameForLoc(generatedInfo->originalSourceRange.Start,
+    auto originalFilename = SM.getDisplayNameForLoc(generatedInfo->originalSourceRange.getStart(),
                                 EmitMacroExpansionFiles);
     addRangeToRecord(
-        Lexer::getCharSourceRangeFromSourceRange(
-            SM, generatedInfo->originalSourceRange),
+        generatedInfo->originalSourceRange,
         SM, originalFilename, Record
     );
   } else {
