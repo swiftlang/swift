@@ -24,6 +24,7 @@ class ArgumentList;
 class Decl;
 class Expr;
 class ClosureExpr;
+class CustomAttr;
 class ModuleDecl;
 class Stmt;
 class Pattern;
@@ -46,9 +47,17 @@ struct ReferenceMetaData {
   SemaReferenceKind Kind;
   llvm::Optional<AccessKind> AccKind;
   bool isImplicit = false;
-  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
-                    bool isImplicit = false)
-      : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit) {}
+
+  /// When non-none, this is a custom attribute reference.
+  Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef;
+
+  ReferenceMetaData(
+      SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
+      bool isImplicit = false,
+      Optional<std::pair<const CustomAttr *, Decl *>> customAttrRef
+        = None
+  ) : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit),
+      CustomAttrRef(customAttrRef) {}
 };
 
 /// Specifies how the initialization expression of a \c lazy variable should be

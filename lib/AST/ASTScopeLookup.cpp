@@ -127,13 +127,16 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
           // A map from enclosing source files to original source ranges of the macro
           // expansions within that file, recording the chain of macro expansions for
           // the given scope.
-          llvm::SmallDenseMap<const SourceFile *, SourceRange> scopeExpansions;
+          llvm::SmallDenseMap<const SourceFile *, CharSourceRange>
+              scopeExpansions;
 
           // Walk up the chain of macro expansion buffers for the scope, recording the
           // original source range of the macro expansion along the way using generated
           // source info.
           auto *scopeExpansion = scopeSourceFile;
-          scopeExpansions[scopeExpansion] = scope->getSourceRangeOfThisASTNode();
+          scopeExpansions[scopeExpansion] =
+              Lexer::getCharSourceRangeFromSourceRange(
+                sourceMgr, scope->getSourceRangeOfThisASTNode());
           while (auto *ancestor = scopeExpansion->getEnclosingSourceFile()) {
             auto generatedInfo =
                 sourceMgr.getGeneratedSourceInfo(*scopeExpansion->getBufferID());
@@ -150,15 +153,14 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
             if (scopeExpansion != scopeExpansions.end()) {
               // Take the original expansion range within the LCA of the loc and
               // the scope to compare.
-              rangeOfScope =
-                  Lexer::getCharSourceRangeFromSourceRange(sourceMgr, scopeExpansion->second);
+              rangeOfScope = scopeExpansion->second;
               loc = expansionLoc;
               break;
             }
 
             auto generatedInfo =
                 sourceMgr.getGeneratedSourceInfo(*potentialLCA->getBufferID());
-            expansionLoc = generatedInfo->originalSourceRange.Start;
+            expansionLoc = generatedInfo->originalSourceRange.getStart();
             potentialLCA = potentialLCA->getEnclosingSourceFile();
           }
         }

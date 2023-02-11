@@ -346,8 +346,9 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
         newBufferID,
         GeneratedSourceInfo{
           GeneratedSourceInfo::ReplacedFunctionBody,
-          AFD->getOriginalBodySourceRange(),
-          newBodyRange,
+          Lexer::getCharSourceRangeFromSourceRange(
+              SM, AFD->getOriginalBodySourceRange()),
+          Lexer::getCharSourceRangeFromSourceRange(SM, newBodyRange),
           AFD,
           nullptr
         }

@@ -369,9 +369,9 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
 
 DeclAttributes Decl::getSemanticAttrs() const {
   auto mutableThis = const_cast<Decl *>(this);
-  evaluateOrDefault(getASTContext().evaluator,
-                    ExpandMemberAttributeMacros{mutableThis},
-                    false);
+  (void)evaluateOrDefault(getASTContext().evaluator,
+                          ExpandMemberAttributeMacros{mutableThis},
+                          { });
 
   return getAttrs();
 }

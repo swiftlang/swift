@@ -19,6 +19,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
@@ -691,9 +692,23 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
       return true;
     }
   }
+
   for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
     if (auto *Repr = customAttr->getTypeRepr()) {
-      if (!Repr->walk(*this))
+      // If this attribute resolves to a macro, index that.
+      ASTContext &ctx = D->getASTContext();
+      ResolveMacroRequest req{const_cast<CustomAttr *>(customAttr),
+                              getAttachedMacroRoles(),
+                              D->getInnermostDeclContext()};
+      if (auto macroDecl = evaluateOrDefault(ctx.evaluator, req, nullptr)) {
+        Type macroRefType = macroDecl->getDeclaredInterfaceType();
+        if (!passReference(
+              macroDecl, macroRefType, DeclNameLoc(Repr->getStartLoc()),
+              ReferenceMetaData(SemaReferenceKind::DeclRef, None,
+                                /*isImplicit=*/false,
+                                std::make_pair(customAttr, D))))
+          return false;
+      } else if (!Repr->walk(*this))
         return false;
     }
     if (auto *SemaInit = customAttr->getSemanticInit()) {

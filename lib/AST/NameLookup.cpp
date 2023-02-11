@@ -2082,9 +2082,9 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
 
     // Expand synthesized member macros.
     auto &ctx = current->getASTContext();
-    evaluateOrDefault(ctx.evaluator,
-                      ExpandSynthesizedMemberMacroRequest{current},
-                      false);
+    (void)evaluateOrDefault(ctx.evaluator,
+                            ExpandSynthesizedMemberMacroRequest{current},
+                            false);
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
