@@ -377,6 +377,7 @@ void SourceManager::setGeneratedSourceInfo(
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
+  case GeneratedSourceInfo::PeerMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
     break;
 
