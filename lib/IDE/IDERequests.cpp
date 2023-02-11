@@ -94,7 +94,8 @@ private:
   bool rangeContainsLoc(CharSourceRange Range) const;
   bool isDone() const { return CursorInfo.isValid(); }
   bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                  SourceLoc Loc, bool IsRef, Type Ty = Type());
+                  SourceLoc Loc, bool IsRef, Type Ty = Type(),
+                  Optional<ReferenceMetaData> Data = None);
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool tryResolve(Stmt *St);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
@@ -109,7 +110,8 @@ SourceManager &CursorInfoResolver::getSourceMgr() const
 
 bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
                                     ExtensionDecl *ExtTyRef, SourceLoc Loc,
-                                    bool IsRef, Type Ty) {
+                                    bool IsRef, Type Ty,
+                                    Optional<ReferenceMetaData> Data) {
   if (!D->hasName())
     return false;
 
@@ -136,6 +138,9 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
       ValueRefInfo.setReceiverTypes(ReceiverTypes);
     }
   }
+
+  if (Data)
+    ValueRefInfo.setCustomAttrRef(Data->CustomAttrRef);
 
   CursorInfo = ValueRefInfo;
   return true;
@@ -260,7 +265,7 @@ bool CursorInfoResolver::visitDeclReference(ValueDecl *D,
     return false;
   if (Data.isImplicit || !Range.isValid())
     return true;
-  return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
+  return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T, Data);
 }
 
 static bool isCursorOn(Expr *E, SourceLoc Loc) {

@@ -151,6 +151,8 @@ protected:
     bool IsRef = true;
     Type Ty;
     Type ContainerType;
+    Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef = None;
+
     bool IsKeywordArgument = false;
     /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
     bool IsDynamic = false;
@@ -260,6 +262,13 @@ struct ResolvedValueRefCursorInfo : public ResolvedCursorInfo {
   ValueDecl *typeOrValue() {
     return ValueRefInfo.CtorTyRef ? ValueRefInfo.CtorTyRef
                                   : ValueRefInfo.ValueD;
+  }
+
+  Optional<std::pair<const CustomAttr *, Decl *>> getCustomAttrRef() const {
+    return ValueRefInfo.CustomAttrRef;
+  }
+  void setCustomAttrRef(Optional<std::pair<const CustomAttr *, Decl *>> ref) {
+    ValueRefInfo.CustomAttrRef = ref;
   }
 
   static bool classof(const ResolvedCursorInfo *Info) {

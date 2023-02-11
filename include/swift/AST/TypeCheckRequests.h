@@ -3825,11 +3825,12 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Expand all member attribute macros attached to the given
-/// declaration.
-class ExpandMemberAttributeMacros
-    : public SimpleRequest<ExpandMemberAttributeMacros,
-                           bool(Decl *),
+/// Expand all accessor macros attached to the given declaration.
+///
+/// Produces the set of macro expansion buffer IDs.
+class ExpandAccessorMacros
+    : public SimpleRequest<ExpandAccessorMacros,
+                           ArrayRef<unsigned>(AbstractStorageDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3837,16 +3838,39 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  ArrayRef<unsigned> evaluate(
+      Evaluator &evaluator, AbstractStorageDecl *storage) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Expand all member attribute macros attached to the given
+/// declaration.
+///
+/// Produces the set of macro expansion buffer IDs.
+class ExpandMemberAttributeMacros
+    : public SimpleRequest<ExpandMemberAttributeMacros,
+                           ArrayRef<unsigned>(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<unsigned> evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
 };
 
 /// Expand synthesized member macros attached to the given declaration.
+///
+/// Produces the set of macro expansion buffer IDs.
 class ExpandSynthesizedMemberMacroRequest
     : public SimpleRequest<ExpandSynthesizedMemberMacroRequest,
-                           bool(Decl *),
+                           ArrayRef<unsigned>(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3854,7 +3878,7 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  ArrayRef<unsigned> evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -3887,7 +3911,7 @@ public:
 /// Expand peer macros attached to the given declaration.
 class ExpandPeerMacroRequest
     : public SimpleRequest<ExpandPeerMacroRequest,
-                           bool(Decl *),
+                           ArrayRef<unsigned>(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3895,7 +3919,7 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  ArrayRef<unsigned> evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
