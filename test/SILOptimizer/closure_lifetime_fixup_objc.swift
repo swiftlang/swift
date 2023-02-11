@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend %s -sil-verify-all -emit-sil -enable-copy-propagation=false -o - -I %S/Inputs/usr/include | %FileCheck %s
 // REQUIRES: objc_interop
 
+// REQUIRES: swift_in_compiler
+
 // Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around
 // long enough in the same form to be worth rewriting CHECK lines.
@@ -75,12 +77,6 @@ public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villain
 // CHECK-LABEL: sil @$s27closure_lifetime_fixup_objc9dontCrashyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[NONE:%.*]] = enum $Optional<{{.*}}>, #Optional.none!enumelt
-// CHECK:   br bb1
-//
-// CHECK: bb1:
-// CHECK:   br bb2
-//
-// CHECK: bb2:
 // CHECK:   br [[LOOP_HEADER_BB:bb[0-9]+]]([[NONE]]
 //
 // CHECK: [[LOOP_HEADER_BB]]([[LOOP_IND_VAR:%.*]] : $Optional

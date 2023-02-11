@@ -977,6 +977,10 @@ private:
         getForeignResultType(AFD, methodTy, asyncConvention, errorConvention);
 
     if (outputLang == OutputLanguageMode::Cxx) {
+      // FIXME: Support operators.
+      if (AFD->isOperator() || (AFD->isStatic() && AFD->isImplicit()))
+        return;
+
       auto *typeDeclContext = dyn_cast<NominalTypeDecl>(AFD->getParent());
       if (!typeDeclContext) {
         typeDeclContext =
@@ -991,6 +995,13 @@ private:
                              /*selfTypeDeclContext=*/typeDeclContext);
       if (!funcABI)
         return;
+      Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo;
+      if (!isa<ConstructorDecl>(AFD)) {
+        dispatchInfo = owningPrinter.interopContext.getIrABIDetails()
+                           .getMethodDispatchInfo(AFD);
+        if (!dispatchInfo)
+          return;
+      }
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
       printDocumentationComment(AFD);
@@ -1013,7 +1024,8 @@ private:
         declPrinter.printCxxMethod(typeDeclContext, AFD,
                                    funcABI->getSignature(),
                                    funcABI->getSymbolName(), resultTy,
-                                   /*isDefinition=*/false);
+                                   /*isStatic=*/isClassMethod,
+                                   /*isDefinition=*/false, dispatchInfo);
       }
 
       DeclAndTypeClangFunctionPrinter defPrinter(
@@ -1035,7 +1047,8 @@ private:
       } else {
         defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
                                   funcABI->getSymbolName(), resultTy,
-                                  /*isDefinition=*/true);
+                                  /*isStatic=*/isClassMethod,
+                                  /*isDefinition=*/true, dispatchInfo);
       }
 
       // FIXME: SWIFT_WARN_UNUSED_RESULT
@@ -1652,9 +1665,6 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
-      // FIXME: Support static methods.
-      if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
-        return;
       if (FD->getDeclContext()->isTypeContext())
         return printAbstractFunctionAsMethod(FD, FD->isStatic());
 

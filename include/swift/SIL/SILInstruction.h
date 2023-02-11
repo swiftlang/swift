@@ -4782,9 +4782,6 @@ class AssignByWrapperInst
   USE_SHARED_UINT8;
 
 public:
-  /// The kind of a wrapper that is being applied.
-  enum class Originator : uint8_t { TypeWrapper, PropertyWrapper };
-
   enum Mode {
     /// The mode is not decided yet (by DefiniteInitialization).
     Unknown,
@@ -4804,17 +4801,13 @@ public:
   };
 
 private:
-  Originator originator;
-
-  AssignByWrapperInst(SILDebugLocation DebugLoc, Originator origin,
+  AssignByWrapperInst(SILDebugLocation DebugLoc,
                       SILValue Src, SILValue Dest, SILValue Initializer,
                       SILValue Setter, Mode mode);
 
 public:
   SILValue getInitializer() { return Operands[2].get(); }
   SILValue getSetter() { return  Operands[3].get(); }
-
-  Originator getOriginator() const { return originator; }
 
   Mode getMode() const {
     return Mode(sharedUInt8().AssignByWrapperInst.mode);
@@ -4927,6 +4920,19 @@ public:
   OperandValueArrayRef getElements() const {
     return OperandValueArrayRef(getAllOperands());
   }
+};
+
+/// This instruction is inserted by Onone optimizations as a replacement for deleted
+/// instructions to ensure that it's possible to set a breakpoint on its location.
+class DebugStepInst final
+    : public InstructionBase<SILInstructionKind::DebugStepInst, NonValueInstruction> {
+  friend SILBuilder;
+
+  DebugStepInst(SILDebugLocation debugLoc) : InstructionBase(debugLoc) {}
+
+public:
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
 /// Define the start or update to a symbolic variable value (for loadable
@@ -7744,6 +7750,53 @@ public:
 
   SILType getElementType() const {
     return getValue()->getType();
+  }
+};
+
+/// Projects a tuple element as appropriate for the given
+/// pack element index.  The pack index must index into a pack with
+/// the same shape as the tuple element type list.
+class TuplePackElementAddrInst final
+  : public InstructionBaseWithTrailingOperands<
+                           SILInstructionKind::TuplePackElementAddrInst,
+                           TuplePackElementAddrInst,
+                           SingleValueInstruction> {
+public:
+  enum {
+    IndexOperand = 0,
+    TupleOperand = 1
+  };
+
+private:
+  friend SILBuilder;
+
+  TuplePackElementAddrInst(SILDebugLocation debugLoc,
+                           ArrayRef<SILValue> allOperands,
+                           SILType elementType)
+      : InstructionBaseWithTrailingOperands(allOperands, debugLoc,
+                                            elementType) {}
+
+  static TuplePackElementAddrInst *create(SILFunction &F,
+                                          SILDebugLocation debugLoc,
+                                          SILValue indexOperand,
+                                          SILValue tupleOperand,
+                                          SILType elementType);
+
+public:
+  SILValue getIndex() const {
+    return getAllOperands()[IndexOperand].get();
+  }
+
+  SILValue getTuple() const {
+    return getAllOperands()[TupleOperand].get();
+  }
+
+  CanTupleType getTupleType() const {
+    return getTuple()->getType().castTo<TupleType>();
+  }
+
+  SILType getElementType() const {
+    return getType();
   }
 };
 

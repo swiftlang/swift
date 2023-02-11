@@ -323,6 +323,18 @@ SourceFile *DeclContext::getParentSourceFile() const {
   return fallbackSF;
 }
 
+SourceFile *DeclContext::getOutermostParentSourceFile() const {
+  auto sf = getParentSourceFile();
+  if (!sf)
+    return nullptr;
+
+  // Find the originating source file.
+  while (auto enclosingSF = sf->getEnclosingSourceFile())
+    sf = enclosingSF;
+
+  return sf;
+}
+
 DeclContext *DeclContext::getModuleScopeContext() const {
   auto DC = const_cast<DeclContext*>(this);
 

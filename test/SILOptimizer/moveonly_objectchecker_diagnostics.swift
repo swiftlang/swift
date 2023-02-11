@@ -4,6 +4,8 @@
 // Declarations //
 //////////////////
 
+public class CopyableKlass {}
+
 @_moveOnly
 public final class Klass {
     var intField: Int
@@ -17,6 +19,7 @@ public final class Klass {
 var boolValue: Bool { return true }
 
 public func borrowVal(_ x: __shared Klass) {}
+public func borrowVal(_ x: __shared CopyableKlass) {}
 public func borrowVal(_ x: __shared FinalKlass) {}
 public func borrowVal(_ x: __shared AggStruct) {}
 public func borrowVal(_ x: __shared KlassPair) {}
@@ -2431,4 +2434,47 @@ func sameCallSiteTestConsumeTwice(_ k: __owned Klass) { // expected-error {{'k' 
 func sameCallSiteConsumeAndUse(_ k: __owned Klass) { // expected-error {{'k' consumed and used at the same time}}
     func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: Klass) {}
     consumeKlassAndUseKlass(k, k) // expected-note {{consuming and non-consuming uses here}}
+}
+
+////////////////////////////////
+// Recursive Enum Switch Test //
+////////////////////////////////
+
+enum EnumSwitchTests {
+    @_moveOnly
+    enum E2 {
+        case lhs(CopyableKlass)
+        case rhs(Klass)
+    }
+
+    @_moveOnly
+    enum E {
+        case first(KlassPair)
+        case second(AggStruct)
+        case third(CopyableKlass)
+        case fourth(E2)
+    }
+}
+
+func consumeVal(_ e: __owned EnumSwitchTests.E2) {}
+
+func enumSwitchTest1(_ e: __owned EnumSwitchTests.E) {
+    switch e {
+    case .first:
+        break
+    case .second(let x):
+        borrowVal(x)
+        break
+    case .third(let y):
+        borrowVal(y)
+        break
+    case .fourth where boolValue:
+        break
+    case .fourth(.lhs(let lhs)):
+        borrowVal(lhs)
+        break
+    case .fourth(.rhs(let rhs)):
+        consumeVal(rhs)
+        break
+    }
 }

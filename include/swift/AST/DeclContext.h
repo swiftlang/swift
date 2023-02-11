@@ -519,6 +519,12 @@ public:
   LLVM_READONLY
   SourceFile *getParentSourceFile() const;
 
+  /// Returns the "outermost" source file that contains this context,
+  /// looking through any source files for generated code, such as
+  /// macro expansions.
+  LLVM_READONLY
+  SourceFile *getOutermostParentSourceFile() const;
+
   /// Determine whether this declaration context is generic, meaning that it or
   /// any of its parents have generic parameters.
   bool isGenericContext() const;

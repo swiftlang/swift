@@ -1302,6 +1302,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   SILInstruction *ResultInst;
   switch (OpCode) {
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugStepInst:
   case SILInstructionKind::TestSpecificationInst:
     llvm_unreachable("not supported");
 
@@ -1442,6 +1443,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto indexType = SILType::getPackIndexType(MF->getContext());
     auto index = getLocalValue(ValID3, indexType);
     ResultInst = Builder.createPackElementSet(Loc, value, index, pack);
+    break;
+  }
+  case SILInstructionKind::TuplePackElementAddrInst: {
+    assert(RecordKind == SIL_PACK_ELEMENT_GET);
+    auto elementType = getSILType(MF->getType(TyID),
+                                  (SILValueCategory) TyCategory, Fn);
+    auto tupleType = getSILType(MF->getType(TyID2),
+                               (SILValueCategory) TyCategory2, Fn);
+    auto tuple = getLocalValue(ValID2, tupleType);
+    auto indexType = SILType::getPackIndexType(MF->getContext());
+    auto index = getLocalValue(ValID3, indexType);
+    ResultInst = Builder.createTuplePackElementAddr(Loc, index, tuple,
+                                                    elementType);
     break;
   }
 

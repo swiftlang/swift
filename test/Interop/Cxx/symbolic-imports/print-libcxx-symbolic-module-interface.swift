@@ -2,7 +2,6 @@
 
 // REQUIRES: asserts
 // REQUIRES: OS=macosx
-// REQUIRES: libcxx-in-sdk
 
 // CHECK: enum std {
 // CHECK-NEXT: enum __1 {

@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/Library.swiftmodule -module-name Library %S/Inputs/moveonly_deinit.swift -enable-experimental-move-only
+// TODO: re-enable the simplification passes once rdar://104875010 is fixed
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -emit-module -o %t/Library.swiftmodule -module-name Library %S/Inputs/moveonly_deinit.swift -enable-experimental-move-only
 // RUN: not %target-swift-frontend -I %t %s -emit-sil -o /dev/null 2>&1 | %FileCheck %s
 
 // This test makes sure that if we import a move only type and do not set the

@@ -5,6 +5,8 @@
 // Diagnostics testing
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS
 
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature Macros -plugin-path %t -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS
+
 // RUN: not %target-swift-frontend -swift-version 5 -typecheck -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics > %t/macro-printing.txt
 // RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
 

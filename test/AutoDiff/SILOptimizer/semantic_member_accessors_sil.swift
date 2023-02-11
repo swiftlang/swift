@@ -77,7 +77,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK: }
 
 // CHECK-LABEL: sil private [ossa] @$s4null6StructV1xSfvsTJpSSpSr
-// CHECK: bb0([[ADJ_SELF:%.*]] : $*Struct.TangentVector, {{.*}} : $_AD__$s4null6StructV1xSfvs_bb0__PB__src_0_wrt_0_1):
+// CHECK: bb0([[ADJ_SELF:%.*]] : $*Struct.TangentVector, {{.*}} : $()):
 // CHECK:   [[ADJ_X_ADDR:%.*]] = struct_element_addr [[ADJ_SELF]] : $*Struct.TangentVector, #Struct.TangentVector.x
 // CHECK:   [[ADJ_X:%.*]] = load [trivial] [[ADJ_X_ADDR]] : $*Float
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $Float, #AdditiveArithmetic.zero!getter
@@ -86,7 +86,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK: }
 
 // CHECK-LABEL: sil private [ossa] @$s4null6StructV1xSfvgTJpSpSr
-// CHECK: bb0([[ADJ_X:%.*]] : $Float, {{.*}} : $_AD__$s4null6StructV1xSfvg_bb0__PB__src_0_wrt_0):
+// CHECK: bb0([[ADJ_X:%.*]] : $Float, {{.*}} : $()):
 // CHECK:   [[ADJ_Y_ADDR:%.*]] = alloc_stack $Float
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $Float, #AdditiveArithmetic.zero!getter
 // CHECK:   apply [[ZERO_FN]]<Float>([[ADJ_Y_ADDR]], {{.*}})

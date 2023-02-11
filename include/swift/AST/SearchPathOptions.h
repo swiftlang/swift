@@ -339,6 +339,10 @@ public:
   /// preference.
   std::vector<std::string> RuntimeLibraryPaths;
 
+  /// Paths that contain compiler plugins loaded on demand for, e.g.,
+  /// macro implementations.
+  std::vector<std::string> PluginSearchPaths;
+
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;
 
@@ -354,6 +358,10 @@ public:
 
   /// A map of explicit Swift module information.
   std::string ExplicitSwiftModuleMap;
+
+  /// Module inputs specified with -swift-module-input,
+  /// <ModuleName, Path to .swiftmodule file>
+  std::vector<std::pair<std::string, std::string>> ExplicitSwiftModuleInputs;
 
   /// A map of placeholder Swift module dependency information.
   std::string PlaceholderDependencyModuleMap;

@@ -29,7 +29,7 @@ extension TypeMetadata {
   @inlinable
   public var descriptor: TypeDescriptor {
     var address: UnsafeRawPointer
-    
+
     switch metadata.kind {
     case .struct:
       address = ptr + MemoryLayout<StructMetadata.Layout>.offset(of: \.descriptor)!
@@ -39,12 +39,12 @@ extension TypeMetadata {
     default:
       address = ptr + MemoryLayout<ClassMetadata.Layout>.offset(of: \.descriptor)!
     }
-    
-    address = address.loadUnaligned(as: UnsafeRawPointer.self)
-    
+
+    address = address.unprotectedLoad(as: UnsafeRawPointer.self)
+
     return TypeDescriptor(address)
   }
-  
+
   @inlinable
   public var genericArguments: UnsafeRawPointer {
     switch metadata.kind {
@@ -68,17 +68,17 @@ extension TypeMetadata {
   public var metadata: Metadata {
     Metadata(ptr)
   }
-  
+
   @inlinable
   public var `class`: ClassMetadata {
     ClassMetadata(ptr)
   }
-  
+
   @inlinable
   public var `enum`: EnumMetadata {
     EnumMetadata(ptr)
   }
-  
+
   @inlinable
   public var `struct`: StructMetadata {
     StructMetadata(ptr)
@@ -93,10 +93,10 @@ extension TypeMetadata {
     if let ss = typeRef.standardSubstitution {
       return ss
     }
-    
+
     return _resolve(typeRef)
   }
-  
+
   @usableFromInline
   func _resolve(_ typeRef: MangledTypeReference) -> Any.Type? {
     typeCache.getOrInsert(typeRef, from: self)

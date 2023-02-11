@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -optimized-mandatory-combine -sil-mandatory-combine-enable-canon-and-simple-dce -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-combine -semantic-arc-opts %s | %FileCheck %s
 
 // Make sure that we can perform all of these RAUW without producing ARC traffic
 // that semantic arc opts can't eliminate.
@@ -258,19 +258,18 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK-NOT: destroy_value
 //
 // CHECK: bb2:
-// CHECK-NEXT: [[COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT: cond_br undef, bb3, bb4
 //
 // CHECK: bb3:
-// CHECK-NEXT: destroy_value [[COPY]]
 // CHECK-NEXT: br bb2
 //
 // CHECK: bb4:
-// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[COPY]]
-// CHECK-NEXT: br bb6([[ENUM_SOME_RESULT]] : $FakeOptional<Klass>)
+// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[ENUM_SOME_RESULT]]
+// CHECK-NEXT: br bb6([[COPY]] : $FakeOptional<Klass>)
 //
 // CHECK: bb5:
-// CHECK-NEXT: [[ENUM_NONE_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt // user: %10
+// CHECK-NEXT: [[ENUM_NONE_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
 // CHECK-NEXT: br bb6([[ENUM_NONE_RESULT]] :
 //
 // CHECK: bb6([[RESULT:%.*]] : @owned $FakeOptional<Klass>):
@@ -340,7 +339,6 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 // CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Klass {
 // CHECK: bb0(
 // CHECK-NEXT: unchecked_ref_cast
-// CHECK-NEXT: unchecked_ownership_conversion
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2b'
 sil [ossa] @unowned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Klass {

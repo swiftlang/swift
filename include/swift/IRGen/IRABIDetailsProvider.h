@@ -248,6 +248,40 @@ public:
   llvm::MapVector<EnumElementDecl *, EnumElementInfo>
   getEnumTagMapping(const EnumDecl *ED);
 
+  /// Details how a specific method should be dispatched.
+  struct MethodDispatchInfo {
+    enum class Kind {
+      /// A direct call can be made to the underlying function.
+      Direct,
+      /// An indirect call that can be made via a static offset in a vtable.
+      IndirectVTableStaticOffset
+    };
+
+    static MethodDispatchInfo direct() {
+      return MethodDispatchInfo(Kind::Direct, 0);
+    }
+
+    static MethodDispatchInfo indirectVTableStaticOffset(size_t bitOffset) {
+      return MethodDispatchInfo(Kind::IndirectVTableStaticOffset, bitOffset);
+    }
+
+    Kind getKind() const { return kind; }
+    size_t getStaticBitOffset() const {
+      assert(kind == Kind::IndirectVTableStaticOffset);
+      return bitOffset;
+    }
+
+  private:
+    constexpr MethodDispatchInfo(Kind kind, size_t bitOffset)
+        : kind(kind), bitOffset(bitOffset) {}
+
+    Kind kind;
+    size_t bitOffset;
+  };
+
+  Optional<MethodDispatchInfo>
+  getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl);
+
 private:
   std::unique_ptr<IRABIDetailsProviderImpl> impl;
 };

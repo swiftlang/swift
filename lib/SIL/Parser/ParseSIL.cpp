@@ -2248,35 +2248,6 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B) {
   return false;
 }
 
-static bool
-parseAssignByWrapperOriginator(AssignByWrapperInst::Originator &Result,
-                               SILParser &P) {
-  if (P.parseVerbatim("origin"))
-    return true;
-
-  SourceLoc loc;
-  Identifier origin;
-
-  if (P.parseSILIdentifier(origin, loc, diag::expected_in_attribute_list))
-    return true;
-
-  // Then try to parse one of our other initialization kinds. We do not support
-  // parsing unknown here so we use that as our fail value.
-  auto Tmp =
-      llvm::StringSwitch<Optional<AssignByWrapperInst::Originator>>(
-          origin.str())
-          .Case("type_wrapper", AssignByWrapperInst::Originator::TypeWrapper)
-          .Case("property_wrapper",
-                AssignByWrapperInst::Originator::PropertyWrapper)
-          .Default(None);
-
-  if (!Tmp)
-    return true;
-
-  Result = *Tmp;
-  return false;
-}
-
 static bool parseAssignByWrapperMode(AssignByWrapperInst::Mode &Result,
                                           SILParser &P) {
   StringRef Str;
@@ -2416,7 +2387,9 @@ static bool parseSILDifferentiabilityWitnessConfigAndFunction(
   auto origFnType = resultOrigFn->getLoweredFunctionType();
   auto *parameterIndices = IndexSubset::get(
       P.Context, origFnType->getNumParameters(), rawParameterIndices);
-  auto *resultIndices = IndexSubset::get(P.Context, origFnType->getNumResults(),
+  auto *resultIndices = IndexSubset::get(P.Context,
+                                         origFnType->getNumResults() +
+                                         origFnType->getNumIndirectMutatingParameters(),
                                          rawResultIndices);
   resultConfig = AutoDiffConfig(parameterIndices, resultIndices, witnessGenSig);
   return false;
@@ -3453,6 +3426,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createPackElementSet(InstLoc, value, index, pack);
     break;
   }
+  case SILInstructionKind::TuplePackElementAddrInst: {
+    SILValue index, tuple;
+    SILType elementType;
+    if (parseValueRef(index, SILType::getPackIndexType(P.Context), InstLoc, B) ||
+        parseVerbatim("of") ||
+        parseTypedValueRef(tuple, B) ||
+        parseVerbatim("as") ||
+        parseSILType(elementType))
+      return true;
+    ResultVal = B.createTuplePackElementAddr(InstLoc, index, tuple, elementType);
+    break;
+  }
 
 #define UNARY_INSTRUCTION(ID)                                                  \
   case SILInstructionKind::ID##Inst:                                           \
@@ -3595,6 +3580,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                    hasTrace);
     break;
   }
+
+  case SILInstructionKind::DebugStepInst:
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDebugStep(InstLoc);
+    break;
 
   case SILInstructionKind::TestSpecificationInst: {
     // Parse the specification string.
@@ -4406,30 +4397,14 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::AssignByWrapperInst: {
     SILValue Src, DestAddr, InitFn, SetFn;
     SourceLoc DestLoc;
-    AssignByWrapperInst::Originator originator;
     AssignByWrapperInst::Mode mode;
-
-    if (parseAssignByWrapperOriginator(originator, *this))
-      return true;
-
-    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
-      return true;
 
     if (parseTypedValueRef(Src, B) || parseVerbatim("to") ||
         parseAssignByWrapperMode(mode, *this) ||
-        parseTypedValueRef(DestAddr, DestLoc, B))
-      return true;
-
-    if (originator == AssignByWrapperInst::Originator::PropertyWrapper) {
-      if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-          parseVerbatim("init") || parseTypedValueRef(InitFn, B))
-        return true;
-    } else {
-      assert(originator == AssignByWrapperInst::Originator::TypeWrapper);
-      InitFn = SILUndef::get(DestAddr->getType(), B.getModule());
-    }
-
-    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseTypedValueRef(DestAddr, DestLoc, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("init") || parseTypedValueRef(InitFn, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseVerbatim("set") || parseTypedValueRef(SetFn, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
@@ -4440,7 +4415,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
 
-    ResultVal = B.createAssignByWrapper(InstLoc, originator, Src, DestAddr,
+    ResultVal = B.createAssignByWrapper(InstLoc, Src, DestAddr,
                                         InitFn, SetFn, mode);
     break;
   }

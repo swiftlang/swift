@@ -154,10 +154,14 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // resolution of nonescaping closure lifetimes to correctly check the use
   // of move-only values as captures in nonescaping closures as borrows.
 
+  // Check noImplicitCopy and move only types for objects
+  //
+  // NOTE: It is important that this is run /before/ move only address checker
+  // since if the address checker emits an error, it will cleanup copy_value of
+  // move only objects meaning that we could lose object level diagnostics.
+  P.addMoveOnlyObjectChecker();
   // Check noImplicitCopy and move only types for addresses.
   P.addMoveOnlyAddressChecker();
-  // Check noImplicitCopy and move only types for objects
-  P.addMoveOnlyObjectChecker();
   // Convert last destroy_value to deinits.
   P.addMoveOnlyDeinitInsertion();
   // Lower move only wrapped trivial types.
@@ -572,7 +576,7 @@ static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
 #endif
 
   P.addForEachLoopUnroll();
-  P.addOptimizedMandatoryCombine();
+  P.addSimplification();
   P.addAccessMarkerElimination();
 }
 
@@ -971,7 +975,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // in the editor.
   P.startPipeline("Non-Diagnostic Mandatory Optimizations");
   P.addForEachLoopUnroll();
-  P.addMandatoryCombine();
+  P.addOnoneSimplification();
 
   // TODO: MandatoryARCOpts should be subsumed by CopyPropagation. There should
   // be no need to run another analysis of copies at -Onone.
@@ -1010,6 +1014,12 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // In Onone builds, do a function-local analysis in a function pass.
   P.addFunctionStackProtection();
+
+  // This is mainly there to optimize `Builtin.isConcrete`, which must not be
+  // constant folded before any generic specialization.
+  P.addLateOnoneSimplification();
+
+  P.addCleanupDebugSteps();
 
   // Has only an effect if the -sil-based-debuginfo option is specified.
   P.addSILDebugInfoGenerator();

@@ -851,6 +851,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::IntegerLiteralInst:
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugStepInst:
   case SILInstructionKind::StringLiteralInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndBorrowInst:
@@ -878,6 +879,12 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::ProjectBlockStorageInst:
     return InlineCost::Free;
+
+  // tuple_pack_element_addr is just a GEP, but getting the offset
+  // can require accessing metadata, so conservatively treat it as
+  // expensive.
+  case SILInstructionKind::TuplePackElementAddrInst:
+    return InlineCost::Expensive;
 
   // dynamic_pack_index is free.  The other pack-indexing instructions
   // are just adds of values that should be trivially dynamically

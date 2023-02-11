@@ -656,19 +656,6 @@ struct llvm::DenseMapInfo<ModuleIdentifierArrayKind> {
   }
 };
 
-namespace std {
-template <>
-struct hash<ModuleDependencyID> {
-  using UnderlyingKindType = std::underlying_type<ModuleDependencyKind>::type;
-  std::size_t operator()(const ModuleDependencyID &id) const {
-    auto underlyingKindValue = static_cast<UnderlyingKindType>(id.second);
-
-    return (hash<string>()(id.first) ^
-            (hash<UnderlyingKindType>()(underlyingKindValue)));
-  }
-};
-} // namespace std
-
 namespace swift {
 
 class ModuleDependenciesCacheSerializer {

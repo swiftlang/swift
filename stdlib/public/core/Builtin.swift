@@ -139,7 +139,7 @@ internal func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
 ///   - t1: Another type to compare.
 /// - Returns: `true` if both `t0` and `t1` are `nil` or if they represent the
 ///   same type; otherwise, `false`.
-@inlinable
+@inlinable @_transparent
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   switch (t0, t1) {
   case (.none, .none): return true
@@ -156,7 +156,7 @@ public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
 ///   - t1: Another type to compare.
 /// - Returns: `true` if one, but not both, of `t0` and `t1` are `nil`, or if
 ///   they represent different types; otherwise, `false`.
-@inlinable
+@inlinable @_transparent
 public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return !(t0 == t1)
 }

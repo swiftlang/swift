@@ -7,6 +7,12 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  SimplifyApply.swift
   SimplifyBeginCOWMutation.swift
+  SimplifyBranch.swift
+  SimplifyBuiltin.swift
+  SimplifyCondBranch.swift
   SimplifyGlobalValue.swift
-  SimplifyStrongRetainRelease.swift)
+  SimplifyStrongRetainRelease.swift
+  SimplifyStructExtract.swift
+  SimplifyUncheckedEnumData.swift)

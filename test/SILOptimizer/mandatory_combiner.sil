@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -mandatory-combine %s | %FileCheck %s
+// RUN: %target-sil-opt -onone-simplification %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

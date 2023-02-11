@@ -1363,6 +1363,25 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.IncludeClangDocs = false;
 }
 
+static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModuleArgument,
+                                                  DiagnosticEngine &Diags,
+                                                  std::vector<std::pair<std::string, std::string>> &ExplicitSwiftModuleInputs) {
+  std::size_t foundDelimeterPos = swiftModuleArgument.find_first_of("=");
+  if (foundDelimeterPos == std::string::npos) {
+    Diags.diagnose(SourceLoc(), diag::error_swift_module_file_requires_delimeter,
+                   swiftModuleArgument);
+    return true;
+  }
+  std::string moduleName = swiftModuleArgument.substr(0, foundDelimeterPos),
+              modulePath = swiftModuleArgument.substr(foundDelimeterPos+1);
+  if (!Lexer::isIdentifier(moduleName)) {
+    Diags.diagnose(SourceLoc(), diag::error_bad_module_name, moduleName, false);
+    return true;
+  }
+  ExplicitSwiftModuleInputs.emplace_back(std::make_pair(moduleName, modulePath));
+  return false;
+}
+
 static bool ParseSearchPathArgs(SearchPathOptions &Opts,
                                 ArgList &Args,
                                 DiagnosticEngine &Diags,
@@ -1394,6 +1413,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   Opts.setFrameworkSearchPaths(FrameworkSearchPaths);
 
+  for (const Arg *A : Args.filtered(OPT_plugin_path)) {
+    Opts.PluginSearchPaths.push_back(resolveSearchPath(A->getValue()));
+  }
+
   for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
@@ -1415,6 +1438,11 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
 
   if (const Arg *A = Args.getLastArg(OPT_explicit_swift_module_map))
     Opts.ExplicitSwiftModuleMap = A->getValue();
+  for (auto A : Args.getAllArgValues(options::OPT_swift_module_file)) {
+    if (validateSwiftModuleFileArgumentAndAdd(A, Diags,
+                                              Opts.ExplicitSwiftModuleInputs))
+      return true;
+  }
   for (auto A: Args.filtered(OPT_candidate_module_file)) {
     Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));
   }

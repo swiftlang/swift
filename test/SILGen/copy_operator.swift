@@ -2,6 +2,8 @@
 // RUN: %target-swift-emit-sil -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-experimental-move-only | %FileCheck -check-prefix=CHECK-SIL %s
 // RUN: %target-swift-emit-sil -enable-copy-propagation=requested-passes-only -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -enable-experimental-move-only | %FileCheck -check-prefix=CHECK-SIL-OPT %s
 
+// REQUIRES: swift_in_compiler
+
 import Swift
 
 class Klass {}
@@ -45,7 +47,6 @@ class Klass {}
 // CHECK-SIL-NEXT: strong_retain [[VALUE]]
 // CHECK-SIL-NEXT: strong_retain [[VALUE]]
 // CHECK-SIL-NEXT: strong_release [[VALUE]]
-// CHECK-SIL-NEXT: tuple ()
 // CHECK-SIL-NEXT: dealloc_stack [[INPUT]] : $*Klass
 // CHECK-SIL-NEXT: strong_release [[VALUE]] : $Klass
 // CHECK-SIL-NEXT: return [[VALUE]] : $Klass
@@ -87,7 +88,6 @@ public func useCopy(_ k: Klass) -> Klass {
 // CHECK-SIL-NEXT: strong_retain [[VALUE]]
 // CHECK-SIL-NEXT: strong_retain [[VALUE]]
 // CHECK-SIL-NEXT: strong_release [[VALUE]]
-// CHECK-SIL-NEXT: tuple ()
 // CHECK-SIL-NEXT: dealloc_stack [[INPUT]]
 // CHECK-SIL-NEXT: strong_release [[VALUE]] : $T
 // CHECK-SIL-NEXT: return [[VALUE]] : $T

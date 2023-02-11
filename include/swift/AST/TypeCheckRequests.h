@@ -66,7 +66,6 @@ struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
-struct TypeWrapperInfo;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -3440,10 +3439,6 @@ enum class CustomAttrTypeKind {
   /// unbound generic types.
   PropertyWrapper,
 
-  /// Just like property wrappers, type wrappers are represented
-  /// as custom type attributes and allow unbound generic types.
-  TypeWrapper,
-
   /// Global actors are represented as custom type attributes. They don't
   /// have any particularly interesting semantics.
   GlobalActor,
@@ -3613,173 +3608,6 @@ private:
   friend SimpleRequest;
 
   ASTNode evaluate(Evaluator &evaluator, const SourceFile *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Return a type wrapper (if any) associated with the given declaration.
-class GetTypeWrapper
-    : public SimpleRequest<GetTypeWrapper,
-                           Optional<TypeWrapperInfo>(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  Optional<TypeWrapperInfo> evaluate(Evaluator &evaluator,
-                                     NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Inject or get `$Storage` type which has all of the stored properties
-/// of the given type with a type wrapper.
-class GetTypeWrapperStorage
-    : public SimpleRequest<GetTypeWrapperStorage, TypeDecl *(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  TypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Inject or get `$storage` property which is used to route accesses through
-/// to all stored properties of a type that has a type wrapper.
-class GetTypeWrapperProperty
-    : public SimpleRequest<GetTypeWrapperProperty, VarDecl *(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Given a stored property associated with a type wrapped type,
-/// produce a property that mirrors it in the type wrapper context.
-class GetTypeWrapperStorageForProperty
-    : public SimpleRequest<GetTypeWrapperStorageForProperty,
-                           VarDecl *(VarDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  VarDecl *evaluate(Evaluator &evaluator, VarDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Synthesize the body of a getter for a stored property that belongs to
-/// a type wrapped type.
-class SynthesizeTypeWrappedPropertyGetterBody
-    : public SimpleRequest<SynthesizeTypeWrappedPropertyGetterBody,
-                           BraceStmt *(AccessorDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  BraceStmt *evaluate(Evaluator &evaluator, AccessorDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Synthesize the body of a setter for a stored property that belongs to
-/// a type wrapped type.
-class SynthesizeTypeWrappedPropertySetterBody
-    : public SimpleRequest<SynthesizeTypeWrappedPropertySetterBody,
-                           BraceStmt *(AccessorDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  BraceStmt *evaluate(Evaluator &evaluator, AccessorDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Inject or get `$Storage` type which has all of the stored properties
-/// of the given type with a type wrapper.
-class IsPropertyAccessedViaTypeWrapper
-    : public SimpleRequest<IsPropertyAccessedViaTypeWrapper, bool(VarDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, VarDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-class SynthesizeTypeWrappedTypeMemberwiseInitializer
-    : public SimpleRequest<SynthesizeTypeWrappedTypeMemberwiseInitializer,
-                           ConstructorDecl *(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-class SynthesizeTypeWrappedTypeStorageWrapperInitializer
-    : public SimpleRequest<SynthesizeTypeWrappedTypeStorageWrapperInitializer,
-                           ConstructorDecl *(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-class SynthesizeLocalVariableForTypeWrapperStorage
-    : public SimpleRequest<SynthesizeLocalVariableForTypeWrapperStorage,
-                           VarDecl *(ConstructorDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  VarDecl *evaluate(Evaluator &evaluator, ConstructorDecl *) const;
 
 public:
   bool isCached() const { return true; }
@@ -3959,22 +3787,6 @@ public:
   bool isCached() const { return true; }
 };
 
-class GetTypeWrapperInitializer
-    : public SimpleRequest<GetTypeWrapperInitializer,
-                           ConstructorDecl *(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 /// Find the definition of a given macro.
 class MacroDefinitionRequest
     : public SimpleRequest<MacroDefinitionRequest,
@@ -4045,6 +3857,30 @@ private:
   bool evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
+  bool isCached() const { return true; }
+};
+
+/// Load a plugin module with the given name.
+///
+///
+class CompilerPluginLoadRequest
+  : public SimpleRequest<CompilerPluginLoadRequest,
+                         void *(ASTContext *, Identifier),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  void *evaluate(
+      Evaluator &evaluator, ASTContext *ctx, Identifier moduleName
+  ) const;
+
+public:
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); }
+
   bool isCached() const { return true; }
 };
 

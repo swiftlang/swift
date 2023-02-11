@@ -1534,6 +1534,16 @@ class AccessPathDefUseTraversal {
   // The origin of the def-use traversal.
   AccessStorage storage;
 
+  // The base of the formal access. For class storage, it is the
+  // ref_element_addr. For global storage it is the global_addr or initializer
+  // apply. For other storage, it is the same as accessPath.getRoot().
+  //
+  // 'base' is typically invalid, maning that all uses of 'storage' for the
+  // access path will be visited. When 'base' is set, the the visitor is
+  // restricted to a specific access base, such as a particular
+  // ref_element_addr.
+  SILValue base;
+
   // Indices of the path to match from inner to outer component.
   // A cursor is used to represent the most recently visited def.
   // During def-use traversal, the cursor starts at the end of pathIndices and
@@ -1581,6 +1591,20 @@ public:
     });
   }
 
+  AccessPathDefUseTraversal(AccessUseVisitor &visitor,
+                            AccessPathWithBase accessPathWithBase,
+                            SILFunction *function)
+      : visitor(visitor), storage(accessPathWithBase.accessPath.getStorage()),
+        base(accessPathWithBase.getAccessBase().getBaseAddress()) {
+
+    auto accessPath = accessPathWithBase.accessPath;
+    assert(accessPath.isValid());
+
+    initializePathIndices(accessPath);
+
+    initializeDFS(base);
+  }
+
   // Return true is all uses have been visited.
   bool visitUses() {
     // Return false if initialization failed.
@@ -1601,8 +1625,8 @@ protected:
       if (phi->isPhi())
         visitedPhis.insert(phi);
     }
-    pushUsers(root,
-              DFSEntry(nullptr, storage.isReference(), pathIndices.size(), 0));
+    bool isRef = !base && storage.isReference();
+    pushUsers(root, DFSEntry(nullptr, isRef, pathIndices.size(), 0));
   }
 
   void pushUsers(SILValue def, const DFSEntry &dfs) {
@@ -1654,6 +1678,10 @@ void AccessPathDefUseTraversal::initializePathIndices(AccessPath accessPath) {
   if (int offset = accessPath.getOffset()) {
     pathIndices.push_back(AccessPath::Index::forOffset(offset));
   }
+  // If traversal starts at the base address, then class storage is irrelevant.
+  if (base)
+    return;
+
   // The search will start from the object root, not the formal access base,
   // so add the class index to the front.
   if (storage.getKind() == AccessStorage::Class) {
@@ -1964,6 +1992,13 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
 bool swift::visitAccessPathUses(AccessUseVisitor &visitor,
                                 AccessPath accessPath, SILFunction *function) {
   return AccessPathDefUseTraversal(visitor, accessPath, function).visitUses();
+}
+
+bool swift::visitAccessPathBaseUses(AccessUseVisitor &visitor,
+                                    AccessPathWithBase accessPathWithBase,
+                                    SILFunction *function) {
+  return AccessPathDefUseTraversal(visitor, accessPathWithBase, function)
+      .visitUses();
 }
 
 bool swift::visitAccessStorageUses(AccessUseVisitor &visitor,

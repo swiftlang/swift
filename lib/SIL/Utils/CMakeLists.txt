@@ -11,6 +11,7 @@ target_sources(swiftSIL PRIVATE
   MemAccessUtils.cpp
   MemoryLocations.cpp
   OptimizationRemark.cpp
+  OwnershipLiveness.cpp
   OwnershipUtils.cpp
   PrettyStackTrace.cpp
   Projection.cpp

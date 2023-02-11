@@ -36,6 +36,7 @@
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -47,6 +48,7 @@
 #include <set>
 #include <string>
 #include <sstream>
+#include <algorithm>
 
 using namespace swift;
 using namespace swift::dependencies;
@@ -155,6 +157,149 @@ static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
   for (const auto &dep : dependencies->getModuleDependencies()) {
     findAllImportedClangModules(ctx, dep.first, cache, allModules, knownModules);
   }
+}
+
+// Get all dependencies's IDs of this module from its cached
+// ModuleDependencyInfo
+static ArrayRef<ModuleDependencyID>
+getDependencies(const ModuleDependencyID &moduleID,
+                const ModuleDependenciesCache &cache) {
+  const auto &optionalModuleInfo =
+      cache.findDependency(moduleID.first, moduleID.second);
+  assert(optionalModuleInfo.has_value());
+  return optionalModuleInfo.value()->getModuleDependencies();
+}
+
+/// Implements a topological sort via recursion and reverse postorder DFS.
+/// Does not bother handling cycles, relying on a DAG guarantee by the client.
+static std::vector<ModuleDependencyID>
+computeTopologicalSortOfExplicitDependencies(
+    const ModuleDependencyIDSetVector &allModules,
+    const ModuleDependenciesCache &cache) {
+  std::unordered_set<ModuleDependencyID> visited;
+  std::vector<ModuleDependencyID> result;
+  std::stack<ModuleDependencyID> stack;
+
+  // Must be explicitly-typed to allow recursion
+  std::function<void(const ModuleDependencyID &)> visit;
+  visit = [&visit, &cache, &visited, &result,
+           &stack](const ModuleDependencyID &moduleID) {
+    // Mark this node as visited -- we are done if it already was.
+    if (!visited.insert(moduleID).second)
+      return;
+
+    // Otherwise, visit each adjacent node.
+    for (const auto &succID : getDependencies(moduleID, cache)) {
+      // We don't worry if successor is already in this current stack,
+      // since that would mean we have found a cycle, which should not
+      // be possible because we checked for cycles earlier.
+      stack.push(succID);
+      visit(succID);
+      auto top = stack.top();
+      stack.pop();
+      assert(top == succID);
+    }
+
+    // Add to the result.
+    result.push_back(moduleID);
+  };
+
+  for (const auto &modID : allModules) {
+    assert(stack.empty());
+    stack.push(modID);
+    visit(modID);
+    auto top = stack.top();
+    stack.pop();
+    assert(top == modID);
+  }
+
+  std::reverse(result.begin(), result.end());
+  return result;
+}
+
+/// For each module in the graph, compute a set of all its dependencies,
+/// direct *and* transitive.
+static std::unordered_map<ModuleDependencyID,
+                          std::set<ModuleDependencyID>>
+computeTransitiveClosureOfExplicitDependencies(
+    const std::vector<ModuleDependencyID> &topologicallySortedModuleList,
+    const ModuleDependenciesCache &cache) {
+  // The usage of an ordered ::set is important to ensure the
+  // dependencies are listed in a deterministic order.
+  std::unordered_map<ModuleDependencyID, std::set<ModuleDependencyID>>
+      result;
+  for (const auto &modID : topologicallySortedModuleList)
+    result[modID] = {modID};
+
+  // Traverse the set of modules in reverse topological order, assimilating
+  // transitive closures
+  for (auto it = topologicallySortedModuleList.rbegin(),
+            end = topologicallySortedModuleList.rend();
+       it != end; ++it) {
+    const auto &modID = *it;
+    auto &modReachableSet = result[modID];
+    for (const auto &succID : getDependencies(modID, cache)) {
+      const auto &succReachableSet = result[succID];
+      llvm::set_union(modReachableSet, succReachableSet);
+    }
+  }
+  return result;
+}
+
+static void
+resolveExplicitModuleInputs(ModuleDependencyID moduleID,
+                            const ModuleDependencyInfo &resolvingDepInfo,
+                            const std::set<ModuleDependencyID> &dependencies,
+                            ModuleDependenciesCache &cache) {
+  auto resolvingInterfaceDepDetails =
+      resolvingDepInfo.getAsSwiftInterfaceModule();
+  assert(resolvingInterfaceDepDetails &&
+         "Expected Swift Interface dependency.");
+
+  auto commandLine = resolvingInterfaceDepDetails->buildCommandLine;
+  for (const auto &depModuleID : dependencies) {
+    const auto optionalDepInfo =
+        cache.findDependency(depModuleID.first, depModuleID.second);
+    assert(optionalDepInfo.has_value());
+    const auto depInfo = optionalDepInfo.value();
+    switch (depModuleID.second) {
+    case swift::ModuleDependencyKind::SwiftInterface: {
+      auto interfaceDepDetails = depInfo->getAsSwiftInterfaceModule();
+      assert(interfaceDepDetails && "Expected Swift Interface dependency.");
+      commandLine.push_back("-swift-module-file=" + depModuleID.first + "=" +
+                            interfaceDepDetails->moduleOutputPath);
+    } break;
+    case swift::ModuleDependencyKind::SwiftBinary: {
+      auto binaryDepDetails = depInfo->getAsSwiftBinaryModule();
+      assert(binaryDepDetails && "Expected Swift Binary Module dependency.");
+      commandLine.push_back("-swift-module-file=" + depModuleID.first + "=" +
+                            binaryDepDetails->compiledModulePath);
+    } break;
+    case swift::ModuleDependencyKind::SwiftPlaceholder: {
+      auto placeholderDetails = depInfo->getAsPlaceholderDependencyModule();
+      assert(placeholderDetails && "Expected Swift Placeholder dependency.");
+      commandLine.push_back("-swift-module-file=" + depModuleID.first + "=" +
+                            placeholderDetails->compiledModulePath);
+    } break;
+    case swift::ModuleDependencyKind::Clang: {
+      auto clangDepDetails = depInfo->getAsClangModule();
+      assert(clangDepDetails && "Expected Clang Module dependency.");
+      commandLine.push_back("-Xcc");
+      commandLine.push_back("-fmodule-file=" + depModuleID.first + "=" +
+                            clangDepDetails->pcmOutputPath);
+      commandLine.push_back("-Xcc");
+      commandLine.push_back("-fmodule-map-file=" +
+                            clangDepDetails->moduleMapFile);
+    } break;
+    default:
+      llvm_unreachable("Unhandled dependency kind.");
+    }
+  }
+
+  // Update the dependency in the cache with the modified command-line.
+  auto dependencyInfoCopy = resolvingDepInfo;
+  dependencyInfoCopy.updateCommandLine(commandLine);
+  cache.updateDependency(moduleID, dependencyInfoCopy);
 }
 
 /// Resolve the direct dependencies of the given module.
@@ -1475,8 +1620,29 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   if (diagnoseCycle(instance, cache, mainModuleID, ASTDelegate))
     return std::make_error_code(std::errc::not_supported);
 
+  // Resolve Swift dependency command-line arguments
+  // Must happen after cycle detection, because it relies on
+  // the DAG property of the dependency graph.
+  auto topoSortedModuleList =
+      computeTopologicalSortOfExplicitDependencies(allModules, cache);
+  auto moduleTransitiveClosures =
+      computeTransitiveClosureOfExplicitDependencies(topoSortedModuleList,
+                                                     cache);
+  for (const auto &dependencyClosure : moduleTransitiveClosures) {
+    auto &modID = dependencyClosure.first;
+    // For main module or binary modules, no command-line to resolve.
+    // For Clang modules, their dependencies are resolved by the clang Scanner
+    // itself for us.
+    if (modID.second != ModuleDependencyKind::SwiftInterface)
+      continue;
+    auto optionalDeps = cache.findDependency(modID.first, modID.second);
+    assert(optionalDeps.has_value());
+    auto deps = optionalDeps.value();
+    resolveExplicitModuleInputs(modID, *deps, dependencyClosure.second, cache);
+  }
+
   auto dependencyGraph = generateFullDependencyGraph(
-      instance, cache, ASTDelegate, allModules.getArrayRef());
+      instance, cache, ASTDelegate, topoSortedModuleList);
   // Update the dependency tracker.
   if (auto depTracker = instance.getDependencyTracker()) {
     for (auto module : allModules) {

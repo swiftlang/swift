@@ -91,7 +91,6 @@ _swift_complete()
       -sil-loop-region-view-cfg-only-function \
       -sil-loop-region-view-cfg-only-functions \
       -sil-lower-agg-instrs-expand-all \
-      -sil-mandatory-combine-enable-canon-and-simple-dce \
       -sil-merge-stack-slots \
       -sil-opt-pass-count \
       -sil-opt-remark-ignore-always-infer \

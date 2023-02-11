@@ -492,6 +492,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ScalarPackIndexInst:
   case SILInstructionKind::PackElementGetInst:
   case SILInstructionKind::PackElementSetInst:
+  case SILInstructionKind::DebugStepInst:
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::DebugValueInst:
@@ -511,6 +512,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::KeyPathInst:
     return RuntimeEffect::Allocating | RuntimeEffect::Releasing |
            RuntimeEffect::MetaData;
+
+  case SILInstructionKind::TuplePackElementAddrInst:
+    return RuntimeEffect::MetaData;
 
   case SILInstructionKind::SwitchEnumAddrInst:
   case SILInstructionKind::InjectEnumAddrInst:

@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BeginCOWMutationInst : SILCombineSimplifyable {
+extension BeginCOWMutationInst : Simplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     /// The buffer of an empty Array/Set/Dictionary singleton is known to be not
