@@ -3929,10 +3929,23 @@ class SILTypeSubstituter :
   CanGenericSignature Sig;
 
   struct PackExpansion {
-    CanType ExpandedShape;
+    /// The shape class of pack parameters that are expanded by this
+    /// expansion.  Set during construction and not changed.
+    CanType OrigShapeClass;
+
+    /// The count type of the pack expansion in the current lane of
+    /// expansion, if any.  Pack elements in this lane should be
+    /// expansions with this shape.
+    CanType SubstPackExpansionCount;
+
+    /// The index of the current lane of expansion.  Basic
+    /// substitution of pack parameters with the same shape as
+    /// OrigShapeClass should yield a pack, and lanewise
+    /// substitution should produce this element of that pack.
     unsigned Index;
 
-    PackExpansion(CanType shape) : ExpandedShape(shape), Index(0) {}
+    PackExpansion(CanType origShapeClass)
+      : OrigShapeClass(origShapeClass), Index(0) {}
   };
   SmallVector<PackExpansion> ActivePackExpansions;
 
@@ -4253,7 +4266,7 @@ public:
 
   CanType visitPackExpansionType(CanPackExpansionType origType) {
     CanType patternType = visit(origType.getPatternType());
-    CanType countType = visit(origType.getCountType());
+    CanType countType = substASTType(origType.getCountType());
 
     return CanType(PackExpansionType::get(patternType, countType));
   }
@@ -4264,7 +4277,7 @@ public:
     CanType origPatternType = origType.getPatternType();
 
     // Substitute the count type (as an AST type).
-    CanType substCountType = visitType(origCountType);
+    CanType substCountType = substASTType(origCountType);
 
     // If that produces a pack type, expand the pattern element-wise.
     if (auto substCountPackType = dyn_cast<PackType>(substCountType)) {
@@ -4272,13 +4285,16 @@ public:
       ActivePackExpansions.emplace_back(origCountType);
 
       for (CanType substCountEltType : substCountPackType.getElementTypes()) {
+        auto expansionType = dyn_cast<PackExpansionType>(substCountEltType);
+        ActivePackExpansions.back().SubstPackExpansionCount =
+          (expansionType ? expansionType.getCountType() : CanType());
+
         // Expand the pattern type in the element-wise context.
         CanType expandedType = visit(origPatternType);
 
         // Turn that into a pack expansion if appropriate for the
         // count element.
-        if (auto expansionType =
-              dyn_cast<PackExpansionType>(substCountEltType)) {
+        if (expansionType) {
           expandedType =
             CanPackExpansionType::get(expandedType,
                                       expansionType.getCountType());
@@ -4317,11 +4333,44 @@ public:
     SmallVector<TupleTypeElt, 8> substElts;
     substElts.reserve(origType->getNumElements());
     for (auto &origElt : origType->getElements()) {
-      auto substEltType = visit(CanType(origElt.getType()));
-      substElts.push_back(origElt.getWithType(substEltType));
+      CanType origEltType = CanType(origElt.getType());
+      if (auto origExpansion = dyn_cast<PackExpansionType>(origEltType)) {
+        bool first = true;
+        substPackExpansion(origExpansion, [&](CanType substEltType) {
+          auto substElt = origElt.getWithType(substEltType);
+          if (first) {
+            first = false;
+          } else {
+            substElt = substElt.getWithoutName();
+          }
+          substElts.push_back(substElt);
+        });
+      } else {
+        auto substEltType = visit(origEltType);
+        substElts.push_back(origElt.getWithType(substEltType));
+      }
     }
+
+    // Turn unlabeled singleton scalar tuples into their underlying types.
+    // The AST type substituter doesn't actually implement this rule yet,
+    // but we need to implement it in SIL in order to support testing,
+    // since the type parser can't parse a singleton tuple.
+    //
+    // For compatibility with previous behavior, don't do this if the
+    // original tuple type was singleton.  AutoDiff apparently really
+    // likes making singleton tuples.
+    if (isParenType(substElts) && !isParenType(origType->getElements()))
+      return CanType(substElts[0].getType());
+
     return CanType(TupleType::get(substElts, TC.Context));
   }
+
+  static bool isParenType(ArrayRef<TupleTypeElt> elts) {
+    return (elts.size() == 1 &&
+            !elts[0].hasName() &&
+            !isa<PackExpansionType>(CanType(elts[0].getType())));
+  }
+
   // Block storage types need to substitute their capture type by these same
   // rules.
   CanType visitSILBlockStorageType(CanSILBlockStorageType origType) {
@@ -4375,11 +4424,21 @@ public:
       [&](SubstitutableType *origType) -> Type {
         auto substType = Subst(origType);
         if (!substType) return substType;
-        auto substPackType = substType->getAs<PackType>();
+        auto substPackType = dyn_cast<PackType>(substType->getCanonicalType());
         if (!substPackType) return substType;
-        auto index = getPackExpansionIndex(CanType(origType));
-        if (!index) return substType;
-        return substPackType->getElementType(*index);
+        auto activeExpansion = getActivePackExpansion(CanType(origType));
+        if (!activeExpansion) return substType;
+        auto substEltType =
+          substPackType.getElementType(activeExpansion->Index);
+        auto substExpansion = dyn_cast<PackExpansionType>(substEltType);
+        assert((bool) substExpansion ==
+               (bool) activeExpansion->SubstPackExpansionCount);
+        if (substExpansion) {
+          assert(hasSameShape(substExpansion.getCountType(),
+                              activeExpansion->SubstPackExpansionCount));
+          return substExpansion.getPatternType();
+        }
+        return substEltType;
       },
       [&](CanType dependentType,
           Type conformingReplacementType,
@@ -4388,23 +4447,27 @@ public:
                                         conformingReplacementType,
                                         conformingProtocol);
         if (!conformance || !conformance.isPack()) return conformance;
-        auto index = getPackExpansionIndex(dependentType);
-        if (!index) return conformance;
+        auto activeExpansion = getActivePackExpansion(dependentType);
+        if (!activeExpansion) return conformance;
         auto pack = conformance.getPack();
-        return pack->getPatternConformances()[*index];
+        auto substEltConf =
+          pack->getPatternConformances()[activeExpansion->Index];
+        // There isn't currently a ProtocolConformanceExpansion that
+        // we would need to look through here.
+        return substEltConf;
       },
       substOptions)->getCanonicalType();
   }
 
-  Optional<size_t> getPackExpansionIndex(CanType dependentType) {
+  PackExpansion *getActivePackExpansion(CanType dependentType) {
     // We push new expansions onto the end of this vector, and we
     // want to honor the innermost expansion, so we have to traverse
     // in it reverse.
     for (auto &entry : reverse(ActivePackExpansions)) {
-      if (hasSameShape(dependentType, entry.ExpandedShape))
-        return entry.Index;
+      if (hasSameShape(dependentType, entry.OrigShapeClass))
+        return &entry;
     }
-    return None;
+    return nullptr;
   }
 
   bool hasSameShape(CanType lhs, CanType rhs) {

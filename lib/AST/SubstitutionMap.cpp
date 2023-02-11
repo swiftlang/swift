@@ -164,10 +164,12 @@ bool SubstitutionMap::isCanonical() const {
   return true;
 }
 
-SubstitutionMap SubstitutionMap::getCanonical() const {
+SubstitutionMap SubstitutionMap::getCanonical(bool canonicalizeSignature) const {
   if (empty()) return *this;
 
-  auto canonicalSig = getGenericSignature().getCanonicalSignature();
+  auto sig = getGenericSignature();
+  if (canonicalizeSignature) sig = sig.getCanonicalSignature();
+
   SmallVector<Type, 4> replacementTypes;
   for (Type replacementType : getReplacementTypesBuffer()) {
     if (replacementType)
@@ -181,11 +183,10 @@ SubstitutionMap SubstitutionMap::getCanonical() const {
     conformances.push_back(conf.getCanonicalConformanceRef());
   }
 
-  return SubstitutionMap::get(canonicalSig,
+  return SubstitutionMap::get(sig,
                               ArrayRef<Type>(replacementTypes),
                               ArrayRef<ProtocolConformanceRef>(conformances));
 }
-
 
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      SubstitutionMap substitutions) {
