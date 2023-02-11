@@ -49,7 +49,8 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
     // they cannot escape.
     if (selfValue->getOwnershipKind() == OwnershipKind::Owned) {
       selfValue = B.createMarkMustCheckInst(
-          selfDecl, selfValue, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+          selfDecl, selfValue,
+          MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
     }
   }
 
@@ -129,7 +130,7 @@ public:
       // check ownership.
       if (mv.getType().isMoveOnly() && !mv.getType().isMoveOnlyWrapped())
         mv = SGF.B.createMarkMustCheckInst(
-            loc, mv, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+            loc, mv, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
       return mv;
     }
 
@@ -322,7 +323,7 @@ struct ArgumentInitHelper {
         value = SGF.B.createMoveValue(loc, argrv.forward(SGF),
                                       /*isLexical*/ true);
         value = SGF.B.createMarkMustCheckInst(
-            loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+            loc, value, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
         SGF.emitManagedRValueWithCleanup(value);
         return value;
       }
@@ -330,7 +331,7 @@ struct ArgumentInitHelper {
       assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
       value = SGF.B.createCopyValue(loc, value);
       value = SGF.B.createMarkMustCheckInst(
-          loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+          loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
       SGF.emitManagedRValueWithCleanup(value);
       return value;
     }
@@ -341,9 +342,9 @@ struct ArgumentInitHelper {
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
-      auto kind = MarkMustCheckInst::CheckKind::NoCopy;
+      auto kind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
       if (pd->isOwned())
-        kind = MarkMustCheckInst::CheckKind::NoImplicitCopy;
+        kind = MarkMustCheckInst::CheckKind::ConsumableAndAssignable;
       value = SGF.B.createMarkMustCheckInst(loc, value, kind);
       SGF.emitManagedRValueWithCleanup(value);
       return value;
@@ -353,7 +354,7 @@ struct ArgumentInitHelper {
       value = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(loc, value);
       value = SGF.B.createCopyValue(loc, value);
       value = SGF.B.createMarkMustCheckInst(
-          loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+          loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
       SGF.emitManagedRValueWithCleanup(value);
       return value;
     }
@@ -365,7 +366,7 @@ struct ArgumentInitHelper {
           loc, argrv.forward(SGF));
       value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
       value = SGF.B.createMarkMustCheckInst(
-          loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+          loc, value, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
       SGF.emitManagedRValueWithCleanup(value);
       return value;
     }
@@ -547,14 +548,14 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       val = addr->getManagedAddress();
     }
 
-    // If this constant is a move only type, we need to add no_copy checking to
+    // If this constant is a move only type, we need to add no_consume_or_assign checking to
     // ensure that we do not consume this captured value in the function. This
     // is because closures can be invoked multiple times which is inconsistent
     // with consuming the move only type.
     if (val.getType().isMoveOnly()) {
       val = val.ensurePlusOne(SGF, Loc);
-      val = SGF.B.createMarkMustCheckInst(Loc, val,
-                                          MarkMustCheckInst::CheckKind::NoCopy);
+      val = SGF.B.createMarkMustCheckInst(
+          Loc, val, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
     }
 
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(val.getValue());
@@ -585,7 +586,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
     if (addr->getType().isMoveOnly())
       addr = SGF.B.createMarkMustCheckInst(
-          VD, addr, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+          VD, addr, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
@@ -608,7 +609,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILValue arg = SILValue(fArg);
     if (isInOut && (ty.isMoveOnly() && !ty.isMoveOnlyWrapped())) {
       arg = SGF.B.createMarkMustCheckInst(
-          Loc, arg, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+          Loc, arg, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
     }
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(arg);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);

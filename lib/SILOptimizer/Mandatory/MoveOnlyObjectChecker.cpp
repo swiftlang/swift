@@ -87,20 +87,20 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       //
       // bb0(%0 : @guaranteed $T):
       //   %1 = copy_value %0
-      //   %2 = mark_must_check [no_copy] %1
+      //   %2 = mark_must_check [no_consume_or_assign] %1
       // bb0(%0 : @owned $T):
-      //   %1 = mark_must_check [no_copy] %2
+      //   %1 = mark_must_check [no_consume_or_assign] %2
       //
       // This is forming a let or an argument.
       // bb0:
       //   %1 = move_value [lexical] %0
-      //   %2 = mark_must_check [no_implicit_copy] %1
+      //   %2 = mark_must_check [consumable_and_assignable] %1
       //
       // This occurs when SILGen materializes a temporary move only value?
       // bb0:
       //   %1 = begin_borrow [lexical] %0
       //   %2 = copy_value %1
-      //   %3 = mark_must_check [no_copy] %2
+      //   %3 = mark_must_check [no_consume_or_assign] %2
       if (mmci->getOperand()->getType().isMoveOnly() &&
           !mmci->getOperand()->getType().isMoveOnlyWrapped()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(mmci->getOperand())) {
@@ -142,7 +142,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       // bb0(%0 : @guaranteed $T):
       //   %1 = copyable_to_moveonlywrapper [guaranteed] %0
       //   %2 = copy_value %1
-      //   %3 = mark_must_check [no_copy] %2
+      //   %3 = mark_must_check [no_consume_or_assign] %2
       //
       // NOTE: Unlike with owned arguments, we do not need to insert a
       // begin_borrow lexical since the lexical value comes from the guaranteed
@@ -170,14 +170,14 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       // bb0(%0 : $Trivial):
       //  %1 = copyable_to_moveonlywrapper [owned] %0
       //  %2 = move_value [lexical] %1
-      //  %3 = mark_must_check [no_implicit_copy] %2
+      //  %3 = mark_must_check [consumable_and_assignable] %2
       //
       // *OR*
       //
       // bb0(%0 : $Trivial):
       //  %1 = copyable_to_moveonlywrapper [owned] %0
       //  %2 = move_value [lexical] %1
-      //  %3 = mark_must_check [no_copy] %2
+      //  %3 = mark_must_check [no_consume_or_assign] %2
       //
       // We are relying on a structural SIL requirement that %0 has only one
       // use, %1. This is validated by the SIL verifier. In this case, we need
@@ -202,7 +202,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       // bb0(%0 : @owned $T):
       //   %1 = copyable_to_moveonlywrapper [owned] %0
       //   %2 = move_value [lexical] %1
-      //   %3 = mark_must_check [no_implicit_copy_owned] %2
+      //   %3 = mark_must_check [consumable_and_assignable_owned] %2
       if (auto *mvi = dyn_cast<MoveValueInst>(mmci->getOperand())) {
         if (mvi->isLexical()) {
           if (auto *cvt = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
@@ -224,7 +224,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       //  %1 = begin_borrow [lexical] %0
       //  %2 = copy_value %1
       //  %3 = copyable_to_moveonlywrapper [owned] %2
-      //  %4 = mark_must_check [no_implicit_copy]
+      //  %4 = mark_must_check [consumable_and_assignable]
       //
       // Or for a move only type, we look for a move_value [lexical].
       if (auto *mvi = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
@@ -245,7 +245,7 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
       //
       // %1 = copyable_to_moveonlywrapper [owned] %0
       // %2 = move_value [lexical] %1
-      // %3 = mark_must_check [no_implicit_copy] %2
+      // %3 = mark_must_check [consumable_and_assignable] %2
       if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mmci->getOperand())) {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
           if (bbi->isLexical()) {
@@ -684,7 +684,8 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
     // If we are asked to perform guaranteed checking, emit an error if we have
     // /any/ consuming boundary uses or uses that need copies and then rewrite
     // lifetimes.
-    if (markedValue->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
+    if (markedValue->getCheckKind() ==
+        MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
       if (canonicalizer.foundAnyConsumingUses()) {
         diagnosticEmitter.emitObjectGuaranteedDiagnostic(markedValue);
       }
@@ -728,7 +729,8 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
     // If we didn't emit a diagnostic on a non-trivial guaranteed argument,
     // eliminate the copy_value, destroy_values, and the mark_must_check.
     if (!diagnosticEmitter.emittedDiagnosticForValue(markedInst)) {
-      if (markedInst->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
+      if (markedInst->getCheckKind() ==
+          MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
         if (auto *cvi = dyn_cast<CopyValueInst>(markedInst->getOperand())) {
           SingleValueInstruction *i = cvi;
           if (auto *copyToMoveOnly =

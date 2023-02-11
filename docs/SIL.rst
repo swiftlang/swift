@@ -2660,7 +2660,7 @@ which codegens to the following SIL::
   bb0(%0 : @noImplicitCopy $Klass):
     %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $@moveOnly Klass
     %2 = copy_value %1 : $@moveOnly Klass
-    %3 = mark_must_check [no_copy] %2 : $@moveOnly Klass
+    %3 = mark_must_check [no_consume_or_assign] %2 : $@moveOnly Klass
     debug_value %3 : $@moveOnly Klass, let, name "x", argno 1
     %4 = begin_borrow %3 : $@moveOnly Klass
     %5 = function_ref @$s4test5KlassC11doSomethingyyF : $@convention(method) (@guaranteed Klass) -> ()
@@ -2730,7 +2730,7 @@ Today this codegens to the following Swift::
   bb0(%0 : @noImplicitCopy $Int):
     %1 = copyable_to_moveonlywrapper [owned] %0 : $Int
     %2 = move_value [lexical] %1 : $@moveOnly Int
-    %3 = mark_must_check [no_implicit_copy] %2 : $@moveOnly Int
+    %3 = mark_must_check [consumable_and_assignable] %2 : $@moveOnly Int
     %5 = begin_borrow %3 : $@moveOnly Int
     %6 = begin_borrow %3 : $@moveOnly Int
     %7 = function_ref @addIntegers : $@convention(method) (Int, Int Int.Type) -> Int
@@ -2789,7 +2789,7 @@ A hypothetical SILGen for this code is as follows::
     %3 = begin_borrow [lexical] %0 : $Klass
     %4 = copy_value %3 : $Klass
     %5 = copyable_to_moveonlywrapper [owned] %4 : $Klass
-    %6 = mark_must_check [no_implicit_copy] %5 : $@moveOnly Klass
+    %6 = mark_must_check [consumable_and_assignable] %5 : $@moveOnly Klass
     debug_value %6 : $@moveOnly Klass, let, name "value"
     %8 = begin_borrow %6 : $@moveOnly Klass
     %9 = copy_value %8 : $@moveOnly Klass
@@ -7823,8 +7823,8 @@ mark_must_check
   sil-instruction ::= 'mark_must_check'
                       '[' sil-optimizer-analysis-marker ']'
 
-  sil-optimizer-analysis-marker ::= 'no_implicit_copy'
-                                ::= 'no_copy'
+  sil-optimizer-analysis-marker ::= 'consumable_and_assignable'
+                                ::= 'no_consume_or_assign'
 
 A canary value inserted by a SIL generating frontend to signal to the move
 checker to check a specific value.  Valid only in Raw SIL. The relevant checkers
@@ -7833,10 +7833,10 @@ relevant diagnostic. The idea here is that instead of needing to introduce
 multiple "flagging" instructions for the optimizer, we can just reuse this one
 instruction by varying the kind.
 
-If the sil optimizer analysis marker is ``no_implicit_copy`` then the move
+If the sil optimizer analysis marker is ``consumable_and_assignable`` then the move
 checker is told to check that the result of this instruction is consumed at most
-once. If the marker is ``no_copy``, then the move checker will validate that the
-result of this instruction is never consumed.
+once. If the marker is ``no_consume_or_assign``, then the move checker will
+validate that the result of this instruction is never consumed or assigned over.
 
 No Implicit Copy and No Escape Value Instructions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

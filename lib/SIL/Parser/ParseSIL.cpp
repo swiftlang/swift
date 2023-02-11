@@ -3661,10 +3661,13 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
 
     using CheckKind = MarkMustCheckInst::CheckKind;
-    CheckKind CKind = llvm::StringSwitch<CheckKind>(AttrName)
-                          .Case("no_implicit_copy", CheckKind::NoImplicitCopy)
-                          .Case("no_copy", CheckKind::NoCopy)
-                          .Default(CheckKind::Invalid);
+    CheckKind CKind =
+        llvm::StringSwitch<CheckKind>(AttrName)
+            .Case("consumable_and_assignable",
+                  CheckKind::ConsumableAndAssignable)
+            .Case("no_consume_or_assign", CheckKind::NoConsumeOrAssign)
+            .Case("assignable_but_not_consumable", CheckKind::AssignableButNotConsumable)
+            .Default(CheckKind::Invalid);
 
     if (CKind == CheckKind::Invalid) {
       auto diag = diag::sil_markmustcheck_invalid_attribute;

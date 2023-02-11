@@ -1081,7 +1081,8 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     assert(op->getOperandNumber() == CopyAddrInst::Src &&
            "Should have dest above in memInstMust{Rei,I}nitialize");
 
-    if (markedValue->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
+    if (markedValue->getCheckKind() ==
+        MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Found mark must check [nocopy] error: " << *user);
       diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, copyAddr);
@@ -1159,7 +1160,8 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
       // If we are asked to perform guaranteed checking, emit an error if we
       // have /any/ consuming uses. This is a case that can always be converted
       // to a load_borrow if we pass the check.
-      if (markedValue->getCheckKind() == MarkMustCheckInst::CheckKind::NoCopy) {
+      if (markedValue->getCheckKind() ==
+          MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
         if (!moveChecker.canonicalizer.foundAnyConsumingUses()) {
           LLVM_DEBUG(llvm::dbgs()
                      << "Found mark must check [nocopy] error: " << *user);
