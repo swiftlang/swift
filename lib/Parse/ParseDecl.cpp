@@ -2197,6 +2197,7 @@ static Optional<MacroRole> getMacroRole(
       .Case("accessor", MacroRole::Accessor)
       .Case("memberAttribute", MacroRole::MemberAttribute)
       .Case("member", MacroRole::Member)
+      .Case("peer", MacroRole::Peer)
       .Default(None);
 
   if (!role) {

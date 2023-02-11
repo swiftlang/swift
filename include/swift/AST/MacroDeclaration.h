@@ -49,6 +49,9 @@ enum class MacroRole: uint32_t {
   /// An attached macro that generates synthesized members
   /// inside the declaration.
   Member = 0x10,
+  /// An attached macro that generates declarations that are peers
+  /// of the declaration the macro is attached to.
+  Peer = 0x20,
 };
 
 /// The contexts in which a particular macro declaration can be used.
