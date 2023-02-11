@@ -2341,14 +2341,26 @@ public:
 
     switch (BAI->getAccessKind()) {
     case SILAccessKind::Init:
-    case SILAccessKind::Deinit:
       // A signed access preserves the access marker until IRGen
-      require(
-          BAI->getEnforcement() == SILAccessEnforcement::Static ||
-              BAI->getEnforcement() == SILAccessEnforcement::Signed,
-          "init/deinit accesses cannot use non-static/non-signed enforcement");
+      require(BAI->getEnforcement() == SILAccessEnforcement::Static ||
+                  BAI->getEnforcement() == SILAccessEnforcement::Signed,
+              "init accesses cannot use non-static/non-signed enforcement");
       break;
 
+    case SILAccessKind::Deinit:
+      // A signed access preserves the access marker until IRGen.
+      //
+      // NOTE: We allow for deinit to be non-static before Lowered SIL to allow
+      // for it to be used to represent deinit accesses for move only types
+      // stored in classes, globals, and escaping mutable captures. This is ok
+      // to do since even though we allow for them to be represented there, the
+      // move only checker passes will always emit an error for them implying
+      // that we will never get to LoweredSIL and codegen.
+      require(BAI->getEnforcement() == SILAccessEnforcement::Static ||
+                  BAI->getEnforcement() == SILAccessEnforcement::Signed ||
+                  BAI->getModule().getStage() != SILStage::Lowered,
+              "init accesses cannot use non-static/non-signed enforcement");
+      break;
     case SILAccessKind::Read:
     case SILAccessKind::Modify:
       break;
@@ -2407,10 +2419,22 @@ public:
 
     switch (BUAI->getAccessKind()) {
     case SILAccessKind::Init:
-    case SILAccessKind::Deinit:
       require(BUAI->getEnforcement() == SILAccessEnforcement::Static,
-              "init/deinit accesses cannot use non-static enforcement");
+              "init accesses cannot use non-static enforcement");
       break;
+    case SILAccessKind::Deinit:
+      // NOTE: We allow for deinit to be non-static before Lowered SIL to allow
+      // for it to be used to represent deinit accesses for move only types
+      // stored in classes, globals, and escaping mutable captures. This is ok
+      // to do since even though we allow for them to be represented there, the
+      // move only checker passes will always emit an error for them implying
+      // that we will never get to LoweredSIL and codegen.
+      require(
+          BUAI->getEnforcement() == SILAccessEnforcement::Static ||
+              BUAI->getModule().getStage() != SILStage::Lowered,
+          "deinit accesses cannot use non-static enforcement in Lowered SIL");
+      break;
+
     case SILAccessKind::Read:
     case SILAccessKind::Modify:
       break;
