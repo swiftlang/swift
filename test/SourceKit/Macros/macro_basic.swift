@@ -24,6 +24,16 @@ struct S {
   var y: Int
 }
 
+struct S2 {
+  private var _storage = _Storage()
+
+  @accessViaStorage
+  var x: Int
+
+  @accessViaStorage
+  var y: Int = 17
+}
+
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
@@ -92,3 +102,23 @@ struct S {
 // ATTACHED_EXPAND:   22:11-22:11 "private var _storage = _Storage()"
 // ATTACHED_EXPAND: source.edit.kind.active:
 // ATTACHED_EXPAND:   21:1-21:15 ""
+
+//##-- Refactoring expanding the first accessor macro
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=30:4 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ACCESSOR1_EXPAND %s
+// ACCESSOR1_EXPAND: source.edit.kind.active:
+// ACCESSOR1_EXPAND:   31:13-31:13 "{
+// ACCESSOR1_EXPAND:  get { _storage.x }
+// ACCESSOR1_EXPAND:  set { _storage.x = newValue }
+// ACCESSOR1_EXPAND: }"
+// ACCESSOR1_EXPAND: source.edit.kind.active:
+// ACCESSOR1_EXPAND:   30:3-30:20 ""
+
+//##-- Refactoring expanding the first accessor macro
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=33:13 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ACCESSOR2_EXPAND %s
+// ACCESSOR2_EXPAND: source.edit.kind.active:
+// ACCESSOR2_EXPAND:   34:14-34:18 "{
+// ACCESSOR2_EXPAND:  get { _storage.y }
+// ACCESSOR2_EXPAND:  set { _storage.y = newValue }
+// ACCESSOR2_EXPAND: }"
+// ACCESSOR2_EXPAND: source.edit.kind.active:
+// ACCESSOR2_EXPAND:   33:3-33:20 ""

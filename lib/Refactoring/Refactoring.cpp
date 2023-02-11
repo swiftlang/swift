@@ -8491,7 +8491,11 @@ getMacroExpansionBuffers(MacroDecl *macro, const CustomAttr *attr, Decl *decl) {
   ASTContext &ctx = macro->getASTContext();
   llvm::SmallVector<unsigned, 2> allBufferIDs;
   if (roles.contains(MacroRole::Accessor)) {
-    // FIXME: Need to requestify.
+    if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
+      auto bufferIDs = evaluateOrDefault(
+          ctx.evaluator, ExpandAccessorMacros{storage}, { });
+      allBufferIDs.append(bufferIDs.begin(), bufferIDs.end());
+    }
   }
 
   if (roles.contains(MacroRole::MemberAttribute)) {
@@ -8607,9 +8611,10 @@ bool RefactoringActionExpandMacro::performChange() {
 
     auto originalSourceRange = generatedInfo->originalSourceRange;
 
-    // For member macros, adjust the source range from before-the-close-brace
-    // to after-the-open-brace.
+    SmallString<64> scratchBuffer;
     if (generatedInfo->kind == GeneratedSourceInfo::MemberMacroExpansion) {
+      // For member macros, adjust the source range from before-the-close-brace
+      // to after-the-open-brace.
       ASTNode node = ASTNode::getFromOpaqueValue(generatedInfo->astNode);
       auto decl = node.dyn_cast<Decl *>();
       if (!decl)
@@ -8626,6 +8631,13 @@ bool RefactoringActionExpandMacro::performChange() {
 
       auto afterLeftBraceLoc = Lexer::getLocForEndOfToken(SM, leftBraceLoc);
       originalSourceRange = CharSourceRange(afterLeftBraceLoc, 0);
+    } else if (generatedInfo->kind ==
+                   GeneratedSourceInfo::AccessorMacroExpansion) {
+      // For accessor macros, wrap curly braces around the buffer contents.
+      scratchBuffer += "{\n";
+      scratchBuffer += rewrittenBuffer;
+      scratchBuffer += "\n}";
+      rewrittenBuffer = scratchBuffer;
     }
 
     EditConsumer.accept(SM, originalSourceRange, rewrittenBuffer);

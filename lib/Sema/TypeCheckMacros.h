@@ -49,7 +49,7 @@ bool expandFreestandingDeclarationMacro(
 
 /// Expand the accessors for the given storage declaration based on the
 /// custom attribute that references the given macro.
-void expandAccessors(
+Optional<unsigned> expandAccessors(
     AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
 );
 

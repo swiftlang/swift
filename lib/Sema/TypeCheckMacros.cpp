@@ -990,8 +990,14 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
           Lexer::getCharSourceRangeFromSourceRange(sourceMgr, *initRange);
     } else {
       // The accessors go at the end.
+      SourceLoc endLoc = storage->getEndLoc();
+      if (auto var = dyn_cast<VarDecl>(storage)) {
+        if (auto pattern = var->getParentPattern())
+          endLoc = pattern->getEndLoc();
+      }
+
       generatedOriginalSourceRange = CharSourceRange(
-         Lexer::getLocForEndOfToken(sourceMgr, storage->getEndLoc()), 0);
+         Lexer::getLocForEndOfToken(sourceMgr, endLoc), 0);
     }
 
     break;
@@ -1064,7 +1070,7 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   return macroSourceFile;
 }
 
-void swift::expandAccessors(
+Optional<unsigned> swift::expandAccessors(
     AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
 ) {
   // Evaluate the macro.
@@ -1072,7 +1078,7 @@ void swift::expandAccessors(
                                                /*passParentContext*/false,
                                                MacroRole::Accessor);
   if (!macroSourceFile)
-    return;
+    return None;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", storage);
@@ -1098,6 +1104,22 @@ void swift::expandAccessors(
       }
     }
   }
+
+  return macroSourceFile->getBufferID();
+}
+
+ArrayRef<unsigned> ExpandAccessorMacros::evaluate(
+    Evaluator &evaluator, AbstractStorageDecl *storage
+) const {
+  llvm::SmallVector<unsigned, 1> bufferIDs;
+  storage->forEachAttachedMacro(MacroRole::Accessor,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        if (auto bufferID = expandAccessors(
+                storage, customAttr, macro))
+          bufferIDs.push_back(*bufferID);
+      });
+
+  return storage->getASTContext().AllocateCopy(bufferIDs);
 }
 
 Optional<unsigned>

@@ -3414,10 +3414,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   }
 
   // Expand any attached accessor macros.
-  storage->forEachAttachedMacro(MacroRole::Accessor,
-      [&](CustomAttr *customAttr, MacroDecl *macro) {
-        expandAccessors(storage, customAttr, macro);
-      });
+  (void)evaluateOrDefault(evaluator, ExpandAccessorMacros{storage}, { });
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
   bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);
