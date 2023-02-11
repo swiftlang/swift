@@ -17,13 +17,13 @@ using namespace swift;
 
 extern "C" SWIFT_CC(swift)
 size_t _swift_reflection_lock_size() {
-  size_t words = sizeof(Mutex) / sizeof(void *);
+  size_t bytes = sizeof(Mutex);
 
-  if (words < 1) {
+  if (bytes < 1) {
     return 1;
   }
 
-  return words;
+  return bytes;
 }
 
 extern "C" SWIFT_CC(swift)
