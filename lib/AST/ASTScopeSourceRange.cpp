@@ -75,12 +75,11 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
     if (!generatedInfo)
       return false;
 
-    SourceRange expansionRange = generatedInfo->originalSourceRange;
+    CharSourceRange expansionRange = generatedInfo->originalSourceRange;
     if (expansionRange.isInvalid())
       return false;
 
-    return containedInParent(
-        Lexer::getCharSourceRangeFromSourceRange(sourceMgr, expansionRange));
+    return containedInParent(expansionRange);
   };
 
   auto childCharRange = child->getCharSourceRangeOfScope(sourceMgr);

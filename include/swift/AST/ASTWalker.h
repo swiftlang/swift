@@ -24,6 +24,7 @@ class ArgumentList;
 class Decl;
 class Expr;
 class ClosureExpr;
+class CustomAttr;
 class ModuleDecl;
 class Stmt;
 class Pattern;

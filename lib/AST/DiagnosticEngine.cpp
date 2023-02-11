@@ -1241,11 +1241,8 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
             bufferID,
             GeneratedSourceInfo{
               GeneratedSourceInfo::PrettyPrinted,
-              SourceRange(),
-              SourceRange(
-                  memBufferStartLoc,
-                  memBufferStartLoc.getAdvancedLoc(buffer.size())
-              ),
+              CharSourceRange(),
+              CharSourceRange(memBufferStartLoc, buffer.size()),
               ASTNode(const_cast<Decl *>(ppDecl)).getOpaqueValue(),
               nullptr
             }

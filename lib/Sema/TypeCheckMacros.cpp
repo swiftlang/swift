@@ -593,8 +593,9 @@ Expr *swift::expandMacroExpr(
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
     GeneratedSourceInfo::ExpressionMacroExpansion,
-    expr->getSourceRange(),
-    SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
+    Lexer::getCharSourceRangeFromSourceRange(
+      sourceMgr, expr->getSourceRange()),
+    macroBufferRange,
     ASTNode(expr).getOpaqueValue(),
     dc
   };
@@ -761,8 +762,9 @@ bool swift::expandFreestandingDeclarationMacro(
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
       GeneratedSourceInfo::FreestandingDeclMacroExpansion,
-      med->getSourceRange(),
-      SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
+      Lexer::getCharSourceRangeFromSourceRange(
+        sourceMgr, med->getSourceRange()),
+      macroBufferRange,
       ASTNode(med).getOpaqueValue(),
       dc
   };
@@ -792,6 +794,27 @@ bool swift::expandFreestandingDeclarationMacro(
     results.push_back(decl);
   }
   return true;
+}
+
+// If this storage declaration is a variable with an explicit initializer,
+// return the range from the `=` to the end of the explicit initializer.
+static Optional<SourceRange> getExplicitInitializerRange(
+    AbstractStorageDecl *storage) {
+  auto var = dyn_cast<VarDecl>(storage);
+  if (!var)
+    return None;
+
+  auto pattern = var->getParentPatternBinding();
+  if (!pattern)
+    return None;
+
+  unsigned index = pattern->getPatternEntryIndexForVarDecl(var);
+  SourceLoc equalLoc = pattern->getEqualLoc(index);
+  SourceRange initRange = pattern->getOriginalInitRange(index);
+  if (equalLoc.isInvalid() || initRange.End.isInvalid())
+    return None;
+
+  return SourceRange(equalLoc, initRange.End);
 }
 
 static SourceFile *
@@ -947,20 +970,69 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
                  << "\n------------------------------\n";
   }
 
+  CharSourceRange generatedOriginalSourceRange;
   GeneratedSourceInfo::Kind generatedSourceKind;
   switch (role) {
-  case MacroRole::Accessor:
+  case MacroRole::Accessor: {
     generatedSourceKind = GeneratedSourceInfo::AccessorMacroExpansion;
+
+    // Compute the location where the accessors will be added.
+    auto storage = cast<AbstractStorageDecl>(attachedTo);
+    auto bracesRange = storage->getBracesRange();
+    if (bracesRange.Start.isValid()) {
+      // We have braces already, so insert them inside the leading '{'.
+      generatedOriginalSourceRange = CharSourceRange(
+         Lexer::getLocForEndOfToken(sourceMgr, bracesRange.Start), 0);
+    } else if (auto initRange = getExplicitInitializerRange(storage)) {
+      // The accessor had an initializer, so the initializer (including
+      // the `=`) is replaced by the accessors.
+      generatedOriginalSourceRange =
+          Lexer::getCharSourceRangeFromSourceRange(sourceMgr, *initRange);
+    } else {
+      // The accessors go at the end.
+      generatedOriginalSourceRange = CharSourceRange(
+         Lexer::getLocForEndOfToken(sourceMgr, storage->getEndLoc()), 0);
+    }
+
     break;
-  case MacroRole::MemberAttribute:
+  }
+
+  case MacroRole::MemberAttribute: {
     generatedSourceKind = GeneratedSourceInfo::MemberAttributeMacroExpansion;
+    SourceLoc startLoc;
+    if (auto valueDecl = dyn_cast<ValueDecl>(attachedTo))
+      startLoc = valueDecl->getAttributeInsertionLoc(/*forModifier=*/false);
+    else
+      startLoc = attachedTo->getStartLoc();
+
+    generatedOriginalSourceRange = CharSourceRange(startLoc, 0);
     break;
-  case MacroRole::Member:
+  }
+
+  case MacroRole::Member: {
     generatedSourceKind = GeneratedSourceInfo::MemberMacroExpansion;
+
+    // Semantically, we insert members right before the closing brace.
+    SourceLoc rightBraceLoc;
+    if (auto nominal = dyn_cast<NominalTypeDecl>(attachedTo)) {
+      rightBraceLoc = nominal->getBraces().End;
+    } else {
+      auto ext = cast<ExtensionDecl>(parentDecl);
+      rightBraceLoc = ext->getBraces().End;
+    }
+
+    generatedOriginalSourceRange = CharSourceRange(rightBraceLoc, 0);
     break;
-  case MacroRole::Peer:
+  }
+
+  case MacroRole::Peer: {
     generatedSourceKind = GeneratedSourceInfo::PeerMacroExpansion;
+    SourceLoc afterDeclLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, decl->getEndLoc());
+    generatedOriginalSourceRange = CharSourceRange(afterDeclLoc, 0);
     break;
+  }
+
   case MacroRole::Expression:
   case MacroRole::Declaration:
     llvm_unreachable("freestanding macro in attached macro evaluation");
@@ -973,8 +1045,8 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
       generatedSourceKind,
-      attachedTo->getEndLoc(),
-      SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
+      generatedOriginalSourceRange,
+      macroBufferRange,
       ASTNode(attachedTo).getOpaqueValue(),
       dc,
       attr
