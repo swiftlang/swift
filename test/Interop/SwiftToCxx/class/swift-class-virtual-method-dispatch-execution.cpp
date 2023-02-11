@@ -8,9 +8,6 @@
 // RUN: %target-codesign %t/swift-class-execution
 // RUN: %target-run %t/swift-class-execution | %FileCheck %s
 
-// FIXME: pointer signing support.
-// UNSUPPORTED: CPU=arm64e
-
 // REQUIRES: executable_test
 
 #include "class.h"
