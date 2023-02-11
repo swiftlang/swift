@@ -1234,13 +1234,11 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
 }
 
 AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
-                                         AssignByWrapperInst::Originator origin,
                                          SILValue Src, SILValue Dest,
                                          SILValue Initializer, SILValue Setter,
                                          AssignByWrapperInst::Mode mode)
-    : AssignInstBase(Loc, Src, Dest, Initializer, Setter), originator(origin) {
-  assert(Initializer->getType().is<SILFunctionType>() ||
-         (isa<SILUndef>(Initializer) && originator == Originator::TypeWrapper));
+    : AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
+  assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
 }
 
@@ -2398,6 +2396,28 @@ PackElementGetInst *PackElementGetInst::create(SILFunction &F,
   auto size = totalSizeToAlloc<swift::Operand>(allOperands.size());
   auto buffer = F.getModule().allocateInst(size, alignof(PackElementGetInst));
   return ::new (buffer) PackElementGetInst(debugLoc, allOperands, elementType);
+}
+
+TuplePackElementAddrInst *
+TuplePackElementAddrInst::create(SILFunction &F,
+                                 SILDebugLocation debugLoc,
+                                 SILValue indexOperand,
+                                 SILValue tupleOperand,
+                                 SILType elementType) {
+  assert(indexOperand->getType().is<BuiltinPackIndexType>());
+  assert(tupleOperand->getType().isAddress() &&
+         tupleOperand->getType().is<TupleType>());
+
+  SmallVector<SILValue, 8> allOperands;
+  allOperands.push_back(indexOperand);
+  allOperands.push_back(tupleOperand);
+  collectTypeDependentOperands(allOperands, F, elementType);
+
+  auto size = totalSizeToAlloc<swift::Operand>(allOperands.size());
+  auto buffer =
+    F.getModule().allocateInst(size, alignof(TuplePackElementAddrInst));
+  return ::new (buffer) TuplePackElementAddrInst(debugLoc, allOperands,
+                                                 elementType);
 }
 
 BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,

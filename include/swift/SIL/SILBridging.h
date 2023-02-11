@@ -197,6 +197,8 @@ typedef enum {
 
 // AST bridging
 
+typedef void * _Nonnull BridgedDecl;
+
 struct BridgedEffectInfo {
   SwiftInt argumentIndex;
   bool isDerived;
@@ -325,6 +327,10 @@ SwiftInt SILType_isStruct(BridgedType type);
 SwiftInt SILType_isTuple(BridgedType type);
 SwiftInt SILType_isEnum(BridgedType type);
 bool SILType_isFunction(BridgedType type);
+bool SILType_isMetatype(BridgedType type);
+BridgedType SILType_instanceTypeOfMetatype(BridgedType type);
+BridgedDecl SILType_getNominal(BridgedType type);
+bool SILType_isOrContainsObjectiveCClass(BridgedType type);
 bool SILType_isCalleeConsumedFunction(BridgedType type);
 SwiftInt SILType_getNumTupleElements(BridgedType type);
 BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx);
@@ -459,6 +465,7 @@ BridgedInstruction SILBuilder_createCopyAddr(BridgedBuilder builder,
           SwiftInt takeSource, SwiftInt initializeDest);
 BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder builder,
           BridgedValue op);
+BridgedInstruction SILBuilder_createDebugStep(BridgedBuilder builder);
 BridgedInstruction SILBuilder_createApply(BridgedBuilder builder,
           BridgedValue function, swift::SubstitutionMap subMap,
           BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,

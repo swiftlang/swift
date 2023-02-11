@@ -47,10 +47,13 @@ static bool hasDefaultAlignment(swift::Type Ty) {
 }
 
 DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
+                                             IRGenModule &IGM,
                                              bool IsFragmentTypeInfo) {
   Optional<Size::int_type> SizeInBits;
   llvm::Type *StorageType = TI.getStorageType();
-  if (TI.isFixedSize()) {
+  if (StorageType->isSized())
+    SizeInBits = IGM.DataLayout.getTypeSizeInBits(StorageType);
+  else if (TI.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&TI);
     Size::int_type Size = FixTy.getFixedSize().getValue() * 8;
     SizeInBits = Size;
@@ -63,6 +66,7 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
 
 DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
                                               const TypeInfo &Info,
+                                              IRGenModule &IGM,
                                               bool IsFragmentTypeInfo) {
 
   auto DeclType = Decl->getInterfaceType();
@@ -77,7 +81,7 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
   // the type hasn't been mucked with by an optimization pass.
   auto *Type = Sugared->isEqual(RealType) ? DeclType.getPointer()
                                           : RealType.getPointer();
-  return getFromTypeInfo(Type, Info, IsFragmentTypeInfo);
+  return getFromTypeInfo(Type, Info, IGM, IsFragmentTypeInfo);
 }
 
 DebugTypeInfo DebugTypeInfo::getGlobalMetadata(swift::Type Ty,
@@ -120,7 +124,7 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
       Type = DeclType.getPointer();
   }
   auto &TI = IGM.getTypeInfoForUnlowered(Type);
-  DebugTypeInfo DbgTy = getFromTypeInfo(Type, TI, false);
+  DebugTypeInfo DbgTy = getFromTypeInfo(Type, TI, IGM, false);
   assert(FragmentStorageType && "FragmentStorageType is a nullptr");
   assert(!DbgTy.isContextArchetype() &&
          "type of global variable cannot be an archetype");
@@ -163,7 +167,7 @@ DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass,
 DebugTypeInfo DebugTypeInfo::getErrorResult(swift::Type Ty,
                                             IRGenModule &IGM) {
   auto &TI = IGM.getTypeInfoForUnlowered(Ty);
-  DebugTypeInfo DbgTy = getFromTypeInfo(Ty, TI, false);
+  DebugTypeInfo DbgTy = getFromTypeInfo(Ty, TI, IGM, false);
   return DbgTy;
 }
 
@@ -195,7 +199,8 @@ LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   if (SizeInBits)
     llvm::errs() << "SizeInBits " << *SizeInBits << " ";
   llvm::errs() << "Alignment " << Align.getValue() << "] ";
-  getType()->dump(llvm::errs());
+  if (auto *Type = getType())
+    Type->dump(llvm::errs());
 
   if (FragmentStorageType) {
     llvm::errs() << "FragmentStorageType=";

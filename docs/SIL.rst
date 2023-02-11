@@ -3952,6 +3952,20 @@ SIL DIExpression can have elements with various types, like AST nodes or strings
 
 The ``[trace]`` flag is available for compiler unit testing. It is not produced during normal compilation. It is used combination with internal logging and optimization controls to select specific values to trace or to transform. For example, liveness analysis combines all "traced" values into a single live range with multiple definitions. This exposes corner cases that cannot be represented by passing valid SIL through the pipeline.
 
+debug_step
+``````````
+
+::
+
+  sil-instruction ::= debug_step
+
+  debug_step
+
+This instruction is inserted by Onone optimizations as a replacement for deleted instructions to
+ensure that it's possible to set a breakpoint on its location.
+
+It is code-generated to a NOP instruction.
+
 Testing
 ~~~~~~~
 

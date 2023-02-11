@@ -1310,7 +1310,7 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
 }
 
 void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
-  Attrs.addAttribute("frame-pointer", "none");
+  Attrs.addAttribute("frame-pointer", "non-leaf");
 }
 
 void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
@@ -1919,10 +1919,11 @@ IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {
   if (GenModules.size() == 1 || !ctxt) {
     return getPrimaryIGM();
   }
-  SourceFile *SF = ctxt->getParentSourceFile();
+  SourceFile *SF = ctxt->getOutermostParentSourceFile();
   if (!SF) {
     return getPrimaryIGM();
   }
+
   IRGenModule *IGM = GenModules[SF];
   assert(IGM);
   return IGM;

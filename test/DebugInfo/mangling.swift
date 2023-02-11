@@ -14,7 +14,7 @@ func markUsed<T>(_ t: T) {}
 // CHECK: ![[DT_CONTAINER]] = !DICompositeType({{.*}}elements: ![[DT_ELTS:[0-9]+]]
 // CHECK: ![[DT_ELTS]] = !{![[DT_MEMBER:[0-9]+]]}
 // CHECK: ![[DT_MEMBER]] = !DIDerivedType(tag: DW_TAG_member, {{.*}}baseType: ![[DT:[0-9]+]]
-// CHECK: ![[DT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Dictionary"
+// CHECK: ![[DT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sSDys5Int64VSSGD"
 var myDict = Dictionary<Int64, String>()
 myDict[12] = "Hello!"
 

@@ -9,6 +9,13 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// \file This is a field sensitive implementation of PrunedLiveness. It is a
+/// completely separate implementation for efficiency reasons but in spirit is
+/// implementing the exact same algorithms with changes to account for dealing
+/// with multiple elements.
+///
+//===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_FIELDSENSITIVEPRUNTEDLIVENESS_H
 #define SWIFT_SIL_FIELDSENSITIVEPRUNTEDLIVENESS_H
@@ -17,7 +24,10 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/SIL/PrunedLiveness.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILValue.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/raw_ostream.h"
@@ -375,6 +385,276 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
+/// Discover "pruned" liveness for an arbitrary set of uses. The client builds
+/// liveness by first initializing "def" blocks, then incrementally feeding uses
+/// to updateForUse().
+///
+/// Incrementally building liveness is important for algorithms that create an
+/// initial live region, perform some analysis on that, then expand the live
+/// region by adding new uses before continuing the analysis.
+///
+/// Initializing "def blocks" restricts liveness on any path through those def
+/// blocks to the blocks that occur on or after the def block. If any uses is
+/// not dominated by a def block, then liveness will include the entry block,
+/// as if defined by a function argument
+///
+/// We allow for multiple bits of liveness information to be tracked by
+/// internally using a SmallBitVector. The multiple bit tracking is useful when
+/// tracking state for multiple fields of the same root value. To do this, we
+/// actually track 2 bits per actual needed bit so we can represent 3 Dead,
+/// LiveOut, LiveWithin. This was previously unnecessary since we could just
+/// represent dead by not having liveness state for a block. With multiple bits
+/// possible this is no longer true.
+///
+/// TODO: For efficiency, use BasicBlockBitfield rather than SmallDenseMap.
+class FieldSensitivePrunedLiveBlocks {
+public:
+  /// Per-block liveness state computed during backward dataflow propagation.
+  /// All unvisited blocks are considered Dead. As the are visited, blocks
+  /// transition through these states in one direction:
+  ///
+  /// Dead -> LiveWithin -> LiveOut
+  ///
+  /// Dead blocks are either outside of the def's pruned liveness region, or
+  /// they have not yet been discovered by the liveness computation.
+  ///
+  /// LiveWithin blocks have at least one use and/or def within the block, but
+  /// are not (yet) LiveOut.
+  ///
+  /// LiveOut blocks are live on at least one successor path. LiveOut blocks may
+  /// or may not contain defs or uses.
+  ///
+  /// NOTE: The values below for Dead, LiveWithin, LiveOut were picked to ensure
+  /// that given a 2 bit representation of the value, a value is Dead if the
+  /// first bit is 0 and is LiveOut if the second bit is set.
+  enum IsLive {
+    Dead = 0,
+    LiveWithin = 1,
+    LiveOut = 3,
+  };
+
+  /// A bit vector that stores information about liveness. This is composed
+  /// with SmallBitVector since it contains two bits per liveness so that it
+  /// can represent 3 states, Dead, LiveWithin, LiveOut. We take advantage of
+  /// their numeric values to make testing easier \see documentation on IsLive.
+  class LivenessSmallBitVector {
+    SmallBitVector bits;
+
+  public:
+    LivenessSmallBitVector() : bits() {}
+
+    void init(unsigned numBits) {
+      assert(bits.size() == 0);
+      assert(numBits != 0);
+      bits.resize(numBits * 2);
+    }
+
+    unsigned size() const { return bits.size() / 2; }
+
+    IsLive getLiveness(unsigned bitNo) const {
+      if (!bits[bitNo * 2])
+        return IsLive::Dead;
+      return bits[bitNo * 2 + 1] ? LiveOut : LiveWithin;
+    }
+
+    /// Returns the liveness in \p resultingFoundLiveness. We only return the
+    /// bits for endBitNo - startBitNo.
+    void getLiveness(unsigned startBitNo, unsigned endBitNo,
+                     SmallVectorImpl<IsLive> &resultingFoundLiveness) const {
+      unsigned actualStartBitNo = startBitNo * 2;
+      unsigned actualEndBitNo = endBitNo * 2;
+
+      for (unsigned i = actualStartBitNo, e = actualEndBitNo; i != e; i += 2) {
+        if (!bits[i]) {
+          resultingFoundLiveness.push_back(Dead);
+          continue;
+        }
+
+        resultingFoundLiveness.push_back(bits[i + 1] ? LiveOut : LiveWithin);
+      }
+    }
+
+    void setLiveness(unsigned startBitNo, unsigned endBitNo, IsLive isLive) {
+      for (unsigned i = startBitNo * 2, e = endBitNo * 2; i != e; i += 2) {
+        bits[i] = isLive & 1;
+        bits[i + 1] = isLive & 2;
+      }
+    }
+
+    void setLiveness(unsigned bitNo, IsLive isLive) {
+      setLiveness(bitNo, bitNo + 1, isLive);
+    }
+  };
+
+private:
+  /// Map all blocks in which current def is live to a SmallBitVector indicating
+  /// whether the value represented by said bit is also liveout of the block.
+  llvm::SmallDenseMap<SILBasicBlock *, LivenessSmallBitVector, 4> liveBlocks;
+
+  /// Number of bits of liveness to track. By default 1. Used to track multiple
+  /// liveness bits.
+  ///
+  /// NOTE: After clearing, this is set to None to ensure that the user
+  /// reinitializes it as appropriate.
+  Optional<unsigned> numBitsToTrack;
+
+  /// Optional vector of live blocks for clients that deterministically iterate.
+  SmallVectorImpl<SILBasicBlock *> *discoveredBlocks;
+
+  /// Once the first use has been seen, no definitions can be added.
+  SWIFT_ASSERT_ONLY_DECL(bool seenUse = false);
+
+public:
+  FieldSensitivePrunedLiveBlocks(
+      SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
+      : numBitsToTrack(), discoveredBlocks(discoveredBlocks) {
+    assert(!discoveredBlocks || discoveredBlocks->empty());
+  }
+
+  bool isInitialized() const { return numBitsToTrack.hasValue(); }
+
+  unsigned getNumBitsToTrack() const { return *numBitsToTrack; }
+
+  bool empty() const { return liveBlocks.empty(); }
+
+  void clear() {
+    liveBlocks.clear();
+    if (discoveredBlocks)
+      discoveredBlocks->clear();
+    numBitsToTrack = None;
+    SWIFT_ASSERT_ONLY(seenUse = false);
+  }
+
+  void init(unsigned inputNumBitsToTrack) {
+    clear();
+    numBitsToTrack = inputNumBitsToTrack;
+  }
+
+  unsigned numLiveBlocks() const {
+    assert(isInitialized());
+    return liveBlocks.size();
+  }
+
+  /// If the constructor was provided with a vector to populate, then this
+  /// returns the list of all live blocks with no duplicates.
+  ArrayRef<SILBasicBlock *> getDiscoveredBlocks() const {
+    assert(isInitialized());
+    return *discoveredBlocks;
+  }
+
+  void initializeDefBlock(SILBasicBlock *defBB, unsigned bitNo) {
+    assert(isInitialized());
+    markBlockLive(defBB, bitNo, LiveWithin);
+  }
+
+  void initializeDefBlock(SILBasicBlock *defBB, unsigned startBitNo,
+                          unsigned endBitNo) {
+    assert(isInitialized());
+    markBlockLive(defBB, startBitNo, endBitNo, LiveWithin);
+  }
+
+  /// Update this liveness result for a single use.
+  IsLive updateForUse(SILInstruction *user, unsigned bitNo) {
+    assert(isInitialized());
+    auto *block = user->getParent();
+    auto liveness = getBlockLiveness(block, bitNo);
+    if (liveness != Dead)
+      return liveness;
+    computeScalarUseBlockLiveness(block, bitNo);
+    return getBlockLiveness(block, bitNo);
+  }
+
+  /// Update this range of liveness results for a single use.
+  void updateForUse(SILInstruction *user, unsigned startBitNo,
+                    unsigned endBitNo,
+                    SmallVectorImpl<IsLive> &resultingLiveness);
+
+  IsLive getBlockLiveness(SILBasicBlock *bb, unsigned bitNo) const {
+    assert(isInitialized());
+    auto liveBlockIter = liveBlocks.find(bb);
+    if (liveBlockIter == liveBlocks.end()) {
+      return Dead;
+    }
+
+    return liveBlockIter->second.getLiveness(bitNo);
+  }
+
+  /// FIXME: This API should directly return the live bitset. The live bitset
+  /// type should have an api for querying and iterating over the live fields.
+  void getBlockLiveness(SILBasicBlock *bb, unsigned startBitNo,
+                        unsigned endBitNo,
+                        SmallVectorImpl<IsLive> &foundLivenessInfo) const {
+    assert(isInitialized());
+    auto liveBlockIter = liveBlocks.find(bb);
+    if (liveBlockIter == liveBlocks.end()) {
+      for (unsigned i : range(endBitNo - startBitNo)) {
+        (void)i;
+        foundLivenessInfo.push_back(Dead);
+      }
+      return;
+    }
+
+    liveBlockIter->second.getLiveness(startBitNo, endBitNo, foundLivenessInfo);
+  }
+
+  llvm::StringRef getStringRef(IsLive isLive) const;
+  void print(llvm::raw_ostream &OS) const;
+  void dump() const;
+
+protected:
+  void markBlockLive(SILBasicBlock *bb, unsigned bitNo, IsLive isLive) {
+    assert(isInitialized());
+
+    assert(isLive != Dead && "erasing live blocks isn't implemented.");
+    auto iterAndInserted =
+        liveBlocks.insert(std::make_pair(bb, LivenessSmallBitVector()));
+    if (iterAndInserted.second) {
+      // We initialize the size of the small bit vector here rather than in
+      // liveBlocks.insert above to prevent us from allocating upon failure if
+      // we have more than SmallBitVector's small size number of bits.
+      auto &insertedBV = iterAndInserted.first->getSecond();
+      insertedBV.init(*numBitsToTrack);
+      insertedBV.setLiveness(bitNo, bitNo + 1, isLive);
+      if (discoveredBlocks)
+        discoveredBlocks->push_back(bb);
+    } else {
+      // If we are dead, always update to the new liveness.
+      switch (iterAndInserted.first->getSecond().getLiveness(bitNo)) {
+      case Dead:
+        iterAndInserted.first->getSecond().setLiveness(bitNo, bitNo + 1,
+                                                       isLive);
+        break;
+      case LiveWithin:
+        if (isLive == LiveOut) {
+          // Update the existing entry to be live-out.
+          iterAndInserted.first->getSecond().setLiveness(bitNo, bitNo + 1,
+                                                         LiveOut);
+        }
+        break;
+      case LiveOut:
+        break;
+      }
+    }
+  }
+
+  void markBlockLive(SILBasicBlock *bb, unsigned startBitNo, unsigned endBitNo,
+                     IsLive isLive) {
+    assert(isInitialized());
+    for (unsigned index : range(startBitNo, endBitNo)) {
+      markBlockLive(bb, index, isLive);
+    }
+  }
+
+private:
+  /// A helper routine that as a fast path handles the scalar case. We do not
+  /// handle the mult-bit case today since the way the code is written today
+  /// assumes we process a bit at a time.
+  ///
+  /// TODO: Make a multi-bit query for efficiency reasons.
+  void computeScalarUseBlockLiveness(SILBasicBlock *userBB,
+                                     unsigned startBitNo);
+};
+
 /// This is exactly like pruned liveness except that instead of tracking a
 /// single bit of liveness, it tracks multiple bits of liveness for leaf type
 /// tree nodes of an allocation one is calculating pruned liveness for.
@@ -383,7 +663,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// the type T being a child of T in the tree. We say recursively since the tree
 /// unfolds for F and its children as well.
 class FieldSensitivePrunedLiveness {
-  PrunedLiveBlocks liveBlocks;
+  FieldSensitivePrunedLiveBlocks liveBlocks;
 
 public:
   struct InterestingUser {
@@ -419,10 +699,9 @@ private:
 
 public:
   FieldSensitivePrunedLiveness(
-      SILFunction *fn, SILValue rootValue,
+      SILFunction *fn,
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
-      : liveBlocks(TypeSubElementCount(rootValue), discoveredBlocks),
-        rootValue(rootValue) {}
+      : liveBlocks(discoveredBlocks) {}
 
   bool empty() const {
     assert(!liveBlocks.empty() || users.empty());
@@ -432,26 +711,50 @@ public:
   void clear() {
     liveBlocks.clear();
     users.clear();
+    rootValue = SILValue();
   }
 
-  SILValue getRootValue() const { return rootValue; }
-  SILType getRootType() const { return rootValue->getType(); }
+  void init(SILValue newRootValue) {
+    clear();
+    rootValue = newRootValue;
+    liveBlocks.init(TypeSubElementCount(newRootValue));
+  }
 
-  unsigned numLiveBlocks() const { return liveBlocks.numLiveBlocks(); }
+  bool isInitialized() const {
+    return liveBlocks.isInitialized() && bool(rootValue);
+  }
+
+  SILValue getRootValue() const {
+    assert(isInitialized());
+    return rootValue;
+  }
+
+  SILType getRootType() const {
+    assert(isInitialized());
+    return rootValue->getType();
+  }
+
+  unsigned numLiveBlocks() const {
+    assert(isInitialized());
+    return liveBlocks.numLiveBlocks();
+  }
 
   TypeTreeLeafTypeRange getTopLevelSpan() const {
+    assert(isInitialized());
     return TypeTreeLeafTypeRange(0, getNumSubElements());
   }
 
   /// If the constructor was provided with a vector to populate, then this
   /// returns the list of all live blocks with no duplicates.
   ArrayRef<SILBasicBlock *> getDiscoveredBlocks() const {
+    assert(isInitialized());
     return liveBlocks.getDiscoveredBlocks();
   }
 
   using UserRange =
       iterator_range<const std::pair<SILInstruction *, InterestingUser> *>;
   UserRange getAllUsers() const {
+    assert(isInitialized());
     return llvm::make_range(users.begin(), users.end());
   }
 
@@ -460,6 +763,7 @@ public:
       function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
           const std::pair<SILInstruction *, InterestingUser> &)>>;
   LifetimeEndingUserRange getAllLifetimeEndingUses() const {
+    assert(isInitialized());
     function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
         const std::pair<SILInstruction *, InterestingUser> &)>
         op;
@@ -477,6 +781,7 @@ public:
       function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
           const std::pair<SILInstruction *, InterestingUser> &)>>;
   NonLifetimeEndingUserRange getAllNonLifetimeEndingUses() const {
+    assert(isInitialized());
     function_ref<Optional<std::pair<SILInstruction *, TypeTreeLeafTypeRange>>(
         const std::pair<SILInstruction *, InterestingUser> &)>
         op;
@@ -493,6 +798,7 @@ public:
       UserRange, function_ref<SILBasicBlock *(
                      const std::pair<SILInstruction *, InterestingUser> &)>>;
   UserBlockRange getAllUserBlocks() const {
+    assert(isInitialized());
     function_ref<SILBasicBlock *(
         const std::pair<SILInstruction *, InterestingUser> &)>
         op;
@@ -502,6 +808,7 @@ public:
   }
 
   void initializeDefBlock(SILBasicBlock *defBB, TypeTreeLeafTypeRange span) {
+    assert(isInitialized());
     liveBlocks.initializeDefBlock(defBB, span.startEltOffset,
                                   span.endEltOffset);
   }
@@ -517,22 +824,22 @@ public:
   void updateForUse(SILInstruction *user, TypeTreeLeafTypeRange span,
                     bool lifetimeEnding);
 
-  void getBlockLiveness(
-      SILBasicBlock *bb, TypeTreeLeafTypeRange span,
-      SmallVectorImpl<PrunedLiveBlocks::IsLive> &resultingFoundLiveness) const {
+  void getBlockLiveness(SILBasicBlock *bb, TypeTreeLeafTypeRange span,
+                        SmallVectorImpl<FieldSensitivePrunedLiveBlocks::IsLive>
+                            &resultingFoundLiveness) const {
     liveBlocks.getBlockLiveness(bb, span.startEltOffset, span.endEltOffset,
                                 resultingFoundLiveness);
   }
 
   /// Return the liveness for this specific sub-element of our root value.
-  PrunedLiveBlocks::IsLive getBlockLiveness(SILBasicBlock *bb,
-                                            unsigned subElementNumber) const {
+  FieldSensitivePrunedLiveBlocks::IsLive
+  getBlockLiveness(SILBasicBlock *bb, unsigned subElementNumber) const {
     return liveBlocks.getBlockLiveness(bb, subElementNumber);
   }
 
-  void getBlockLiveness(
-      SILBasicBlock *bb,
-      SmallVectorImpl<PrunedLiveBlocks::IsLive> &foundLiveness) const {
+  void getBlockLiveness(SILBasicBlock *bb,
+                        SmallVectorImpl<FieldSensitivePrunedLiveBlocks::IsLive>
+                            &foundLiveness) const {
     liveBlocks.getBlockLiveness(bb, 0, liveBlocks.getNumBitsToTrack(),
                                 foundLiveness);
   }
@@ -547,6 +854,7 @@ public:
   /// interesting use of the current def and whether it ends the lifetime.
   std::pair<IsInterestingUser, Optional<TypeTreeLeafTypeRange>>
   isInterestingUser(SILInstruction *user) const {
+    assert(isInitialized());
     auto useIter = users.find(user);
     if (useIter == users.end())
       return {NonUser, None};
@@ -680,9 +988,9 @@ class FieldSensitivePrunedLiveRange : public FieldSensitivePrunedLiveness {
 
 public:
   FieldSensitivePrunedLiveRange(
-      SILFunction *fn, SILValue rootValue,
+      SILFunction *fn,
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
-      : FieldSensitivePrunedLiveness(fn, rootValue, discoveredBlocks) {}
+      : FieldSensitivePrunedLiveness(fn, discoveredBlocks) {}
 
   /// Check if \p inst occurs in between the definition of a def and the
   /// liveness boundary for bits in \p span.
@@ -724,6 +1032,8 @@ public:
 /// could be handled by adding an updateForUseBeforeFirstDef() API.
 class FieldSensitiveSSAPrunedLiveRange
     : public FieldSensitivePrunedLiveRange<FieldSensitiveSSAPrunedLiveRange> {
+  using Super = FieldSensitivePrunedLiveRange<FieldSensitiveSSAPrunedLiveRange>;
+
   std::pair<SILValue, Optional<TypeTreeLeafTypeRange>> def = {{}, {}};
 
   /// None for arguments.
@@ -732,11 +1042,12 @@ class FieldSensitiveSSAPrunedLiveRange
 
 public:
   FieldSensitiveSSAPrunedLiveRange(
-      SILFunction *fn, SILValue rootValue,
+      SILFunction *fn,
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
-      : FieldSensitivePrunedLiveRange(fn, rootValue, discoveredBlocks) {}
+      : FieldSensitivePrunedLiveRange(fn, discoveredBlocks) {}
 
   std::pair<SILValue, Optional<TypeTreeLeafTypeRange>> getDef() const {
+    assert(isInitialized());
     return def;
   }
 
@@ -747,6 +1058,7 @@ public:
   }
 
   void initializeDef(SILValue def, TypeTreeLeafTypeRange span) {
+    assert(Super::isInitialized());
     assert(!this->def.first && !this->def.second && "reinitialization");
 
     this->def = {def, span};
@@ -754,7 +1066,9 @@ public:
     initializeDefBlock(def->getParentBlock(), span);
   }
 
-  bool isInitialized() const { return bool(def.first) && bool(def.second); }
+  bool isInitialized() const {
+    return Super::isInitialized() && bool(def.first) && bool(def.second);
+  }
 
   bool isDef(SILInstruction *inst, unsigned bit) const {
     return inst == defInst.first && defInst.second->contains(bit);
@@ -781,6 +1095,9 @@ public:
 class FieldSensitiveMultiDefPrunedLiveRange
     : public FieldSensitivePrunedLiveRange<
           FieldSensitiveMultiDefPrunedLiveRange> {
+  using Super =
+      FieldSensitivePrunedLiveRange<FieldSensitiveMultiDefPrunedLiveRange>;
+
   // TODO: See if we can make this more efficient.
   SmallFrozenMultiMap<SILNode *, TypeTreeLeafTypeRange, 8> defs;
   SmallFrozenMultiMap<SILBasicBlock *, TypeTreeLeafTypeRange, 8> defBlocks;
@@ -789,7 +1106,14 @@ public:
   FieldSensitiveMultiDefPrunedLiveRange(
       SILFunction *fn, SILValue rootValue,
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
-      : FieldSensitivePrunedLiveRange(fn, rootValue, discoveredBlocks) {}
+      : FieldSensitivePrunedLiveRange(fn, discoveredBlocks) {
+    // We init here since we do not allow for reinitialization to occur.
+    Super::init(rootValue);
+  }
+
+  void init(SILValue rootValue) {
+    llvm_unreachable("multi-def liveness cannot be reused");
+  }
 
   void clear() { llvm_unreachable("multi-def liveness cannot be reused"); }
 
@@ -799,11 +1123,13 @@ public:
   /// Internally this freezes our def/defblocks arrays so we can use them as
   /// maps.
   void finishedInitializationOfDefs() {
+    assert(isInitialized());
     defs.setFrozen();
     defBlocks.setFrozen();
   }
 
   void initializeDef(SILValue def, TypeTreeLeafTypeRange span) {
+    assert(Super::isInitialized());
     defs.insert(def, span);
     auto *block = def->getParentBlock();
     defBlocks.insert(block, span);
@@ -811,16 +1137,18 @@ public:
   }
 
   void initializeDef(SILInstruction *def, TypeTreeLeafTypeRange span) {
+    assert(Super::isInitialized());
     defs.insert(cast<SILNode>(def), span);
     auto *block = def->getParent();
     defBlocks.insert(block, span);
     initializeDefBlock(block, span);
   }
 
-  bool isInitialized() const { return !defs.empty(); }
+  bool isInitialized() const { return Super::isInitialized() && !defs.empty(); }
 
   /// Return true if this block is a def block for this specific bit.
   bool isDefBlock(SILBasicBlock *block, unsigned bit) const {
+    assert(isInitialized());
     auto iter = defBlocks.find(block);
     if (!iter)
       return false;
@@ -829,6 +1157,7 @@ public:
   }
 
   bool isDefBlock(SILBasicBlock *block, TypeTreeLeafTypeRange span) const {
+    assert(isInitialized());
     auto iter = defBlocks.find(block);
     if (!iter)
       return false;
@@ -838,6 +1167,7 @@ public:
   }
 
   bool isDef(SILInstruction *inst, unsigned bit) const {
+    assert(isInitialized());
     auto iter = defs.find(cast<SILNode>(inst));
     if (!iter)
       return false;
@@ -846,6 +1176,7 @@ public:
   }
 
   bool isDef(SILValue value, unsigned bit) const {
+    assert(isInitialized());
     auto iter = defs.find(cast<SILNode>(value));
     if (!iter)
       return false;
@@ -854,6 +1185,7 @@ public:
   }
 
   bool isDef(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
+    assert(isInitialized());
     auto iter = defs.find(cast<SILNode>(inst));
     if (!iter)
       return false;
@@ -863,6 +1195,7 @@ public:
   }
 
   bool isDef(SILValue value, TypeTreeLeafTypeRange span) const {
+    assert(isInitialized());
     auto iter = defs.find(cast<SILNode>(value));
     if (!iter)
       return false;

@@ -915,8 +915,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 
   case SILInstructionKind::DebugValueInst:
-    // Currently we don't serialize debug variable infos, so it doesn't make
-    // sense to write the instruction at all.
+  case SILInstructionKind::DebugStepInst:
+    // Currently we don't serialize debug info, so it doesn't make
+    // sense to write those instructions at all.
     // TODO: decide if we want to serialize those instructions.
     return;
   case SILInstructionKind::TestSpecificationInst:
@@ -1692,6 +1693,25 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         packTypeRef,
         (unsigned) packType.getCategory(),
         packRef,
+        indexRef);
+    break;
+  }
+  case SILInstructionKind::TuplePackElementAddrInst: {
+    auto TPEAI = cast<TuplePackElementAddrInst>(&SI);
+    auto elementType = TPEAI->getElementType();
+    auto elementTypeRef = S.addTypeRef(elementType.getASTType());
+    auto tuple = TPEAI->getTuple();
+    auto tupleType = tuple->getType();
+    auto tupleTypeRef = S.addTypeRef(tupleType.getASTType());
+    auto tupleRef = addValueRef(tuple);
+    auto indexRef = addValueRef(TPEAI->getIndex());
+    SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILPackElementGetLayout::Code],
+        elementTypeRef,
+        (unsigned) elementType.getCategory(),
+        tupleTypeRef,
+        (unsigned) tupleType.getCategory(),
+        tupleRef,
         indexRef);
     break;
   }

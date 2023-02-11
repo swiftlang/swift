@@ -26,7 +26,7 @@ public struct RelativeIndirectablePointer<Pointee>: RelativePointer {
     let address = ptr + Int(truncatingIfNeeded: offset & ~1)
     
     if offset & 1 != 0 {
-      return address.loadUnaligned(as: UnsafeRawPointer.self)
+      return address.unprotectedLoad(as: UnsafeRawPointer.self)
     } else {
       return address
     }

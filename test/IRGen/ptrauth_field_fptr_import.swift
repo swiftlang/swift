@@ -1,5 +1,4 @@
-// RUN: %swift-frontend %s -enable-import-ptrauth-field-function-pointers -emit-ir -target arm64e-apple-ios13.0 -I %S/Inputs/ -validate-tbd-against-ir=none 2>&1 | %FileCheck %s
-
+// RUN: %swift-frontend %s -enable-import-ptrauth-field-function-pointers -emit-ir -target arm64e-apple-ios13.0 -I %S/Inputs/ -validate-tbd-against-ir=none | %FileCheck %s
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
 

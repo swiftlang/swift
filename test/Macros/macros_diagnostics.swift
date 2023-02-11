@@ -18,18 +18,18 @@ protocol P { }
 
 internal struct X { } // expected-note{{type declared here}}
 
-@freestanding(expression) public macro createAnX: X = #externalMacro(module: "BuiltinMacros", type: "Blah")
+@freestanding(expression) public macro createAnX() -> X = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-error@-1{{macro cannot be declared public because its result type uses an internal type}}
 // expected-warning@-2{{external macro implementation type}}
 
-@freestanding(expression) macro m1: Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
+@freestanding(expression) macro m1() -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-warning@-1{{external macro implementation type}}
-@freestanding(expression) macro m1: Float = #externalMacro(module: "BuiltinMacros", type: "Blah")
+@freestanding(expression) macro m1() -> Float = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-warning@-1{{external macro implementation type}}
 
-@freestanding(expression) macro m2: Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-note{{'m2' previously declared here}}
+@freestanding(expression) macro m2() -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-note{{'m2()' previously declared here}}
 // expected-warning@-1{{external macro implementation type}}
-@freestanding(expression) macro m2: Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-error{{invalid redeclaration of 'm2'}}
+@freestanding(expression) macro m2() -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah") // expected-error{{invalid redeclaration of 'm2()'}}
 // expected-warning@-1{{external macro implementation type}}
 
 @freestanding(expression) macro m3(_: Int) -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
@@ -43,9 +43,9 @@ internal struct X { } // expected-note{{type declared here}}
 // expected-warning@-1{{external macro implementation type}}
 
 struct ZZZ {
-  macro m5: Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
-  // expected-error@-1{{macro 'm5' can only be declared at file scope}}
-  // expected-error@-2{{macro 'm5' must declare its applicable roles}}
+  macro m5() -> Int = #externalMacro(module: "BuiltinMacros", type: "Blah")
+  // expected-error@-1{{macro 'm5()' can only be declared at file scope}}
+  // expected-error@-2{{macro 'm5()' must declare its applicable roles}}
   // expected-warning@-3{{external macro implementation type}}
 }
 
@@ -134,3 +134,8 @@ func testExternalMacroOutOfPlace() {
   let _: Int = #externalMacro(module: "A", type: "B")
   // expected-error@-1{{macro 'externalMacro' can only be used to define another macro}}
 }
+
+@freestanding(expression)
+public macro macroWithDefaults(_: Int = 17) = #externalMacro(module: "A", type: "B")
+// expected-error@-1{{default arguments are not allowed in macros}}
+// expected-warning@-2{{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'}}

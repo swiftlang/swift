@@ -650,3 +650,16 @@ func test_that_closures_are_attempted_in_order() {
     return false
   }
 }
+
+// https://github.com/apple/swift/issues/63455
+func test_recursive_var_reference_in_multistatement_closure() {
+  func takeClosure(_ x: () -> Void) {}
+
+  func test(optionalInt: Int?) {
+    takeClosure {
+      let int = optionalInt { // expected-error {{cannot call value of non-function type 'Int?'}}
+        print(int)
+      }
+    }
+  }
+}

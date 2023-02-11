@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -sil-disable-pass=simplification %s | %FileCheck %s
 
 struct Point {
   let x: Int

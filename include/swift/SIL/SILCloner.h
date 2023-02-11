@@ -1272,7 +1272,7 @@ void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createAssignByWrapper(
-                getOpLocation(Inst->getLoc()), Inst->getOriginator(),
+                getOpLocation(Inst->getLoc()),
                 getOpValue(Inst->getSrc()), getOpValue(Inst->getDest()),
                 getOpValue(Inst->getInitializer()),
                 getOpValue(Inst->getSetter()), Inst->getMode()));
@@ -1314,6 +1314,11 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
       Inst->poisonRefs(), Inst->getWasMoved(), Inst->hasTrace());
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
+}
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitDebugStepInst(DebugStepInst *Inst) {
+  recordClonedInstruction(Inst, getBuilder().createDebugStep(Inst->getLoc()));
 }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                    \
@@ -2537,6 +2542,21 @@ void SILCloner<ImplClass>::visitPackElementSetInst(PackElementSetInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createPackElementSet(loc, newElementValue,
                                               newIndex, newPack));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitTuplePackElementAddrInst(
+                                             TuplePackElementAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto loc = getOpLocation(Inst->getLoc());
+  auto newIndex = getOpValue(Inst->getIndex());
+  auto newTuple = getOpValue(Inst->getTuple());
+  auto newElementType = getOpType(Inst->getElementType());
+  // FIXME: do we need to rewrite when substitution removes the
+  // tuple-ness of the type?  If so, what do we rewrite to?
+  recordClonedInstruction(
+      Inst, getBuilder().createTuplePackElementAddr(loc, newIndex, newTuple,
+                                                    newElementType));
 }
 
 template<typename ImplClass>

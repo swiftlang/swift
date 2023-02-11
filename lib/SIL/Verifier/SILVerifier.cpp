@@ -2574,13 +2574,11 @@ public:
             "assign instruction can only exist in raw SIL");
     require(Dest->getType().isAddress(), "Must store to an address dest");
 
-    if (AI->getOriginator() ==
-        AssignByWrapperInst::Originator::PropertyWrapper) {
-      SILValue initFn = AI->getInitializer();
-      CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
-      SILFunctionConventions initConv(initTy, AI->getModule());
-      checkAssignByWrapperArgs(Src->getType(), initConv);
-      switch (initConv.getNumIndirectSILResults()) {
+    SILValue initFn = AI->getInitializer();
+    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
+    SILFunctionConventions initConv(initTy, AI->getModule());
+    checkAssignByWrapperArgs(Src->getType(), initConv);
+    switch (initConv.getNumIndirectSILResults()) {
       case 0:
         require(initConv.getNumDirectSILResults() == 1,
                 "wrong number of init function results");
@@ -2601,13 +2599,6 @@ public:
         break;
       default:
         require(false, "wrong number of indirect init function results");
-      }
-    } else {
-      require(AI->getOriginator() ==
-                  AssignByWrapperInst::Originator::TypeWrapper,
-              "wrong originator");
-      require(isa<SILUndef>(AI->getInitializer()),
-              "assignment via type wrapper does not have initializer");
     }
 
     SILValue setterFn = AI->getSetter();
@@ -5726,6 +5717,27 @@ public:
     if (!index) return;
 
     verifyPackElementType(i->getPackType(), index, i->getElementType());
+  }
+
+  void checkTuplePackElementAddrInst(TuplePackElementAddrInst *i) {
+    auto index = requireValueKind<AnyPackIndexInst>(i->getIndex(),
+            "pack index operand must be one of the pack_index instructions");
+    if (!index) return;
+
+    // Remove the extra tuple element type structure.
+    SmallVector<CanType, 8> tupleElements; {
+      auto tupleType = requireAddressType(TupleType, i->getTuple()->getType(),
+                                  "tuple operand of tuple_pack_element_addr");
+      auto eltTypes = tupleType.getElementTypes();
+      tupleElements.append(eltTypes.begin(), eltTypes.end());
+    }
+
+    require(i->getElementType().isAddress(),
+            "result of tuple_pack_element_addr must be an address");
+
+    verifyPackElementType(tupleElements, index,
+                          i->getElementType().getASTType(),
+                          /*types are SIL types*/ true);
   }
 
   // This verifies that the entry block of a SIL function doesn't have

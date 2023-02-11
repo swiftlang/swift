@@ -541,6 +541,32 @@ bool SILType_isFunction(BridgedType type) {
   return castToSILType(type).is<SILFunctionType>();
 }
 
+bool SILType_isMetatype(BridgedType type) {
+  return castToSILType(type).is<MetatypeType>();
+}
+
+BridgedType SILType_instanceTypeOfMetatype(BridgedType type) {
+  auto metaType = castToSILType(type).castTo<MetatypeType>();
+  SILType instanceTy = SILType::getPrimitiveObjectType(metaType.getInstanceType());
+  return {instanceTy.getOpaqueValue()};
+}
+
+BridgedDecl SILType_getNominal(BridgedType type) {
+  return castToSILType(type).getNominalOrBoundGenericNominal();
+}
+
+bool SILType_isOrContainsObjectiveCClass(BridgedType type) {
+  return castToSILType(type).getASTType().findIf([](Type ty) {
+    if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {
+      if (cd->isForeign() || cd->getObjectModel() == ReferenceCounting::ObjC)
+        return true;
+    }
+    if (ty->is<ProtocolCompositionType>())
+      return true;
+    return false;
+  });
+}
+
 bool SILType_isCalleeConsumedFunction(BridgedType type) {
   auto funcTy = castToSILType(type).castTo<SILFunctionType>();
   return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
@@ -1188,6 +1214,12 @@ BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder b,
                      b.loc.getScope());
   return {builder.createDestroyValue(RegularLocation(b.loc.getLocation()),
                                      castToSILValue(op))};
+}
+
+BridgedInstruction SILBuilder_createDebugStep(BridgedBuilder b) {
+  SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
+                     b.loc.getScope());
+  return {builder.createDebugStep(RegularLocation(b.loc.getLocation()))};
 }
 
 BridgedInstruction SILBuilder_createApply(BridgedBuilder b,

@@ -2737,7 +2737,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     return ctx.AllocateCopy(result);
   }
 
-  auto nominal = dyn_cast<NominalTypeDecl>(idc);
+  auto nominal = dyn_cast<NominalTypeDecl>(dc->getImplementedObjCContext());
 
   if (nominal) {
     // We need to add implicit initializers because they
@@ -2785,13 +2785,6 @@ static ArrayRef<Decl *> evaluateMembersRequest(
       ResolveImplicitMemberRequest{nominal,
                  ImplicitMemberAction::ResolveCodingKeys},
       {});
-
-    // Synthesize $Storage type and `var $storage` associated with
-    // type wrapped type.
-    if (nominal->hasTypeWrapper()) {
-      (void)nominal->getTypeWrapperStorageDecl();
-      (void)nominal->getTypeWrapperProperty();
-    }
   }
 
   // Expand synthesized member macros.

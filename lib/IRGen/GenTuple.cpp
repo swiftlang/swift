@@ -73,22 +73,37 @@ namespace {
   /// Project a tuple offset from a tuple metadata structure.
   static llvm::Value *loadTupleOffsetFromMetadata(IRGenFunction &IGF,
                                                   llvm::Value *metadata,
-                                                  unsigned index) {
+                                                  llvm::Value *index) {
     auto asTuple = IGF.Builder.CreateBitCast(metadata,
                                              IGF.IGM.TupleTypeMetadataPtrTy);
 
     llvm::Value *indices[] = {
-      IGF.IGM.getSize(Size(0)),                   // (*tupleType)
-      llvm::ConstantInt::get(IGF.IGM.Int32Ty, 3), //   .Elements
-      IGF.IGM.getSize(Size(index)),               //     [index]
-      llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)  //       .Offset
+        IGF.IGM.getSize(Size(0)),                   // (*tupleType)
+        llvm::ConstantInt::get(IGF.IGM.Int32Ty, 3), //   .Elements
+        index,                                      //     [index]
+        llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)  //       .Offset
     };
     auto slot = IGF.Builder.CreateInBoundsGEP(IGF.IGM.TupleTypeMetadataTy,
                                               asTuple, indices);
 
-    return IGF.Builder.CreateLoad(
-        slot, IGF.IGM.Int32Ty, IGF.IGM.getPointerAlignment(),
-        metadata->getName() + "." + Twine(index) + ".offset");
+    Twine name = [&]() -> Twine {
+      if (auto *constantIndex = dyn_cast<llvm::ConstantInt>(index)) {
+        return metadata->getName() + "." +
+               Twine(constantIndex->getValue().getLimitedValue()) + ".offset";
+      } else {
+        return metadata->getName() + ".dynamic.offset";
+      }
+    }();
+
+    return IGF.Builder.CreateLoad(slot, IGF.IGM.Int32Ty,
+                                  IGF.IGM.getPointerAlignment(), name);
+  }
+
+  static llvm::Value *loadTupleOffsetFromMetadata(IRGenFunction &IGF,
+                                                  llvm::Value *metadata,
+                                                  unsigned index) {
+    return loadTupleOffsetFromMetadata(IGF, metadata,
+                                       IGF.IGM.getSize(Size(index)));
   }
 
   /// Adapter for tuple types.
@@ -487,6 +502,19 @@ Address irgen::projectTupleElementAddress(IRGenFunction &IGF,
                                           unsigned fieldNo) {
   FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress, tuple,
                  tupleType, fieldNo);
+}
+
+Address irgen::projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
+                                                        Address tuple,
+                                                        SILType tupleType,
+                                                        llvm::Value *index,
+                                                        SILType elementType) {
+  auto *metadata = IGF.emitTypeMetadataRefForLayout(tupleType);
+
+  llvm::Value *offset = loadTupleOffsetFromMetadata(IGF, metadata, index);
+  auto *gep =
+      IGF.emitByteOffsetGEP(tuple.getAddress(), offset, IGF.IGM.OpaqueTy);
+  return Address(gep, IGF.IGM.OpaqueTy, IGF.IGM.getPointerAlignment());
 }
 
 Optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,

@@ -102,6 +102,7 @@ void DiagnosticEmitter::emitCheckerDoesntUnderstandDiagnostic(
              diag::sil_moveonlychecker_not_understand_moveonly);
   }
   registerDiagnosticEmitted(markedValue);
+  emittedCheckerDoesntUnderstandDiagnostic = true;
 }
 
 //===----------------------------------------------------------------------===//

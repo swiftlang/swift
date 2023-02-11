@@ -1397,6 +1397,12 @@ bool visitAccessStorageUses(AccessUseVisitor &visitor, AccessStorage storage,
 bool visitAccessPathUses(AccessUseVisitor &visitor, AccessPath accessPath,
                          SILFunction *function);
 
+/// Similar to visitAccessPathUses, but the visitor is restricted to a specific
+/// access base, such as a particular ref_element_addr.
+bool visitAccessPathBaseUses(AccessUseVisitor &visitor,
+                             AccessPathWithBase accessPathWithBase,
+                             SILFunction *function);
+
 } // end namespace swift
 
 //===----------------------------------------------------------------------===//

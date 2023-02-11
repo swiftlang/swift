@@ -19,7 +19,7 @@ struct CErrorOr<T>
     // CHECK-DAG: ![[TY_CONTAINER]] = !DICompositeType({{.*}}elements: ![[TY_ELTS:[0-9]+]]
     // CHECK-DAG: ![[TY_ELTS]] = !{![[TY_MEMBER:[0-9]+]]}
     // CHECK-DAG: ![[TY_MEMBER]] = !DIDerivedType(tag: DW_TAG_member, {{.*}}baseType: ![[TY:[0-9]+]]
-    // CHECK-DAG: ![[TY]] = !DICompositeType({{.*}}, identifier: "$s20generic_enum_closure8CErrorOrVyxGD")
+    // CHECK-DAG: ![[TY]] = !DICompositeType({{.*}}, name: "$s20generic_enum_closure8CErrorOrVyxGD"
     value = .none
   }
 }

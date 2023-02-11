@@ -24,7 +24,7 @@ sil_witness_table S_3 : P module main {}
 // CHECK:         store i8** getelementptr inbounds {{.*}}$s26variadic_generic_functions3S_2VAA1PAAWP{{.*}}, i8*** [[WTABLE_ELEMENT_0]]
 // CHECK:         [[METADATA_PACK_PTR:%[^,]+]] = bitcast [1 x %swift.type*]* [[METADATA_PACK]] to %swift.type**
 // CHECK:         [[WTABLE_PACK_ADDR:%[^,]+]] = bitcast [1 x i8**]* [[WTABLE_PACK]] to i8***
-// CHECK:         call swiftcc void @g(i64 1, %swift.type** [[METADATA_PACK_PTR]], i8*** [[WTABLE_PACK_ADDR]])
+// CHECK:         call swiftcc void @g(i{{(64|32)}} 1, %swift.type** [[METADATA_PACK_PTR]], i8*** [[WTABLE_PACK_ADDR]])
 sil @c : $() -> () {
   %g = function_ref @g : $@convention(thin) <T... : P> () -> ()
   apply %g<Pack{S_2}>() : $@convention(thin) <T... : P> () -> ()
@@ -32,13 +32,13 @@ sil @c : $() -> () {
   return %ret : $()
 }
 
-// CHECK: define {{.*}}void @f(i64 %0, %swift.type** %T, i8*** %T.P)
+// CHECK: define {{.*}}void @f(i{{(64|32)}} %0, %swift.type** %T, i8*** %T.P)
 sil @f : $<T... : P> () -> () {
     %ret = tuple ()
     return %ret : $()
 }
 
-// CHECK: define {{.*}}void @g(i64 %0, %swift.type** %T, i8*** %T.P)
+// CHECK: define {{.*}}void @g(i{{(64|32)}} %0, %swift.type** %T, i8*** %T.P)
 sil @g : $<T... : P> () -> () {
     %f = function_ref @f : $@convention(thin) <T... : P> () -> ()
     apply %f<Pack{repeat each T, S, repeat each T, repeat each T}>() : $@convention(thin) <T... : P> () -> ()

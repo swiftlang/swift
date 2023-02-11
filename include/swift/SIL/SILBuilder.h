@@ -888,30 +888,13 @@ public:
                                  Qualifier));
   }
 
-  AssignByWrapperInst *
-  createAssignByPropertyWrapper(SILLocation Loc, SILValue Src, SILValue Dest,
-                                SILValue Initializer, SILValue Setter,
-                                AssignByWrapperInst::Mode mode) {
-    return createAssignByWrapper(
-        Loc, AssignByWrapperInst::Originator::PropertyWrapper, Src, Dest,
-        Initializer, Setter, mode);
-  }
-
-  AssignByWrapperInst *
-  createAssignByTypeWrapper(SILLocation Loc, SILValue Src, SILValue Dest,
-                            SILValue Setter, AssignByWrapperInst::Mode mode) {
-    return createAssignByWrapper(
-        Loc, AssignByWrapperInst::Originator::TypeWrapper, Src, Dest,
-        SILUndef::get(Dest->getType(), getModule()), Setter, mode);
-  }
-
-  AssignByWrapperInst *
-  createAssignByWrapper(SILLocation Loc, AssignByWrapperInst::Originator origin,
-                        SILValue Src, SILValue Dest, SILValue Initializer,
-                        SILValue Setter, AssignByWrapperInst::Mode mode) {
-    return insert(new (getModule())
-                      AssignByWrapperInst(getSILDebugLocation(Loc), origin, Src,
-                                          Dest, Initializer, Setter, mode));
+  AssignByWrapperInst *createAssignByWrapper(SILLocation Loc, SILValue Src,
+                                             SILValue Dest,
+                                             SILValue Initializer,
+                                             SILValue Setter,
+                                             AssignByWrapperInst::Mode mode) {
+    return insert(new (getModule()) AssignByWrapperInst(
+        getSILDebugLocation(Loc), Src, Dest, Initializer, Setter, mode));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
@@ -984,6 +967,10 @@ public:
                                        SILDebugVariable Var,
                                        bool wasMoved = false,
                                        bool trace = false);
+
+  DebugStepInst *createDebugStep(SILLocation Loc) {
+    return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
+  }
 
   /// Create a debug_value according to the type of \p src
   SILInstruction *emitDebugDescription(SILLocation Loc, SILValue src,
@@ -1989,6 +1976,14 @@ public:
     return insert(new (getModule()) PackElementSetInst(
                               getSILDebugLocation(loc),
                               elementValue, packIndex, pack));
+  }
+
+  TuplePackElementAddrInst *
+  createTuplePackElementAddr(SILLocation loc, SILValue packIndex,
+                             SILValue tupleAddr, SILType elementType) {
+    return insert(TuplePackElementAddrInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              packIndex, tupleAddr, elementType));
   }
 
   ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,

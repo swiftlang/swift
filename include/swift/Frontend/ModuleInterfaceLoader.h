@@ -129,7 +129,8 @@ class SearchPathOptions;
 class CompilerInvocation;
 
 /// A ModuleLoader that loads explicitly built Swift modules specified via
-/// -swift-module-file
+/// -swift-module-file or modules found in a provided
+/// -explicit-swift-module-map-file JSON input.
 class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
   explicit ExplicitSwiftModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
                                      ModuleLoadingMode loadMode,
@@ -164,6 +165,7 @@ public:
   create(ASTContext &ctx,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          StringRef ExplicitSwiftModuleMap,
+         const std::vector<std::pair<std::string, std::string>> &ExplicitSwiftModuleInputs,
          bool IgnoreSwiftSourceInfoFile);
 
   /// Append visible module names to \p names. Note that names are possibly

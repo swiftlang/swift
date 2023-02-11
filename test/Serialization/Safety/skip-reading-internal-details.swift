@@ -19,6 +19,19 @@
 // RUN:   | %FileCheck --check-prefixes=NEEDED,UNSAFE %s
 
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -verify -Xllvm -debug-only=Serialization \
+// RUN:   -enable-deserialization-safety 2>&1 \
+// RUN:   | %FileCheck --check-prefixes=NEEDED,CLEAN,SAFE %s
+
+/// Disabled by default.
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -verify -Xllvm -debug-only=Serialization \
+// RUN:   -disable-deserialization-safety 2>&1 \
+// RUN:   | %FileCheck --check-prefixes=NEEDED,UNSAFE %s
+
+/// Enable with env var.
+// RUN: env SWIFT_ENABLE_DESERIALIZATION_SAFETY=true \
+// RUN:   %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -verify -Xllvm -debug-only=Serialization 2>&1 \
 // RUN:   | %FileCheck --check-prefixes=NEEDED,CLEAN,SAFE %s
 
