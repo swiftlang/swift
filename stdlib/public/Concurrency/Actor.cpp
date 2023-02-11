@@ -1136,6 +1136,9 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
       }
     }
 
+    // This needs to be a store release so that we also publish the contents of
+    // the new Job we are adding to the atomic job queue. Pairs with load
+    // acquire in drainOne.
     if (_status().compare_exchange_weak(oldState, newState,
                    /* success */ std::memory_order_release,
                    /* failure */ std::memory_order_relaxed)) {
@@ -1176,6 +1179,7 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
 Job * DefaultActorImpl::drainOne() {
   SWIFT_TASK_DEBUG_LOG("Draining one job from default actor %p", this);
 
+  // Pairs with the store release in DefaultActorImpl::enqueue
   auto oldState = _status().load(std::memory_order_acquire);
 
   auto jobToPreprocessFrom = oldState.getFirstJob();
@@ -1389,6 +1393,8 @@ retry:;
   SWIFT_TASK_DEBUG_LOG("Thread attempting to jump onto %p, as drainer = %d", this, asDrainer);
 #endif
 
+  // Note: This doesn't have to be a load acquire because the jobQueue is part
+  // of the same atomic.
   auto oldState = _status().load(std::memory_order_relaxed);
   while (true) {
 

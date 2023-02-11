@@ -92,7 +92,7 @@ enum class MetadataKind : uint32_t {
 #define ABSTRACTMETADATAKIND(name, start, end)                                 \
   name##_Start = start, name##_End = end,
 #include "MetadataKind.def"
-  
+
   /// The largest possible non-isa-pointer metadata kind value.
   ///
   /// This is included in the enumeration to prevent against attempts to
@@ -473,7 +473,7 @@ class ProtocolDescriptorFlags {
   };
 
   int_type Data;
-  
+
   constexpr ProtocolDescriptorFlags(int_type Data) : Data(Data) {}
 public:
   constexpr ProtocolDescriptorFlags() : Data(0) {}
@@ -498,7 +498,7 @@ public:
   constexpr ProtocolDescriptorFlags withResilient(bool s) const {
     return ProtocolDescriptorFlags((Data & ~IsResilient) | (s ? IsResilient : 0));
   }
-  
+
   /// Was the protocol defined in Swift 1 or 2?
   bool isSwift() const { return Data & IsSwift; }
 
@@ -506,24 +506,24 @@ public:
   ProtocolClassConstraint getClassConstraint() const {
     return ProtocolClassConstraint(bool(Data & ClassConstraint));
   }
-  
+
   /// What dispatch strategy does this protocol use?
   ProtocolDispatchStrategy getDispatchStrategy() const {
     return ProtocolDispatchStrategy((Data & DispatchStrategyMask)
                                       >> DispatchStrategyShift);
   }
-  
+
   /// Does the protocol require a witness table for method dispatch?
   bool needsWitnessTable() const {
     return swift::protocolRequiresWitnessTable(getDispatchStrategy());
   }
-  
+
   /// Return the identifier if this is a special runtime-known protocol.
   SpecialProtocol getSpecialProtocol() const {
     return SpecialProtocol(uint8_t((Data & SpecialProtocolMask)
                                  >> SpecialProtocolShift));
   }
-  
+
   /// Can new requirements with default witnesses be added resiliently?
   bool isResilient() const { return Data & IsResilient; }
 
@@ -784,11 +784,11 @@ public:
     return ExistentialTypeFlags((Data & ~SpecialProtocolMask)
                                   | (int_type(sp) << SpecialProtocolShift));
   }
-  
+
   unsigned getNumWitnessTables() const {
     return Data & NumWitnessTablesMask;
   }
-  
+
   ProtocolClassConstraint getClassConstraint() const {
     return ProtocolClassConstraint(bool(Data & ClassConstraintMask));
   }
@@ -803,7 +803,7 @@ public:
     return SpecialProtocol(uint8_t((Data & SpecialProtocolMask)
                                      >> SpecialProtocolShift));
   }
-  
+
   int_type getIntValue() const {
     return Data;
   }
@@ -998,7 +998,7 @@ class TargetFunctionTypeFlags {
     // NOTE: The next bit will need to introduce a separate flags word.
   };
   int_type Data;
-  
+
   constexpr TargetFunctionTypeFlags(int_type Data) : Data(Data) {}
 public:
   constexpr TargetFunctionTypeFlags() : Data(0) {}
@@ -1007,7 +1007,7 @@ public:
   withNumParameters(unsigned numParams) const {
     return TargetFunctionTypeFlags((Data & ~NumParametersMask) | numParams);
   }
-  
+
   constexpr TargetFunctionTypeFlags<int_type>
   withConvention(FunctionMetadataConvention c) const {
     return TargetFunctionTypeFlags((Data & ~ConventionMask)
@@ -1088,11 +1088,11 @@ public:
   int_type getIntValue() const {
     return Data;
   }
-  
+
   static TargetFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
     return TargetFunctionTypeFlags(Data);
   }
-  
+
   bool operator==(TargetFunctionTypeFlags<int_type> other) const {
     return Data == other.Data;
   }
@@ -1458,32 +1458,32 @@ constexpr unsigned WitnessTableFirstRequirementOffset = 1;
 enum class ContextDescriptorKind : uint8_t {
   /// This context descriptor represents a module.
   Module = 0,
-  
+
   /// This context descriptor represents an extension.
   Extension = 1,
-  
+
   /// This context descriptor represents an anonymous possibly-generic context
   /// such as a function body.
   Anonymous = 2,
 
   /// This context descriptor represents a protocol context.
   Protocol = 3,
-  
+
   /// This context descriptor represents an opaque type alias.
   OpaqueType = 4,
 
   /// First kind that represents a type of any sort.
   Type_First = 16,
-  
+
   /// This context descriptor represents a class.
   Class = Type_First,
-  
+
   /// This context descriptor represents a struct.
   Struct = Type_First + 1,
-  
+
   /// This context descriptor represents an enum.
   Enum = Type_First + 2,
-  
+
   /// Last kind that represents a type of any sort.
   Type_Last = 31,
 };
@@ -1514,34 +1514,34 @@ public:
   constexpr ContextDescriptorKind getKind() const {
     return ContextDescriptorKind(Value & 0x1Fu);
   }
-  
+
   /// Whether the context being described is generic.
   constexpr bool isGeneric() const {
     return (Value & 0x80u) != 0;
   }
-  
+
   /// Whether this is a unique record describing the referenced context.
   constexpr bool isUnique() const {
     return (Value & 0x40u) != 0;
   }
-  
+
   /// The format version of the descriptor. Higher version numbers may have
   /// additional fields that aren't present in older versions.
   constexpr uint8_t getVersion() const {
     return (Value >> 8u) & 0xFFu;
   }
-  
+
   /// The most significant two bytes of the flags word, which can have
   /// kind-specific meaning.
   constexpr uint16_t getKindSpecificFlags() const {
     return (Value >> 16u) & 0xFFFFu;
   }
-  
+
   constexpr ContextDescriptorFlags withKind(ContextDescriptorKind kind) const {
     return assert((uint8_t(kind) & 0x1F) == uint8_t(kind)),
       ContextDescriptorFlags((Value & 0xFFFFFFE0u) | uint8_t(kind));
   }
-  
+
   constexpr ContextDescriptorFlags withGeneric(bool isGeneric) const {
     return ContextDescriptorFlags((Value & 0xFFFFFF7Fu)
                                   | (isGeneric ? 0x80u : 0));
@@ -1560,7 +1560,7 @@ public:
   withKindSpecificFlags(uint16_t flags) const {
     return ContextDescriptorFlags((Value & 0xFFFFu) | (flags << 16u));
   }
-  
+
   constexpr uint32_t getIntValue() const {
     return Value;
   }
@@ -1591,7 +1591,7 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Meaningful for all type-descriptor kinds.
     HasImportInfo = 2,
 
-    /// Set if the type descriptor has a pointer to a list of canonical 
+    /// Set if the type descriptor has a pointer to a list of canonical
     /// prespecializations.
     HasCanonicalMetadataPrespecializations = 3,
 
@@ -1780,13 +1780,13 @@ public:
 enum class GenericParamKind : uint8_t {
   /// A type parameter.
   Type = 0,
-  
+
   Max = 0x3F,
 };
 
 class GenericParamDescriptor {
   uint8_t Value;
-  
+
   explicit constexpr GenericParamDescriptor(uint8_t Value)
     : Value(Value) {}
 public:
@@ -1798,7 +1798,7 @@ public:
                          .withKeyArgument(hasKeyArgument)
                          .withExtraArgument(hasExtraArgument))
   {}
-  
+
   constexpr bool hasKeyArgument() const {
     return (Value & 0x80u) != 0;
   }
@@ -1810,24 +1810,24 @@ public:
   constexpr GenericParamKind getKind() const {
     return GenericParamKind(Value & 0x3Fu);
   }
-  
+
   constexpr GenericParamDescriptor
   withKeyArgument(bool hasKeyArgument) const {
     return GenericParamDescriptor((Value & 0x7Fu)
       | (hasKeyArgument ? 0x80u : 0));
   }
-  
+
   constexpr GenericParamDescriptor
   withExtraArgument(bool hasExtraArgument) const {
     return GenericParamDescriptor((Value & 0xBFu)
       | (hasExtraArgument ? 0x40u : 0));
   }
-  
+
   constexpr GenericParamDescriptor withKind(GenericParamKind kind) const {
     return assert((uint8_t(kind) & 0x3Fu) == uint8_t(kind)),
       GenericParamDescriptor((Value & 0xC0u) | uint8_t(kind));
   }
-  
+
   constexpr uint8_t getIntValue() const {
     return Value;
   }
@@ -1881,7 +1881,7 @@ enum class GenericRequirementKind : uint8_t {
 
 class GenericRequirementFlags {
   uint32_t Value;
-  
+
   explicit constexpr GenericRequirementFlags(uint32_t Value)
     : Value(Value) {}
 public:
@@ -1893,7 +1893,7 @@ public:
                          .withKeyArgument(hasKeyArgument)
                          .withExtraArgument(hasExtraArgument))
   {}
-  
+
   constexpr bool hasKeyArgument() const {
     return (Value & 0x80u) != 0;
   }
@@ -1905,25 +1905,25 @@ public:
   constexpr GenericRequirementKind getKind() const {
     return GenericRequirementKind(Value & 0x1Fu);
   }
-  
+
   constexpr GenericRequirementFlags
   withKeyArgument(bool hasKeyArgument) const {
     return GenericRequirementFlags((Value & 0x7Fu)
       | (hasKeyArgument ? 0x80u : 0));
   }
-  
+
   constexpr GenericRequirementFlags
   withExtraArgument(bool hasExtraArgument) const {
     return GenericRequirementFlags((Value & 0xBFu)
       | (hasExtraArgument ? 0x40u : 0));
   }
-  
+
   constexpr GenericRequirementFlags
   withKind(GenericRequirementKind kind) const {
     return assert((uint8_t(kind) & 0x1Fu) == uint8_t(kind)),
       GenericRequirementFlags((Value & 0xE0u) | uint8_t(kind));
   }
-  
+
   constexpr uint32_t getIntValue() const {
     return Value;
   }
@@ -2343,8 +2343,9 @@ public:
 
 /// Kinds of task status record.
 enum class TaskStatusRecordKind : uint8_t {
-  /// A DeadlineStatusRecord, which represents an active deadline.
-  Deadline = 0,
+  /// A TaskDependencyStatusRecord which tracks what the current task is
+  /// dependent on.
+  TaskDependency = 0,
 
   /// A ChildTaskStatusRecord, which represents the potential for
   /// active child tasks.
