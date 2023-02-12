@@ -18,6 +18,7 @@
 #include "PrintClangClassType.h"
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
@@ -1107,13 +1108,27 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       os << "void ***selfPtr_ = reinterpret_cast<void ***>( "
             "::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));"
             "\n";
+
+      os << "#ifdef __arm64e__\n";
+      os << "void **vtable_ = ptrauth_auth_data(*selfPtr_, "
+            "ptrauth_key_process_independent_data, "
+            "ptrauth_blend_discriminator(selfPtr_,"
+         << SpecialPointerAuthDiscriminators::ObjCISA << "));\n";
+      os << "#else\n";
       os << "void **vtable_ = *selfPtr_;\n";
-      os << "using FType = decltype("
-         << cxx_synthesis::getCxxImplNamespaceName() << "::" << swiftSymbolName
-         << ");\n";
-      os << "FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + "
-         << (dispatchInfo->getStaticBitOffset() / 8) << "));\n";
-      indirectFunctionVar = StringRef("fptr_");
+      os << "#endif\n";
+      os << "struct FTypeAddress {\n";
+      os << "decltype(" << cxx_synthesis::getCxxImplNamespaceName()
+         << "::" << swiftSymbolName << ") *";
+      if (auto ptrAuthDisc = dispatchInfo->getPointerAuthDiscriminator())
+        os << " __ptrauth_swift_class_method_pointer(" << ptrAuthDisc->value
+           << ')';
+      os << " func;\n";
+      os << "};\n";
+      os << "FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ "
+            "+ "
+         << (dispatchInfo->getStaticBitOffset() / 8) << ");\n";
+      indirectFunctionVar = StringRef("fptrptr_->func");
       break;
     case DispatchKindTy::Thunk:
       swiftSymbolName = dispatchInfo->getThunkSymbolName();

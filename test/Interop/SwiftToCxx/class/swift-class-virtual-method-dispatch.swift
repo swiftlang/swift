@@ -116,18 +116,30 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 
 // CHECK:      void BaseClass::virtualMethod() {
 // CHECK-NEXT: void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT: void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT: #else
 // CHECK-NEXT: void **vtable_ = *selfPtr_;
-// CHECK-NEXT: using FType = decltype(_impl::$s5Class04BaseA0C13virtualMethodyyF);
-// CHECK-NEXT: FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1:]]));
-// CHECK-NEXT:   return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
-// CHECK-NEXT:  }
+// CHECK-NEXT: #endif
+// CHECK-NEXT: struct FTypeAddress {
+// CHECK-NEXT: decltype(_impl::$s5Class04BaseA0C13virtualMethodyyF) * func;
+// CHECK-NEXT: };
+// CHECK-NEXT: FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1:]]);
+// CHECK-NEXT: return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: }
 
 // CHECK:      swift::Int BaseClass::virtualMethodIntInt(swift::Int x) {
 // CHECK-NEXT: void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT: void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT: #else
 // CHECK-NEXT: void **vtable_ = *selfPtr_;
-// CHECK-NEXT: using FType = decltype(_impl::$s5Class04BaseA0C016virtualMethodIntE0yS2iF);
-// CHECK-NEXT: FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 1]]));
-// CHECK-NEXT:   return (* fptr_)(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: #endif
+// CHECK-NEXT: struct FTypeAddress {
+// CHECK-NEXT: decltype(_impl::$s5Class04BaseA0C016virtualMethodIntE0yS2iF) * func;
+// CHECK-NEXT: };
+// CHECK-NEXT: FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 1]]);
+// CHECK-NEXT:   return (* fptrptr_->func)(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
 // CHECK:        swift::Int BaseClass::finalMethodInBase(swift::Int x) {
@@ -136,121 +148,212 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 
 // CHECK:        swift::Int BaseClass::getVirtualComputedProp() {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #ifdef __arm64e__
+// CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:   #else
 // CHECK-NEXT:   void **vtable_ = *selfPtr_;
-// CHECK-NEXT:   using FType = decltype(_impl::$s5Class04BaseA0C19virtualComputedPropSivg);
-// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 2]]));
-// CHECK-NEXT:   return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #endif
+// CHECK-NEXT:   struct FTypeAddress {
+// CHECK-NEXT:   decltype(_impl::$s5Class04BaseA0C19virtualComputedPropSivg) * func;
+// CHECK-NEXT:   };
+// CHECK-NEXT:   FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 2]]);
+// CHECK-NEXT:     return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
 // CHECK:        int64_t BaseClass::getVirtualComputedGetSet() {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #ifdef __arm64e__
+// CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:   #else
 // CHECK-NEXT:   void **vtable_ = *selfPtr_;
-// CHECK-NEXT:   using FType = decltype(_impl::$s5Class04BaseA0C21virtualComputedGetSets5Int64Vvg);
-// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 3]]));
-// CHECK-NEXT:   return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #endif
+// CHECK-NEXT:   struct FTypeAddress {
+// CHECK-NEXT:   decltype(_impl::$s5Class04BaseA0C21virtualComputedGetSets5Int64Vvg) * func;
+// CHECK-NEXT:   };
+// CHECK-NEXT:   FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 3]]);
+// CHECK-NEXT:     return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
 // CHECK:        void BaseClass::setVirtualComputedGetSet(int64_t newValue) {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #ifdef __arm64e__
+// CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:   #else
 // CHECK-NEXT:   void **vtable_ = *selfPtr_;
-// CHECK-NEXT:   using FType = decltype(_impl::$s5Class04BaseA0C21virtualComputedGetSets5Int64Vvs);
-// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 4]]));
-// CHECK-NEXT:   return (* fptr_)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #endif
+// CHECK-NEXT:   struct FTypeAddress {
+// CHECK-NEXT:   decltype(_impl::$s5Class04BaseA0C21virtualComputedGetSets5Int64Vvs) * func;
+// CHECK-NEXT:   };
+// CHECK-NEXT:   FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 4]]);
+// CHECK-NEXT:   return (* fptrptr_->func)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
 // CHECK:        swift::Int BaseClass::getStoredProp() {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #ifdef __arm64e__
+// CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:   #else
 // CHECK-NEXT:   void **vtable_ = *selfPtr_;
-// CHECK-NEXT:   using FType = decltype(_impl::$s5Class04BaseA0C10storedPropSivg);
-// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 6]]));
-// CHECK-NEXT:   return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #endif
+// CHECK-NEXT:   struct FTypeAddress {
+// CHECK-NEXT:   decltype(_impl::$s5Class04BaseA0C10storedPropSivg) * func;
+// CHECK-NEXT:   };
+// CHECK-NEXT:   FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 6]]);
+// CHECK-NEXT:   return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
 // CHECK:        void BaseClass::setStoredProp(swift::Int value) {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #ifdef __arm64e__
+// CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:   #else
 // CHECK-NEXT:   void **vtable_ = *selfPtr_;
-// CHECK-NEXT:   using FType = decltype(_impl::$s5Class04BaseA0C10storedPropSivs);
-// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 7]]));
-// CHECK-NEXT:   return (* fptr_)(value, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #endif
+// CHECK-NEXT:   struct FTypeAddress {
+// CHECK-NEXT:   decltype(_impl::$s5Class04BaseA0C10storedPropSivs) * func;
+// CHECK-NEXT:   };
+// CHECK-NEXT:   FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 7]]);
+// CHECK-NEXT:     return (* fptrptr_->func)(value, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:   }
 
 // CHECK:         swift::Int BaseClass::operator [](swift::Int i) const
 // CHECK-NEXT:    void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:    #ifdef __arm64e__
+// CHECK-NEXT:    void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:    #else
 // CHECK-NEXT:    void **vtable_ = *selfPtr_;
-// CHECK-NEXT:    using FType = decltype(_impl::$s5Class04BaseA0CyS2icig);
-// CHECK-NEXT:    FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 9]]));
-// CHECK-NEXT:    return (* fptr_)(i, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:    #endif
+// CHECK-NEXT:    struct FTypeAddress {
+// CHECK-NEXT:    decltype(_impl::$s5Class04BaseA0CyS2icig) * func;
+// CHECK-NEXT:    };
+// CHECK-NEXT:    FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 9]]);
+// CHECK-NEXT:    return (* fptrptr_->func)(i, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:    }
 
 // CHECK:        void DerivedClass::virtualMethod() {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #ifdef __arm64e__
+// CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:   #else
 // CHECK-NEXT:   void **vtable_ = *selfPtr_;
-// CHECK-NEXT:   using FType = decltype(_impl::$s5Class07DerivedA0C13virtualMethodyyF);
-// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1]]));
-// CHECK-NEXT:     return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
-// CHECK-NEXT:     }
+// CHECK-NEXT:   #endif
+// CHECK-NEXT:   struct FTypeAddress {
+// CHECK-NEXT:   decltype(_impl::$s5Class07DerivedA0C13virtualMethodyyF) * func;
+// CHECK-NEXT:   };
+// CHECK-NEXT:   FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1]]);
+// CHECK-NEXT:   return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   }
 
 // CHECK:        swift::Int DerivedClass::virtualMethodIntInt(swift::Int x) {
-// CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
-// CHECK-NEXT:   void **vtable_ = *selfPtr_;
-// CHECK-NEXT:   using FType = decltype(_impl::$s5Class07DerivedA0C016virtualMethodIntE0yS2iF);
-// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 1]]));
-// CHECK-NEXT:     return (* fptr_)(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     #ifdef __arm64e__
+// CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:     #else
+// CHECK-NEXT:     void **vtable_ = *selfPtr_;
+// CHECK-NEXT:     #endif
+// CHECK-NEXT:     struct FTypeAddress {
+// CHECK-NEXT:     decltype(_impl::$s5Class07DerivedA0C016virtualMethodIntE0yS2iF) * func;
+// CHECK-NEXT:     };
+// CHECK-NEXT:     FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 1]]);
+// CHECK-NEXT:     return (* fptrptr_->func)(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
 // CHECK:        BaseClass DerivedClass::virtualMethodInDerived(const BaseClass& x) {
 // CHECK-NEXT:   void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:   #ifdef __arm64e__
+// CHECK-NEXT:   void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:   #else
 // CHECK-NEXT:   void **vtable_ = *selfPtr_;
-// CHECK-NEXT:   using FType = decltype(_impl::$s5Class07DerivedA0C015virtualMethodInB0yAA04BaseA0CAFF);
-// CHECK-NEXT:   FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 10]]));
-// CHECK-NEXT:     return _impl::_impl_BaseClass::makeRetained((* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
-// CHECK-NEXT:     }
+// CHECK-NEXT:   #endif
+// CHECK-NEXT:   struct FTypeAddress {
+// CHECK-NEXT:   decltype(_impl::$s5Class07DerivedA0C015virtualMethodInB0yAA04BaseA0CAFF) * func;
+// CHECK-NEXT:   };
+// CHECK-NEXT:   FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 10]]);
+// CHECK-NEXT:   return _impl::_impl_BaseClass::makeRetained((* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
+// CHECK-NEXT:   }
 
 // CHECK:         swift::Int DerivedClass::getVirtualComputedProp() {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     #ifdef __arm64e__
+// CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:     #else
 // CHECK-NEXT:     void **vtable_ = *selfPtr_;
-// CHECK-NEXT:     using FType = decltype(_impl::$s5Class07DerivedA0C19virtualComputedPropSivg);
-// CHECK-NEXT:     FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 2]]));
-// CHECK-NEXT:     return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
-// CHECK-NEXT:     }
+// CHECK-NEXT:     #endif
+// CHECK-NEXT:     struct FTypeAddress {
+// CHECK-NEXT:     decltype(_impl::$s5Class07DerivedA0C19virtualComputedPropSivg) * func;
+// CHECK-NEXT:     };
+// CHECK-NEXT:     FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 2]]);
+// CHECK-NEXT:       return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:       }
 
 // CHECK:         int64_t DerivedClass::getVirtualComputedGetSet() {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     #ifdef __arm64e__
+// CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:     #else
 // CHECK-NEXT:     void **vtable_ = *selfPtr_;
-// CHECK-NEXT:     using FType = decltype(_impl::$s5Class07DerivedA0C21virtualComputedGetSets5Int64Vvg);
-// CHECK-NEXT:     FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 3]]));
-// CHECK-NEXT:     return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     #endif
+// CHECK-NEXT:     struct FTypeAddress {
+// CHECK-NEXT:     decltype(_impl::$s5Class07DerivedA0C21virtualComputedGetSets5Int64Vvg) * func;
+// CHECK-NEXT:     };
+// CHECK-NEXT:     FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 3]]);
+// CHECK-NEXT:     return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
 // CHECK:         void DerivedClass::setVirtualComputedGetSet(int64_t newValue) {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     #ifdef __arm64e__
+// CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:     #else
 // CHECK-NEXT:     void **vtable_ = *selfPtr_;
-// CHECK-NEXT:     using FType = decltype(_impl::$s5Class07DerivedA0C21virtualComputedGetSets5Int64Vvs);
-// CHECK-NEXT:     FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 4]]));
-// CHECK-NEXT:     return (* fptr_)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     #endif
+// CHECK-NEXT:     struct FTypeAddress {
+// CHECK-NEXT:     decltype(_impl::$s5Class07DerivedA0C21virtualComputedGetSets5Int64Vvs) * func;
+// CHECK-NEXT:     };
+// CHECK-NEXT:     FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 4]]);
+// CHECK-NEXT:     return (* fptrptr_->func)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
 // CHECK:         swift::Int DerivedClass::getStoredProp() {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     #ifdef __arm64e__
+// CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:     #else
 // CHECK-NEXT:     void **vtable_ = *selfPtr_;
-// CHECK-NEXT:     using FType = decltype(_impl::$s5Class07DerivedA0C10storedPropSivg);
-// CHECK-NEXT:     FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 6]]));
-// CHECK-NEXT:     return (* fptr_)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
-// CHECK-NEXT:     }
+// CHECK-NEXT:     #endif
+// CHECK-NEXT:     struct FTypeAddress {
+// CHECK-NEXT:     decltype(_impl::$s5Class07DerivedA0C10storedPropSivg) * func;
+// CHECK-NEXT:     };
+// CHECK-NEXT:     FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 6]]);
+// CHECK-NEXT:       return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:       }
 
 // CHECK:         void DerivedClass::setStoredProp(swift::Int newValue) {
 // CHECK-NEXT:     void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     #ifdef __arm64e__
+// CHECK-NEXT:     void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:     #else
 // CHECK-NEXT:     void **vtable_ = *selfPtr_;
-// CHECK-NEXT:     using FType = decltype(_impl::$s5Class07DerivedA0C10storedPropSivs);
-// CHECK-NEXT:     FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 7]]));
-// CHECK-NEXT:     return (* fptr_)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:     #endif
+// CHECK-NEXT:     struct FTypeAddress {
+// CHECK-NEXT:     decltype(_impl::$s5Class07DerivedA0C10storedPropSivs) * func;
+// CHECK-NEXT:     };
+// CHECK-NEXT:     FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 7]]);
+// CHECK-NEXT:     return (* fptrptr_->func)(newValue, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
 
 // CHECK:         swift::Int DerivedClass::operator [](swift::Int i) const
 // CHECK-NEXT:    void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:    #ifdef __arm64e__
+// CHECK-NEXT:    void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
+// CHECK-NEXT:    #else
 // CHECK-NEXT:    void **vtable_ = *selfPtr_;
-// CHECK-NEXT:    using FType = decltype(_impl::$s5Class07DerivedA0CyS2icig);
-// CHECK-NEXT:    FType *fptr_ = reinterpret_cast<FType *>(*(vtable_ + [[#VM1 + 9]]));
-// CHECK-NEXT:    return (* fptr_)(i, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT:    #endif
+// CHECK-NEXT:    struct FTypeAddress {
+// CHECK-NEXT:    decltype(_impl::$s5Class07DerivedA0CyS2icig) * func;
+// CHECK-NEXT:    };
+// CHECK-NEXT:    FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1 + 9]]);
+// CHECK-NEXT:      return (* fptrptr_->func)(i, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 
 // CHECK:        void DerivedDerivedClass::virtualMethod() {
 // CHECK-NEXT:     return _impl::$s5Class07DerivedbA0C13virtualMethodyyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
