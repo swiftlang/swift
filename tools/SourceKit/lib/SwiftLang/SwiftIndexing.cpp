@@ -228,9 +228,10 @@ static void indexModule(llvm::MemoryBuffer *Input,
     // documentation file.
     // FIXME: refactor the frontend to provide an easy way to figure out the
     // correct filename here.
-    auto FUnit = Loader->loadAST(*Mod, None, /*moduleInterfacePath*/"",
+    auto FUnit = Loader->loadAST(*Mod, None, /*moduleInterfacePath=*/"",
+                                 /*moduleInterfaceSourcePath=*/"",
                                  std::move(Buf), nullptr, nullptr,
-                                 /*isFramework*/false);
+                                 /*isFramework=*/false);
 
     // FIXME: Not knowing what went wrong is pretty bad. loadModule() should be
     // more modular, rather than emitting diagnostics itself.
