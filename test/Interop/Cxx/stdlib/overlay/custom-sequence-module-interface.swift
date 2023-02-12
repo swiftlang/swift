@@ -50,9 +50,9 @@
 // CHECK-NOT:   typealias Iterator
 // CHECK-NOT:   typealias RawIterator
 // CHECK: }
-// CHECK: struct __CxxTemplateInst20HasTemplatedIteratorIi12NoDefinitionIiEE {
+// CHECK: struct HasTemplatedIterator<Int32, NoDefinition<Int32>> {
 // CHECK-NOT:   typealias Element
 // CHECK-NOT:   typealias Iterator
 // CHECK-NOT:   typealias RawIterator
 // CHECK: }
-// CHECK: typealias HasUninstantiatableIterator = __CxxTemplateInst20HasTemplatedIteratorIi12NoDefinitionIiEE
+// CHECK: typealias HasUninstantiatableIterator = HasTemplatedIterator<Int32, NoDefinition<Int32>>

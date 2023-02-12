@@ -86,11 +86,11 @@
 // CHECK-NOT: struct HasNoPreIncrementOperator : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasNoDereferenceOperator : UnsafeCxxInputIterator
 
-// CHECK: struct __CxxTemplateInst17TemplatedIteratorIiE : UnsafeCxxInputIterator {
+// CHECK: struct TemplatedIterator<Int32> : UnsafeCxxInputIterator {
 // CHECK:   var pointee: Int32 { get }
-// CHECK:   func successor() -> __CxxTemplateInst17TemplatedIteratorIiE
+// CHECK:   func successor() -> TemplatedIterator<Int32>
 // CHECK:   typealias Pointee = Int32
-// CHECK:   static func == (lhs: __CxxTemplateInst17TemplatedIteratorIiE, other: __CxxTemplateInst17TemplatedIteratorIiE) -> Bool
+// CHECK:   static func == (lhs: TemplatedIterator<Int32>, other: TemplatedIterator<Int32>) -> Bool
 // CHECK: }
 
 // CHECK: struct __CxxTemplateInst28TemplatedIteratorOutOfLineEqIiE : UnsafeCxxInputIterator {
