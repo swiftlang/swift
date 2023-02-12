@@ -27,4 +27,13 @@ struct HasMethods {
   NonTrivialInWrapper constPassThroughAsWrapper(int a) const { return {a}; }
 };
 
+struct ReferenceParams {
+  int a;
+  int b;
+  ReferenceParams(const int &a, const int &b) : a(a), b(b) { }
+  static void staticMethod(const int &a, const int &b) {
+    ReferenceParams t{a, b};
+  }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_METHOD_METHODS_H
