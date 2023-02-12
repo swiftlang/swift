@@ -8,8 +8,8 @@ var b = IntWrapper(a)
 var c = ObjCSwiftBridge(embedded: b)
 
 // FIXME: the const-ref C++ Consructor here is not getting an @in_guaranteed or even an @in convention here.
-// CHECK: {{%[0-9]+}} = function_ref @_ZN10IntWrapperC1ERKi : $@convention(c) (Int32) -> @out IntWrapper
-// CHECK: {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(c) (Int32) -> @out IntWrapper
+// CHECK: {{%[0-9]+}} = function_ref @_ZN10IntWrapperC1ERKi : $@convention(c) (@in_guaranteed Int32) -> @out IntWrapper
+// CHECK: {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(c) (@in_guaranteed Int32) -> @out IntWrapper
 // CHECK: alloc_global @$s4main1cSo15ObjCSwiftBridgeCSgvp
 // CHECK: {{%[0-9]+}} = global_addr @$s4main1cSo15ObjCSwiftBridgeCSgvp : $*Optional<ObjCSwiftBridge>
 // CHECK: {{%[0-9]+}} = load {{%[0-9]+}} : $*IntWrapper

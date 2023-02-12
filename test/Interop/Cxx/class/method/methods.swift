@@ -52,4 +52,20 @@ CxxMethodTestSuite.test("(Int) -> NonTrivialInWrapper") {
   expectEqual(42, instance.constPassThroughAsWrapper(42).value)
 }
 
+CxxMethodTestSuite.test("Constructor with ref params") {
+  let a = CInt(42)
+  let b = CInt(11)
+  var instance = ReferenceParams(a, b)
+
+  expectEqual(42, instance.a)
+  expectEqual(11, instance.b)
+}
+
+// Just make sure we don't crash
+CxxMethodTestSuite.test("Static method with ref params") {
+  let a = CInt(42)
+  let b = CInt(11)
+  ReferenceParams.staticMethod(a, b)
+}
+
 runAllTests()
