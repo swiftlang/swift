@@ -24,15 +24,14 @@
 using namespace swift;
 using llvm::ErrorOr;
 
-
 std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
-                                      ImportPath::Element ModuleID,
-                                      const SerializedModuleBaseName &BaseName,
-                                      SmallVectorImpl<char> *ModuleInterfacePath,
-                                      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                                      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-                                      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                                      bool skipBuildingInterface, bool IsFramework) {
+    ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
+    SmallVectorImpl<char> *ModuleInterfacePath,
+    SmallVectorImpl<char> *ModuleInterfaceSourcePath,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool skipBuildingInterface, bool IsFramework) {
   using namespace llvm::sys;
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -72,6 +71,7 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
 
 bool PlaceholderSwiftModuleScanner::findModule(
     ImportPath::Element moduleID, SmallVectorImpl<char> *moduleInterfacePath,
+    SmallVectorImpl<char> *moduleInterfaceSourcePath,
     std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
