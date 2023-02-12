@@ -548,30 +548,12 @@ void *ExistentialTypeRepr_create(void *ctx, void *anyLoc, void *baseTy) {
 }
 
 void *GenericParamList_create(void *ctx, void *lAngleLoc,
-                              BridgedArrayRef params, void *_Nullable whereLoc,
-                              BridgedArrayRef reqs, void *rAngleLoc) {
+                              BridgedArrayRef params, void *rAngleLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  SmallVector<RequirementRepr> requirements;
-  for (auto req : getArrayRef<BridgedRequirementRepr>(reqs)) {
-    switch (req.Kind) {
-    case BridgedRequirementReprKindTypeConstraint:
-      requirements.push_back(RequirementRepr::getTypeConstraint(
-          (TypeRepr *)req.FirstType, getSourceLocFromPointer(req.SeparatorLoc),
-          (TypeRepr *)req.SecondType));
-      break;
-    case BridgedRequirementReprKindSameType:
-      requirements.push_back(RequirementRepr::getSameType(
-          (TypeRepr *)req.FirstType, getSourceLocFromPointer(req.SeparatorLoc),
-          (TypeRepr *)req.SecondType));
-      break;
-    case BridgedRequirementReprKindLayoutConstraint:
-      llvm_unreachable("cannot handle layout constraints!");
-    }
-  }
   return GenericParamList::create(Context, getSourceLocFromPointer(lAngleLoc),
                                   getArrayRef<GenericTypeParamDecl *>(params),
-                                  getSourceLocFromPointer(whereLoc),
-                                  requirements,
+                                  /*whereLoc=*/SourceLoc(),
+                                  /*requirements=*/{},
                                   getSourceLocFromPointer(rAngleLoc));
 }
 

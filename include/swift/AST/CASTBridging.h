@@ -259,8 +259,7 @@ void *NamedOpaqueReturnTypeRepr_create(void *ctx, void *baseTy);
 void *OpaqueReturnTypeRepr_create(void *ctx, void *opaqueLoc, void *baseTy);
 void *ExistentialTypeRepr_create(void *ctx, void *anyLoc, void *baseTy);
 void *GenericParamList_create(void *ctx, void *lAngleLoc,
-                              BridgedArrayRef params, void *_Nullable whereLoc,
-                              BridgedArrayRef reqs, void *rAngleLoc);
+                              BridgedArrayRef params, void *rAngleLoc);
 void *GenericTypeParamDecl_create(void *ctx, void *declContext,
                                   BridgedIdentifier name, void *nameLoc,
                                   void *_Nullable ellipsisLoc, long index,
