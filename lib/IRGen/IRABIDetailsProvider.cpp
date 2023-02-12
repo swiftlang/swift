@@ -14,6 +14,7 @@
 #include "Callee.h"
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
+#include "GenPointerAuth.h"
 #include "GenType.h"
 #include "GenericRequirement.h"
 #include "IRGen.h"
@@ -206,6 +207,21 @@ public:
 
   using MethodDispatchInfo = IRABIDetailsProvider::MethodDispatchInfo;
 
+  Optional<MethodDispatchInfo::PointerAuthDiscriminator>
+  getMethodPointerAuthInfo(const AbstractFunctionDecl *funcDecl,
+                           SILDeclRef method) {
+    // FIXME: Async support.
+    if (funcDecl->hasAsync())
+      return None;
+    const auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods;
+    if (!schema)
+      return None;
+    auto discriminator =
+        PointerAuthInfo::getOtherDiscriminator(IGM, schema, method);
+    return MethodDispatchInfo::PointerAuthDiscriminator{
+        discriminator->getZExtValue()};
+  }
+
   Optional<MethodDispatchInfo>
   getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl) {
     if (funcDecl->isSemanticallyFinal())
@@ -227,8 +243,8 @@ public:
     if (!isa<ClassMetadataLayout>(layout))
       return {};
     auto &classLayout = cast<ClassMetadataLayout>(layout);
-    auto *mi = classLayout.getStoredMethodInfoIfPresent(
-        SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl)));
+    auto silDecl = SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl));
+    auto *mi = classLayout.getStoredMethodInfoIfPresent(silDecl);
     if (!mi)
       return {};
     switch (mi->TheKind) {
@@ -237,7 +253,8 @@ public:
     case ClassMetadataLayout::MethodInfo::Kind::Offset:
       if (mi->TheOffset.isStatic()) {
         return MethodDispatchInfo::indirectVTableStaticOffset(
-            /*bitOffset=*/mi->TheOffset.getStaticOffset().getValue());
+            /*bitOffset=*/mi->TheOffset.getStaticOffset().getValue(),
+            getMethodPointerAuthInfo(funcDecl, silDecl));
       }
       return {};
     }

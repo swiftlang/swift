@@ -8,9 +8,6 @@
 // RUN: %target-codesign %t/swift-class-execution
 // RUN: %target-run %t/swift-class-execution | %FileCheck %S/swift-class-virtual-method-dispatch-execution.cpp
 
-// FIXME: pointer signing support.
-// UNSUPPORTED: CPU=arm64e
-
 // REQUIRES: executable_test
 
 #include "swift-class-virtual-method-dispatch-execution.cpp"

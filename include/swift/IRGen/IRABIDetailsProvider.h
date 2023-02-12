@@ -258,13 +258,19 @@ public:
       /// The call should be made via the provided thunk function.
       Thunk
     };
+    struct PointerAuthDiscriminator {
+      /// The value of the other discriminator
+      uint64_t value;
+    };
 
     static MethodDispatchInfo direct() {
       return MethodDispatchInfo(Kind::Direct, 0);
     }
 
-    static MethodDispatchInfo indirectVTableStaticOffset(size_t bitOffset) {
-      return MethodDispatchInfo(Kind::IndirectVTableStaticOffset, bitOffset);
+    static MethodDispatchInfo indirectVTableStaticOffset(
+        size_t bitOffset, Optional<PointerAuthDiscriminator> discriminator) {
+      return MethodDispatchInfo(Kind::IndirectVTableStaticOffset, bitOffset, "",
+                                discriminator);
     }
 
     static MethodDispatchInfo thunk(std::string thunkName) {
@@ -276,18 +282,25 @@ public:
       assert(kind == Kind::IndirectVTableStaticOffset);
       return bitOffset;
     }
+    Optional<PointerAuthDiscriminator> getPointerAuthDiscriminator() const {
+      assert(kind == Kind::IndirectVTableStaticOffset);
+      return discriminator;
+    }
     StringRef getThunkSymbolName() const {
       assert(kind == Kind::Thunk);
       return thunkName;
     }
 
   private:
-    MethodDispatchInfo(Kind kind, size_t bitOffset, std::string thunkName = "")
-        : kind(kind), bitOffset(bitOffset), thunkName(thunkName) {}
+    MethodDispatchInfo(Kind kind, size_t bitOffset, std::string thunkName = "",
+                       Optional<PointerAuthDiscriminator> discriminator = None)
+        : kind(kind), bitOffset(bitOffset), thunkName(thunkName),
+          discriminator(discriminator) {}
 
     Kind kind;
     size_t bitOffset;
     std::string thunkName;
+    Optional<PointerAuthDiscriminator> discriminator;
   };
 
   Optional<MethodDispatchInfo>
