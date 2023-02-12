@@ -382,7 +382,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         
         // Class references, which are directly located in the array elements cannot escape,
         // because those are passed as `self` to their deinits - and `self` cannot escape in a deinit.
-        if path.projectionPath.hasNoClassProjection {
+        if !path.projectionPath.mayHaveClassProjection {
           return .continueWalk
         }
         return isEscaping
@@ -818,7 +818,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   private func followLoads(at path: SmallProjectionPath) -> Bool {
     return visitor.followLoads ||
            // When part of a class field we have to follow loads.
-           !path.hasNoClassProjection
+           path.mayHaveClassProjection
   }
 
   private func pathForArgumentEscapeChecking(_ path: SmallProjectionPath) -> SmallProjectionPath {
