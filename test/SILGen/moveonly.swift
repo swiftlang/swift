@@ -44,6 +44,9 @@ public enum NonTrivialEnum {
     case third(NonTrivialStruct)
 }
 
+var varGlobal = NonTrivialStruct()
+let letGlobal = NonTrivialStruct()
+
 public func borrowVal(_ e : NonTrivialEnum) {}
 public func borrowVal(_ e : FD) {}
 public func borrowVal(_ k: CopyableKlass) {}
@@ -516,4 +519,124 @@ func enumSwitchTest1(_ e: EnumSwitchTests.E) {
         consumeVal(rhs)
         break
     }
+}
+
+//////////////////////
+// Global Addr Test //
+//////////////////////
+
+// Make sure that we emit a new global_addr for each use.
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly16testGlobalBorrowyyF : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[ACCESS]]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+// CHECK: end_borrow [[LOADED_VAL]]
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[GEP:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[GEP]]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+// CHECK: end_borrow [[LOADED_VAL]]
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+// CHECK: destroy_value [[LOADED_VAL]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]]
+// CHECK: [[LOADED_BORROWED_VAL:%.*]] = begin_borrow [[LOADED_VAL]]
+// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_BORROWED_VAL]]
+// CHECK: [[LOADED_GEP_COPY:%.*]] = copy_value [[LOADED_GEP]]
+// CHECK: end_borrow [[LOADED_BORROWED_VAL]]
+// CHECK: destroy_value [[LOADED_VAL]]
+// CHECK: apply {{%.*}}([[LOADED_GEP_COPY]])
+// CHECK: destroy_value [[LOADED_GEP_COPY]]
+// CHECK: } // end sil function '$s8moveonly16testGlobalBorrowyyF'
+func testGlobalBorrow() {
+    borrowVal(varGlobal)
+    borrowVal(varGlobal.nonTrivialStruct2)
+    borrowVal(letGlobal)
+    borrowVal(letGlobal.nonTrivialStruct2)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly17testGlobalConsumeyyF : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [deinit] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load [take]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [deinit] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[GEP:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK: [[LOADED_VAL:%.*]] = load [take] [[GEP]]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]]
+// CHECK: [[LOADED_BORROWED_VAL:%.*]] = begin_borrow [[LOADED_VAL]]
+// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_BORROWED_VAL]]
+// CHECK: [[LOADED_GEP_COPY:%.*]] = copy_value [[LOADED_GEP]]
+// CHECK: end_borrow [[LOADED_BORROWED_VAL]]
+// CHECK: destroy_value [[LOADED_VAL]]
+// CHECK: apply {{%.*}}([[LOADED_GEP_COPY]])
+//
+// CHECK: } // end sil function '$s8moveonly17testGlobalConsumeyyF'
+func testGlobalConsume() {
+    consumeVal(varGlobal)
+    consumeVal(varGlobal.nonTrivialStruct2)
+    consumeVal(letGlobal)
+    consumeVal(letGlobal.nonTrivialStruct2)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly16testGlobalAssignyyF : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: assign {{%.*}} to [[ACCESS]]
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: assign {{%.*}} to [[ACCESS]]
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[GEP:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK: assign {{%.*}} to [[GEP]]
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[GEP:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK: assign {{%.*}} to [[GEP]]
+// CHECK: end_access [[ACCESS]]
+// CHECK: } // end sil function '$s8moveonly16testGlobalAssignyyF'
+func testGlobalAssign() {
+    varGlobal = NonTrivialStruct()
+    varGlobal = NonTrivialStruct()
+    varGlobal.nonTrivialStruct2 = NonTrivialStruct2()
+    varGlobal.nonTrivialStruct2 = NonTrivialStruct2()
 }

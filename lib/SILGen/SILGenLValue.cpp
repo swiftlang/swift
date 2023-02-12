@@ -2988,6 +2988,14 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       // The only other case that should get here is a global variable.
       if (!address) {
         address = SGF.emitGlobalVariableRef(Loc, Storage, ActorIso);
+        if (address.getType().isMoveOnly()) {
+            auto checkKind =
+                MarkMustCheckInst::CheckKind::AssignableButNotConsumable;
+            if (isReadAccess(AccessKind)) {
+              checkKind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
+            }
+            address = SGF.B.createMarkMustCheckInst(Loc, address, checkKind);
+        }
       } else {
         assert((!ActorIso || Storage->isTopLevelGlobal()) &&
                "local var should not be actor isolated!");

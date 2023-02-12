@@ -615,6 +615,15 @@ void UseState::initializeLiveness(
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
 
+  // Check if our address is from a global_addr. In such a case, we treat the
+  // mark_must_check as the initialization.
+  if (auto *globalAddr = dyn_cast<GlobalAddrInst>(address->getOperand())) {
+    LLVM_DEBUG(llvm::dbgs() << "Found global_addr use... "
+                               "adding mark_must_check as init!\n");
+    initInsts.insert({address, liveness.getTopLevelSpan()});
+    liveness.initializeDef(address, liveness.getTopLevelSpan());
+  }
+
   // Now that we have finished initialization of defs, change our multi-maps
   // from their array form to their map form.
   liveness.finishedInitializationOfDefs();

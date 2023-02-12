@@ -59,11 +59,14 @@ static void diagnose(ASTContext &context, SILInstruction *inst, Diag<T...> diag,
   context.Diags.diagnose(loc.getSourceLoc(), diag, std::forward<U>(args)...);
 }
 
-static void getVariableNameForValue(MarkMustCheckInst *mmci,
+/// Helper function that actually implements getVariableNameForValue. Do not
+/// call it directly! Call the unary variants instead.
+static void getVariableNameForValue(SILValue value2,
+                                    SILValue searchValue,
                                     SmallString<64> &resultingString) {
   // Before we do anything, lets see if we have an exact debug_value on our
   // mmci. In such a case, we can end early and are done.
-  if (auto *use = getSingleDebugUse(mmci)) {
+  if (auto *use = getSingleDebugUse(value2)) {
     if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
       assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
       resultingString += debugVar.getName();
@@ -72,28 +75,27 @@ static void getVariableNameForValue(MarkMustCheckInst *mmci,
   }
 
   // Otherwise, we need to look at our mark_must_check's operand.
-  StackList<SILInstruction *> variableNamePath(mmci->getFunction());
-  SILValue value = mmci->getOperand();
+  StackList<SILInstruction *> variableNamePath(value2->getFunction());
   while (true) {
-    if (auto *allocInst = dyn_cast<AllocationInst>(value)) {
+    if (auto *allocInst = dyn_cast<AllocationInst>(searchValue)) {
       variableNamePath.push_back(allocInst);
       break;
     }
 
-    if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(value)) {
+    if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
       variableNamePath.push_back(globalAddrInst);
       break;
     }
 
-    if (auto *rei = dyn_cast<RefElementAddrInst>(value)) {
+    if (auto *rei = dyn_cast<RefElementAddrInst>(searchValue)) {
       variableNamePath.push_back(rei);
-      value = rei->getOperand();
+      searchValue = rei->getOperand();
       continue;
     }
 
     // If we do not do an exact match, see if we can find a debug_var inst. If
     // we do, we always break since we have a root value.
-    if (auto *use = getSingleDebugUse(value)) {
+    if (auto *use = getSingleDebugUse(searchValue)) {
       if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
         assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
         variableNamePath.push_back(use->getUser());
@@ -103,9 +105,9 @@ static void getVariableNameForValue(MarkMustCheckInst *mmci,
 
     // Otherwise, try to see if we have a single value instruction we can look
     // through.
-    if (isa<BeginBorrowInst>(value) || isa<LoadInst>(value) ||
-        isa<BeginAccessInst>(value) || isa<MarkMustCheckInst>(value)) {
-      value = cast<SingleValueInstruction>(value)->getOperand(0);
+    if (isa<BeginBorrowInst>(searchValue) || isa<LoadInst>(searchValue) ||
+        isa<BeginAccessInst>(searchValue) || isa<MarkMustCheckInst>(searchValue)) {
+      searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }
 
@@ -131,6 +133,19 @@ static void getVariableNameForValue(MarkMustCheckInst *mmci,
     resultingString += '.';
   }
 }
+
+
+static void getVariableNameForValue(MarkMustCheckInst *mmci,
+                                    SmallString<64> &resultingString) {
+  return getVariableNameForValue(mmci, mmci->getOperand(), resultingString);
+}
+
+#if 0
+static void getVariableNameForValue(SILValue value,
+                                    SmallString<64> &resultingString) {
+  return getVariableNameForValue(value, value, resultingString);
+}
+#endif
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Misc Diagnostics
