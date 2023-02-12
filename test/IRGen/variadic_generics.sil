@@ -166,3 +166,21 @@ bb0(%tuple : $*(String, T, U, Int), %i : $Builtin.Word):
   %ret = tuple ()
   return %ret : $()
 }
+
+// CHECK-LABEL: define{{.*}} @test_pack_length_1
+// CHECK:         ret [[INT]] %0
+sil @test_pack_length_1 : $<T...> () -> Builtin.Word {
+bb0:
+  %len = pack_length $Pack{repeat each T}
+  return %len : $Builtin.Word
+}
+
+// CHECK-LABEL: define{{.*}} @test_pack_length_2
+// CHECK:         [[T0:%.*]] = add [[INT]] %0, %0
+// CHECK:         [[T1:%.*]] = add [[INT]] [[T0]], 3
+// CHECK:         ret [[INT]] [[T1]]
+sil @test_pack_length_2 : $<T...> () -> Builtin.Word {
+bb0:
+  %len = pack_length $Pack{repeat each T, repeat each T, Int, Float, String}
+  return %len : $Builtin.Word
+}

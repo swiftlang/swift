@@ -3284,6 +3284,14 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         B.createOpenExistentialValue(InstLoc, Val, Ty, forwardingOwnership);
     break;
   }
+  case SILInstructionKind::PackLengthInst: {
+    CanPackType packType;
+    if (P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+        parseASTPackType(packType))
+      return true;
+    ResultVal = B.createPackLength(InstLoc, packType);
+    break;
+  }
   case SILInstructionKind::DynamicPackIndexInst: {
     CanPackType packType;
     if (parseValueRef(Val, SILType::getBuiltinWordType(P.Context), InstLoc, B) ||
