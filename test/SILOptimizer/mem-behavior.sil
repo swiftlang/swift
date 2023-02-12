@@ -16,7 +16,7 @@ class X {
 class Derived : X { }
 
 class C {
-  @_hasStorage @_hasInitialValue final let prop: Builtin.Int32 { get }
+  @_hasStorage @_hasInitialValue final var prop: Builtin.Int32 { get }
 }
 
 class Parent {
@@ -948,5 +948,35 @@ bb0 (%0 : $*C):
   destroy_addr %0 : $*C
   %3 = tuple()
   return %3 : $()
+}
+
+sil @do_store : $@convention(thin) (@guaranteed Parent) -> () {
+[%0: noescape **, read c0.v**]
+[global: write]
+}
+
+// CHECK-LABEL: @test_double_class_indirection
+// CHECK:       PAIR #4.
+// CHECK-NEXT:      %8 = apply %7(%1) : $@convention(thin) (@guaranteed Parent) -> ()
+// CHECK-NEXT:      %3 = ref_element_addr %1 : $Parent, #Parent.child
+// CHECK-NEXT:    r=1,w=0
+// CHECK-NEXT:  PAIR #5.
+// CHECK-NEXT:      %8 = apply %7(%1) : $@convention(thin) (@guaranteed Parent) -> ()
+// CHECK-NEXT:      %5 = ref_element_addr %2 : $C, #C.prop
+// CHECK-NEXT:    r=1,w=1
+sil @test_double_class_indirection : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = alloc_ref $Parent
+  %2 = alloc_ref $C
+  %3 = ref_element_addr %1 : $Parent, #Parent.child
+  store %2 to %3 : $*C
+  %5 = ref_element_addr %2 : $C, #C.prop
+  store %0 to %5 : $*Builtin.Int32
+
+  %f = function_ref @do_store : $@convention(thin) (@guaranteed Parent) -> ()
+  %a = apply %f(%1) : $@convention(thin) (@guaranteed Parent) -> ()
+
+  %r = tuple ()
+  return %r : $()
 }
 
