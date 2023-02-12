@@ -354,6 +354,12 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
     // Handle by operand and result check.
     break;
 
+  case SILInstructionKind::PackLengthInst:
+    // We reduce the pack shape, so it would very odd if this pack had
+    // opaque archetypes in it, but there's no harm in doing it right.
+    return opaqueArchetypeWouldChange(context,
+              cast<PackLengthInst>(&inst)->getPackType());
+
   case SILInstructionKind::DynamicPackIndexInst:
   case SILInstructionKind::PackPackIndexInst:
   case SILInstructionKind::ScalarPackIndexInst:

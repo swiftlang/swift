@@ -1276,6 +1276,7 @@ public:
   void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i);
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *i);
   
+  void visitPackLengthInst(PackLengthInst *i);
   void visitOpenPackElementInst(OpenPackElementInst *i);
   void visitDynamicPackIndexInst(DynamicPackIndexInst *i);
   void visitPackPackIndexInst(PackPackIndexInst *i);
@@ -6867,6 +6868,11 @@ void IRGenSILFunction::visitOpenExistentialMetatypeInst(
 void IRGenSILFunction::visitOpenExistentialValueInst(
     OpenExistentialValueInst *i) {
   llvm_unreachable("unsupported instruction during IRGen");
+}
+
+void IRGenSILFunction::visitPackLengthInst(PackLengthInst *i) {
+  auto length = emitPackShapeExpression(i->getPackType());
+  setLoweredSingletonExplosion(i, length);
 }
 
 void IRGenSILFunction::visitDynamicPackIndexInst(DynamicPackIndexInst *i) {

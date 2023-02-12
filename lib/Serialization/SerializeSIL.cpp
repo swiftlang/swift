@@ -1089,6 +1089,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     writeOneTypeLayout(API->getKind(), 0, API->getPackType());
     break;
   }
+  case SILInstructionKind::PackLengthInst: {
+    const PackLengthInst *PLI = cast<PackLengthInst>(&SI);
+    writeOneTypeLayout(PLI->getKind(), 0, PLI->getPackType());
+    break;
+  }
   case SILInstructionKind::ProjectBoxInst: {
     auto PBI = cast<ProjectBoxInst>(&SI);
     
