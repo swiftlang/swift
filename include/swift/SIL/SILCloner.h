@@ -2496,6 +2496,17 @@ void SILCloner<ImplClass>::visitDeinitExistentialValueInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitPackLengthInst(PackLengthInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  auto loc = getOpLocation(Inst->getLoc());
+  auto newPackType = cast<PackType>(getOpASTType(Inst->getPackType()));
+
+  recordClonedInstruction(
+      Inst, getBuilder().createPackLength(loc, newPackType));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitDynamicPackIndexInst(
     DynamicPackIndexInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

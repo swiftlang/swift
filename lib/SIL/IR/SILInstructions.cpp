@@ -2267,6 +2267,28 @@ OpenExistentialValueInst::OpenExistentialValueInst(
     : UnaryInstructionBase(debugLoc, operand, selfTy, forwardingOwnershipKind) {
 }
 
+PackLengthInst *PackLengthInst::create(SILFunction &F,
+                                       SILDebugLocation loc,
+                                       CanPackType packType) {
+  auto resultType = SILType::getBuiltinWordType(F.getASTContext());
+
+  // Always reduce the pack shape.
+  packType = packType->getReducedShape();
+
+  // Under current limitations, that should reliably eliminate
+  // any local archetypes from the pack, but there's no real need to
+  // assume that in the SIL representation.
+  SmallVector<SILValue, 8> typeDependentOperands;
+  collectTypeDependentOperands(typeDependentOperands, F, packType);
+
+  size_t size =
+    totalSizeToAlloc<swift::Operand>(typeDependentOperands.size());
+  void *buffer =
+    F.getModule().allocateInst(size, alignof(PackLengthInst));
+  return ::new (buffer)
+      PackLengthInst(loc, typeDependentOperands, resultType, packType);
+}
+
 DynamicPackIndexInst *DynamicPackIndexInst::create(SILFunction &F,
                                                    SILDebugLocation loc,
                                                    SILValue indexOperand,
@@ -2276,7 +2298,7 @@ DynamicPackIndexInst *DynamicPackIndexInst::create(SILFunction &F,
   SmallVector<SILValue, 8> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, F, packType);
 
-  unsigned size =
+  size_t size =
     totalSizeToAlloc<swift::Operand>(1 + typeDependentOperands.size());
   void *buffer =
     F.getModule().allocateInst(size, alignof(DynamicPackIndexInst));
@@ -2299,7 +2321,7 @@ PackPackIndexInst *PackPackIndexInst::create(SILFunction &F,
   SmallVector<SILValue, 8> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, F, packType);
 
-  unsigned size =
+  size_t size =
     totalSizeToAlloc<swift::Operand>(1 + typeDependentOperands.size());
   void *buffer =
     F.getModule().allocateInst(size, alignof(PackPackIndexInst));
@@ -2322,7 +2344,7 @@ ScalarPackIndexInst *ScalarPackIndexInst::create(SILFunction &F,
   SmallVector<SILValue, 8> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, F, packType);
 
-  unsigned size =
+  size_t size =
     totalSizeToAlloc<swift::Operand>(typeDependentOperands.size());
   void *buffer =
     F.getModule().allocateInst(size, alignof(ScalarPackIndexInst));
