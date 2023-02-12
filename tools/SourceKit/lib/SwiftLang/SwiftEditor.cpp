@@ -945,9 +945,13 @@ public:
     if (AvailableAttr::isUnavailable(D))
       return true;
 
+    Optional<unsigned> inBufferID;
+    if (SM.getRangeForBuffer(BufferID).contains(Range.getStart()))
+      inBufferID = BufferID;
+
     auto &SM = D->getASTContext().SourceMgr;
     if (D == D->getASTContext().getOptionalNoneDecl() &&
-        SM.extractText(Range, BufferID) == "nil") {
+        SM.extractText(Range, inBufferID) == "nil") {
       // If a 'nil' literal occurs in a swift-case statement, it gets replaced
       // by a reference to 'Optional.none' in the AST. We want to continue
       // highlighting 'nil' as a keyword and not as an enum element.
