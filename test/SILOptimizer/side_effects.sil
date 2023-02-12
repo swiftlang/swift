@@ -22,6 +22,13 @@ final class X {
 class Y {
 }
 
+final class Z {
+  @_hasStorage var a: Int32
+
+  init()
+  deinit
+}
+
 struct SP {
   var value: X
 }
@@ -71,6 +78,10 @@ sil @unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> (
 
 sil @$s4test1XCfD : $@convention(method) (@owned X) -> () {
 [global: copy, write]
+}
+
+sil @$s4test1ZCfD : $@convention(method) (@owned Z) -> () {
+[%0: write c0.v**]
 }
 
 // CHECK-LABEL: sil @load_store_to_args
@@ -495,7 +506,7 @@ bb0(%0 : $*X, %1 : $*X):
 }
 
 // CHECK-LABEL: sil [ossa] @destroy_value_effects1
-// CHECK-NEXT:  [%0: destroy v**.c*.v**]
+// CHECK-NEXT:  [%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
 // CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @destroy_value_effects1 : $@convention(thin) (@owned SP) -> () {
@@ -513,6 +524,17 @@ sil [ossa] @destroy_value_effects2 : $@convention(thin) (@owned SP) -> () {
 bb0(%0 : @owned $SP):
   (%1) = destructure_struct %0 : $SP
   destroy_value %1 : $X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_value_effects3
+// CHECK-NEXT:  [%0: write c0.v**, destroy c*.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @destroy_value_effects3 : $@convention(thin) (@owned Z) -> () {
+bb0(%0 : @owned $Z):
+  destroy_value %0 : $Z
   %2 = tuple ()
   return %2 : $()
 }
