@@ -344,6 +344,17 @@ entry(%intIndex : $Builtin.Word):
   return %t : $()
 }
 
+// Verify that we just gep into parameter packs for metadata and witness tables when that's all that the pack consists of.
+// CHECK-LL-LABEL: define {{.*}}@direct_access_from_parameter_with_conformance(
+// CHECK-LL-SAME:        i{{(32|64)}} [[INDEX:%[^,]+]], 
+// CHECK-LL-SAME:        i{{(32|64)}} {{%[^,]+}},
+// CHECK-LL-SAME:        %swift.type** [[METADATA_PACK:%[^,]+]],
+// CHECK-LL-SAME:        i8*** [[WTABLE_PACK:%[^,]+]])
+// CHECK-LL:         [[METADATA_ADDRESS:%[^,]+]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA_PACK]], i{{(32|64)}} [[INDEX]]
+// CHECK-LL:         [[METADATA:%[^,]+]] = load %swift.type*, %swift.type** [[METADATA_ADDRESS]]
+// CHECK-LL:         [[WTABLE_ADDRESS:%[^,]+]] = getelementptr inbounds i8**, i8*** [[WTABLE_PACK]], i{{(32|64)}} [[INDEX]]
+// CHECK-LL:         [[WTABLE:%[^,]+]] = load i8**, i8*** [[WTABLE_ADDRESS]], align 8
+// CHECK-LL:         call swiftcc void @printGenericType(%swift.type* [[METADATA]], %swift.type* [[METADATA]])
 sil @direct_access_from_parameter_with_conformance : $<T_1... : P> (Builtin.Word) -> () {
 entry(%intIndex : $Builtin.Word):
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T_1}

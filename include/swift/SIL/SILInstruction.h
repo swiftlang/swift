@@ -7451,6 +7451,36 @@ class DeinitExistentialValueInst
       : UnaryInstructionBase(DebugLoc, Existential) {}
 };
 
+/// Compute the length of a pack (as a Builtin.Word).
+class PackLengthInst final
+    : public NullaryInstructionWithTypeDependentOperandsBase<
+                  SILInstructionKind::PackLengthInst,
+                  PackLengthInst,
+                  SingleValueInstruction> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+  CanPackType ThePackType;
+
+  PackLengthInst(SILDebugLocation loc,
+                 ArrayRef<SILValue> typeDependentOperands,
+                 SILType resultType,
+                 CanPackType packType)
+    : NullaryInstructionWithTypeDependentOperandsBase(loc,
+                                                      typeDependentOperands,
+                                                      resultType),
+      ThePackType(packType) {}
+
+  static PackLengthInst *create(SILFunction &parent,
+                                SILDebugLocation loc,
+                                CanPackType packType);
+public:
+  /// Return the measured pack type.
+  CanPackType getPackType() const {
+    return ThePackType;
+  }
+};
+
 /// An abstract class for instructions which producing variadic
 /// pack indices.
 ///
@@ -8208,15 +8238,26 @@ public:
   enum class CheckKind : unsigned {
     Invalid = 0,
 
-    // A signal to the move only checker to perform no implicit copy checking on
-    // the result of this instruction. This implies that the result can be
-    // consumed at most once.
-    NoImplicitCopy,
+    /// A signal to the move only checker to perform checking that allows for
+    /// this value to be consumed along its boundary (in the case of let/var
+    /// semantics) and also written over in the case of var semantics. NOTE: Of
+    /// course this still implies the value cannot be copied and can be consumed
+    /// only once along all program paths.
+    ConsumableAndAssignable,
 
-    // A signal to the move only checker ot perform no copy checking. This
-    // forces the result of this instruction owned value to never be consumed
-    // (still allowing for non-consuming uses of course).
-    NoCopy,
+    /// A signal to the move only checker to perform no consume or assign
+    /// checking. This forces the result of this instruction owned value to never
+    /// be consumed (for let/var semantics) or assigned over (for var
+    /// semantics). Of course, we still allow for non-consuming uses.
+    NoConsumeOrAssign,
+
+    /// A signal to the move checker that the given value cannot be consumed,
+    /// but is allowed to be assigned over. This is used for situations like
+    /// global_addr/ref_element_addr/closure escape where we do not want to
+    /// allow for the user to take the value (leaving the memory in an
+    /// uninitialized state), but we are ok with the user assigning a new value,
+    /// completely assigning over the value at once.
+    AssignableButNotConsumable,
   };
 
 private:
@@ -8239,8 +8280,9 @@ public:
     switch (kind) {
     case CheckKind::Invalid:
       return false;
-    case CheckKind::NoImplicitCopy:
-    case CheckKind::NoCopy:
+    case CheckKind::ConsumableAndAssignable:
+    case CheckKind::NoConsumeOrAssign:
+    case CheckKind::AssignableButNotConsumable:
       return true;
     }
   }

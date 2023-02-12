@@ -918,11 +918,11 @@ static void setLocationInfo(const ValueDecl *VD,
         // function body and which we created while reusing the ASTContext for
         // the rest of the file. Map the location back to the original file.
         unsigned OriginalBufID = SM.findBufferContainingLoc(
-            GeneratedSourceInfo->originalSourceRange.Start);
+            GeneratedSourceInfo->originalSourceRange.getStart());
         auto OriginalStartOffset = SM.getLocOffsetInBuffer(
-            GeneratedSourceInfo->originalSourceRange.Start, OriginalBufID);
+            GeneratedSourceInfo->originalSourceRange.getStart(), OriginalBufID);
         auto GeneratedStartOffset = SM.getLocOffsetInBuffer(
-            GeneratedSourceInfo->generatedSourceRange.Start, DeclBufID);
+            GeneratedSourceInfo->generatedSourceRange.getStart(), DeclBufID);
         Location.Offset += OriginalStartOffset - GeneratedStartOffset;
         assert(SM.findBufferContainingLoc(Loc) == DeclBufID);
         std::tie(Location.Line, Location.Column) =

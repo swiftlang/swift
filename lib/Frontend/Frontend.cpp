@@ -1229,11 +1229,11 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports(
   bool hadLoadError = false;
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
-    auto *file =
-      DefaultSerializedLoader->loadAST(*mod, /*diagLoc*/ SourceLoc(), /*moduleInterfacePath*/ "",
-                     std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
-                     std::move(PM.ModuleSourceInfoBuffer),
-                     /*isFramework*/ false);
+    auto *file = DefaultSerializedLoader->loadAST(
+        *mod, /*diagLoc=*/SourceLoc(), /*moduleInterfacePath*/ "",
+        /*moduleInterfaceSourcePath=*/"", std::move(PM.ModuleBuffer),
+        std::move(PM.ModuleDocBuffer), std::move(PM.ModuleSourceInfoBuffer),
+        /*isFramework*/ false);
     if (file) {
       partialModules.push_back(file);
     } else {

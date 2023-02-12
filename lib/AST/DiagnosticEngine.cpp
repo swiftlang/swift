@@ -1241,11 +1241,8 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
             bufferID,
             GeneratedSourceInfo{
               GeneratedSourceInfo::PrettyPrinted,
-              SourceRange(),
-              SourceRange(
-                  memBufferStartLoc,
-                  memBufferStartLoc.getAdvancedLoc(buffer.size())
-              ),
+              CharSourceRange(),
+              CharSourceRange(memBufferStartLoc, buffer.size()),
               ASTNode(const_cast<Decl *>(ppDecl)).getOpaqueValue(),
               nullptr
             }
@@ -1315,7 +1312,8 @@ std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
     case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
     case GeneratedSourceInfo::AccessorMacroExpansion:
     case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-    case GeneratedSourceInfo::MemberMacroExpansion: {
+    case GeneratedSourceInfo::MemberMacroExpansion:
+    case GeneratedSourceInfo::PeerMacroExpansion: {
       SourceRange origRange = expansionNode.getSourceRange();
       DeclName macroName;
       if (auto customAttr = generatedInfo->attachedMacroCustomAttr) {

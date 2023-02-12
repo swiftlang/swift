@@ -474,6 +474,7 @@ private:
     case Node::Kind::OwningMutableAddressor:
     case Node::Kind::PartialApplyForwarder:
     case Node::Kind::PartialApplyObjCForwarder:
+    case Node::Kind::PeerAttachedMacroExpansion:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
     case Node::Kind::PrefixOperator:
@@ -1356,6 +1357,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::MemberAttachedMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "member macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::PeerAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "peer macro expansion #",
                        (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::MacroExpansionUniqueName:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,

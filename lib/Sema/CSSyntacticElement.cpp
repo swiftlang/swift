@@ -74,7 +74,7 @@ public:
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
       auto *decl = DRE->getDecl();
 
-      if (auto type = CS.getTypeIfAvailable(decl)) {
+      if (auto type = CS.getTypeIfAvailable(DRE->getDecl())) {
         auto &ctx = CS.getASTContext();
         // If this is not one of the closure parameters which
         // is inferrable from the body, let's replace type

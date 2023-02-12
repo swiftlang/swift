@@ -1992,11 +1992,14 @@ public:
     switch (I->getCheckKind()) {
     case CheckKind::Invalid:
       llvm_unreachable("Invalid?!");
-    case CheckKind::NoImplicitCopy:
-      *this << "[no_implicit_copy] ";
+    case CheckKind::ConsumableAndAssignable:
+      *this << "[consumable_and_assignable] ";
       break;
-    case CheckKind::NoCopy:
-      *this << "[no_copy] ";
+    case CheckKind::NoConsumeOrAssign:
+      *this << "[no_consume_or_assign] ";
+      break;
+    case CheckKind::AssignableButNotConsumable:
+      *this << "[assignable_but_not_consumable] ";
       break;
     }
     *this << getIDAndType(I->getOperand());
@@ -2270,6 +2273,9 @@ public:
   }
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEI) {
     *this << getIDAndType(DEI->getOperand()) << ", $" << DEI->getConcreteType();
+  }
+  void visitPackLengthInst(PackLengthInst *PLI) {
+    *this << "$" << PLI->getPackType();
   }
   void visitDynamicPackIndexInst(DynamicPackIndexInst *DPII) {
     *this << Ctx.getID(DPII->getOperand()) << " of $"

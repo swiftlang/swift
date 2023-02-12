@@ -143,11 +143,41 @@ enum class SGFAccessKind : uint8_t {
   /// The access is a read-modify-write.
   ///
   /// The caller will be calling emitAddressOfLValue on the l-value.
-  ReadWrite
+  ReadWrite,
+
+  /// The access is a consuming operation that would prefer a loaded address
+  /// value. The lvalue will subsequently be left in an uninitialized state.
+  ///
+  /// The caller will be calling emitAddressOfLValue and then load from the
+  /// l-value.
+  OwnedAddressConsume,
+
+  /// The access is a consuming operation that would prefer a loaded owned
+  /// value. The lvalue will subsequently be left in an uninitialized state.
+  ///
+  /// The caller will be calling emitAddressOfLValue and then load from the
+  /// l-value.
+  OwnedObjectConsume,
 };
 
 static inline bool isReadAccess(SGFAccessKind kind) {
   return uint8_t(kind) <= uint8_t(SGFAccessKind::OwnedObjectRead);
+}
+
+static inline bool isConsumeAccess(SGFAccessKind kind) {
+  switch (kind) {
+  case SGFAccessKind::IgnoredRead:
+  case SGFAccessKind::BorrowedAddressRead:
+  case SGFAccessKind::BorrowedObjectRead:
+  case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::OwnedObjectRead:
+  case SGFAccessKind::Write:
+  case SGFAccessKind::ReadWrite:
+    return false;
+  case SGFAccessKind::OwnedAddressConsume:
+  case SGFAccessKind::OwnedObjectConsume:
+    return true;
+  }
 }
 
 /// Given a read access kind, does it require an owned result?
@@ -170,9 +200,12 @@ static inline SGFAccessKind getAddressAccessKind(SGFAccessKind kind) {
     return SGFAccessKind::BorrowedAddressRead;
   case SGFAccessKind::OwnedObjectRead:
     return SGFAccessKind::OwnedAddressRead;
+  case SGFAccessKind::OwnedObjectConsume:
+    return SGFAccessKind::OwnedAddressConsume;
   case SGFAccessKind::IgnoredRead:
   case SGFAccessKind::BorrowedAddressRead:
   case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::OwnedAddressConsume:
   case SGFAccessKind::Write:
   case SGFAccessKind::ReadWrite:
     return kind;
@@ -190,6 +223,10 @@ static inline AccessKind getFormalAccessKind(SGFAccessKind kind) {
     return AccessKind::Read;
   case SGFAccessKind::Write:
     return AccessKind::Write;
+
+  // TODO: Do we need our own AccessKind here?
+  case SGFAccessKind::OwnedAddressConsume:
+  case SGFAccessKind::OwnedObjectConsume:
   case SGFAccessKind::ReadWrite:
     return AccessKind::ReadWrite;
   }
@@ -1666,6 +1703,8 @@ public:
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    TSanKind tsanKind = TSanKind::None);
   ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
+                                  TSanKind tsanKind = TSanKind::None);
+  ManagedValue emitConsumedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,

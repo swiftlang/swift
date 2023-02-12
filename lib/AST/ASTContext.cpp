@@ -6204,10 +6204,19 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
 
 void ASTContext::loadCompilerPlugins() {
   for (auto &path : SearchPathOpts.getCompilerPluginLibraryPaths()) {
+    auto fs = this->SourceMgr.getFileSystem();
+    SmallString<128> resolvedPath;
+    if (auto err = fs->getRealPath(path, resolvedPath)) {
+      Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
+                     err.message());
+      continue;
+    }
+
     void *lib = nullptr;
 #if !defined(_WIN32)
-    lib = dlopen(path.c_str(), RTLD_LAZY|RTLD_LOCAL);
+    lib = dlopen(resolvedPath.c_str(), RTLD_LAZY|RTLD_LOCAL);
 #endif
+
     if (!lib) {
       const char *errorMsg = "Unsupported platform";
 #if !defined(_WIN32)
@@ -6218,7 +6227,7 @@ void ASTContext::loadCompilerPlugins() {
       continue;
     }
 
-    getImpl().LoadedPluginPaths.push_back({path, lib});
+    getImpl().LoadedPluginPaths.emplace_back(resolvedPath.str().str(), lib);
   }
 }
 

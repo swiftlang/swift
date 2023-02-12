@@ -88,3 +88,12 @@ bb0(%tuple : $*(String, repeat each T, Int), %i : $Builtin.Word):
   %ret = tuple ()
   return %ret : $()
 }
+
+// CHECK-LABEBL: sil @test7
+// CHECK:   [[LEN:%.*]] = pack_length $Pack{(), (), ()}
+// CHECK:   return [[LEN]] : $Builtin.Word
+sil @test7 : $() -> Builtin.Word {
+bb0:
+  %0 = pack_length $Pack{Int, Float, String}
+  return %0 : $Builtin.Word
+}

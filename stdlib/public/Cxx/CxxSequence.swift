@@ -10,53 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Bridged C++ iterator that allows to traverse the elements of a sequence 
-/// using a for-in loop.
-///
-/// Mostly useful for conforming a type to the `CxxSequence` protocol and should
-/// not generally be used directly.
-///
-/// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/InputIterator
-public protocol UnsafeCxxInputIterator: Equatable {
-  associatedtype Pointee
-
-  /// Returns the unwrapped result of C++ `operator*()`.
-  ///
-  /// Generally, Swift creates this property automatically for C++ types that
-  /// define `operator*()`.
-  var pointee: Pointee { get }
-
-  /// Returns an iterator pointing to the next item in the sequence.
-  ///
-  /// Generally, Swift creates this property automatically for C++ types that
-  /// define pre-increment `operator++()`.
-  func successor() -> Self
-}
-
-extension UnsafePointer: UnsafeCxxInputIterator {}
-
-extension UnsafeMutablePointer: UnsafeCxxInputIterator {}
-
-extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
-  public typealias Pointee = Wrapped.Pointee
-
-  @inlinable
-  public var pointee: Pointee {
-    if let value = self {
-      return value.pointee
-    }
-    fatalError("Could not dereference nullptr")
-  }
-
-  @inlinable
-  public func successor() -> Self {
-    if let value = self {
-      return value.successor()
-    }
-    fatalError("Could not increment nullptr")
-  }
-}
-
 /// Use this protocol to conform custom C++ sequence types to Swift's `Sequence`
 /// protocol like this:
 ///

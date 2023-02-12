@@ -47,6 +47,9 @@ public:
     /// The expansion of an attached member macro.
     MemberMacroExpansion,
 
+    /// The expansion of an attached peer macro.
+    PeerMacroExpansion,
+
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
 
@@ -60,12 +63,12 @@ public:
   /// which source code was generated. Conceptually, one can think of the
   /// buffer described by a \c GeneratedSource instance as replacing the
   /// code in the \c originalSourceRange.
-  SourceRange originalSourceRange;
+  CharSourceRange originalSourceRange;
 
   /// The source range in the generated-source buffer where the generated
   /// code exists. This might be a subrange of the buffer containing the
   /// generated source, but it will never be from a different buffer.
-  SourceRange generatedSourceRange;
+  CharSourceRange generatedSourceRange;
 
   /// The opaque pointer for an ASTNode for which this buffer was generated.
   void *astNode;

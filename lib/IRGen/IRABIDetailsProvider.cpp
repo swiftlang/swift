@@ -14,6 +14,7 @@
 #include "Callee.h"
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
+#include "GenPointerAuth.h"
 #include "GenType.h"
 #include "GenericRequirement.h"
 #include "IRGen.h"
@@ -29,6 +30,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
@@ -205,6 +207,21 @@ public:
 
   using MethodDispatchInfo = IRABIDetailsProvider::MethodDispatchInfo;
 
+  Optional<MethodDispatchInfo::PointerAuthDiscriminator>
+  getMethodPointerAuthInfo(const AbstractFunctionDecl *funcDecl,
+                           SILDeclRef method) {
+    // FIXME: Async support.
+    if (funcDecl->hasAsync())
+      return None;
+    const auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods;
+    if (!schema)
+      return None;
+    auto discriminator =
+        PointerAuthInfo::getOtherDiscriminator(IGM, schema, method);
+    return MethodDispatchInfo::PointerAuthDiscriminator{
+        discriminator->getZExtValue()};
+  }
+
   Optional<MethodDispatchInfo>
   getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl) {
     if (funcDecl->isSemanticallyFinal())
@@ -216,12 +233,18 @@ public:
     auto *parentClass = dyn_cast<ClassDecl>(funcDecl->getDeclContext());
     if (!parentClass)
       return MethodDispatchInfo::direct();
+    // Resilient indirect calls should go through a thunk.
+    if (parentClass->hasResilientMetadata())
+      return MethodDispatchInfo::thunk(
+          LinkEntity::forDispatchThunk(
+              SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl)))
+              .mangleAsString());
     auto &layout = IGM.getMetadataLayout(parentClass);
     if (!isa<ClassMetadataLayout>(layout))
       return {};
     auto &classLayout = cast<ClassMetadataLayout>(layout);
-    auto *mi = classLayout.getStoredMethodInfoIfPresent(
-        SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl)));
+    auto silDecl = SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl));
+    auto *mi = classLayout.getStoredMethodInfoIfPresent(silDecl);
     if (!mi)
       return {};
     switch (mi->TheKind) {
@@ -230,7 +253,8 @@ public:
     case ClassMetadataLayout::MethodInfo::Kind::Offset:
       if (mi->TheOffset.isStatic()) {
         return MethodDispatchInfo::indirectVTableStaticOffset(
-            /*bitOffset=*/mi->TheOffset.getStaticOffset().getValue());
+            /*bitOffset=*/mi->TheOffset.getStaticOffset().getValue(),
+            getMethodPointerAuthInfo(funcDecl, silDecl));
       }
       return {};
     }

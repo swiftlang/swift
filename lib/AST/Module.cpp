@@ -921,6 +921,9 @@ Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::MemberMacroExpansion:
     return MacroRole::Member;
 
+  case GeneratedSourceInfo::PeerMacroExpansion:
+    return MacroRole::Peer;
+
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
     return None;
@@ -2064,11 +2067,9 @@ StringRef ModuleDecl::getModuleFilename() const {
 
 StringRef ModuleDecl::getModuleSourceFilename() const {
   for (auto F : getFiles()) {
-    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(F))
-      continue;
-    return F->getModuleDefiningPath();
+    if (auto LF = dyn_cast<LoadedFile>(F))
+      return LF->getSourceFilename();
   }
-
   return StringRef();
 }
 

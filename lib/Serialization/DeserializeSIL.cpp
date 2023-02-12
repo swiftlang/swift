@@ -1329,6 +1329,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     break;
   }
+  case SILInstructionKind::PackLengthInst: {
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultInst = Builder.createPackLength(
+        Loc, cast<PackType>(MF->getType(TyID)->getCanonicalType()));
+    break;
+  }
   case SILInstructionKind::MetatypeInst:
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultInst = Builder.createMetatype(

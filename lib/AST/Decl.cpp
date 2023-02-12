@@ -369,9 +369,9 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
 
 DeclAttributes Decl::getSemanticAttrs() const {
   auto mutableThis = const_cast<Decl *>(this);
-  evaluateOrDefault(getASTContext().evaluator,
-                    ExpandMemberAttributeMacros{mutableThis},
-                    false);
+  (void)evaluateOrDefault(getASTContext().evaluator,
+                          ExpandMemberAttributeMacros{mutableThis},
+                          { });
 
   return getAttrs();
 }
@@ -6814,6 +6814,11 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
   return false;
 }
 
+/// Whether this property has any attached runtime metadata attributes.
+bool VarDecl::hasRuntimeMetadataAttributes() const {
+  return !getRuntimeDiscoverableAttrs().empty();
+}
+
 bool VarDecl::hasImplicitPropertyWrapper() const {
   if (getAttrs().hasAttribute<CustomAttr>()) {
     if (!getAttachedPropertyWrappers().empty())
@@ -9753,6 +9758,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::Member:
     return "member";
+
+  case MacroRole::Peer:
+    return "peer";
   }
 }
 
@@ -9798,7 +9806,8 @@ static MacroRoles freestandingMacroRoles =
 static MacroRoles attachedMacroRoles = (MacroRoles() |
                                         MacroRole::Accessor |
                                         MacroRole::MemberAttribute |
-                                        MacroRole::Member);
+                                        MacroRole::Member |
+                                        MacroRole::Peer);
 
 bool swift::isFreestandingMacro(MacroRoles contexts) {
   return bool(contexts & freestandingMacroRoles);
@@ -9976,6 +9985,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
+  case GeneratedSourceInfo::PeerMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
     return origDC;

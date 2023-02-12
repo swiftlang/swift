@@ -110,13 +110,19 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
                                            IterableDeclContext *implDecl) {
   // Expand synthesized member macros.
   auto &ctx = decl->getASTContext();
-  evaluateOrDefault(ctx.evaluator,
-                    ExpandSynthesizedMemberMacroRequest{decl},
-                    false);
+  (void)evaluateOrDefault(ctx.evaluator,
+                          ExpandSynthesizedMemberMacroRequest{decl},
+                          false);
 
   // Just walk over the members of the type, forcing backing storage
   // for lazy properties and property wrappers to be synthesized.
   for (auto *member : implDecl->getMembers()) {
+    // Expand peer macros.
+    (void)evaluateOrDefault(
+        ctx.evaluator,
+        ExpandPeerMacroRequest{member},
+        false);
+
     auto *var = dyn_cast<VarDecl>(member);
     if (!var || var->isStatic())
       continue;
@@ -3408,10 +3414,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   }
 
   // Expand any attached accessor macros.
-  storage->forEachAttachedMacro(MacroRole::Accessor,
-      [&](CustomAttr *customAttr, MacroDecl *macro) {
-        expandAccessors(storage, customAttr, macro);
-      });
+  (void)evaluateOrDefault(evaluator, ExpandAccessorMacros{storage}, { });
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
   bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);

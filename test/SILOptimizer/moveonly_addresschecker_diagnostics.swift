@@ -2387,16 +2387,26 @@ func fieldSensitiveTestReinitEnumMultiBlock2() {
 
 func sameCallSiteTestConsumeTwice(_ k: inout Klass) { // expected-error {{'k' consumed more than once}}
     func consumeKlassTwice(_ k: __owned Klass, _ k2: __owned Klass) {}
-    consumeKlassTwice(k, k)
+    consumeKlassTwice(k, k) // expected-error {{overlapping accesses to 'k', but deinitialization requires exclusive access; consider copying to a local variable}}
     // expected-note @-1 {{consuming use here}}
     // expected-note @-2 {{consuming use here}}
+    // expected-note @-3 {{conflicting access is here}}
     k = Klass()
 }
 
 func sameCallSiteConsumeAndUse(_ k: inout Klass) { // expected-error {{'k' used after consume}}
     func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: Klass) {}
-    consumeKlassAndUseKlass(k, k)
+    consumeKlassAndUseKlass(k, k) // expected-error {{overlapping accesses to 'k', but deinitialization requires exclusive access; consider copying to a local variable}}
     // expected-note @-1 {{consuming use here}}
     // expected-note @-2 {{non-consuming use here}}
+    // expected-note @-3 {{conflicting access is here}}
     k = Klass()
+}
+
+func inoutAndConsumingUse(_ k: inout Klass) { // expected-error {{'k' used after consume}}
+    func consumeKlassAndInoutUseKlass(_ k: __owned Klass, _ k2: inout Klass) {}
+    consumeKlassAndInoutUseKlass(k, &k) // expected-error {{overlapping accesses to 'k', but deinitialization requires exclusive access; consider copying to a local variable}}
+    // expected-note @-1 {{non-consuming use here}}
+    // expected-note @-2 {{consuming use here}}
+    // expected-note @-3 {{conflicting access is here}}
 }

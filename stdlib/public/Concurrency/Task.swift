@@ -1008,8 +1008,8 @@ extension Task where Failure == Error {
   public static func runInline(_ body: () async throws -> Success) rethrows -> Success {
     return try _runInlineHelper(
       body: {
-        do { 
-          let value = try await body() 
+        do {
+          let value = try await body()
           return Result.success(value)
         }
         catch let error {

@@ -570,6 +570,25 @@ void SILBuilder::emitDestructureAddressOperation(
                   });
 }
 
+void SILBuilder::emitDestructureAddressOperation(
+    SILLocation loc, SILValue v,
+    function_ref<void(unsigned, SILValue)> results) {
+
+  // If we do not have a tuple or a struct, add to our results list.
+  SILType type = v->getType();
+  if (!(type.is<TupleType>() || type.getStructOrBoundGenericStruct())) {
+    return;
+  }
+
+  SmallVector<Projection, 16> projections;
+  Projection::getFirstLevelProjections(v->getType(), getModule(),
+                                       getTypeExpansionContext(), projections);
+  for (auto pair : llvm::enumerate(projections)) {
+    results(pair.index(),
+            pair.value().createAddressProjection(*this, loc, v).get());
+  }
+}
+
 void SILBuilder::emitDestructureValueOperation(
     SILLocation loc, SILValue operand,
     function_ref<void(unsigned, SILValue)> func) {

@@ -492,6 +492,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ScalarPackIndexInst:
   case SILInstructionKind::PackElementGetInst:
   case SILInstructionKind::PackElementSetInst:
+  case SILInstructionKind::PackLengthInst:
   case SILInstructionKind::DebugStepInst:
     return RuntimeEffect::NoEffect;
 

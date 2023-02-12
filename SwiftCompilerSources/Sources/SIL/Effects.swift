@@ -88,9 +88,41 @@ extension Function {
   public func getSideEffects(forArgument argument: ProjectedValue,
                              atIndex argumentIndex: Int,
                              withConvention convention: ArgumentConvention) -> SideEffects.GlobalEffects {
+    var result = SideEffects.GlobalEffects()
+
+    // Effects are only defined for operations which don't involve a load.
+    // In case the argument's path involves a load we need to return the global effects.
+    if argument.value.type.isAddress {
+      // Indirect arguments:
+      if argument.path.mayHaveClassProjection {
+        // For example:
+        //   bb0(%0: $*C):
+        //     %1 = load %0               // the involved load
+        //     %2 = ref_element_addr %1   // class projection
+        return getSideEffects()
+      }
+    } else {
+      // Direct arguments:
+      if argument.path.mayHaveTwoClassProjections {
+        // For example:
+        //   bb0(%0: $C):
+        //     %1 = ref_element_addr %1   // first class projection
+        //     %2 = load %1               // the involved load
+        //     %3 = ref_element_addr %2   // second class projection
+        return getSideEffects()
+
+      } else if argument.path.mayHaveClassProjection {
+        // For example:
+        //   bb0(%0: $C):
+        //     %1 = ref_element_addr %1   // class projection
+        //     %2 = load [take] %1        // the involved load
+        //     destroy_value %2
+        result.ownership = getSideEffects().ownership
+      }
+    }
+
     if let sideEffects = effects.sideEffects {
       /// There are computed side effects.
-      var result = SideEffects.GlobalEffects()
       let argEffect = sideEffects.getArgumentEffects(for: argumentIndex)
       if let effectPath = argEffect.read, effectPath.mayOverlap(with: argument.path) {
         result.memory.read = true
@@ -499,7 +531,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
       case .directGuaranteed:
         // Note that `directGuaranteed` still has a "destroy" effect, because an object stored in
         // a class property could be destroyed.
-        if argument.path.hasNoClassProjection {
+        if !argument.path.mayHaveClassProjection {
           result.ownership.destroy = false
         }
         fallthrough

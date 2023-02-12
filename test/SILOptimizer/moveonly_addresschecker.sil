@@ -56,7 +56,7 @@ public struct NonTrivialStruct2 {
 sil [ossa] @simpleInitReturn : $@convention(thin) (@owned NonTrivialStruct) -> @owned NonTrivialStruct {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   %3 = load [copy] %2 : $*NonTrivialStruct
   destroy_addr %2 : $*NonTrivialStruct
@@ -67,7 +67,7 @@ bb0(%0 : @owned $NonTrivialStruct):
 sil [ossa] @simpleInitReturn2 : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> @owned NonTrivialStructPair {
 bb0(%arg1 : @owned $NonTrivialStruct, %arg2 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %arg1 to [init] %2 : $*NonTrivialStruct
   %3 = load [copy] %2 : $*NonTrivialStruct
   destroy_addr %2 : $*NonTrivialStruct
@@ -96,7 +96,7 @@ bb0(%arg1 : @owned $NonTrivialStruct, %arg2 : @owned $NonTrivialStruct):
 sil [ossa] @simpleInitReturnMoveOnlyField : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   %3a = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.k
   %3 = load [copy] %3a : $*Klass
@@ -132,7 +132,7 @@ bb0(%0 : @owned $NonTrivialStruct):
 sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   cond_br undef, bb1, bb2
 
@@ -182,7 +182,7 @@ bb3(%5 : @owned $Klass):
 sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock2 : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   cond_br undef, bb1, bb2
 
@@ -235,7 +235,7 @@ bb3(%5 : @owned $Klass):
 sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock3 : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [no_implicit_copy] %1 : $*NonTrivialStruct
+  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   cond_br undef, bb1, bb2
 
@@ -269,7 +269,7 @@ bb3(%5 : @owned $Klass):
 sil [ossa] @useVarKlassNoErrorSimple : $@convention(thin) (@owned Klass) -> () {
 bb0(%arg : @owned $Klass):
   %0 = alloc_stack [lexical] $Klass, var, name "k"
-  %1 = mark_must_check [no_implicit_copy] %0 : $*Klass
+  %1 = mark_must_check [consumable_and_assignable] %0 : $*Klass
   store %arg to [init] %1 : $*Klass
   %12 = begin_access [read] [static] %1 : $*Klass
   %13 = load_borrow %12 : $*Klass
@@ -281,7 +281,7 @@ bb0(%arg : @owned $Klass):
   %19 = load [copy] %18 : $*Klass
   end_access %18 : $*Klass
   %21 = move_value [lexical] %19 : $Klass
-  %22 = mark_must_check [no_implicit_copy] %21 : $Klass
+  %22 = mark_must_check [consumable_and_assignable] %21 : $Klass
   debug_value %22 : $Klass, let, name "k2"
   %25 = move_value %22 : $Klass
   destroy_value %25 : $Klass
@@ -308,7 +308,7 @@ bb0(%arg : @owned $Klass):
 sil [ossa] @classSimpleNonConsumingUseTest : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   %4 = alloc_stack [lexical] $Klass, var, name "x2"
-  %5 = mark_must_check [no_implicit_copy] %4 : $*Klass
+  %5 = mark_must_check [consumable_and_assignable] %4 : $*Klass
   store %0 to [init] %5 : $*Klass
   %9 = begin_access [modify] [static] %5 : $*Klass
   store %1 to [assign] %9 : $*Klass
@@ -331,7 +331,7 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
 sil [ossa] @myBufferViewSetter : $@convention(method) <T> (UnsafeBufferPointer<T>, @inout MyBufferView<T>) -> () {
 bb0(%0 : $UnsafeBufferPointer<T>, %1 : $*MyBufferView<T>):
   debug_value %0 : $UnsafeBufferPointer<T>, let, name "value", argno 1, implicit
-  %3 = mark_must_check [no_implicit_copy] %1 : $*MyBufferView<T>
+  %3 = mark_must_check [consumable_and_assignable] %1 : $*MyBufferView<T>
   debug_value %3 : $*MyBufferView<T>, var, name "self", argno 2, implicit, expr op_deref
   %5 = begin_access [modify] [static] %3 : $*MyBufferView<T>
   %6 = struct_element_addr %5 : $*MyBufferView<T>, #MyBufferView.ptr
