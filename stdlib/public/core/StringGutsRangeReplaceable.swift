@@ -247,7 +247,10 @@ extension _StringGuts {
 
     // We re-initialize from the modified storage to pick up new count, flags,
     // etc.
-    self = _StringGuts(self._object.nativeStorage)
+    let object = self._object // keep object alive during self mutation
+    withExtendedLifetime(object) {
+      self = _StringGuts(object.nativeStorage)
+    }
   }
 
   @inline(never) // slow-path
@@ -260,7 +263,10 @@ extension _StringGuts {
 
     // We re-initialize from the modified storage to pick up new count, flags,
     // etc.
-    self = _StringGuts(self._object.nativeStorage)
+    let object = self._object // keep object alive during self mutation
+    withExtendedLifetime(object) {
+      self = _StringGuts(object.nativeStorage)
+    }
   }
 
   internal mutating func clear() {
@@ -271,7 +277,10 @@ extension _StringGuts {
 
     // Reset the count
     _object.nativeStorage.clear()
-    self = _StringGuts(_object.nativeStorage)
+    let object = self._object // keep object alive during self mutation
+    withExtendedLifetime(object) {
+      self = _StringGuts(object.nativeStorage)
+    }
   }
 
   internal mutating func remove(from lower: Index, to upper: Index) {
@@ -284,7 +293,10 @@ extension _StringGuts {
       _object.nativeStorage.remove(from: lowerOffset, to: upperOffset)
       // We re-initialize from the modified storage to pick up new count, flags,
       // etc.
-      self = _StringGuts(self._object.nativeStorage)
+      let object = self._object // keep object alive during self mutation
+      withExtendedLifetime(object) {
+        self = _StringGuts(object.nativeStorage)
+      }
       return
     }
 
@@ -413,7 +425,10 @@ extension _StringGuts {
     let start = bounds.lowerBound._encodedOffset
     let end = bounds.upperBound._encodedOffset
     _object.nativeStorage.replace(from: start, to: end, with: codeUnits)
-    self = _StringGuts(_object.nativeStorage)
+    let object = self._object // keep object alive during self mutation
+    withExtendedLifetime(object) {
+      self = _StringGuts(object.nativeStorage)
+    }
     return Range(_uncheckedBounds: (start, start + codeUnits.count))
   }
 
@@ -437,7 +452,10 @@ extension _StringGuts {
     let end = bounds.upperBound._encodedOffset
     _object.nativeStorage.replace(
       from: start, to: end, with: codeUnits, replacementCount: replCount)
-    self = _StringGuts(_object.nativeStorage)
+    let object = self._object // keep object alive during self mutation
+    withExtendedLifetime(object) {
+      self = _StringGuts(object.nativeStorage)
+    }
     return Range(_uncheckedBounds: (start, start + replCount))
   }
 
