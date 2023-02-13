@@ -75,7 +75,7 @@ public func createCrossModuleDerivedDerivedClass() -> CrossModuleDerivedDerivedC
 #endif
 
 // CHECK: SWIFT_EXTERN void $s8UseClass018CrossModuleDerivedB0C015virtualMethodInE0yyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // virtualMethodInDerived()
-// CHECK-NEXT: SWIFT_EXTERN uint64_t $s8UseClass018CrossModuleDerivedB0CMo; // class metadata base offset
+// CHECK-NEXT: SWIFT_EXTERN uint[[#NUM:]]_t $s8UseClass018CrossModuleDerivedB0CMo; // class metadata base offset
 // CHECK-NEXT: SWIFT_EXTERN ptrdiff_t $s8UseClass018CrossModuleDerivedB0C19derivedComputedPropSivg(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN void $s8UseClass018CrossModuleDerivedB0C016virtualMethod2InE0yyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // virtualMethod2InDerived()
 
