@@ -1231,145 +1231,6 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
   }
 }
 
-/// Check that, if this declaration is a member of an `@_objcImplementation`
-/// extension, it is either `final` or `@objc` (which may have been inferred by
-/// checking whether it shadows an imported declaration).
-static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
-  // We check the properties instead of their accessors.
-  if (isa<AccessorDecl>(VD) || isa<DestructorDecl>(member))
-    return;
-
-  // Are we in an @_objcImplementation extension?
-  auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
-  if (!ED || !ED->isObjCImplementation())
-    return;
-
-  assert(ED->getSelfClassDecl() &&
-         !ED->getSelfClassDecl()->hasKnownSwiftImplementation() &&
-         "@_objcImplementation on non-class or Swift class?");
-
-  if (!VD->isObjCMemberImplementation())
-    return;
-
-  auto isNotRelevantInterfaceMember = [&](ValueDecl *member) -> bool {
-    return !member->hasClangNode()
-             || member->getAttrs().isUnavailable(VD->getASTContext())
-             || VD->isInstanceMember() != member->isInstanceMember();
-  };
-  assert(!VD->hasClangNode() &&
-            "we assumed VD could not be in sameNameMembers!");
-
-  auto &diags = VD->getASTContext().Diags;
-  auto extendedType = ED->getSelfClassDecl();
-  auto objcAttr = VD->getSemanticAttrs().getAttribute<ObjCAttr>();
-  TinyPtrVector<ValueDecl *> sameNameMembers;
-
-  // Look up by @objc(<selector>), if present
-  if (objcAttr && objcAttr->getName()) {
-    auto selectorLookup = extendedType->lookupDirect(*objcAttr->getName(),
-                                                     VD->isInstanceMember());
-    // Loop upcasts from AbstractFunctionDecl to ValueDecl
-    for (ValueDecl *member : selectorLookup) {
-      if (auto accessor = dyn_cast<AccessorDecl>(member))
-        member = accessor->getStorage();
-
-      if (!isNotRelevantInterfaceMember(member)
-            && !llvm::is_contained(sameNameMembers, member))
-        sameNameMembers.push_back(member);
-    }
-  }
-
-  // Fallback: Look up by Swift name
-  // If we tried the selector lookup but it failed, this will find near-matches
-  // we can suggest.
-  if (sameNameMembers.empty()) {
-    sameNameMembers = extendedType->lookupDirect(VD->getName());
-  }
-
-  // Filter matches down to only imported members of the same instance-ness.
-  if (!sameNameMembers.empty()) {
-    sameNameMembers.erase(llvm::remove_if(sameNameMembers,
-                                          isNotRelevantInterfaceMember),
-                          sameNameMembers.end());
-  }
-
-  // If we didn't find any methods, diagnose.
-  if (sameNameMembers.empty()) {
-    diags.diagnose(VD, diag::member_of_objc_implementation_not_objc_or_final,
-                   VD->getDescriptiveKind(), VD, ED->getExtendedNominal());
-
-    if (canBeRepresentedInObjC(VD))
-      diags.diagnose(VD, diag::fixit_add_private_for_objc_implementation,
-                     VD->getDescriptiveKind())
-          .fixItInsert(VD->getAttributeInsertionLoc(true), "private ");
-
-    diags.diagnose(VD, diag::fixit_add_final_for_objc_implementation,
-                   VD->getDescriptiveKind())
-        .fixItInsert(VD->getAttributeInsertionLoc(true), "final ");
-    return;
-  }
-
-  // FIXME: Diagnose multiple matches?
-
-  // If we only found methods in the wrong extensions, diagnose.
-  auto expectedInterfaceDC = ED->getImplementedObjCContext();
-  auto selectedMethodIter = llvm::find_if(sameNameMembers,
-                                          [&](ValueDecl *member) {
-    return expectedInterfaceDC == member->getDeclContext();
-  });
-  if (selectedMethodIter == sameNameMembers.end()) {
-    Identifier expectedInterfaceName;
-    if (auto ED = dyn_cast<ExtensionDecl>(expectedInterfaceDC)) {
-      expectedInterfaceName = ED->getObjCCategoryName();
-    }
-
-    // Arbitarily assume sameNameMethods.front() is the correct declaration.
-    auto actualInterfaceDC = sameNameMembers.front()->getDeclContext();
-    Identifier actualInterfaceName;
-    if (auto ED = dyn_cast<ExtensionDecl>(actualInterfaceDC)) {
-      actualInterfaceName = ED->getObjCCategoryName();
-    }
-
-    diags.diagnose(VD, diag::objc_implementation_wrong_category,
-                   VD->getDescriptiveKind(), VD,
-                   actualInterfaceName, expectedInterfaceName);
-
-    // FIXME: Add fix-it to move implementation
-
-    return;
-  }
-
-  auto selectedMethod = *selectedMethodIter;
-  // If the Swift names don't match, suggest correcting the implementation
-  if (selectedMethod->getName() != VD->getName()) {
-    auto diag = diags.diagnose(VD, diag::objc_implementation_wrong_swift_name,
-                               *selectedMethod->getObjCRuntimeName(),
-                               selectedMethod->getDescriptiveKind(),
-                               selectedMethod->getName());
-    fixDeclarationName(diag, VD, selectedMethod->getName());
-  }
-  // If there was no @objc, add one with the implementation's @objc name.
-  else if (!objcAttr) {
-    objcAttr = ObjCAttr::create(VD->getASTContext(),
-                                selectedMethod->getObjCRuntimeName(),
-                                true);
-    VD->getAttrs().add(objcAttr);
-  }
-  // If there was an @objc with the wrong name, diagnose.
-  else if (objcAttr->hasName()
-             && objcAttr->getName() != selectedMethod->getObjCRuntimeName()) {
-    auto diag = diags.diagnose(VD, diag::objc_implementation_wrong_objc_name,
-                               *objcAttr->getName(), VD->getDescriptiveKind(),
-                               VD, *selectedMethod->getObjCRuntimeName());
-    fixDeclarationObjCName(diag, VD, objcAttr->getName(),
-                           selectedMethod->getObjCRuntimeName());
-  }
-
-  assert(VD->isObjC());
-  assert(isa<DestructorDecl>(VD) || VD->isDynamic() &&
-         "@objc decls in @_objcImplementations should be dynamic!");
-}
-
 /// Build a default initializer string for the given pattern.
 ///
 /// This string is suitable for display in diagnostics.
@@ -2013,10 +1874,6 @@ public:
       // Check whether the member is @objc or dynamic.
       (void) VD->isObjC();
       (void) VD->isDynamic();
-
-      // If this is in an `@_objcImplementation` extension, check whether it's
-      // valid there.
-      checkObjCImplementationMemberAvoidsVTable(VD);
 
       // Check for actor isolation of top-level and local declarations.
       // Declarations inside types are handled in checkConformancesInContext()
@@ -3542,6 +3399,8 @@ public:
       
       // FIXME: Should we duplicate any other logic from visitClassDecl()?
     }
+
+    TypeChecker::checkObjCImplementation(ED);
 
     for (Decl *Member : ED->getMembers())
       visit(Member);

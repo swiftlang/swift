@@ -1625,6 +1625,33 @@ ERROR(objc_implementation_wrong_swift_name,none,
       "mean %2?",
       (ObjCSelector, DescriptiveDeclKind, DeclName))
 
+ERROR(objc_implementation_missing_impl,none,
+      "extension for %select{main class interface|category %0}0 should "
+      "provide implementation for %1 %2",
+      (Identifier, DescriptiveDeclKind, ValueDecl *))
+
+ERROR(objc_implementation_class_or_instance_mismatch,none,
+      "%0 %1 does not match %2 declared in header",
+      (DescriptiveDeclKind, ValueDecl *, DescriptiveDeclKind))
+
+ERROR(objc_implementation_multiple_matching_candidates,none,
+      "found multiple implementations that could match %0 %1 with selector %2",
+      (DescriptiveDeclKind, ValueDecl *, ObjCSelector))
+NOTE(objc_implementation_candidate_impl_here,none,
+     "%0 %1 is a potential match%select{|; insert '@objc(%3)' to use it}2",
+     (DescriptiveDeclKind, ValueDecl *, bool, StringRef))
+NOTE(objc_implementation_requirement_here,none,
+     "%0 %1 declared in header here",
+     (DescriptiveDeclKind, ValueDecl *))
+
+ERROR(objc_implementation_multiple_matching_requirements,none,
+      "%0 %1 could match several different members declared in the header",
+      (DescriptiveDeclKind, ValueDecl *))
+NOTE(objc_implementation_one_matched_requirement,none,
+     "%0 %1 (with selector %2) is a potential match%select{|; insert "
+     "'@objc(%4)' to use it}3",
+     (DescriptiveDeclKind, ValueDecl *, ObjCSelector, bool, StringRef))
+
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())
 ERROR(cdecl_empty_name,none,

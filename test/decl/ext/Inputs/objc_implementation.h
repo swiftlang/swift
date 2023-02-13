@@ -34,6 +34,12 @@
 @property (readonly) int readonlyPropertyFromHeader5;
 @property (readonly) int readonlyPropertyFromHeader6;
 
++ (void)classMethod1:(int)param;
++ (void)classMethod2:(int)param;
+
+- (void)instanceMethod1:(int)param;
+- (void)instanceMethod2:(int)param;
+
 @end
 
 @interface ObjCClass (PresentAdditions)
@@ -59,6 +65,21 @@
 - (void)methodObjCName5 __attribute__((swift_name("methodSwiftName5()")));
 - (void)methodObjCName6A __attribute__((swift_name("methodSwiftName6A()")));
 - (void)methodObjCName6B __attribute__((swift_name("methodSwiftName6B()")));
+
+@end
+
+@interface ObjCClass (AmbiguousMethods)
+
+- (void)ambiguousMethod1WithCInt:(int)param  __attribute__((swift_name("ambiguousMethod1(with:)")));
+- (void)ambiguousMethod1WithCChar:(char)param  __attribute__((swift_name("ambiguousMethod1(with:)")));
+
+- (void)ambiguousMethod2WithCInt:(int)param  __attribute__((swift_name("ambiguousMethod2(with:)")));
+- (void)ambiguousMethod2WithCChar:(char)param  __attribute__((swift_name("ambiguousMethod2(with:)")));
+
+- (void)ambiguousMethod3WithCInt:(int)param  __attribute__((swift_name("ambiguousMethod3(with:)")));
+- (void)ambiguousMethod3WithCChar:(char)param  __attribute__((swift_name("ambiguousMethod3(with:)")));
+
+- (void)ambiguousMethod4WithCInt:(int)param  __attribute__((swift_name("ambiguousMethod4(with:)")));
 
 @end
 
