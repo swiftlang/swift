@@ -255,6 +255,9 @@ public:
       Direct,
       /// An indirect call that can be made via a static offset in a vtable.
       IndirectVTableStaticOffset,
+      /// An indirect call that should be made via an offset relative to
+      /// external base value in a vtable.
+      IndirectVTableRelativeOffset,
       /// The call should be made via the provided thunk function.
       Thunk
     };
@@ -273,38 +276,67 @@ public:
                                 discriminator);
     }
 
+    static MethodDispatchInfo indirectVTableRelativeOffset(
+        size_t bitOffset, std::string symbolName,
+        Optional<PointerAuthDiscriminator> discriminator) {
+      return MethodDispatchInfo(Kind::IndirectVTableRelativeOffset, bitOffset,
+                                symbolName, discriminator);
+    }
+
     static MethodDispatchInfo thunk(std::string thunkName) {
       return MethodDispatchInfo(Kind::Thunk, 0, thunkName);
     }
 
     Kind getKind() const { return kind; }
+
+    /// Return the bit offset into the vtable from which the method pointer
+    /// should be loaded.
     size_t getStaticBitOffset() const {
       assert(kind == Kind::IndirectVTableStaticOffset);
       return bitOffset;
     }
     Optional<PointerAuthDiscriminator> getPointerAuthDiscriminator() const {
-      assert(kind == Kind::IndirectVTableStaticOffset);
+      assert(kind == Kind::IndirectVTableStaticOffset ||
+             kind == Kind::IndirectVTableRelativeOffset);
       return discriminator;
     }
     StringRef getThunkSymbolName() const {
       assert(kind == Kind::Thunk);
-      return thunkName;
+      return symbolName;
+    }
+
+    /// Return the bit offset relative to base offset value into the vtable from
+    /// which the method pointer should be loaded.
+    size_t getRelativeBitOffset() const {
+      assert(kind == Kind::IndirectVTableRelativeOffset);
+      return bitOffset;
+    }
+
+    /// Return the external symbol from which the relative base offset should be
+    /// loaded.
+    StringRef getBaseOffsetSymbolName() const {
+      assert(kind == Kind::IndirectVTableRelativeOffset);
+      return symbolName;
     }
 
   private:
-    MethodDispatchInfo(Kind kind, size_t bitOffset, std::string thunkName = "",
+    MethodDispatchInfo(Kind kind, size_t bitOffset, std::string symbolName = "",
                        Optional<PointerAuthDiscriminator> discriminator = None)
-        : kind(kind), bitOffset(bitOffset), thunkName(thunkName),
+        : kind(kind), bitOffset(bitOffset), symbolName(symbolName),
           discriminator(discriminator) {}
 
     Kind kind;
     size_t bitOffset;
-    std::string thunkName;
+    std::string symbolName;
     Optional<PointerAuthDiscriminator> discriminator;
   };
 
   Optional<MethodDispatchInfo>
   getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl);
+
+  /// Returns the type of the base offset value located at the specific class
+  /// base offset symbol.
+  Type getClassBaseOffsetSymbolType() const;
 
 private:
   std::unique_ptr<IRABIDetailsProviderImpl> impl;
