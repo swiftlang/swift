@@ -62,6 +62,7 @@ set(swift_runtime_sources
     MetadataLookup.cpp
     Numeric.cpp
     Once.cpp
+    Paths.cpp
     Portability.cpp
     ProtocolConformance.cpp
     RefCount.cpp
