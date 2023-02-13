@@ -444,15 +444,20 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   ///                         running on, add virtual frames to show inline
   ///                         function calls.
   ///
+  /// @param useSymbolCache   If the system we are on has a symbol cache,
+  ///                         says whether or not to use it.
+  ///
   /// @returns A new `SymbolicatedBacktrace`.
   public func symbolicated(with images: [Image]? = nil,
                            sharedCacheInfo: SharedCacheInfo? = nil,
-                           showInlineFrames: Bool = true)
+                           showInlineFrames: Bool = true,
+                           useSymbolCache: Bool = true)
     -> SymbolicatedBacktrace? {
     return SymbolicatedBacktrace.symbolicate(backtrace: self,
                                              images: images,
                                              sharedCacheInfo: sharedCacheInfo,
-                                             showInlineFrames: showInlineFrames)
+                                             showInlineFrames: showInlineFrames,
+                                             useSymbolCache: useSymbolCache)
   }
 
   /// Provide a textual version of the backtrace.

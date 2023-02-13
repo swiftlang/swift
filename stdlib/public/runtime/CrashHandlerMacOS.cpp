@@ -268,6 +268,8 @@ const char *backtracer_argv[] = {
   top_buf,                      // 24
   "--sanitize",                 // 25
   "preset",                     // 26
+  "--cache",                    // 27
+  "true",                       // 28
   NULL
 };
 
@@ -439,6 +441,8 @@ run_backtracer()
     backtracer_argv[26] = "true";
     break;
   }
+
+  backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
 
   format_unsigned(_swift_backtraceSettings.timeout, timeout_buf);
 

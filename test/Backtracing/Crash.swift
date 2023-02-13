@@ -7,11 +7,11 @@
 // RUN: %target-codesign %t/CrashNoDebug
 // RUN: %target-codesign %t/CrashOpt
 // RUN: %target-codesign %t/CrashOptNoDebug
-// RUN: (env SWIFT_BACKTRACE=enable=yes %target-run %t/Crash || true) | %FileCheck %s
-// RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes %target-run %t/Crash || true) | %FileCheck %s --check-prefix FRIENDLY
-// RUN: (env SWIFT_BACKTRACE=enable=yes %target-run %t/CrashNoDebug || true) | %FileCheck %s --check-prefix NODEBUG
-// RUN: (env SWIFT_BACKTRACE=enable=yes %target-run %t/CrashOpt || true) | %FileCheck %s --check-prefix OPTIMIZED
-// RUN: (env SWIFT_BACKTRACE=enable=yes %target-run %t/CrashOptNoDebug || true) | %FileCheck %s --check-prefix OPTNODEBUG
+// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Crash || true) | %FileCheck %s
+// RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Crash || true) | %FileCheck %s --check-prefix FRIENDLY
+// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashNoDebug || true) | %FileCheck %s --check-prefix NODEBUG
+// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOpt || true) | %FileCheck %s --check-prefix OPTIMIZED
+// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOptNoDebug || true) | %FileCheck %s --check-prefix OPTNODEBUG
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx

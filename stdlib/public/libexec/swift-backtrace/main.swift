@@ -65,6 +65,7 @@ internal struct SwiftBacktrace {
     var limit: Int? = 64
     var top = 16
     var sanitize: Bool? = nil
+    var cache = true
   }
 
   static var args = Arguments()
@@ -83,7 +84,7 @@ internal struct SwiftBacktrace {
 
   static func usage() {
     print("""
-usage: swift-backtrace [--unwind <algorithm>] [--demangle [<bool>]] [--interactive [<bool>]] [--color [<bool>]] [--timeout <seconds>] [--preset <preset>] [--threads [<bool>]] [--registers <registers>] [--images <images>] --crashinfo <addr>
+usage: swift-backtrace [--unwind <algorithm>] [--demangle [<bool>]] [--interactive [<bool>]] [--color [<bool>]] [--timeout <seconds>] [--preset <preset>] [--threads [<bool>]] [--registers <registers>] [--images <images>] [--cache [<bool>]] --crashinfo <addr>
 
 Generate a backtrace for the parent process.
 
@@ -129,6 +130,8 @@ Generate a backtrace for the parent process.
 
 --sanitize [<bool>]
 -s [<bool>]             Set whether or not to sanitize paths.
+
+--cache [<bool>]        Set whether or not to use the symbol cache, if any.
 
 --crashinfo <addr>
 -a <addr>               Provide a pointer to a platform specific CrashInfo
@@ -295,6 +298,12 @@ Generate a backtrace for the parent process.
         } else {
           args.sanitize = true
         }
+      case "--cache":
+        if let v = value {
+          args.cache = parseBool(v)
+        } else {
+          args.cache = true
+        }
       case "-a", "--crashinfo":
         if let v = value {
           if let a = UInt64(v, radix: 16) {
@@ -381,7 +390,8 @@ Generate a backtrace for the parent process.
     formattingOptions = formattingOptions.showImages(.none)
 
     target = Target(crashInfoAddr: crashInfoAddr,
-                    limit: args.limit, top: args.top)
+                    limit: args.limit, top: args.top,
+                    cache: args.cache)
 
     currentThread = target!.crashingThreadNdx
 
@@ -903,7 +913,9 @@ Generate a backtrace for the parent process.
                 }
 
                 if changedBacktrace {
-                  target.redoBacktraces(limit: args.limit, top: args.top)
+                  target.redoBacktraces(limit: args.limit,
+                                        top: args.top,
+                                        cache: args.cache)
                 }
               }
             }

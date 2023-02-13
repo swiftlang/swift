@@ -104,6 +104,9 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // preset
   Preset::Auto,
 
+  // cache
+  true,
+
   // swiftBacktracePath
   NULL,
 };
@@ -599,6 +602,8 @@ _swift_processBacktracingSetting(llvm::StringRef key,
                      "swift runtime: bad backtrace top count '%.*s'\n",
                      static_cast<int>(value.size()), value.data());
     }
+  } else if (key.equals_insensitive("cache")) {
+    _swift_backtraceSettings.cache = parseBoolean(value);
   } else if (key.equals_insensitive("swift-backtrace")) {
     size_t len = value.size();
     char *path = (char *)std::malloc(len + 1);

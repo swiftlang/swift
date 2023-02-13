@@ -186,6 +186,7 @@ func CSIsNull(_ obj: CSTypeRef) -> Bool {
 
 // .. CSSymbolicator ...........................................................
 
+let kCSSymbolicatorDisallowDaemonCommunication = UInt32(0x00000800)
 
 struct BinaryRelocationInformation {
   var base: mach_vm_address_t

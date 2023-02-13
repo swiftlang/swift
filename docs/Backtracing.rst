@@ -92,6 +92,10 @@ follows:
 | top             | 16      | Specify a minimum number of frames to capture    |
 |                 |         | from the top of the stack.  See below for more.  |
 +-----------------+---------+--------------------------------------------------+
+| cache           | yes     | Set to ``no`` to disable symbol caching.  This   |
+|                 |         | only has effect on platforms that have a symbol  |
+|                 |         | cache that can be controlled by the runtime.     |
++-----------------+---------+--------------------------------------------------+
 | swift-backtrace |         | If specified, gives the full path to the         |
 |                 |         | swift-backtrace binary to use for crashes.       |
 |                 |         | Otherwise, Swift will locate the binary relative |
