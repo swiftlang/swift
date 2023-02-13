@@ -136,7 +136,8 @@ void DeclarationFragmentPrinter::printStructurePre(PrintStructureKind Kind,
 void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
     Identifier Name,
     PrintNameContext NameContext) {
-  openFragment(FragmentKind::TypeIdentifier);
+  if (Kind != FragmentKind::Attribute)
+    openFragment(FragmentKind::TypeIdentifier);
   printText(Name.str());
   USR.clear();
 
