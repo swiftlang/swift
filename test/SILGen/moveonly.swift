@@ -1,43 +1,27 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-move-only %s | %FileCheck %s
 
 //////////////////
 // Declarations //
 //////////////////
 
 public final class CopyableKlass {
-    var k = Klass()
+    var fd = FD()
 }
 
 @_moveOnly
-public class Klass2 {}
-
-@_moveOnly
-public final class Klass {
-    var int: Int
-    var moveOnlyKlass: Klass2
-    var copyableKlass: CopyableKlass
-
-    // CHECK-LABEL: sil hidden [ossa] @$s8moveonly5KlassCACycfc : $@convention(method) (@owned Klass) -> @owned Klass {
-    // CHECK: bb0([[ARG:%.*]] : @owned $Klass):
-    // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [rootself] [[ARG]]
-    // CHECK:   [[MARK_NO_IMP_COPY:%.*]] = mark_must_check [consumable_and_assignable] [[MARK_UNINIT]]
-    // CHECK: } // end sil function '$s8moveonly5KlassCACycfc'
-    init() {
-        moveOnlyKlass = Klass2()
-        int = 5
-        copyableKlass = CopyableKlass()
-    }
+public struct FD {
+    var copyableKlass = CopyableKlass()
 }
 
 @_moveOnly
 public struct NonTrivialStruct2 {
-    var moveOnlyKlass = Klass()
+    var fd = FD()
     var copyableKlass = CopyableKlass()
 }
 
 @_moveOnly
 public struct NonTrivialStruct {
-    var moveOnlyKlass = Klass()
+    var fd = FD()
     var nonTrivialStruct2 = NonTrivialStruct2()
     var copyableKlass = CopyableKlass()
     var nonTrivialCopyableStruct = NonTrivialCopyableStruct()
@@ -56,23 +40,24 @@ public struct NonTrivialCopyableStruct {
 @_moveOnly
 public enum NonTrivialEnum {
     case first
-    case second(Klass)
+    case second(CopyableKlass)
     case third(NonTrivialStruct)
 }
 
+var varGlobal = NonTrivialStruct()
+let letGlobal = NonTrivialStruct()
+
 public func borrowVal(_ e : NonTrivialEnum) {}
+public func borrowVal(_ e : FD) {}
 public func borrowVal(_ k: CopyableKlass) {}
-public func borrowVal(_ k: Klass) {}
-public func borrowVal(_ k: Klass2) {}
 public func borrowVal(_ k: NonTrivialCopyableStruct) {}
 public func borrowVal(_ k: NonTrivialCopyableStruct2) {}
 public func borrowVal(_ s: NonTrivialStruct) {}
 public func borrowVal(_ s: NonTrivialStruct2) {}
 
 public func consumeVal(_ e : __owned NonTrivialEnum) {}
+public func consumeVal(_ e : __owned FD) {}
 public func consumeVal(_ k: __owned CopyableKlass) {}
-public func consumeVal(_ k: __owned Klass) {}
-public func consumeVal(_ k: __owned Klass2) {}
 public func consumeVal(_ k: __owned NonTrivialCopyableStruct) {}
 public func consumeVal(_ k: __owned NonTrivialCopyableStruct2) {}
 public func consumeVal(_ s: __owned NonTrivialStruct) {}
@@ -86,31 +71,6 @@ public func consumeVal(_ s: __owned NonTrivialStruct2) {}
 // Function Arguments
 //
 
-// CHECK-LABEL: sil [ossa] @$s8moveonly8useKlassyyAA0C0CF : $@convention(thin) (@guaranteed Klass) -> () {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $Klass):
-// CHECK:   [[OWNED_ARG:%.*]] = copy_value [[ARG]]
-// CHECK:   [[MARKED_OWNED_ARG:%.*]] = mark_must_check [no_consume_or_assign] [[OWNED_ARG]]
-// CHECK: } // end sil function '$s8moveonly8useKlassyyAA0C0CF'
-public func useKlass(_ k: Klass) {
-    borrowVal(k)
-    let k2 = k
-    borrowVal(k)
-    let _ = k2
-}
-
-// CHECK-LABEL: sil [ossa] @$s8moveonly15useKlassConsumeyyAA0C0CnF : $@convention(thin) (@owned Klass) -> () {
-// CHECK: bb0([[ARG:%.*]] : @owned $Klass):
-// TODO: Is this move_value [lexical] necessary?
-// CHECK:   [[LEXICAL_MOVE:%.*]] = move_value [lexical] [[ARG]]
-// CHECK:   mark_must_check [consumable_and_assignable] [[LEXICAL_MOVE]]
-// CHECK: } // end sil function '$s8moveonly15useKlassConsumeyyAA0C0CnF'
-public func useKlassConsume(_ k: __owned Klass) {
-    borrowVal(k)
-    let k2 = k
-    borrowVal(k)
-    let _ = k2
-}
-
 // CHECK-LABEL: sil [ossa] @$s8moveonly19useNonTrivialStructyyAA0cdE0VF : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonTrivialStruct):
 // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[ARG]]
@@ -119,7 +79,7 @@ public func useKlassConsume(_ k: __owned Klass) {
 public func useNonTrivialStruct(_ s: NonTrivialStruct) {
     borrowVal(s)
     let s2 = s
-    let k = s.moveOnlyKlass
+    let k = s.fd
     let _ = k
     borrowVal(s)
     let _ = s2
@@ -133,7 +93,7 @@ public func useNonTrivialStruct(_ s: NonTrivialStruct) {
 public func useNonTrivialOwnedStruct(_ s: __owned NonTrivialStruct) {
     borrowVal(s)
     let s2 = s
-    let k = s.moveOnlyKlass
+    let k = s.fd
     let _ = k
     borrowVal(s)
     let _ = s2
@@ -179,18 +139,6 @@ public func useNonTrivialOwnedEnum(_ s: __owned NonTrivialEnum) {
 // Self in Methods
 //
 
-extension Klass {
-    // CHECK-LABEL: sil hidden [ossa] @$s8moveonly5KlassC13testNoUseSelfyyF : $@convention(method) (@guaranteed Klass) -> () {
-    // CHECK: bb0([[ARG:%.*]] : @guaranteed $Klass):
-    // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[ARG]]
-    // CHECK:   mark_must_check [no_consume_or_assign] [[COPIED_ARG]]
-    // CHECK: } // end sil function '$s8moveonly5KlassC13testNoUseSelfyyF'
-    func testNoUseSelf() {
-        let x = self
-        let _ = x
-    }
-}
-
 extension NonTrivialStruct {
     // CHECK-LABEL: sil hidden [ossa] @$s8moveonly16NonTrivialStructV13testNoUseSelfyyF : $@convention(method) (@guaranteed NonTrivialStruct) -> () {
     // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonTrivialStruct):
@@ -220,7 +168,7 @@ extension NonTrivialEnum {
 ///////////////////////////////
 
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly27blackHoleLetInitialization1yyF : $@convention(thin) () -> () {
-// CHECK: [[FN:%.*]] = function_ref @$s8moveonly5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly2FDVACycfC :
 // CHECK: [[X:%.*]] = apply [[FN]](
 // CHECK: [[X_MV_LEXICAL:%.*]] = move_value [lexical] [[X]]
 // CHECK: [[X_MV_ONLY:%.*]] = mark_must_check [consumable_and_assignable] [[X_MV_LEXICAL]]
@@ -229,12 +177,12 @@ extension NonTrivialEnum {
 // CHECK: [[X_MV_ONLY_CONSUME:%.*]] = move_value [[X_MV_ONLY_COPY]]
 // CHECK: } // end sil function '$s8moveonly27blackHoleLetInitialization1yyF'
 func blackHoleLetInitialization1() {
-    let x = Klass()
+    let x = FD()
     let _ = x
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly27blackHoleLetInitialization2yyF : $@convention(thin) () -> () {
-// CHECK: [[FN:%.*]] = function_ref @$s8moveonly5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly2FDVACycfC :
 // CHECK: [[X:%.*]] = apply [[FN]](
 // CHECK: [[X_MV_LEXICAL:%.*]] = move_value [lexical] [[X]]
 // CHECK: [[X_MV_ONLY:%.*]] = mark_must_check [consumable_and_assignable] [[X_MV_LEXICAL]]
@@ -243,7 +191,7 @@ func blackHoleLetInitialization1() {
 // CHECK: [[X_MV_ONLY_CONSUME:%.*]] = move_value [[X_MV_ONLY_COPY]]
 // CHECK: } // end sil function '$s8moveonly27blackHoleLetInitialization2yyF'
 func blackHoleLetInitialization2() {
-    let x = Klass()
+    let x = FD()
     var _ = x
 }
 
@@ -252,7 +200,7 @@ func blackHoleLetInitialization2() {
 // CHECK: [[BOX_BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
 // CHECK: [[PROJECT_BOX:%.*]] = project_box [[BOX_BORROW]]
 // CHECK: [[MARKED_ADDR:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT_BOX]]
-// CHECK: [[FN:%.*]] = function_ref @$s8moveonly5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly2FDVACycfC :
 // CHECK: [[X:%.*]] = apply [[FN]](
 // CHECK: store [[X]] to [init] [[MARKED_ADDR]]
 // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
@@ -260,8 +208,8 @@ func blackHoleLetInitialization2() {
 // CHECK: [[CONSUME:%.*]] = move_value [[LD]]
 // CHECK: } // end sil function '$s8moveonly27blackHoleVarInitialization1yyF'
 func blackHoleVarInitialization1() {
-    var x = Klass()
-    x = Klass()
+    var x = FD()
+    x = FD()
     let _ = x
 }
 
@@ -270,7 +218,7 @@ func blackHoleVarInitialization1() {
 // CHECK: [[BOX_BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
 // CHECK: [[PROJECT_BOX:%.*]] = project_box [[BOX_BORROW]]
 // CHECK: [[MARKED_ADDR:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT_BOX]]
-// CHECK: [[FN:%.*]] = function_ref @$s8moveonly5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly2FDVACycfC :
 // CHECK: [[X:%.*]] = apply [[FN]](
 // CHECK: store [[X]] to [init] [[MARKED_ADDR]]
 // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
@@ -278,9 +226,27 @@ func blackHoleVarInitialization1() {
 // CHECK: [[CONSUME:%.*]] = move_value [[LD]]
 // CHECK: } // end sil function '$s8moveonly27blackHoleVarInitialization2yyF'
 func blackHoleVarInitialization2() {
-    var x = Klass()
-    x = Klass()
+    var x = FD()
+    x = FD()
     var _ = x
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly27blackHoleVarInitialization3yyF : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = alloc_box
+// CHECK: [[BOX_BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[PROJECT_BOX:%.*]] = project_box [[BOX_BORROW]]
+// CHECK: [[MARKED_ADDR:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT_BOX]]
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly2FDVACycfC :
+// CHECK: [[X:%.*]] = apply [[FN]](
+// CHECK: store [[X]] to [init] [[MARKED_ADDR]]
+// CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
+// CHECK: [[LD:%.*]] = load [copy] [[READ]]
+// CHECK: [[CONSUME:%.*]] = move_value [[LD]]
+// CHECK: } // end sil function '$s8moveonly27blackHoleVarInitialization3yyF'
+func blackHoleVarInitialization3() {
+    var x = FD()
+    x = FD()
+    _ = x
 }
 
 ////////////////////////////////
@@ -290,62 +256,13 @@ func blackHoleVarInitialization2() {
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly24borrowObjectFunctionCallyyF : $@convention(thin) () -> () {
 // CHECK: [[CLS:%.*]] = mark_must_check [consumable_and_assignable]
 // CHECK: [[BORROW:%.*]] = begin_borrow [[CLS]]
-// CHECK: [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA5KlassCF
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA2FDVF :
 // CHECK: apply [[FN]]([[BORROW]])
 // CHECK: end_borrow [[BORROW]]
 // CHECK: } // end sil function '$s8moveonly24borrowObjectFunctionCallyyF'
 func borrowObjectFunctionCall() {
-    let k = Klass()
+    let k = FD()
     borrowVal(k)
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s8moveonly25borrowAddressFunctionCallyyF : $@convention(thin) () -> () {
-// CHECK: [[BOX:%.*]] = mark_must_check [consumable_and_assignable]
-// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[BOX]]
-// CHECK: [[BORROW:%.*]] = load_borrow [[ACCESS]]
-// CHECK: [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA5KlassCF
-// CHECK: apply [[FN]]([[BORROW]])
-// CHECK: end_borrow [[BORROW]]
-// CHECK: end_access [[ACCESS]]
-// CHECK: } // end sil function '$s8moveonly25borrowAddressFunctionCallyyF'
-func borrowAddressFunctionCall() {
-    var k = Klass()
-    k = Klass()
-    borrowVal(k)
-}
-
-// We currently have the wrong behavior here since the class is treated by
-// LValue emission as a base. That being said, move only classes are not our
-// high order bit here, so I filed a bug. We might be able to do it in the future.
-//
-// CHECK-LABEL: sil hidden [ossa] @$s8moveonly31klassBorrowAddressFunctionCall2yyF : $@convention(thin) () -> () {
-// CHECK: [[MARK:%.*]] = mark_must_check [consumable_and_assignable]
-// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARK]]
-// CHECK: } // end sil function '$s8moveonly31klassBorrowAddressFunctionCall2yyF'
-func klassBorrowAddressFunctionCall2() {
-    var k = Klass()
-    k = Klass()
-    borrowVal(k.moveOnlyKlass)
-}
-
-// We copy here since we have a class as our base like the above.
-//
-// CHECK-LABEL: sil hidden [ossa] @$s8moveonly38klassBorrowCopyableAddressFunctionCallyyF : $@convention(thin) () -> () {
-// CHECK: bb0:
-// CHECK:  [[CLASS:%.*]] = mark_must_check [consumable_and_assignable]
-// CHECK:  [[ACCESS:%.*]] = begin_access [read] [unknown] [[CLASS]]
-// CHECK:  [[LOAD:%.*]] = load [copy] [[ACCESS]]
-// CHECK:  end_access [[ACCESS]]
-// CHECK:  [[BORROW_LOAD:%.*]] = begin_borrow [[LOAD]]
-// CHECK:  [[ADDR:%.*]] = ref_element_addr [[BORROW_LOAD]]
-// CHECK:  [[ACCESS_ADDR:%.*]] = begin_access [read] [dynamic] [[ADDR]]
-// CHECK:  [[BORROWED_COPY_CLASS:%.*]] = load_borrow [[ACCESS_ADDR]]
-// CHECK:  apply {{%.*}}([[BORROWED_COPY_CLASS]])
-// CHECK: } // end sil function '$s8moveonly38klassBorrowCopyableAddressFunctionCallyyF'
-func klassBorrowCopyableAddressFunctionCall() {
-    var k = Klass()
-    k = Klass()
-    borrowVal(k.copyableKlass)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly29moveOnlyStructNonConsumingUseyyF : $@convention(thin) () -> () {
@@ -363,68 +280,6 @@ func moveOnlyStructNonConsumingUse() {
     borrowVal(k)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8moveonly018moveOnlyStructMoveC20KlassNonConsumingUseyyF : $@convention(thin) () -> () {
-// CHECK: [[MARKED_ADDR:%.*]] = mark_must_check [consumable_and_assignable]
-// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
-// CHECK: [[STRUCT_EXT:%.*]] = struct_element_addr [[ACCESS]]
-// CHECK: [[BORROW:%.*]] = load_borrow [[STRUCT_EXT]]
-// CHECK: [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA5KlassCF
-// CHECK: apply [[FN]]([[BORROW]])
-// CHECK: end_borrow [[BORROW]]
-// CHECK: end_access [[ACCESS]]
-// CHECK: } // end sil function '$s8moveonly018moveOnlyStructMoveC20KlassNonConsumingUseyyF'
-func moveOnlyStructMoveOnlyKlassNonConsumingUse() {
-    var k = NonTrivialStruct()
-    k = NonTrivialStruct()
-    borrowVal(k.moveOnlyKlass)
-}
-
-// We fail here b/c we are accessing through a class.
-//
-// CHECK-LABEL: sil hidden [ossa] @$s8moveonly018moveOnlyStructMovec5KlassecF15NonConsumingUseyyF : $@convention(thin) () -> () {
-// CHECK:   [[MARKED_ADDR:%.*]] = mark_must_check [consumable_and_assignable]
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
-// CHECK:   [[STRUCT_EXT:%.*]] = struct_element_addr [[ACCESS]]
-// CHECK:   [[STRUCT_EXT_COPY:%.*]] = load [copy] [[STRUCT_EXT]]
-// CHECK:   end_access [[ACCESS]]
-// CHECK:   [[STRUCT_EXT_COPY_BORROW:%.*]] = begin_borrow [[STRUCT_EXT_COPY]]
-// CHECK:   [[ELT_ADDR:%.*]] = ref_element_addr [[STRUCT_EXT_COPY_BORROW]]
-// CHECK:   [[ACCESS_ELT_ADDR:%.*]] = begin_access [read] [dynamic] [[ELT_ADDR]]
-// CHECK:   [[KLS:%.*]] = load_borrow [[ACCESS_ELT_ADDR]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA6Klass2CF
-// CHECK:   apply [[FN]]([[KLS]])
-// CHECK:   end_borrow [[KLS]]
-// CHECK:   destroy_value [[STRUCT_EXT_COPY]]
-// CHECK: } // end sil function '$s8moveonly018moveOnlyStructMovec5KlassecF15NonConsumingUseyyF'
-func moveOnlyStructMoveOnlyKlassMoveOnlyKlassNonConsumingUse() {
-    var k = NonTrivialStruct()
-    k = NonTrivialStruct()
-    borrowVal(k.moveOnlyKlass.moveOnlyKlass)
-}
-
-// We fail here b/c we are accessing through a class.
-//
-// CHECK-LABEL: sil hidden [ossa] @$s8moveonly018moveOnlyStructMovec13KlassCopyableF15NonConsumingUseyyF : $@convention(thin) () -> () {
-// CHECK:   [[MARKED_ADDR:%.*]] = mark_must_check [consumable_and_assignable]
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
-// CHECK:   [[STRUCT_EXT:%.*]] = struct_element_addr [[ACCESS]]
-// CHECK:   [[STRUCT_EXT_COPY:%.*]] = load [copy] [[STRUCT_EXT]]
-// CHECK:   end_access [[ACCESS]]
-// CHECK:   [[STRUCT_EXT_COPY_BORROW:%.*]] = begin_borrow [[STRUCT_EXT_COPY]]
-// CHECK:   [[FIELD:%.*]] = ref_element_addr [[STRUCT_EXT_COPY_BORROW]]
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD]]
-// CHECK:   [[BORROWED_KLS:%.*]] = load_borrow [[ACCESS]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA13CopyableKlassCF
-// CHECK:   apply [[FN]]([[BORROWED_KLS]])
-// CHECK:   end_borrow [[BORROWED_KLS]]
-// CHECK:   destroy_value [[STRUCT_EXT_COPY]]
-// CHECK: } // end sil function '$s8moveonly018moveOnlyStructMovec13KlassCopyableF15NonConsumingUseyyF'
-func moveOnlyStructMoveOnlyKlassCopyableKlassNonConsumingUse() {
-    var k = NonTrivialStruct()
-    k = NonTrivialStruct()
-    borrowVal(k.moveOnlyKlass.copyableKlass)
-}
-
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly018moveOnlyStructMovecD15NonConsumingUseyyF : $@convention(thin) () -> () {
 // CHECK:   [[MARKED_ADDR:%.*]] = mark_must_check [consumable_and_assignable]
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
@@ -439,23 +294,6 @@ func moveOnlyStructMoveOnlyStructNonConsumingUse() {
     var k = NonTrivialStruct()
     k = NonTrivialStruct()
     borrowVal(k.nonTrivialStruct2)
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s8moveonly018moveOnlyStructMovecdeC20KlassNonConsumingUseyyF : $@convention(thin) () -> () {
-// CHECK:   [[MARKED_ADDR:%.*]] = mark_must_check [consumable_and_assignable]
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARKED_ADDR]]
-// CHECK:   [[GEP1:%.*]] = struct_element_addr [[ACCESS]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
-// CHECK:   [[GEP2:%.*]] = struct_element_addr [[GEP1]] : $*NonTrivialStruct2, #NonTrivialStruct2.moveOnlyKlass
-// CHECK:   [[BORROW:%.*]] = load_borrow [[GEP2]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA5KlassCF : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK:   apply [[FN]]([[BORROW]])
-// CHECK:   end_borrow [[BORROW]]
-// CHECK:   end_access [[ACCESS]]
-// CHECK: } // end sil function '$s8moveonly018moveOnlyStructMovecdeC20KlassNonConsumingUseyyF'
-func moveOnlyStructMoveOnlyStructMoveOnlyKlassNonConsumingUse() {
-    var k = NonTrivialStruct()
-    k = NonTrivialStruct()
-    borrowVal(k.nonTrivialStruct2.moveOnlyKlass)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly018moveOnlyStructMovecD28CopyableKlassNonConsumingUseyyF : $@convention(thin) () -> () {
@@ -571,9 +409,10 @@ func moveOnlyStructCopyableStructCopyableStructCopyableKlassNonConsumingUse() {
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   [[BORROWED_COPYABLE_KLASS:%.*]] = begin_borrow [[COPYABLE_KLASS]]
 // CHECK:   [[FIELD:%.*]] = ref_element_addr [[BORROWED_COPYABLE_KLASS]]
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD]]
+// CHECK:   [[FIELD_MARK:%.*]] = mark_must_check [no_consume_or_assign] [[FIELD]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD_MARK]]
 // CHECK:   [[BORROWED_MOVEONLY_KLASS:%.*]] = load_borrow [[ACCESS]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA5KlassCF :
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA2FDVF :
 // CHECK:   apply [[FN]]([[BORROWED_MOVEONLY_KLASS]])
 // CHECK:   end_borrow [[BORROWED_MOVEONLY_KLASS]]
 // CHECK:   destroy_value [[COPYABLE_KLASS]]
@@ -581,7 +420,7 @@ func moveOnlyStructCopyableStructCopyableStructCopyableKlassNonConsumingUse() {
 func moveOnlyStructCopyableStructCopyableStructCopyableKlassMoveOnlyKlassNonConsumingUse() {
     var k = NonTrivialStruct()
     k = NonTrivialStruct()
-    borrowVal(k.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.copyableKlass.k)
+    borrowVal(k.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.copyableKlass.fd)
 }
 
 ///////////////////////
@@ -592,7 +431,7 @@ enum EnumSwitchTests {
     @_moveOnly
     enum E2 {
         case lhs(CopyableKlass)
-        case rhs(Klass)
+        case rhs(FD)
     }
 
     @_moveOnly
@@ -680,4 +519,124 @@ func enumSwitchTest1(_ e: EnumSwitchTests.E) {
         consumeVal(rhs)
         break
     }
+}
+
+//////////////////////
+// Global Addr Test //
+//////////////////////
+
+// Make sure that we emit a new global_addr for each use.
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly16testGlobalBorrowyyF : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[ACCESS]]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+// CHECK: end_borrow [[LOADED_VAL]]
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[GEP:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[GEP]]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+// CHECK: end_borrow [[LOADED_VAL]]
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+// CHECK: destroy_value [[LOADED_VAL]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]]
+// CHECK: [[LOADED_BORROWED_VAL:%.*]] = begin_borrow [[LOADED_VAL]]
+// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_BORROWED_VAL]]
+// CHECK: [[LOADED_GEP_COPY:%.*]] = copy_value [[LOADED_GEP]]
+// CHECK: end_borrow [[LOADED_BORROWED_VAL]]
+// CHECK: destroy_value [[LOADED_VAL]]
+// CHECK: apply {{%.*}}([[LOADED_GEP_COPY]])
+// CHECK: destroy_value [[LOADED_GEP_COPY]]
+// CHECK: } // end sil function '$s8moveonly16testGlobalBorrowyyF'
+func testGlobalBorrow() {
+    borrowVal(varGlobal)
+    borrowVal(varGlobal.nonTrivialStruct2)
+    borrowVal(letGlobal)
+    borrowVal(letGlobal.nonTrivialStruct2)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly17testGlobalConsumeyyF : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [deinit] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load [take]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [deinit] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[GEP:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK: [[LOADED_VAL:%.*]] = load [take] [[GEP]]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]]
+// CHECK: apply {{%.*}}([[LOADED_VAL]])
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]]
+// CHECK: [[LOADED_BORROWED_VAL:%.*]] = begin_borrow [[LOADED_VAL]]
+// CHECK: [[LOADED_GEP:%.*]] = struct_extract [[LOADED_BORROWED_VAL]]
+// CHECK: [[LOADED_GEP_COPY:%.*]] = copy_value [[LOADED_GEP]]
+// CHECK: end_borrow [[LOADED_BORROWED_VAL]]
+// CHECK: destroy_value [[LOADED_VAL]]
+// CHECK: apply {{%.*}}([[LOADED_GEP_COPY]])
+//
+// CHECK: } // end sil function '$s8moveonly17testGlobalConsumeyyF'
+func testGlobalConsume() {
+    consumeVal(varGlobal)
+    consumeVal(varGlobal.nonTrivialStruct2)
+    consumeVal(letGlobal)
+    consumeVal(letGlobal.nonTrivialStruct2)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly16testGlobalAssignyyF : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: assign {{%.*}} to [[ACCESS]]
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: assign {{%.*}} to [[ACCESS]]
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[GEP:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK: assign {{%.*}} to [[GEP]]
+// CHECK: end_access [[ACCESS]]
+//
+// CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
+// CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [assignable_but_not_consumable] [[GLOBAL]]
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[MARKED_GLOBAL]]
+// CHECK: [[GEP:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK: assign {{%.*}} to [[GEP]]
+// CHECK: end_access [[ACCESS]]
+// CHECK: } // end sil function '$s8moveonly16testGlobalAssignyyF'
+func testGlobalAssign() {
+    varGlobal = NonTrivialStruct()
+    varGlobal = NonTrivialStruct()
+    varGlobal.nonTrivialStruct2 = NonTrivialStruct2()
+    varGlobal.nonTrivialStruct2 = NonTrivialStruct2()
 }

@@ -103,6 +103,8 @@ public:
                                           Operand *consumingUse,
                                           Operand *nonConsumingUse);
 
+  void emitAddressInstLoadedAndConsumed(MarkMustCheckInst *markedValue);
+
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing
   /// copy. If filter is non-null, allow for the caller to pre-process operands
