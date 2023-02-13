@@ -359,26 +359,23 @@ public func classAccessAccessFieldOwnedArg(_ x2: __owned Klass) {
 
 public func classAccessConsumeField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
-    // Since a class is a reference type, we do not emit an error here.
-    consumeVal(x2.k)
+    consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k)
+        consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
 public func classAccessConsumeFieldArg(_ x2: Klass) {
-    // Since a class is a reference type, we do not emit an error here.
-    consumeVal(x2.k)
+    consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k)
+        consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
 public func classAccessConsumeFieldOwnedArg(_ x2: __owned Klass) {
-    // Since a class is a reference type, we do not emit an error here.
-    consumeVal(x2.k)
+    consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k)
+        consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
@@ -696,30 +693,25 @@ public func finalClassAccessFieldOwnedArg(_ x2: __owned FinalKlass) {
 
 public func finalClassConsumeField(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
-
-    // No diagnostic here since class is a reference type and we are not copying
-    // the class, we are copying its field.
-    consumeVal(x2.k)
+    consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k)
+        consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
 public func finalClassConsumeFieldArg(_ x2: FinalKlass) {
-    // No diagnostic here since class is a reference type and we are not copying
-    // the class, we are copying its field.
-    consumeVal(x2.k)
+    consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k)
+        consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
 public func finalClassConsumeFieldArg(_ x2: __owned FinalKlass) {
     // No diagnostic here since class is a reference type and we are not copying
     // the class, we are copying its field.
-    consumeVal(x2.k)
+    consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k)
+        consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 

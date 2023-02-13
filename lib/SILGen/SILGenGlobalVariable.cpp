@@ -100,14 +100,22 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var,
     return ManagedValue::forLValue(addr);
   }
 
-  // Global variables can be accessed directly with global_addr.  Emit this
-  // instruction into the prolog of the function so we can memoize/CSE it in
-  // VarLocs.
+  // Global variables can be accessed directly with global_addr. If we have a
+  // noncopyable type, just emit the global_addr so each individual access has
+  // its own base projection. This is important so that the checker can
+  // distinguish in between different accesses to the same global.
+  auto *silG = SGM.getSILGlobalVariable(var, NotForDefinition);
+  if (silG->getLoweredType().isMoveOnly()) {
+    SILValue addr = B.createGlobalAddr(var, silG);
+    return ManagedValue::forLValue(addr);
+  }
+
+  // If we have a copyable type, emit this instruction into the prolog of the
+  // function so we can memoize/CSE it via the VarLocs map.
   auto *entryBB = &*getFunction().begin();
   SILGenBuilder prologueB(*this, entryBB, entryBB->begin());
   prologueB.setTrackingList(B.getTrackingList());
 
-  auto *silG = SGM.getSILGlobalVariable(var, NotForDefinition);
   SILValue addr = prologueB.createGlobalAddr(var, silG);
 
   VarLocs[var] = SILGenFunction::VarLoc::get(addr);
