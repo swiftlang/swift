@@ -2873,7 +2873,15 @@ static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
 static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
   if (decls.empty())
     return false;
-  return llvm::any_of(decls, [&](const TypeDecl *decl) { return isa<ProtocolDecl>(decl); });;;
+  return llvm::any_of(decls, [&](const TypeDecl *decl) {
+    if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
+      auto ty = alias->getUnderlyingType();
+      decl = ty->getNominalOrBoundGenericNominal();
+      if (decl == nullptr || ty->is<ExistentialType>())
+        return false;
+    }
+    return isa<ProtocolDecl>(decl);
+  });;;
 }
 
 bool TypeRepr::isProtocol(DeclContext *dc){
@@ -2882,7 +2890,6 @@ bool TypeRepr::isProtocol(DeclContext *dc){
     return declsAreProtocols(directReferencesForTypeRepr(ctx.evaluator, ctx, ty, dc));
   });
 }
-
 
 static GenericParamList *
 createExtensionGenericParams(ASTContext &ctx,
