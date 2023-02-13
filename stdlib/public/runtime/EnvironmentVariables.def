@@ -86,4 +86,9 @@ VARIABLE(SWIFT_ROOT, string, "",
          "This is used to locate auxiliary files relative to the runtime "
          "itself.")
 
+VARIABLE(SWIFT_BACKTRACE, string, "",
+         "A comma-separated list of key=value pairs that controls the "
+         "crash catching and backtracing support in the runtime. "
+         "See docs/Backtracing.rst in the Swift repository for details.")
+
 #undef VARIABLE
