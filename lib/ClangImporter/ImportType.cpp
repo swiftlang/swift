@@ -1271,8 +1271,8 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::Variable:
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::Enum:
-    return false;
   case ImportTypeKind::RecordField:
+    return false;
   case ImportTypeKind::Result:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
@@ -1604,6 +1604,10 @@ static ImportedType adjustTypeForConcreteImport(
       // structs, at which point we should really be checking the lifetime
       // qualifiers.
       case clang::Qualifiers::OCL_Strong:
+        if (!impl.SwiftContext.LangOpts.EnableCXXInterop) {
+          return {Type(), false};
+        }
+        break;
       case clang::Qualifiers::OCL_Weak:
         return {Type(), false};
       case clang::Qualifiers::OCL_Autoreleasing:
