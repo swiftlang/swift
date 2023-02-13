@@ -1779,6 +1779,11 @@ bool swift::visitForwardedGuaranteedOperands(
       || isa<OwnershipForwardingMultipleValueInstruction>(inst)
       || isa<MoveOnlyWrapperToCopyableValueInst>(inst)
       || isa<CopyableToMoveOnlyWrapperValueInst>(inst)) {
+    //!!!
+    if (inst->getNumRealOperands() != 1) {
+      llvm::dbgs() << "UNKNOWN FORWARDING INST: " << *inst << "in function:\n";
+      inst->getFunction()->dump();
+    }
     assert(inst->getNumRealOperands() == 1
            && "forwarding instructions must have a single real operand");
     assert(!isa<SingleValueInstruction>(inst)
