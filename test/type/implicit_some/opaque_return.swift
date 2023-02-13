@@ -73,8 +73,8 @@ func inspect( _ snack: some Snack) -> some Snack {
 // tuple type alias
 func highestRated() -> (some Snack, some Snack) { } // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
 
-// TO-DO: Fix type alias for plain protocols; resolves as an existential type
-func list(_: (Meal, Meal)) -> (Meal, Meal){ }
+func list(_: (Meal, Meal)) -> (Meal, Meal){ } // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+
 func find() -> Snack { }
 
 // opaque compostion types

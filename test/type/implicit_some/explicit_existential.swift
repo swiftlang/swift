@@ -208,10 +208,6 @@ protocol Output {
   associatedtype A
 }
 
-
-
-// NOT SURE IF THIS WILL WORK
-
 // ImplicitSome feature always expects explicit 'any' and plain protocols now imply 'some'
 // Verify existential_requires_any error is no longer produced
 typealias OpaqueFunction = (Input) -> Output
