@@ -1967,6 +1967,8 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
         while (true) {
           if (auto mdi = dyn_cast<MarkDependenceInst>(deallocOperand)) {
             deallocOperand = mdi->getValue();
+          } else if (isa<ConvertEscapeToNoEscapeInst>(deallocOperand)) {
+            break;
           } else if (auto conv = dyn_cast<ConversionInst>(deallocOperand)) {
             deallocOperand = conv->getConverted();
           } else {
