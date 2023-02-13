@@ -13,6 +13,8 @@
 // RUN: %target-codesign %t/swift-class-execution
 // RUN: %target-run %t/swift-class-execution | %FileCheck %s
 
+// REQUIRES: executable_test
+
 #include "class.h"
 #include "useclass.h"
 #include <assert.h>
