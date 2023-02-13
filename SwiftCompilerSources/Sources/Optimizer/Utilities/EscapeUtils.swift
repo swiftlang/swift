@@ -547,7 +547,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     }
 
     // Indirect arguments cannot escape the function, but loaded values from such can.
-    if !followLoads(at: path.projectionPath) {
+    if !followLoads(at: path.projectionPath) &&
+       // Except for begin_apply: it can yield an address value.
+       !apply.isBeginApplyWithIndirectResults {
       return .continueWalk
     }
 
@@ -822,5 +824,15 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
 private extension SmallProjectionPath {
   var escapePath: EscapeUtilityTypes.EscapePath {
     EscapeUtilityTypes.EscapePath(projectionPath: self, followStores: false, knownType: nil)
+  }
+}
+
+private extension ApplySite {
+  var isBeginApplyWithIndirectResults: Bool {
+    guard let ba = self as? BeginApplyInst else {
+      return false
+    }
+    // Note that the token result is always a non-address type.
+    return ba.results.contains { $0.type.isAddress }
   }
 }

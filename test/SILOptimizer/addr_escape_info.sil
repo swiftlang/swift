@@ -51,6 +51,7 @@ sil @initX : $@convention(method) (@owned X) -> @owned X {
 [%0: escape => %r, escape c*.v** => %r.c*.v**]
 }
 sil @modifyStr : $@convention(method) (@inout Str) -> ()
+sil @guaranteed_yield_coroutine : $@yield_once @convention(thin) (@inout X) -> @yields @inout X
 
 // CHECK-LABEL: Address escape information for test_simple:
 // CHECK:       value:  %1 = struct_element_addr %0 : $*Str, #Str.a
@@ -266,6 +267,28 @@ bb0:
   dealloc_stack %1 : $*X
   %12 = tuple ()
   return %12 : $()
+}
+
+// CHECK-LABEL: Address escape information for indirect_argument_escape_to_yield:
+// CHECK:       value:  %1 = alloc_stack $X
+// CHECK-NEXT:    ==>   (%5, %6) = begin_apply %4(%1) : $@yield_once @convention(thin) (@inout X) -> @yields @inout X
+// CHECK-NEXT:    ==>   %8 = apply %7(%5) : $@convention(thin) (@inout X) -> ()
+// CHECK:       End function indirect_argument_escape_to_yield
+sil @indirect_argument_escape_to_yield : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : $X):
+  %1 = alloc_stack $X
+  store %0 to %1 : $*X
+  fix_lifetime %1 : $*X
+  %3 = function_ref @guaranteed_yield_coroutine : $@yield_once @convention(thin) (@inout X) -> @yields @inout X
+  (%4, %5) = begin_apply %3(%1) : $@yield_once @convention(thin) (@inout X) -> @yields @inout X
+
+  %6 = function_ref @inout_class_argument : $@convention(thin) (@inout X) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@inout X) -> ()
+
+  end_apply %5
+  dealloc_stack %1 : $*X
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: Address escape information for ignore_copy_addr_and_release:
