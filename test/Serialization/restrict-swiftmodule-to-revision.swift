@@ -37,8 +37,8 @@ foo()
 // RUN:   not %target-swift-frontend -typecheck %t/ResilientClient.swift -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache 2>&1 | %FileCheck %s
 // CHECK: compiled module was created by a different version of the compiler; rebuild 'ResilientLib' and try again: {{.*}}ResilientLib.swiftmodule
 
-/// Building a ResilientLib client should succeed for a tagged compiler with SWIFT_DEBUG_IGNORE_SWIFTMODULE_REVISION
-// RUN: env SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION=not-a-revision SWIFT_DEBUG_IGNORE_SWIFTMODULE_REVISION=true \
+/// Building a ResilientLib client should succeed for a tagged compiler with SWIFT_IGNORE_SWIFTMODULE_REVISION
+// RUN: env SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION=not-a-revision SWIFT_IGNORE_SWIFTMODULE_REVISION=true \
 // RUN:   %target-swift-frontend -typecheck %t/ResilientClient.swift -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache
 
 

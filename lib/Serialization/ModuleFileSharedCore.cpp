@@ -356,7 +356,7 @@ static ValidationInfo validateControlBlock(
       // Disable this restriction for compiler testing by setting this
       // env var to any value.
       static const char* ignoreRevision =
-        ::getenv("SWIFT_DEBUG_IGNORE_SWIFTMODULE_REVISION");
+        ::getenv("SWIFT_IGNORE_SWIFTMODULE_REVISION");
       if (ignoreRevision)
         break;
 
