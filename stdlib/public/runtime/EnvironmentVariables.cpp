@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Paths.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 
 #include <string.h>
@@ -23,6 +24,12 @@
 using namespace swift;
 
 namespace {
+
+// This is required to make the macro machinery work correctly; we can't
+// declare a VARIABLE(..., const char *, ...) because then the token-pasted
+// names won't work properly.  It *does* mean that if you want to use std::string
+// somewhere in this file, you'll have to fully qualify the name.
+typedef const char *string;
 
 // Require all environment variable names to start with SWIFT_
 static constexpr bool hasSwiftPrefix(const char *str) {
@@ -122,6 +129,14 @@ static uint32_t parse_uint32_t(const char *name,
   }
 
   return n;
+}
+
+static string parse_string(const char *name,
+                           const char *value,
+                           string defaultValue) {
+  if (!value || value[0] == 0)
+    return strdup(defaultValue);
+  return strdup(value);
 }
 
 // Print a list of all the environment variables. Lazy initialization makes
