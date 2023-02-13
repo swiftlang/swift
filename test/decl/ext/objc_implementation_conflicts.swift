@@ -11,7 +11,6 @@
 import objc_implementation_private
 #endif
 
-// FIXME: Should complain about method(fromHeader4:) and propertyFromHeader9
 @_objcImplementation extension ObjCClass {
   @objc func method(fromHeader1: CInt) {
     // OK, provides an implementation for the header's method.
@@ -22,6 +21,10 @@ import objc_implementation_private
   }
 
   @objc func method(fromHeader3: CInt) {
+    // OK
+  }
+
+  func method(fromHeader4: CInt) {
     // OK
   }
 
@@ -63,8 +66,9 @@ import objc_implementation_private
     get { return 1 }
   }
 
-  final var propertyFromHeader8: CInt
-  // FIXME: Should complain about final not fulfilling the @objc requirement
+  var propertyFromHeader8: CInt
+
+  @objc var propertyFromHeader9: CInt
 
   @objc var readonlyPropertyFromHeader1: CInt
   // OK, provides an implementation with a stored property that's nonpublicly settable
@@ -92,10 +96,10 @@ import objc_implementation_private
     get { return 1 }
   }
 
-  @objc var propertyNotFromHeader2: CInt
+  @objc fileprivate var propertyNotFromHeader2: CInt
   // OK, provides a nonpublic but ObjC-compatible stored property
 
-  @objc var propertyNotFromHeader3: CInt {
+  @objc private var propertyNotFromHeader3: CInt {
     // OK, provides a nonpublic but ObjC-compatible computed property
     get { return 1 }
     set {}
@@ -129,9 +133,14 @@ import objc_implementation_private
     // OK
     super.init(fromSuperclass2: v)
   }
+
+  class func classMethod1(_: CInt) {}
+  class func classMethod2(_: CInt) {}
+
+  func instanceMethod1(_: CInt) {}
+  func instanceMethod2(_: CInt) {}
 }
 
-// FIXME: Should complain about categoryMethodFromHeader4:
 @_objcImplementation(PresentAdditions) extension ObjCClass {
   @objc func categoryMethod(fromHeader3: CInt) {
     // OK
@@ -145,6 +154,10 @@ import objc_implementation_private
     // OK, provides an implementation for the header's method.
   }
 
+  @objc func categoryMethod(fromHeader4: CInt) {
+    // OK, provides an implementation for the header's method.
+  }
+
   @objc fileprivate func categoryMethodNot(fromHeader1: CInt) {
     // OK, declares a new @objc dynamic method.
   }
@@ -155,6 +168,11 @@ import objc_implementation_private
 
   private func categoryMethodNot(fromHeader3: CInt) {
     // OK
+  }
+
+  @objc var categoryPropertyFromHeader1: CInt {
+    get { return 1 }
+    set {}
   }
 
   @objc var categoryPropertyFromHeader2: CInt {

@@ -652,6 +652,12 @@ Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
 /// modify the declaration.
 void checkDeclCircularity(NominalTypeDecl *decl);
 
+/// Type check whether an extension matches its Objective-C interface, if it
+/// has one.
+///
+/// \param ED The extension to check.
+void checkObjCImplementation(ExtensionDecl *ED);
+
 /// Type check whether the given switch statement exhaustively covers
 /// its domain.
 ///
