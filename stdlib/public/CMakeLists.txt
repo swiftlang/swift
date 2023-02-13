@@ -150,6 +150,8 @@ if(SWIFT_BUILD_STDLIB)
   if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
     add_subdirectory(Reflection)
   endif()
+
+  add_subdirectory(Backtracing)
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
