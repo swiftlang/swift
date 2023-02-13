@@ -26,6 +26,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -233,7 +234,8 @@ class Verifier : public ASTWalker {
       ClosureDiscriminators;
   DeclContext *CanonicalTopLevelSubcontext = nullptr;
 
-  typedef std::pair<DeclContext *, Identifier> MacroExpansionDiscriminatorKey;
+  typedef std::pair</*MacroDiscriminatorContext*/const void *, Identifier>
+      MacroExpansionDiscriminatorKey;
   llvm::DenseMap<MacroExpansionDiscriminatorKey, SmallBitVector>
       MacroExpansionDiscriminators;
 
@@ -2410,9 +2412,8 @@ public:
     }
 
     void verifyChecked(MacroExpansionExpr *expansion) {
-      auto dc = getCanonicalDeclContext(expansion->getDeclContext());
       MacroExpansionDiscriminatorKey key{
-        dc,
+        MacroDiscriminatorContext::getParentOf(expansion).getOpaqueValue(),
         expansion->getMacroName().getBaseName().getIdentifier()
       };
       auto &discriminatorSet = MacroExpansionDiscriminators[key];
@@ -2433,9 +2434,8 @@ public:
     }
 
     void verifyChecked(MacroExpansionDecl *expansion) {
-      auto dc = getCanonicalDeclContext(expansion->getDeclContext());
       MacroExpansionDiscriminatorKey key{
-        dc,
+        MacroDiscriminatorContext::getParentOf(expansion).getOpaqueValue(),
         expansion->getMacroName().getBaseName().getIdentifier()
       };
       auto &discriminatorSet = MacroExpansionDiscriminators[key];
