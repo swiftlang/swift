@@ -1,12 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -Xfrontend -parse-as-library -Onone -o %t/SimpleBacktrace
+// RUN: %target-build-swift %s -Xfrontend -enable-implicit-backtracing-module-import -parse-as-library -Onone -o %t/SimpleBacktrace
 // RUN: %target-codesign %t/SimpleBacktrace
 // RUN: %target-run %t/SimpleBacktrace | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=iOS || OS=watchOS || OS=tvOS
-
-import _Backtracing
 
 func level1() {
   level2()
