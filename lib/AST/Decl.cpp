@@ -422,7 +422,15 @@ unsigned Decl::getAttachedMacroDiscriminator(
         foundDiscriminator = discriminator;
     });
 
-  return *foundDiscriminator;
+  if (foundDiscriminator)
+    return *foundDiscriminator;
+
+  // If that failed, conjure up a discriminator.
+  ASTContext &ctx = getASTContext();
+  assert(ctx.Diags.hadAnyError());
+  return ctx.getNextMacroDiscriminator(
+      MacroDiscriminatorContext::getParentOf(getLoc(), getDeclContext()),
+      DeclBaseName());
 }
 
 const Decl *Decl::getInnermostDeclWithAvailability() const {
