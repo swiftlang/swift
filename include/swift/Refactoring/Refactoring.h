@@ -136,7 +136,7 @@ void collectAvailableRefactorings(
     llvm::SmallVectorImpl<RefactoringKind> &Kinds,
     llvm::ArrayRef<DiagnosticConsumer *> DiagConsumers);
 
-void collectAvailableRefactorings(const ResolvedCursorInfo &CursorInfo,
+void collectAvailableRefactorings(ResolvedCursorInfoPtr CursorInfo,
                                   llvm::SmallVectorImpl<RefactoringKind> &Kinds,
                                   bool ExcludeRename);
 

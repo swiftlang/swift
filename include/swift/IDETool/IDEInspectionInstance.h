@@ -82,7 +82,7 @@ struct ConformingMethodListResults {
 /// The results returned from \c IDEInspectionInstance::cursorInfo.
 struct CursorInfoResults {
   /// The actual results. If \c nullptr, no results were found.
-  const ResolvedCursorInfo *Result;
+  ResolvedCursorInfoPtr Result;
   /// Whether an AST was reused to produce the results.
   bool DidReuseAST;
 };
