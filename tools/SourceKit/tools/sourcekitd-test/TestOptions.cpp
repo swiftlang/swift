@@ -455,6 +455,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       DisableImplicitStringProcessingModuleImport = true;
       break;
 
+    case OPT_disable_implicit_backtracing_module_import:
+      DisableImplicitBacktracingModuleImport = true;
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'
