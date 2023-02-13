@@ -253,12 +253,13 @@ public:
     case ClassMetadataLayout::MethodInfo::Kind::Offset:
       if (mi->TheOffset.isStatic()) {
         return MethodDispatchInfo::indirectVTableStaticOffset(
-            /*bitOffset=*/mi->TheOffset.getStaticOffset().getValue(),
+            /*offset=*/mi->TheOffset.getStaticOffset().getValue(),
             getMethodPointerAuthInfo(funcDecl, silDecl));
       }
       assert(mi->TheOffset.isDynamic());
       return MethodDispatchInfo::indirectVTableRelativeOffset(
-          mi->TheOffset.getRelativeOffset().getValue(),
+          /*offset=*/mi->TheOffset.getRelativeOffset().getValue(),
+          /*symbolName=*/
           LinkEntity::forClassMetadataBaseOffset(parentClass).mangleAsString(),
           getMethodPointerAuthInfo(funcDecl, silDecl));
     }

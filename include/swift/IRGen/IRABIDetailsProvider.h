@@ -271,15 +271,15 @@ public:
     }
 
     static MethodDispatchInfo indirectVTableStaticOffset(
-        size_t bitOffset, Optional<PointerAuthDiscriminator> discriminator) {
-      return MethodDispatchInfo(Kind::IndirectVTableStaticOffset, bitOffset, "",
+        size_t offset, Optional<PointerAuthDiscriminator> discriminator) {
+      return MethodDispatchInfo(Kind::IndirectVTableStaticOffset, offset, "",
                                 discriminator);
     }
 
     static MethodDispatchInfo indirectVTableRelativeOffset(
-        size_t bitOffset, std::string symbolName,
+        size_t offset, std::string symbolName,
         Optional<PointerAuthDiscriminator> discriminator) {
-      return MethodDispatchInfo(Kind::IndirectVTableRelativeOffset, bitOffset,
+      return MethodDispatchInfo(Kind::IndirectVTableRelativeOffset, offset,
                                 symbolName, discriminator);
     }
 
@@ -289,11 +289,11 @@ public:
 
     Kind getKind() const { return kind; }
 
-    /// Return the bit offset into the vtable from which the method pointer
+    /// Return the byte offset into the vtable from which the method pointer
     /// should be loaded.
-    size_t getStaticBitOffset() const {
+    size_t getStaticOffset() const {
       assert(kind == Kind::IndirectVTableStaticOffset);
-      return bitOffset;
+      return offset;
     }
     Optional<PointerAuthDiscriminator> getPointerAuthDiscriminator() const {
       assert(kind == Kind::IndirectVTableStaticOffset ||
@@ -305,11 +305,11 @@ public:
       return symbolName;
     }
 
-    /// Return the bit offset relative to base offset value into the vtable from
-    /// which the method pointer should be loaded.
-    size_t getRelativeBitOffset() const {
+    /// Return the byte offset relative to base offset value into the vtable
+    /// from which the method pointer should be loaded.
+    size_t getRelativeOffset() const {
       assert(kind == Kind::IndirectVTableRelativeOffset);
-      return bitOffset;
+      return offset;
     }
 
     /// Return the external symbol from which the relative base offset should be
@@ -320,13 +320,13 @@ public:
     }
 
   private:
-    MethodDispatchInfo(Kind kind, size_t bitOffset, std::string symbolName = "",
+    MethodDispatchInfo(Kind kind, size_t offset, std::string symbolName = "",
                        Optional<PointerAuthDiscriminator> discriminator = None)
-        : kind(kind), bitOffset(bitOffset), symbolName(symbolName),
+        : kind(kind), offset(offset), symbolName(symbolName),
           discriminator(discriminator) {}
 
     Kind kind;
-    size_t bitOffset;
+    size_t offset;
     std::string symbolName;
     Optional<PointerAuthDiscriminator> discriminator;
   };

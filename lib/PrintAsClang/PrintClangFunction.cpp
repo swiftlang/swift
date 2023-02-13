@@ -1129,13 +1129,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       os << "FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ "
             "+ ";
       if (dispatchInfo->getKind() == DispatchKindTy::IndirectVTableStaticOffset)
-        os << (dispatchInfo->getStaticBitOffset() / 8);
+        os << dispatchInfo->getStaticOffset();
       else
         os << '(' << cxx_synthesis::getCxxImplNamespaceName()
-           << "::" << dispatchInfo->getBaseOffsetSymbolName()
-           << " / sizeof(void *)) + "
-           << (dispatchInfo->getRelativeBitOffset() / 8);
-      os << ");\n";
+           << "::" << dispatchInfo->getBaseOffsetSymbolName() << " + "
+           << dispatchInfo->getRelativeOffset() << ')';
+      os << " / sizeof(void *));\n";
       indirectFunctionVar = StringRef("fptrptr_->func");
       break;
     case DispatchKindTy::Thunk:

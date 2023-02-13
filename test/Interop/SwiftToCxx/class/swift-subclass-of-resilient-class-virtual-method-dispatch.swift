@@ -93,21 +93,21 @@ public func createCrossModuleDerivedDerivedClass() -> CrossModuleDerivedDerivedC
 // CHECK-NEXT: struct FTypeAddress {
 // CHECK-NEXT: decltype(_impl::$s8UseClass018CrossModuleDerivedB0C015virtualMethodInE0yyF) * func;
 // CHECK-NEXT: };
-// CHECK-NEXT: FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo / sizeof(void *)) + 0);
+// CHECK-NEXT: FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + 0) / sizeof(void *));
 // CHECK-NEXT: return (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
 
 // CHECK:      swift::Int CrossModuleDerivedClass::getDerivedComputedProp() {
-// CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo / sizeof(void *)) + 1);
+// CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + [[#VM1:]]) / sizeof(void *));
 
 // CHECK:      void CrossModuleDerivedClass::virtualMethod2InDerived() {
-// CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo / sizeof(void *)) + 2);
+// CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + [[#VM2:]]) / sizeof(void *));
 
 // CHECK:      void CrossModuleDerivedDerivedClass::virtualMethodInDerived() {
-// CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo / sizeof(void *)) + 0);
+// CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + 0) / sizeof(void *));
 
 // CHECK:      swift::Int CrossModuleDerivedDerivedClass::getDerivedComputedProp() {
-// CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo / sizeof(void *)) + 1);
+// CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + [[#VM1]]) / sizeof(void *));
 
 // CHECK:      void CrossModuleDerivedDerivedClass::virtualMethod2InDerived() {
 // CHECK-NEXT: return _impl::$s8UseClass018CrossModuleDerivedeB0C016virtualMethod2InE0yyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
