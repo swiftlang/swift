@@ -820,7 +820,7 @@ def create_argument_parser():
                     'is %(default)s)')
 
         option(['-R', '--release'], store('build_variant'),
-               const='Release',
+               const='RelWithDebInfo',
                help='build the Release variant of everything (default is '
                     '%(default)s)')
 
