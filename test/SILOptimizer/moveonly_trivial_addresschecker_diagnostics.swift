@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -verify -enable-experimental-move-only %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-move-only %s
 
 //////////////////
 // Declarations //
