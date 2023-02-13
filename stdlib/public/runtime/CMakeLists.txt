@@ -30,8 +30,10 @@ set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
     AutoDiffSupport.cpp
+    Backtrace.cpp
     Bincompat.cpp
     Casting.cpp
+    CrashHandlerMacOS.cpp
     CrashReporter.cpp
     Demangle.cpp
     DynamicCast.cpp
