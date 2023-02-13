@@ -370,7 +370,7 @@ static ValidationInfo validateControlBlock(
       if (forcedDebugRevision ||
           (requiresRevisionMatch && version::isCurrentCompilerTagged())) {
         StringRef compilerRevision = forcedDebugRevision ?
-          forcedDebugRevision : version::getCurrentCompilerTag();
+          forcedDebugRevision : version::getCurrentCompilerSerializationTag();
         if (moduleRevision != compilerRevision) {
           result.status = Status::RevisionIncompatible;
 
