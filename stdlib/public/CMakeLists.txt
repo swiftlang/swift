@@ -172,3 +172,5 @@ if(SWIFT_BUILD_SDK_OVERLAY)
     add_subdirectory(Windows)
   endif()
 endif()
+
+add_subdirectory(libexec)
