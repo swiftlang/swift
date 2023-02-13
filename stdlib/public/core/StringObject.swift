@@ -940,7 +940,10 @@ extension _StringObject {
     return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
 #else
     _internalInvariant(hasNativeStorage)
-    return Builtin.reinterpretCast(largeAddressBits)
+    let storageAddress =
+       UnsafeRawPointer(bitPattern:largeAddressBits)._unsafelyUnwrappedUnchecked
+    let unmanagedRef = Unmanaged<__StringStorage>.fromOpaque(storageAddress)
+    return unmanagedRef.takeUnretainedValue()
 #endif
   }
 
