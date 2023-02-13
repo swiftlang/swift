@@ -91,6 +91,7 @@ struct ValidationInfo {
   version::Version compatibilityVersion = {};
   llvm::VersionTuple userModuleVersion;
   StringRef sdkName = {};
+  StringRef problematicRevision = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
   std::vector<StringRef> allowableClients;

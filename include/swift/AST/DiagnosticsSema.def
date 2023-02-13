@@ -804,9 +804,13 @@ ERROR(serialization_module_too_old,Fatal,
       "rebuild %0 and try again: %1",
       (Identifier, StringRef))
 ERROR(serialization_module_incompatible_revision,Fatal,
-      "compiled module was created by a different version of the compiler; "
-      "rebuild %0 and try again: %1",
-      (Identifier, StringRef))
+      "compiled module was created by a different version of the compiler '%0'; "
+      "rebuild %1 and try again: %2",
+      (StringRef, Identifier, StringRef))
+REMARK(serialization_module_problematic_revision, none,
+      "compiled module was created by a different version of the compiler '%0': "
+      "%1",
+      (StringRef, StringRef))
 ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,Fatal,
