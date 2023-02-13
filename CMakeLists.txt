@@ -553,6 +553,10 @@ option(SWIFT_IMPLICIT_CONCURRENCY_IMPORT
   "Implicitly import the Swift concurrency module"
   TRUE)
 
+option(SWIFT_IMPLICIT_BACKTRACING_IMPORT
+  "Implicitly import the Swift backtracing module"
+  FALSE)
+
 option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   "Enable build of the Swift concurrency module"
   FALSE)

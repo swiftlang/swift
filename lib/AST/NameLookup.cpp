@@ -662,6 +662,22 @@ static void recordShadowedDeclsAfterTypeMatch(
         }
       }
 
+      // Next, prefer any other module over the _Backtracing module.
+      if (auto spModule = ctx.getLoadedModule(ctx.Id_Backtracing)) {
+        if ((firstModule == spModule) != (secondModule == spModule)) {
+          // If second module is _StringProcessing, then it is shadowed by
+          // first.
+          if (secondModule == spModule) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+
+          // Otherwise, the first declaration is shadowed by the second.
+          shadowed.insert(firstDecl);
+          break;
+        }
+      }
+
       // The Foundation overlay introduced Data.withUnsafeBytes, which is
       // treated as being ambiguous with SwiftNIO's Data.withUnsafeBytes
       // extension. Apply a special-case name shadowing rule to use the

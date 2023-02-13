@@ -352,6 +352,10 @@ namespace swift {
     /// Disable the implicit import of the _StringProcessing module.
     bool DisableImplicitStringProcessingModuleImport = false;
 
+    /// Disable the implicit import of the _Backtracing module.
+    bool DisableImplicitBacktracingModuleImport =
+        !SWIFT_IMPLICIT_BACKTRACING_IMPORT;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;

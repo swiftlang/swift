@@ -1140,6 +1140,20 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
           "-disable-implicit-string-processing-module-import");
     }
+    if (Opts.EnableImplicitBacktracingModuleImport &&
+        !compilerArgsAreClang) {
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          "-Xfrontend");
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+          "-enable-implicit-backtracing-module-import");
+    }
+    if (Opts.DisableImplicitBacktracingModuleImport &&
+        !compilerArgsAreClang) {
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          "-Xfrontend");
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+          "-disable-implicit-backtracing-module-import");
+    }
 
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);

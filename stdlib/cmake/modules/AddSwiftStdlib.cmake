@@ -1822,10 +1822,9 @@ function(add_swift_target_library name)
                       "-Xfrontend;-disable-implicit-string-processing-module-import")
   endif()
 
-  # Turn off implicit import of _StringProcessing when building libraries
-  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS
-                      "-Xfrontend;-disable-implicit-string-processing-module-import")
+  # Turn off implicit import of _Backtracing when building libraries
+  if(SWIFT_IMPLICIT_BACKTRACING_IMPORT)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-backtracing-module-import")
   endif()
 
   if(SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_ENABLE_PRESPECIALIZATION)
