@@ -126,8 +126,8 @@ if "@SWIFT_HAVE_LIBXML2@" == "TRUE":
 if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':
     config.available_features.add('swift_tools_extra')
 
-if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
-    config.available_features.add('differentiable_programming')
+#if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
+#    config.available_features.add('differentiable_programming')
 if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
 if "@SWIFT_BACK_DEPLOY_CONCURRENCY@" == "TRUE":
