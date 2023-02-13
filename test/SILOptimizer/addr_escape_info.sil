@@ -500,6 +500,28 @@ bb0:
   return %7 : $()
 }
 
+// CHECK-LABEL: Address escape information for load_rawpointer:
+// CHECK:       value:  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Int
+// CHECK-NEXT:    ==>   %8 = apply %7(%5) : $@convention(thin) (@in Int) -> ()
+// CHECK:       End function load_rawpointer
+sil @load_rawpointer : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int
+  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %2 = alloc_stack $Builtin.RawPointer
+  store %1 to %2 : $*Builtin.RawPointer
+  %4 = load %2 : $*Builtin.RawPointer
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Int
+  fix_lifetime %5 : $*Int
+  %7 = function_ref @indirect_argument : $@convention(thin) (@in Int) -> ()
+  %8 = apply %7(%5) : $@convention(thin) (@in Int) -> ()
+  dealloc_stack %2 : $*Builtin.RawPointer
+  dealloc_stack %0 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
+
 // CHECK-LABEL: Address escape information for test_addr_alias1:
 // CHECK:      pair 0 - 1
 // CHECK-NEXT:   %2 = ref_element_addr %0 : $XandIntClass, #XandIntClass.x
