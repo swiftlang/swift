@@ -111,6 +111,7 @@ struct BacktraceSettings {
   unsigned         top;
   SanitizePaths    sanitize;
   Preset           preset;
+  bool             cache;
   const char      *swiftBacktracePath;
 };
 

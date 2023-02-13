@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/CrashWithThunk
 // RUN: %target-codesign %t/CrashWithThunk
-// RUN: (env SWIFT_BACKTRACE=enable=yes %target-run %t/CrashWithThunk || true) | %FileCheck %s
-// RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes %target-run %t/CrashWithThunk || true) | %FileCheck %s --check-prefix FRIENDLY
+// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashWithThunk || true) | %FileCheck %s
+// RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/CrashWithThunk || true) | %FileCheck %s --check-prefix FRIENDLY
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx

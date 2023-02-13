@@ -141,7 +141,7 @@ class Target {
     }
   }
 
-  init(crashInfoAddr: UInt64, limit: Int?, top: Int) {
+  init(crashInfoAddr: UInt64, limit: Int?, top: Int, cache: Bool) {
     pid = getppid()
     if let parentTask = Self.getParentTask() {
       task = parentTask
@@ -177,10 +177,10 @@ class Target {
     images = Backtrace.captureImages(for: task)
     sharedCacheInfo = Backtrace.captureSharedCacheInfo(for: task)
 
-    fetchThreads(limit: limit, top: top)
+    fetchThreads(limit: limit, top: top, cache: cache)
   }
 
-  func fetchThreads(limit: Int?, top: Int) {
+  func fetchThreads(limit: Int?, top: Int, cache: Bool) {
     var threadPorts: thread_act_array_t? = nil
     var threadCount: mach_msg_type_number_t = 0
     let kr = task_threads(task,
@@ -248,7 +248,8 @@ class Target {
       }
 
       guard let symbolicated = backtrace.symbolicated(with: images,
-                                                      sharedCacheInfo: sharedCacheInfo) else {
+                                                      sharedCacheInfo: sharedCacheInfo,
+                                                      useSymbolCache: cache) else {
         print("unable to symbolicate backtrace from context for thread \(ndx)")
         exit(1)
       }
@@ -262,7 +263,7 @@ class Target {
     }
   }
 
-  public func redoBacktraces(limit: Int?, top: Int) {
+  public func redoBacktraces(limit: Int?, top: Int, cache: Bool) {
     for (ndx, thread) in threads.enumerated() {
       guard let context = thread.context else {
         continue
@@ -277,7 +278,8 @@ class Target {
       }
 
       guard let symbolicated = backtrace.symbolicated(with: images,
-                                                      sharedCacheInfo: sharedCacheInfo) else {
+                                                      sharedCacheInfo: sharedCacheInfo,
+                                                      useSymbolCache: cache) else {
         print("unable to symbolicate backtrace from context for thread \(ndx)")
         continue
       }

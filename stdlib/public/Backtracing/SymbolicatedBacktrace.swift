@@ -259,6 +259,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   /// Create a symbolicator.
   private static func withSymbolicator<T>(images: [Backtrace.Image],
                                           sharedCacheInfo: Backtrace.SharedCacheInfo?,
+                                          useSymbolCache: Bool,
                                           fn: (CSSymbolicatorRef) throws -> T) rethrows -> T {
     let binaryImageList = images.map{ image in
       BinaryImageInformation(
@@ -279,7 +280,9 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     }
 
     let symbolicator = CSSymbolicatorCreateWithBinaryImageList(
-      binaryImageList, 0, nil
+      binaryImageList,
+      useSymbolCache ? 0 : kCSSymbolicatorDisallowDaemonCommunication,
+      nil
     )
 
     defer { CSRelease(symbolicator) }
@@ -345,7 +348,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   internal static func symbolicate(backtrace: Backtrace,
                                    images: [Backtrace.Image]?,
                                    sharedCacheInfo: Backtrace.SharedCacheInfo?,
-                                   showInlineFrames: Bool)
+                                   showInlineFrames: Bool,
+                                   useSymbolCache: Bool)
     -> SymbolicatedBacktrace? {
 
     let theImages: [Backtrace.Image]
@@ -370,7 +374,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
     withSymbolicator(images: theImages,
-                     sharedCacheInfo: theCacheInfo) { symbolicator in
+                     sharedCacheInfo: theCacheInfo,
+                     useSymbolCache: useSymbolCache) { symbolicator in
       for frame in backtrace.frames {
         switch frame {
           case .omittedFrames(_), .truncated:

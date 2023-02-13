@@ -29,7 +29,7 @@ func splat() {
 }
 
 func pow() {
-  let backtrace = try! Backtrace.capture().symbolicated()!
+  let backtrace = try! Backtrace.capture().symbolicated(useSymbolCache: false)!
 
   // CHECK:      0{{[ \t]+}}0x{{[0-9a-f]+}} [ra] [0] SymbolicatedBacktrace pow()
   // CHECK:      1{{[ \t]+}}0x{{[0-9a-f]+}} [ra] [0] SymbolicatedBacktrace splat()
