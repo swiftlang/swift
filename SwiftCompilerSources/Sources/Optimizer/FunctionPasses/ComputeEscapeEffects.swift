@@ -197,25 +197,39 @@ private func isOperandOfRecursiveCall(_ op: Operand) -> Bool {
   return false
 }
 
-/// Returns true if when walking from the `toSelection` to the `fromArgument`,
-/// there are no other arguments or escape points than `fromArgument`. Also, the
-/// path at the `fromArgument` must match with `fromPath`.
+/// Returns true if when walking up from the `returnInst`, the `fromArgument` is the one
+/// and only argument which is reached - with a matching `fromPath`.
 private
 func isExclusiveEscapeToReturn(fromArgument: Argument, fromPath: SmallProjectionPath,
                                toPath: SmallProjectionPath,
                                returnInst: ReturnInst, _ context: FunctionPassContext) -> Bool {
-  struct IsExclusiveReturnEscapeVisitor : EscapeVisitor {
+  struct IsExclusiveReturnEscapeVisitor : EscapeVisitorWithResult {
     let fromArgument: Argument
     let fromPath: SmallProjectionPath
     let toPath: SmallProjectionPath
+    var result = false
     
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
-      if operand.instruction is ReturnInst {
+      switch operand.instruction {
+      case is ReturnInst:
         if path.followStores { return .abort }
         if path.projectionPath.matches(pattern: toPath) {
           return .ignore
         }
         return .abort
+      case let si as StoringInstruction:
+        // Don't allow store instructions because this allows the EscapeUtils to walk up
+        // an apply result with `followStores`.
+        if operand == si.destinationOperand {
+          return .abort
+        }
+      case let ca as CopyAddrInst:
+        // `copy_addr` is like a store.
+        if operand == ca.destinationOperand {
+          return .abort
+        }
+      default:
+        break
       }
       return .continueWalk
     }
@@ -226,11 +240,12 @@ func isExclusiveEscapeToReturn(fromArgument: Argument, fromPath: SmallProjection
       }
       if path.followStores { return .abort }
       if arg == fromArgument && path.projectionPath.matches(pattern: fromPath) {
+        result = true
         return .walkDown
       }
       return .abort
     }
   }
   let visitor = IsExclusiveReturnEscapeVisitor(fromArgument: fromArgument, fromPath: fromPath, toPath: toPath)
-  return !returnInst.operand.at(toPath).isEscaping(using: visitor, context)
+  return returnInst.operand.at(toPath).visit(using: visitor, context) ?? false
 }
