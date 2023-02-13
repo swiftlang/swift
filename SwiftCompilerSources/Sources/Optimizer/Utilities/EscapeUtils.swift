@@ -592,7 +592,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     var matched = false
     for effect in effects.escapeEffects.arguments {
       switch effect.kind {
-      case .escapingToArgument(let toArgIdx, let toPath, let exclusive):
+      case .escapingToArgument(let toArgIdx, let toPath, _):
+        // Note: exclusive argument -> argument effects cannot appear, so we don't need to handle them here.
         if effect.matches(calleeArgIdx, argPath.projectionPath) {
           guard let callerToIdx = apply.callerArgIndex(calleeArgIndex: toArgIdx) else {
             return isEscaping
@@ -602,20 +603,6 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
           let arg = apply.arguments[callerToIdx]
           
           let p = Path(projectionPath: toPath, followStores: false, knownType: nil)
-          if walkUp(addressOrValue: arg, path: p) == .abortWalk {
-            return .abortWalk
-          }
-          matched = true
-        } else if toArgIdx == calleeArgIdx && argPath.projectionPath.matches(pattern: toPath) {
-          // Handle the reverse direction of an arg-to-arg escape.
-          guard let callerArgIdx = apply.callerArgIndex(calleeArgIndex: effect.argumentIndex) else {
-            return isEscaping
-          }
-          if !exclusive { return isEscaping }
-
-          let arg = apply.arguments[callerArgIdx]
-          let p = Path(projectionPath: effect.pathPattern, followStores: false, knownType: nil)
-
           if walkUp(addressOrValue: arg, path: p) == .abortWalk {
             return .abortWalk
           }

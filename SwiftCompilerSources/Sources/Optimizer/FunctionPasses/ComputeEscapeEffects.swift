@@ -158,9 +158,9 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
     effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath, exclusive),
                                           argumentIndex: arg.index, pathPattern: argPath)
   case .toArgument(let toArgIdx, let toPath):
-    let exclusive = isExclusiveEscapeToArgument(fromArgument: arg, fromPath: argPath,
-                                                toArgumentIndex: toArgIdx, toPath: toPath, context)
-    effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
+    // Exclusive argument -> argument effects cannot appear because such an effect would
+    // involve a store which is not permitted for exclusive escapes.
+    effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgIdx, toPath, /*exclusive*/ false),
                                           argumentIndex: arg.index, pathPattern: argPath)
   }
   newEffects.append(effect)
@@ -234,29 +234,3 @@ func isExclusiveEscapeToReturn(fromArgument: Argument, fromPath: SmallProjection
   let visitor = IsExclusiveReturnEscapeVisitor(fromArgument: fromArgument, fromPath: fromPath, toPath: toPath)
   return !returnInst.operand.at(toPath).isEscaping(using: visitor, context)
 }
-
-private
-func isExclusiveEscapeToArgument(fromArgument: Argument, fromPath: SmallProjectionPath,
-                                 toArgumentIndex: Int, toPath: SmallProjectionPath, _ context: FunctionPassContext) -> Bool {
-  struct IsExclusiveArgumentEscapeVisitor : EscapeVisitor {
-    let fromArgument: Argument
-    let fromPath: SmallProjectionPath
-    let toArgumentIndex: Int
-    let toPath: SmallProjectionPath
-    
-    mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
-      guard let arg = def as? FunctionArgument else {
-        return .continueWalkUp
-      }
-      if path.followStores { return .abort }
-      if arg == fromArgument && path.projectionPath.matches(pattern: fromPath) { return .walkDown }
-      if arg.index == toArgumentIndex && path.projectionPath.matches(pattern: toPath) { return .walkDown }
-      return .abort
-    }
-  }
-  let visitor = IsExclusiveArgumentEscapeVisitor(fromArgument: fromArgument, fromPath: fromPath,
-                                                 toArgumentIndex: toArgumentIndex, toPath: toPath)
-  let toArg = fromArgument.parentFunction.arguments[toArgumentIndex]
-  return !toArg.at(toPath).isEscapingWhenWalkingDown(using: visitor, context)
-}
-

@@ -93,8 +93,8 @@ sil [ossa] @arg_to_return : $@convention(thin) (@owned X) -> @owned Str {
 [%0: escape => %r.s0]
 }
 sil [ossa] @arg_to_arg : $@convention(thin) (@owned X) -> @out Str {
-[%0: noescape]
-[%1: escape => %0.s0]
+[%0: noescape v**]
+[%1: escape -> %0.s0]
 }
 sil [ossa] @content_of_arg_to_return : $@convention(thin) (@owned Z) -> @owned Y {
 [%0: noescape, escape c* => %r]
