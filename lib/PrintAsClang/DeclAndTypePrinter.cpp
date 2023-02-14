@@ -1443,6 +1443,21 @@ private:
               FD, funcABI, resultTy, funcTy, dispatchInfo->getThunkSymbolName(),
               "dispatch thunk for");
           assert(!thunkRepresentation.isUnsupported());
+        } else if (dispatchInfo->getKind() ==
+                   IRABIDetailsProvider::MethodDispatchInfo::Kind::
+                       IndirectVTableRelativeOffset) {
+          // Emit the C signature for the class metadata base offset.
+          owningPrinter.interopContext.runIfStubForDeclNotEmitted(
+              dispatchInfo->getBaseOffsetSymbolName(), [&] {
+                auto baseClassOffsetType =
+                    owningPrinter.interopContext.getIrABIDetails()
+                        .getClassBaseOffsetSymbolType();
+                os << "SWIFT_EXTERN ";
+                ClangSyntaxPrinter(os).printKnownCType(
+                    baseClassOffsetType, owningPrinter.typeMapping);
+                os << ' ' << dispatchInfo->getBaseOffsetSymbolName()
+                   << "; // class metadata base offset\n";
+              });
         }
       }
     }

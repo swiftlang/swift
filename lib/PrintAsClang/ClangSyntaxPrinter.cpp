@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangSyntaxPrinter.h"
+#include "PrimitiveTypeMapping.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -423,4 +424,14 @@ void ClangSyntaxPrinter::printSymbolUSRAttribute(const ValueDecl *D) const {
   if (result.empty())
     return;
   os << " SWIFT_SYMBOL(\"" << result << "\")";
+}
+
+void ClangSyntaxPrinter::printKnownCType(
+    Type t, PrimitiveTypeMapping &typeMapping) const {
+  auto info =
+      typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
+  assert(info.has_value() && "not a known type");
+  os << info->name;
+  if (info->canBeNullable)
+    os << " _Null_unspecified";
 }

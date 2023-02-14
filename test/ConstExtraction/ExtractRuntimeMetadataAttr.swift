@@ -4,6 +4,8 @@
 // RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractRuntimeMetadataAttr.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s -enable-experimental-feature RuntimeDiscoverableAttrs
 // RUN: cat %t/ExtractRuntimeMetadataAttr.swiftconstvalues 2>&1 | %FileCheck %s
 
+// REQUIRES: asserts
+
 @runtimeMetadata
 struct Flag<T> {
   init(attachedTo: T.Type, _ description: String = "") {}
@@ -20,7 +22,7 @@ struct A : MyProto {
 // CHECK:    "typeName": "ExtractRuntimeMetadataAttr.A",
 // CHECK-NEXT:    "kind": "struct",
 // CHECK-NEXT:    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractRuntimeMetadataAttr.swift",
-// CHECK-NEXT:    "line": 16,
+// CHECK-NEXT:    "line": 18,
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "v1",
@@ -28,7 +30,7 @@ struct A : MyProto {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractRuntimeMetadataAttr.swift",
-// CHECK-NEXT:        "line": 17,
+// CHECK-NEXT:        "line": 19,
 // CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "foo",
 // CHECK-NEXT:        "propertyWrappers": [],
@@ -36,7 +38,7 @@ struct A : MyProto {
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractRuntimeMetadataAttr.Flag",
 // CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractRuntimeMetadataAttr.swift",
-// CHECK-NEXT:            "line": 17,
+// CHECK-NEXT:            "line": 19,
 // CHECK-NEXT:            "arguments": [
 // CHECK-NEXT:              {
 // CHECK-NEXT:                "label": "",
