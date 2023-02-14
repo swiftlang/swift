@@ -2393,6 +2393,12 @@ namespace {
       // function, to set the type of the pattern.
       auto setType = [&](Type type) {
         CS.setType(pattern, type);
+        if (auto PE = dyn_cast<ExprPattern>(pattern)) {
+          // Set the type of the pattern's sub-expression as well, so code
+          // completion can retrieve the expression's type in case it is a code
+          // completion token.
+          CS.setType(PE->getSubExpr(), type);
+        }
         return type;
       };
 
