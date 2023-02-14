@@ -197,7 +197,7 @@ func testCompleteInStringLiteral() {
     }
 // STRING_LITERAL_VAR: Begin completions, 2 items
 // STRING_LITERAL_VAR-DAG: Keyword[self]/CurrNominal:          self[#Island#]; name=self
-// STRING_LITERAL_VAR-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: turnipPrice[#String#]; name=turnipPrice
+// STRING_LITERAL_VAR-DAG: Decl[InstanceVar]/CurrNominal: turnipPrice[#String#]; name=turnipPrice
   }
 
   func bar(island: Island) {

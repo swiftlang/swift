@@ -586,15 +586,6 @@ bool TypeChecker::typeCheckForCodeCompletion(
   if (!contextAnalyzer.hasCompletion())
     return false;
 
-  // Interpolation components are type-checked separately.
-  if (contextAnalyzer.locatedInStringInterpolation())
-    return false;
-
-  // FIXME: There is currently no way to distinguish between
-  // multi-statement closures which are result builder bodies
-  // (that are type-checked together with enclosing context)
-  // and regular closures which are type-checked separately.
-
   if (needsPrecheck) {
     // First, pre-check the expression, validating any types that occur in the
     // expression and folding sequence expressions.
