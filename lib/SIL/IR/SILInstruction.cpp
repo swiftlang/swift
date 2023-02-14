@@ -1243,7 +1243,8 @@ bool SILInstruction::isAllocatingStack() const {
     return PA->isOnStack();
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc) {
+    if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
+        BI->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
       return true;
     }
   }
