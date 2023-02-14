@@ -117,8 +117,8 @@ if "@CMAKE_GENERATOR@" == "Xcode":
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
-#if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
-#    config.available_features.add('differentiable_programming')
+if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
+    config.available_features.add('differentiable_programming')
 if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
 if "@SWIFT_BACK_DEPLOY_CONCURRENCY@" == "TRUE":

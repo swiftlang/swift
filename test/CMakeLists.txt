@@ -369,9 +369,9 @@ foreach(SDK ${SWIFT_SDKS})
 
         list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")
 
-        #if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
-        #  list(APPEND LIT_ARGS "--param" "differentiable_programming")
-        #endif()
+        if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+          list(APPEND LIT_ARGS "--param" "differentiable_programming")
+        endif()
 
         if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
           list(APPEND LIT_ARGS "--param" "concurrency")
