@@ -9,10 +9,6 @@
 
 // RUN: %FileCheck %s < %t/UseCxxTyExposeOnly.h
 
-// FIXME: remove once https://github.com/apple/swift/pull/60971 lands.
-// RUN: echo "#include \"header.h\"" > %t/full-cxx-swift-cxx-bridging.h
-// RUN: cat %t/UseCxxTy.h >> %t/full-cxx-swift-cxx-bridging.h
-
 // RUN: %check-interop-cxx-header-in-clang(%t/full-cxx-swift-cxx-bridging.h -Wno-reserved-identifier)
 
 // FIXME: test in C++ with modules (but libc++ modularization is preventing this)

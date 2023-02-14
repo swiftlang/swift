@@ -9,10 +9,6 @@
 
 // RUN: %FileCheck %s < %t/UseObjCTyExposeOnly.h
 
-// FIXME: remove once https://github.com/apple/swift/pull/60971 lands.
-// RUN: echo "#include \"header.h\"" > %t/full-header.h
-// RUN: cat %t/UseObjCTy.h >> %t/full-header.h
-
 // RUN: %target-interop-build-clangxx -std=gnu++20 -fobjc-arc -c -x objective-c++-header %t/full-header.h -o %t/o.o
 
 // REQUIRES: objc_interop
