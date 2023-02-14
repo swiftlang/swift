@@ -1779,8 +1779,6 @@ bool swift::visitForwardedGuaranteedOperands(
       || isa<OwnershipForwardingMultipleValueInstruction>(inst)
       || isa<MoveOnlyWrapperToCopyableValueInst>(inst)
       || isa<CopyableToMoveOnlyWrapperValueInst>(inst)) {
-    assert(inst->getNumRealOperands() == 1
-           && "forwarding instructions must have a single real operand");
     assert(!isa<SingleValueInstruction>(inst)
            || !BorrowedValue(cast<SingleValueInstruction>(inst))
                   && "forwarded operand cannot begin a borrow scope");
