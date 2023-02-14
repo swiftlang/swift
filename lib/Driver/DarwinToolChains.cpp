@@ -221,27 +221,6 @@ static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
   arguments.push_back(inputArgs.MakeArgString(os.str()));
 }
 
-/// Returns true if the compiler depends on features provided by the ObjC
-/// runtime that are not present on the deployment target indicated by
-/// \p triple.
-static bool wantsObjCRuntime(const llvm::Triple &triple) {
-  assert((!triple.isTvOS() || triple.isiOS()) &&
-         "tvOS is considered a kind of iOS");
-
-  // When updating the versions listed here, please record the most recent
-  // feature being depended on and when it was introduced:
-  //
-  // - Make assigning 'nil' to an NSMutableDictionary subscript delete the
-  //   entry, like it does for Swift.Dictionary, rather than trap.
-  if (triple.isiOS())
-    return triple.isOSVersionLT(9);
-  if (triple.isMacOSX())
-    return triple.isMacOSXVersionLT(10, 11);
-  if (triple.isWatchOS())
-    return false;
-  llvm_unreachable("unknown Darwin OS");
-}
-
 void
 toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
                                        const JobContext &context) const {
