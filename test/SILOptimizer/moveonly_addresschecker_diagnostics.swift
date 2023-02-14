@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s
 
 //////////////////
 // Declarations //
@@ -26,6 +26,8 @@ public func consumeVal(_ x: __owned AggStruct) {}
 public func consumeVal(_ x: __owned AggGenericStruct<CopyableKlass>) {}
 public func consumeVal<T>(_ x: __owned AggGenericStruct<T>) {}
 public func consumeVal(_ x: __owned EnumTy) {}
+public func consumeVal(_ x: __owned NonTrivialStruct) {}
+public func consumeVal(_ x: __owned NonTrivialStruct2) {}
 
 @_moveOnly
 public final class Klass {
@@ -72,6 +74,11 @@ public enum NonTrivialEnum {
 @_moveOnly
 public final class FinalKlass {
     var k: Klass = Klass()
+}
+
+public final class CopyableKlassWithMoveOnlyField {
+    var moveOnlyVarStruct = NonTrivialStruct()
+    let moveOnlyLetStruct = NonTrivialStruct()
 }
 
 ///////////
@@ -395,8 +402,10 @@ public func classAccessConsumeField(_ x: Klass) { // expected-error {{'x' has gu
     x2 = Klass()
     // Since a class is a reference type, we do not emit an error here.
     consumeVal(x2.k) // expected-note {{consuming use here}}
+    // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
         consumeVal(x2.k) // expected-note {{consuming use here}}
+        // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
@@ -405,8 +414,11 @@ public func classAccessConsumeFieldArg(_ x2: inout Klass) {
     // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     // Since a class is a reference type, we do not emit an error here.
     consumeVal(x2.k) // expected-note {{consuming use here}}
+    // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+
     for _ in 0..<1024 {
         consumeVal(x2.k) // expected-note {{consuming use here}}
+        // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
@@ -695,8 +707,10 @@ public func finalClassConsumeField() {
     x2 = FinalKlass()
 
     consumeVal(x2.k) // expected-note {{consuming use here}}
+    // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
         consumeVal(x2.k) // expected-note {{consuming use here}}
+        // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
@@ -704,8 +718,10 @@ public func finalClassConsumeFieldArg(_ x2: inout FinalKlass) {
     // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     consumeVal(x2.k) // expected-note {{consuming use here}}
+    // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
         consumeVal(x2.k) // expected-note {{consuming use here}}
+        // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
@@ -2097,9 +2113,8 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-3 {{'x2' consumed more than once}}
     // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
-    // expected-error @-5 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-6 {{'x2' consumed more than once}}
-    // expected-error @-7 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-5 {{'x2' consumed more than once}}
+    // expected-error @-6 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
     let f = {
         let g = {
@@ -2125,8 +2140,7 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
     // expected-error @-3 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-4 {{'x2' consumed more than once}}
     // expected-error @-5 {{'x2' consumed more than once}}
-    // expected-error @-6 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-7 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-6 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
     let f = {
         let g = {
@@ -2409,4 +2423,60 @@ func inoutAndConsumingUse(_ k: inout Klass) { // expected-error {{'k' used after
     // expected-note @-1 {{non-consuming use here}}
     // expected-note @-2 {{consuming use here}}
     // expected-note @-3 {{conflicting access is here}}
+}
+
+////////////////////////////
+// Ref Element Addr Tests //
+////////////////////////////
+
+func copyableKlassWithMoveOnlyFieldBorrowValue(_ x: CopyableKlassWithMoveOnlyField) {
+    borrowVal(x.moveOnlyVarStruct)
+    borrowVal(x.moveOnlyVarStruct)
+    borrowVal(x.moveOnlyVarStruct.nonTrivialStruct2)
+    borrowVal(x.moveOnlyLetStruct)
+    borrowVal(x.moveOnlyLetStruct)
+    borrowVal(x.moveOnlyLetStruct.nonTrivialStruct2)
+}
+
+func copyableKlassWithMoveOnlyFieldConsumeValue(_ x: CopyableKlassWithMoveOnlyField) {
+    consumeVal(x.moveOnlyVarStruct)
+    // expected-error @-1 {{'x.moveOnlyVarStruct' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+    consumeVal(x.moveOnlyVarStruct.nonTrivialStruct2) // expected-error {{'x.moveOnlyVarStruct' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+    // TODO: We should place a note on x. We need to make the diagnostic part of
+    // this a little smarter.
+    consumeVal(x.moveOnlyLetStruct) // expected-error {{'x.moveOnlyLetStruct' was consumed but it is illegal to consume a noncopyable class let field. One can only read from it}}
+    consumeVal(x.moveOnlyLetStruct.nonTrivialStruct2) // expected-error {{'x.moveOnlyLetStruct' was consumed but it is illegal to consume a noncopyable class let field. One can only read from it}}
+}
+
+func copyableKlassWithMoveOnlyFieldAssignValue(_ x: CopyableKlassWithMoveOnlyField) {
+    x.moveOnlyVarStruct = NonTrivialStruct()
+    x.moveOnlyVarStruct = NonTrivialStruct()
+}
+
+///////////////////////
+// Global Addr Tests //
+///////////////////////
+
+var varGlobal = NonTrivialStruct()
+let letGlobal = NonTrivialStruct()
+
+func moveOnlyGlobalBorrowValue() {
+    borrowVal(varGlobal)
+    borrowVal(varGlobal.nonTrivialStruct2)
+    borrowVal(letGlobal)
+    borrowVal(letGlobal.nonTrivialStruct2)
+}
+
+func moveOnlyGlobalConsumeValue() {
+    consumeVal(varGlobal) // expected-error {{'varGlobal' was consumed but it is illegal to consume a noncopyable global var. One can only read from it or assign to it}}
+    // TODO: Fix error to say that it is from nonTrivialStruct2
+    consumeVal(varGlobal.nonTrivialStruct2) // expected-error {{'varGlobal' was consumed but it is illegal to consume a noncopyable global var. One can only read from it or assign to it}}
+    consumeVal(letGlobal) // expected-error {{'letGlobal' was consumed but it is illegal to consume a noncopyable global let. One can only read from it}}
+    // TODO: Fix error to say that it is from nonTrivialStruct2
+    consumeVal(letGlobal.nonTrivialStruct2) // expected-error {{'letGlobal' was consumed but it is illegal to consume a noncopyable global let. One can only read from it}}
+}
+
+func moveOnlyGlobalAssignValue() {
+    varGlobal = NonTrivialStruct()
+    varGlobal.nonTrivialStruct2 = NonTrivialStruct2()
 }

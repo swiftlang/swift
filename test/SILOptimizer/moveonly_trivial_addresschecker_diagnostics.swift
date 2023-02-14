@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -verify -enable-experimental-move-only %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-move-only %s
 
 //////////////////
 // Declarations //
@@ -1402,11 +1402,10 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
     var x2 = NonTrivialStruct()
     // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-3 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-3 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-4 {{'x2' consumed more than once}}
     // expected-error @-5 {{'x2' consumed more than once}}
-    // expected-error @-6 {{'x2' consumed more than once}}
-    // expected-error @-7 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-6 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = NonTrivialStruct()
     let f = {
         let g = {
@@ -1429,11 +1428,10 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
     var x2 = NonTrivialStruct()
     // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-3 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-3 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-4 {{'x2' consumed more than once}}
     // expected-error @-5 {{'x2' consumed more than once}}
-    // expected-error @-6 {{'x2' consumed more than once}}
-    // expected-error @-7 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-6 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = NonTrivialStruct()
     let f = {
         let g = {

@@ -253,12 +253,22 @@ public:
     case ClassMetadataLayout::MethodInfo::Kind::Offset:
       if (mi->TheOffset.isStatic()) {
         return MethodDispatchInfo::indirectVTableStaticOffset(
-            /*bitOffset=*/mi->TheOffset.getStaticOffset().getValue(),
+            /*offset=*/mi->TheOffset.getStaticOffset().getValue(),
             getMethodPointerAuthInfo(funcDecl, silDecl));
       }
-      return {};
+      assert(mi->TheOffset.isDynamic());
+      return MethodDispatchInfo::indirectVTableRelativeOffset(
+          /*offset=*/mi->TheOffset.getRelativeOffset().getValue(),
+          /*symbolName=*/
+          LinkEntity::forClassMetadataBaseOffset(parentClass).mangleAsString(),
+          getMethodPointerAuthInfo(funcDecl, silDecl));
     }
     llvm_unreachable("invalid kind");
+  }
+
+  Type getClassBaseOffsetSymbolType() const {
+    return *getPrimitiveTypeFromLLVMType(
+        silMod->getASTContext(), IGM.ClassMetadataBaseOffsetTy->elements()[0]);
   }
 
   Lowering::TypeConverter typeConverter;
@@ -469,4 +479,8 @@ Optional<IRABIDetailsProvider::MethodDispatchInfo>
 IRABIDetailsProvider::getMethodDispatchInfo(
     const AbstractFunctionDecl *funcDecl) {
   return impl->getMethodDispatchInfo(funcDecl);
+}
+
+Type IRABIDetailsProvider::getClassBaseOffsetSymbolType() const {
+  return impl->getClassBaseOffsetSymbolType();
 }

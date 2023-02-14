@@ -3764,6 +3764,7 @@ void ASTMangler::appendMacroExpansionContext(
     outerExpansionDC = expansion->getDeclContext();
     discriminator = expansion->getDiscriminator();
     role = MacroRole::Declaration;
+    baseName = expansion->getMacroName().getBaseName();
     break;
   }
 
@@ -3799,6 +3800,17 @@ void ASTMangler::appendMacroExpansionContext(
     outerExpansionLoc = decl->getLoc();
     outerExpansionDC = decl->getDeclContext();
     discriminator = decl->getAttachedMacroDiscriminator(role, attr);
+
+    auto *macroDecl = evaluateOrDefault(
+        ctx.evaluator,
+        ResolveMacroRequest{const_cast<CustomAttr *>(attr),
+                            getAttachedMacroRoles(), outerExpansionDC},
+        nullptr);
+    if (macroDecl)
+      baseName = macroDecl->getBaseName();
+    else
+      baseName = ctx.getIdentifier("__unknown_macro__");
+
     break;
   }
 
