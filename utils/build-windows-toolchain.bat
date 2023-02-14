@@ -677,18 +677,22 @@ IF NOT "%SKIP_PACKAGING%"=="1" call :PackageToolchain
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==swift SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestSwift
+IF %ERRORLEVEL% NEQ 0 (EXIT /B)
 
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==dispatch SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestDispatch
+IF %ERRORLEVEL% NEQ 0 (EXIT /B)
 
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==foundation SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestFoundation
+IF %ERRORLEVEL% NEQ 0 (EXIT /B)
 
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==xctest SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestXCTest
+IF %ERRORLEVEL% NEQ 0 (EXIT /B)
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
