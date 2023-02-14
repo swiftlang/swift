@@ -89,8 +89,10 @@ call :build_libdispatch %exitOnError%
 path %install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
 
 if %RunTest%==1 (
-  call :test_swift %exitOnError%
-  call :test_libdispatch %exitOnError%
+  call :test_swift
+  IF %ERRORLEVEL% NEQ 0 (exit /b)
+  call :test_libdispatch
+  IF %ERRORLEVEL% NEQ 0 (exit /b)
 )
 
 goto :end
