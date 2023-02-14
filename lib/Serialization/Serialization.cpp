@@ -1011,7 +1011,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     static const char* forcedDebugRevision =
       ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
     auto revision = forcedDebugRevision ?
-      forcedDebugRevision : version::getCurrentCompilerTag();
+      forcedDebugRevision : version::getCurrentCompilerSerializationTag();
     Revision.emit(ScratchRecord, revision);
 
     IsOSSA.emit(ScratchRecord, options.IsOSSA);
