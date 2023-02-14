@@ -15,28 +15,31 @@ import Swift
 /// A service that can execute jobs.
 @available(SwiftStdlib 5.1, *)
 public protocol Executor: AnyObject, Sendable {
-  // This requirement is repeated here as a non-override so that we
-  // get a redundant witness-table entry for it.  This allows us to
-  // avoid drilling down to the base conformance just for the basic
-  // work-scheduling operation.
-  @available(*, deprecated, message: "Implement enqueueJob instead")
+  @available(*, deprecated, message: "Implement 'enqueue(_: __owned Job)' instead")
   func enqueue(_ job: UnownedJob)
 
   @available(SwiftStdlib 5.9, *)
-  func enqueueJob(_ job: __owned Job) // FIXME: figure out how to introduce in compatible way
+  func enqueue(_ job: __owned Job)
 }
 
 /// A service that executes jobs.
 @available(SwiftStdlib 5.1, *)
 public protocol SerialExecutor: Executor {
-
+  // This requirement is repeated here as a non-override so that we
+  // get a redundant witness-table entry for it.  This allows us to
+  // avoid drilling down to the base conformance just for the basic
+  // work-scheduling operation.
   @_nonoverride
-  @available(*, deprecated, message: "Implement enqueueJob instead")
+  @available(*, deprecated, message: "Implement 'enqueue_: __owned Job) instead")
   func enqueue(_ job: UnownedJob)
 
+  // This requirement is repeated here as a non-override so that we
+  // get a redundant witness-table entry for it.  This allows us to
+  // avoid drilling down to the base conformance just for the basic
+  // work-scheduling operation.
   @_nonoverride
   @available(SwiftStdlib 5.9, *)
-  func enqueueJob(_ job: __owned Job) // FIXME: figure out how to introduce in compatible way
+  func enqueue(_ job: __owned Job)
 
   /// Convert this executor value to the optimized form of borrowed
   /// executor references.
@@ -45,11 +48,19 @@ public protocol SerialExecutor: Executor {
 
 @available(SwiftStdlib 5.9, *)
 extension Executor {
-  public func enqueue(_ job: UnownedJob) { // FIXME: this is bad; how could we deploy this nicely
+  public func enqueue(_ job: UnownedJob) {
     fatalError("Please implement \(Self.self).enqueueJob(_:)")
   }
-  public func enqueueJob(_ job: __owned Job) {
+
+  public func enqueue(_ job: __owned Job) {
     self.enqueue(UnownedJob(job))
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension SerialExecutor {
+  public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+    UnownedSerialExecutor(ordinary: self)
   }
 }
 
@@ -124,7 +135,7 @@ internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
 internal func _enqueueOnExecutor<E>(job unownedJob: UnownedJob, executor: E)
 where E: SerialExecutor {
   if #available(SwiftStdlib 5.9, *) {
-    executor.enqueueJob(Job(context: unownedJob.context))
+    executor.enqueue(Job(context: unownedJob.context))
   } else {
     executor.enqueue(unownedJob)
   }

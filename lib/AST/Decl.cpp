@@ -5247,6 +5247,42 @@ VarDecl *NominalTypeDecl::getGlobalActorInstance() const {
                            nullptr);
 }
 
+AbstractFunctionDecl *
+NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
+  auto &C = getASTContext();
+
+  auto proto = dyn_cast<ProtocolDecl>(this);
+  if (!proto)
+    return nullptr;
+
+  llvm::SmallVector<ValueDecl *, 2> results;
+  lookupQualified(getSelfNominalTypeDecl(),
+                  DeclNameRef(C.Id_enqueue),
+                  NL_ProtocolMembers,
+                  results);
+
+  for (auto candidate: results) {
+    // we're specifically looking for the Executor protocol requirement
+    if (!isa<ProtocolDecl>(candidate->getDeclContext()))
+      continue;
+
+    fprintf(stderr, "[%s:%d](%s) candidate\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    candidate->dump();
+
+    if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(candidate)) {
+      if (funcDecl->getParameters()->size() != 1)
+        continue;
+
+      auto params = funcDecl->getParameters();
+      if (params->get(0)->getSpecifier() == ParamSpecifier::Owned) {
+        return funcDecl;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      ArrayRef<InheritedEntry> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent,

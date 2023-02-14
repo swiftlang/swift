@@ -8,15 +8,8 @@
 // REQUIRES: concurrency_runtime
 
 final class InlineExecutor: SerialExecutor, CustomStringConvertible {
-
-  public func enqueueJob(_ job: __owned Job) {
-    print("\(self): enqueue (job: \(job.description))")
-    runJobSynchronously(job)
-    print("\(self): after run")
-  }
-
-  public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    return UnownedSerialExecutor(ordinary: self)
+  public func enqueue(_ job: __owned Job) {
+    job.runSynchronously(on: self)
   }
 
   var description: Swift.String {

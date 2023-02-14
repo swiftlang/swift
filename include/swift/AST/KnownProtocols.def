@@ -76,6 +76,7 @@ PROTOCOL(SIMDScalar)
 PROTOCOL(BinaryInteger)
 PROTOCOL(FixedWidthInteger)
 PROTOCOL(RangeReplaceableCollection)
+PROTOCOL(Executor)
 PROTOCOL(SerialExecutor)
 PROTOCOL(GlobalActor)
 

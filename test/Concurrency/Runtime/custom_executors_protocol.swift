@@ -8,12 +8,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
-import Dispatch
-
-func checkIfMainQueue(expectedAnswer expected: Bool) {
-  dispatchPrecondition(condition: expected ? .onQueue(DispatchQueue.main)
-      : .notOnQueue(DispatchQueue.main))
-}
+@preconcurrency import Dispatch
 
 protocol WithSpecifiedExecutor: Actor {
   nonisolated var executor: SpecifiedExecutor { get }
@@ -29,7 +24,7 @@ extension WithSpecifiedExecutor {
   }
 }
 
-final class InlineExecutor: SpecifiedExecutor, Swift.CustomStringConvertible {
+final class InlineExecutor: SpecifiedExecutor, CustomStringConvertible {
   let name: String
 
   init(_ name: String) {
@@ -38,22 +33,47 @@ final class InlineExecutor: SpecifiedExecutor, Swift.CustomStringConvertible {
 
   public func enqueue(_ job: UnownedJob) {
     print("\(self): enqueue")
-    job._runSynchronously(on: self.asUnownedSerialExecutor())
+    job.runSynchronously(on: self.asUnownedSerialExecutor())
     print("\(self): after run")
   }
 
-  public func enqueueJob(_ job: __owned Job) {
+  public func enqueue(_ job: __owned Job) {
     print("\(self): enqueue")
-    runJobSynchronously(job)
+    job.runSynchronously(on: self)
     print("\(self): after run")
-  }
-
-  public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    return UnownedSerialExecutor(ordinary: self)
   }
 
   var description: Swift.String {
     "InlineExecutor(\(name))"
+  }
+}
+
+final class NaiveQueueExecutor: SpecifiedExecutor, CustomStringConvertible {
+  let queue: DispatchQueue
+
+  init(_ queue: DispatchQueue) {
+    self.queue = queue
+  }
+
+  public func enqueue(_ job: UnownedJob) {
+    print("\(self): enqueue")
+    queue.sync {
+      job.runSynchronously(on: self)
+    }
+    print("\(self): after run")
+  }
+
+  public func enqueue(_ job: __owned Job) {
+    print("\(self): enqueue")
+    let unowned = UnownedJob(job)
+    queue.sync {
+      unowned.runSynchronously(on: self)
+    }
+    print("\(self): after run")
+  }
+
+  var description: Swift.String {
+    "NaiveQueueExecutor(\(queue))"
   }
 }
 
@@ -68,9 +88,9 @@ actor MyActor: WithSpecifiedExecutor {
     self.executor = executor
   }
 
-  func test(expectedExecutor: some SerialExecutor) {
+  func test(expectedExecutor: some SerialExecutor, expectedQueue: DispatchQueue) {
     precondition(_taskIsOnExecutor(expectedExecutor), "Expected to be on: \(expectedExecutor)")
-    checkIfMainQueue(expectedAnswer: true)
+    dispatchPrecondition(condition: .onQueue(expectedQueue))
     print("\(Self.self): on executor \(expectedExecutor)")
   }
 }
@@ -78,11 +98,12 @@ actor MyActor: WithSpecifiedExecutor {
 @main struct Main {
   static func main() async {
     print("begin")
-    let one = InlineExecutor("one")
+    let queue = DispatchQueue(label: "CustomQueue")
+    let one = NaiveQueueExecutor(queue)
     let actor = MyActor(executor: one)
-    await actor.test(expectedExecutor: one)
-    await actor.test(expectedExecutor: one)
-    await actor.test(expectedExecutor: one)
+    await actor.test(expectedExecutor: one, expectedQueue: queue)
+    await actor.test(expectedExecutor: one, expectedQueue: queue)
+    await actor.test(expectedExecutor: one, expectedQueue: queue)
     print("end")
   }
 }

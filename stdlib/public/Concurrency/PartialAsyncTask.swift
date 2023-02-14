@@ -35,7 +35,7 @@ public struct UnownedJob: Sendable {
 
   @available(SwiftStdlib 5.9, *)
   @usableFromInline
-  internal init(_ job: __owned Job) {
+  public init(_ job: __owned Job) {
     self.context = job.context
   }
 
@@ -48,7 +48,7 @@ public struct UnownedJob: Sendable {
 
   @_alwaysEmitIntoClient
   @inlinable
-  @available(*, deprecated, renamed: "runSynchronously")
+  @available(*, deprecated, renamed: "runSynchronously(on:)")
   public func _runSynchronously(on executor: UnownedSerialExecutor) {
       _swiftJobRun(self, executor)
   }
@@ -67,6 +67,70 @@ extension UnownedJob {
   }
 }
 
+/// A unit of scheduleable work.
+///
+/// Unless you're implementing a scheduler,
+/// you don't generally interact with jobs directly.
+@available(SwiftStdlib 5.9, *)
+@frozen
+@_moveOnly
+public struct Job: Sendable {
+  internal var context: Builtin.Job
+
+  @usableFromInline
+  internal init(context: __owned Builtin.Job) {
+    self.context = context
+  }
+
+  public var priority: UnownedJob.Priority {
+    // let raw = _swift_concurrency_jobPriority(UnownedJob(context: self.context)) // TODO: do we also surface this or the base priority?
+    let raw = _taskCurrentPriority(context as! Builtin.NativeObject)
+    return UnownedJob.Priority(rawValue: raw)
+  }
+
+  // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
+  //       we can still offer a description to be called explicitly though.
+  public var description: String {
+    let id = _getJobTaskId(UnownedJob(context: self.context))
+    /// Tasks are always assigned an unique ID, however some jobs may not have it set,
+    /// and it appearing as 0 for _different_ jobs may lead to misunderstanding it as
+    /// being "the same 0 id job", we specifically print 0 (id not set) as nil.
+    if (id > 0) {
+      return "\(Self.self)(id: \(id))"
+    } else {
+      return "\(Self.self)(id: nil)"
+    }
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension Job {
+
+  /// Run the job synchronously.
+  ///
+  /// This operation consumes the job, preventing it accidental use after it has ben run.
+  ///
+  /// Converting a `Job` to an `UnownedJob` and invoking `runSynchronously` on it multiple times is undefined behavior,
+  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  @_alwaysEmitIntoClient
+  @inlinable
+  __consuming public func runSynchronously(on executor: some SerialExecutor) {
+    _swiftJobRun(UnownedJob(self), UnownedSerialExecutor(ordinary: executor))
+  }
+
+  /// Run the job synchronously.
+  ///
+  /// This operation consumes the job, preventing it accidental use after it has ben run.
+  ///
+  /// Converting a `Job` to an `UnownedJob` and invoking `runSynchronously` on it multiple times is undefined behavior,
+  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  @_alwaysEmitIntoClient
+  @inlinable
+  __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
+    _swiftJobRun(UnownedJob(self), executor)
+  }
+}
+
 /// The priority of this job.
 ///
 /// The executor determines how priority information affects the way tasks are scheduled.
@@ -82,8 +146,10 @@ extension UnownedJob {
 /// Conversions between the two priorities are available as initializers on the respective types.
 @available(SwiftStdlib 5.9, *)
 @frozen
-public struct JobPriority {
+public struct JobPriority: CustomStringConvertible {
   public typealias RawValue = UInt8
+    _swiftJobRun(UnownedJob(self), UnownedSerialExecutor(ordinary: executor))
+  }
 
   /// The raw priority value.
   public var rawValue: RawValue
@@ -95,6 +161,9 @@ extension TaskPriority {
   ///
   /// Most values are directly interchangeable, but this initializer reserves the right to fail for certain values.
   @available(SwiftStdlib 5.9, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
   public init?(_ p: JobPriority) {
     // currently we always convert, but we could consider mapping over only recognized values etc.
     self = .init(rawValue: p.rawValue)

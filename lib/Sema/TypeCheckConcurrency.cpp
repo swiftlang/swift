@@ -1225,6 +1225,79 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
   }
 }
 
+void swift::tryDiagnoseExecutorConformance(ASTContext &C,
+                                           const NominalTypeDecl *nominal,
+                                           ProtocolDecl *proto) {
+  assert(proto->isSpecificProtocol(KnownProtocolKind::Executor) ||
+         proto->isSpecificProtocol(KnownProtocolKind::SerialExecutor));
+
+  auto &diags = C.Diags;
+  auto module = nominal->getParentModule();
+  Type nominalTy = nominal->getDeclaredInterfaceType();
+
+  // enqueue(_: UnownedJob)
+  auto enqueueDeclName = DeclName(C, DeclBaseName(C.Id_enqueue), { Identifier() });
+
+  FuncDecl *unownedEnqueueRequirement = nullptr;
+  FuncDecl *moveOnlyEnqueueRequirement = nullptr;
+  for (auto req: proto->getProtocolRequirements()) {
+    auto *funcDecl = dyn_cast<FuncDecl>(req);
+    if (!funcDecl)
+      continue;
+
+    if (funcDecl->getName() != enqueueDeclName)
+      continue;
+
+
+    // look for the first parameter being a Job or UnownedJob
+    if (funcDecl->getParameters()->size() != 1)
+      continue;
+    if (auto param = funcDecl->getParameters()->front()) {
+      if (param->getType()->isEqual(C.getJobDecl()->getDeclaredInterfaceType())) {
+        assert(moveOnlyEnqueueRequirement == nullptr);
+        moveOnlyEnqueueRequirement = funcDecl;
+      } else if (param->getType()->isEqual(C.getUnownedJobDecl()->getDeclaredInterfaceType())) {
+        assert(unownedEnqueueRequirement == nullptr);
+        unownedEnqueueRequirement = funcDecl;
+      }
+    }
+
+    // if we found both, we're done here and break out of the loop
+    if (unownedEnqueueRequirement && moveOnlyEnqueueRequirement)
+      break; // we're done looking for the requirements
+  }
+
+
+  auto conformance = module->lookupConformance(nominalTy, proto);
+  auto concreteConformance = conformance.getConcrete();
+  auto unownedEnqueueWitness = concreteConformance->getWitnessDeclRef(unownedEnqueueRequirement);
+  auto moveOnlyEnqueueWitness = concreteConformance->getWitnessDeclRef(moveOnlyEnqueueRequirement);
+
+  if (auto enqueueUnownedDecl = unownedEnqueueWitness.getDecl()) {
+    // Old UnownedJob based impl is present, warn about it suggesting the new protocol requirement.
+    if (enqueueUnownedDecl->getLoc().isValid()) {
+      diags.diagnose(enqueueUnownedDecl->getLoc(), diag::executor_enqueue_unowned_implementation, nominalTy);
+    }
+  }
+
+  if (auto unownedEnqueueDecl = unownedEnqueueWitness.getDecl()) {
+    if (auto moveOnlyEnqueueDecl = moveOnlyEnqueueWitness.getDecl()) {
+      if (unownedEnqueueDecl && unownedEnqueueDecl->getLoc().isInvalid() &&
+          moveOnlyEnqueueDecl && moveOnlyEnqueueDecl->getLoc().isInvalid()) {
+        // Neither old nor new implementation have been found, but we provide default impls for them
+        // that are mutually recursive, so we must error and suggest implementing the right requirement.
+        auto ownedRequirement = C.getExecutorDecl()->getExecutorOwnedEnqueueFunction();
+        nominal->diagnose(diag::type_does_not_conform, nominalTy, proto->getDeclaredInterfaceType());
+        ownedRequirement->diagnose(diag::no_witnesses,
+                                   getProtocolRequirementKind(ownedRequirement),
+                                   ownedRequirement->getName(),
+                                   proto->getDeclaredInterfaceType(),
+                                   /*AddFixIt=*/true);
+      }
+    }
+  }
+}
+
 /// Determine whether this is the main actor type.
 static bool isMainActor(Type type) {
   if (auto nominal = type->getAnyNominal())
