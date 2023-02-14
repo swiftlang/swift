@@ -35,7 +35,6 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/StackList.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
@@ -393,9 +392,11 @@ struct MoveOnlyChecker {
 
   borrowtodestructure::IntervalMapAllocator allocator;
 
-  MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks) : fn(fn) {}
+  MoveOnlyChecker(SILFunction *fn) : fn(fn) {}
 
-  void check(DominanceInfo *domTree, PostOrderAnalysis *poa);
+  void check(DominanceInfo *domTree, PostOrderAnalysis *poa,
+             OSSACanonicalizer &canonicalizer,
+             DiagnosticEmitter &diagnosticEmitter);
 
   bool convertBorrowExtractsToOwnedDestructures(MarkMustCheckInst *mmci,
                                                 DiagnosticEmitter &emitter,
@@ -564,7 +565,9 @@ bool MoveOnlyChecker::checkForSameInstMultipleUseErrors(
 //                             MARK: Main Routine
 //===----------------------------------------------------------------------===//
 
-void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
+void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa,
+                            OSSACanonicalizer &canonicalizer,
+                            DiagnosticEmitter &diagnosticEmitter) {
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
         if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
@@ -572,9 +575,7 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
         instToDelete->eraseFromParent();
       });
   InstructionDeleter deleter(std::move(callbacks));
-  OSSACanonicalizer canonicalizer;
   canonicalizer.init(fn, domTree, deleter);
-  DiagnosticEmitter diagnosticEmitter;
   diagnosticEmitter.init(fn, &canonicalizer);
 
   // First search for candidates to process and emit diagnostics on any
@@ -778,6 +779,27 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
 //                         MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
+bool swift::siloptimizer::runMoveOnlyObjectChecking(
+    SILFunction *fn, DominanceAnalysis *da, PostOrderAnalysis *poa,
+    OSSACanonicalizer &canonicalizer, DiagnosticEmitter &diagnosticEmitter) {
+  // Only run this pass if the move only language feature is enabled.
+  assert(fn->getASTContext().LangOpts.Features.contains(Feature::MoveOnly));
+
+  // Don't rerun diagnostics on deserialized functions.
+  assert(!fn->wasDeserializedCanonical());
+
+  assert(fn->getModule().getStage() == SILStage::Raw &&
+         "Should only run on Raw SIL");
+
+  LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Object Checker. Visiting: "
+                          << fn->getName() << '\n');
+
+  auto *domTree = da->get(fn);
+  MoveOnlyChecker checker(fn);
+  checker.check(domTree, poa, canonicalizer, diagnosticEmitter);
+  return checker.changed;
+}
+
 namespace {
 
 class MoveOnlyCheckerPass : public SILFunctionTransform {
@@ -800,11 +822,12 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
 
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
-    auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
     auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
 
-    MoveOnlyChecker checker(getFunction(), deAnalysis);
-    checker.check(domTree, postOrderAnalysis);
+    MoveOnlyChecker checker(getFunction());
+    OSSACanonicalizer canonicalizer;
+    DiagnosticEmitter emitter;
+    checker.check(domTree, postOrderAnalysis, canonicalizer, emitter);
     if (checker.changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

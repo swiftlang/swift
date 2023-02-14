@@ -57,6 +57,11 @@ case lhs(AggStruct2)
 case rhs(E)
 }
 
+@_moveOnly
+public struct NonTrivialStruct {
+  var i: Builtin.Int32
+}
+
 sil @misc_use : $@convention(thin) () -> ()
 sil @aggstruct_consume : $@convention(thin) (@owned AggStruct) -> ()
 sil @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()

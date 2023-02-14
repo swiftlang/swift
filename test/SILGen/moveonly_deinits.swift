@@ -59,7 +59,9 @@ var value: Bool { false }
 //////////////////
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits24testIntPairWithoutDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
+// SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -69,29 +71,35 @@ var value: Bool { false }
 // SILGEN:   br bb3
 //
 // SILGEN: bb3:
-// SILGEN:   destroy_value [[VALUE]]
+// SILGEN:   destroy_value [[BOX]]
 // SILGEN: } // end sil function '$s16moveonly_deinits24testIntPairWithoutDeinityyF'
 
 // SIL-LABEL: sil @$s16moveonly_deinits24testIntPairWithoutDeinityyF : $@convention(thin) () -> () {
-// SIL: [[CONSTRUCTOR:%[^,]+]] = function_ref @$s16moveonly_deinits20IntPairWithoutDeinitVACycfC
+// SIL: [[STACK:%.*]] = alloc_stack
+// SIL: [[CONSTRUCTOR:%.*]] = function_ref @$s16moveonly_deinits20IntPairWithoutDeinitVACycfC
 // SIL: [[VALUE:%.*]] = apply [[CONSTRUCTOR]]
+// SIL: store [[VALUE]] to [[STACK]]
 // SIL: cond_br {{%.*}}, bb1, bb2
 //
 // SIL: bb1:
-// SIL:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits27consumeIntPairWithoutDeinityyAA0defG0VnF : $@convention(thin) (@owned IntPairWithoutDeinit) -> ()
-// SIL:   apply [[FUNC_REF]]([[VALUE]])
+// SIL:   [[LOADED_VALUE:%.*]] = load [[STACK]]
+// SIL-NEXT:   // function_ref
+// SIL-NEXT:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits27consumeIntPairWithoutDeinityyAA0defG0VnF : $@convention(thin) (@owned IntPairWithoutDeinit) -> ()
+// SIL-NEXT:   apply [[FUNC_REF]]([[LOADED_VALUE]])
 // SIL-NOT: release_value
+// SIL-NOT: destroy_addr
 // SIL-NOT: apply
 // SIL:   br bb3
 //
 // SIL: bb2:
 // SIL-NOT: apply
-// SIL:   release_value [[VALUE]]
+// SIL:   destroy_addr [[STACK]]
 // SIL-NOT: apply
 // SIL:   br bb3
 //
 // SIL: bb3:
 // SIL-NOT: release_value
+// SIL-NOT: destroy_addr
 // SIL: } // end sil function '$s16moveonly_deinits24testIntPairWithoutDeinityyF'
 public func testIntPairWithoutDeinit() {
     let f = IntPairWithoutDeinit()
@@ -101,7 +109,9 @@ public func testIntPairWithoutDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits21testIntPairWithDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
+// SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -111,30 +121,38 @@ public func testIntPairWithoutDeinit() {
 // SILGEN:   br bb3
 //
 // SILGEN: bb3:
-// SILGEN:   destroy_value [[VALUE]]
+// SILGEN:   destroy_value [[BOX]]
 // SILGEN: } // end sil function '$s16moveonly_deinits21testIntPairWithDeinityyF'
 
 // SIL-LABEL: sil @$s16moveonly_deinits21testIntPairWithDeinityyF : $@convention(thin) () -> () {
-// SIL: [[CONSTRUCTOR:%[^,]+]] = function_ref @$s16moveonly_deinits17IntPairWithDeinitVACycfC
+// SIL: [[CONSTRUCTOR:%.*]] = function_ref @$s16moveonly_deinits17IntPairWithDeinitVACycfC
 // SIL: [[VALUE:%.*]] = apply [[CONSTRUCTOR]]
+// SIL: store [[VALUE]] to [[STACK:%.*]] :
 // SIL: cond_br {{%.*}}, bb1, bb2
 //
 // SIL: bb1:
-// SIL:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits24consumeIntPairWithDeinityyAA0defG0VnF : $@convention(thin) (@owned IntPairWithDeinit) -> ()
-// SIL:   apply [[FUNC_REF]]([[VALUE]])
+// SIL-NEXT:   [[LOADED_VALUE:%.*]] = load [[STACK]]
+// SIL-NEXT:   // function_ref
+// SIL-NEXT:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits24consumeIntPairWithDeinityyAA0defG0VnF : $@convention(thin) (@owned IntPairWithDeinit) -> ()
+// SIL-NEXT:   apply [[FUNC_REF]]([[LOADED_VALUE]])
 // SIL-NOT: release_value
+// SIL-NOT: destroy_addr
 // SIL-NOT: apply
 // SIL:   br bb3
 //
 // SIL: bb2:
-// SIL: [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits17IntPairWithDeinitVfD : $@convention(method) (@owned IntPairWithDeinit) -> ()
-// SIL: apply [[DEINIT]]([[VALUE]]) : $@convention(method) (@owned IntPairWithDeinit) -> ()
+// SIL:   // function_ref
+// SIL-NEXT:   [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits17IntPairWithDeinitVfD : $@convention(method) (@owned IntPairWithDeinit) -> ()
+// SIL-NEXT:   [[LOADED_VALUE:%.*]] = load [[STACK]]
+// SIL-NEXT:   apply [[DEINIT]]([[LOADED_VALUE]]) : $@convention(method) (@owned IntPairWithDeinit) -> ()
 // SIL-NOT: apply
 // SIL-NOT: release_value
+// SIL-NOT: destroy_addr
 // SIL:   br bb3
 //
 // SIL: bb3:
 // SIL-NOT: release_value
+// SIL-NOT: destroy_addr
 // SIL: } // end sil function '$s16moveonly_deinits21testIntPairWithDeinityyF'
 public func testIntPairWithDeinit() {
     let f = IntPairWithDeinit()
@@ -144,7 +162,10 @@ public func testIntPairWithDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits26testKlassPairWithoutDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
+// SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROW]]
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -154,29 +175,31 @@ public func testIntPairWithDeinit() {
 // SILGEN:   br bb3
 //
 // SILGEN: bb3:
-// SILGEN:   destroy_value [[VALUE]]
+// SILGEN:   destroy_value [[BOX]]
 // SILGEN: } // end sil function '$s16moveonly_deinits26testKlassPairWithoutDeinityyF'
 
 // SIL-LABEL: sil @$s16moveonly_deinits26testKlassPairWithoutDeinityyF : $@convention(thin) () -> () {
-// SIL: [[CONSTRUCTOR:%[^,]+]] = function_ref @$s16moveonly_deinits22KlassPairWithoutDeinitVACycfC
+// SIL: [[CONSTRUCTOR:%.*]] = function_ref @$s16moveonly_deinits22KlassPairWithoutDeinitVACycfC
 // SIL: [[VALUE:%.*]] = apply [[CONSTRUCTOR]]
+// SIL: store [[VALUE]] to [[STACK:%.*]] :
 // SIL: cond_br {{%.*}}, bb1, bb2
 //
 // SIL: bb1:
-// SIL:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits29consumeKlassPairWithoutDeinityyAA0defG0VnF : $@convention(thin) (@owned KlassPairWithoutDeinit) -> ()
-// SIL:   apply [[FUNC_REF]]([[VALUE]])
-// SIL-NOT: release_value
-// SIL-NOT: apply
-// SIL:   br bb3
+// SIL-NEXT:   [[LOADED_VALUE:%.*]] = load [[STACK]]
+// SIL-NEXT:   // function_ref
+// SIL-NEXT:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits29consumeKlassPairWithoutDeinityyAA0defG0VnF : $@convention(thin) (@owned KlassPairWithoutDeinit) -> ()
+// SIL-NEXT:   apply [[FUNC_REF]]([[LOADED_VALUE]])
+// SIL-NEXT:   br bb3
 //
 // SIL: bb2:
 // SIL-NOT: apply
-// SIL:   release_value [[VALUE]]
+// SIL:   destroy_addr [[STACK]]
 // SIL-NOT: apply
 // SIL:   br bb3
 //
 // SIL: bb3:
 // SIL-NOT: release_value
+// SIL-NOT: destroy_addr
 // SIL: } // end sil function '$s16moveonly_deinits26testKlassPairWithoutDeinityyF'
 public func testKlassPairWithoutDeinit() {
     let f = KlassPairWithoutDeinit()
@@ -186,7 +209,10 @@ public func testKlassPairWithoutDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits23testKlassPairWithDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
+// SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROW]]
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -196,30 +222,33 @@ public func testKlassPairWithoutDeinit() {
 // SILGEN:   br bb3
 //
 // SILGEN: bb3:
-// SILGEN:   destroy_value [[VALUE]]
+// SILGEN:   destroy_value [[BOX]]
 // SILGEN: } // end sil function '$s16moveonly_deinits23testKlassPairWithDeinityyF'
 
 // SIL-LABEL: sil @$s16moveonly_deinits23testKlassPairWithDeinityyF : $@convention(thin) () -> () {
-// SIL: [[CONSTRUCTOR:%[^,]+]] = function_ref @$s16moveonly_deinits19KlassPairWithDeinitVACycfC
+// SIL: [[CONSTRUCTOR:%.*]] = function_ref @$s16moveonly_deinits19KlassPairWithDeinitVACycfC
 // SIL: [[VALUE:%.*]] = apply [[CONSTRUCTOR]]
+// SIL: store [[VALUE]] to [[STACK:%.*]] :
 // SIL: cond_br {{%.*}}, bb1, bb2
 //
 // SIL: bb1:
-// SIL:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits26consumeKlassPairWithDeinityyAA0defG0VnF : $@convention(thin) (@owned KlassPairWithDeinit) -> ()
-// SIL:   apply [[FUNC_REF]]([[VALUE]])
-// SIL-NOT: release_value
-// SIL-NOT: apply
-// SIL:   br bb3
+// SIL-NEXT:   [[LOADED_VALUE:%.*]] = load [[STACK]]
+// SIL-NEXT:   // function_ref
+// SIL-NEXT:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits26consumeKlassPairWithDeinityyAA0defG0VnF : $@convention(thin) (@owned KlassPairWithDeinit) -> ()
+// SIL-NEXT:   apply [[FUNC_REF]]([[LOADED_VALUE]])
+// SIL-NEXT:   br bb3
 //
 // SIL: bb2:
-// SIL: [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits19KlassPairWithDeinitVfD : $@convention(method) (@owned KlassPairWithDeinit) -> ()
-// SIL: apply [[DEINIT]]([[VALUE]]) : $@convention(method) (@owned KlassPairWithDeinit) -> ()
-// SIL-NOT: apply
-// SIL-NOT: release_value
-// SIL:   br bb3
+// SIL-NEXT:   // function_ref
+// SIL-NEXT:   [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits19KlassPairWithDeinitVfD : $@convention(method) (@owned KlassPairWithDeinit) -> ()
+// SIL-NEXT:   [[LOADED_VALUE:%.*]] = load [[STACK]]
+// SIL-NEXT:   apply [[DEINIT]]([[LOADED_VALUE]]) : $@convention(method) (@owned KlassPairWithDeinit) -> ()
+// SIL-NEXT:   br bb3
 //
 // SIL: bb3:
-// SIL-NOT: release_value
+// SIL-NEXT: dealloc_stack
+// SIL-NEXT: tuple ()
+// SIL-NEXT: return
 // SIL: } // end sil function '$s16moveonly_deinits23testKlassPairWithDeinityyF'
 public func testKlassPairWithDeinit() {
     let f = KlassPairWithDeinit()
@@ -274,7 +303,9 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 ////////////////
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
+// SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -284,28 +315,28 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 // SILGEN:   br bb3
 //
 // SILGEN: bb3:
-// SILGEN:   destroy_value [[VALUE]]
+// SILGEN:   destroy_value [[BOX]]
 // SILGEN: } // end sil function '$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF'
 
 // SIL-LABEL: sil @$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SIL: [[VALUE:%.*]] = enum $IntEnumPairWithoutDeinit
+// SIL: store [[VALUE]] to [[STACK:%.*]] :
 // SIL: cond_br {{%.*}}, bb1, bb2
 //
 // SIL: bb1:
-// SIL:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits31consumeIntEnumPairWithoutDeinityyAA0defgH0OnF : $@convention(thin) (@owned IntEnumPairWithoutDeinit) -> ()
-// SIL:   apply [[FUNC_REF]]([[VALUE]])
-// SIL-NOT: release_value
-// SIL-NOT: apply
-// SIL:   br bb3
+// SIL-NEXT:   [[LOADED_VALUE:%.*]] = load [[STACK]]
+// SIL-NEXT:   // function_ref
+// SIL-NEXT:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits31consumeIntEnumPairWithoutDeinityyAA0defgH0OnF : $@convention(thin) (@owned IntEnumPairWithoutDeinit) -> ()
+// SIL-NEXT:   apply [[FUNC_REF]]([[LOADED_VALUE]])
+// SIL-NEXT:   br bb3
 //
 // SIL: bb2:
-// SIL-NOT: apply
-// SIL:   release_value [[VALUE]]
-// SIL-NOT: apply
-// SIL:   br bb3
+// SIL-NEXT:   destroy_addr [[STACK]]
+// SIL-NEXT:   br bb3
 //
 // SIL: bb3:
 // SIL-NOT: release_value
+// SIL-NOT: destroy_addr
 // SIL: } // end sil function '$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF'
 public func testIntEnumPairWithoutDeinit() {
     let f = IntEnumPairWithoutDeinit.lhs(5)
@@ -315,7 +346,9 @@ public func testIntEnumPairWithoutDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits25testIntEnumPairWithDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
+// SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -325,29 +358,32 @@ public func testIntEnumPairWithoutDeinit() {
 // SILGEN:   br bb3
 //
 // SILGEN: bb3:
-// SILGEN:   destroy_value [[VALUE]]
+// SILGEN:   destroy_value [[BOX]]
 // SILGEN: } // end sil function '$s16moveonly_deinits25testIntEnumPairWithDeinityyF'
 
 // SIL-LABEL: sil @$s16moveonly_deinits25testIntEnumPairWithDeinityyF : $@convention(thin) () -> () {
 // SIL: [[VALUE:%.*]] = enum $IntEnumPairWithDeinit
+// SIL: store [[VALUE]] to [[STACK:%.*]] :
 // SIL: cond_br {{%.*}}, bb1, bb2
 //
 // SIL: bb1:
-// SIL:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits28consumeIntEnumPairWithDeinityyAA0defgH0OnF : $@convention(thin) (@owned IntEnumPairWithDeinit) -> ()
-// SIL:   apply [[FUNC_REF]]([[VALUE]])
-// SIL-NOT: release_value
-// SIL-NOT: apply
-// SIL:   br bb3
+// SIL-NEXT:   [[LOADED_VALUE:%.*]] = load [[STACK]]
+// SIL-NEXT:   // function_ref
+// SIL-NEXT:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits28consumeIntEnumPairWithDeinityyAA0defgH0OnF : $@convention(thin) (@owned IntEnumPairWithDeinit) -> ()
+// SIL-NEXT:   apply [[FUNC_REF]]([[LOADED_VALUE]])
+// SIL-NEXT:   br bb3
 //
 // SIL: bb2:
-// SIL: [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits21IntEnumPairWithDeinitOfD : $@convention(method) (@owned IntEnumPairWithDeinit) -> ()
-// SIL: apply [[DEINIT]]([[VALUE]]) : $@convention(method) (@owned IntEnumPairWithDeinit) -> ()
-// SIL-NOT: apply
-// SIL-NOT: release_value
-// SIL:   br bb3
+// SIL-NEXT:   // function_ref
+// SIL-NEXT:   [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits21IntEnumPairWithDeinitOfD : $@convention(method) (@owned IntEnumPairWithDeinit) -> ()
+// SIL-NEXT:   [[LOADED_VALUE:%.*]] = load [[STACK]]
+// SIL-NEXT:   apply [[DEINIT]]([[LOADED_VALUE]]) : $@convention(method) (@owned IntEnumPairWithDeinit) -> ()
+// SIL-NEXT:   br bb3
 //
 // SIL: bb3:
-// SIL-NOT: release_value
+// SIL-NEXT: dealloc_stack
+// SIL-NEXT: tuple ()
+// SIL-NEXT: return
 // SIL: } // end sil function '$s16moveonly_deinits25testIntEnumPairWithDeinityyF'
 public func testIntEnumPairWithDeinit() {
     let f = IntEnumPairWithDeinit.rhs(6)
@@ -357,7 +393,10 @@ public func testIntEnumPairWithDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits30testKlassEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
+// SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROW]]
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -367,28 +406,29 @@ public func testIntEnumPairWithDeinit() {
 // SILGEN:   br bb3
 //
 // SILGEN: bb3:
-// SILGEN:   destroy_value [[VALUE]]
+// SILGEN:   destroy_value [[BOX]]
 // SILGEN: } // end sil function '$s16moveonly_deinits30testKlassEnumPairWithoutDeinityyF'
 
 // SIL-LABEL: sil @$s16moveonly_deinits30testKlassEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SIL: [[VALUE:%.*]] = enum $KlassEnumPairWithoutDeinit
+// SIL: store [[VALUE]] to [[STACK:%.*]] :
 // SIL: cond_br {{%.*}}, bb1, bb2
 //
 // SIL: bb1:
-// SIL:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits33consumeKlassEnumPairWithoutDeinityyAA0defgH0OnF : $@convention(thin) (@owned KlassEnumPairWithoutDeinit) -> ()
-// SIL:   apply [[FUNC_REF]]([[VALUE]])
-// SIL-NOT: release_value
-// SIL-NOT: apply
-// SIL:   br bb3
+// SIL-NEXT:   [[LOADED_VAL:%.*]] = load [[STACK]]
+// SIL-NEXT:   // function_ref
+// SIL-NEXT:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits33consumeKlassEnumPairWithoutDeinityyAA0defgH0OnF : $@convention(thin) (@owned KlassEnumPairWithoutDeinit) -> ()
+// SIL-NEXT:   apply [[FUNC_REF]]([[LOADED_VAL]])
+// SIL-NEXT:   br bb3
 //
 // SIL: bb2:
-// SIL-NOT: apply
-// SIL:   release_value [[VALUE]]
-// SIL-NOT: apply
-// SIL:   br bb3
+// SIL-NEXT:   destroy_addr [[STACK]]
+// SIL-NEXT:   br bb3
 //
 // SIL: bb3:
-// SIL-NOT: release_value
+// SIL-NEXT:   dealloc_stack
+// SIL-NEXT:   tuple ()
+// SIL-NEXT:   return
 // SIL: } // end sil function '$s16moveonly_deinits30testKlassEnumPairWithoutDeinityyF'
 public func testKlassEnumPairWithoutDeinit() {
     let f = KlassEnumPairWithoutDeinit.lhs(Klass())
@@ -398,7 +438,10 @@ public func testKlassEnumPairWithoutDeinit() {
 }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits27testKlassEnumPairWithDeinityyF : $@convention(thin) () -> () {
-// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] {{%.*}}
+// SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROW]]
+// SILGEN: [[VALUE:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
@@ -408,29 +451,32 @@ public func testKlassEnumPairWithoutDeinit() {
 // SILGEN:   br bb3
 //
 // SILGEN: bb3:
-// SILGEN:   destroy_value [[VALUE]]
+// SILGEN:   destroy_value [[BOX]]
 // SILGEN: } // end sil function '$s16moveonly_deinits27testKlassEnumPairWithDeinityyF'
 
 // SIL-LABEL: sil @$s16moveonly_deinits27testKlassEnumPairWithDeinityyF : $@convention(thin) () -> () {
 // SIL: [[VALUE:%.*]] = enum $KlassEnumPairWithDeinit
+// SIL: store [[VALUE]] to [[STACK:%.*]] :
 // SIL: cond_br {{%.*}}, bb1, bb2
 //
 // SIL: bb1:
-// SIL:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits30consumeKlassEnumPairWithDeinityyAA0defgH0OnF : $@convention(thin) (@owned KlassEnumPairWithDeinit) -> ()
-// SIL:   apply [[FUNC_REF]]([[VALUE]])
-// SIL-NOT: release_value
-// SIL-NOT: apply
-// SIL:   br bb3
+// SIL-NEXT:   [[LOADED_VAL:%.*]] = load [[STACK]]
+// SIL-NEXT:   // function_ref
+// SIL-NEXT:   [[FUNC_REF:%.*]] = function_ref @$s16moveonly_deinits30consumeKlassEnumPairWithDeinityyAA0defgH0OnF : $@convention(thin) (@owned KlassEnumPairWithDeinit) -> ()
+// SIL-NEXT:   apply [[FUNC_REF]]([[LOADED_VAL]])
+// SIL-NEXT:   br bb3
 //
 // SIL: bb2:
-// SIL: [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits23KlassEnumPairWithDeinitOfD : $@convention(method) (@owned KlassEnumPairWithDeinit) -> ()
-// SIL: apply [[DEINIT]]([[VALUE]]) : $@convention(method) (@owned KlassEnumPairWithDeinit) -> ()
-// SIL-NOT: apply
-// SIL-NOT: release_value
-// SIL:   br bb3
+// SIL-NEXT: // function_ref
+// SIL-NEXT: [[DEINIT:%.*]] = function_ref @$s16moveonly_deinits23KlassEnumPairWithDeinitOfD : $@convention(method) (@owned KlassEnumPairWithDeinit) -> ()
+// SIL-NEXT: [[LOADED_VAL:%.*]] = load [[STACK]]
+// SIL-NEXT: apply [[DEINIT]]([[LOADED_VAL]]) : $@convention(method) (@owned KlassEnumPairWithDeinit) -> ()
+// SIL-NEXT:   br bb3
 //
 // SIL: bb3:
-// SIL-NOT: release_value
+// SIL-NEXT: dealloc_stack
+// SIL-NEXT: tuple ()
+// SIL-NEXT: return
 // SIL: } // end sil function '$s16moveonly_deinits27testKlassEnumPairWithDeinityyF'
 public func testKlassEnumPairWithDeinit() {
     let f = KlassEnumPairWithDeinit.rhs(Klass())

@@ -15,13 +15,14 @@ struct MoveOnlyStruct {
         // expected-error @-3 {{'self' consumed more than once}}
         let x = self // expected-note {{consuming use here}}
         _ = x
+        // We get an infinite recursion since we are going to call our own
+        // deinit here. We are just testing diagnostics here though.
         var y = MoveOnlyStruct() // expected-error {{'y' consumed more than once}}
+        // expected-warning @-1 {{function call causes an infinite recursion}}
         y = self
         // expected-note @-1 {{consuming use here}}
         // expected-note @-2 {{consuming use here}}
-        // We get an infinite recursion since we are going to call our own
-        // deinit here. We are just testing diagnostics here though.
-        _ = y // expected-warning {{function call causes an infinite recursion}}
+        _ = y
         // expected-note @-1 {{consuming use here}}
         let z = y // expected-note {{consuming use here}}
         let _ = z
@@ -46,7 +47,7 @@ enum MoveOnlyEnum {
         // expected-note @-1 {{consuming use here}}
         // We get an infinite recursion since we are going to call our own
         // deinit here. We are just testing diagnostics here though.
-        // expected-warning @-4 {{function call causes an infinite recursion}}
+        // expected-warning @-5 {{function call causes an infinite recursion}}
         _ = y 
         globalMoveOnlyEnum = self // expected-note {{consuming use here}}
         // expected-note @-1 {{consuming use here}}

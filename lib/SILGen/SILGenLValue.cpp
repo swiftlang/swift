@@ -1075,7 +1075,14 @@ namespace {
       Value(value),
       Enforcement(enforcement),
       IsRValue(isRValue) {
-        assert(IsRValue || value.getType().isAddress());
+      assert(
+          IsRValue || value.getType().isAddress() ||
+          (value.getType().is<SILBoxType>() &&
+           value.getType()
+               .getSILBoxFieldType(value.getUnmanagedValue()->getFunction(), 0)
+               .isMoveOnly() &&
+           cast<SILFunctionArgument>(value.getUnmanagedValue())
+               ->isClosureCapture()));
     }
 
     virtual bool isLoadingPure() const override { return true; }
@@ -1084,8 +1091,57 @@ namespace {
                          ManagedValue base) && override {
       assert(!base && "value component must be root of lvalue path");
 
+      // Before we do anything, see if we have a non-copyable value in a box. In
+      // such a case, we need to reproject.
+      if (Value.getType().is<SILBoxType>()) {
+        SILType boxedType = Value.getType().getSILBoxFieldType(&SGF.F, 0);
+        if (boxedType.isMoveOnly()) {
+          auto *arg = cast<SILFunctionArgument>(Value.getUnmanagedValue());
+          SILValue addr = SGF.B.createProjectBox(loc, arg, 0);
+          assert(Enforcement && "We assume we should /always/ have enforcement "
+                                "when checking noncopyable escaping vars");
+          addr = enterAccessScope(SGF, loc, base, addr, getTypeData(),
+                                  getAccessKind(), *Enforcement,
+                                  takeActorIsolation());
+          auto checkKind =
+              MarkMustCheckInst::CheckKind::AssignableButNotConsumable;
+          if (isReadAccess(getAccessKind())) {
+            checkKind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
+          }
+          addr = SGF.B.createMarkMustCheckInst(loc, addr, checkKind);
+          return ManagedValue::forLValue(addr);
+        }
+      }
+
+      // See if we have a project_box from a captured box.
+      if (Value.getType().isAddress()) {
+        if (auto *pbi = dyn_cast<ProjectBoxInst>(Value.getValue())) {
+          if (pbi->getType().isMoveOnly()) {
+            if (auto *fArg = dyn_cast<SILFunctionArgument>(pbi->getOperand())) {
+              assert(fArg->isClosureCapture());
+              assert(Enforcement &&
+                     "We assume we should /always/ have enforcement when "
+                     "checking noncopyable escaping vars");
+              SILValue addr = pbi;
+              addr = enterAccessScope(SGF, loc, base, addr, getTypeData(),
+                                      getAccessKind(), *Enforcement,
+                                      takeActorIsolation());
+              auto checkKind =
+                  MarkMustCheckInst::CheckKind::AssignableButNotConsumable;
+              if (isReadAccess(getAccessKind())) {
+                checkKind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
+              }
+              addr = SGF.B.createMarkMustCheckInst(loc, addr, checkKind);
+              return ManagedValue::forLValue(addr);
+            }
+          }
+        }
+      }
+
       if (!Enforcement)
         return Value;
+
+      assert(Value.getType().isAddress() && "Must have an address here?!");
 
       SILValue addr = Value.getLValueAddress();
       addr =
@@ -3000,8 +3056,15 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
         assert((!ActorIso || Storage->isTopLevelGlobal()) &&
                "local var should not be actor isolated!");
       }
-      assert(address.isLValue() &&
-             "physical lvalue decl ref must evaluate to an address");
+
+      assert((address.isLValue() ||
+              (address.getType().is<SILBoxType>() &&
+               address.getType().getSILBoxFieldType(&SGF.F, 0).isMoveOnly() &&
+               cast<SILFunctionArgument>(address.getUnmanagedValue())
+                   ->isClosureCapture())) &&
+             "Must have either a physical copyable lvalue decl ref that "
+             "evaluates to an address or a closure captured box that contains "
+             "a non-copyable type that we will reproject on each access");
 
       Optional<SILAccessEnforcement> enforcement;
       if (!Storage->isLet()) {
@@ -3089,6 +3152,21 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
                   emitReadAsyncLetBinding(loc, var));
   }
   auto localValue = maybeEmitValueOfLocalVarDecl(var, AccessKind::Read);
+
+  // If our localValue is a closure captured box of a noncopyable type, project
+  // it out eagerly and insert a no_consume_or_assign constraint.
+  if (localValue && localValue.getType().is<SILBoxType>()) {
+    auto fieldType = localValue.getType().getSILBoxFieldType(&F, 0);
+    if (fieldType.isMoveOnly()) {
+      assert(
+          cast<SILFunctionArgument>(localValue.getValue())->isClosureCapture());
+      SILValue value = localValue.getValue();
+      SILValue addr = B.createProjectBox(loc, value, 0);
+      addr = B.createMarkMustCheckInst(
+          loc, addr, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+      localValue = ManagedValue::forLValue(addr);
+    }
+  }
 
   // If this VarDecl is represented as an address, emit it as an lvalue, then
   // perform a load to get the rvalue.
@@ -4388,6 +4466,26 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
   // also handle address only lets.
   if (rvalue->getType().isMoveOnlyWrapped() && rvalue->getType().isObject()) {
     rvalue = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, rvalue);
+  }
+
+  // See if our rvalue is a box whose boxed type matches the destTL type. In
+  // that case, emit a project_box eagerly. This can happen for escaping
+  // captured move only arguments.
+  if (rvalue->getType().is<SILBoxType>()) {
+    auto fieldType = rvalue->getType().getSILBoxFieldType(&F, 0);
+    assert(fieldType.isMoveOnly());
+    if (fieldType.getObjectType() == destTL.getLoweredType()) {
+      SILValue box = rvalue;
+      rvalue = B.createProjectBox(loc, rvalue, 0);
+      // If we have a let, we rely on the typechecker to error if we attempt to
+      // assign to it.
+      rvalue = B.createMarkMustCheckInst(
+          loc, rvalue,
+          MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
+      B.emitCopyAddrOperation(loc, rvalue, dest, IsNotTake, isInit);
+      B.emitDestroyValueOperation(loc, box);
+      return;
+    }
   }
 
   // Easy case: the types match.

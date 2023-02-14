@@ -112,15 +112,19 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   assert(var->hasStorage() &&
          "should not have attempted to directly capture this variable");
 
-  // If this is a non-address-only stored 'let' constant, we can capture it
-  // by value.  If it is address-only, then we can't load it, so capture it
-  // by its address (like a var) instead.
-  if (!var->supportsMutation() &&
-      !getTypeLowering(var->getType(),
-                       TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
-                           expansion.getResilienceExpansion()))
-           .isAddressOnly())
-    return CaptureKind::Constant;
+  // If this is a non-address-only stored 'let' constant, we can capture it by
+  // value.  If it is address-only or noncopyable, then we can't load it, so
+  // capture it by its address (like a var) instead.
+  if (!var->supportsMutation()) {
+      auto &lowering = getTypeLowering(
+          var->getType(),
+          TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+              expansion.getResilienceExpansion()));
+      if (lowering.getLoweredType().isMoveOnlyType())
+        return CaptureKind::Box;
+      if (!lowering.isAddressOnly())
+        return CaptureKind::Constant;
+  }
 
   // In-out parameters are captured by address.
   if (auto *param = dyn_cast<ParamDecl>(var)) {
@@ -139,11 +143,11 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
 
   // For 'let' constants
   if (!var->supportsMutation()) {
-    assert(getTypeLowering(
-               var->getType(),
-               TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
-                   expansion.getResilienceExpansion()))
-               .isAddressOnly());
+    auto &lowering = getTypeLowering(
+        var->getType(),
+        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+            expansion.getResilienceExpansion()));
+    assert(lowering.isAddressOnly());
     return CaptureKind::Immutable;
   }
 

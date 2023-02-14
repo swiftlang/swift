@@ -485,9 +485,13 @@ public:
       isUninitialized = true;
     } else {
       // If this is a let with an initializer or bound value, we only need a
-      // buffer if the type is address only.
+      // buffer if the type is address only or is noncopyable.
+      //
+      // For noncopyable types, we always need to box them to ensure that
+      // escaping closures do not consume lets.
       needsTemporaryBuffer =
-          lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses();
+          (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
+          lowering->getLoweredType().isMoveOnlyType();
     }
 
     // Make sure that we have a non-address only type when binding a
@@ -1253,10 +1257,10 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
 
   assert(!isa<InOutType>(varType) && "local variables should never be inout");
 
-  // If this is a 'let' initialization for a non-global, set up a
-  // let binding, which stores the initialization value into VarLocs directly.
+  // If this is a 'let' initialization for a copyable non-global, set up a let
+  // binding, which stores the initialization value into VarLocs directly.
   if (forceImmutable && vd->getDeclContext()->isLocalContext() &&
-      !isa<ReferenceStorageType>(varType))
+      !isa<ReferenceStorageType>(varType) && !varType->isPureMoveOnly())
     return InitializationPtr(new LetValueInitialization(vd, *this));
 
   // If the variable has no initial value, emit a mark_uninitialized instruction

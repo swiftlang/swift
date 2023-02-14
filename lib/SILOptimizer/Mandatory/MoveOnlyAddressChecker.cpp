@@ -312,8 +312,14 @@ static bool memInstMustConsume(Operand *memOper) {
     return applySite.getArgumentOperandConvention(*memOper).isOwnedConvention();
   }
   case SILInstructionKind::PartialApplyInst: {
-    // If we are on the stack, we do not consume. Otherwise, we do.
-    return !cast<PartialApplyInst>(memInst)->isOnStack();
+    // If we are on the stack or have an inout convention, we do not
+    // consume. Otherwise, we do.
+    auto *pai = cast<PartialApplyInst>(memInst);
+    if (pai->isOnStack())
+      return false;
+    ApplySite applySite(pai);
+    auto convention = applySite.getArgumentConvention(*memOper);
+    return convention.isInoutConvention();
   }
   case SILInstructionKind::DestroyAddrInst:
     return true;
@@ -346,6 +352,15 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(SILValue value) {
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Pack_Inout:
+      LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
+      return true;
+    }
+  }
+
+  if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(pbi->getOperand())) {
+      if (!fArg->isClosureCapture())
+        return false;
       LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
       return true;
     }
@@ -594,6 +609,47 @@ void UseState::initializeLiveness(
       if (fArg->isClosureCapture()) {
         assert(fArg->getArgumentConvention() ==
                    SILArgumentConvention::Direct_Guaranteed &&
+               "Just a paranoid assert check to make sure this code is thought "
+               "about if we change the convention in some way");
+        // We need to add our address to the initInst array to make sure that
+        // later invariants that we assert upon remain true.
+        LLVM_DEBUG(llvm::dbgs() << "Found move only arg closure box use... "
+                                   "adding mark_must_check as init!\n");
+        initInsts.insert({address, liveness.getTopLevelSpan()});
+        liveness.initializeDef(address, liveness.getTopLevelSpan());
+      }
+    }
+  }
+
+  if (auto *access = dyn_cast<BeginAccessInst>(address->getOperand())) {
+    if (auto *projectBox = dyn_cast<ProjectBoxInst>(access->getOperand())) {
+      if (auto *fArg =
+              dyn_cast<SILFunctionArgument>(projectBox->getOperand())) {
+        if (fArg->isClosureCapture()) {
+          assert(
+              fArg->getArgumentConvention() ==
+                  SILArgumentConvention::Direct_Guaranteed &&
+              "Just a paranoid assert check to make sure this code is thought "
+              "about if we change the convention in some way");
+          // We need to add our address to the initInst array to make sure that
+          // later invariants that we assert upon remain true.
+          LLVM_DEBUG(llvm::dbgs() << "Found move only arg closure box use... "
+                                     "adding mark_must_check as init!\n");
+          initInsts.insert({address, liveness.getTopLevelSpan()});
+          liveness.initializeDef(address, liveness.getTopLevelSpan());
+        }
+      }
+    }
+  }
+
+  // See if our address is from a closure guaranteed box that we did not promote
+  // to an address. In such a case, just treat our mark_must_check as the init
+  // of our value.
+  if (auto *access = dyn_cast<BeginAccessInst>(address->getOperand())) {
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(access->getOperand())) {
+      if (fArg->isClosureCapture()) {
+        assert(fArg->getArgumentConvention() ==
+                   SILArgumentConvention::Indirect_InoutAliasable &&
                "Just a paranoid assert check to make sure this code is thought "
                "about if we change the convention in some way");
         // We need to add our address to the initInst array to make sure that
@@ -942,6 +998,141 @@ struct MoveOnlyChecker {
 } // namespace
 
 //===----------------------------------------------------------------------===//
+//                     MARK: CopiedLoadBorrowElimination
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// An early transform that we run to convert any load_borrow that are copied
+/// directly or that have any subelement that is copied to a load [copy]. This
+/// lets the rest of the optimization handle these as appropriate.
+struct CopiedLoadBorrowEliminationVisitor : public AccessUseVisitor {
+  SILFunction *fn;
+  SmallVector<LoadBorrowInst *, 8> targets;
+
+  CopiedLoadBorrowEliminationVisitor(SILFunction *fn)
+      : AccessUseVisitor(AccessUseType::Overlapping,
+                         NestedAccessType::IgnoreAccessBegin),
+        fn(fn) {}
+
+  bool visitUse(Operand *op, AccessUseType useTy) override {
+    LLVM_DEBUG(llvm::dbgs() << "CopiedLBElim. Visiting: " << *op->getUser());
+    auto *lbi = dyn_cast<LoadBorrowInst>(op->getUser());
+    if (!lbi)
+      return true;
+
+    LLVM_DEBUG(llvm::dbgs() << "Found load_borrow: " << *lbi);
+
+    StackList<Operand *> useWorklist(lbi->getFunction());
+    for (auto *use : lbi->getUses())
+      useWorklist.push_back(use);
+
+    bool shouldConvertToLoadCopy = false;
+    while (!useWorklist.empty()) {
+      auto *nextUse = useWorklist.pop_back_val();
+      switch (nextUse->getOperandOwnership()) {
+      case OperandOwnership::NonUse:
+      case OperandOwnership::ForwardingUnowned:
+      case OperandOwnership::PointerEscape:
+        continue;
+
+        // These might be uses that we need to perform a destructure or insert
+        // struct_extracts for.
+      case OperandOwnership::TrivialUse:
+      case OperandOwnership::InstantaneousUse:
+      case OperandOwnership::UnownedInstantaneousUse:
+      case OperandOwnership::InteriorPointer:
+      case OperandOwnership::BitwiseEscape: {
+        // Look through copy_value of a move only value. We treat copy_value of
+        // copyable values as normal uses.
+        if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
+          if (cvi->getOperand()->getType().isMoveOnly()) {
+            shouldConvertToLoadCopy = true;
+            break;
+          }
+        }
+        continue;
+      }
+
+      case OperandOwnership::ForwardingConsume:
+      case OperandOwnership::DestroyingConsume:
+        // We can only hit this if our load_borrow was copied.
+        llvm_unreachable("We should never hit this");
+
+      case OperandOwnership::GuaranteedForwarding:
+        // If we have a switch_enum, we always need to convert it to a load
+        // [copy] since we need to destructure through it.
+        shouldConvertToLoadCopy |= isa<SwitchEnumInst>(nextUse->getUser());
+
+        ForwardingOperand(nextUse).visitForwardedValues([&](SILValue value) {
+          for (auto *use : value->getUses()) {
+            useWorklist.push_back(use);
+          }
+          return true;
+        });
+        continue;
+
+      case OperandOwnership::Borrow:
+        LLVM_DEBUG(llvm::dbgs() << "        Found recursive borrow!\n");
+        // Look through borrows.
+        for (auto value : nextUse->getUser()->getResults()) {
+          for (auto *use : value->getUses()) {
+            useWorklist.push_back(use);
+          }
+        }
+        continue;
+      case OperandOwnership::EndBorrow:
+        LLVM_DEBUG(llvm::dbgs() << "        Found end borrow!\n");
+        continue;
+      case OperandOwnership::Reborrow:
+        llvm_unreachable("Unsupported for now?!");
+      }
+
+      if (shouldConvertToLoadCopy)
+        break;
+    }
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "Load Borrow was copied: "
+               << (shouldConvertToLoadCopy ? "true" : "false") << '\n');
+    if (!shouldConvertToLoadCopy)
+      return true;
+
+    targets.push_back(lbi);
+    return true;
+  }
+
+  void process() {
+    if (targets.empty())
+      return;
+
+    while (!targets.empty()) {
+      auto *lbi = targets.pop_back_val();
+      SILBuilderWithScope builder(lbi);
+      SILValue li = builder.emitLoadValueOperation(
+          lbi->getLoc(), lbi->getOperand(), LoadOwnershipQualifier::Copy);
+      SILValue borrow = builder.createBeginBorrow(lbi->getLoc(), li);
+
+      for (auto *ebi : lbi->getEndBorrows()) {
+        auto *next = ebi->getNextInstruction();
+        SILBuilderWithScope builder(next);
+        auto loc = RegularLocation::getAutoGeneratedLocation();
+        builder.emitDestroyValueOperation(loc, li);
+      }
+
+      lbi->replaceAllUsesWith(borrow);
+      lbi->eraseFromParent();
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "After Load Borrow Elim. Func Dump Start! ";
+               fn->print(llvm::dbgs()));
+    LLVM_DEBUG(llvm::dbgs() << "After Load Borrow Elim. Func Dump End!\n");
+  }
+};
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
 //                   MARK: GatherLexicalLifetimeUseVisitor
 //===----------------------------------------------------------------------===//
 
@@ -979,7 +1170,7 @@ struct GatherUsesVisitor : public AccessUseVisitor {
   /// marked value. For the move operator though we will want this to be the
   /// base address that we are checking which should be the operand of the mark
   /// must check value.
-  SILValue getRootAddress() const { return markedValue; }
+  SILValue getRootAddress() const { return markedValue->getOperand(); }
 
   /// Returns true if we emitted an error.
   bool checkForExclusivityHazards(LoadInst *li) {
@@ -1262,18 +1453,37 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     }
   }
 
+  // A partial apply that is on the stack or that uses our operand as an inout
+  // parameter is a liveness use.
+  if (auto *pai = dyn_cast<PartialApplyInst>(op->getUser())) {
+    LLVM_DEBUG(llvm::dbgs() << "Have partial apply!\n");
+    ApplySite applySite(pai);
+    auto convention = applySite.getArgumentConvention(*op);
+    if (pai->isOnStack() || convention.isInoutConvention()) {
+      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      if (!leafRange) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf type range!\n");
+        return false;
+      }
+
+      useState.livenessUses.insert({user, *leafRange});
+      return true;
+    }
+  }
+
   // Now that we have handled or loadTakeOrCopy, we need to now track our
   // additional pure takes.
   if (::memInstMustConsume(op)) {
+    LLVM_DEBUG(llvm::dbgs() << "Pure consuming use: " << *user);
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
     if (!leafRange)
       return false;
-    LLVM_DEBUG(llvm::dbgs() << "Pure consuming use: " << *user);
     useState.takeInsts.insert({user, *leafRange});
     return true;
   }
 
   if (auto fas = FullApplySite::isa(op->getUser())) {
+    LLVM_DEBUG(llvm::dbgs() << "Found full applysite: " << *op->getUser());
     switch (fas.getArgumentConvention(*op)) {
     case SILArgumentConvention::Indirect_In_Guaranteed: {
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
@@ -1642,30 +1852,6 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       if (!mmci || !mmci->hasMoveCheckerKind() || !mmci->getType().isAddress())
         continue;
 
-      // Skip any alloc_box due to heap to stack failing on a box capture. This
-      // will just cause an error.
-      if (auto *pbi = dyn_cast<ProjectBoxInst>(mmci->getOperand())) {
-        if (isa<AllocBoxInst>(pbi->getOperand())) {
-          LLVM_DEBUG(
-              llvm::dbgs()
-              << "Early emitting diagnostic for unsupported alloc box!\n");
-          diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
-          emittedDiagnostic = true;
-          continue;
-        }
-
-        if (auto *bbi = dyn_cast<BeginBorrowInst>(pbi->getOperand())) {
-          if (isa<AllocBoxInst>(bbi->getOperand())) {
-            LLVM_DEBUG(
-                llvm::dbgs()
-                << "Early emitting diagnostic for unsupported alloc box!\n");
-            diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
-            emittedDiagnostic = true;
-            continue;
-          }
-        }
-      }
-
       moveIntroducersToProcess.insert(mmci);
     }
   }
@@ -1911,14 +2097,64 @@ void MoveOnlyChecker::rewriteUses(
 #endif
 }
 
+static void convertAllocBoxDestroysToDeallocBox(AllocBoxInst *abi) {
+  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+  SSAPrunedLiveness liveness(&discoveredBlocks);
+  liveness.initializeDef(abi);
+  liveness.computeSimple();
+
+  PrunedLivenessBoundary boundary;
+  liveness.computeBoundary(boundary);
+
+  for (auto *user : boundary.lastUsers) {
+    auto *dvi = dyn_cast<DestroyValueInst>(user);
+    if (!dvi)
+      continue;
+    SILBuilderWithScope builder(dvi);
+    builder.createDeallocBox(dvi->getLoc(), dvi->getOperand());
+    dvi->eraseFromParent();
+  }
+}
+
 bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   SWIFT_DEFER { diagnosticEmitter.clearUsesWithDiagnostic(); };
 
-  auto accessPathWithBase = AccessPathWithBase::compute(markedAddress);
+  // See if we have an access to a closure captured box through an access
+  // scope. In such a case, we do a search within scope. Otherwise, we use the
+  // full base.
+  bool isFromClosureCapturedFArg = false;
+  if (auto *access = dyn_cast<BeginAccessInst>(markedAddress->getOperand())) {
+    if (auto *pbi = dyn_cast<ProjectBoxInst>(access->getOperand())) {
+      if (auto *fArg = dyn_cast<SILFunctionArgument>(pbi->getOperand())) {
+        isFromClosureCapturedFArg = fArg->isClosureCapture();
+      }
+    }
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(access->getOperand())) {
+      isFromClosureCapturedFArg = fArg->isClosureCapture();
+    }
+  }
+
+  auto accessPathWithBase =
+      isFromClosureCapturedFArg
+          ? AccessPathWithBase::computeInScope(markedAddress)
+          : AccessPathWithBase::compute(markedAddress);
   auto accessPath = accessPathWithBase.accessPath;
   if (!accessPath.isValid()) {
     LLVM_DEBUG(llvm::dbgs() << "Invalid access path: " << *markedAddress);
     return false;
+  }
+
+  // Before we do anything, convert any load_borrow that are copied into load
+  // [copy] for further processing.
+  {
+    CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(fn);
+    if (!visitAccessPathBaseUses(copiedLoadBorrowEliminator, accessPathWithBase,
+                                 fn)) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed copied load borrow eliminator visit: "
+                              << *markedAddress);
+      return false;
+    }
+    copiedLoadBorrowEliminator.process();
   }
 
   // Then gather all uses of our address by walking from def->uses. We use this
@@ -1971,8 +2207,27 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   SWIFT_DEFER { consumes.clear(); };
   FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
   liveness.computeBoundary(boundary);
-  insertDestroysOnBoundary(liveness, boundary);
+
+  // Check if we have a no_consume check kind. In such a case, we shouldn't need
+  // any destroys on our boundary.
+  if (markedAddress->getCheckKind() ==
+      MarkMustCheckInst::CheckKind::ConsumableAndAssignable) {
+    insertDestroysOnBoundary(liveness, boundary);
+  } else {
+    consumes.finishRecordingFinalConsumes();
+  }
   rewriteUses(liveness, boundary);
+
+  // If we processed an alloc_box, then we consumed the box's contents
+  // ourselves. So change any destroy_value of the box to dealloc_box.
+  if (markedAddress->getCheckKind() ==
+      MarkMustCheckInst::CheckKind::ConsumableAndAssignable) {
+    if (auto *pbi = dyn_cast<ProjectBoxInst>(markedAddress->getOperand())) {
+      auto *abi =
+          cast<AllocBoxInst>(lookThroughOwnershipInsts(pbi->getOperand()));
+      convertAllocBoxDestroysToDeallocBox(abi);
+    }
+  }
 
   return true;
 }

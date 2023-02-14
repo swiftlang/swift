@@ -318,14 +318,18 @@ struct ArgumentInitHelper {
         return value;
       }
 
-      // At this point, we have a move only type.
+      // At this point, we have a noncopyable type. If it is owned, create an
+      // alloc_box for it.
       if (value->getOwnershipKind() == OwnershipKind::Owned) {
-        value = SGF.B.createMoveValue(loc, argrv.forward(SGF),
-                                      /*isLexical*/ true);
-        value = SGF.B.createMarkMustCheckInst(
-            loc, value, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
-        SGF.emitManagedRValueWithCleanup(value);
-        return value;
+        auto *box = SGF.B.createAllocBox(loc, value->getType(), varinfo);
+        SILValue destAddr = SGF.B.createProjectBox(loc, box, 0);
+        SGF.B.emitStoreValueOperation(loc, argrv.forward(SGF), destAddr,
+                                      StoreOwnershipQualifier::Init);
+        destAddr = SGF.B.createMarkMustCheckInst(
+            loc, destAddr,
+            MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+        SGF.emitManagedRValueWithCleanup(box);
+        return destAddr;
       }
 
       assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
@@ -407,7 +411,11 @@ struct ArgumentInitHelper {
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
       value = updateArgumentValueForBinding(argrv, loc, pd, value, varinfo);
-      SGF.B.createDebugValue(loc, value, varinfo);
+      // If we don't have a noncopyable address type, emit a debug_value. If we
+      // had the address type, then the alloc_stack/alloc_box/function argument
+      // has the debug info.
+      if (!value->getType().isMoveOnly() || !value->getType().isAddress())
+        SGF.B.createDebugValue(loc, value, varinfo);
     } else {
       if (auto *allocStack = dyn_cast<AllocStackInst>(value)) {
         allocStack->setArgNo(ArgNo);
@@ -583,13 +591,25 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     auto *box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
     box->setClosureCapture(true);
+
+    // If we have a noncopyable let type, then just setup the box as our
+    // varLoc. Every time we re-access the VarLoc box, we will reproject the box
+    // and create a new debug_value_addr. The reason why we do this is that the
+    // move checker needs a separate project_box base for each separate access
+    // we need to check so we can tell the difference in between the difference
+    // accesses.
+    if (VD->isLet() &&
+        box->getType().getSILBoxFieldType(&SGF.F, 0).isMoveOnly()) {
+      SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(box);
+      break;
+    }
+
+    // Project_box once for the entire function and create a single
+    // debug_value_addr.
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
-    if (addr->getType().isMoveOnly())
-      addr = SGF.B.createMarkMustCheckInst(
-          VD, addr, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
-    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
+    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     break;
   }
   case CaptureKind::Immutable:
@@ -609,7 +629,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILValue arg = SILValue(fArg);
     if (isInOut && (ty.isMoveOnly() && !ty.isMoveOnlyWrapped())) {
       arg = SGF.B.createMarkMustCheckInst(
-          Loc, arg, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+          Loc, arg, MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
     }
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(arg);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);

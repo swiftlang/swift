@@ -307,6 +307,20 @@ SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue borrowed) {
   return emitManagedBorrowedRValueWithCleanup(borrowed, lowering);
 }
 
+ManagedValue
+SILGenFunction::emitManagedBorrowedAddressRValueWithCleanup(SILValue borrowed) {
+  assert(borrowed->getType().isAddress());
+  assert(isa<StoreBorrowInst>(borrowed) &&
+         "Only supported on store_borrow today");
+
+  auto &lowering = getTypeLowering(borrowed->getType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(borrowed);
+
+  Cleanups.pushCleanup<EndBorrowCleanup>(borrowed);
+  return ManagedValue(borrowed, CleanupHandle::invalid());
+}
+
 ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
     SILValue borrowed, const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() ==

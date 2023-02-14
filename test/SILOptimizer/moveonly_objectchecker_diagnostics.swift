@@ -142,7 +142,7 @@ public func classLoopConsume(_ x: Klass) { // expected-error {{'x' has guarantee
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -154,7 +154,7 @@ public func classLoopConsumeArg(_ x2: Klass) { // expected-error {{'x2' has guar
 
 public func classLoopConsumeOwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -192,7 +192,7 @@ public func classDiamondInLoop(_ x: Klass) { // expected-error {{'x' has guarant
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -214,7 +214,7 @@ public func classDiamondInLoopOwnedArg(_ x2: __owned Klass) { // expected-error 
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -357,11 +357,14 @@ public func classAccessAccessFieldOwnedArg(_ x2: __owned Klass) {
     }
 }
 
+// TODO: The error message here is 'unknown' b/c we are using a move only class
+// here with the move address checker. We don't need to support move only
+// classes today, so it is ok to leave it.
 public func classAccessConsumeField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
-    consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+    consumeVal(x2.k) // expected-error {{'unknown' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+        consumeVal(x2.k) // expected-error {{'unknown' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
@@ -372,10 +375,13 @@ public func classAccessConsumeFieldArg(_ x2: Klass) {
     }
 }
 
+// TODO: The error message here is 'unknown' b/c we are using a move only class
+// here with the move address checker. We don't need to support move only
+// classes today, so it is ok to leave it.
 public func classAccessConsumeFieldOwnedArg(_ x2: __owned Klass) {
-    consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+    consumeVal(x2.k) // expected-error {{'unknown' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+        consumeVal(x2.k) // expected-error {{'unknown' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
@@ -482,7 +488,7 @@ public func finalClassLoopConsume(_ x: FinalKlass) { // expected-error {{'x' has
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -494,7 +500,7 @@ public func finalClassLoopConsumeArg(_ x2: FinalKlass) { // expected-error {{'x2
 
 public func finalClassLoopConsumeOwnedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -532,7 +538,7 @@ public func finalClassDiamondInLoop(_ x: FinalKlass) { // expected-error {{'x' h
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -554,7 +560,7 @@ public func finalClassDiamondInLoopOwnedArg(_ x2: __owned FinalKlass) { // expec
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -691,11 +697,14 @@ public func finalClassAccessFieldOwnedArg(_ x2: __owned FinalKlass) {
     }
 }
 
+// TODO: The error message here is 'unknown' b/c we are using a move only class
+// here with the move address checker. We don't need to support move only
+// classes today, so it is ok to leave it.
 public func finalClassConsumeField(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
-    consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+    consumeVal(x2.k) // expected-error {{'unknown' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+        consumeVal(x2.k) // expected-error {{'unknown' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
@@ -706,12 +715,16 @@ public func finalClassConsumeFieldArg(_ x2: FinalKlass) {
     }
 }
 
+
+// TODO: The error message here is 'unknown' b/c we are using a move only class
+// here with the move address checker. We don't need to support move only
+// classes today, so it is ok to leave it.
 public func finalClassConsumeFieldArg(_ x2: __owned FinalKlass) {
     // No diagnostic here since class is a reference type and we are not copying
     // the class, we are copying its field.
-    consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+    consumeVal(x2.k) // expected-error {{'unknown' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
+        consumeVal(x2.k) // expected-error {{'unknown' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
@@ -825,7 +838,7 @@ public func aggStructLoopConsume(_ x: AggStruct) { // expected-error {{'x' has g
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -837,7 +850,7 @@ public func aggStructLoopConsumeArg(_ x2: AggStruct) { // expected-error {{'x2' 
 
 public func aggStructLoopConsumeOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -875,7 +888,7 @@ public func aggStructDiamondInLoop(_ x: AggStruct) { // expected-error {{'x' has
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -897,7 +910,7 @@ public func aggStructDiamondInLoopOwnedArg(_ x2: __owned AggStruct) { // expecte
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -924,13 +937,13 @@ public func aggStructAccessFieldOwnedArg(_ x2: __owned AggStruct) {
     }
 }
 
-public func aggStructConsumeField(_ x: AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+public func aggStructConsumeField(_ x: __owned AggStruct) {
+    let x2 = x // expected-error {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -944,11 +957,12 @@ public func aggStructConsumeFieldArg(_ x2: AggStruct) {
 }
 
 public func aggStructConsumeFieldOwnedArg(_ x2: __owned AggStruct) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -974,13 +988,14 @@ public func aggStructAccessGrandFieldOwnedArg(_ x2: __owned AggStruct) {
     }
 }
 
-public func aggStructConsumeGrandField(_ x: AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+public func aggStructConsumeGrandField(_ x: __owned AggStruct) {
+    let x2 = x
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -994,11 +1009,12 @@ public func aggStructConsumeGrandFieldArg(_ x2: AggStruct) {
 }
 
 public func aggStructConsumeGrandFieldOwnedArg(_ x2: __owned AggStruct) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1012,13 +1028,13 @@ public func aggStructConsumeFieldNoError(_ x2: __owned AggStruct) {
 }
 
 public func aggStructConsumeFieldError(_ x2: __owned AggStruct) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' used after consume}}
     if boolValue {
         consumeVal(x2.lhs)
     } else {
         consumeVal(x2.pair.rhs) // expected-note {{consuming use here}}
     }
-    borrowVal(x2.pair) // expected-note {{boundary use here}}
+    borrowVal(x2.pair) // expected-note {{non-consuming use here}}
 }
 
 public func aggStructConsumeFieldError2(_ x2: __owned AggStruct) {
@@ -1138,7 +1154,7 @@ public func aggGenericStructLoopConsume(_ x: AggGenericStruct<String>) { // expe
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -1150,7 +1166,7 @@ public func aggGenericStructLoopConsumeArg(_ x2: AggGenericStruct<String>) { // 
 
 public func aggGenericStructLoopConsumeOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -1188,7 +1204,7 @@ public func aggGenericStructDiamondInLoop(_ x: AggGenericStruct<String>) { // ex
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -1210,7 +1226,7 @@ public func aggGenericStructDiamondInLoopOwnedArg(_ x2: __owned AggGenericStruct
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -1237,13 +1253,14 @@ public func aggGenericStructAccessFieldOwnedArg(_ x2: __owned AggGenericStruct<S
     }
 }
 
-public func aggGenericStructConsumeField(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+public func aggGenericStructConsumeField(_ x: __owned AggGenericStruct<String>) {
+    let x2 = x
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1257,11 +1274,12 @@ public func aggGenericStructConsumeFieldArg(_ x2: AggGenericStruct<String>) {
 }
 
 public func aggGenericStructConsumeFieldOwnedArg(_ x2: __owned AggGenericStruct<String>) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1287,13 +1305,14 @@ public func aggGenericStructAccessGrandFieldOwnedArg(_ x2: __owned AggGenericStr
     }
 }
 
-public func aggGenericStructConsumeGrandField(_ x: AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+public func aggGenericStructConsumeGrandField(_ x: __owned AggGenericStruct<String>) {
+    let x2 = x
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1307,11 +1326,12 @@ public func aggGenericStructConsumeGrandFieldArg(_ x2: AggGenericStruct<String>)
 }
 
 public func aggGenericStructConsumeGrandFieldOwnedArg(_ x2: __owned AggGenericStruct<String>) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1411,7 +1431,7 @@ public func aggGenericStructLoopConsume<T>(_ x: AggGenericStruct<T>) { // expect
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -1423,7 +1443,7 @@ public func aggGenericStructLoopConsumeArg<T>(_ x2: AggGenericStruct<T>) { // ex
 
 public func aggGenericStructLoopConsumeOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -1461,7 +1481,7 @@ public func aggGenericStructDiamondInLoop<T>(_ x: AggGenericStruct<T>) { // expe
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -1483,7 +1503,7 @@ public func aggGenericStructDiamondInLoopOwnedArg<T>(_ x2: __owned AggGenericStr
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -1510,13 +1530,14 @@ public func aggGenericStructAccessFieldOwnedArg<T>(_ x2: __owned AggGenericStruc
     }
 }
 
-public func aggGenericStructConsumeField<T>(_ x: AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+public func aggGenericStructConsumeField<T>(_ x: __owned AggGenericStruct<T>) {
+    let x2 = x
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1530,11 +1551,12 @@ public func aggGenericStructConsumeFieldArg<T>(_ x2: AggGenericStruct<T>) {
 }
 
 public func aggGenericStructConsumeFieldOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1560,13 +1582,14 @@ public func aggGenericStructAccessGrandFieldOwnedArg<T>(_ x2: __owned AggGeneric
     }
 }
 
-public func aggGenericStructConsumeGrandField<T>(_ x: AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+public func aggGenericStructConsumeGrandField<T>(_ x: __owned AggGenericStruct<T>) {
+    let x2 = x
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1580,11 +1603,12 @@ public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: AggGenericStruct<T>) {
 }
 
 public func aggGenericStructConsumeGrandFieldOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1692,7 +1716,7 @@ public func enumLoopConsume(_ x: EnumTy) { // expected-error {{'x' has guarantee
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -1704,7 +1728,7 @@ public func enumLoopConsumeArg(_ x2: EnumTy) { // expected-error {{'x2' has guar
 
 public func enumLoopConsumeOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -1742,7 +1766,7 @@ public func enumDiamondInLoop(_ x: EnumTy) { // expected-error {{'x' has guarant
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -1764,7 +1788,7 @@ public func enumDiamondInLoopOwnedArg(_ x2: __owned EnumTy) { // expected-error 
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -1912,7 +1936,7 @@ public func enumPatternMatchIfLet2(_ x: EnumTy) { // expected-error {{'x' has gu
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming in loop use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
             borrowVal(x)
         }
     }
@@ -1928,7 +1952,7 @@ public func enumPatternMatchIfLet2Arg(_ x2: EnumTy) { // expected-error {{'x2' h
 
 public func enumPatternMatchIfLet2OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming in loop use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
             borrowVal(x)
         }
     }
@@ -2078,10 +2102,9 @@ public func enumPatternMatchSwitch2WhereClause2OwnedArg(_ x2: __owned EnumTy) {
 
 public func closureClassUseAfterConsume1(_ x: Klass) {
     // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
-    // expected-error @-2 {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    let f = { // expected-note {{closure capture here}}
+    let f = { // expected-note {{consuming use here}}
         let x2 = x // expected-error {{'x2' consumed more than once}}
-        // expected-note @-1 {{consuming use here}}
+        // expected-error @-1 {{'x' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         borrowVal(x2)
         consumeVal(x2) // expected-note {{consuming use here}}
         consumeVal(x2) // expected-note {{consuming use here}}
@@ -2111,58 +2134,51 @@ public func closureClassUseAfterConsumeArg(_ argX: Klass) {
 
 public func closureCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     }
     f()
 }
 
-public func closureCaptureClassUseAfterConsumeError(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func closureCaptureClassUseAfterConsumeError(_ x: __owned Klass) {
     let x2 = x
-    // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // expected-note @-3 {{consuming use here}}
-    let f = { // expected-note {{consuming use here}}
+    let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     }
     f()
-    let x3 = x2 // expected-note {{consuming use here}}
+    let x3 = x2
     let _ = x3
 }
 
 public func closureCaptureClassArgUseAfterConsume(_ x2: Klass) {
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
-    let f = { // expected-note {{closure capture here}}
+    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    let f = { // expected-note {{consuming use here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     }
     f()
 }
 
 public func closureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     }
     f()
 }
 
 public func closureCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = { // expected-note {{consuming use here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     }
     f()
     let x3 = x2 // expected-note {{consuming use here}}
@@ -2171,68 +2187,63 @@ public func closureCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
 
 public func deferCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     defer {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     }
     consumeVal(x) // expected-note {{consuming use here}}
 }
 
-public func deferCaptureClassUseAfterConsume2(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' used after consume}}
-    // expected-note @-1 {{consuming use here}}
-    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    defer { // expected-note {{non-consuming use}}
+public func deferCaptureClassUseAfterConsume2(_ x: __owned Klass) {
+    let x2 = x 
+    defer {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     }
-    let x3 = x2 // expected-note {{consuming use here}}
+    let x3 = x2
     let _ = x3
 }
 
 public func deferCaptureClassArgUseAfterConsume(_ x2: Klass) {
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
-    defer {
+    defer { // expected-note {{consuming use here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     }
     print("foo")
 }
 
 public func deferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     defer {
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     }
     print("foo")
 }
 
 public func deferCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
-    // expected-error @-1 {{'x2' used after consume}}
-    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    defer { // expected-note {{non-consuming use here}}
+    // expected-error @-1 {{'x2' consumed more than once}}
+    defer { // expected-note {{consuming use here}}
         borrowVal(x2)
-        consumeVal(x2) // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     }
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
 public func closureAndDeferCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-1 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     let f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         print("foo")
     }
@@ -2241,14 +2252,13 @@ public func closureAndDeferCaptureClassUseAfterConsume(_ x: Klass) { // expected
 
 public func closureAndDeferCaptureClassUseAfterConsume2(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-1 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     let f = {
-        consumeVal(x2) // expected-note {{consuming use here}}
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         print("foo")
     }
@@ -2256,31 +2266,30 @@ public func closureAndDeferCaptureClassUseAfterConsume2(_ x: Klass) { // expecte
 }
 
 public func closureAndDeferCaptureClassUseAfterConsume3(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x
     // expected-note @-1 {{consuming use here}}
-    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // expected-error @-3 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    let f = { // expected-note {{consuming use here}}
-        consumeVal(x2) // expected-note {{consuming use here}}
+    // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+    let f = {
+        consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         print("foo")
     }
     f()
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2)
 }
 
 public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: Klass) {
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
-    let f = { // expected-note {{closure capture here}}
+    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+    let f = { // expected-note {{consuming use here}}
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         print("foo")
     }
@@ -2288,12 +2297,12 @@ public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: Klass) {
 }
 
 public func closureAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-1 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     let f = {
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         print("foo")
     }
@@ -2302,12 +2311,12 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Kla
 
 public func closureAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     let f = { // expected-note {{consuming use here}}
         defer {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         print("foo")
     }
@@ -2317,13 +2326,12 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Kl
 
 public func closureAndClosureCaptureClassUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
+    // expected-error @-1 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     let f = {
-        let g = { // expected-note {{closure capture here}}
+        let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         g()
     }
@@ -2331,32 +2339,30 @@ public func closureAndClosureCaptureClassUseAfterConsume(_ x: Klass) { // expect
 }
 
 public func closureAndClosureCaptureClassUseAfterConsume2(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
-    let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x2 = x
     // expected-note @-1 {{consuming use here}}
-    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // expected-error @-3 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
-    let f = { // expected-note {{consuming use here}}
-        let g = { // expected-note {{closure capture here}}
+    // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+    let f = {
+        let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         g()
     }
     f()
-    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2)
 }
 
 
 public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: Klass) {
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
-    // expected-error @-3 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
-    let f = { // expected-note {{closure capture here}}
-        let g = { // expected-note {{closure capture here}}
+    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+    let f = { // expected-note {{consuming use here}}
+        let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         g()
     }
@@ -2364,13 +2370,12 @@ public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: Klass) {
 }
 
 public func closureAndClosureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
-    // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
+    // expected-error @-1 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     let f = {
-        let g = { // expected-note {{closure capture here}}
+        let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         g()
     }
@@ -2379,13 +2384,12 @@ public func closureAndClosureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned K
 
 public func closureAndClosureCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned Klass) {
     // expected-error @-1 {{'x2' consumed more than once}}
-    // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    // expected-error @-3 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
+    // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
     let f = { // expected-note {{consuming use here}}
-        let g = { // expected-note {{closure capture here}}
+        let g = {
             borrowVal(x2)
-            consumeVal(x2) // expected-note {{consuming use here}}
-            consumeVal(x2) // expected-note {{consuming use here}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+            consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
         }
         g()
     }
@@ -2420,12 +2424,14 @@ func blackHoleTestCase(_ k: __owned Klass) {
 
 func sameCallSiteTestConsumeTwice(_ k: __owned Klass) { // expected-error {{'k' consumed more than once}}
     func consumeKlassTwice(_ k: __owned Klass, _ k2: __owned Klass) {}
-    consumeKlassTwice(k, k) // expected-note {{two consuming uses here}}
+    consumeKlassTwice(k, k) // expected-note {{consuming use here}}
+    // expected-note @-1 {{consuming use here}}
 }
 
-func sameCallSiteConsumeAndUse(_ k: __owned Klass) { // expected-error {{'k' consumed and used at the same time}}
+func sameCallSiteConsumeAndUse(_ k: __owned Klass) { // expected-error {{'k' used after consume}}
     func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: Klass) {}
-    consumeKlassAndUseKlass(k, k) // expected-note {{consuming and non-consuming uses here}}
+    consumeKlassAndUseKlass(k, k) // expected-note {{consuming use here}}
+    // expected-note @-1 {{non-consuming use here}}
 }
 
 ////////////////////////////////

@@ -3,13 +3,21 @@
 sil_stage raw
 
 import Swift
+import Builtin
 
 public class CopyableKlass {}
+
+// FD = FileDescriptor
+@_moveOnly
+public struct FD {
+    var i: Int
+}
 
 @_moveOnly
 public final class Klass {
     var intField: Int
     var k: Klass
+    var fd: FD
     init()
 }
 
@@ -53,6 +61,9 @@ final class ClassContainingMoveOnly {
 @_hasStorage @_hasInitialValue let letGlobal: NonTrivialStruct { get }
 sil_global hidden @$s23moveonly_addresschecker9varGlobalAA16NonTrivialStructVvp : $NonTrivialStruct
 sil_global hidden [let] @$s23moveonly_addresschecker9letGlobalAA16NonTrivialStructVvp : $NonTrivialStruct
+
+sil @escapingClosure : $@convention(thin) (@inout_aliasable FD) -> ()
+sil @get_fd : $@convention(thin) () -> @owned FD
 
 ///////////
 // Tests //
@@ -407,4 +418,23 @@ bb0:
   end_access %8 : $*NonTrivialStruct
   %15 = tuple ()
   return %15 : $()
+}
+
+sil [ossa] @escapingClosureTest : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %2 = alloc_stack $FD, var, name "x"
+  %3 = mark_must_check [consumable_and_assignable] %2 : $*FD
+  %5 = function_ref @get_fd : $@convention(thin) () -> @owned FD
+  %6 = apply %5() : $@convention(thin) () -> @owned FD
+  store %6 to [init] %3 : $*FD
+  %8 = function_ref @escapingClosure : $@convention(thin) (@inout_aliasable FD) -> ()
+  %9 = partial_apply [callee_guaranteed] %8(%2) : $@convention(thin) (@inout_aliasable FD) -> ()
+  %10 = begin_borrow [lexical] %9 : $@callee_guaranteed () -> ()
+  debug_value %10 : $@callee_guaranteed () -> (), let, name "f"
+  end_borrow %10 : $@callee_guaranteed () -> ()
+  destroy_value %9 : $@callee_guaranteed () -> ()
+  destroy_addr %3 : $*FD
+  dealloc_stack %2 : $*FD
+  %16 = tuple ()
+  return %16 : $()
 }

@@ -132,6 +132,11 @@ bool searchForCandidateObjectMarkMustChecks(
 
 bool cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(SILFunction *fn);
 
+bool runMoveOnlyObjectChecking(SILFunction *fn, DominanceAnalysis *da,
+                               PostOrderAnalysis *poa,
+                               OSSACanonicalizer &canonicalizer,
+                               DiagnosticEmitter &diagnosticEmitter);
+
 } // namespace siloptimizer
 } // namespace swift
 

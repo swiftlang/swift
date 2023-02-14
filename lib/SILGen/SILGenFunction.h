@@ -1598,6 +1598,9 @@ public:
                                        const TypeLowering &lowering);
   ManagedValue emitManagedBorrowedRValueWithCleanup(SILValue borrowedValue);
 
+  ManagedValue
+  emitManagedBorrowedAddressRValueWithCleanup(SILValue borrowedValue);
+
   ManagedValue emitManagedBorrowedRValueWithCleanup(SILValue original,
                                                     SILValue borrowedValue);
   ManagedValue emitManagedBorrowedRValueWithCleanup(

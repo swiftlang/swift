@@ -108,6 +108,11 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
+    if (auto *mmci = dyn_cast<MarkMustCheckInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = mmci->getOperand();
+      continue;
+    }
+
     if (auto *teai =
             dyn_cast<TupleElementAddrInst>(projectionDerivedFromRoot)) {
       SILType tupleType = teai->getOperand()->getType();
