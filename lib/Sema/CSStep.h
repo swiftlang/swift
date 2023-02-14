@@ -895,7 +895,35 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
         CG.addConstraint(&constraint);
     }
 
-    void applySolution(const Solution &solution);
+    void applySolution(const Solution &solution) {
+      CS.applySolution(solution);
+
+      if (!CS.shouldAttemptFixes())
+        return;
+
+      // If inference succeeded, we are done.
+      auto score = solution.getFixedScore();
+      if (score.Data[SK_Fix] == 0)
+        return;
+
+      // If this conjunction represents a closure and inference
+      // has failed, let's bind all of unresolved type variables
+      // in its interface type to holes to avoid extraneous
+      // fixes produced by outer context.
+
+      auto locator = Conjunction->getLocator();
+      if (locator->directlyAt<ClosureExpr>()) {
+        auto closureTy =
+            CS.getClosureType(castToExpr<ClosureExpr>(locator->getAnchor()));
+
+        CS.simplifyType(closureTy).visit([&](Type componentTy) {
+          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+            CS.assignFixedType(
+                typeVar, PlaceholderType::get(CS.getASTContext(), typeVar));
+          }
+        });
+      }
+    }
   };
 
   /// Best solution solver reached so far.

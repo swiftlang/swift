@@ -3658,10 +3658,6 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
 
-    Type visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
-      llvm_unreachable("Handled by the walker directly");
-    }
-
     Type visitOneWayExpr(OneWayExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);
       auto resultTypeVar = CS.createTypeVariable(locator, 0);
@@ -3691,42 +3687,12 @@ namespace {
       SmallVector<std::pair<Type, ConstraintLocator *>, 4> elements;
       elements.reserve(expr->getNumElements());
 
-      if (auto *SVE = expr->getSingleValueStmtExpr()) {
-        // If we have a SingleValueStmtExpr, form a join of the branch types.
-        SmallVector<Expr *, 4> scratch;
-        auto branches = SVE->getSingleExprBranches(scratch);
-        for (auto idx : indices(branches)) {
-          auto *eltLoc = CS.getConstraintLocator(
-              SVE, {LocatorPathElt::SingleValueStmtBranch(idx)});
-          elements.emplace_back(CS.getType(branches[idx]), eltLoc);
-        }
-      } else {
-        for (auto *element : expr->getElements()) {
-          elements.emplace_back(CS.getType(element),
-                                CS.getConstraintLocator(element));
-        }
+      for (auto *element : expr->getElements()) {
+        elements.emplace_back(CS.getType(element),
+                              CS.getConstraintLocator(element));
       }
 
-      Type resultTy;
-
-      if (auto *var = expr->getVar()) {
-        resultTy = CS.getType(var);
-      } else {
-        resultTy = expr->getType();
-      }
-
-      assert(resultTy);
-
-      // If we have a single branch of a SingleValueStmtExpr, we want a
-      // conversion of the result, not a join, which would skip the conversion.
-      // This is needed to ensure we apply the Void/Never conversions.
-      if (elements.size() == 1 && expr->getSingleValueStmtExpr()) {
-        auto &elt = elements[0];
-        CS.addConstraint(ConstraintKind::Conversion, elt.first,
-                         resultTy, elt.second);
-        return resultTy;
-      }
-
+      auto resultTy = CS.getType(expr->getVar());
       // The type of a join expression is obtained by performing
       // a "join-meet" operation on deduced types of its elements
       // and the underlying variable.
@@ -3974,12 +3940,6 @@ namespace {
 
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         CG.setTypeForArgumentIgnoredForCompletion(expr);
-        return Action::SkipChildren(expr);
-      }
-
-      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
-        if (CS.generateConstraints(SVE))
-          return Action::Stop();
         return Action::SkipChildren(expr);
       }
 
@@ -4429,14 +4389,8 @@ bool ConstraintSystem::generateConstraints(
     // constraint.
     if (Type convertType = target.getExprConversionType()) {
       ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
-
-      // If a custom locator wasn't specified, create a locator anchored on
-      // the expression itself.
-      auto *convertTypeLocator = target.getExprConvertTypeLocator();
-      if (!convertTypeLocator) {
-        convertTypeLocator =
-            getConstraintLocator(expr, LocatorPathElt::ContextualType(ctp));
-      }
+      auto *convertTypeLocator =
+          getConstraintLocator(expr, LocatorPathElt::ContextualType(ctp));
 
       auto getLocator = [&](Type ty) -> ConstraintLocator * {
         // If we have a placeholder originating from a PlaceholderTypeRepr,
@@ -4474,8 +4428,7 @@ bool ConstraintSystem::generateConstraints(
         });
       }
 
-      addContextualConversionConstraint(expr, convertType, ctp,
-                                        convertTypeLocator);
+      addContextualConversionConstraint(expr, convertType, ctp);
     }
 
     // For an initialization target, generate constraints for the pattern.

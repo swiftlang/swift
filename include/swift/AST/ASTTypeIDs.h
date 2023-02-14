@@ -41,7 +41,6 @@ class GenericParamList;
 class GenericSignature;
 class GenericTypeParamType;
 class InfixOperatorDecl;
-class IsSingleValueStmtResult;
 class IterableDeclContext;
 class ModuleDecl;
 struct ImplicitImportList;

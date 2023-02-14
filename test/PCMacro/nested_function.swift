@@ -47,5 +47,7 @@ foo()
 // CHECK-NEXT: [19:3-19:8] pc before
 // CHECK-NEXT: [14:5-14:6] pc before
 // CHECK-NEXT: [14:5-14:6] pc after
+// CHECK-NEXT: [14:5-14:6] pc before
+// CHECK-NEXT: [14:5-14:6] pc after
 // CHECK-NEXT: [19:3-19:8] pc after
 // CHECK-NEXT: [22:1-22:6] pc after

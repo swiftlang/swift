@@ -5354,61 +5354,32 @@ private:
       : Blocks(Blocks), Params(Params), HandledSwitches(HandledSwitches),
         DiagEngine(DiagEngine), CurrentBlock(&Blocks.SuccessBlock) {}
 
-  /// Attempt to apply custom classification logic to a given node, returning
-  /// \c true if the node was classified, otherwise \c false.
-  bool tryClassifyNode(ASTNode Node) {
-    auto *Statement = Node.dyn_cast<Stmt *>();
-    if (!Statement)
-      return false;
-
-    if (auto *IS = dyn_cast<IfStmt>(Statement)) {
-      NodesToPrint TempNodes;
-      if (auto *BS = dyn_cast<BraceStmt>(IS->getThenStmt())) {
-        TempNodes = NodesToPrint::inBraceStmt(BS);
-      } else {
-        TempNodes = NodesToPrint({IS->getThenStmt()}, /*commentLocs*/ {});
-      }
-
-      classifyConditional(IS, IS->getCond(), std::move(TempNodes),
-                          IS->getElseStmt());
-      return true;
-    } else if (auto *GS = dyn_cast<GuardStmt>(Statement)) {
-      classifyConditional(GS, GS->getCond(), NodesToPrint(), GS->getBody());
-      return true;
-    } else if (auto *SS = dyn_cast<SwitchStmt>(Statement)) {
-      classifySwitch(SS);
-      return true;
-    } else if (auto *RS = dyn_cast<ReturnStmt>(Statement)) {
-      // We can look through an implicit Void return of a SingleValueStmtExpr,
-      // as that's semantically a statement.
-      if (RS->hasResult() && RS->isImplicit()) {
-        auto Ty = RS->getResult()->getType();
-        if (Ty && Ty->isVoid()) {
-          if (auto *SVE = dyn_cast<SingleValueStmtExpr>(RS->getResult()))
-            return tryClassifyNode(SVE->getStmt());
+  void classifyNodes(ArrayRef<ASTNode> Nodes, SourceLoc endCommentLoc) {
+    for (auto I = Nodes.begin(), E = Nodes.end(); I < E; ++I) {
+      auto *Statement = I->dyn_cast<Stmt *>();
+      if (auto *IS = dyn_cast_or_null<IfStmt>(Statement)) {
+        NodesToPrint TempNodes;
+        if (auto *BS = dyn_cast<BraceStmt>(IS->getThenStmt())) {
+          TempNodes = NodesToPrint::inBraceStmt(BS);
+        } else {
+          TempNodes = NodesToPrint({IS->getThenStmt()}, /*commentLocs*/ {});
         }
+
+        classifyConditional(IS, IS->getCond(), std::move(TempNodes),
+                            IS->getElseStmt());
+      } else if (auto *GS = dyn_cast_or_null<GuardStmt>(Statement)) {
+        classifyConditional(GS, GS->getCond(), NodesToPrint(), GS->getBody());
+      } else if (auto *SS = dyn_cast_or_null<SwitchStmt>(Statement)) {
+        classifySwitch(SS);
+      } else {
+        CurrentBlock->addNode(*I);
       }
-    }
-    return false;
-  }
 
-  /// Classify a node, or add the node to the block if it cannot be classified.
-  /// Returns \c true if there was an error.
-  bool classifyNode(ASTNode Node) {
-    auto DidClassify = tryClassifyNode(Node);
-    if (!DidClassify)
-      CurrentBlock->addNode(Node);
-    return DiagEngine.hadAnyError();
-  }
-
-  void classifyNodes(ArrayRef<ASTNode> Nodes, SourceLoc EndCommentLoc) {
-    for (auto Node : Nodes) {
-      auto HadError = classifyNode(Node);
-      if (HadError)
+      if (DiagEngine.hadAnyError())
         return;
     }
     // Make sure to pick up any trailing comments.
-    CurrentBlock->addPossibleCommentLoc(EndCommentLoc);
+    CurrentBlock->addPossibleCommentLoc(endCommentLoc);
   }
 
   /// Whether any of the provided ASTNodes have a child expression that force
@@ -6783,15 +6754,6 @@ private:
       }
     }
 
-    // A void SingleValueStmtExpr is semantically more like a statement than
-    // an expression, so recurse without bumping the expr depth or wrapping in
-    // continuation.
-    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
-      auto ty = SVE->getType();
-      if (!ty || ty->isVoid())
-        return true;
-    }
-
     // We didn't do any special conversion for this expression. If needed, wrap
     // it in a continuation.
     wrapScopeInContinationIfNecessary(E);
@@ -6809,11 +6771,6 @@ private:
   }
 
   bool walkToExprPost(Expr *E) override {
-    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
-      auto ty = SVE->getType();
-      if (!ty || ty->isVoid())
-        return true;
-    }
     NestedExprCount--;
     return true;
   }
