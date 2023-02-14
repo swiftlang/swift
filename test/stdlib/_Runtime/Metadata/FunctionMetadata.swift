@@ -120,9 +120,13 @@ if #available(SwiftStdlib 5.9, *) {
 
     expectEqual(fn11.convention, .c)
 
+    // Block calling conventions are only supported on platforms with an
+    // ObjectiveC interop.
+#if canImport(ObjectiveC)
     let fn12 = Metadata((@convention(block) () -> Int).self).function
 
     expectEqual(fn12.convention, .block)
+#endif
   }
 }
 
