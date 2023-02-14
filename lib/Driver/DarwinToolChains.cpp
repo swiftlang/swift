@@ -854,6 +854,12 @@ toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
     diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
   }
 
+  // Validating darwin deprecated -link-objc-runtime.
+  if (args.hasArg(options::OPT_link_objc_runtime,
+		  options::OPT_no_link_objc_runtime)) {
+    diags.diagnose(SourceLoc(), diag::warn_darwin_link_objc_deprecated);
+  }
+
   // If a C++ standard library is specified, it has to be libc++.
   if (auto arg = args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
     if (StringRef(arg->getValue()) != "libc++") {
