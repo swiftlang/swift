@@ -479,7 +479,7 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) 
 // ==== add / attachChild ------------------------------------------------------
 
 void TaskGroup::addChildTask(AsyncTask *child) {
-  SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p", child, group);
+  SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p", child, this);
 
   // The counterpart of this (detachChild) is performed by the group itself,
   // when it offers the completed (child) task's value to a waiting task -
