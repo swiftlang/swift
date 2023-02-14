@@ -2127,6 +2127,17 @@ namespace {
       // The name of every member.
       llvm::DenseSet<StringRef> allMemberNames;
 
+      bool hasConstOperatorStar = false;
+      for (auto member : decl->decls()) {
+        if (auto method = dyn_cast<clang::CXXMethodDecl>(member)) {
+          if (method->getOverloadedOperator() ==
+                  clang::OverloadedOperatorKind::OO_Star &&
+              method->param_empty() && method->isConst())
+            hasConstOperatorStar = true;
+        }
+      }
+      bool hasSynthesizedPointeeProperty = false;
+
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
       for (auto m : decl->decls()) {
@@ -2210,9 +2221,16 @@ namespace {
             if (cxxOperatorKind == clang::OO_Star && cxxMethod->param_empty()) {
               // This is a dereference operator. We synthesize a computed
               // property called `pointee` for it.
-              VarDecl *pointeeProperty =
-                  synthesizer.makeDereferencedPointeeProperty(MD);
-              result->addMember(pointeeProperty);
+
+              // If this record has multiple overloads of `operator*`, prefer
+              // the const overload if it exists.
+              if ((cxxMethod->isConst() || !hasConstOperatorStar) &&
+                  !hasSynthesizedPointeeProperty) {
+                VarDecl *pointeeProperty =
+                    synthesizer.makeDereferencedPointeeProperty(MD);
+                result->addMember(pointeeProperty);
+                hasSynthesizedPointeeProperty = true;
+              }
 
               Impl.markUnavailable(MD, "use .pointee property");
               MD->overwriteAccess(AccessLevel::Private);
