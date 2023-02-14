@@ -106,11 +106,12 @@ struct S3 {
 //##-- Refactoring expanding the attached macro
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=21:2 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ATTACHED_EXPAND %s
 // ATTACHED_EXPAND: source.edit.kind.active:
-// ATTACHED_EXPAND:   23:3-23:3 "@accessViaStorage"
+// ATTACHED_EXPAND:   23:3-23:3 "@accessViaStorage "
 // ATTACHED_EXPAND: source.edit.kind.active:
-// ATTACHED_EXPAND:   24:3-24:3 "@accessViaStorage"
+// ATTACHED_EXPAND:   24:3-24:3 "@accessViaStorage "
 // ATTACHED_EXPAND: source.edit.kind.active:
-// ATTACHED_EXPAND:   22:11-22:11 "private var _storage = _Storage()"
+// ATTACHED_EXPAND:   22:11-22:11 "
+// ATTACHED_EXPAND: private var _storage = _Storage()
 // ATTACHED_EXPAND: source.edit.kind.active:
 // ATTACHED_EXPAND:   21:1-21:15 ""
 
@@ -137,10 +138,11 @@ struct S3 {
 //##-- Refactoring expanding the second accessor macro
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=42:5 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=PEER_EXPAND %s
 // PEER_EXPAND: source.edit.kind.active:
-// PEER_EXPAND:   45:4-45:4 "func f(a: Int, for b: String, _ value: Double, completionHandler: (String) -> Void) {
+// PEER_EXPAND:   45:4-45:4 "
+// PEER_EXPAND: func f(a: Int, for b: String, _ value: Double, completionHandler: (String) -> Void) {
 // PEER_EXPAND:  Task {
 // PEER_EXPAND:    completionHandler(await f(a: a, for: b, value))
 // PEER_EXPAND:  }
-// PEER_EXPAND: }"
+// PEER_EXPAND: }
 // PEER_EXPAND: source.edit.kind.active:
 // PEER_EXPAND:   42:3-42:24 ""

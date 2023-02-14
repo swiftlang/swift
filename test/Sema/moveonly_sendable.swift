@@ -161,3 +161,10 @@ extension Sendable {
 func tryToDupe(_ fd: FileDescriptor) {
   fd.doIllegalThings() // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
 }
+
+@_moveOnly
+struct PaperAirplaneFile {
+  var fd: FileDescriptor
+}
+
+extension PaperAirplaneFile: Sendable {}
