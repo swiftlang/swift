@@ -13,7 +13,7 @@
 import TestsUtils
 import Foundation
 
-public let UTF16Decode = [
+public let benchmarks = [
     BenchmarkInfo(
       name: "UTF16Decode",
       runFunction: run_UTF16Decode,
