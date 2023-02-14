@@ -676,6 +676,16 @@ struct AccessState {
   // be suppressed.
   llvm::SmallVector<ConflictingAccess, 4> ConflictingAccesses;
 
+  void recordConflictingAccess(const ConflictingAccess &a) {
+    ConflictingAccesses.push_back(a);
+  }
+
+  void recordConflictingAccess(const AccessStorage &Storage,
+                               const RecordedAccess &First,
+                               const RecordedAccess &Second) {
+    ConflictingAccesses.emplace_back(Storage, First, Second);
+  }
+
   // Collects calls the Standard Library swap() for Fix-Its.
   llvm::SmallVector<ApplyInst *, 8> CallsToSwap;
 
@@ -718,7 +728,7 @@ checkAccessSummary(ApplySite Apply, AccessState &State,
 
     const AccessInfo &Info = AccessIt->getSecond();
     if (auto Conflict = findConflictingArgumentAccess(AS, Storage, Info))
-      State.ConflictingAccesses.push_back(*Conflict);
+      State.recordConflictingAccess(*Conflict);
   }
 }
 
@@ -762,8 +772,8 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
     if (!inProgressAccess)
       continue;
 
-    State.ConflictingAccesses.emplace_back(Storage, *inProgressAccess,
-                                           argAccess);
+    State.recordConflictingAccess(Storage, *inProgressAccess,
+                                  argAccess);
   }
 }
 
@@ -842,8 +852,8 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
     AccessInfo &Info = (*State.Accesses)[Storage];
     const IndexTrieNode *SubPath = State.ASA->findSubPathAccessed(BAI);
     if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
-      State.ConflictingAccesses.emplace_back(Storage, *Conflict,
-                                             RecordedAccess(BAI, SubPath));
+      State.recordConflictingAccess(Storage, *Conflict,
+                                    RecordedAccess(BAI, SubPath));
     }
 
     Info.beginAccess(BAI, SubPath);

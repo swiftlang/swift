@@ -1,5 +1,7 @@
+// REQUIRES: wip
 // RUN: %target-swift-frontend -enable-experimental-move-only -emit-sil -verify %s
 // TODO: test with (-DNONTRIVIAL | -DADDRESS_ONLY) * (REABSTRACT)
+// TODO: phantom diagnostic during verify
 
 protocol P {}
 extension Int: P {}
@@ -73,19 +75,19 @@ func f(x: __shared M) {
 }
 
 // TODO: Interfering inout/borrow access
-func g(x: inout M) { // e/xpected-error{{}}
-    clodger({ mutate(&x) }, borrow: x) // e/xpected-note{{}}
+func g(x: inout M) { // expected-error{{}}
+    clodger({ mutate(&x) }, borrow: x) // expected-note{{}}
 }
 
 // TODO: Interfering inout/borrow access
-func h(x: inout M) { // e/xpected-error{{}}
-    clodger({ mutate(&x) }, consume: x) // e/xpected-note{{}}
+func h(x: inout M) { // expected-error{{}}
+    clodger({ mutate(&x) }, consume: x) // expected-note{{}}
     x = M()
 }
 
-// TODO: Interfering inout/borrow access
-func i(x: inout M) { // e/xpected-error{{}}
-    clodger({ mutate(&x) }, mutate: &x) // e/xpected-note{{}}
+// TODO: Interfering inout/inout access
+func i(x: inout M) { // expected-error{{}}
+    clodger({ mutate(&x) }, mutate: &x) // expected-note{{}}
 }
 
 // Multiple closures are allowed to capture the same inout binding concurrently.
@@ -135,4 +137,3 @@ func p(x: inout M) {
 // - capture list binding can't be consumed
 // - andy's bookmarked test cases
 // - nested closure captures
-REQUIRES: updating_for_owned_noescape
