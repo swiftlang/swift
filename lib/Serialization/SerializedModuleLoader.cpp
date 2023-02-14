@@ -845,6 +845,13 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     if (loadedModuleFile &&
         loadedModuleFile->mayHaveDiagnosticsPointingAtBuffer())
       OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
+  } else {
+    // Report non-fatal compiler tag mismatch.
+    if (!loadInfo.problematicRevision.empty()) {
+      Ctx.Diags.diagnose(*diagLoc,
+                         diag::serialization_module_problematic_revision,
+                         loadInfo.problematicRevision, moduleBufferID);
+    }
   }
 
   // The -experimental-hermetic-seal-at-link flag turns on dead-stripping
@@ -905,7 +912,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     break;
   case serialization::Status::RevisionIncompatible:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_revision,
-                       ModuleName, moduleBufferID);
+                       loadInfo.problematicRevision, ModuleName, moduleBufferID);
     break;
   case serialization::Status::Malformed:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_malformed_module,
