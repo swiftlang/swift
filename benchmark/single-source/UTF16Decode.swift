@@ -19,39 +19,39 @@ public let benchmarks = [
       runFunction: run_UTF16Decode,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
-      name: "UTF16Decode_InitFromCustom_contiguous",
+      name: "UTF16Decode.initFromCustom.cont",
       runFunction: run_UTF16Decode_InitFromCustom_contiguous,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
-      name: "UTF16Decode_InitFromCustom_contiguous_ascii",
+      name: "UTF16Decode.initFromCustom.cont.ascii",
       runFunction: run_UTF16Decode_InitFromCustom_contiguous_ascii,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
-      name: "UTF16Decode_InitFromCustom_noncontiguous",
+      name: "UTF16Decode.initFromCustom.noncont",
       runFunction: run_UTF16Decode_InitFromCustom_noncontiguous,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
-      name: "UTF16Decode_InitFromCustom_noncontiguous_ascii",
+      name: "UTF16Decode.initFromCustom.noncont.ascii",
       runFunction: run_UTF16Decode_InitFromCustom_noncontiguous_ascii,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
-      name: "UTF16Decode_InitFromData",
+      name: "UTF16Decode.initFromData",
       runFunction: run_UTF16Decode_InitFromData,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
-      name: "UTF16Decode_InitDecoding",
+      name: "UTF16Decode.initDecoding",
       runFunction: run_UTF16Decode_InitDecoding,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
-      name: "UTF16Decode_InitFromData_ascii",
+      name: "UTF16Decode.initFromData.ascii",
       runFunction: run_UTF16Decode_InitFromData_ascii,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
-      name: "UTF16Decode_InitDecoding_ascii",
+      name: "UTF16Decode.initDecoding.ascii",
       runFunction: run_UTF16Decode_InitDecoding_ascii,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
-      name: "UTF16Decode_InitFromData_ascii_as_ascii",
+      name: "UTF16Decode.initFromData.asciiAsAscii",
       runFunction: run_UTF16Decode_InitFromData_ascii_as_ascii,
       tags: [.validation, .api, .String]),
 ]
