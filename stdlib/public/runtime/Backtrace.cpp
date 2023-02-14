@@ -217,15 +217,20 @@ const char *presetToString(Preset preset) {
 BacktraceInitializer::BacktraceInitializer() {
   const char *backtracing = swift::runtime::environment::SWIFT_BACKTRACE();
 
+#if !_WIN32
+  // Force off for setuid processes.
+  if (issetugid()) {
+    _swift_backtraceSettings.enabled = OnOffTty::Off;
+  }
+#endif
+
   if (backtracing)
     _swift_parseBacktracingSettings(backtracing);
 
 #if TARGET_OS_OSX
-  // Make sure that we don't pass on setuid privileges, and that all fds
-  // are closed except for stdin/stdout/stderr.
+  // Make sure that all fds are closed except for stdin/stdout/stderr.
   posix_spawnattr_init(&backtraceSpawnAttrs);
-  posix_spawnattr_setflags(&backtraceSpawnAttrs,
-                           POSIX_SPAWN_RESETIDS | POSIX_SPAWN_CLOEXEC_DEFAULT);
+  posix_spawnattr_setflags(&backtraceSpawnAttrs, POSIX_SPAWN_CLOEXEC_DEFAULT);
 
   posix_spawn_file_actions_init(&backtraceFileActions);
   posix_spawn_file_actions_addinherit_np(&backtraceFileActions, STDIN_FILENO);
@@ -241,6 +246,26 @@ BacktraceInitializer::BacktraceInitializer() {
     _swift_backtraceSettings.enabled = OnOffTty::Off;
   }
 #else
+  #if !_WIN32
+  if (issetugid()) {
+    if (_swift_backtraceSettings.enabled != OnOffTty::Off) {
+      // You'll only see this warning if you do e.g.
+      //
+      //    SWIFT_BACKTRACE=enable=on /path/to/some/setuid/binary
+      //
+      // as opposed to
+      //
+      //    /path/to/some/setuid/binary
+      //
+      // i.e. when you're trying to force matters.
+      swift::warning(0,
+                     "swift runtime: backtrace-on-crash is not supported for "
+                     "setuid executables.\n");
+      _swift_backtraceSettings.enabled = OnOffTty::Off;
+    }
+  }
+  #endif // !_WIN32
+
   if (_swift_backtraceSettings.enabled == OnOffTty::TTY)
     _swift_backtraceSettings.enabled =
       isStdoutATty() ? OnOffTty::On : OnOffTty::Off;
