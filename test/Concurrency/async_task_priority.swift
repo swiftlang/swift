@@ -16,6 +16,8 @@
 // rdar://101077408 – Temporarily disable on watchOS simulator
 // UNSUPPORTED: DARWIN_SIMULATOR=watchos
 
+// REQUIRES: rdar105396748
+
 import Darwin
 @preconcurrency import Dispatch
 import StdlibUnittest
