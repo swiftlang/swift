@@ -114,14 +114,24 @@ public struct ClosureWrapper {
     }
 }
 
-public protocol SomeProtocol {
-}
+public protocol SomeProtocol {}
 
 public struct ExistentialWrapper {
     let x: any SomeProtocol
     let y: Int = 0
 
     public init(x: any SomeProtocol) {
+        self.x = x
+    }
+}
+
+public protocol SomeClassProtocol: AnyObject {}
+
+public struct ExistentialRefWrapper {
+    let x: any SomeClassProtocol
+    let y: Int = 0
+
+    public init(x: any SomeClassProtocol) {
         self.x = x
     }
 }
@@ -197,62 +207,20 @@ public struct SinglePayloadEnumWrapper<T> {
     }
 }
 
-public protocol P {
-    associatedtype T
+public enum MultiPayloadEnum {
+    case a(String, Int)
+    case b(Int, String)
+    case c(Bool)
+    case d
 }
 
-public struct SinglePayloadEnumWrapper2<T: P> {
-    let x: SinglePayloadEnum<SinglePayloadEnum<T.T>>
-    let y: Int
+public struct MultiPayloadEnumWrapper {
+    let x: MultiPayloadEnum
+    let y: AnyObject
 
-    public init(x: SinglePayloadEnum<SinglePayloadEnum<T.T>>, y: Int) {
+    public init(x: MultiPayloadEnum, y: AnyObject) {
         self.x = x
         self.y = y
-    }
-}
-
-public enum Enum2 {
-    case a
-    case b
-}
-
-public enum Enum1 {
-    case a(AnyObject, Int)
-    case b(Int, Enum2)
-}
-
-public enum Enum0 {
-    case a(String, AnyObject)
-    case b(Int, Bool)
-}
-
-public struct EnumWrapper {
-    let x: Enum0
-    let y: Enum1
-
-    public init(x: Enum0, y: Enum1) {
-        self.x = x
-        self.y = y
-    }
-}
-
-public class Level3<T> {
-    let x: T? = nil
-}
-
-public struct Level2<T> {
-    let x: Level3<T> = Level3<T>()
-    let y: Int32 = 2
-}
-
-public struct Level0<T> {
-    let x: T
-    let y: Level2<T> = Level2()
-    let z: T
-
-    public init(x: T, z: T) {
-        self.x = x
-        self.z = z
     }
 }
 

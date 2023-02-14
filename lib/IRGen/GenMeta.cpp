@@ -3622,7 +3622,27 @@ namespace {
       B.add(metadata);
     }
 
-    void addLayoutStringPointer() { B.addNullPointer(IGM.Int8PtrTy); }
+    llvm::Constant *emitLayoutString() {
+      if (!IGM.getOptions().ForceStructTypeLayouts)
+        return nullptr;
+      auto lowered = getLoweredType();
+      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
+      auto genericSig =
+          lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+      return typeLayoutEntry.layoutString(IGM, genericSig);
+    }
+
+    llvm::Constant *getLayoutString() {
+      return emitLayoutString();
+    }
+
+    void addLayoutStringPointer() {
+      if (auto *layoutString = getLayoutString()) {
+        B.add(layoutString);
+      } else {
+        B.addNullPointer(IGM.Int8PtrTy);
+      }
+    }
 
     void addDestructorFunction() {
       if (asImpl().getFieldLayout().hasObjCImplementation())
@@ -5192,6 +5212,7 @@ namespace {
     using super::asImpl;
     using super::IGM;
     using super::Target;
+    using super::getLoweredType;
 
     EnumMetadataBuilderBase(IRGenModule &IGM, EnumDecl *theEnum,
                             ConstantStructBuilder &B)
@@ -5214,10 +5235,26 @@ namespace {
       return emitValueWitnessTable(relativeReference);
     }
 
+    llvm::Constant *emitLayoutString() {
+      if (!IGM.getOptions().ForceStructTypeLayouts)
+        return nullptr;
+      auto lowered = getLoweredType();
+      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
+      auto genericSig =
+          lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+      return typeLayoutEntry.layoutString(IGM, genericSig);
+    }
+
+    llvm::Constant *getLayoutString() {
+      return emitLayoutString();
+    }
+
     void addLayoutStringPointer() {
-      // TODO: really add the pointer
-      B.add(llvm::Constant::getIntegerValue(IGM.Int8PtrTy,
-                                            APInt(64, 0x13371337)));
+      if (auto *layoutString = getLayoutString()) {
+        B.add(layoutString);
+      } else {
+        B.addNullPointer(IGM.Int8PtrTy);
+      }
     }
 
     void addValueWitnessTable() {

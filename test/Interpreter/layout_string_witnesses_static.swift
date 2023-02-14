@@ -216,6 +216,71 @@ func testExistential() {
 
 testExistential()
 
+class ClassWithSomeClassProtocol: SomeClassProtocol {
+    deinit {
+        print("ClassWithSomeClassProtocol deinitialized!")
+    }
+}
+
+func testExistentialReference() {
+    let ptr = UnsafeMutablePointer<ExistentialRefWrapper>.allocate(capacity: 1)
+    
+    do {
+        let x = ClassWithSomeClassProtocol()
+        testInit(ptr, to: ExistentialRefWrapper(x: x))
+    }
+
+    do {
+        let y = ClassWithSomeClassProtocol()
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ClassWithSomeClassProtocol deinitialized!
+        testAssign(ptr, from: ExistentialRefWrapper(x: y))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: ClassWithSomeClassProtocol deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testExistentialReference()
+
+func testMultiPayloadEnum() {
+    let ptr = UnsafeMutablePointer<MultiPayloadEnumWrapper>.allocate(capacity: 1)
+
+    do {
+        let x = MultiPayloadEnumWrapper(x: .d, y: SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = MultiPayloadEnumWrapper(x: .d, y: SimpleClass(x: 28))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+        
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+        
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+    
+    ptr.deallocate()
+}
+
+testMultiPayloadEnum()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)

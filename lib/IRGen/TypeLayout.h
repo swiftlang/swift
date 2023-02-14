@@ -483,10 +483,14 @@ public:
 
   EnumTypeLayoutEntry(unsigned numEmptyCases,
                       const std::vector<TypeLayoutEntry *> &cases, SILType ty,
-                      Alignment::int_type minimumAlignment)
+                      Alignment::int_type minimumAlignment, llvm::Optional<Size> fixedSize)
       : TypeLayoutEntry(TypeLayoutEntryKind::Enum),
-        numEmptyCases(numEmptyCases), minimumAlignment(minimumAlignment),
-        cases(cases), ty(ty) {}
+        numEmptyCases(numEmptyCases), minimumAlignment(minimumAlignment), cases(cases),
+        ty(ty) {
+          if (fixedSize) {
+            _fixedSize = fixedSize;
+          }
+        }
 
   ~EnumTypeLayoutEntry();
 
@@ -720,7 +724,7 @@ public:
   EnumTypeLayoutEntry *
   getOrCreateEnumEntry(unsigned numEmptyCase,
                        const std::vector<TypeLayoutEntry *> &nonEmptyCases,
-                       SILType ty, Alignment::int_type minimumAlignment);
+                       SILType ty, const TypeInfo &ti);
 
   TypeInfoBasedTypeLayoutEntry *
   getOrCreateTypeInfoBasedEntry(const TypeInfo &ti, SILType representative);

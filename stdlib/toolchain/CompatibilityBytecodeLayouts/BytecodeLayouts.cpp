@@ -112,30 +112,27 @@ void existential_destroy(OpaqueValue* object) {
 }
 
 const DestroyFuncAndMask destroyTable[] = {
-    {(DestrFn)&skipDestroy, UINTPTR_MAX, false},
-    {(DestrFn)&swift_errorRelease, UINTPTR_MAX, true},
-    {(DestrFn)&swift_release, ~heap_object_abi::SwiftSpareBitsMask, true},
-    {(DestrFn)&swift_unownedRelease, ~heap_object_abi::SwiftSpareBitsMask,
-     true},
-    {(DestrFn)&swift_weakDestroy, UINTPTR_MAX, false},
-    {(DestrFn)&swift_unknownObjectRelease, ~heap_object_abi::SwiftSpareBitsMask,
-     true},
-    {(DestrFn)&swift_unknownObjectUnownedDestroy, UINTPTR_MAX, false},
-    {(DestrFn)&swift_unknownObjectWeakDestroy, UINTPTR_MAX, false},
-    {(DestrFn)&swift_bridgeObjectRelease, ~heap_object_abi::SwiftSpareBitsMask,
-     true},
+  {(DestrFn)&skipDestroy, UINTPTR_MAX, false},
+  {(DestrFn)&swift_errorRelease, UINTPTR_MAX, true},
+  {(DestrFn)&swift_release, ~heap_object_abi::SwiftSpareBitsMask, true},
+  {(DestrFn)&swift_unownedRelease, ~heap_object_abi::SwiftSpareBitsMask, true},
+  {(DestrFn)&swift_weakDestroy, UINTPTR_MAX, false},
+  {(DestrFn)&swift_unknownObjectRelease, ~heap_object_abi::SwiftSpareBitsMask, true},
+  {(DestrFn)&swift_unknownObjectUnownedDestroy, UINTPTR_MAX, false},
+  {(DestrFn)&swift_unknownObjectWeakDestroy, UINTPTR_MAX, false},
+  {(DestrFn)&swift_bridgeObjectRelease, ~heap_object_abi::SwiftSpareBitsMask, true},
 #if SWIFT_OBJC_INTEROP
-    {(DestrFn)&_Block_release, UINTPTR_MAX, true},
-    {(DestrFn)&objc_release, UINTPTR_MAX, true},
+  {(DestrFn)&_Block_release, UINTPTR_MAX, true},
+  {(DestrFn)&swift_unknownObjectRelease, UINTPTR_MAX, true},
 #else
   {nullptr, UINTPTR_MAX, true},
   {nullptr, UINTPTR_MAX, true},
 #endif
-    // TODO: how to handle Custom?
-    {nullptr, UINTPTR_MAX, true},
-    {nullptr, UINTPTR_MAX, true},
-    {nullptr, UINTPTR_MAX, true},
-    {(DestrFn)&existential_destroy, UINTPTR_MAX, false},
+  // TODO: how to handle Custom?
+  {nullptr, UINTPTR_MAX, true},
+  {nullptr, UINTPTR_MAX, true},
+  {nullptr, UINTPTR_MAX, true},
+  {(DestrFn)&existential_destroy, UINTPTR_MAX, false},
 };
 
 __attribute__((weak)) extern "C" void
@@ -222,7 +219,7 @@ const RetainFuncAndMask retainTable[] = {
   {(void*)&existential_initializeWithCopy, UINTPTR_MAX, false},
 };
 
-__attribute__((weak)) extern "C" void
+__attribute__((weak)) extern "C" void *
 swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
   uintptr_t addrOffset = 0;
   Metadata *typedMetadata = (Metadata *)metadata;
@@ -241,7 +238,7 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
     addrOffset += skip;
 
     if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
-      return;
+      return dest;
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Metatype)) {
       auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
       auto *type = reinterpret_cast<Metadata*>(typePtr);
@@ -264,7 +261,7 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
   }
 }
 
-__attribute__((weak)) extern "C" void
+__attribute__((weak)) extern "C" void *
 swift_generic_initWithTake(void *dest, void *src, void *metadata) {
   Metadata *typedMetadata = (Metadata *)metadata;
   const uint8_t *typeLayout = typedMetadata->getLayoutString();
@@ -273,7 +270,7 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
   memcpy(dest, src, size);
 
   if (SWIFT_LIKELY(typedMetadata->getValueWitnesses()->isBitwiseTakable())) {
-    return;
+    return dest;
   }
 
   auto offset = layoutStringHeaderSize;
@@ -322,23 +319,25 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
       break;
     }
     case RefCountingKind::End:
-      return;
+      return dest;
     default:
       break;
     }
   }
+
+  return dest;
 }
 
-__attribute__((weak)) extern "C" void
+__attribute__((weak)) extern "C" void *
 swift_generic_assignWithCopy(void *dest, void *src, void *metadata) {
   swift_generic_destroy(dest, metadata);
-  swift_generic_initWithCopy(dest, src, metadata);
+  return swift_generic_initWithCopy(dest, src, metadata);
 }
 
-__attribute__((weak)) extern "C" void
+__attribute__((weak)) extern "C" void *
 swift_generic_assignWithTake(void *dest, void *src, void *metadata) {
   swift_generic_destroy(dest, metadata);
-  swift_generic_initWithTake(dest, src, metadata);
+  return swift_generic_initWithTake(dest, src, metadata);
 }
 
 __attribute__((weak)) extern "C" void

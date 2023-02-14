@@ -1177,26 +1177,27 @@ llvm::Value *ScalarTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 llvm::Constant *
 ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM,
                                     GenericSignature genericSig) const {
-  if (_layoutString) {
-    return *_layoutString;
-  }
+  return nullptr;
+  // if (_layoutString) {
+  //   return *_layoutString;
+  // }
 
-  LayoutStringBuilder B{};
+  // LayoutStringBuilder B{};
 
-  if (!refCountString(IGM, B, genericSig)) {
-    return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
-  }
+  // if (!refCountString(IGM, B, genericSig)) {
+  //   return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
+  // }
 
-  ConstantInitBuilder IB(IGM);
-  auto SB = IB.beginStruct();
-  SB.setPacked(true);
+  // ConstantInitBuilder IB(IGM);
+  // auto SB = IB.beginStruct();
+  // SB.setPacked(true);
 
-  B.result(IGM, SB);
+  // B.result(IGM, SB);
 
-  _layoutString = SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
-                                           /*constant*/ true);
+  // _layoutString = SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+  //                                          /*constant*/ true);
 
-  return *_layoutString;
+  // return *_layoutString;
 }
 
 bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
@@ -1653,7 +1654,13 @@ AlignedGroupEntry::layoutString(IRGenModule &IGM,
 
   B.result(IGM, SB);
 
-  _layoutString = SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
+  IRGenMangler mangler;
+  std::string symbolName =
+      mangler.mangleSymbolNameForMangledMetadataAccessorString(
+          "type_layout_string", genericSig.getCanonicalSignature(),
+          ty.getASTType()->mapTypeOutOfContext()->getCanonicalType());
+
+  _layoutString = SB.finishAndCreateGlobal(symbolName, IGM.getPointerAlignment(),
                                            /*constant*/ true);
 
   return *_layoutString;
@@ -3717,7 +3724,7 @@ TypeLayoutEntry *TypeLayoutCache::getEmptyEntry() { return &emptyEntry; }
 
 EnumTypeLayoutEntry *TypeLayoutCache::getOrCreateEnumEntry(
     unsigned numEmptyCases, const std::vector<TypeLayoutEntry *> &nonEmptyCases,
-    SILType ty, Alignment::int_type minimumAlignment) {
+    SILType ty, const TypeInfo &ti) {
 
   llvm::FoldingSetNodeID id;
   EnumTypeLayoutEntry::Profile(id, numEmptyCases, nonEmptyCases);
@@ -3727,8 +3734,15 @@ EnumTypeLayoutEntry *TypeLayoutCache::getOrCreateEnumEntry(
   }
   auto bytes = sizeof(EnumTypeLayoutEntry);
   auto mem = bumpAllocator.Allocate(bytes, alignof(EnumTypeLayoutEntry));
-  auto newEntry = new (mem)
-      EnumTypeLayoutEntry(numEmptyCases, nonEmptyCases, ty, minimumAlignment);
+
+  llvm::Optional<Size> fixedSize;
+  if (const auto *fixedTI = dyn_cast<const FixedTypeInfo>(&ti)) {
+    fixedSize = fixedTI->getFixedSize();
+  }
+
+  auto newEntry =
+      new (mem) EnumTypeLayoutEntry(numEmptyCases, nonEmptyCases, ty,
+        ti.getBestKnownAlignment().getValue(), fixedSize);
   enumEntries.InsertNode(newEntry, insertPos);
   newEntry->computeProperties();
   return newEntry;

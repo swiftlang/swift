@@ -395,9 +395,8 @@ namespace {
       std::vector<TypeLayoutEntry *> nonEmptyCases;
       nonEmptyCases.push_back(
           getSingleton()->buildTypeLayoutEntry(IGM, getSingletonType(IGM, T)));
-      return IGM.typeLayoutCache.getOrCreateEnumEntry(
-          emptyCases, nonEmptyCases, T,
-          getTypeInfo().getBestKnownAlignment().getValue());
+      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases, nonEmptyCases,
+                                                      T, getTypeInfo());
     }
 
     llvm::Value *
@@ -1656,13 +1655,17 @@ namespace {
       //   return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(),
       //                                                            T);
 
+      if (CopyDestroyKind == NullableRefcounted) {
+        return IGM.typeLayoutCache.getOrCreateScalarEntry(
+            getTypeInfo(), T, refcountingToScalarKind(Refcounting));
+      }
+
       unsigned emptyCases = ElementsWithNoPayload.size();
       std::vector<TypeLayoutEntry *> nonEmptyCases;
       nonEmptyCases.push_back(getPayloadTypeInfo().buildTypeLayoutEntry(
           IGM, getPayloadType(IGM, T)));
-      return IGM.typeLayoutCache.getOrCreateEnumEntry(
-          emptyCases, nonEmptyCases, T,
-          getTypeInfo().getBestKnownAlignment().getValue());
+      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases, nonEmptyCases,
+                                                      T, getTypeInfo());
     }
 
     EnumElementDecl *getPayloadElement() const {
@@ -3557,9 +3560,8 @@ namespace {
         nonEmptyCases.push_back(
             elt.ti->buildTypeLayoutEntry(IGM, eltPayloadType));
       }
-      return IGM.typeLayoutCache.getOrCreateEnumEntry(
-          emptyCases, nonEmptyCases, T,
-          getTypeInfo().getBestKnownAlignment().getValue());
+      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases, nonEmptyCases,
+                                                      T, getTypeInfo());
     }
 
     llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, SILType type) const {
