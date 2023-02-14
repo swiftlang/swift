@@ -110,7 +110,7 @@ public func run_UTF16Decode_InitFromData(_ N: Int) {
 @inline(never)
 public func run_UTF16Decode_InitDecoding(_ N: Int) {
     let input: [CodeUnit] = allStringsCodeUnits
-  for _ in 0..<200*N {
+  for _ in 0..<2*N {
     blackHole(String(decoding: input, as: UTF16.self))
   }
 }
@@ -118,7 +118,7 @@ public func run_UTF16Decode_InitDecoding(_ N: Int) {
 @inline(never)
 public func run_UTF16Decode_InitFromData_ascii(_ N: Int) {
   let input = asciiData
-  for _ in 0..<1_000*N {
+  for _ in 0..<100*N {
     blackHole(String(data: input, encoding: .utf16))
   }
 }
@@ -126,7 +126,7 @@ public func run_UTF16Decode_InitFromData_ascii(_ N: Int) {
 @inline(never)
 public func run_UTF16Decode_InitDecoding_ascii(_ N: Int) {
   let input = asciiCodeUnits
-  for _ in 0..<1_000*N {
+  for _ in 0..<N {
     blackHole(String(decoding: input, as: UTF16.self))
   }
 }
@@ -183,7 +183,7 @@ let asciiCustomNoncontiguous = CustomNoncontiguousCollection(Array(ascii.utf16))
 @inline(never)
 public func run_UTF16Decode_InitFromCustom_contiguous(_ N: Int) {
   let input = allStringsCustomContiguous
-  for _ in 0..<200*N {
+  for _ in 0..<20*N {
     blackHole(String(decoding: input, as: UTF16.self))
   }
 }
@@ -191,7 +191,7 @@ public func run_UTF16Decode_InitFromCustom_contiguous(_ N: Int) {
 @inline(never)
 public func run_UTF16Decode_InitFromCustom_contiguous_ascii(_ N: Int) {
   let input = asciiCustomContiguous
-  for _ in 0..<1_000*N {
+  for _ in 0..<10*N {
     blackHole(String(decoding: input, as: UTF16.self))
   }
 }
@@ -199,7 +199,7 @@ public func run_UTF16Decode_InitFromCustom_contiguous_ascii(_ N: Int) {
 @inline(never)
 public func run_UTF16Decode_InitFromCustom_noncontiguous(_ N: Int) {
   let input = allStringsCustomNoncontiguous
-  for _ in 0..<200*N {
+  for _ in 0..<20*N {
     blackHole(String(decoding: input, as: UTF16.self))
   }
 }
@@ -207,7 +207,7 @@ public func run_UTF16Decode_InitFromCustom_noncontiguous(_ N: Int) {
 @inline(never)
 public func run_UTF16Decode_InitFromCustom_noncontiguous_ascii(_ N: Int) {
   let input = asciiCustomNoncontiguous
-  for _ in 0..<1_000*N {
+  for _ in 0..<10*N {
     blackHole(String(decoding: input, as: UTF16.self))
   }
 }
