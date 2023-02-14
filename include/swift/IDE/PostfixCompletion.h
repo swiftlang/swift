@@ -35,6 +35,11 @@ class PostfixCompletionCallback : public TypeCheckCompletionCallback {
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.
     bool IsInAsyncContext;
+
+    /// Actor isolations that were determined during constraint solving but that
+    /// haven't been saved to the AST.
+    llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
+        ClosureActorIsolations;
   };
 
   CodeCompletionExpr *CompletionExpr;

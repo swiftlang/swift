@@ -274,3 +274,94 @@ func testAmbiguousInResultBuilder() {
 // AMBIGUOUS_IN_RESULT_BUILDER: End completions
   }
 }
+
+func testCompleteGlobalInResultBuilderIf() {
+  func buildView(@ViewBuilder2 content: () -> MyView) {}
+
+  @resultBuilder public struct ViewBuilder2 {
+    static func buildBlock() -> MyView { fatalError() }
+    static func buildBlock(_ content: MyView) -> MyView { fatalError() }
+    static func buildIf(_ content: MyView?) -> MyView? { fatalError() }
+    static func buildEither(first: MyView) -> MyView { fatalError() }
+    static func buildEither(second: MyView) -> MyView { fatalError() }
+  }
+
+  struct MyView {}
+
+  func test() {
+    buildView {
+      if true {
+        MyView()
+      } else {
+        #^GLOBAL_IN_RESULT_BUILDER_IF^#
+      }
+    }
+  }
+
+  // GLOBAL_IN_RESULT_BUILDER_IF: Begin completions
+  // GLOBAL_IN_RESULT_BUILDER_IF-DAG: Decl[Struct]/Local/TypeRelation[Convertible]: MyView[#MyView#]; name=MyView
+  // GLOBAL_IN_RESULT_BUILDER_IF: End completions
+}
+
+func testInStringLiteralInResultBuilder() {
+  func buildResult<Content>(@MyResultBuilder content: () -> Content) {}
+
+  @resultBuilder
+  struct MyResultBuilder {
+    static func buildBlock(_ components: String) -> String {
+      components
+    }
+  }
+
+  struct Foo {
+    var bar: Int
+  }
+
+  func withClosure(_ x: () -> Bool) -> String { return "" }
+
+  func test(foo: Foo) {
+    buildResult {
+      "\(withClosure { foo.#^IN_STRING_LITERAL_IN_RESULT_BUILDER^# })"
+    }
+  }
+// IN_STRING_LITERAL_IN_RESULT_BUILDER: Begin completions, 2 items
+// IN_STRING_LITERAL_IN_RESULT_BUILDER-DAG: Keyword[self]/CurrNominal:          self[#Foo#]; name=self
+// IN_STRING_LITERAL_IN_RESULT_BUILDER-DAG: Decl[InstanceVar]/CurrNominal:      bar[#Int#]; name=bar
+// IN_STRING_LITERAL_IN_RESULT_BUILDER: End completions
+}
+
+func testSwitchInResultBuilder() {
+  @resultBuilder
+  enum ReducerBuilder2<Action> {
+    static func buildBlock(_ r: Reduce2<Action>) -> Reduce2<Action> { r }
+    static func buildBlock(_ r0: Reduce2<Action>, _ r1: Reduce2<Action>) -> Reduce2<Action> { r0 }
+    static func buildExpression(_ r: Reduce2<Action>) -> Reduce2<Action> { r }
+  }
+
+  enum Action {
+    case alertDismissed
+  }
+
+  struct Reduce2<Action> {
+    init() {}
+
+    init(_ reduce: (Action) -> Int) {}
+  }
+
+  struct Login2 {
+    @ReducerBuilder2<Action>
+    var body: Reduce2<Action> {
+      Reduce2()
+      Reduce2 { action in
+        switch action {
+        case .#^SWITCH_IN_RESULT_BUILDER^# alertDismissed:
+          return 0
+        }
+      }
+    }
+  }
+// SWITCH_IN_RESULT_BUILDER: Begin completions, 2 items
+// SWITCH_IN_RESULT_BUILDER-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: alertDismissed[#Action#];
+// SWITCH_IN_RESULT_BUILDER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Action#})[#(into: inout Hasher) -> Void#];
+// SWITCH_IN_RESULT_BUILDER: End completions
+}
