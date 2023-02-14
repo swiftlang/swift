@@ -79,8 +79,6 @@ let allStringsData: Data = allStringsCodeUnits.withUnsafeBytes { Data($0) }
 
 @inline(never)
 public func run_UTF16Decode(_ N: Int) {
-  let strings = allStrings
-
   func isEmpty(_ result: UnicodeDecodingResult) -> Bool {
     switch result {
     case .emptyInput:
@@ -91,7 +89,7 @@ public func run_UTF16Decode(_ N: Int) {
   }
 
   for _ in 1...200*N {
-    for string in strings {
+    for string in allStrings {
       var it = string.makeIterator()
       var utf16 = UTF16()
       while !isEmpty(utf16.decode(&it)) { }
@@ -101,41 +99,36 @@ public func run_UTF16Decode(_ N: Int) {
 
 @inline(never)
 public func run_UTF16Decode_InitFromData(_ N: Int) {
-  let input = allStringsData
   for _ in 0..<200*N {
-    blackHole(String(data: input, encoding: .utf16))
+    blackHole(String(data: allStringsData, encoding: .utf16))
   }
 }
 
 @inline(never)
 public func run_UTF16Decode_InitDecoding(_ N: Int) {
-    let input: [CodeUnit] = allStringsCodeUnits
   for _ in 0..<2*N {
-    blackHole(String(decoding: input, as: UTF16.self))
+    blackHole(String(decoding: allStringsCodeUnits, as: UTF16.self))
   }
 }
 
 @inline(never)
 public func run_UTF16Decode_InitFromData_ascii(_ N: Int) {
-  let input = asciiData
   for _ in 0..<100*N {
-    blackHole(String(data: input, encoding: .utf16))
+    blackHole(String(data: asciiData, encoding: .utf16))
   }
 }
 
 @inline(never)
 public func run_UTF16Decode_InitDecoding_ascii(_ N: Int) {
-  let input = asciiCodeUnits
   for _ in 0..<N {
-    blackHole(String(decoding: input, as: UTF16.self))
+    blackHole(String(decoding: asciiCodeUnits, as: UTF16.self))
   }
 }
 
 @inline(never)
 public func run_UTF16Decode_InitFromData_ascii_as_ascii(_ N: Int) {
-  let input = asciiData
   for _ in 0..<1_000*N {
-    blackHole(String(data: input, encoding: .ascii))
+    blackHole(String(data: asciiData, encoding: .ascii))
   }
 }
 
@@ -182,32 +175,28 @@ let asciiCustomNoncontiguous = CustomNoncontiguousCollection(Array(ascii.utf16))
 
 @inline(never)
 public func run_UTF16Decode_InitFromCustom_contiguous(_ N: Int) {
-  let input = allStringsCustomContiguous
   for _ in 0..<20*N {
-    blackHole(String(decoding: input, as: UTF16.self))
+    blackHole(String(decoding: allStringsCustomContiguous, as: UTF16.self))
   }
 }
 
 @inline(never)
 public func run_UTF16Decode_InitFromCustom_contiguous_ascii(_ N: Int) {
-  let input = asciiCustomContiguous
   for _ in 0..<10*N {
-    blackHole(String(decoding: input, as: UTF16.self))
+    blackHole(String(decoding: asciiCustomContiguous, as: UTF16.self))
   }
 }
 
 @inline(never)
 public func run_UTF16Decode_InitFromCustom_noncontiguous(_ N: Int) {
-  let input = allStringsCustomNoncontiguous
   for _ in 0..<20*N {
-    blackHole(String(decoding: input, as: UTF16.self))
+    blackHole(String(decoding: allStringsCustomNoncontiguous, as: UTF16.self))
   }
 }
 
 @inline(never)
 public func run_UTF16Decode_InitFromCustom_noncontiguous_ascii(_ N: Int) {
-  let input = asciiCustomNoncontiguous
   for _ in 0..<10*N {
-    blackHole(String(decoding: input, as: UTF16.self))
+    blackHole(String(decoding: asciiCustomNoncontiguous, as: UTF16.self))
   }
 }
