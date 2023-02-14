@@ -86,14 +86,13 @@ namespace {
     auto slot = IGF.Builder.CreateInBoundsGEP(IGF.IGM.TupleTypeMetadataTy,
                                               asTuple, indices);
 
-    Twine name = [&]() -> Twine {
-      if (auto *constantIndex = dyn_cast<llvm::ConstantInt>(index)) {
-        return metadata->getName() + "." +
-               Twine(constantIndex->getValue().getLimitedValue()) + ".offset";
-      } else {
-        return metadata->getName() + ".dynamic.offset";
-      }
-    }();
+    std::string name;
+    if (auto *constantIndex = dyn_cast<llvm::ConstantInt>(index))
+      name = (metadata->getName() + "." +
+              Twine(constantIndex->getValue().getLimitedValue()) + ".offset")
+                .str();
+    else
+      name = (metadata->getName() + ".dynamic.offset").str();
 
     return IGF.Builder.CreateLoad(slot, IGF.IGM.Int32Ty,
                                   IGF.IGM.getPointerAlignment(), name);
