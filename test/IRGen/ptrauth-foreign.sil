@@ -2,6 +2,7 @@
 
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
+// REQUIRES: rdar105176187
 
 sil @test0 : $() -> () {
 bb0:

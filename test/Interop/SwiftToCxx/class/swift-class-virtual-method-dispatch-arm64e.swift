@@ -7,6 +7,8 @@
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
 
+// REQUIRES: rdar105396625
+
 // note: uses swift-class-virtual-method-dispatch.swift
 
 // CHECK:      void BaseClass::virtualMethod() {
