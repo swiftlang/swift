@@ -2541,8 +2541,8 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   auto *suspendCall = Builder.CreateCall(
       IGM.getTaskSwitchFuncFunctionPointer(),
       {context, resumeFunction, targetExecutorFirst, targetExecutorSecond});
-  suspendCall->setDoesNotThrow();
   suspendCall->setCallingConv(IGM.SwiftAsyncCC);
+  suspendCall->setDoesNotThrow();
   suspendCall->setTailCallKind(IGM.AsyncTailCallKind);
 
   llvm::AttributeList attrs = suspendCall->getAttributes();
