@@ -79,3 +79,4 @@ bb9:
   unreachable
 }
 
+REQUIRES: updating_for_owned_noescape

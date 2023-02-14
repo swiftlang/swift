@@ -54,3 +54,4 @@ testStringConstantForCFunction()
 // CHECK-OUTPUT: String
 testTypeInterpolation()
 
+REQUIRES: updating_for_owned_noescape

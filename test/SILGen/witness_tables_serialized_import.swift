@@ -13,3 +13,4 @@ extension PublicResilientStruct : AnotherPublicProtocol, AnotherInternalProtocol
 
 // CHECK: sil_witness_table [serialized] PublicResilientStruct: AnotherPublicProtocol
 // CHECK: sil_witness_table [serialized] PublicResilientStruct: AnotherInternalProtocol
+REQUIRES: updating_for_owned_noescape

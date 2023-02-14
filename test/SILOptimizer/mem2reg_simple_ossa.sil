@@ -449,3 +449,4 @@ bb7:
 // CHECK-LABEL: } // end sil function 'test_switch'
 
 
+REQUIRES: updating_for_owned_noescape

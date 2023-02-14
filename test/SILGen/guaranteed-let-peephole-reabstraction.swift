@@ -20,3 +20,4 @@ func foo(struc: BlockStruct<String>) {
   escapingCompletion(completion: struc.block)
   escapingCompletion(completion: struc.computedBlock)
 }
+REQUIRES: updating_for_owned_noescape

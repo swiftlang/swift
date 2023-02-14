@@ -76,3 +76,4 @@ public func testDeadClosureCycle(a: Apply, x: inout Int) {
 // CHECK: testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF'
 // CHECK: CYCLE HEAD: localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
 // CHECK: closure #1 in localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
+REQUIRES: updating_for_owned_noescape

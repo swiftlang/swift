@@ -34,3 +34,4 @@ func extensionMethodCurrying(_ x: Foo) {
 // CHECK-LABEL: sil private [ossa] @$s15extensions_objc23extensionMethodCurryingyyAA3FooCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Foo) -> () {
 // CHECK: objc_method %0 : $Foo, #Foo.kay!foreign : (Foo) -> () -> (), $@convention(objc_method) (Foo) -> ()
 
+REQUIRES: updating_for_owned_noescape

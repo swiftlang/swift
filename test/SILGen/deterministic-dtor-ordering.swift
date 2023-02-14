@@ -8,3 +8,4 @@ public class Horse {}
 // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s5horse5HorseCACycfC : $@convention(method) (@thick Horse.Type) -> @owned Horse {
 // CHECK-LABEL: sil hidden [ossa] @$s5horse5HorseCACycfc : $@convention(method) (@owned Horse) -> @owned Horse {
 
+REQUIRES: updating_for_owned_noescape

@@ -40,3 +40,4 @@ public func takesDerived<T, V>(_ d: Derived<T>, _ v: V) where T : Q {
 
   // CHECK: return
 }
+REQUIRES: updating_for_owned_noescape

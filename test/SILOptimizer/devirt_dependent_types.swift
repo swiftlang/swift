@@ -40,3 +40,4 @@ public func zzz() {
   source = source.virtualMethod()
 }
 
+REQUIRES: updating_for_owned_noescape

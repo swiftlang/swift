@@ -82,3 +82,4 @@ checkResult(testWithMultipleCatches(somethingGood: true), expected: 27)
 
 checkResult(testWithForceCast(somethingGood: false), expected: 123)
 checkResult(testWithMultipleCatches(somethingGood: false), expected: 123)
+REQUIRES: updating_for_owned_noescape

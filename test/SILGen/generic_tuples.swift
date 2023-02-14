@@ -37,3 +37,4 @@ extension HasAssoc where A == (Int, Int) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s14generic_tuples8HasAssocPAASi_Sit1ARtzrlE16returnTupleAliasSi_SityF : $@convention(method) <Self where Self : HasAssoc, Self.A == (Int, Int)> (@in_guaranteed Self) -> (Int, Int) {
 // CHECK:       return {{.*}} : $(Int, Int)
+REQUIRES: updating_for_owned_noescape

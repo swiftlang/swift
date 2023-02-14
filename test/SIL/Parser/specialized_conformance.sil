@@ -45,3 +45,4 @@ sil_default_witness_table hidden Another {
   no_default
   no_default
 }
+REQUIRES: updating_for_owned_noescape

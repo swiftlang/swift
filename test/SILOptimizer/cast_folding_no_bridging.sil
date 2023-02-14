@@ -101,3 +101,4 @@ bb2:
   apply %fn() : $@convention(thin) () -> Never
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

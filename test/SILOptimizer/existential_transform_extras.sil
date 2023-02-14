@@ -261,3 +261,4 @@ bb0(%0 : $PlotView):
   %v = tuple ()
   return %v : $()
 }
+REQUIRES: updating_for_owned_noescape

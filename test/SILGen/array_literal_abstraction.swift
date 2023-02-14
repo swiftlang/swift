@@ -23,3 +23,4 @@ func vararg_funcs(_ fs: (() -> ())...) {}
 func call_vararg_funcs() {
   vararg_funcs({}, {})
 }
+REQUIRES: updating_for_owned_noescape

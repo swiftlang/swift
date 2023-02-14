@@ -70,3 +70,4 @@ func delayBool(_ fn: @autoclosure () -> Bool) -> Bool {
 func closureInAutoclosure(_ lhs: Bool, _ rhs: Bool) -> Bool {
   return delayBool(testBool(lhs, { compareBool($0, rhs) }))
 }
+REQUIRES: updating_for_owned_noescape

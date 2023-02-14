@@ -21,3 +21,4 @@ class ExampleCallingClass {
         ExampleClass.exampleProperty.toggle()
     }
 }
+REQUIRES: updating_for_owned_noescape

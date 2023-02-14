@@ -118,3 +118,4 @@ func local() {
   anotherVar = "hello!"
   _ = anotherVar
 }
+REQUIRES: updating_for_owned_noescape

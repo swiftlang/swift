@@ -19,3 +19,4 @@ bb0:
   %p = address_to_pointer %ba : $*Int to $Builtin.RawPointer
   return %p : $Builtin.RawPointer
 }
+REQUIRES: updating_for_owned_noescape

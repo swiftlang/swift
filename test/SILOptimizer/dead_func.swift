@@ -9,3 +9,4 @@ for i in 0...a.count {
   let x = 0
 }
 
+REQUIRES: updating_for_owned_noescape

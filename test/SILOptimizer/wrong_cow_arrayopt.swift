@@ -21,3 +21,4 @@ func testit(_ input: [[Int]]) -> [[Int]] {
 
 // CHECK: {{\[\[1\], \[2\]\]}}
 print(testit([[0]]))
+REQUIRES: updating_for_owned_noescape

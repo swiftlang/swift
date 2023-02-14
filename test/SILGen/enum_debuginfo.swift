@@ -5,3 +5,4 @@ public func makeEnum() -> MyEnum {
 }
 
 // CHECK-NOT: enum_debuginfo_other.swift":{{[0-9]}}
+REQUIRES: updating_for_owned_noescape

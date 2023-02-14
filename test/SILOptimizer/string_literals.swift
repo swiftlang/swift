@@ -41,3 +41,4 @@ public func test_create_largestring() -> String {
 public func test_create_unicode() -> String {
   return "❄️gastroperiodyni"
 }
+REQUIRES: updating_for_owned_noescape

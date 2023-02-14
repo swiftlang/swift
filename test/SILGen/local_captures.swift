@@ -23,3 +23,4 @@ func globalfunc() -> () -> () {
 	callit()
 	return getit()
 }
+REQUIRES: updating_for_owned_noescape

@@ -29,3 +29,4 @@ func deinitAccessConsumeTest(_ x: inout FD) {
     x = FD()
 }
 
+REQUIRES: updating_for_owned_noescape

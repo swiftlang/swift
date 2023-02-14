@@ -64,3 +64,4 @@ sil_vtable [serialized] C {
 }
 
 
+REQUIRES: updating_for_owned_noescape

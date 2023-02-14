@@ -36,3 +36,4 @@ func array_func_lhs_non_nil(x: [Int]?) -> Bool {
   return nil != x
 }
 
+REQUIRES: updating_for_owned_noescape

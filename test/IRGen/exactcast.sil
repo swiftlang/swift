@@ -123,3 +123,4 @@ sil_vtable DerivedInt {
   #BaseBase.foo: (BaseBase) -> () -> () : @$s5test110DerivedIntC3fooyyF [override]
   #DerivedInt.deinit!deallocator: @$s5test110DerivedIntCfD
 }
+REQUIRES: updating_for_owned_noescape

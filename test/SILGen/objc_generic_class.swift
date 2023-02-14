@@ -51,3 +51,4 @@ public extension GenericStruct where T == String {
     @objc public func f() -> String { "hello" }
   }
 }
+REQUIRES: updating_for_owned_noescape

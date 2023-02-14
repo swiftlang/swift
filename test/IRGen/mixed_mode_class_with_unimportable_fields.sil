@@ -66,3 +66,4 @@ entry:
   %z = alloc_ref $SubSubButtHolder
   return %x : $ButtHolder
 }
+REQUIRES: updating_for_owned_noescape

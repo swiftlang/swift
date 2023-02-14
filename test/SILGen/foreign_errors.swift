@@ -306,3 +306,4 @@ extension NSURL {
     return prop as? T
   }
 }
+REQUIRES: updating_for_owned_noescape

@@ -80,3 +80,4 @@ struct HasDefaultTupleOfNils {
 // CHECK:   %6 = tuple (%2 : $Optional<Int>, %3 : $Optional<Int>, %4 : $Optional<Int>, %5 : $Optional<Int>)
 // CHECK:   return %6 : $(Optional<Int>, Optional<Int>, Optional<Int>, Optional<Int>)
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

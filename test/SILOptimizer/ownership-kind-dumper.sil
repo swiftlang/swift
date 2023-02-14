@@ -25,3 +25,4 @@ bb0(%0 : @owned $Builtin.NativeObject):
 }
 
 
+REQUIRES: updating_for_owned_noescape

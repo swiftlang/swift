@@ -10,3 +10,4 @@ class Foo: NSObject {
 func invokeMethodsWithDefaultArgs(x: Foo) {
   x.bridged()
 }
+REQUIRES: updating_for_owned_noescape

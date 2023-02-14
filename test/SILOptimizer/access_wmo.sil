@@ -336,3 +336,4 @@ bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $C):
   %9 = tuple (%5 : $Builtin.RawPointer, %8 : $Optional<Builtin.RawPointer>)
   return %9 : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
 } // end sil function '$s10access_wmo1CC10publicPropSivm'
+REQUIRES: updating_for_owned_noescape

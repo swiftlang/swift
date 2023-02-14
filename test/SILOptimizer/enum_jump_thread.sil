@@ -129,3 +129,4 @@ bb6(%12 : $Builtin.Int32):
 // CHECK: } // end sil function 'dont_jumpthread_enum_addr'
 }
 
+REQUIRES: updating_for_owned_noescape

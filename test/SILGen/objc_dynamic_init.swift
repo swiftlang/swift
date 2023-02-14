@@ -61,3 +61,4 @@ func callInit() {
 
 // CHECK-LABEL: sil_vtable Gizmo {
 // CHECK-NOT:     #Gadget.init!allocator
+REQUIRES: updating_for_owned_noescape

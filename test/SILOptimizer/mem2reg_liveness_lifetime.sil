@@ -55,3 +55,4 @@ bb6:
 }
 // CHECK-LABEL: } // end sil function 'liveness0'
 
+REQUIRES: updating_for_owned_noescape

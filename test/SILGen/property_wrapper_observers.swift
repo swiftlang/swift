@@ -139,3 +139,4 @@ struct HasMutatingGetter {
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_observers17HasMutatingGetterV10hasWillSetSivg : $@convention(method) (@inout HasMutatingGetter) -> Int {
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_observers17HasMutatingGetterV10hasWillSetSivs : $@convention(method) (Int, HasMutatingGetter) -> () {
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_observers17HasMutatingGetterV10hasWillSetSivM : $@yield_once @convention(method) (@inout HasMutatingGetter) -> @yields @inout Int {
+REQUIRES: updating_for_owned_noescape

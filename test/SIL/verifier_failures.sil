@@ -18,3 +18,4 @@ sil [ossa] @end_borrow_1_addr_alloc_stack : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+REQUIRES: updating_for_owned_noescape

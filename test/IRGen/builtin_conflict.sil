@@ -14,3 +14,4 @@ bb0:
 }
 
 sil hidden_external @swift_task_getCurrent : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
+REQUIRES: updating_for_owned_noescape

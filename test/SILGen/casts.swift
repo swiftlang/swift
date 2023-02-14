@@ -101,3 +101,4 @@ func downcast_existential_conditional(p: P) -> S? {
   return p as? S
 }
 
+REQUIRES: updating_for_owned_noescape

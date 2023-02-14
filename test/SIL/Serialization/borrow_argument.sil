@@ -21,3 +21,4 @@ bb1(%1 : @guaranteed $Builtin.NativeObject):
   %4 = tuple()
   return %4 : $()
 }
+REQUIRES: updating_for_owned_noescape

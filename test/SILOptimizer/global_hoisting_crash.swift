@@ -23,3 +23,4 @@ struct Teststruct {
 print(Teststruct.s)
 
 
+REQUIRES: updating_for_owned_noescape

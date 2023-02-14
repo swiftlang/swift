@@ -30,3 +30,4 @@ bb0(%0 : $B):
   %5 = tuple()
   return %5 : $()
 }
+REQUIRES: updating_for_owned_noescape

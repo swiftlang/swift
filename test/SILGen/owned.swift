@@ -28,3 +28,4 @@ struct Foo {
 func oneUnnamedArgument1(_: __owned ValueAggregate) {}
 // CHECK-LABEL: sil hidden [ossa] @$s5owned19oneUnnamedArgument2yyAA12RefAggregateCnF : $@convention(thin) (@owned RefAggregate) -> () {
 func oneUnnamedArgument2(_: __owned RefAggregate) {}
+REQUIRES: updating_for_owned_noescape

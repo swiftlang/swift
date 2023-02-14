@@ -253,3 +253,4 @@ public func test_optimize_init_static() -> Int {
   return Foo.x
 }
 
+REQUIRES: updating_for_owned_noescape

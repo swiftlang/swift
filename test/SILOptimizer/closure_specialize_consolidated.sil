@@ -722,3 +722,4 @@ bb0:
   dealloc_stack %s1 : $*()
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

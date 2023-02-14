@@ -101,3 +101,4 @@ class ConcreteDerived: ConcreteBase {
 // CHECK-NEXT:   #ConcreteDerived.g: <U where U : P> (ConcreteDerived) -> (U) -> () : @$s24vtable_generic_signature15ConcreteDerivedC1gyyxAA1PRzlF
 // CHECK-NEXT:   #ConcreteDerived.deinit!deallocator: @$s24vtable_generic_signature15ConcreteDerivedCfD  // ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

@@ -64,3 +64,4 @@ let s: Set<KeyClass> = Set()
 
 setUpCast(s)
 setDownCast(s)
+REQUIRES: updating_for_owned_noescape

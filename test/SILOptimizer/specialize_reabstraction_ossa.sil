@@ -130,3 +130,4 @@ bb0(%0 : $Bool):
   %rv = tuple ()
   return %rv : $()
 }
+REQUIRES: updating_for_owned_noescape

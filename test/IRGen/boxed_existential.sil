@@ -113,3 +113,4 @@ entry(%b : $Error):
   // CHECK: ret { %swift.type*, i8** } [[RET2]]
   return %m : $@thick Error.Type
 }
+REQUIRES: updating_for_owned_noescape

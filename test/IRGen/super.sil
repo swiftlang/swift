@@ -226,3 +226,4 @@ bb0(%0 : $Derived):
   return %7 : $()
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -202,3 +202,4 @@ bb2:
 bb3(%3 : $TestArrayStorage):
   return %3 : $TestArrayStorage
 }
+REQUIRES: updating_for_owned_noescape

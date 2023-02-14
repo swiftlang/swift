@@ -132,3 +132,4 @@ class DeinitAsFunction {
 // CHECK-LABEL: sil_vtable DeinitAsFunction {
 // CHECK:         #DeinitAsFunction.`deinit`:
 // CHECK:         #DeinitAsFunction.deinit!deallocator
+REQUIRES: updating_for_owned_noescape

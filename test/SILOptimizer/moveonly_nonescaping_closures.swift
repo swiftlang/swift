@@ -135,3 +135,4 @@ func p(x: inout M) {
 // - capture list binding can't be consumed
 // - andy's bookmarked test cases
 // - nested closure captures
+REQUIRES: updating_for_owned_noescape

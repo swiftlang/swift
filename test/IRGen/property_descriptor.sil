@@ -150,3 +150,4 @@ sil @set_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hash
 
 sil @get_reabstracted : $@convention(thin) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed @substituted <U> () -> @out U for <()>
 sil @set_reabstracted : $@convention(thin) <T> (@in_guaranteed @callee_guaranteed @substituted <U> () -> @out U for <()>, @inout ExternalReabstractions<T>) -> ()
+REQUIRES: updating_for_owned_noescape

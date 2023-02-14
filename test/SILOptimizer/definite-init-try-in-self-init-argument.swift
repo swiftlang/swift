@@ -10,3 +10,4 @@ class Z { init() throws {} }
 class X {
   required init(_: Z) throws {}
 }
+REQUIRES: updating_for_owned_noescape

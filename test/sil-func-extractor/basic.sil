@@ -40,3 +40,4 @@ bb0:
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <Int64>
   return %0 : $()
 }
+REQUIRES: updating_for_owned_noescape

@@ -26,3 +26,4 @@ throw MyError.A
 // CHECK: [[T0:%.*]] = integer_literal $Builtin.Int32, 1
 // CHECK: [[T1:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)
 // CHECK: br bb1([[T1]] : $Int32)
+REQUIRES: updating_for_owned_noescape

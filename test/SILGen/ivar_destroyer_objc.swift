@@ -16,3 +16,4 @@ internal class ObjCFoo : NSObject {
   var object: AnyObject
   init(o: AnyObject) { object = o }
 }
+REQUIRES: updating_for_owned_noescape

@@ -221,3 +221,4 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   x.nonMutatingCounter = y
   takesInOut(&x.nonMutatingCounter)
 }
+REQUIRES: updating_for_owned_noescape

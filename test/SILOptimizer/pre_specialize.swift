@@ -123,3 +123,4 @@ public func usePrespecializedEntryPointsAvailability() {
 // NONE: sil @$s22pre_specialized_module16publicInlineableyyxlFSd_Ts5 : $@convention(thin) (Double) -> () {
 @_specialize(exported: true, target: publicInlineable(_:), where T == Double)
 public func specializeTarget<T>(_ t: T) {}
+REQUIRES: updating_for_owned_noescape

@@ -309,3 +309,4 @@ actor Ahmad {
   // CHECK: } // end sil function '$s4test5AhmadCACyYacfc'
   nonisolated init() async {}
 }
+REQUIRES: updating_for_owned_noescape

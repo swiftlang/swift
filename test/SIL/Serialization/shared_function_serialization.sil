@@ -38,3 +38,4 @@ sil @$ss1XVABycfC : $@convention(method) (@thin X.Type) -> X
 sil @$ss17the_thing_it_does1xys1XV_tF : $@convention(thin) (X) -> ()
 
 
+REQUIRES: updating_for_owned_noescape

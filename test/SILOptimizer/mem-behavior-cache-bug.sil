@@ -108,3 +108,4 @@ sil_property #Complex.x<τ_0_0 where τ_0_0 : FloatingPoint> ()
 sil_property #Complex.y<τ_0_0 where τ_0_0 : FloatingPoint> ()
 
 
+REQUIRES: updating_for_owned_noescape

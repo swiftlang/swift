@@ -40,3 +40,4 @@ entry(%a : @owned $ObjCProto):
   %0 = apply %f<ObjCProto>(%a) : $@convention(thin) <T: AnyObject> (@owned T) -> ()
   return %0 : $()
 }
+REQUIRES: updating_for_owned_noescape

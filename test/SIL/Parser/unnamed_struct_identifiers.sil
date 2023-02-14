@@ -27,3 +27,4 @@ bb0(%0 : $UnnamedStructs):
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
 }
+REQUIRES: updating_for_owned_noescape

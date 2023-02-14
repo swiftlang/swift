@@ -692,3 +692,4 @@ class Polar {
 func accessStaticIsolated() async -> Int {
   return await Polar.temperature
 }
+REQUIRES: updating_for_owned_noescape

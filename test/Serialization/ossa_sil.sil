@@ -19,3 +19,4 @@ bb0(%0 : @guaranteed $AnyObject):
   return %2 : $X
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -328,3 +328,4 @@ sil_vtable D {}
 sil_vtable E {}
 sil_vtable Empty {}
 sil_witness_table C: P module main {}
+REQUIRES: updating_for_owned_noescape

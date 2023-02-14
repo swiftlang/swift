@@ -28,3 +28,4 @@ public func sum() -> Int {
 // CHECK-DAG: function_ref @$s7ModuleB2ggSivau
 // CHECK: return
 
+REQUIRES: updating_for_owned_noescape

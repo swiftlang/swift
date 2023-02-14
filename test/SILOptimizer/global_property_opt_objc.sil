@@ -49,3 +49,4 @@ sil [_semantics "array.init"] @_array_X_init : $@convention(thin) () -> @owned A
 
 sil [_semantics "array.props.isNativeTypeChecked"] @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
 
+REQUIRES: updating_for_owned_noescape

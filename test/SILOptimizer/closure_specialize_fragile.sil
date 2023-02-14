@@ -58,3 +58,4 @@ bb0:
   %2 = tuple ()
   return %2 : $()
 } // end sil function '$s26closure_specialize_fragile0C6CalleryyFyycfU_'
+REQUIRES: updating_for_owned_noescape

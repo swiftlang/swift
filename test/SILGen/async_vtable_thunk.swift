@@ -21,3 +21,4 @@ class Derived : BaseClass<Int> {
 // CHECK-NEXT:  #Derived.deinit!deallocator: @$s18async_vtable_thunk7DerivedCfD
 // CHECK-NEXT: }
 
+REQUIRES: updating_for_owned_noescape

@@ -43,3 +43,4 @@ sil [transparent] [serialized] @_TFSiCfT22_builtinIntegerLiteralBI__Si : $@conve
 // StdlibUnittest._blackHole <A> (A) -> ()
 sil @_TF14StdlibUnittest10_blackHoleurFxT_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 
+REQUIRES: updating_for_owned_noescape

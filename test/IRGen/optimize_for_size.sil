@@ -14,3 +14,4 @@ bb0(%0 : $Builtin.Int32):
 
 // O-NOT: attributes #0 = {{{.*}}optsize
 // CHECK: attributes #0 = {{{.*}}minsize
+REQUIRES: updating_for_owned_noescape

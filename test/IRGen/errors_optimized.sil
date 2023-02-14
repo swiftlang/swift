@@ -18,3 +18,4 @@ bb0(%0 : $Error):
   throw %0 : $Error                        // id: %3
 }
 
+REQUIRES: updating_for_owned_noescape

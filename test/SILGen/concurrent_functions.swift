@@ -21,3 +21,4 @@ func concurrentWithCaptures(i: Int) -> Int {
 
   return i
 }
+REQUIRES: updating_for_owned_noescape

@@ -634,3 +634,4 @@ bb(%class : $SwiftClass):
   return %result : $@callee_guaranteed @async () -> @out Int
 }
 
+REQUIRES: updating_for_owned_noescape

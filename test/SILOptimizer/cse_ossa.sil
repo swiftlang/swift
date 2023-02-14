@@ -1335,3 +1335,4 @@ exit(%proj : @guaranteed $C, %borrow : @guaranteed $S, %owned_s_2 : @owned $S):
     return %copy : $C
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -33,3 +33,4 @@ public func eliminate_two_bounds_checks(_ array: [Int]) {
   }
 }
 
+REQUIRES: updating_for_owned_noescape

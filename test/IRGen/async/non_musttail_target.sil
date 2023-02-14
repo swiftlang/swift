@@ -16,3 +16,4 @@ bb0:
 // CHECK-NOT: unreachable
 // CHECK:     ret void
 }
+REQUIRES: updating_for_owned_noescape

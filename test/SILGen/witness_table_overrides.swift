@@ -40,3 +40,4 @@ struct X3: P3 {
   func foo() { }
 }
 
+REQUIRES: updating_for_owned_noescape

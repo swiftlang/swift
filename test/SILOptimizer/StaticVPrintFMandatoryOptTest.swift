@@ -18,3 +18,4 @@ func testSimpleInterpolation() {
   // Match the format string. For now we don't expect all allocations to be avoided
   // CHECK: string_literal utf8 "Hello %ld %s"
 }
+REQUIRES: updating_for_owned_noescape

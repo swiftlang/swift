@@ -123,3 +123,4 @@ struct HasPrivate {
   // WHOLEMOD: sil private [ossa] @$s17delayed_functions10HasPrivateV08testFileD7Wrapper{{.*}}LL1xyAA09ProjectedG0VySiG_tF : $@convention(method) (ProjectedWrapper<Int>, HasPrivate) -> ()
   fileprivate func testFilePrivateWrapper(@ProjectedWrapper x: Int) {}
 }
+REQUIRES: updating_for_owned_noescape

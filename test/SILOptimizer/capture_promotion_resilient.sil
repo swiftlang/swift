@@ -57,3 +57,4 @@ bb0(%0 : $*ResilientStruct):
   %5 = partial_apply [callee_guaranteed] %4(%1) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> ()
   return %5 : $@callee_guaranteed () -> ()
 }
+REQUIRES: updating_for_owned_noescape

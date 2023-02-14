@@ -28,3 +28,4 @@ TakeBOOL(true)
 let f: Bool = false
 TakeBOOL(f)
 
+REQUIRES: updating_for_owned_noescape

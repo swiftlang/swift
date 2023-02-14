@@ -9,3 +9,4 @@ let _: (CFURL) -> CGDataProvider? = CGDataProvider.init
 
 // CHECK-LABEL: sil private [ossa] @$s15cf_curried_initSo17CGDataProviderRefaSgSo8CFURLRefacfu_ : $@convention(thin) (@guaranteed CFURL) -> @owned Optional<CGDataProvider>
 // CHECK-LABEL: sil {{.*}}[clang CGDataProvider.init] @CGDataProviderCreateWithURL : $@convention(c) (CFURL) -> @owned Optional<CGDataProvider>
+REQUIRES: updating_for_owned_noescape

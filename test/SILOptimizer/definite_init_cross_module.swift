@@ -278,3 +278,4 @@ class AcceptsInModuleVisibleNoArgsDesignatedInit: InModuleVisibleNoArgsDesignate
     // no error
   }
 }
+REQUIRES: updating_for_owned_noescape

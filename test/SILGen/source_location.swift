@@ -22,3 +22,4 @@ let FILE = #file, LINE = #line
 // CHECK: [[INPLACE_LINE_VAL:%.*]] = integer_literal $Builtin.IntLiteral, 20000,
 // CHECK: [[INPLACE_LINE:%.*]] = apply {{.*}}([[INPLACE_LINE_VAL]],
 // CHECK: store [[INPLACE_LINE]] to [trivial] [[LINE_ADDR]]
+REQUIRES: updating_for_owned_noescape

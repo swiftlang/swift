@@ -198,3 +198,4 @@ bb3(%borrow3 : @guaranteed $C, %copy3 : @owned $C):
   %result = tuple ()
   return %result : $()
 }
+REQUIRES: updating_for_owned_noescape

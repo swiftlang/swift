@@ -55,3 +55,4 @@ extension Canvas : Medium {}
 // CHECK: [[FN:%.*]] = function_ref @$s15generic_witness6CanvasV4draw5paint6pencily5PaintQz_qd__tAA6PencilRd__6StrokeQyd__AHRSlF : $@convention(method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_0_0.Paint == τ_1_0.Stroke> (@in_guaranteed τ_0_0.Paint, @in_guaranteed τ_1_0, Canvas<τ_0_0>) -> ()
 // CHECK: apply [[FN]]<τ_0_0, τ_1_0>({{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_0_0.Paint == τ_1_0.Stroke> (@in_guaranteed τ_0_0.Paint, @in_guaranteed τ_1_0, Canvas<τ_0_0>) -> ()
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

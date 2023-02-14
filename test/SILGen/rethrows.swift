@@ -83,3 +83,4 @@ func test2() {
 func test3() {
   rethrower { rethrower(nonthrower) }
 }
+REQUIRES: updating_for_owned_noescape

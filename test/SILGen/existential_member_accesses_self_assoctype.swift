@@ -767,3 +767,4 @@ protocol P4: P where A == (B, B) {
 func testCovariantAssocMethod1PartiallyConcrete(p4: any P4) {
   let x = p4.covariantAssocMethod1()
 }
+REQUIRES: updating_for_owned_noescape

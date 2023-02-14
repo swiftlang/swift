@@ -10,3 +10,4 @@ import Builtin
 // CHECK-SAME: i32 add {{.*}} ptrtoint (i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP24generic_requirement_objc9ObjCProto_" {{.*}} @"$s24generic_requirement_objc13GenericStructVMn", {{.*}} i32 3)
 
 struct GenericStruct<T: ObjCProto> { }
+REQUIRES: updating_for_owned_noescape

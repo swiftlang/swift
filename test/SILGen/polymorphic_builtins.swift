@@ -419,3 +419,4 @@ func concreteUremTest(_ x: Builtin.Int64, _ y: Builtin.Int64) -> Builtin.Int64 {
 func genericUremTest<T>(_ x : T, _ y : T) -> T {
   return Builtin.generic_urem(x, y)
 }
+REQUIRES: updating_for_owned_noescape

@@ -16,3 +16,4 @@ public func foo() {
   p(Bar<Int>())
 }
 
+REQUIRES: updating_for_owned_noescape

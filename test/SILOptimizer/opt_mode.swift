@@ -49,3 +49,4 @@ func test_ospeed(_ a: A) -> Int {
 
 // CHECK-IR-DAG: attributes [[SIZE_ATTR]] = { minsize optsize "
 // CHECK-IR-DAG: attributes [[NOSIZE_ATTR]] = { "
+REQUIRES: updating_for_owned_noescape

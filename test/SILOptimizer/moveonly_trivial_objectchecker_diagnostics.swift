@@ -1635,3 +1635,4 @@ public func closureAndClosureCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned 
     f()
     consumeVal(x2) // expected-note {{consuming use here}}
 }
+REQUIRES: updating_for_owned_noescape

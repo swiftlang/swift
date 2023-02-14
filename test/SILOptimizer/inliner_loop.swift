@@ -28,3 +28,4 @@ class KKKK: JJJJJ {
     var LLLL: [JJJJJ]
     init (LLLL: [JJJJJ]) { self.LLLL = LLLL }
 }
+REQUIRES: updating_for_owned_noescape

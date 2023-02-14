@@ -80,3 +80,4 @@ extension Struct: Codable where T: Codable {}
 // CHECK-NEXT:   conditional_conformance (T: Decodable): dependent
 // CHECK-NEXT:   conditional_conformance (T: Encodable): dependent
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

@@ -8,3 +8,4 @@ protocol Runcible {
 struct Foo: Runcible {
   func runce(x: Int = 0) {}
 }
+REQUIRES: updating_for_owned_noescape

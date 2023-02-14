@@ -24,3 +24,4 @@ func someFunc() async {
   await doMeow()
   await doHiss()
 }
+REQUIRES: updating_for_owned_noescape

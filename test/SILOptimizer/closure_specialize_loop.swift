@@ -79,3 +79,4 @@ public struct IndirectEnum {
         print(containsFalse)
     }
 }
+REQUIRES: updating_for_owned_noescape

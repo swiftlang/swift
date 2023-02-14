@@ -21,3 +21,4 @@ public func testit() -> Bool {
   return call_closure(0, 1, closure)
 }
 
+REQUIRES: updating_for_owned_noescape

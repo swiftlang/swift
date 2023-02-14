@@ -249,3 +249,4 @@ public func passArrayOfClasses(a: SwiftClass, b: SwiftClass, c: SwiftClass) {
 
 
 
+REQUIRES: updating_for_owned_noescape

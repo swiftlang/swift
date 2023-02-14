@@ -274,3 +274,4 @@ func check_call_on_downcasted_instance(_ a: A7) -> Bool {
   }
   return a.foo()
 }
+REQUIRES: updating_for_owned_noescape

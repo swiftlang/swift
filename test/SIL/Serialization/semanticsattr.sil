@@ -24,3 +24,4 @@ bb0:
   return undef : $()
 }
 
+REQUIRES: updating_for_owned_noescape

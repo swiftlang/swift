@@ -44,3 +44,4 @@ class InternalSub : InternalBase {
 // CHECK-NEXT:  #InternalSub.deinit
 // CHECK-NEXT: }
 
+REQUIRES: updating_for_owned_noescape

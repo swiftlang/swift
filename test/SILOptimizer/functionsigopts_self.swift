@@ -29,3 +29,4 @@ extension C {
 // Call the function so the specialization is not dead.
 var x = C()
 var x2 = C.factory(1)
+REQUIRES: updating_for_owned_noescape

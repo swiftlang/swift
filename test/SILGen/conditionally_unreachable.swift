@@ -35,3 +35,4 @@ func condUnreachable() {
 // RELEASE-NOT:     return
 // RELEASE-NOT:     builtin
 // RELEASE:         {{ unreachable}}
+REQUIRES: updating_for_owned_noescape

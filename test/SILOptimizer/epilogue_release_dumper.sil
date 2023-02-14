@@ -433,3 +433,4 @@ bb2(%2 : $foo):
 bb3(%3 : $foo):
   return %0 : $foo
 }
+REQUIRES: updating_for_owned_noescape

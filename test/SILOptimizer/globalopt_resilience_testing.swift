@@ -25,3 +25,4 @@ public struct Wrapper {
 // CHECK-NEXT: }
 
 // CHECK-TESTING-LABEL: sil_global [let] @$s28globalopt_resilience_testing7WrapperV14usefulConstantACvpZ : $Wrapper{{$}}
+REQUIRES: updating_for_owned_noescape

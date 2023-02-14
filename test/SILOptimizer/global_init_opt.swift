@@ -31,3 +31,4 @@ public func licm() -> Int {
   return s
 }
 
+REQUIRES: updating_for_owned_noescape

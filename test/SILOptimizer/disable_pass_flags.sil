@@ -22,3 +22,4 @@ bb0(%0 : @owned $Buffer):
   %e = end_cow_mutation %b : $Buffer
   return %e : $Buffer
 }
+REQUIRES: updating_for_owned_noescape

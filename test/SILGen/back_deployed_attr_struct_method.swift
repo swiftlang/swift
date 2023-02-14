@@ -48,3 +48,4 @@ func caller(_ s: TopLevelStruct) {
   // CHECK: {{%.*}} = function_ref @$s11back_deploy14TopLevelStructV13trivialMethodyyFTwb : $@convention(method) (TopLevelStruct) -> ()
   s.trivialMethod()
 }
+REQUIRES: updating_for_owned_noescape

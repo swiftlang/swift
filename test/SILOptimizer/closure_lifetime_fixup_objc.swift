@@ -175,3 +175,4 @@ func getBlockWithLoop(noEscapeBlock: () -> Void ) -> MyBlock {
   return (Optional<MyBlock>.none)!
 }
 
+REQUIRES: updating_for_owned_noescape

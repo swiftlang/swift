@@ -5,3 +5,4 @@ class Test {
     // CHECK: string_literal utf8 "{{.*}}.swift"
     let file = #file
 }
+REQUIRES: updating_for_owned_noescape

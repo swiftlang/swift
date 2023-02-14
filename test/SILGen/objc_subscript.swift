@@ -58,3 +58,4 @@ extension Guisemeau: SubscriptProto {}
 // CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo9GuisemeauCyypSgSicigTO
 // CHECK: objc_method {{%[0-9]+}} : $Guisemeau, #Guisemeau.subscript!getter.foreign : (Guisemeau) -> (Int) -> Any?, $@convention(objc_method) (Int, Guisemeau) -> @autoreleased Optional<AnyObject>
 // CHECK: end sil function '$sSo9GuisemeauCyypSgSicigTO'
+REQUIRES: updating_for_owned_noescape

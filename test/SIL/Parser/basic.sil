@@ -1790,3 +1790,4 @@ sil_vtable Foo2 {
   #Foo.subscript!getter: @Foo_subscript_getter [inherited] [nonoverridden]
   #Foo.subscript!setter: @Foo_subscript_setter [override]
 }
+REQUIRES: updating_for_owned_noescape

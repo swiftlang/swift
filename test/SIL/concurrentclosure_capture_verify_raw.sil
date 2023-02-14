@@ -126,3 +126,4 @@ sil_vtable [serialized] F {
   #F.init!allocator: (F.Type) -> () -> F : @$s37concurrentfunction_capturediagnostics1FCACycfC	// F.__allocating_init()
   #F.deinit!deallocator: @$s37concurrentfunction_capturediagnostics1FCfD	// F.__deallocating_deinit
 }
+REQUIRES: updating_for_owned_noescape

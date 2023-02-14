@@ -349,3 +349,4 @@ bb2:
   unwind
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -146,3 +146,4 @@ func setBuilder<F: Factory>(_ factory: inout F) where F.Product == MyClass {
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*F
 // CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter
 // CHECK:   apply [[SETTER]]<F>([[F0_THICK]], [[WRITE]])
+REQUIRES: updating_for_owned_noescape

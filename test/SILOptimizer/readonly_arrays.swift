@@ -90,3 +90,4 @@ storeArray()
 // CHECK-OUTPUT-NEXT: [227, 228]
 print(gg!)
 
+REQUIRES: updating_for_owned_noescape

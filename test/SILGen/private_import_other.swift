@@ -41,3 +41,4 @@ func test(internalSub: Sub, publicSub: PublicSub) {
 // CHECK: } // end sil function '$s4main4test11internalSub06publicD0yAA0D0C_AA06PublicD0CtF'
 
 
+REQUIRES: updating_for_owned_noescape

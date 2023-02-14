@@ -14,3 +14,4 @@ public enum E: Int {
 
 // CHECK-RESILIENT-DAG: sil [ossa] @$s22enum_raw_representable1EO0B5ValueACSgSi_tcfC
 // CHECK-RESILIENT-DAG: sil [ossa] @$s22enum_raw_representable1EO0B5ValueSivg
+REQUIRES: updating_for_owned_noescape

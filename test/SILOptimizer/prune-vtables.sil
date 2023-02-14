@@ -186,3 +186,4 @@ sil_vtable OpenB {
   #OpenA.yesOverrides: @OpenB_yesOverrides  [override]
   #OpenA.isFinal:      @PublicA_isFinal     [inherited]
 }
+REQUIRES: updating_for_owned_noescape

@@ -43,4 +43,4 @@ public func testPublicView() {
 
   //CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE021wrapWithPublicGenericF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out PublicGenericView<τ_0_0>
   _ = v.wrapWithPublicGenericView()
-}
+}REQUIRES: updating_for_owned_noescape

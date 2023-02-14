@@ -19,4 +19,4 @@ func referencesConsumesSelf(_ c: C) {
 
 // The curry thunk's inner closure...
 
-// CHECK-LABEL: sil private [ossa] @$s28partial_apply_consuming_self22referencesConsumesSelfyyAA1CCFyycADncfu_yycfu0_ : $@convention(thin) (@guaranteed C) -> () {
+// CHECK-LABEL: sil private [ossa] @$s28partial_apply_consuming_self22referencesConsumesSelfyyAA1CCFyycADncfu_yycfu0_ : $@convention(thin) (@guaranteed C) -> () {REQUIRES: updating_for_owned_noescape

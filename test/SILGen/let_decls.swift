@@ -512,3 +512,4 @@ func test_unassigned_let_constant() {
 // CHECK-NEXT:  destroy_addr [[MUI]] : $*String
 // CHECK-NEXT:  dealloc_stack [[S]] : $*String
 
+REQUIRES: updating_for_owned_noescape

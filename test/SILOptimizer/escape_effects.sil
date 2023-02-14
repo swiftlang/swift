@@ -384,3 +384,4 @@ bb0(%0 : $*Str):
   return %1 : $Y
 }
 
+REQUIRES: updating_for_owned_noescape

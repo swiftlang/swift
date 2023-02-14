@@ -42,3 +42,4 @@ func dict_upcast(dict: [S: Int]) -> [S: Any] {
 
 // It's not actually possible to test this for Sets independent of
 // the bridging rules.
+REQUIRES: updating_for_owned_noescape

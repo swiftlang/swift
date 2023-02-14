@@ -3318,3 +3318,4 @@ bb21:
   %75 = tuple ()
   return %75 : $()
 }
+REQUIRES: updating_for_owned_noescape

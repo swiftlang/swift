@@ -38,3 +38,4 @@ struct ComplexExample<T, U> {
 
   init(_: T) where T == String {}
 }
+REQUIRES: updating_for_owned_noescape

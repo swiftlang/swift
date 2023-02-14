@@ -63,3 +63,4 @@ func addr_only_ternary_1(x: Bool) -> AddressOnly {
 func iuo_lvalue_ternary(x: inout Bool!) -> Int {
   return x ? 1 : 0
 }
+REQUIRES: updating_for_owned_noescape

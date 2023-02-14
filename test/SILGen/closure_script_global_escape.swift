@@ -39,3 +39,4 @@ _ = { _ = flag }
 // CHECK: [[CLOSURE:%.*]] = function_ref @$s3fooyyXEfU2_
 // CHECK: apply [[CLOSURE]]
 _ = { _ = flag }()
+REQUIRES: updating_for_owned_noescape

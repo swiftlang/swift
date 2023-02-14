@@ -25,3 +25,4 @@ bb0:
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @utf8_literal_with_nul() {{.*}} {
 // CHECK:   ret i8* getelementptr inbounds ([5 x i8], [5 x i8]* [[U8_1]], i64 0, i64 0)
 
+REQUIRES: updating_for_owned_noescape

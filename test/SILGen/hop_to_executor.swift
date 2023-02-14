@@ -468,3 +468,4 @@ func asyncWithUnsafeInheritance_hopback() async {
   // CHECK-NEXT: return
   await redFn(0)
 }
+REQUIRES: updating_for_owned_noescape

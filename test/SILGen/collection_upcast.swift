@@ -108,3 +108,4 @@ func testSetUpcastBridged(_ set: Set<BridgedSwift>) {
   // CHECK-NOT: destroy_value [[SET]]
   let anyObjectSet = set as Set<NSObject>
 }
+REQUIRES: updating_for_owned_noescape

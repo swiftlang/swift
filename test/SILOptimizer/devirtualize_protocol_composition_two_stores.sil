@@ -119,3 +119,4 @@ sil_vtable [serialized] C {
 sil_witness_table [serialized] B: P module run {
   method #P.foo: <Self where Self : P> (Self) -> () -> Int64 : @Pfoo  // protocol witness for P.foo() in conformance B
 }
+REQUIRES: updating_for_owned_noescape

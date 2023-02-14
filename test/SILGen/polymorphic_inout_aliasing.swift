@@ -29,3 +29,4 @@ func testProtocol<T: Storied>(x: inout T) {
   // expected-note@+1 {{conflicting access is here}}
   swap(&x.protocolRequirement[0], &x.protocolRequirement[1])
 }
+REQUIRES: updating_for_owned_noescape

@@ -1178,3 +1178,4 @@ bb3(%result : $Optional<ObjCClass>):
   dealloc_stack %b : $*ObjCClass
   return %result : $Optional<ObjCClass>
 }
+REQUIRES: updating_for_owned_noescape

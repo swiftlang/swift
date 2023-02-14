@@ -579,3 +579,4 @@ public class ConcreteDerived : GenericBase<Int> {
 // CHECK-NEXT: #GenericBase.init!allocator: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : @$s7dynamic15ConcreteDerivedCACycfC [override]
 // CHECK-NEXT: #ConcreteDerived.deinit!deallocator: @$s7dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

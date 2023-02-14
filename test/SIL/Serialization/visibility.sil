@@ -159,3 +159,4 @@ sil [serialized] @shared_external_function_test_caller : $@convention(thin) () -
   %2 = tuple()
   return %2 : $()
 }
+REQUIRES: updating_for_owned_noescape

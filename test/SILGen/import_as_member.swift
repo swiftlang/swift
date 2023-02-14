@@ -69,3 +69,4 @@ public func useSpecialInit() -> Struct1 {
   return Struct1(specialLabel:())
 }
 
+REQUIRES: updating_for_owned_noescape

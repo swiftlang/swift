@@ -291,3 +291,4 @@ func passesFuncTakingBaseClass() {
 // CHECK-LABEL: sil_witness_table hidden ConformsToSillyDefault: SillyDefault module protocol_with_superclass {
 // CHECK-NEXT: method #SillyDefault.makeT: <Self where Self : SillyDefault> (Self) -> () -> Int : @$s24protocol_with_superclass22ConformsToSillyDefaultCAA0fG0A2aDP5makeTSiyFTW
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

@@ -28,3 +28,4 @@ class C<T> : P {
 func usesCInt(c: C<Int>) {
   _ = c.returnsSelf()
 }
+REQUIRES: updating_for_owned_noescape

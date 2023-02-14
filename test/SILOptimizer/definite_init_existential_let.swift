@@ -28,3 +28,4 @@ func immutableP(field: P) {
   x.foo() // expected-error{{}}
   x.bar = 4 // expected-error{{}}
 }
+REQUIRES: updating_for_owned_noescape

@@ -29,3 +29,4 @@ entry(%1 : $Foo):
 }
 
 sil_vtable Foo {}
+REQUIRES: updating_for_owned_noescape

@@ -388,3 +388,4 @@ entry(%value : $Builtin.IntLiteral, %index : $Builtin.Word):
   %result = builtin "wordAtIndex_IntLiteral"(%value : $Builtin.IntLiteral, %index : $Builtin.Word) : $Builtin.Word
   return %result : $Builtin.Word
 }
+REQUIRES: updating_for_owned_noescape

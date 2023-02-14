@@ -83,3 +83,4 @@ func caller() {
   // CHECK: {{%.*}} = function_ref @$s11back_deploy8isNumberySbSiFTwb : $@convention(thin) (Int) -> Bool
   _ = isNumber(6)
 }
+REQUIRES: updating_for_owned_noescape

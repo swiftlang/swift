@@ -26,3 +26,4 @@ func localFoo(x: inout Int) {
 func anonFoo(x: inout Int) {
   { return x }()
 }
+REQUIRES: updating_for_owned_noescape

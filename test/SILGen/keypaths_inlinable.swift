@@ -44,3 +44,4 @@ public struct KeypathStruct {
 
 // CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$s18keypaths_inlinable13KeypathStructVySbSi_SStcipACTkq : $@convention(thin) (@in_guaranteed Bool, @inout KeypathStruct, UnsafeRawPointer) -> ()
 
+REQUIRES: updating_for_owned_noescape

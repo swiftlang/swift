@@ -394,3 +394,4 @@ public func entryPoint() {
   let c = ConformerClass()
   repo(c)
 }
+REQUIRES: updating_for_owned_noescape

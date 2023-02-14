@@ -496,3 +496,4 @@ bb0(%twoInts: $*TwoInts):
   %200 = tuple ()
   return %200 : $()
 }
+REQUIRES: updating_for_owned_noescape

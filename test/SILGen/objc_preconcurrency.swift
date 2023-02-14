@@ -158,3 +158,4 @@ func testInoutAccess(_ grass: NSTouchGrass) {
 func testProtocolVarAccess(p: P) {
   modify(&p.sendyHandler)
 }
+REQUIRES: updating_for_owned_noescape

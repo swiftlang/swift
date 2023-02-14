@@ -31,3 +31,4 @@ public class Horse : NSObject {
 @inlinable public func talkAboutAHorse(h: Horse) {
   _ = h.gallop
 }
+REQUIRES: updating_for_owned_noescape

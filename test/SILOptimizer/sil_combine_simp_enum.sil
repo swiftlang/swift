@@ -51,3 +51,4 @@ bb5(%16 : $SimpleEnum):                           // Preds: bb2 bb4
   return %16 : $SimpleEnum                        // id: %17
 }
 
+REQUIRES: updating_for_owned_noescape

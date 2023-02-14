@@ -31,3 +31,4 @@ bb4:                                              // Preds: bb3 bb1
   %10 = tuple ()                                  // user: %11
   return %10 : $()                                // id: %11
 }
+REQUIRES: updating_for_owned_noescape

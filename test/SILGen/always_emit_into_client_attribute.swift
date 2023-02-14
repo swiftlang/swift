@@ -47,3 +47,4 @@ public final class C {
   @_alwaysEmitIntoClient
   deinit {}
 }
+REQUIRES: updating_for_owned_noescape

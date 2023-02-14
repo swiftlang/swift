@@ -115,3 +115,4 @@ bb0(%0 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float):
   %1 = convert_escape_to_noescape %0 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float to $@noescape @differentiable(reverse) @callee_guaranteed (Float) -> Float
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

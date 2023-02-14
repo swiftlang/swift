@@ -11,3 +11,4 @@ import gizmo
 // CHECK-NOT: sil_witness_table shared NSFungingMask: RawRepresentable module gizmo
 // CHECK-NOT: sil_witness_table hidden NSRuncingOptions: Bub module objc_enum
 
+REQUIRES: updating_for_owned_noescape

@@ -73,3 +73,4 @@ func caller(_ s: S) {
   _ = TopLevelStruct(s)
 }
 
+REQUIRES: updating_for_owned_noescape

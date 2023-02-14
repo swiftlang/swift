@@ -215,3 +215,4 @@ bb0(%0 : @owned $SomeClass, %1 : @owned $RefStruct):
   return %16 : $RefStruct
 }
 
+REQUIRES: updating_for_owned_noescape

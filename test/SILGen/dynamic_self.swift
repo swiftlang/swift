@@ -535,3 +535,4 @@ func testNoErasure(_ body: (Final) -> ()) {
 
 // CHECK-LABEL: sil_witness_table hidden X: CP module dynamic_self {
 // CHECK: method #CP.f: {{.*}} : @$s12dynamic_self1XCAA2CPA2aDP1f{{[_0-9a-zA-Z]*}}FTW
+REQUIRES: updating_for_owned_noescape

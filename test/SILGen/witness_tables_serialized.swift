@@ -30,3 +30,4 @@ internal struct InternalStruct : PublicProtocol, InternalProtocol {}
 
 // CHECK-NONRESILIENT-DAG: sil_witness_table [serialized] PublicResilientStruct: PublicProtocol
 // CHECK-NONRESILIENT-DAG: sil_witness_table [serialized] PublicResilientStruct: InternalProtocol
+REQUIRES: updating_for_owned_noescape

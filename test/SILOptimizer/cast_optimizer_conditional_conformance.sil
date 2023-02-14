@@ -412,3 +412,4 @@ sil_witness_table hidden <T where T : AnyObject> S3<T>: HasFoo module tot {
 sil_witness_table hidden <T where T : C> S4<T>: HasFoo module tot {
   method #HasFoo.foo: <Self where Self : HasFoo> (Self) -> () -> () : @witnessS4
 }
+REQUIRES: updating_for_owned_noescape

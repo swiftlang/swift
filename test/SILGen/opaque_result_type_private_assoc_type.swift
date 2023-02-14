@@ -12,3 +12,4 @@ func usesAssocTypeOfPrivateResultType() {
   let iterator = doSomething()
   let _ = iterator.next()
 }
+REQUIRES: updating_for_owned_noescape

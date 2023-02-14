@@ -43,3 +43,4 @@ bb0(%0 : $Builtin.Int64, %1 : @owned $Builtin.NativeObject):
   %999 = tuple ()
   return %999 : $()
 }
+REQUIRES: updating_for_owned_noescape

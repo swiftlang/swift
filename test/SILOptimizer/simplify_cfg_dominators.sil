@@ -90,3 +90,4 @@ bb7(%18 : $DupCaseEnum):
   return %18 : $DupCaseEnum
 }
 
+REQUIRES: updating_for_owned_noescape

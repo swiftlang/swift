@@ -13,3 +13,4 @@ func bar(_ f: (Butt<D>) -> ()) {
   // CHECK: convert_function {{.*}} $@noescape @callee_guaranteed (Butt<D>) -> () to $@noescape @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : P> (Butt<τ_0_0>) -> () for <D>
   foo(f)
 }
+REQUIRES: updating_for_owned_noescape

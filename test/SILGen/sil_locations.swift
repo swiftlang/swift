@@ -443,3 +443,4 @@ func testKeyPathGetterSetterAutogen() -> Struct.InnerStruct {
   // CHECK-LABEL: sil shared [thunk] [ossa] @$s13sil_locations6StructV14structProperty{{[_0-9a-zA-Z]*}}Tk
   // CHECK: load {{.*}} loc * "<compiler-generated>":0:0{{.*}}<invalid loc>:auto_gen
 }
+REQUIRES: updating_for_owned_noescape

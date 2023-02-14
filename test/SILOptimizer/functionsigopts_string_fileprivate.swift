@@ -20,3 +20,4 @@ fileprivate func setStorageTo(_ newValue: String) {
 }
 
 setStorageTo("hi")
+REQUIRES: updating_for_owned_noescape

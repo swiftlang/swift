@@ -513,3 +513,4 @@ public class DerivedObserved : MiddleObserved {
 }
 
 // CHECK-LABEL: sil private [ossa] @$s9observers15DerivedObservedC1xSivW : $@convention(method) (@guaranteed DerivedObserved) -> () {
+REQUIRES: updating_for_owned_noescape

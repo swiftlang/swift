@@ -37,3 +37,4 @@ public class DerivedClass<Result> : BaseClass<Int, Result> {
 // CHECK: dealloc_stack [[OUTER_RESULT_BUF]] :
 // CHECK: end_apply [[TOKEN]]
 // CHECK: return
+REQUIRES: updating_for_owned_noescape

@@ -28,3 +28,4 @@ func testBlub(a: AnyObject) throws {
   // CHECK:   throw {{%.*}} : $any Error
   try a.blub()
 }
+REQUIRES: updating_for_owned_noescape

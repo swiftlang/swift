@@ -22,3 +22,4 @@ func callsG(_ c: C) {
 }
 
 callsG(C())
+REQUIRES: updating_for_owned_noescape

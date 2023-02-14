@@ -36,3 +36,4 @@ struct Mystr<T> {
   @_silgen_name("func7") func func7<T>(_ t: inout Mystr<T>, _ s: T) -> T { }
 }
 
+REQUIRES: updating_for_owned_noescape

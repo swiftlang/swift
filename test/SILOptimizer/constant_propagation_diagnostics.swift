@@ -12,3 +12,4 @@ enum EnumWithTooLargeElements : UInt8 {
   case twoHundredFiftySix    // expected-error 2 {{integer literal '256' overflows when stored into 'UInt8'}}
   case tooFarByFar = 123456  // expected-error 2 {{integer literal '123456' overflows when stored into 'UInt8'}}
 }
+REQUIRES: updating_for_owned_noescape

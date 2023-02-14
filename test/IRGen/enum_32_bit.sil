@@ -59,3 +59,4 @@ entry(%0 : $Bas):
 sil @indirect_foo : $@convention(thin) (@in Foo) -> ()
 sil @indirect_bar : $@convention(thin) (@in Bar) -> ()
 sil @indirect_bas : $@convention(thin) (@in Bas) -> ()
+REQUIRES: updating_for_owned_noescape

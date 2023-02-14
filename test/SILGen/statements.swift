@@ -770,3 +770,4 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   return [[PAYLOAD_1]] : $Int
 }
 
+REQUIRES: updating_for_owned_noescape

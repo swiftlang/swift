@@ -36,3 +36,4 @@ public func testSet() -> Int {
   return d.count + d.capacity
 }
 
+REQUIRES: updating_for_owned_noescape

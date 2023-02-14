@@ -635,3 +635,4 @@ func castToCFunction(ptr: UnsafeRawPointer) {
   typealias Fn = @convention(c) (AnyObject?) -> Void
   unsafeBitCast(ptr, to: Fn.self)(nil)
 }
+REQUIRES: updating_for_owned_noescape

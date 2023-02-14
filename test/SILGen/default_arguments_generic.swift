@@ -92,3 +92,4 @@ func g<T>(_: T) {
     _ = T.self
   }
 }
+REQUIRES: updating_for_owned_noescape

@@ -77,3 +77,4 @@ func archetype_init_partial_apply<T: C>(t: T.Type) where T: P {
 
 // CHECK-LABEL: sil private [ossa] @$s18partial_apply_init010archetype_c1_a1_B01tyxm_tAA1CCRbzAA1PRzlFxSfcfu4_ :
 // CHECK:         function_ref @$s18partial_apply_init1PPAAE8protoExtxSf_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : P> (Float, @thick τ_0_0.Type) -> @out τ_0_0
+REQUIRES: updating_for_owned_noescape

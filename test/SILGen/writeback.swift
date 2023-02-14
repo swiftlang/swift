@@ -154,3 +154,4 @@ func loadMember<Runce: Runcible>(runce runce: Runce) -> Runce.Frob.Anse {
   return runce.frob.anse
 }
 
+REQUIRES: updating_for_owned_noescape

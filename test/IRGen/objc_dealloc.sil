@@ -134,3 +134,4 @@ sil [ossa] @$s12objc_dealloc10SwiftGizmoC7bellsOnACSgSi_tcfcTo : $@convention(ob
 bb0(%0 : $Int, %1 : @owned $SwiftGizmo):
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

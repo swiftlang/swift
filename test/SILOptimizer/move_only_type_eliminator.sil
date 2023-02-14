@@ -562,3 +562,4 @@ bb3(%result : @owned $@moveOnly FakeOptional<Klass>):
   %result2 = moveonlywrapper_to_copyable [owned] %result : $@moveOnly FakeOptional<Klass>
   return %result2 : $FakeOptional<Klass>
 }
+REQUIRES: updating_for_owned_noescape

@@ -551,3 +551,4 @@ bb6:
   strong_release %0 : $Builtin.NativeObject
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

@@ -24,3 +24,4 @@ func bar(x: Attributt<(Int) -> Int>) {
     foo(x: &x.address_and_set)
 }
 
+REQUIRES: updating_for_owned_noescape

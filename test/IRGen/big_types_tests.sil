@@ -42,3 +42,4 @@ entry(%x : $BigStruct, %i : $Builtin.Int1):
   %ret = tuple ()
   return %ret : $()
 }
+REQUIRES: updating_for_owned_noescape

@@ -12,3 +12,4 @@ class MyDictionary: NSDictionary {
     super.nonObjCExtensionMethod(x)
   }
 }
+REQUIRES: updating_for_owned_noescape

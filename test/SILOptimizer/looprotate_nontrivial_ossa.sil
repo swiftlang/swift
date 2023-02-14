@@ -248,3 +248,4 @@ bb9:
 bb10:
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

@@ -175,3 +175,4 @@ bb0(%0 : $*τ_0_0):
   %3 = apply %2<τ_0_0>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
   return %3 : $()
 }
+REQUIRES: updating_for_owned_noescape

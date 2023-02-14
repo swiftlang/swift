@@ -305,3 +305,4 @@ func testGlobalBlock() {
 // CHECK-LABEL: sil hidden [ossa] @$s20objc_blocks_bridging15testGlobalBlockyyF
 // CHECK: global_addr @GlobalBlock : $*@convention(block) (NSString) -> @autoreleased Optional<NSString>
 // CHECK: function_ref @$sSo8NSStringCABSgIeyBya_S2SIeggo_TR : $@convention(thin) (@guaranteed String, @guaranteed @convention(block) (NSString) -> @autoreleased Optional<NSString>) -> @owned String
+REQUIRES: updating_for_owned_noescape

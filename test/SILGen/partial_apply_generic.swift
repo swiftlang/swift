@@ -70,3 +70,4 @@ func getNonCanonicalSelfFunc<T, U : Panda>(t: T.Type) -> (T) -> (U) -> () where 
 
 // CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic23getNonCanonicalSelfFunc1tyq_cxcxm_t7CuddlesQy_RszAA5PandaR_r0_lFyq_cxcfu_yq_cfu0_ : $@convention(thin) <T, U where T == U.Cuddles, U : Panda> (@in_guaranteed U, @in_guaranteed T) -> () {
 // CHECK: witness_method $T, #Foo.makesSelfNonCanonical : <Self><T where Self == T.Cuddles, T : Panda> (Self) -> (T) -> () : $@convention(witness_method: Foo) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
+REQUIRES: updating_for_owned_noescape

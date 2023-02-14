@@ -291,3 +291,4 @@ bb0(%0 : $Float):
   return %3 : $Bool
 }
 
+REQUIRES: updating_for_owned_noescape

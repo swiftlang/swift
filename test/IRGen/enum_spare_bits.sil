@@ -78,3 +78,4 @@ sil @$s15enum_spare_bits1DCACycfcTo : $@convention(thin) (@owned D) -> @owned D 
 entry(%x : $D):
   return undef : $D
 }
+REQUIRES: updating_for_owned_noescape

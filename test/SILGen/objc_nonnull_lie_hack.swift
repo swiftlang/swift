@@ -82,3 +82,4 @@ func loadUnownedProperty(obj: NonNilTest) -> NonNilTest? {
   }
   return foo  
 }
+REQUIRES: updating_for_owned_noescape

@@ -30,3 +30,4 @@ public func testNestedAccess() {
   var s: SomeP = Some()
   assignNonConflict(&s)
 }
+REQUIRES: updating_for_owned_noescape

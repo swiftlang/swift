@@ -13,3 +13,4 @@ import TestModule
 testit(MyStruct())
 
 // CHECK-NOT: sil_witness_table MyStruct: Proto module TestModule
+REQUIRES: updating_for_owned_noescape

@@ -122,3 +122,4 @@ struct S {
     let _: Int = (S.foo(self).self)()
   }
 }
+REQUIRES: updating_for_owned_noescape

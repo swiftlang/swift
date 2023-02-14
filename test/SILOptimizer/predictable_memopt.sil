@@ -994,3 +994,4 @@ bb0(%0 : $*Int):
   dealloc_stack %1 : $*Optional<Int>
   return %4 : $Int
 }
+REQUIRES: updating_for_owned_noescape

@@ -49,3 +49,4 @@ public func caller(_ c: Concrete) throws {
   // CHECK: try_apply [[FN]]([[ARG]]) : $@convention(method) (Concrete) -> @error any Error
   try callee(c)
 }
+REQUIRES: updating_for_owned_noescape

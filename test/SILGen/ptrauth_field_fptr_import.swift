@@ -127,3 +127,4 @@ func test_addr_only_struct() -> Int32 {
   return struct_with_signed_val.secure_func_ptr1()
 }
 
+REQUIRES: updating_for_owned_noescape

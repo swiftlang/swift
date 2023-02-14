@@ -149,3 +149,4 @@ sil_vtable REC {
   #REC.recursive: @REC_recursive	// test.REC.recursive (test.REC)(Swift.Int) -> ()
   #REC.init!initializer: @_TFC4test3RECcfMS0_FT_S0_	// test.REC.init (test.REC.Type)() -> test.REC
 }
+REQUIRES: updating_for_owned_noescape

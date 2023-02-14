@@ -19,3 +19,4 @@ let x: Any = Foo.self
 // CHECK: store [[CLOSURE_CONV]] to [init] [[CONCRETE]]
 let y: Any = {() -> () in ()}
 
+REQUIRES: updating_for_owned_noescape

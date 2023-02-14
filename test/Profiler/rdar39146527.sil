@@ -93,3 +93,4 @@ bb11(%46 : $String):
   release_value %1 : $String
   return %46 : $String
 }
+REQUIRES: updating_for_owned_noescape

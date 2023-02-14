@@ -20,3 +20,4 @@ d.append([Foo()])
 // CHECK-DAG: mayStoreToMemoryOnDestruction is true: Array<Foo>
 // CHECK-DAG: mayStoreToMemoryOnDestruction is true: Array<Array<Foo>>
 // CHECK-DAG: mayStoreToMemoryOnDestruction is true: Array<Element>
+REQUIRES: updating_for_owned_noescape

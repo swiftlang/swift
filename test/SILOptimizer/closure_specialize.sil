@@ -828,3 +828,4 @@ bb0(%0 : $Int):
   %empty = tuple ()
   return %empty : $()
 }
+REQUIRES: updating_for_owned_noescape

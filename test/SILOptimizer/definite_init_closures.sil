@@ -78,3 +78,4 @@ bb0(%0 : @guaranteed $SimpleClass):
   %4 = load [trivial] %3 : $*Bool
   return %4 : $Bool
 }
+REQUIRES: updating_for_owned_noescape

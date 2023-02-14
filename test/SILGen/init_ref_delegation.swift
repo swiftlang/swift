@@ -193,3 +193,4 @@ struct Cs : Pb {
     self.init(d: d3)
   }
 }
+REQUIRES: updating_for_owned_noescape

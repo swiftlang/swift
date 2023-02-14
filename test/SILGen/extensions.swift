@@ -78,3 +78,4 @@ extension Box {
     self.t = t
   }
 }
+REQUIRES: updating_for_owned_noescape

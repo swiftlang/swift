@@ -18,3 +18,4 @@ public func caller(_ x: Int) -> Int {
 	return to_be_inlined(x)
 }
 
+REQUIRES: updating_for_owned_noescape

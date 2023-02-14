@@ -17,3 +17,4 @@ bb0(%0 : $(_: Int)):
   %2 = tuple $(_: Int) (%1)
   return %2 : $(_: Int)
 }
+REQUIRES: updating_for_owned_noescape

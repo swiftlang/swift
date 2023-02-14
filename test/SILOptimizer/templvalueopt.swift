@@ -59,3 +59,4 @@ print(TestStruct("A non-trivial value", 1))
 print(createAnyLeft(27))
 print(createAnyLeft("A non-trivial value"))
 
+REQUIRES: updating_for_owned_noescape

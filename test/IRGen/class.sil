@@ -168,3 +168,4 @@ entry(%x : $ClassConstrainedGenericField<ClassConstraintConformance>):
 // CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %T5class28ClassConstrainedGenericFieldCyAA0B21ConstraintConformanceCG, %T5class28ClassConstrainedGenericFieldCyAA0B21ConstraintConformanceCG* %0, i32 0, i32 1
 // CHECK:         load %T5class26ClassConstraintConformanceC*, %T5class26ClassConstraintConformanceC** [[FIELD_ADDR_GENERIC]]
 
+REQUIRES: updating_for_owned_noescape

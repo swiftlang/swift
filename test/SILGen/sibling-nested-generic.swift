@@ -19,3 +19,4 @@ func foo<A: AP>(x: A) -> A {
   let x = bang()
   bong(x)
 }
+REQUIRES: updating_for_owned_noescape

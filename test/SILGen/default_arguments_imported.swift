@@ -28,3 +28,4 @@ func testNullableDictionary(gizmo: Gizmo) {
   // CHECK: objc_method [[SELF:%[0-9]+]] : $Gizmo, #Gizmo.doTheOtherThing!foreign
   gizmo.doTheOtherThing()
 } // CHECK: } // end sil function '$s26default_arguments_imported22testNullableDictionary5gizmoySo5GizmoC_tF'
+REQUIRES: updating_for_owned_noescape

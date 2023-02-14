@@ -876,3 +876,4 @@ func assumeTrue(_ x: Builtin.Int1) {
 func assumeAlignment(_ p: Builtin.RawPointer, _ x: Builtin.Word) {
   Builtin.assumeAlignment(p, x)
 }
+REQUIRES: updating_for_owned_noescape

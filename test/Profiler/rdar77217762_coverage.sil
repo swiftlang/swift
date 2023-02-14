@@ -62,3 +62,4 @@ bb3:
 sil_coverage_map "main.swift" "$foo" "$foo" 0 {
   10:6 -> 10:11 : 0
 }
+REQUIRES: updating_for_owned_noescape

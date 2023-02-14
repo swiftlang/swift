@@ -315,3 +315,4 @@ bb0:
 
 // REMARKS_PASSED-NOT: remark:
 // REMARKS_MISSED-NOT: remark:
+REQUIRES: updating_for_owned_noescape

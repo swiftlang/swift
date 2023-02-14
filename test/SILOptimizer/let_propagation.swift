@@ -340,3 +340,4 @@ public func testVarTuple(s: S3) -> Int32 {
 }
 
 
+REQUIRES: updating_for_owned_noescape

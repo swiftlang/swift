@@ -10,3 +10,4 @@ import Foundation
 func foo<T: NSCopying>(f: (T) -> ()) {}
 // CHECK-LABEL: sil {{.*}}3bar{{.*}} : $@convention(thin) <T where T : NSCopying> (@noescape @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : AnyObject> (@guaranteed Optional<τ_0_0>) -> ()
 func bar<T: NSCopying>(f: (T?) -> ()) {}
+REQUIRES: updating_for_owned_noescape

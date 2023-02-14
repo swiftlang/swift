@@ -43,3 +43,4 @@ func baz(_ p : P, _ q : Q) {
 
 baz(C(), D());
 
+REQUIRES: updating_for_owned_noescape

@@ -9,3 +9,4 @@ struct Butt {
         _ = foo.lazy.compactMap { $0.value.0 }
     }
 }
+REQUIRES: updating_for_owned_noescape

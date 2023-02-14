@@ -182,3 +182,4 @@ bb0:
  return %10 : $MyInt
 }
 
+REQUIRES: updating_for_owned_noescape

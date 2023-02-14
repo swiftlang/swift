@@ -135,3 +135,4 @@ sil_vtable D {
 sil_vtable E {
   #C.doIt: @_TFC1b1E4doItfS0_FT_T_ [override]
 }
+REQUIRES: updating_for_owned_noescape

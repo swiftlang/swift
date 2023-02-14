@@ -33,3 +33,4 @@ func protocolToProtocolClass() -> Protocol {
   // CHECK: return [[COPIED_PROTO]]
   return OP.self
 }
+REQUIRES: updating_for_owned_noescape

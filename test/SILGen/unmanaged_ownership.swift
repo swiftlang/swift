@@ -64,3 +64,4 @@ func project(fn fn: () -> Holder) -> C {
 // CHECK-NEXT: [[T1:%.*]] = struct_extract [[T0]] : $Holder, #Holder.value
 // CHECK-NEXT: [[T2:%.*]] = strong_copy_unmanaged_value [[T1]]
 // CHECK-NEXT: return [[T2]]
+REQUIRES: updating_for_owned_noescape

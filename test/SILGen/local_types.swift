@@ -20,3 +20,4 @@ func function2() {
 // CHECK-LABEL: sil private [transparent] [ossa] @$s11local_types9function2yyFyycfU_1SL_V1xSivpfi : $@convention(thin) () -> Int
 
 // CHECK-LABEL: sil_vtable LocalClass
+REQUIRES: updating_for_owned_noescape

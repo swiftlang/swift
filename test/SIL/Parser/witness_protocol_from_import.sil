@@ -46,3 +46,4 @@ sil_witness_table X: Hashable module test2 {
   base_protocol Equatable: X: Equatable module test2
   method #Hashable.hashValue!getter: @_TTWO5test21Xs8HashableS_FS1_g9hashValueSi
 }
+REQUIRES: updating_for_owned_noescape

@@ -27,3 +27,4 @@ func testit(_ x: Int) {
 func nonTrivialInit(_ b: Bool) -> Int {
 	return b ? 0 : 27
 }
+REQUIRES: updating_for_owned_noescape

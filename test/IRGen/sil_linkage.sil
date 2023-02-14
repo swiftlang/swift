@@ -143,3 +143,4 @@ sil public @use_all_symbols : $@convention(thin) () -> () {
   return %24 : $()
 }
 
+REQUIRES: updating_for_owned_noescape

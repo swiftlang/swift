@@ -44,3 +44,4 @@ func f3(arg: (a: Int, b: Any)) {
 func f4(arg: (a: Int, b: Bool)) {
   guard case let (x, false) = arg else { return }
 }
+REQUIRES: updating_for_owned_noescape

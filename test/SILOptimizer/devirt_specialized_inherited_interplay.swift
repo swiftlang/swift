@@ -192,3 +192,4 @@ public func driver() {
   WhatShouldIDo(b4)
   WhatShouldIDo2(b4)
 }
+REQUIRES: updating_for_owned_noescape

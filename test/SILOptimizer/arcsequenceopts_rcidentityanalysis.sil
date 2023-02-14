@@ -725,3 +725,4 @@ bb0(%0 : $SContainer):
   %r = tuple()
   return %r : $()
 }
+REQUIRES: updating_for_owned_noescape

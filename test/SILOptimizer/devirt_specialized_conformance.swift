@@ -74,3 +74,4 @@ func testWithUnsafeBytes<T>(_ t: T) {
 }
 
 testWithUnsafeBytes([])
+REQUIRES: updating_for_owned_noescape

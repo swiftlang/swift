@@ -74,3 +74,4 @@ _ = state1.someValues
 // CHECK:  destroy_value [[COPY_VALUE]] : $TestWrapper<Array<String>>
 // CHECK:  unwind
 // CHECK-END: }
+REQUIRES: updating_for_owned_noescape

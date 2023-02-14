@@ -3,3 +3,4 @@
 func foo() {
     if #available(macOS 10.15, *) {}
 }
+REQUIRES: updating_for_owned_noescape

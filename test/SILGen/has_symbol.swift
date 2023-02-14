@@ -236,3 +236,4 @@ func testNotWeaklyLinked() {
 
 // We should not generate a #_hasSymbol query helper for Swift.Int.
 // CHECK-NOT: sSiTwS
+REQUIRES: updating_for_owned_noescape

@@ -1477,3 +1477,4 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
   %30 = tuple(%3 : $A, %20 : $A)
   return %30 : $(A, A)
 }
+REQUIRES: updating_for_owned_noescape

@@ -258,3 +258,4 @@ bb10: // Exit dominated by bb3
 bb11: // Non-exit dominated by bb1
   return %4 : $Builtin.Int1
 }
+REQUIRES: updating_for_owned_noescape

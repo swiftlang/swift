@@ -151,3 +151,4 @@ public func resumeThrowingContinuationThrowing(_ cont: Builtin.RawUnsafeContinua
   // CHECK-NEXT: destroy_value %1 : $any Error
   Builtin.resumeThrowingContinuationThrowing(cont, error)
 }
+REQUIRES: updating_for_owned_noescape

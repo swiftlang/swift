@@ -249,3 +249,4 @@ bb0(%0 : $*T, %1 : $*T):
   return %78 : $()
 }
 
+REQUIRES: updating_for_owned_noescape

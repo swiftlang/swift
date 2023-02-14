@@ -64,3 +64,4 @@ public func computeFunctionType<T>(t: [T]) {
 public func testComputeFunctionType() {
   computeFunctionType(t: [0])
 }
+REQUIRES: updating_for_owned_noescape

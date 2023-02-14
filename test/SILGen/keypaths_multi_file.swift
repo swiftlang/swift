@@ -43,3 +43,4 @@ class MM<T: P> : PP {}
 func foo<T3: BB, T4: MM<T3>>(t: T3, u: T4) {
   let _ = \CC<T4>.x
 }
+REQUIRES: updating_for_owned_noescape

@@ -19,3 +19,4 @@ class Derived : Middle {
 // CHECK:         [[T0:%.*]] = class_method %0 : $Base, #Base.foo
 // CHECK-NEXT:    apply [[T0]](%0)
 // CHECK-LABEL: } // end sil function '$s4test4BaseC6callityyF'
+REQUIRES: updating_for_owned_noescape

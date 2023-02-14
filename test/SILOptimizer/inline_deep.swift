@@ -23,3 +23,4 @@ public func top() -> Int32 {
   return S().l9(709)
   // CHECK: return [[STRUCT]]
 }
+REQUIRES: updating_for_owned_noescape

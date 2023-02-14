@@ -809,3 +809,4 @@ bb7:
   %25 = tuple ()
   return %25 : $()
 }
+REQUIRES: updating_for_owned_noescape

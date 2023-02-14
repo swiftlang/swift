@@ -79,3 +79,4 @@ func concreteDirectTakesFunction(
   // thunking and conversion to the substituted form
   return genericTakesFunction(f)
 }
+REQUIRES: updating_for_owned_noescape

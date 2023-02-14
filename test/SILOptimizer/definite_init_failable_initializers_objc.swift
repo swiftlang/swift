@@ -165,3 +165,4 @@ class Cat : FakeNSObject {
     self.init(n: 0, after: after)
   }
 }
+REQUIRES: updating_for_owned_noescape

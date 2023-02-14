@@ -58,3 +58,4 @@ struct ConformsToReturnsAssocWithFunction : ReturnsAssoc {
     return {s in R()}
   }
 }
+REQUIRES: updating_for_owned_noescape

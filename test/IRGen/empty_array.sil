@@ -29,3 +29,4 @@ entry(%0 : $*()):
   %2 = index_addr %0 : $*(), %1 : $Builtin.Word
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

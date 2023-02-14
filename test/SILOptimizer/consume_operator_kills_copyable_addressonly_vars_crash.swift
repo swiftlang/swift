@@ -21,3 +21,4 @@ public func copyableVarArgTestCCFlowReinitOutOfBlockTest(_ k: inout Klass) {
     k.doSomething()
 }
 
+REQUIRES: updating_for_owned_noescape

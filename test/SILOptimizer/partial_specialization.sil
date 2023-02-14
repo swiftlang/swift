@@ -152,3 +152,4 @@ bb3:
   %13 = tuple ()
   return %13 : $()
 } // end sil function 'simple_generic_caller4'
+REQUIRES: updating_for_owned_noescape

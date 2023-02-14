@@ -470,3 +470,4 @@ bb0:
 // TODO:
 // Check that the inlining heuristic takes into account the possibility
 // of performing a devirtualization after inlining.
+REQUIRES: updating_for_owned_noescape

@@ -33,3 +33,4 @@ public func getStride() -> Int {
   return MemoryLayout<Int32>.stride
 }
 
+REQUIRES: updating_for_owned_noescape

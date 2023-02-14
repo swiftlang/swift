@@ -36,3 +36,4 @@ func test_call_as_function<T : C>(_ s: S, _ p1: P1, _ p2: P2, _ t: T) {
   _ = t("")
 }
 
+REQUIRES: updating_for_owned_noescape

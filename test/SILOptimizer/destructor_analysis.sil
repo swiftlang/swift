@@ -43,3 +43,4 @@ bb0:
 sil [serialized] [_semantics "array.init"] @array_init : $@convention(thin) (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
 
 sil [serialized] [_semantics "array.get_count"] @array_get_count : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt
+REQUIRES: updating_for_owned_noescape

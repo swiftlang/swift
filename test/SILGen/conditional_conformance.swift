@@ -87,3 +87,4 @@ extension Base: P1 where A: P2 {
 // These don't get separate witness tables, but shouldn't crash anything.
 class SubclassGood: Base<IsP2> {}
 class SubclassBad: Base<IsNotP2> {}
+REQUIRES: updating_for_owned_noescape

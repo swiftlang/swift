@@ -32,3 +32,4 @@ enum E {
     self.init(p: p, failable: ())!
   }
 }
+REQUIRES: updating_for_owned_noescape

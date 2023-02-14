@@ -47,3 +47,4 @@ public func testit(_ i: Int) {
   funcPtrs[i].cl()
 }
 
+REQUIRES: updating_for_owned_noescape

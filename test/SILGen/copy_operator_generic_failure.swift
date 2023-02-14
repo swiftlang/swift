@@ -5,3 +5,4 @@ import Swift
 func addressOnlyCopy<T>(t: T) -> T {
     _copy(t) // expected-error {{copy() used on a generic or existential value}}
 }
+REQUIRES: updating_for_owned_noescape

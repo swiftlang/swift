@@ -59,3 +59,4 @@ bb0:
   %35 = tuple ()                                  // user: %36
   return %35 : $()                                // id: %36
 } // end sil function '$s37concurrentfunction_capturediagnostics20testCaseTrivialValueyyF'
+REQUIRES: updating_for_owned_noescape

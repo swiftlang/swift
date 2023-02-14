@@ -130,3 +130,4 @@ func checkInitExistentialThunk() -> P? {
   cls.crash(setup: { (arg:  P) -> () in  })
   return nil
 }
+REQUIRES: updating_for_owned_noescape

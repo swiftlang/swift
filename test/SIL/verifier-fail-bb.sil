@@ -5,3 +5,4 @@ sil @no_terminator : $@convention(thin) () -> () {
 bb0:
   %1 = tuple()
 }
+REQUIRES: updating_for_owned_noescape

@@ -16,3 +16,4 @@ func bar() throws  -> Int32 {
   return try foo()
 }
 
+REQUIRES: updating_for_owned_noescape

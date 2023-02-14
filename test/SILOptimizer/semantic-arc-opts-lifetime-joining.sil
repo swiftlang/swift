@@ -883,3 +883,4 @@ bb3(%result : @owned $FakeOptional<Builtin.NativeObject>):
   dealloc_stack %allocStack : $*Builtin.NativeObject
   return %result : $FakeOptional<Builtin.NativeObject>
 }
+REQUIRES: updating_for_owned_noescape

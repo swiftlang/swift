@@ -19,3 +19,4 @@ func c(_ x: Int) -> Int {
 func d(_ x: Int) -> Int { // expected-error {{multiple definitions of symbol 'bar'}}
   return x
 }
+REQUIRES: updating_for_owned_noescape

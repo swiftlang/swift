@@ -447,3 +447,4 @@ bb0(%0 : $ClassA<T> & ProtocolA):
   dealloc_stack %3 : $*@opened("92C29DA8-5479-11EA-8668-ACDE48001122", ClassA<T> & ProtocolA) Self
   return %6 : $Int
 }
+REQUIRES: updating_for_owned_noescape

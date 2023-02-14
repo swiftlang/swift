@@ -60,3 +60,4 @@ bb0(%0 : $*Key, %1 : $Int, %2 : $MMStorage<Key, Value>):
 }
 
 sil @ext_fn1 : $@convention(thin) (Int, @thin MMStorage<MMString, Optional<MMFont>>.Type) -> @owned MMStorage<MMString, Optional<MMFont>>
+REQUIRES: updating_for_owned_noescape

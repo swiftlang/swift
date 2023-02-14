@@ -2777,3 +2777,4 @@ enum MultiPayloadLessThan32BitsWithEmptyCases {
   case C(Builtin.Int8)
   case D(Builtin.Int8)
 }
+REQUIRES: updating_for_owned_noescape

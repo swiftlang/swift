@@ -9,3 +9,4 @@ public func test<T>(_ x: NonnullMembers<T>) -> T? {
   z = x[x]
   _ = z
 }
+REQUIRES: updating_for_owned_noescape

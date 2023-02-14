@@ -197,3 +197,4 @@ sil_vtable S1 {
 sil_vtable S2 {
   #Throw.mayThrow: (Throw) -> () throws -> () : @$S4main2S2C8mayThrowyyKF [override]
 }
+REQUIRES: updating_for_owned_noescape

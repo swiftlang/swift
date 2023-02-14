@@ -354,3 +354,4 @@ bb0(%0 : $@thick MyAction.Type):
   dealloc_stack %1 : $*@thick AnyAction.Type
   return %7 : $@thick AnyAction.Type
 }
+REQUIRES: updating_for_owned_noescape

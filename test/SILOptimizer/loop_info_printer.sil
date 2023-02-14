@@ -119,3 +119,4 @@ bb5:
 bb6:
   br bb1(%11 : $Builtin.Int32)
 }
+REQUIRES: updating_for_owned_noescape

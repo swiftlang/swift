@@ -11,3 +11,4 @@ func foo<T>(x: Int, y: T, z: Int) {
     break
   }
 }
+REQUIRES: updating_for_owned_noescape

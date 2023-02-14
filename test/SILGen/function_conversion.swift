@@ -687,3 +687,4 @@ func butt() -> Butt<Any>
 func foo() throws -> Any {
   return try butt().foo()
 }
+REQUIRES: updating_for_owned_noescape

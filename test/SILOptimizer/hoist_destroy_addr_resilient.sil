@@ -70,3 +70,4 @@ bb0:
   return %retval : $()
 } // end sil function 'dont_fold_into_one_of_two_copy_addr_resilient_struct'
 
+REQUIRES: updating_for_owned_noescape

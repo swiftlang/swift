@@ -35,3 +35,4 @@ public func testit() {
   x = a.f(x)
 }
 
+REQUIRES: updating_for_owned_noescape

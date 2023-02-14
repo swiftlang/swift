@@ -18,3 +18,4 @@
 func asHex(a: [UInt8]) -> String {
   return a.map { "0x" + String($0, radix: 16) }.joined(separator: "")
 }
+REQUIRES: updating_for_owned_noescape

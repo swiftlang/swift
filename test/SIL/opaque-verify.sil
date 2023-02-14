@@ -21,3 +21,4 @@ bb(%0 : $P):
   %void = tuple ()
   return %void : $()
 }
+REQUIRES: updating_for_owned_noescape

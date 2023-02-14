@@ -222,3 +222,4 @@ func checkDefaultInitGenericOptional() {
   // CHECK: [[FN:%.*]] =  function_ref @$s27stored_property_default_arg15OptionalGenericV1t1xACyxGxSg_SitcfC : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, Int, @thin OptionalGeneric<τ_0_0>.Type) -> @out OptionalGeneric<τ_0_0>
   // CHECK: apply [[FN]]<Int>(%0, [[NIL]], {{%.*}}, %1)
 }
+REQUIRES: updating_for_owned_noescape

@@ -733,3 +733,4 @@ func arrayInitLiteralFlowSensitive() -> ContainsArray {
 func invokeArrayInitLiteralFlowSensitive() {
   #assert(arrayInitLiteralFlowSensitive().x == 1)
 }
+REQUIRES: updating_for_owned_noescape

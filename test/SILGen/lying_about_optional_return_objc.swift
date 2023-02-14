@@ -99,3 +99,4 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
 
 
 }
+REQUIRES: updating_for_owned_noescape

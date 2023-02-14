@@ -134,3 +134,4 @@ struct S<T> {
 
   // CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1SV6value2ACyxGSi_tcfC : $@convention(method) <T> (Int, @thin S<T>.Type) -> @out S<T>
 }
+REQUIRES: updating_for_owned_noescape

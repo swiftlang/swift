@@ -56,3 +56,4 @@ bb2:
   %4 = tuple ()
   return %4 : $()
 }
+REQUIRES: updating_for_owned_noescape

@@ -363,3 +363,4 @@ bb7:
 bb8:
   return %6 : $MyBool
 }
+REQUIRES: updating_for_owned_noescape

@@ -26,3 +26,4 @@ bb0(%0 : $Builtin.RawPointer):
 }
 
 // CHECK-IR: ![[DBG_VAR]] = !DILocalVariable(name: "hello"
+REQUIRES: updating_for_owned_noescape

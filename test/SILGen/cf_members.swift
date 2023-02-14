@@ -291,3 +291,4 @@ public func importGlobalVarsAsProperties()
   // CHECK: global_addr @kCCPowerSupplyDefaultPower
   return (CCPowerSupply.defaultPower, CCPowerSupply.AC, CCPowerSupply.DC)
 }
+REQUIRES: updating_for_owned_noescape

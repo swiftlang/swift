@@ -182,3 +182,4 @@ func testNestedFallthrough(x: (Int, String), y: (Int, Int)) {
     print("done")
   }
 }
+REQUIRES: updating_for_owned_noescape

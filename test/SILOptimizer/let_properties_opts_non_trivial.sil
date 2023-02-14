@@ -85,3 +85,4 @@ bb0(%0 : @guaranteed $HasCenter):
   destroy_value %3 : $Point                       // id: %8
   return %6 : $Int64                              // id: %9
 } // end sil function '$s19let_properties_opts9HasCenterC03getE0s5Int64VyF'
+REQUIRES: updating_for_owned_noescape

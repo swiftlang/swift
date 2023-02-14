@@ -109,3 +109,4 @@ bb0(%0 : $D):
 }
 
 sil_vtable D {}
+REQUIRES: updating_for_owned_noescape

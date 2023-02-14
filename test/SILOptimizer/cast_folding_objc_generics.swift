@@ -31,3 +31,4 @@ public func testObjCGenericParamChangeSubclass(_ a: GenericClass<NSMutableString
 public func testObjCGenericParamChangeSuperclass(_ a: GenericSubclass<NSMutableString>) -> GenericClass<NSString> {
   return a as! GenericClass<NSString>
 }
+REQUIRES: updating_for_owned_noescape

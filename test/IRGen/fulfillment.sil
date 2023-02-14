@@ -88,3 +88,4 @@ bb0(%0 : $*τ_0_0):
   %3 = tuple ()
   return %3 : $()
 }
+REQUIRES: updating_for_owned_noescape

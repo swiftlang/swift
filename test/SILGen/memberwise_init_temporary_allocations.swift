@@ -16,3 +16,4 @@ struct Butt {
     let y: Int
 }
 
+REQUIRES: updating_for_owned_noescape

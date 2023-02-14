@@ -101,3 +101,4 @@ bb0(%0 : $G<T>):
 // CHECK-NEXT: [[DISCRIMINATOR:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 47035)
 // CHECK-NEXT: call swiftcc void [[FN]](%T4test1GC* swiftself %0) [ "ptrauth"(i32 0, i64 [[DISCRIMINATOR]]) ]
 // CHECK-NEXT: ret void
+REQUIRES: updating_for_owned_noescape

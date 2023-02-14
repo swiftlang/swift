@@ -25,3 +25,4 @@ bb0(%0 : $TheStruct):
   return %2 : $TheStruct, loc "input.swift":7:8, scope 1
 }
 // CHECK: } // end sil function 'struct_debug_info_test'
+REQUIRES: updating_for_owned_noescape

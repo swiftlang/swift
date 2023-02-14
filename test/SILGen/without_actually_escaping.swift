@@ -113,3 +113,4 @@ public func withoutActuallyEscapingCFunction(function: (@convention(c) () -> Voi
     print(pointer)
   }
 }
+REQUIRES: updating_for_owned_noescape

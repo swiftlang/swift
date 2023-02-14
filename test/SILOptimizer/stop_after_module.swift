@@ -21,3 +21,4 @@ public func caller() {
 
 // NOTSKIPPING: *** SIL function after {{.*}}, stage MidLevel,Function, pass {{.*}}: PerfInliner (inline)
 // SKIPPING-NOT: *** SIL function after {{.*}}, stage MidLevel,Function, pass {{.*}}: PerfInliner (inline)
+REQUIRES: updating_for_owned_noescape

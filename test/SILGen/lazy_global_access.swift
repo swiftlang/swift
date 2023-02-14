@@ -35,3 +35,4 @@ func useGlobalBar() -> Bar {
 private var globalBar = Bar() {
   willSet {}
 }
+REQUIRES: updating_for_owned_noescape

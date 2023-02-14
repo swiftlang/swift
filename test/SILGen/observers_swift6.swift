@@ -18,3 +18,4 @@ class Kitty {
   // CHECK:         [[ACCESS:%.+]] = begin_access {{.*}} [[REF]] : $*Int
   // CHECK:         assign {{.*}} to [[ACCESS]] : $*Int
 }
+REQUIRES: updating_for_owned_noescape

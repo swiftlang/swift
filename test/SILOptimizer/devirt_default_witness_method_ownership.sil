@@ -99,3 +99,4 @@ bb0(%0 : $*ConformingGenericStruct<Int>, %1 : $*Int):
   %result = apply %fn<ConformingGenericStruct<Int>, Int>(%1, %0) : $@convention(witness_method: ResilientProtocolWithGeneric) <T where T : ResilientProtocolWithGeneric><U where U : Q> (@in U, @in_guaranteed T) -> ()
   return %result : $()
 }
+REQUIRES: updating_for_owned_noescape

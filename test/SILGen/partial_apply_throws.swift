@@ -13,3 +13,4 @@ _ = C.foo
 // CHECK: try_apply [[FN]](%0)
 // CHECK: return
 // CHECK: throw
+REQUIRES: updating_for_owned_noescape

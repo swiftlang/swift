@@ -111,3 +111,4 @@ public class NSPublicHasDynamicComputedProperty : NSObject, ProtocolWithIntPrope
 
 // CHECK-LABEL: sil shared [serialized] [ossa] @$s11modify_objc34NSPublicHasDynamicComputedPropertyC1xSivM : $@yield_once @convention(method) (@guaranteed NSPublicHasDynamicComputedProperty) -> @yields @inout Int
 // RESILIENT-LABEL: sil shared [serialized] [ossa] @$s11modify_objc34NSPublicHasDynamicComputedPropertyC1xSivM : $@yield_once @convention(method) (@guaranteed NSPublicHasDynamicComputedProperty) -> @yields @inout Int
+REQUIRES: updating_for_owned_noescape

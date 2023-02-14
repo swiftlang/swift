@@ -32,3 +32,4 @@ func returnLocalOpaque() -> some Any {
 
   return LocalClass()
 }
+REQUIRES: updating_for_owned_noescape

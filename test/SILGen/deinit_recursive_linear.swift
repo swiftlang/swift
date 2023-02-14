@@ -55,3 +55,4 @@ class Node {
 // CHECK:   [[SELF_NATIVE_OWNED:%.*]] = unchecked_ownership_conversion [[SELF_NATIVE]] : $Builtin.NativeObject, @guaranteed to @owned
 // CHECK:   return [[SELF_NATIVE_OWNED]] : $Builtin.NativeObject
 // CHECK: } // end sil function '$s23deinit_recursive_linear4NodeCfd'
+REQUIRES: updating_for_owned_noescape

@@ -108,3 +108,4 @@ public func testStructWithMultipleInitsAndInlinedInitializer() {
 }
 
 testStructWithMultipleInitsAndInlinedInitializer()
+REQUIRES: updating_for_owned_noescape

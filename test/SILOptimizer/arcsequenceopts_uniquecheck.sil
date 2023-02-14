@@ -131,3 +131,4 @@ bb0(%0 : $@noescape @callee_guaranteed () -> ()):
   cond_fail %5 : $Builtin.Int1
   return %3 : $@callee_guaranteed () -> ()
 }
+REQUIRES: updating_for_owned_noescape

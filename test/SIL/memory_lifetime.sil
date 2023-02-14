@@ -726,3 +726,4 @@ entry:
   %retval = tuple ()
   return %retval : $()
 }
+REQUIRES: updating_for_owned_noescape

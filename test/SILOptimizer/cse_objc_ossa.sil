@@ -363,3 +363,4 @@ bb0(%0 : @owned $XX):
   %7 = tuple (%4: $AnyObject, %6: $AnyObject)
   return %7 : $(AnyObject, AnyObject)
 }
+REQUIRES: updating_for_owned_noescape

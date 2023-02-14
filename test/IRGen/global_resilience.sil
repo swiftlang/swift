@@ -169,3 +169,4 @@ bb0:
 // CHECK: done:
 // CHECK:   [[PHI:%.*]] = phi %swift.opaque* [ %1, %entry ], [ [[PTR_TO_BUFFER]], %outline.projectValueInBuffer ]
 // CHECK:   ret %swift.opaque* [[PHI]]
+REQUIRES: updating_for_owned_noescape

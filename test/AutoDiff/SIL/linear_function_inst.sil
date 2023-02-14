@@ -59,3 +59,4 @@ bb0:
 // CHECK-SIL:   [[EXTRACTED_TRANS:%.*]] = linear_function_extract [transpose] [[LIN_ORIG]] : $@differentiable(_linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
 // CHECK-SIL:   return [[LIN_ORIG_WITH_TRANS]] : $@differentiable(_linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
 // CHECK-SIL: }
+REQUIRES: updating_for_owned_noescape

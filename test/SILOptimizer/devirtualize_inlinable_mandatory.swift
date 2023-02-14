@@ -11,3 +11,4 @@ public class C {
 @inlinable public func g(_ x: C) {
   x.f()
 }
+REQUIRES: updating_for_owned_noescape

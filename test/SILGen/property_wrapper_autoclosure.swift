@@ -26,3 +26,4 @@ struct ValueHolder {
 // CHECK: Property Wrapper init
 // CHECK-NEXT: S.init
 _ = ValueHolder(value: S())
+REQUIRES: updating_for_owned_noescape

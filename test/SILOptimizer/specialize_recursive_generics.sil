@@ -147,3 +147,4 @@ bb0(%0 : $C, %1 : $*Self):
   strong_release %0 : $C
   return %20 : $Optional<C>
 }
+REQUIRES: updating_for_owned_noescape

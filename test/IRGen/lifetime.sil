@@ -118,3 +118,4 @@ bb0(%x : $*Builtin.Int64):
 // CHECK-NEXT:    [[XBUFLIFE:%.*]] = bitcast i64* [[XBUF]] to i8*
 // CHECK-NEXT:    call void @llvm.lifetime.end.p0i8({{(i32|i64)}} 8, i8* [[XBUFLIFE]])
 
+REQUIRES: updating_for_owned_noescape

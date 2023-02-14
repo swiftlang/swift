@@ -989,3 +989,4 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK-LABEL: sil shared [serialized] @$s14class_callee_1Tfq4gn_n : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0({{%.*}} : $C1, [[IN:%.*]] : $Builtin.Int32):
 // CHECK: return [[IN]] : $Builtin.Int32
+REQUIRES: updating_for_owned_noescape

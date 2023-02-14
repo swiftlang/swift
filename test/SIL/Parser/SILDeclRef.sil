@@ -143,3 +143,4 @@ sil_default_witness_table P {
   no_default
 }
 
+REQUIRES: updating_for_owned_noescape

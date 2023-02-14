@@ -2233,3 +2233,4 @@ func moveOperatorTest(_ k: __owned Klass) {
     let _ = _move k2 // expected-note {{consuming use here}}
     let _ = k3
 }
+REQUIRES: updating_for_owned_noescape

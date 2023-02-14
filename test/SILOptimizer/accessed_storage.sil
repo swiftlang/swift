@@ -463,3 +463,4 @@ bb0(%0 : $Builtin.RawPointer):
   %99 = tuple ()
   return %99 : $()
 }
+REQUIRES: updating_for_owned_noescape

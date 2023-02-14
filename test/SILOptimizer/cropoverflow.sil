@@ -794,3 +794,4 @@ bb0(%x : $Builtin.Int64, %y: $Builtin.Int64):
   %ret = tuple ()
   return %ret : $()
 } // end sil function 'cond_fail_of_cmp'
+REQUIRES: updating_for_owned_noescape

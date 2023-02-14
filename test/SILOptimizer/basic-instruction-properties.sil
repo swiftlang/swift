@@ -82,3 +82,4 @@ bb0(%0 : $X):
   apply %9(%10) : $@callee_owned @convention(thick) (@owned Y) -> ()
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

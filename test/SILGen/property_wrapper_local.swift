@@ -226,3 +226,4 @@ func testLocalDefaultInit() {
   // CHECK: function_ref @$s22property_wrapper_local19DefaultWrappedValueVACycfC : $@convention(method) (@thin DefaultWrappedValue.Type) -> DefaultWrappedValue
   @DefaultWrappedValue var w: Int
 }
+REQUIRES: updating_for_owned_noescape

@@ -208,3 +208,4 @@ public func decodeCustomNonContiguousAsUTF8(_ c: CustomNonContiguousCollection) 
 public func decodeUTF16(_ c: Array<UInt16>) -> String {
   return String(decoding: c, as: UTF16.self)
 }
+REQUIRES: updating_for_owned_noescape

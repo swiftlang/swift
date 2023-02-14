@@ -123,3 +123,4 @@ sil [ossa] @caller_test_specification : $@convention(thin) () -> () {
   %retval = apply %callee() : $@convention(thin) () -> ()
   return %retval : $()
 }
+REQUIRES: updating_for_owned_noescape

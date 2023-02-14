@@ -412,3 +412,4 @@ bb7:                                              // Preds: bb6 bb4 bb2
 }
 
 
+REQUIRES: updating_for_owned_noescape

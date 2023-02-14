@@ -705,3 +705,4 @@ sil_witness_table hidden KKK: PPP module existential_transform {
 sil_witness_table hidden SSSS: PPPP module existential_transform {
   method #PPPP.foo: <Self where Self : PPPP> (Self) -> () -> Int32 : @$s21existential_transform4SSSSVAA4PPPPA2aDP3foos5Int32VyFTW	// protocol witness for PPPP.foo() in conformance SSSS
 }
+REQUIRES: updating_for_owned_noescape

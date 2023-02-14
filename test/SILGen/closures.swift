@@ -864,3 +864,4 @@ func test() {
     assert(k.x == k2.x)
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -20,3 +20,4 @@ func caller() {
   callee(Key.self, { _ in })
 }
 
+REQUIRES: updating_for_owned_noescape

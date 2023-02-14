@@ -22,3 +22,4 @@ func doIt(_ c: C, _ p: P ) {
   _ = P.foo(p)
   _ = P.foo(p)(x: 123)
 }
+REQUIRES: updating_for_owned_noescape

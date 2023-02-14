@@ -15,3 +15,4 @@ public func test_no_optionals_used<T>(_ items: [T]) {
   }
 }
 
+REQUIRES: updating_for_owned_noescape

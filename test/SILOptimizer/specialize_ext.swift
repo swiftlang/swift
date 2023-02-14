@@ -19,3 +19,4 @@ public func exp1() {
 }
 // Make sure that we are able to specialize the extension 'bar'
 //CHECK: sil shared [noinline] @$s14specialize_ext3XXXV3bar{{[_0-9a-zA-Z]*}}FSi_Tg5
+REQUIRES: updating_for_owned_noescape

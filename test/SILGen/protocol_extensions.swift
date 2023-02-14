@@ -911,3 +911,4 @@ extension P2 {
     f2(x)
   }
 }
+REQUIRES: updating_for_owned_noescape

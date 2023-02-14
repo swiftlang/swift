@@ -207,3 +207,4 @@ public struct TestAddressOnlyStruct<T> {
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a
 }
+REQUIRES: updating_for_owned_noescape

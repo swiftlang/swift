@@ -13,3 +13,4 @@ enum E: P {
 // CHECK-LABEL: sil {{.*}} @$s19enum_witness_thunks1EOAA1PA2aDP1cyxAA1CCFZTW : $@convention(witness_method: P) (@guaranteed C, @thick E.Type) -> @out E
 // CHECK:         [[COPY:%.*]] = copy_value
 // CHECK:         apply {{.*}}([[COPY]]
+REQUIRES: updating_for_owned_noescape

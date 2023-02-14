@@ -305,3 +305,4 @@ sil [Osize] [ossa] @destroy_after_borrow : $@convention(thin) () -> @owned Sub {
   apply undef(%162) : $@convention(thin) (Int) -> ()
   return %107 : $Sub
 }
+REQUIRES: updating_for_owned_noescape

@@ -53,3 +53,4 @@ sil @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -
 // CHECK-SAME:   @"get_witness_table
 //            -- computed get-only property, identified by indirect pointer
 // CHECK-SAME:   <i32 0x0208_0002>
+REQUIRES: updating_for_owned_noescape

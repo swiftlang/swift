@@ -44,3 +44,4 @@ bb0(%0 : @owned $@sil_unowned Builtin.NativeObject):
   return %1 : $Builtin.NativeObject
 }
 
+REQUIRES: updating_for_owned_noescape

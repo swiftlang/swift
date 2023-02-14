@@ -33,3 +33,4 @@ sil @alloc_stack_optional_with_generic : $@convention(thin) <T> () -> () {
   %t = tuple ()
   return %t : $()
 }
+REQUIRES: updating_for_owned_noescape

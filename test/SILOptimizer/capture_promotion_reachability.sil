@@ -323,3 +323,4 @@ bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %3 = load [trivial] %1 : $*Builtin.Int64
   return %3 : $Builtin.Int64
 }
+REQUIRES: updating_for_owned_noescape

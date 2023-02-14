@@ -13,3 +13,4 @@ extension MyIterator : FakeIterator {}
 // CHECK:   [[RESULT:%.*]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

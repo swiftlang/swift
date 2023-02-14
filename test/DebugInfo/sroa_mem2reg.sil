@@ -88,3 +88,4 @@ bb0(%0 : $Int64, %1 : $Int64):
 // Shouldn't be marked artificial
 // CHECK-DWARF-NOT:     DW_AT_artificial      (true)
 // CHECK-DWARF:       DW_TAG_{{.*}}
+REQUIRES: updating_for_owned_noescape

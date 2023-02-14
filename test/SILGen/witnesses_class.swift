@@ -116,3 +116,4 @@ class NonMatchingMember: ReturnsCovariantSelf {
 
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15witnesses_class17NonMatchingMemberCAA20ReturnsCovariantSelfA2aDP07returnsgH0xyFTW : $@convention(witness_method: ReturnsCovariantSelf) <τ_0_0 where τ_0_0 : NonMatchingMember> (@in_guaranteed τ_0_0) -> @out τ_0_0 {
 
+REQUIRES: updating_for_owned_noescape

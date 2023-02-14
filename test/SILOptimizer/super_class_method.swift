@@ -28,3 +28,4 @@ class Grandchild : Child {
     super.foo()
   }
 }
+REQUIRES: updating_for_owned_noescape

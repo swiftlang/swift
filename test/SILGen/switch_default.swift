@@ -52,3 +52,4 @@ func testAddressOnlySubjectDefaultCase(_ e: Enum?) {
   default: return
   }
 }
+REQUIRES: updating_for_owned_noescape

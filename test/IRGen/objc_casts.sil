@@ -85,3 +85,4 @@ entry(%a : $T):
   %0 = unconditional_checked_cast %a : $T to ClassProto
   return %0 : $ClassProto
 }
+REQUIRES: updating_for_owned_noescape

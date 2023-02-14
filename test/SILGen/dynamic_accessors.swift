@@ -41,3 +41,4 @@ public class MyObjCClass {
   // CHECK: objc_method %{{[0-9]+}} : $MyObjCClass, #MyObjCClass.subscript!setter.foreign
   x[4] = x[5]
 }
+REQUIRES: updating_for_owned_noescape

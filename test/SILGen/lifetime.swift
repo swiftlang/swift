@@ -784,3 +784,4 @@ func tuple_explosion() {
   // CHECK-NOT: tuple_extract [[TUPLE]]
   // CHECK-NOT: destroy_value [[TUPLE]]
 }
+REQUIRES: updating_for_owned_noescape

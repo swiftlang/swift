@@ -68,4 +68,4 @@ class Node2<A, B> {
 // CHECK:   [[SELF_NATIVE:%.*]] = unchecked_ref_cast [[SELF]] : $Node2<A, B> to $Builtin.NativeObject
 // CHECK:   [[SELF_OWNED:%.*]] = unchecked_ownership_conversion [[SELF_NATIVE]] : $Builtin.NativeObject, @guaranteed to @owned
 // CHECK:   return [[SELF_OWNED]] : $Builtin.NativeObject
-// CHECK: } // end sil function '$s31deinit_recursive_linear_generic5Node2Cfd'
+// CHECK: } // end sil function '$s31deinit_recursive_linear_generic5Node2Cfd'REQUIRES: updating_for_owned_noescape

@@ -59,3 +59,4 @@ func stupidGames() -> ((), ()) {
 func assignToNestedVoid() {
   let _: ((), ()) = stupidGames()
 }
+REQUIRES: updating_for_owned_noescape

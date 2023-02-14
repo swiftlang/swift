@@ -33,3 +33,4 @@ bb0(%0 : $S):
 
 // CHECK-LABEL: sil shared @$s6calleeTf4dxd_n : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: bb0([[KLASS:%[0-9]+]] : $Klass):
+REQUIRES: updating_for_owned_noescape

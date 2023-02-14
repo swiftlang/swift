@@ -70,3 +70,4 @@ public func testInlinable() -> Int {
 // CHECK-inlinable:  [[F:%.*]] = function_ref @$s4Test11newFunctionSiyF
 // CHECK-inlinable:  apply [[F]]() : $@convention(thin) () -> Int
 // CHECK-inlinable: } // end sil function '$s4Test13testInlinableSiyF'
+REQUIRES: updating_for_owned_noescape

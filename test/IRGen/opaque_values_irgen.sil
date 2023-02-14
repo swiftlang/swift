@@ -16,3 +16,4 @@ sil hidden [ossa] @f010_irgen_identity : $@convention(thin) <T> (@in T) -> @out 
 bb0(%0 : @owned $T):
   return %0 : $T
 }
+REQUIRES: updating_for_owned_noescape

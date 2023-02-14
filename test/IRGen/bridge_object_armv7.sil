@@ -41,3 +41,4 @@ entry(%b : $Builtin.BridgeObject):
   %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $C
   return %c : $C
 }
+REQUIRES: updating_for_owned_noescape

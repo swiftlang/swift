@@ -42,3 +42,4 @@ public func returnTestOptions() -> TestOptions {
 public func returnEmptyTestOptions() -> TestOptions {
     return []
 }
+REQUIRES: updating_for_owned_noescape

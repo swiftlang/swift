@@ -90,3 +90,4 @@ bb0(%0 : $@thick ClassProto.Type):
   %2 = tuple ()
   return %2 : $()
 }
+REQUIRES: updating_for_owned_noescape

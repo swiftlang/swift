@@ -13,3 +13,4 @@ func capturesX() {
 func transitiveCapture() {
   capturesX()
 }
+REQUIRES: updating_for_owned_noescape

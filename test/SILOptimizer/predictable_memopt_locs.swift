@@ -20,3 +20,4 @@ public func main() {
   // CHECK-SAME:  loc {{.*}}:11:10, scope [[S]]
 	use(a.a)
 }
+REQUIRES: updating_for_owned_noescape

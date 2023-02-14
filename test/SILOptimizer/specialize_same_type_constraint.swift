@@ -52,3 +52,4 @@ doStuff(f: ConcreteFirstParent<ConcreteChild>(),
 // CHECK: [[SECOND:%.*]] = function_ref @$s31specialize_same_type_constraint16takesSecondChild1tyx_tAA0fG0RzlF
 // CHECK: apply [[SECOND]]<ConcreteChild>({{.*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : SecondChild> (@in_guaranteed τ_0_0) -> ()
 // CHECK: return
+REQUIRES: updating_for_owned_noescape

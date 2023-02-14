@@ -229,3 +229,4 @@ var some_address_only_nontuple_arg_function : (Unloadable) -> Unloadable = unloa
 func call_address_only_nontuple_arg_function(_ x: Unloadable) {
   some_address_only_nontuple_arg_function(x)
 }
+REQUIRES: updating_for_owned_noescape

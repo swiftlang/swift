@@ -25,4 +25,4 @@ bb0:
 // CHECK:   [[ORIG_FN:%.*]] = function_ref @foo : $@convention(thin) (Float, Float, Float) -> Float
 // CHECK:   linear_function [parameters 0] %0 : $@convention(thin) (Float, Float, Float) -> Float with_transpose undef : $@convention(thin) (Float, Float, Float) -> Float
 // CHECK:   linear_function [parameters 0 2] %0 : $@convention(thin) (Float, Float, Float) -> Float with_transpose undef : $@convention(thin) (Float, Float) -> (Float, Float)
-// CHECK: }
+// CHECK: }REQUIRES: updating_for_owned_noescape

@@ -56,3 +56,4 @@ bb0(%0 : @guaranteed $Foo):
 sil_vtable Foo {
   #Foo.get: @_TFC4main3Foo3getfS0_FT_Si
 }
+REQUIRES: updating_for_owned_noescape

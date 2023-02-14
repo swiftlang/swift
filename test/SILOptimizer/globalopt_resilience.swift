@@ -75,3 +75,4 @@ func returnWrapperStruct() -> WrapperStruct {
 // CHECK: store [[S3]] to %0 : $*WrapperStruct
 // CHECK: [[RESULT:%.*]] = tuple ()
 // CHECK: return [[RESULT]] : $()
+REQUIRES: updating_for_owned_noescape

@@ -20,3 +20,4 @@ func test_recursive() {
   #assert(recursive(a: 20000) > 42)
 }
 
+REQUIRES: updating_for_owned_noescape

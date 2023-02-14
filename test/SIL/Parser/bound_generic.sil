@@ -44,3 +44,4 @@ bb4:
 
 sil [transparent] @_TFs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
 sil [transparent] @_TFs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+REQUIRES: updating_for_owned_noescape

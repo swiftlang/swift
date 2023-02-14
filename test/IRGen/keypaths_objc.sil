@@ -57,3 +57,4 @@ entry:
   %b = keypath $KeyPath<C, Int>, (objc "stored"; root $C; stored_property #C.stored : $Int)
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

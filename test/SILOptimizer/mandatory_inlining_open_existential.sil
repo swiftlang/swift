@@ -43,3 +43,4 @@ bb0(%0 : $*P, %1 : @owned $@callee_owned () -> @out τ_0_0):
 sil_default_witness_table hidden P {
   no_default
 }
+REQUIRES: updating_for_owned_noescape

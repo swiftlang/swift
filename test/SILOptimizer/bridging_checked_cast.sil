@@ -69,3 +69,4 @@ entry:
   %z = apply %g() : $@convention(thin) () -> ()
   return %z : $()
 }
+REQUIRES: updating_for_owned_noescape

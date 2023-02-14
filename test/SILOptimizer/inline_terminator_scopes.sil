@@ -73,3 +73,4 @@ bb0(%0 : $Int64):
   %3 = apply %2(%0) : $@convention(thin) (Int64) -> Int64, loc "t.swift":8:45, scope 8 // user: %4
   return %3 : $Int64, loc "t.swift":8:38, scope 8 // id: %4
 } // end sil function '$s1a1fys5Int64VADF'
+REQUIRES: updating_for_owned_noescape

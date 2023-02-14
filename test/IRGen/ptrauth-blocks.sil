@@ -68,3 +68,4 @@ entry(%0 : $@convention(block) () -> ()):
 // CHECK-NEXT: [[INVOKE:%.*]] = bitcast i8* [[T0]] to void (%objc_block*)*
 // CHECK-NEXT: [[DISC:%.*]] = ptrtoint i8** [[SLOT]] to i64
 // CHECK-NEXT: call void [[INVOKE]](%objc_block* %0) [ "ptrauth"(i32 0, i64 [[DISC]]) ]
+REQUIRES: updating_for_owned_noescape

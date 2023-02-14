@@ -45,3 +45,4 @@ entry(%0 : $*MultiPayload<T, U>):
 
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

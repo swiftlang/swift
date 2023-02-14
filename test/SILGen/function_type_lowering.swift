@@ -182,3 +182,4 @@ class Foo {
 class Bar<T>: Foo {
   override func foo() -> Bar<T> { return self }
 }
+REQUIRES: updating_for_owned_noescape

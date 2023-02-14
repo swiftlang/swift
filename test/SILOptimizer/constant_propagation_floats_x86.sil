@@ -95,3 +95,4 @@ return %1 : $Builtin.FPIEEE32
 // CHECK: [[RES:%.*]] = float_literal $Builtin.FPIEEE32, 0x2081CEA // 9.99999991E-38
 // CHECK-NEXT: return [[RES]] : $Builtin.FPIEEE32
 }
+REQUIRES: updating_for_owned_noescape

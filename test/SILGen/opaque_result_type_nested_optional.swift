@@ -13,3 +13,4 @@ _ = bar(foo())
 // CHECK: [[FN:%.*]] = function_ref @$s40opaque_result_type_nested_optional_other3bary1AQzxAA1PRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
 // CHECK: apply [[FN]]<S<Int?>>([[OUTER]], [[INNER]]) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
 // CHECK: return
+REQUIRES: updating_for_owned_noescape

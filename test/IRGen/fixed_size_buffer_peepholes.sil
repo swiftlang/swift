@@ -26,3 +26,4 @@ entry(%p : $*P):
   dealloc_stack %0 : $*P
   return undef: $()
 }
+REQUIRES: updating_for_owned_noescape

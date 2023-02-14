@@ -143,3 +143,4 @@ func existential_metatype_of_metatype(_ x: Any) -> Any.Type.Type {
 func function_metatype_of_metatype(_ x: @escaping () -> ()) -> (() -> ()).Type.Type {
   return type(of: type(of: x))
 }
+REQUIRES: updating_for_owned_noescape

@@ -52,3 +52,4 @@ bb0(%0 : @_eagerMove @owned $Str, %1 : @guaranteed $KeyPath<Str, C>):
   return %9 : $C
 }
 
+REQUIRES: updating_for_owned_noescape

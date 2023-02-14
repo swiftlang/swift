@@ -68,3 +68,4 @@ public func backDeployedCaller(_ s: inout S<Z>) {
   // CHECK: function_ref @$s11back_deploy1SV1xxvsTwb : $@convention(method) <τ_0_0> (@in τ_0_0, @inout S<τ_0_0>) -> ()
   s.x = Z()
 }
+REQUIRES: updating_for_owned_noescape

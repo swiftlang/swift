@@ -68,3 +68,4 @@ public func testBase(b: Base) -> Int32 {
 // CHECK-NEXT: }
 
 
+REQUIRES: updating_for_owned_noescape

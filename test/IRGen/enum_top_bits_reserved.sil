@@ -59,3 +59,4 @@ enum H {
   case either(G)
   case or(G)
 }
+REQUIRES: updating_for_owned_noescape

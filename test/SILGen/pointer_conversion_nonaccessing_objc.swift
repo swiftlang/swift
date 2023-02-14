@@ -55,3 +55,4 @@ func testDynamicOptionalRemoveObserver(object: AnyObject, observer: NSObject) {
   // CHECK: address_to_pointer [stack_protection] [[T0]] :
   object.removeObserver?(observer, forKeyPath: "", context: &global)
 }
+REQUIRES: updating_for_owned_noescape

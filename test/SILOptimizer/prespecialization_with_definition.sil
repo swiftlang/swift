@@ -36,3 +36,4 @@ bb0(%0 : $@thin Box<()>.Type):
 
 // CHECK-DAG: define linkonce_odr hidden swiftcc void @"$s4main3BoxV3fooyyFZyt_Tg5"() {{.*}}{
 // CHECK-DAG: call swiftcc void @"$s4main3BoxV3fooyyFZyt_Tg5"()
+REQUIRES: updating_for_owned_noescape

@@ -387,3 +387,4 @@ func testMetatypeInterpolation<T>(of type: T.Type) {
     // CHECK: [[EXIT]]:
     // CHECK-NEXT: ret void
 }
+REQUIRES: updating_for_owned_noescape

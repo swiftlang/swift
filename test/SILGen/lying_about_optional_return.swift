@@ -25,3 +25,4 @@ func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
   a?.opaquePointerReturning()
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -123,3 +123,4 @@ func testNestedArray() -> Int {
    return num
 }
 
+REQUIRES: updating_for_owned_noescape

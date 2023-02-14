@@ -49,3 +49,4 @@ sil [transparent] @_TFs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@conventio
 sil [transparent] @_TFs17_getOptionalValueU__FT1vGSqQ___Q_ : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> @out τ_0_0
 sil [transparent] @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@guaranteed @callee_guaranteed @substituted <A> () -> @out A for <()>) -> ()
 sil [transparent] @_TFs24_injectValueIntoOptionalU__FT1vQ__GSqQ__ : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+REQUIRES: updating_for_owned_noescape

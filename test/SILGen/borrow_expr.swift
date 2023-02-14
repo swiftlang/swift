@@ -495,3 +495,4 @@ extension P {
     usePGeneric(_borrow self)
   }
 }
+REQUIRES: updating_for_owned_noescape

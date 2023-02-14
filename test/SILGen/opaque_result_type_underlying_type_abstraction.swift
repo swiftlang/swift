@@ -27,3 +27,4 @@ func withTupleOfMetatypeAndFunction() -> some Any {
   let f: () -> () = {}
   return (S.self, f)
 }
+REQUIRES: updating_for_owned_noescape

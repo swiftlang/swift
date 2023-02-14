@@ -31,3 +31,4 @@ class MyGenericClass<T> {
     func foo(@_noImplicitCopy _ t: T) { // expected-error {{@_noImplicitCopy can not be used on a generic or existential typed binding or a nominal type containing such typed things}}
     }
 }
+REQUIRES: updating_for_owned_noescape

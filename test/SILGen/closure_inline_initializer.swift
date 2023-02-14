@@ -8,3 +8,4 @@ struct Foo {
   init(x: Int) {}
   init(y: Int) {}
 }
+REQUIRES: updating_for_owned_noescape

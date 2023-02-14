@@ -170,3 +170,4 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>
   %out = struct $Int32 (%out_literal : $Builtin.Int32)
   return %out : $Int32
 }
+REQUIRES: updating_for_owned_noescape

@@ -298,3 +298,4 @@ bb0(%0 : $*Array<Hello>, %1 : $Hello):
   %26 = apply %25(%11, %0) : $@convention(method) (@owned Array<Hello>, @inout Array<Hello>) -> ()
   return %1 : $Hello
 }
+REQUIRES: updating_for_owned_noescape

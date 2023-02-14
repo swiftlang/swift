@@ -107,3 +107,4 @@ bbreturn:
   %v = tuple ()
   return %v : $()
 }
+REQUIRES: updating_for_owned_noescape

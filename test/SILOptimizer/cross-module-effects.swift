@@ -224,3 +224,4 @@ public func callit6() -> X? {
 
 #endif
 
+REQUIRES: updating_for_owned_noescape

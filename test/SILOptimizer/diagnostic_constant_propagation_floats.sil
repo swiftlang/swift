@@ -84,3 +84,4 @@ bb0:
 %5 = builtin "fptosi_FPIEEE64_Int64"(%4 : $Builtin.FPIEEE64) : $Builtin.Int64 // expected-error {{invalid conversion: '9.2233720368547758E+18' overflows 'Builtin.Int64'}}
 return %1 : $Builtin.Int64
 }
+REQUIRES: updating_for_owned_noescape

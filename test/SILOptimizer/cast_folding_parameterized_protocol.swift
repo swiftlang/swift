@@ -81,3 +81,4 @@ public func existential_to_existential<T>(_ p: any P<T>, _ q: any Q) {
   // CHECK: unconditional_checked_cast_addr any Q in {{%.*}} : $*any Q to any P<String> in {{%.*}} : $*any P<String>
   _ = q as! any P<String>
 }
+REQUIRES: updating_for_owned_noescape

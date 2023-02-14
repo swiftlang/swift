@@ -45,3 +45,4 @@ public func testLexical() -> AnyObject {
   // Without lexical lifetimes, the lifetime of 'a' ends in between the two calls:
   return takeGuaranteed(takeGuaranteed(a))
 }
+REQUIRES: updating_for_owned_noescape

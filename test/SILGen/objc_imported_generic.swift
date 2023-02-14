@@ -131,3 +131,4 @@ func configureWithoutOptions() {
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
 // CHECK: method #Hashable.hashValue!getter: {{.*}}: @$sSo13GenericOptionaSHSCSH9hashValueSivgTW
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

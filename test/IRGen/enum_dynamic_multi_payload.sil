@@ -450,3 +450,4 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 // CHECK-NEXT: store i8** [[LAYOUT]], {{.*}} [[BUF1]]
 
 // CHECK:   call void @swift_initEnumMetadataMultiPayload(%swift.type* [[METADATA]], {{i(32|64)}} 0, {{i(32|64)}} 2, i8*** [[BUF0]])
+REQUIRES: updating_for_owned_noescape

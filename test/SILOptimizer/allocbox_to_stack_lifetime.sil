@@ -50,3 +50,4 @@ bb0(%0 : $Int):
   return %3 : $Int
 }
 
+REQUIRES: updating_for_owned_noescape

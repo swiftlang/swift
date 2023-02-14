@@ -106,3 +106,4 @@ entry:
   %5 = function_ref @FF_address_of_box : $@convention(thin) (@in { var Int }, @in <T> { let T } <Int>) -> ()
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

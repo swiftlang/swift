@@ -184,3 +184,4 @@ bb0:
   %len = pack_length $Pack{repeat each T, repeat each T, Int, Float, String}
   return %len : $Builtin.Word
 }
+REQUIRES: updating_for_owned_noescape

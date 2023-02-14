@@ -6,3 +6,4 @@
 
 let contentView = ContentView() // expected-error {{missing argument for parameter 'runner' in call}}
 
+REQUIRES: updating_for_owned_noescape

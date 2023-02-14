@@ -19,3 +19,4 @@ extension X {
 }
 public class Base: X {}
 public class Sub: Base {}
+REQUIRES: updating_for_owned_noescape

@@ -38,3 +38,4 @@ func setChildren(p: Parent, c: Child) {
 // CHECK: destroy_value [[COPIED]] : $[[OPENED_TYPE]]
 // CHECK: [[RESULT:%.*]] = tuple ()
 // CHECK: return [[RESULT]] : $()
+REQUIRES: updating_for_owned_noescape

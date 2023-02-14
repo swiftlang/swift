@@ -78,3 +78,4 @@ public func compareIt(_ state : AlphabetInt, _ rhs: AlphabetInt) -> Bool {
   // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
   return state == rhs
 }
+REQUIRES: updating_for_owned_noescape

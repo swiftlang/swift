@@ -117,3 +117,4 @@ public func testWithMemoryRebound<T, Result>(
   }
   return try body(.init(rawPtr))
 }
+REQUIRES: updating_for_owned_noescape

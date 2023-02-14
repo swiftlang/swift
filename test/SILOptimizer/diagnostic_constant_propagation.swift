@@ -369,3 +369,4 @@ func testBuiltinGlobalStringTablePointerError(s: String) -> UnsafePointer<CChar>
 func testBuiltinGlobalStringTablePointerNoError(s: String) -> UnsafePointer<CChar> {
   return _getGlobalStringTablePointer(s)
 }
+REQUIRES: updating_for_owned_noescape

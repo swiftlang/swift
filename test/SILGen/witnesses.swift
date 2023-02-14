@@ -579,3 +579,4 @@ struct MyImpl :Sub {
 // CHECK: sil private [transparent] [thunk] [ossa] @$s9witnesses6MyImplVAA3SubA2aDP3baryyFTW :
 // protocol witness for witnesses.Base.foo() -> () in conformance witnesses.MyImpl : witnesses.Base in witnesses
 // CHECK: sil private [transparent] [thunk] [ossa] @$s9witnesses6MyImplVAA4BaseA2aDP3fooyyFTW :
+REQUIRES: updating_for_owned_noescape

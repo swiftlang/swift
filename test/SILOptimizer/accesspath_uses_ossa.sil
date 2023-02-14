@@ -1013,3 +1013,4 @@ bb0(%0 : $Builtin.Int64):
  return %ret : $()
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -257,3 +257,4 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 
 // CHECK:   [[T2:%.*]] = call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, i8** %T.Assoc.HasAssociatedType, %swift.type* %T.Assoc, %swift.protocol_requirement* @"$s22generic_structs_future17HasAssociatedTypeTL", %swift.protocol_requirement* @"$s5Assoc22generic_structs_future17HasAssociatedTypePTl")
 // CHECK:   %T.Assoc.Assoc = extractvalue %swift.metadata_response [[T2]], 0
+REQUIRES: updating_for_owned_noescape

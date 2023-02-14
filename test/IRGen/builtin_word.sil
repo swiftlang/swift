@@ -65,3 +65,4 @@ entry(%w : $Builtin.Word, %i : $Builtin.Int64):
   return %t : $(Builtin.Int32, Builtin.Word)
 }
 
+REQUIRES: updating_for_owned_noescape

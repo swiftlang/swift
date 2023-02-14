@@ -72,3 +72,4 @@ sil_vtable C {
   #C.foo: @_TZFC4spec1C3foofMS0_FT_T_
   #C.bar: @_TZFC4spec1C3barfMS0_FT_T_
 }
+REQUIRES: updating_for_owned_noescape

@@ -49,3 +49,4 @@ sil_property #A.a ()
 // For SIL_DIFFERENTIABILITY_WITNESS_NAMES
 sil_differentiability_witness [reverse] [parameters 0] [results 0] @id : $@convention(thin) (Float) -> Float {}
 
+REQUIRES: updating_for_owned_noescape

@@ -256,3 +256,4 @@ class SubclassOfInner<T, U> : OuterRing<T>.InnerRing<U> {
 // CHECK: sil_witness_table hidden HotDogs.American: HotDog module nested_generics {
 // CHECK:   associated_type Condiment: Deli<Pepper>.Mustard
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

@@ -248,3 +248,4 @@ entry(%0 : @guaranteed $C, %1 : $Builtin.Word):
   %retval = tuple ()
   return %retval : $()
 }
+REQUIRES: updating_for_owned_noescape

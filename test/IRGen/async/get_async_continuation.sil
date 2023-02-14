@@ -137,3 +137,4 @@ bb3:
   %t = tuple()
   return %t : $()
 }
+REQUIRES: updating_for_owned_noescape

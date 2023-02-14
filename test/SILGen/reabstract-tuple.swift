@@ -51,3 +51,4 @@ func g<T>() -> (Int, T)? { }
 func f<T>(t: T) {
   let _: (Int, ((T) -> (), T))? = g()
 }
+REQUIRES: updating_for_owned_noescape

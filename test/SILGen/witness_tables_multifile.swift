@@ -21,3 +21,4 @@ struct FooStruct3 : InheritsFooable { }
 extension FooStruct3 : InheritsFooable2 {
 	func foo() { }
 }
+REQUIRES: updating_for_owned_noescape

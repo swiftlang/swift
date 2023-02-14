@@ -36,3 +36,4 @@ struct Maker<C: Base> {
 // CHECK: test.Derived
 print(Maker<Derived>.create())
 
+REQUIRES: updating_for_owned_noescape

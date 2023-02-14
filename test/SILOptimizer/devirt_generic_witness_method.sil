@@ -51,3 +51,4 @@ sil_witness_table [serialized] Item: Decodable module main {
   method #Decodable.init!allocator: <Self where Self : Decodable> (Self.Type) -> ([String : Any]) -> Self : @witness_method_impl
 }
 
+REQUIRES: updating_for_owned_noescape

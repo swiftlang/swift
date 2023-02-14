@@ -16,3 +16,4 @@ public func testObjcInterface(_ x: ObjcInterface) -> Int {
   return x.i
 }
 
+REQUIRES: updating_for_owned_noescape

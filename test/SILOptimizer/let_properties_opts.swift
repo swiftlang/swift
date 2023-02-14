@@ -508,3 +508,4 @@ public func testInnerStructLetEntry() -> Int32 {
   var outer = Outer()
   return testInnerStructLet1(&outer) + testInnerStructLet2(&outer)
 }
+REQUIRES: updating_for_owned_noescape

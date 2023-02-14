@@ -114,3 +114,4 @@ s.doSomething()
 // CHECK-NEXT: ContainingStruct end: 28
 print("ContainingStruct end: \(s.e)")
 
+REQUIRES: updating_for_owned_noescape

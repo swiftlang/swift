@@ -54,3 +54,4 @@ public func useStorageWrapper(_ c: MyClass) {
 // CHECK-NEXT:    #MyClass.init!allocator: (MyClass.Type) -> () -> MyClass : @$s23property_wrappers_final7MyClassCACycfC
 // CHECK-NEXT:    #MyClass.deinit!deallocator: @$s23property_wrappers_final7MyClassCfD
 // CHECK-NEXT:  }
+REQUIRES: updating_for_owned_noescape

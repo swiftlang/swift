@@ -19,3 +19,4 @@ Foo<Int>.y = 2
 Foo<Int>.y += 3
 print(Foo<Int>.y)
 
+REQUIRES: updating_for_owned_noescape

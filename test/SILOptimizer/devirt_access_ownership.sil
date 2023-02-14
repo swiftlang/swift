@@ -160,3 +160,4 @@ sil_vtable B {
   #A.ping: @_TFC14devirt_access21B4pingfS0_FT_Si [override]
   #A.init!initializer: @_TFC14devirt_access21BcfMS0_FT_S0_ [override]
 }
+REQUIRES: updating_for_owned_noescape

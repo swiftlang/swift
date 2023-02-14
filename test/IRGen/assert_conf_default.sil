@@ -21,3 +21,4 @@ sil @remove_assert_configuration : $@convention(thin) () -> Builtin.Int32 {
 
 // UNCHECKED-LABEL: @remove_assert_configuration
 // UNCHECKED: ret i32 2
+REQUIRES: updating_for_owned_noescape

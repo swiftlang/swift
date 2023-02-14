@@ -59,3 +59,4 @@ bb0(%orig : $@callee_guaranteed (Float) -> Float):
 // CHECK:   [[EXTRACTED_VJP:%.*]] = differentiable_function_extract [vjp] [[DIFF_FN]] : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
 // CHECK:   return [[EXTRACTED_VJP]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK-LABEL: } // end sil function 'differentiable_function_extract_vjp_undefined' 
+REQUIRES: updating_for_owned_noescape

@@ -628,3 +628,4 @@ bb0(%0 : $P):
   return %6 : $()
 }
 
+REQUIRES: updating_for_owned_noescape

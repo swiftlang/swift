@@ -101,3 +101,4 @@ sil @another_simple_func : $@convention(thin) () -> Builtin.Int64 {
 // CHECK-SIL-STATS-ONLY-FUNCTIONS-NOT: function_history, inst,{{.*}}, another_simple_func
 
 
+REQUIRES: updating_for_owned_noescape

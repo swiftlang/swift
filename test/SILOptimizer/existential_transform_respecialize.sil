@@ -97,3 +97,4 @@ bb0(%0 : $τ_0_0, %1 : $τ_0_1):
   %13 = tuple (%9 : $Int, %12 : $Int)
   return %13 : $(Int, Int)
 }
+REQUIRES: updating_for_owned_noescape

@@ -1395,3 +1395,4 @@ public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: inout NonTrivi
     }
     f()
 }
+REQUIRES: updating_for_owned_noescape

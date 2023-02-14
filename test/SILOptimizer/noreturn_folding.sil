@@ -43,3 +43,4 @@ bb3 (%11: $Int64):
 }
 
 sil @exit : $@convention(thin) (Builtin.Int32) -> Never
+REQUIRES: updating_for_owned_noescape

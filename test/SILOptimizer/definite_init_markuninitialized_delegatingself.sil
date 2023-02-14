@@ -378,3 +378,4 @@ bb5(%32 : @owned $Error):
   store %6 to [init] %2 : $*DerivedClassWithNontrivialStoredProperties
   br bb4(%32 : $Error)
 }
+REQUIRES: updating_for_owned_noescape

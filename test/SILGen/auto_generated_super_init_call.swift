@@ -160,3 +160,4 @@ class ThrowingChild : ThrowingParent {
 class FailingThrowingChild : FailingThrowingParent {
   override init?() throws {}
 }
+REQUIRES: updating_for_owned_noescape

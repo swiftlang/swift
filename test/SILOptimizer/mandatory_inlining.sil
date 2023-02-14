@@ -1503,3 +1503,4 @@ entry(%executor: $Builtin.Executor):
   %r = tuple ()
   return %r : $()
 }
+REQUIRES: updating_for_owned_noescape

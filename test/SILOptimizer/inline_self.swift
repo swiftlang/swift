@@ -89,3 +89,4 @@ _ = Z().capturesSelf()
 // CHECK-LABEL: sil hidden {{.*}}@$s11inline_self1ZC20callBaseCapturesSelfACXDyF
 // CHECK-NOT: function_ref @$s11inline_self5BaseZC16baseCapturesSelfACXDyF :
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

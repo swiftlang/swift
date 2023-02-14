@@ -579,3 +579,4 @@ sil @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -
 
 sil @v_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed B, UnsafeRawPointer) -> @out A
 sil @v_set : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, UnsafeRawPointer) -> ()
+REQUIRES: updating_for_owned_noescape

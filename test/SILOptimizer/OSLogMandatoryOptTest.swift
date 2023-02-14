@@ -638,3 +638,4 @@ func testAnimationSignpost(cond: Bool, x: Int, y: Float) {
   // CHECK: string_literal utf8 "animation begins here %ld isAnimation=YES"
   // CHECK: string_literal utf8 "animation begins here %ld %f isAnimation=YES"
 }
+REQUIRES: updating_for_owned_noescape

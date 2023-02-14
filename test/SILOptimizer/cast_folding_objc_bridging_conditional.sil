@@ -29,3 +29,4 @@ done:
 }
 
 sil @use : $@convention(thin) <T> (@in T) -> ()
+REQUIRES: updating_for_owned_noescape

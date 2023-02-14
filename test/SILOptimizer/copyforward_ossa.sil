@@ -570,3 +570,4 @@ bb12:
   dealloc_stack %1 : $*Builtin.Int1
   return %33 : $()
 }
+REQUIRES: updating_for_owned_noescape

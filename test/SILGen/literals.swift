@@ -396,3 +396,4 @@ func makeColorLiteral<T>() -> ReferenceColor<T> {
 // CHECK-LABEL: sil hidden [ossa] @$s8literals16makeColorLiteralAA09ReferenceC0CyxGylF : $@convention(thin) <T> () -> @owned ReferenceColor<T>
 // CHECK: [[FN:%.*]] = function_ref @$s8literals5SillyPAAE16_colorLiteralRed5green4blue5alphaxSf_S3ftcfC : $@convention(method) <τ_0_0 where τ_0_0 : Silly> (Float, Float, Float, Float, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK: apply [[FN]]<ReferenceColor<T>>(
+REQUIRES: updating_for_owned_noescape

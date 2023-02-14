@@ -637,3 +637,4 @@ struct TestKeyPathWithSomeType : DefineSomeType {
 
   }
 }
+REQUIRES: updating_for_owned_noescape

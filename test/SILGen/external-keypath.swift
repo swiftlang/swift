@@ -74,3 +74,4 @@ func testProtocolRequirement<T: ExternalProto>(_: T.Type) {
   // CHECK-NOT: external #ExternalProto.protoReqt
   _ = \T.protoReqt
 }
+REQUIRES: updating_for_owned_noescape

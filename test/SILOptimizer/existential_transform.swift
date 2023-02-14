@@ -455,3 +455,4 @@ let zz:Int32 = getName_wrapper()
 let _ = find_wrapper()
 return x + y + z + Int(zz)
 }
+REQUIRES: updating_for_owned_noescape

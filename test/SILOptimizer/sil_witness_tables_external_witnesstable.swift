@@ -25,3 +25,4 @@ func done() -> Y {
 
 // Make sure dead function elimination does not get rid of done and doSomething.
 done()
+REQUIRES: updating_for_owned_noescape

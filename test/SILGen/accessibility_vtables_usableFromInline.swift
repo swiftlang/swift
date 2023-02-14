@@ -45,3 +45,4 @@ public class Derived : Middle {
 // RESILIENT-CLIENT-NEXT:    #Middle.internalMethod: (Middle) -> () -> () : @$s38accessibility_vtables_usableFromInline7DerivedC14internalMethodyyF [override]
 // RESILIENT-CLIENT-NEXT:    #Derived.deinit!deallocator: @$s38accessibility_vtables_usableFromInline7DerivedCfD
 // RESILIENT-CLIENT-NEXT:  }
+REQUIRES: updating_for_owned_noescape

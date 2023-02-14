@@ -141,3 +141,4 @@ bb0(%0 : $*Outer):
   %23 = load %22 : $*Int32
   return %23 : $Int32
 }
+REQUIRES: updating_for_owned_noescape

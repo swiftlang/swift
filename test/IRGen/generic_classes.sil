@@ -417,3 +417,4 @@ entry(%c : $RootGeneric<Int32>):
 
 // OSIZE: define hidden swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMa"(i64 %0, %swift.type* {{.*}}) [[ATTRS:#[0-9]+]] {{(section)?.*}}{
 // OSIZE: [[ATTRS]] = {{{.*}}noinline
+REQUIRES: updating_for_owned_noescape

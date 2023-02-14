@@ -46,3 +46,4 @@ class SubclassOfOutsideChild : ResilientOutsideChild {
 // CHECK-NEXT:  #SubclassOfOutsideChild.newMethod: (SubclassOfOutsideChild) -> () -> () : @$s16class_resilience22SubclassOfOutsideChildC9newMethodyyF
 // CHECK-NEXT:  #SubclassOfOutsideChild.deinit!deallocator: @$s16class_resilience22SubclassOfOutsideChildCfD
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

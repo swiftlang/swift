@@ -27,3 +27,4 @@ entry(%a : $Int):
   dealloc_stack %y : $*SomeButt2
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

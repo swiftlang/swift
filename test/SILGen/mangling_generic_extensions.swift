@@ -67,3 +67,4 @@ extension Bar {
   // CHECK-LABEL: $s27mangling_generic_extensions3BarV4bar1yyqd__AA8RuncibleRd__AaE5SpoonRp_lF
   func bar1<V: Runcible>(_: V) where U.Spoon: Runcible { }
 }
+REQUIRES: updating_for_owned_noescape

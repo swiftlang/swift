@@ -43,3 +43,4 @@ func lazyLocalWithNestedClosure() {
     return 3
   }()
 }
+REQUIRES: updating_for_owned_noescape

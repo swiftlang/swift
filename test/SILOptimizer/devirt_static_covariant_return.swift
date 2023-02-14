@@ -18,3 +18,4 @@ public class Factory<T> {
 public func foo(m: Factory<Int>.Type) {
   m.foo()
 }
+REQUIRES: updating_for_owned_noescape

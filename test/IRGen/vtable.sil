@@ -48,3 +48,4 @@ sil @$s6vtable1CCfD : $@convention(method) (@owned C) -> ()
 sil_vtable C {
   #C.init!allocator: @$s6vtable1CCACycACmcfC
 }
+REQUIRES: updating_for_owned_noescape

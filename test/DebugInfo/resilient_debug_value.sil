@@ -25,3 +25,4 @@ bb0:
 // CHECK:  [[ASSERTIONSDBG:%.*]] = alloca i8*
 // CHECK:  [[ASSERTIONS:%.*]] = alloca i8, i64 %size
 // CHECK:  store i8* [[ASSERTIONS]], i8** [[ASSERTIONSDBG]]
+REQUIRES: updating_for_owned_noescape

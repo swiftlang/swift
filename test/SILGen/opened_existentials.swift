@@ -33,3 +33,4 @@ public func test() -> String {
   g(f(), getP())
 }
 
+REQUIRES: updating_for_owned_noescape

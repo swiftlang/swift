@@ -55,3 +55,4 @@ enum InternalEnumWithPublicStruct : Foo {
 
 // CHECK-LABEL: sil_witness_table [serialized] AnotherBar: AnotherFoo module protocol_enum_witness {
 // CHECK: method #AnotherFoo.bar: <Self where Self : AnotherFoo> (Self.Type) -> (Int) -> Self : @$s21protocol_enum_witness10AnotherBarOAA0D3FooA2aDP3bar3argxSi_tFZTW
+REQUIRES: updating_for_owned_noescape

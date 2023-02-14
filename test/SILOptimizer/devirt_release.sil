@@ -215,3 +215,4 @@ sil_vtable B {
   #B.deinit!deallocator: @$s4test1BCfD
 }
 
+REQUIRES: updating_for_owned_noescape

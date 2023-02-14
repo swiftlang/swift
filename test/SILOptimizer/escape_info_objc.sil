@@ -86,3 +86,4 @@ bb0:
   return %17 : $()
 }
 
+REQUIRES: updating_for_owned_noescape

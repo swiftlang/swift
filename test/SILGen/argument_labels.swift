@@ -19,3 +19,4 @@ func testFoo(foo: Foo, x: X, y: Y) {
   foo.doSomethingElse(x: x)
 }
 
+REQUIRES: updating_for_owned_noescape

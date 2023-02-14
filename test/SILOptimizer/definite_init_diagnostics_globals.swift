@@ -84,3 +84,4 @@ protocol P {
 var p: P    // expected-note {{variable defined here}}
 
 defer { print(p.f) } // expected-error {{variable 'p' used in defer before being initialized}}
+REQUIRES: updating_for_owned_noescape

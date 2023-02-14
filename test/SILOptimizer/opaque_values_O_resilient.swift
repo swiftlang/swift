@@ -17,3 +17,4 @@ public struct Gadget {
     case theOther
   }
 }
+REQUIRES: updating_for_owned_noescape

@@ -131,3 +131,4 @@ public struct UnsafeValue<Element: AnyObject> {
   @inlinable
   public var strongRef: Element { _value }
 }
+REQUIRES: updating_for_owned_noescape

@@ -54,3 +54,4 @@ bb0(%0 : $_ContiguousArrayStorage<Element>):
   return %15 : $()
 }
 
+REQUIRES: updating_for_owned_noescape

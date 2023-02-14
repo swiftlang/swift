@@ -163,3 +163,4 @@ bb3:
   %61 = tuple ()
   return %61 : $()
 }
+REQUIRES: updating_for_owned_noescape

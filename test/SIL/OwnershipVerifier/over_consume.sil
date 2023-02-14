@@ -292,3 +292,4 @@ bb1(%errorEmptyTup: $()):
 bb2(%error : @owned $Error):
   throw %error : $Error
 }
+REQUIRES: updating_for_owned_noescape

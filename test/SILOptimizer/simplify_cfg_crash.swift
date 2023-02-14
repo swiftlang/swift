@@ -14,3 +14,4 @@ public func testit(_ s: [X]) -> X? {
   return r
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -14,4 +14,4 @@ sil @move_value_test : $@convention(thin) (@owned Builtin.NativeObject) -> @owne
 bb0(%0 : $Builtin.NativeObject):
   %1 = move_value %0 : $Builtin.NativeObject
   return %1 : $Builtin.NativeObject
-}
+}REQUIRES: updating_for_owned_noescape

@@ -45,3 +45,4 @@ class E : B {
     super.init(x: &x)
   }
 }
+REQUIRES: updating_for_owned_noescape

@@ -140,3 +140,4 @@ extension Class.NestedClass {
   // CHECK-LABEL: sil hidden [ossa] @$s18generic_signatures5ClassC06NestedC0C3foo3argyx_tAA9WhereableRz3FooAA7FooablePQz5AssocAaHPRtzrlF : $@convention(method) <T where T : Fooable, T : Whereable, T.Assoc == T.Foo> (@in_guaranteed T, @guaranteed Class<T>.NestedClass) -> ()
   func foo(arg: T) where T: Whereable, T.Foo == T.Assoc { }
 }
+REQUIRES: updating_for_owned_noescape

@@ -27,3 +27,4 @@ func testit(s: S) {
 // CHECK: S(i: 27)
 testit(s: S(i: 27))
 
+REQUIRES: updating_for_owned_noescape

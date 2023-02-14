@@ -441,3 +441,4 @@ sil [serialized] @_TZFsoi3eeeFTGSqPs9AnyObject__GSqPS____Sb : $@convention(thin)
 
 
 
+REQUIRES: updating_for_owned_noescape

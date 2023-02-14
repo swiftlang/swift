@@ -14,3 +14,4 @@ import Foundation
 func foo(x: Bool, y: C & P) -> (String) -> () {
   return x ? y.c : y.p
 }
+REQUIRES: updating_for_owned_noescape

@@ -138,3 +138,4 @@ entry:
 
 // CHECK:       attributes [[CORO_ATTRIBUTES]] =
 // CHECK-SAME:    noinline
+REQUIRES: updating_for_owned_noescape

@@ -75,3 +75,4 @@ func iterateFakeCollection<T>(_ x: FakeCollection<T>) {
     useT(y)
   }
 }
+REQUIRES: updating_for_owned_noescape

@@ -30,3 +30,4 @@ func test_capture_promotion() -> () -> Int {
 
 // CHECK: sil private @$s27capture_promotion_ownership05test_a1_B0SiycyFSiycfU_Tf2iii_n : $@convention(thin) (Int, @guaranteed Foo, @guaranteed Baz) -> Int
 
+REQUIRES: updating_for_owned_noescape

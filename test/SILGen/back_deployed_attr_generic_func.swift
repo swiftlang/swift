@@ -90,3 +90,4 @@ func caller() {
   // CHECK: {{%.*}} = function_ref @$s11back_deploy25genericFuncWithOwnedParamyyxnlFTwb : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   genericFuncWithOwnedParam(S())
 }
+REQUIRES: updating_for_owned_noescape

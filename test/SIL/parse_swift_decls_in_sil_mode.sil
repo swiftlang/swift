@@ -8,3 +8,4 @@ subscript (x : Int, y : Int) -> Int { get }// expected-error{{'subscript' functi
 
 init(i:Int) // expected-error {{initializers may only be declared within a type}}
 
+REQUIRES: updating_for_owned_noescape

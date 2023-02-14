@@ -118,3 +118,4 @@ extension NSObject : Atom {
 protocol Atom : class {
   var valence: Int { get set }
 }
+REQUIRES: updating_for_owned_noescape

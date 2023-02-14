@@ -38,3 +38,4 @@ public class RecursibleDirectoryContentsGenerator {
         current = (path, try fileSystem.getDirectoryContents(path).makeIterator())
     }
 }
+REQUIRES: updating_for_owned_noescape

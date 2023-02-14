@@ -79,3 +79,4 @@ struct AddressStruct {
     self = AddressStruct()
   } // expected-error {{return from initializer without initializing all stored properties}}
 }
+REQUIRES: updating_for_owned_noescape

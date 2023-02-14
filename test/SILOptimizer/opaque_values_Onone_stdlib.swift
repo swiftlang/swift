@@ -138,3 +138,4 @@ struct UnsafeContinuation<T, E: Error> {
     #endif
   }
 }
+REQUIRES: updating_for_owned_noescape

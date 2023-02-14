@@ -23,3 +23,4 @@ public func test() {
   print(bar(5))
   print(bar2(5))
 }
+REQUIRES: updating_for_owned_noescape

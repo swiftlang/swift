@@ -157,3 +157,4 @@ func dynamicMemberLookupMixedKeypaths(foo: DynamicClass<Foo>) {
   // CHECK: keypath $KeyPath<NonObjC, NSObject>, (root
   _ = foo.bar.foo.nonobjc.y 
 }
+REQUIRES: updating_for_owned_noescape

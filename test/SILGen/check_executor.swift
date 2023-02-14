@@ -62,3 +62,4 @@ public actor MyActor {
     print(local())
   }
 }
+REQUIRES: updating_for_owned_noescape

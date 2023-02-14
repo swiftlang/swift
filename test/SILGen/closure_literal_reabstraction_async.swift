@@ -14,3 +14,4 @@ func passNonthrowingAsyncClosureLiteral() {
     // CHECK: apply [[CALLEE]]<Int>([[CLOSURE]])
     takeThrowingAsyncClosure { return 42 }
 }
+REQUIRES: updating_for_owned_noescape

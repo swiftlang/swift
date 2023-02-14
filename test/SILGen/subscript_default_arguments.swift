@@ -168,3 +168,4 @@ public func subscript9() {
   s[] += 1
 }
 #endif
+REQUIRES: updating_for_owned_noescape

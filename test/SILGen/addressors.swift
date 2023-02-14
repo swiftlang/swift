@@ -346,3 +346,4 @@ struct Foo<Base>: FooProtocol {
 // CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base : @$s10addressors3SubCACycfC
 // CHECK-NEXT: #Sub.deinit!deallocator: @$s10addressors3SubCfD
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

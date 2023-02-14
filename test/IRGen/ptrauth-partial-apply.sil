@@ -62,3 +62,4 @@ bb0(%0 : $@callee_owned (Builtin.Int32, Builtin.Int32) -> (), %1 : $Builtin.Int3
 // CHECK:       [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T1]], i64 7185)
 // CHECK:       [[FN:%.*]] = bitcast i8* [[T0]] to void (i32, i32, %swift.refcounted*)*
 // CHECK:       call swiftcc void [[FN]](i32 {{.*}}, i32 {{.*}}, %swift.refcounted* {{.*}}) [ "ptrauth"(i32 1, i64 [[DISC]]) ]
+REQUIRES: updating_for_owned_noescape

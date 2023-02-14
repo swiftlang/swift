@@ -75,3 +75,4 @@ sil_default_witness_table ResilientProtocol {
 sil_default_witness_table hidden InternalProtocol {
   method #InternalProtocol.defaultF: @defaultF
 }
+REQUIRES: updating_for_owned_noescape

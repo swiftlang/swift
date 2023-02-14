@@ -113,3 +113,4 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %0, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
+REQUIRES: updating_for_owned_noescape

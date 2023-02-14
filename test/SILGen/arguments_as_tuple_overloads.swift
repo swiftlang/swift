@@ -66,3 +66,4 @@ public func baz() {
   // CHECK: function_ref @$s4test3bazyyFySi_SitcfU0_ :
   let _: (Int, Int) -> Void = { x, y in }
 }
+REQUIRES: updating_for_owned_noescape

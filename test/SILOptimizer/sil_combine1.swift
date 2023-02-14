@@ -35,3 +35,4 @@ public func test_compose_closure() -> Int32 {
   return gs
 }
 
+REQUIRES: updating_for_owned_noescape

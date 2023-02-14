@@ -156,3 +156,4 @@ print("testNonOptionalNullString:")
 testNonOptionalNullString()
 // CHECK-NEXT: end
 print("end")
+REQUIRES: updating_for_owned_noescape

@@ -289,3 +289,4 @@ extension GenericEmpty {
   init(xx: Double) {
   } // expected-warning {{initializer for struct 'GenericEmpty<T>' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
 }
+REQUIRES: updating_for_owned_noescape

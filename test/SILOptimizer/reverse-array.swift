@@ -66,3 +66,4 @@ public func reverseArray(_ a: [Int]) -> [Int] {
 // CHECK-OUTPUT: [3, 2, 1]
 print(reverseArray([1, 2, 3]))
 
+REQUIRES: updating_for_owned_noescape

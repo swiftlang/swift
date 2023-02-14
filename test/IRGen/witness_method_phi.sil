@@ -17,3 +17,4 @@ entry:
 bb1(%2 : $@convention(witness_method: P) <T: P> (@in T) -> ()):
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

@@ -41,3 +41,4 @@ hasNoPrototype()
 // -- Constructor for imported Ansible was unused, should not be emitted.
 // CHECK-NOT: sil {{.*}} [ossa] @$sSo7AnsibleC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Ansible.Type) -> @owned Ansible
 
+REQUIRES: updating_for_owned_noescape

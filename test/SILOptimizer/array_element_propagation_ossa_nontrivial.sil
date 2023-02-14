@@ -282,3 +282,4 @@ bb0(%0 : $*Array<MyKlass>, %1 : @owned $MyKlass):
   return %1 : $MyKlass
 }
 
+REQUIRES: updating_for_owned_noescape

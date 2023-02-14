@@ -104,3 +104,4 @@ public class DependencyResolver<P: PackageContainerProvider> {
         return AnySequence([])
     }
 }
+REQUIRES: updating_for_owned_noescape

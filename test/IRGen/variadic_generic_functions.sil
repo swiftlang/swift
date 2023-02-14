@@ -65,3 +65,4 @@ sil @f1 : $<T... : PA where each T.A : P> () -> () {
 }
 
 sil @f1c : $<T... : PA where each T.A : P> () -> () {}
+REQUIRES: updating_for_owned_noescape

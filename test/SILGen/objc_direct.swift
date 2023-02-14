@@ -71,3 +71,4 @@ markUsed(bar.directProtocolMethod())
 // CHECK-LABEL: sil{{.*}}@$sSo3BarC5valueABSgs5Int32V_tcfcTO : $@convention(method) (Int32, @owned Bar) -> @owned Optional<Bar> {
 // CHECK: function_ref @[[BYTE01]]-[Bar initWithValue:]
 // CHECK: } // end sil function '$sSo3BarC5valueABSgs5Int32V_tcfcTO'
+REQUIRES: updating_for_owned_noescape

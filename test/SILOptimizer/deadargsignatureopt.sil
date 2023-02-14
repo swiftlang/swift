@@ -90,3 +90,4 @@ bb0:
 // CHECK-LABEL: sil shared @$s13two_args_deadTf4nnd_n
 // CHECK: builtin
 // CHECK: return
+REQUIRES: updating_for_owned_noescape

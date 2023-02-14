@@ -10,3 +10,4 @@
 // OTHER_FILE-LABEL: sil_witness_table hidden B: P module main
 
 class D: B, R {}
+REQUIRES: updating_for_owned_noescape

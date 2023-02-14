@@ -16,3 +16,4 @@ func foo() {
   objc_setUncaughtExceptionHandler { _ in
   }
 }
+REQUIRES: updating_for_owned_noescape

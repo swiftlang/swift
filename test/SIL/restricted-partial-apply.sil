@@ -32,3 +32,4 @@ entry(%0 : $Builtin.NativeObject, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Word>, 
 
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

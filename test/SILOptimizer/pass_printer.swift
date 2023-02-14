@@ -6,3 +6,4 @@
 // AFTER: SIL function after #{{[0-9]+}}, stage  Mandatory Diagnostic Passes + Enabling Optimization Passes, pass {{[0-9]+}}: DefiniteInitialization  (definite-init)
 // DISABLE: (Disabled) #{{[0-9]+}}, stage  Mandatory Diagnostic Passes + Enabling Optimization Passes, pass {{[0-9]+}}: DefiniteInitialization (definite-init)
 func foo() {}
+REQUIRES: updating_for_owned_noescape

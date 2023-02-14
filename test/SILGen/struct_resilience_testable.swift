@@ -16,3 +16,4 @@
 public func takesResilientStructWithInternalField(_ s: ResilientWithInternalField) -> Int {
   return s.x
 }
+REQUIRES: updating_for_owned_noescape

@@ -44,3 +44,4 @@ bb0(%instance : @noImplicitCopy @_lexical @owned $C):
   return %retval : $()
 }
 
+REQUIRES: updating_for_owned_noescape

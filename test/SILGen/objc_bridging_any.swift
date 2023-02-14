@@ -710,3 +710,4 @@ func bridgeNoPayloadEnumCase(_ receiver: NSIdLover) {
 // CHECK-DAG: method #Hashable.hash: {{.*}} : @$sSo13GenericOptionaSHSCSH4hash4intoys6HasherVz_tFTW
 // CHECK-DAG: method #Hashable._rawHashValue: {{.*}} : @$sSo13GenericOptionaSHSCSH13_rawHashValue4seedS2i_tFTW
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

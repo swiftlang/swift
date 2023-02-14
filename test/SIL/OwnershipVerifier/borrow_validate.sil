@@ -808,3 +808,4 @@ bb0(%0 : $*Klass):
   %1 = tuple ()
   return %1 : $()
 }
+REQUIRES: updating_for_owned_noescape

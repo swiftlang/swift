@@ -35,3 +35,4 @@ public func testDevirt(a: A<Int>) -> Int32 {
   return a.doSomething()
 }
 
+REQUIRES: updating_for_owned_noescape

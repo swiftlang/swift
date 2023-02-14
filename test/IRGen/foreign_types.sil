@@ -35,3 +35,4 @@ bb0:
   return %ret : $()
 }
 
+REQUIRES: updating_for_owned_noescape

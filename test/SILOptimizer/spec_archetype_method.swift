@@ -43,3 +43,4 @@ func interesting_code_here() {
   generic_call(x: x)
   useFoo(x: x)
 }
+REQUIRES: updating_for_owned_noescape

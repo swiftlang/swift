@@ -123,3 +123,4 @@ bb7:
   %27 = tuple ()
   return %27 : $()
 }
+REQUIRES: updating_for_owned_noescape

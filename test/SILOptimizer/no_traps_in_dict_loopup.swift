@@ -11,3 +11,4 @@ public func testit(_ s: [Int : Int]) -> Int? {
   return s[27]
 }
 
+REQUIRES: updating_for_owned_noescape

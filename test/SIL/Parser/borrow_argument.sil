@@ -18,3 +18,4 @@ bb1(%2 : @guaranteed $Builtin.NativeObject):
   return %4 : $()
 }
 
+REQUIRES: updating_for_owned_noescape

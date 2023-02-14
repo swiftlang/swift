@@ -7,3 +7,4 @@ protocol P {
 func foo(x: inout P) {
   x.foo { y in return }
 }
+REQUIRES: updating_for_owned_noescape

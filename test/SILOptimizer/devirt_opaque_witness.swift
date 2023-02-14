@@ -27,3 +27,4 @@ public func callsPublicRequirement(_ c: Conformer) {
 // CHECK-LABEL: sil_witness_table public_external Conformer: PublicProtocol module opaque_conformance {
 // CHECK-NEXT:    method #PublicProtocol.publicRequirement: <Self where Self : PublicProtocol> (Self) -> () -> () : @$s18opaque_conformance9ConformerVAA14PublicProtocolA2aDP17publicRequirementyyFTW
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

@@ -46,3 +46,4 @@ bb0(%0 : $S, %1 : $*P):
 }
 
 sil_witness_table S: P module test {}
+REQUIRES: updating_for_owned_noescape

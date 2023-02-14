@@ -16,3 +16,4 @@ entry:
   store undef to undef : $*(Builtin.Int64, Builtin.Int8, Builtin.RawPointer)
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

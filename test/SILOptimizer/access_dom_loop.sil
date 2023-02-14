@@ -109,3 +109,4 @@ bb4:
   %10 = tuple ()
   return %10 : $()
 }
+REQUIRES: updating_for_owned_noescape

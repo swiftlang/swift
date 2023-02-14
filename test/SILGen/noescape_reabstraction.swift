@@ -22,3 +22,4 @@ func generic<T>(_ x: (T) -> T) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s22noescape_reabstraction8concreteyyAA1SVADXEF
 // CHECK:         function_ref [[REABSTRACTION_THUNK]]
+REQUIRES: updating_for_owned_noescape

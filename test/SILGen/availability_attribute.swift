@@ -38,3 +38,4 @@ public struct AvailableStruct {
 @_specialize(exported: true, availability: macOS 10.50, iOS 13, *; where T == Int)
 // CHECK-LABEL: sil [_specialize exported: true, kind: full, available: 10.50, where T == Int] [ossa] @$s22availability_attribute16testAvailabilityyyxlF
 public func testAvailability<T>(_ t: T) {}
+REQUIRES: updating_for_owned_noescape

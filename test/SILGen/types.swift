@@ -103,3 +103,4 @@ func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
 // CHECK-LABEL: sil private [ossa] @$s5types1fyyF2FCL_C3zimyyF
 // CHECK-LABEL: sil private [ossa] @$s5types1g1bySb_tF2FCL_C3zimyyF
 // CHECK-LABEL: sil private [ossa] @$s5types1g1bySb_tF2FCL0_C3zimyyF
+REQUIRES: updating_for_owned_noescape

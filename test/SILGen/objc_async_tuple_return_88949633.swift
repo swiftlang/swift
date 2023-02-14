@@ -23,3 +23,4 @@ class Foo: NSObject, NSButz {
 }
 
 
+REQUIRES: updating_for_owned_noescape

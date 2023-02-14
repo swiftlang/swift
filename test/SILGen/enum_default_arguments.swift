@@ -69,3 +69,4 @@ func testIndirectDefarg1<T: DefaultInitializable>() -> NonTrivialDefaults<T> {
   return .indirect_defarg1()
 }
 
+REQUIRES: updating_for_owned_noescape

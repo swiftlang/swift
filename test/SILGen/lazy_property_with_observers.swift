@@ -160,3 +160,4 @@ foo1.bar = 2
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 // CHECK-END: }
+REQUIRES: updating_for_owned_noescape

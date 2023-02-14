@@ -1474,3 +1474,4 @@ bb3:
   %21 = tuple ()
   return %21 : $()
 }
+REQUIRES: updating_for_owned_noescape

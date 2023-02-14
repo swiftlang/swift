@@ -18,3 +18,4 @@ public func testDevirtMethodWithItsOwnGenericParam() -> Int {
   let s: S<Int> = S<Int>()
   return s.f(0, 0.0)
 }
+REQUIRES: updating_for_owned_noescape

@@ -173,3 +173,4 @@ bb1(%3 : $X, %4 : $X):
   return %r : $(X, X)
 }
 
+REQUIRES: updating_for_owned_noescape

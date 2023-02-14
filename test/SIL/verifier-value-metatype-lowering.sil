@@ -20,3 +20,4 @@ sil @foo : $@convention(thin) () -> () {
   %3 = tuple()
   return %3 : $()
 }
+REQUIRES: updating_for_owned_noescape

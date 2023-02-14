@@ -480,3 +480,4 @@ extension Optional where Wrapped == Optional<Bool> {
     try? self.init(SpecFailableAndThrows: ())
   }
 }
+REQUIRES: updating_for_owned_noescape

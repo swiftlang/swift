@@ -521,3 +521,4 @@ bb0(%0 : $*Int64):
   %z = tuple ()
   return %z : $()
 }
+REQUIRES: updating_for_owned_noescape

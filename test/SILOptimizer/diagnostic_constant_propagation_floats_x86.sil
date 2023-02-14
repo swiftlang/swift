@@ -69,3 +69,4 @@ bb0:
 %14 = builtin "fptosi_FPIEEE64_Int64"(%13 : $Builtin.FPIEEE64) : $Builtin.Int64
 return %14 : $Builtin.Int64
 }
+REQUIRES: updating_for_owned_noescape

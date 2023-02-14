@@ -125,3 +125,4 @@ if a < 10 {
     // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
     // CHECK: end_borrow [[ACTORREF]]
 }
+REQUIRES: updating_for_owned_noescape

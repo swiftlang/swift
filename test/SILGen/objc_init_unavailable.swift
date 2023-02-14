@@ -17,3 +17,4 @@ public func callUnavailableInit(name: String) -> ClassWithUnavailableInit {
 // CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo24ClassWithUnavailableInitC8bundleIDABSgSSSg_tcfcTO : $@convention(method) (@owned Optional<String>, @owned ClassWithUnavailableInit) -> @owned Optional<ClassWithUnavailableInit> {
 // CHECK: objc_method %1 : $ClassWithUnavailableInit, #ClassWithUnavailableInit.init!initializer.foreign : (ClassWithUnavailableInit.Type) -> (String?) -> ClassWithUnavailableInit?, $@convention(objc_method) (Optional<NSString>, @owned ClassWithUnavailableInit) -> @owned Optional<ClassWithUnavailableInit>
 // CHECK: return
+REQUIRES: updating_for_owned_noescape

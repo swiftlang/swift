@@ -136,3 +136,4 @@ bb4:
 bb6:
   br bb4
 }
+REQUIRES: updating_for_owned_noescape

@@ -27,3 +27,4 @@ entry:
   // CHECK: return [[PA]] : $@callee_guaranteed () -> ()
   return %g : $@callee_guaranteed () -> ()
 }
+REQUIRES: updating_for_owned_noescape

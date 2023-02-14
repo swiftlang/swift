@@ -15,3 +15,4 @@ public func testAsyncLet(_ n: String) async -> String {
   let result = await first
   return result
 }
+REQUIRES: updating_for_owned_noescape

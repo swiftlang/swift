@@ -20,3 +20,4 @@ extension ExtremeLateBindingCounter : EvenMoreExtremeLateBindingCounter {}
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s029dynamic_witness_other_module_C025ExtremeLateBindingCounterC0a1_b1_c1_D008EvenMoreefgH0A2dEP7counterSivMTW :
 // CHECK: function_ref @$s029dynamic_witness_other_module_C025ExtremeLateBindingCounterC7counterSivM : $@yield_once @convention(method) (@guaranteed ExtremeLateBindingCounter) -> @yields @inout Int
 // CHECK: return
+REQUIRES: updating_for_owned_noescape

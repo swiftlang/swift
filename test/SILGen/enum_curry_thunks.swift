@@ -44,3 +44,4 @@ func partialApplyEnumCases(_ x: S, y: C) {
 // CHECK-LABEL: sil private [ossa] @$s17enum_curry_thunks21partialApplyEnumCases_1yyAA1SV_AA1CVtFAA07PartialeF7PayloadOyAeGGAE_AGt_tcAJmcfu5_AjE_AGt_tcfu6_ : $@convention(thin) (S, C, @thin PartialApplyEnumPayload<S, C>.Type) -> @owned PartialApplyEnumPayload<S, C> {
 
 // CHECK-LABEL: sil private [ossa] @$s17enum_curry_thunks21partialApplyEnumCases_1yyAA1SV_AA1CVtFAA07PartialeF7PayloadOyAeGGyyXAcAJmcfu7_AJyyXAcfu8_ : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @thin PartialApplyEnumPayload<S, C>.Type) -> @owned PartialApplyEnumPayload<S, C> {
+REQUIRES: updating_for_owned_noescape

@@ -151,3 +151,4 @@ bb9:
   %20 = tuple ()
   return %20 : $()
 }
+REQUIRES: updating_for_owned_noescape

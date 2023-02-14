@@ -494,3 +494,4 @@ sil_vtable Derived2 {
   #Base.boo: @$s14optimize_never8Derived2C3boos5Int32VyF [override]
 }
 
+REQUIRES: updating_for_owned_noescape

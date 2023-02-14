@@ -69,3 +69,4 @@ bb0(%0 : $Int):
   %6 = tuple (%3 : $Int, %4 : $Int, %5 : $Int)
   return %6 : $(Int, Int, Int)
 }
+REQUIRES: updating_for_owned_noescape

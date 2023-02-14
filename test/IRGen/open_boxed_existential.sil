@@ -19,3 +19,4 @@ entry(%b : $Error):
   // CHECK: ret [[INT]] [[RESULT]]
   return %c : $Int
 }
+REQUIRES: updating_for_owned_noescape

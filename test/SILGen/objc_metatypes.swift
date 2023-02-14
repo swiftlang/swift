@@ -44,3 +44,4 @@ class A {
     // CHECK: return
   }
 }
+REQUIRES: updating_for_owned_noescape

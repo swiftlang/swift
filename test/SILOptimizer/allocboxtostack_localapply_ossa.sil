@@ -488,3 +488,4 @@ bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   %8 = apply %7(%0, %1) : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int
   return %8 : $Int
 }
+REQUIRES: updating_for_owned_noescape

@@ -5,3 +5,4 @@ import Foundation
 public func test_nocrash_rdar34913689() {
   _ = \ObjCFoo.objcExtraProp
 }
+REQUIRES: updating_for_owned_noescape

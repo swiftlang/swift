@@ -558,3 +558,4 @@ extension HasConditionalSubscript: ConditionalSubscript where T: ConditionalSubs
 // CHECK:   method #Totalled.total!setter: {{.*}} : @$s6modify4BillVAA8TotalledA2aDP5totalSivsTW
 // CHECK:   method #Totalled.total!modify: {{.*}} : @$s6modify4BillVAA8TotalledA2aDP5totalSivMTW
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

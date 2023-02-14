@@ -23,3 +23,4 @@ func testStaticInit() {
   // CHECK-NOT: class_method
   // CHECK: return
 }
+REQUIRES: updating_for_owned_noescape

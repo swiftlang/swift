@@ -715,3 +715,4 @@ print("SimpleClass obj count: \(SimpleClass.numObjs)")
 print("GenClass obj count: \(numGenClassObjs)")
 
 
+REQUIRES: updating_for_owned_noescape

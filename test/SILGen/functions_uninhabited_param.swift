@@ -42,3 +42,4 @@ func empty_custom_product(_ xs: (E, Int)) { // expected-note {{'xs' is of type '
   print() // expected-warning{{will never be executed}}
 }
 
+REQUIRES: updating_for_owned_noescape

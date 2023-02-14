@@ -55,3 +55,4 @@ func resilientSwitch(_ m: Medium) {
   case .Postcard: ()
   }
 }
+REQUIRES: updating_for_owned_noescape

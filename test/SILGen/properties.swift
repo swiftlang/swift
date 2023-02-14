@@ -898,3 +898,4 @@ public var myglobal3 : Int = 1 {
     print("myglobal.didSet")
   }
 }
+REQUIRES: updating_for_owned_noescape

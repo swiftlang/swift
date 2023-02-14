@@ -10,3 +10,4 @@ import Foundation
 class C : NSObject {
   let x : Int = 100
 }
+REQUIRES: updating_for_owned_noescape

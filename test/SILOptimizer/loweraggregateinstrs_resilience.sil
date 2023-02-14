@@ -29,3 +29,4 @@ bb0(%0 : $*ResilientStruct):
   %result = tuple ()
   return %result : $()
 }
+REQUIRES: updating_for_owned_noescape

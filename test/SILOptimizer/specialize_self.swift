@@ -18,3 +18,4 @@ class Base {
     return cast(x)
   }
 }
+REQUIRES: updating_for_owned_noescape

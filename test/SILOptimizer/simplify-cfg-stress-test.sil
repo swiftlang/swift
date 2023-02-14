@@ -1082,3 +1082,4 @@ bb259:
   %574 = tuple ()
   return %574 : $()
 }
+REQUIRES: updating_for_owned_noescape

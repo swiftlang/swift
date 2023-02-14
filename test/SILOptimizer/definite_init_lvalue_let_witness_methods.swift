@@ -64,3 +64,4 @@ func mutateThis(mutatee: inout Int) {
     mutatee = 666
 }
 mutateThis(mutatee: &testObject3.foo) // expected-error {{cannot mutate property 'foo' of immutable value 'testObject3'}}
+REQUIRES: updating_for_owned_noescape

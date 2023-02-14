@@ -115,3 +115,4 @@ bb0:
 
 // IRGEN: [[PTR7:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @generic16_Differentiation14DifferentiableRz13TangentVector{{.*}}WJrSSpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 // IRGEN: [[FNPTR7:%.*]] = bitcast i8* [[PTR7]] to { i8*, %swift.refcounted* } (%swift.opaque*, %swift.opaque*, float, %swift.type*, i8**)*
+REQUIRES: updating_for_owned_noescape

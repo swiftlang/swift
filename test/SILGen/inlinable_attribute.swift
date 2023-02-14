@@ -209,3 +209,4 @@ public func global(_ x: Int) -> Int { return x }
 // CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$s19inlinable_attribute16cFunctionPointeryyF5localL_yS2iFTo : $@convention(c) (Int) -> Int {
 // CHECK: function_ref @$s19inlinable_attribute16cFunctionPointeryyF5localL_yS2iF
 // CHECK: return
+REQUIRES: updating_for_owned_noescape

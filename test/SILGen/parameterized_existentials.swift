@@ -109,3 +109,4 @@ protocol Box<Contents> {
 func functionTypes<T, U>(box: any Box<(T) -> U>, value: T) -> U {
   return box.contents(value)
 }
+REQUIRES: updating_for_owned_noescape

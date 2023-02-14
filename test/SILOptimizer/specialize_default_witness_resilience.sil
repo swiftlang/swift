@@ -59,3 +59,4 @@ bb0(%0 : $*ConformingStruct):
   %result = apply %fn<ConformingStruct>(%0) : $@convention(witness_method: ResilientProtocol) <T where T : ResilientProtocol> (@in_guaranteed T) -> ()
   return %result : $()
 }
+REQUIRES: updating_for_owned_noescape

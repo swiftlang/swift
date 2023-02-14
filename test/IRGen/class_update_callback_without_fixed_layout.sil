@@ -331,3 +331,4 @@ bb0(%0 : $ClassWithResilientField):
 // CHECK:  call swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientRefVMa"
 // CHECK:  call swiftcc %swift.metadata_response @"$sSqMa"
 // CHECK:  ret
+REQUIRES: updating_for_owned_noescape

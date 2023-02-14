@@ -115,3 +115,4 @@ bb0(%0 : @owned $TestEarlyBail):
   end_borrow %borrow : $TestEarlyBail
   return %0 : $TestEarlyBail
 }
+REQUIRES: updating_for_owned_noescape

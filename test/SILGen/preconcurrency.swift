@@ -27,3 +27,4 @@ func testInstanceMethodWithSendable(c: C, any: Any) {
   let _ = C.g
   c.f(any)
 }
+REQUIRES: updating_for_owned_noescape

@@ -22,3 +22,4 @@ public func caller1(p: P) {
   callee(C<Int32>(), p)
 }
 
+REQUIRES: updating_for_owned_noescape

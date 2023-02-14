@@ -26,3 +26,4 @@ struct X : R {
 func test(x: X) {
   g(x)
 }
+REQUIRES: updating_for_owned_noescape

@@ -5,3 +5,4 @@
 // REQUIRES: objc_interop
 
 // CHECK-NOT: Unknown
+REQUIRES: updating_for_owned_noescape

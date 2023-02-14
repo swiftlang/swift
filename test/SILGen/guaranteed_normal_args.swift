@@ -215,3 +215,4 @@ public struct StructWithOptionalAddressOnlyField<T> {
 func useStructWithOptionalAddressOnlyField<T>(t: T) -> StructWithOptionalAddressOnlyField<T> {
   return StructWithOptionalAddressOnlyField<T>(newValue: t)
 }
+REQUIRES: updating_for_owned_noescape

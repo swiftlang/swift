@@ -42,3 +42,4 @@ public func getValue(_ obj: UnsafeMutablePointer<BridgedSwiftObject>) -> AnyObje
         fatalError("unknown type")
     }
 }
+REQUIRES: updating_for_owned_noescape

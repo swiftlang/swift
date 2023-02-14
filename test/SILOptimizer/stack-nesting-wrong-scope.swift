@@ -26,3 +26,4 @@ struct ThrowAddrOnlyStruct<T : Patatino> {
     try! self.init(throwsOptionalToThrows: throwsOptionalToOptional)
   }
 }
+REQUIRES: updating_for_owned_noescape

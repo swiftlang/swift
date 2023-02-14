@@ -12,3 +12,4 @@ extension Foo where T == Bar {
     return foo2()
   }
 }
+REQUIRES: updating_for_owned_noescape

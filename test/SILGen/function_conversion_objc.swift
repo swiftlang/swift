@@ -113,3 +113,4 @@ func cFuncPtrConversionUnsupported(_ x: @escaping @convention(c) (@convention(bl
     -> @convention(c) (@convention(c) () -> ()) -> () {
   return x  // expected-error{{C function pointer signature '@convention(c) (@convention(block) () -> ()) -> ()' is not compatible with expected type '@convention(c) (@convention(c) () -> ()) -> ()'}}
 }
+REQUIRES: updating_for_owned_noescape

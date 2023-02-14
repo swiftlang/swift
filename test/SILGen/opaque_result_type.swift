@@ -174,3 +174,4 @@ public func tupleAsAny() -> some Any {
 // CHECK-NEXT:   return %1 : $()
   return ()
 }
+REQUIRES: updating_for_owned_noescape

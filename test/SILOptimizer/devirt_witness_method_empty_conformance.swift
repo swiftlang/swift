@@ -88,3 +88,4 @@ extension Array : ApplyRegStruct, RegStructable where Element == PublicStruct {
     mutating func applyTransform() {
     }
 }
+REQUIRES: updating_for_owned_noescape

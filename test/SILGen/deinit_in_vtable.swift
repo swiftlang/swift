@@ -37,3 +37,4 @@ public func testmain() {
 // CHECK-NOT: A.deinit
 // CHECK: B.deinit!deallocator: @[[B]]
 
+REQUIRES: updating_for_owned_noescape

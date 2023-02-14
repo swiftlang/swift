@@ -136,3 +136,4 @@ func testGlobalCSE() -> Int {
   // We should only emit one global_addr in this function.
   return x + x
 }
+REQUIRES: updating_for_owned_noescape

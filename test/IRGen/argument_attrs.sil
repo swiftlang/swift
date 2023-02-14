@@ -57,3 +57,4 @@ bb0(%0 : $*T, %1 : $*U):
   %result = tuple ()
   return %result : $()
 }
+REQUIRES: updating_for_owned_noescape

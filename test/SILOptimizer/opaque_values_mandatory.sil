@@ -83,3 +83,4 @@ bb0(%0 : @owned $T):
   %6 = tuple (%2 : $T, %3 : $T, %4 : $T)
   return %6 : $(T, T, T)
 }
+REQUIRES: updating_for_owned_noescape

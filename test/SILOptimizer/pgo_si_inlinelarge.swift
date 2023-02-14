@@ -134,3 +134,4 @@ public func foo(_ x: Int64) {
 // SIL-OPT-LABEL: } // end sil function '$s18pgo_si_inlinelarge3fooyys5Int64VF'
 
 foo(100)
+REQUIRES: updating_for_owned_noescape

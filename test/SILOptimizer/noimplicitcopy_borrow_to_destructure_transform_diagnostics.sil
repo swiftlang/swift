@@ -57,3 +57,4 @@ bb3:
   %64 = tuple ()
   return %64 : $()
 }
+REQUIRES: updating_for_owned_noescape

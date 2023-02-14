@@ -140,3 +140,4 @@ sil_vtable REC {
   #REC.recursive: @_TFC6single3REC9recursivefS0_FSiT_	// single.REC.recursive (single.REC)(Swift.Int) -> ()
   #REC.init!initializer: @_TFC6single3RECcfMS0_FT_S0_	// single.REC.init (single.REC.Type)() -> single.REC
 }
+REQUIRES: updating_for_owned_noescape

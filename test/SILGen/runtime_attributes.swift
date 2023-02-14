@@ -108,3 +108,4 @@ struct TestSelfUse {
 
 // This make sure that Child is valid even though it opted-out of attribute.
 _ = Child()
+REQUIRES: updating_for_owned_noescape

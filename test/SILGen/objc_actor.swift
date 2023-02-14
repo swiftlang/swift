@@ -32,3 +32,4 @@ public actor MyClass1: NSObject {
 
 // CHECK: alloc_ref $MyClass3
 // CHECK-NOT: alloc_ref [objc] $MyClass3
+REQUIRES: updating_for_owned_noescape

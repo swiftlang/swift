@@ -19,3 +19,4 @@ entry(%instance : @guaranteed $C):
     test_specification "function-get-self-argument-index"
     unreachable
 }
+REQUIRES: updating_for_owned_noescape

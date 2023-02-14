@@ -229,3 +229,4 @@ sil_vtable F {
 sil_vtable G {
   #E.foo: @_TFC5casts1G3foofS0_FT_T_ [override]
 }
+REQUIRES: updating_for_owned_noescape

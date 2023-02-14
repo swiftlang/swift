@@ -980,3 +980,4 @@ bb0(%0 : $Builtin.Int32):
   return %r : $()
 }
 
+REQUIRES: updating_for_owned_noescape

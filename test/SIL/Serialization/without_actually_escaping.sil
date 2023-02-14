@@ -34,3 +34,4 @@ bb0(%0 : @guaranteed $@convention(block) () -> ()):
   return %v : $()
 }
 
+REQUIRES: updating_for_owned_noescape

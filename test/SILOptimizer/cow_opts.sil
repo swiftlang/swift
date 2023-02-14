@@ -200,3 +200,4 @@ bb2:
   return %t : $(Builtin.Int1, Buffer)
 }
 
+REQUIRES: updating_for_owned_noescape

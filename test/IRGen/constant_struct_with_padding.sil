@@ -17,3 +17,4 @@ sil_global hidden @global : $T = {
   %initval = struct $T (%2 : $Builtin.Int1, %3 : $Builtin.Int32)
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -106,3 +106,4 @@ func print_strings_from_addressors() {
 // CHECK-OUTPUT: ❄️gastroperiodyni
 print_strings_from_addressors()
 
+REQUIRES: updating_for_owned_noescape

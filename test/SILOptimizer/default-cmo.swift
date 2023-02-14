@@ -101,3 +101,4 @@ public func getModuleKlassMemberTBD() -> Int {
   return ModuleTBD.moduleKlassMember()
 }
 
+REQUIRES: updating_for_owned_noescape

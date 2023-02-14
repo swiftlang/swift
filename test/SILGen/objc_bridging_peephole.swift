@@ -591,3 +591,4 @@ func testBlockToOptionalAnyObjectBridge(block: @escaping @convention(block) () -
   // CHECK-NEXT: destroy_value [[OPTREF]]
   takeNullableId(block as Any)
 }
+REQUIRES: updating_for_owned_noescape

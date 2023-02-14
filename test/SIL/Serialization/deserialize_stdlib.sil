@@ -4,3 +4,4 @@
 // RUN: %FileCheck %s < %t
 
 // CHECK-NOT: Unknown
+REQUIRES: updating_for_owned_noescape

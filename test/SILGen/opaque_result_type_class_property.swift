@@ -12,3 +12,4 @@ public class HasProperty {
 
 // CHECK-LABEL: sil shared [thunk] [ossa] @$s33opaque_result_type_class_property11HasPropertyC3fooQrvpACTk : $@convention(thin) (@in_guaranteed @_opaqueReturnTypeOf("$s33opaque_result_type_class_property11HasPropertyC3fooQrvp", 0) __, @in_guaranteed HasProperty) -> () {
 // CHECK: bb0(%0 : $*E, %1 : $*HasProperty):
+REQUIRES: updating_for_owned_noescape

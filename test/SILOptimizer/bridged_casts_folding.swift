@@ -949,3 +949,4 @@ public func testMyThing() {
   let x = MyThing(name: "B")
   doSomethingWithAnyHashable(x)
 }
+REQUIRES: updating_for_owned_noescape

@@ -138,3 +138,4 @@ sil_vtable SomeClass {
 sil_witness_table hidden SomeClass: SomeProtocol module test {
   method #SomeProtocol.foo: <Self where Self : SomeProtocol> (Self) -> () -> Int : @foo_
 }
+REQUIRES: updating_for_owned_noescape

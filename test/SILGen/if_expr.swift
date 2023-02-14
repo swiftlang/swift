@@ -230,3 +230,4 @@ func nestedType() throws -> Int {
     0
   }
 }
+REQUIRES: updating_for_owned_noescape

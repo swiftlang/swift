@@ -1241,3 +1241,4 @@ bb6(%14 : @owned $Klass):
   %16 = tuple ()
   return %16 : $()
 }
+REQUIRES: updating_for_owned_noescape

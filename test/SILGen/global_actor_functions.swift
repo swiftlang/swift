@@ -22,3 +22,4 @@ class Sub: Super {
     super.f()
   }
 }
+REQUIRES: updating_for_owned_noescape

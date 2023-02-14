@@ -266,3 +266,4 @@ class C_56857 {
     }
   } // expected-error {{missing return in class method expected to return 'Int'}}
 }
+REQUIRES: updating_for_owned_noescape

@@ -27,3 +27,4 @@ markUsed(a.test())
 
 var nestedType = A.NestedType()
 markUsed(nestedType.test())
+REQUIRES: updating_for_owned_noescape

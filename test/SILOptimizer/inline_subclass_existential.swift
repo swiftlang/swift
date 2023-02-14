@@ -19,3 +19,4 @@ func foo<T>(_ x: C<T> & P) {
 func bar(_ x: C<Int> & P) {
   foo(x)
 }
+REQUIRES: updating_for_owned_noescape

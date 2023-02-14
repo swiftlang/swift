@@ -53,3 +53,4 @@ public class ExclusivityAttrClass {
   public static var staticVar: Int = 27
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -117,3 +117,4 @@ func getBaseObjectUID<T: UID>(x: T) -> (Int, Int, Int) where T: Base {
 
   // CHECK: return
 }
+REQUIRES: updating_for_owned_noescape

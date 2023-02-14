@@ -39,3 +39,4 @@ bb0(%0 : $Int, %1 : $Int):
   return %26 : $Int, loc "file.swift":3:5, scope 1
 } // end sil function 'foo'
 
+REQUIRES: updating_for_owned_noescape

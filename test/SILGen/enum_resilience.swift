@@ -206,3 +206,4 @@ public func resilientIfCase(_ e: MyResilientEnum) -> Bool {
   case .loki: ()
   }
 }
+REQUIRES: updating_for_owned_noescape

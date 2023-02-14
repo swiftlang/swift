@@ -1016,3 +1016,4 @@ struct TestReabstractableWrappedValue<T1> {
   @AutoclosureWrapper var v: S<T1> = S()
   init() where T1 == Int { }
 }
+REQUIRES: updating_for_owned_noescape

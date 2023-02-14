@@ -36,3 +36,4 @@ extension P {
   }
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -167,3 +167,4 @@ entry(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substitute
   %void = builtin "taskRunInline"<T>(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) : $()
   return %void : $()
 }
+REQUIRES: updating_for_owned_noescape

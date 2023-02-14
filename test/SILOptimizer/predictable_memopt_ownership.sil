@@ -1402,3 +1402,4 @@ bb0(%0 : $MyInt, %1 : @guaranteed $Foo, %2 : @guaranteed $Baz):
   dealloc_stack %3 : $*MyInt
   return %38 : $MyInt
 } // end sil function '$s27capture_promotion_ownership05test_a1_B0SiycyFSiycfU_Tf2iii_n'
+REQUIRES: updating_for_owned_noescape

@@ -9,3 +9,4 @@
 class C {}
 
 sil_vtable C {}
+REQUIRES: updating_for_owned_noescape

@@ -1007,3 +1007,4 @@ bb0(%0 : $Builtin.RawPointer, %count : $Builtin.Word):
   %6 = load [copy] %5 : $*Builtin.NativeObject
   return %6 : $Builtin.NativeObject
 }
+REQUIRES: updating_for_owned_noescape

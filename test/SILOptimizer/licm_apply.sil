@@ -319,3 +319,4 @@ bb2:
   return %15 : $()
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -796,3 +796,4 @@ sil_vtable C {}
 sil_vtable C_PQ {}
 sil_vtable CDefaultStatic {}
 sil_vtable MyObject {}
+REQUIRES: updating_for_owned_noescape

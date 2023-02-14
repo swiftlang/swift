@@ -287,3 +287,4 @@ bb0(%0 : $DefaultStringInterpolation, %1 : $@thin String.Type):
   return %2 : $String
 }
 
+REQUIRES: updating_for_owned_noescape

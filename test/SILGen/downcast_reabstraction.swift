@@ -28,3 +28,4 @@ func condFunctionFromAny(_ x: Any) {
 func uncondFunctionFromAny(_ x: Any) {
   (x as! () -> ())()
 }
+REQUIRES: updating_for_owned_noescape

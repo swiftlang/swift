@@ -85,3 +85,4 @@ public func areNotEqualTypes5<T1>(_ t1o: T1.Type?) -> Bool {
 public func areNotEqualTypes6<T1>(_ t1o: T1.Type?) -> Bool {
     return nil != t1o
 }
+REQUIRES: updating_for_owned_noescape

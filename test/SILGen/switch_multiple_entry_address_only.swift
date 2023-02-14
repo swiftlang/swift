@@ -182,3 +182,4 @@ func fallthroughWithValue(e: E) {
     break
   }
 }
+REQUIRES: updating_for_owned_noescape

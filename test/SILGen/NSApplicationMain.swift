@@ -24,3 +24,4 @@ func bar() {
   NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
 }
 #endif
+REQUIRES: updating_for_owned_noescape

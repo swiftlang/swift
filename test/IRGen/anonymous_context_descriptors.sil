@@ -39,3 +39,4 @@ class Blah<T: P> {
 
 // # mangled name
 // CHECK-MANGLED-SAME: @".str.83.$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV"
+REQUIRES: updating_for_owned_noescape

@@ -228,3 +228,4 @@ func makeActorInTask() async {
 func callActorMethodInTask(a: SomeActor) async {
   Task.detached { await a.someMethod() }
 }
+REQUIRES: updating_for_owned_noescape

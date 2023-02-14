@@ -53,3 +53,4 @@ sil @public_declaration : $() -> ()
 // CHECK-LABEL: sil hidden_external @hidden_declaration : $@convention(thin) () -> ()
 sil hidden_external @hidden_declaration : $() -> ()
 
+REQUIRES: updating_for_owned_noescape

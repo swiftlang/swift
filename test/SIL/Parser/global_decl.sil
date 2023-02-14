@@ -52,3 +52,4 @@ sil_global @$s11global_decl7global4Sivp : $Int
 
 // CHECK: sil_global hidden @$s11global_decl7global5AA1CCSgXwvp : $@sil_weak Optional<C>
 sil_global hidden @$s11global_decl7global5AA1CCSgXwvp : $@sil_weak Optional<C>
+REQUIRES: updating_for_owned_noescape

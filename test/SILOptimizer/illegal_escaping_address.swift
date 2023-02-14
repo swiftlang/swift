@@ -49,3 +49,4 @@ public func test_address_escaping_function_single_block() -> UnsafePointer<Int> 
   return p
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -84,3 +84,4 @@ bb16:
 bb17:
   br bb10(undef : $Builtin.Int64)
 }
+REQUIRES: updating_for_owned_noescape

@@ -88,3 +88,4 @@ sil_witness_table [serialized] DeadMethodClass: Proto module witness_tables {
   method #Proto.abc: nil
 }
 
+REQUIRES: updating_for_owned_noescape

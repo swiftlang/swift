@@ -28,3 +28,4 @@ public func apply(_ f : () -> Int) -> Int {
 public func test() {
   let res = apply({ return 1 })
 }
+REQUIRES: updating_for_owned_noescape

@@ -66,3 +66,4 @@ func requires_address_and_reabstraction() {
   case let a as Any: goodbye(a)
   }
 }
+REQUIRES: updating_for_owned_noescape

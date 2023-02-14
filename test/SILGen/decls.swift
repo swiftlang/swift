@@ -192,3 +192,4 @@ class EscapeKeywordsInDottedPaths {
   // CHECK: #EscapeKeywordsInDottedPaths.`switch`!getter
   var `switch`: String = ""
 }
+REQUIRES: updating_for_owned_noescape

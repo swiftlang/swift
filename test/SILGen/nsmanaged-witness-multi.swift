@@ -26,3 +26,4 @@ extension Fish : FishProtocol {}
 // CHECK: objc_method %0 : $Fish, #Fish.name!getter.foreign
 // CHECK: objc_method %0 : $Fish, #Fish.name!setter.foreign
 // CHECK: unwind
+REQUIRES: updating_for_owned_noescape

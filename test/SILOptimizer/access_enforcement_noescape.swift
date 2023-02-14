@@ -473,3 +473,4 @@ func noEscapeBlock() {
   }
 }
 // CHECK-LABEL: sil hidden @$s27access_enforcement_noescape13noEscapeBlockyyF : $@convention(thin) () -> () {
+REQUIRES: updating_for_owned_noescape

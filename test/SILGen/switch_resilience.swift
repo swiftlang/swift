@@ -50,3 +50,4 @@ func resilientTupleEltCaseEnumTest() {
     kraken()
   }
 }
+REQUIRES: updating_for_owned_noescape

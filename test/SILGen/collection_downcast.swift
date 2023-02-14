@@ -309,3 +309,4 @@ func testCollectionCompatibilityCoercions(_ arr: [Int], _ optArr: [Any]?, _ set:
   // CHECK: apply [[CAST_FN]]<Int, String>
   (try [i]) as Magic as [String]
 }
+REQUIRES: updating_for_owned_noescape

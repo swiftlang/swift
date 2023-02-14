@@ -742,3 +742,4 @@ bbexit:
 // test borrowOverValue->borrowCopyOverScope path
 
 //!!!TODO: test prepareUnowned paths
+REQUIRES: updating_for_owned_noescape

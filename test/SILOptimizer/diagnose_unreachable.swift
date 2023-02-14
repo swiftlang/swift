@@ -570,3 +570,4 @@ func test_no_warnings_with_fatalError_when_wrapped_in_buildExpression() {
     }
   }
 }
+REQUIRES: updating_for_owned_noescape

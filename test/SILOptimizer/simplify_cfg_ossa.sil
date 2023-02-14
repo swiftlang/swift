@@ -1839,3 +1839,4 @@ bb5:
 bb6(%14 : $FakeBool):
   return %14 : $FakeBool
 }
+REQUIRES: updating_for_owned_noescape

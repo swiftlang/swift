@@ -196,3 +196,4 @@ func curry_initializer() -> (Int) -> Gizmo? {
 // CHECK-LABEL: sil private [ossa] @$s13objc_currying17curry_initializerSo5GizmoCSgSicyFAESicfu_ : $@convention(thin) (Int) -> @owned Optional<Gizmo> {
 
 // CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfcTO : $@convention(method) (Int, @owned Gizmo) -> @owned Optional<Gizmo> {
+REQUIRES: updating_for_owned_noescape

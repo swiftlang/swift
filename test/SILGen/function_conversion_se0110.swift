@@ -57,3 +57,4 @@ func givesTwoAnyObjectOwned(_ fn: (__owned AnyObject, __owned AnyObject) -> ()) 
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

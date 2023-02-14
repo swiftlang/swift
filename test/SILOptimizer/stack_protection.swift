@@ -118,3 +118,4 @@ public func loadUnaligned(_ urp: UnsafeRawPointer) -> Int {
   return urp.loadUnaligned(as: Int.self)
 }
 
+REQUIRES: updating_for_owned_noescape

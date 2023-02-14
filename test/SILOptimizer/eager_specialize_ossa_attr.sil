@@ -66,3 +66,4 @@ bb0(%0 : $*T, %1 : @_eagerMove $*G<T>, %2 : $*T.Elt):
   return %7 : $()
 }
 
+REQUIRES: updating_for_owned_noescape

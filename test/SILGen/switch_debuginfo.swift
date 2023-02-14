@@ -98,3 +98,4 @@ func test5(s: String) {
     nop1()
   }
 }
+REQUIRES: updating_for_owned_noescape

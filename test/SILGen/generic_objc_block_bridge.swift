@@ -13,3 +13,4 @@ class Tubb<GenericParamName>: Butt {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sS2iIyByd_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int {
+REQUIRES: updating_for_owned_noescape

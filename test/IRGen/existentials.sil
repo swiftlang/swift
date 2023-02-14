@@ -136,3 +136,4 @@ entry(%arg : $*any Constrained<Int>):
 // OPT: store
 // OPT:  call
 // OPT: ret
+REQUIRES: updating_for_owned_noescape

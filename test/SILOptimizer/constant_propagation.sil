@@ -1060,3 +1060,4 @@ bb2:
 bb3(%11 : $Builtin.Int1):
   return %11 : $Builtin.Int1
 }
+REQUIRES: updating_for_owned_noescape

@@ -12,3 +12,4 @@ func test1<T>(_ x: T) {
     consumeValue(x2)
     consumeValue(x2)
 }
+REQUIRES: updating_for_owned_noescape

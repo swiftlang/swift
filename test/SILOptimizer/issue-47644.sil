@@ -135,3 +135,4 @@ bb5(%170 : $Model):                               // Preds: bb3 bb4
   return %170 : $Model                            // id: %171
 } // end sil function 'BuggyFunction'
 
+REQUIRES: updating_for_owned_noescape

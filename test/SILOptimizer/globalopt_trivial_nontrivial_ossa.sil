@@ -158,3 +158,4 @@ bb0:
   return %5 : $Builtin.RawPointer
 }
 
+REQUIRES: updating_for_owned_noescape

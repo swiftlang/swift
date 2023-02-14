@@ -67,3 +67,4 @@ func guaranteed_captures() {
 }
 
 // CHECK: sil private [ossa] [[FN_NAME]] : $@convention(thin) (@guaranteed { var S }, @guaranteed { var C }, @guaranteed { var any P }, S, @guaranteed C, @in_guaranteed any P)
+REQUIRES: updating_for_owned_noescape

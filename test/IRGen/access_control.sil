@@ -25,3 +25,4 @@ func local() {
 // CHECK: @"$s14access_control14InternalStructVN" = hidden alias
 // CHECK: @"$s14access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVN" = internal alias
 // CHECK: @"$s14access_control5localyyF11LocalStructL_VN" = internal alias
+REQUIRES: updating_for_owned_noescape

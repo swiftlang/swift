@@ -21,3 +21,4 @@ import Foundation
 func indexedSubscripting(b b: B, idx: Int, a: A) {
   var a2 = b[idx] as! A
 }
+REQUIRES: updating_for_owned_noescape

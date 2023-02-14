@@ -31,3 +31,4 @@ bb0:
 // CHECK: define{{( protected)?}} swiftcc void @foo
 // CHECK: define{{( protected)?}} swiftcc void @bar
 // CHECK: define{{( protected)?}} swiftcc void @baz
+REQUIRES: updating_for_owned_noescape

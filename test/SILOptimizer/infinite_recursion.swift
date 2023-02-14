@@ -310,3 +310,4 @@ class Node {
 class RootNode: Node {
   override var rootNode: RootNode { return self }
 }
+REQUIRES: updating_for_owned_noescape

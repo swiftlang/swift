@@ -313,3 +313,4 @@ sil_witness_table hidden Klass4: P module devirtualize_protocol_composition {
   method #P.foo: <Self where Self : P> (Self) -> () -> Int32 : @Klass4foo
 }
 
+REQUIRES: updating_for_owned_noescape

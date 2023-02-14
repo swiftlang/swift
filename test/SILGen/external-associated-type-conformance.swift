@@ -10,3 +10,4 @@ extension BadError: LocalizedError {}
 // CHECK:       }
 // -- so we have to emit that too
 // CHECK-LABEL: sil_witness_table shared [serialized] BadError.Code: _ErrorCodeProtocol module __ObjC 
+REQUIRES: updating_for_owned_noescape

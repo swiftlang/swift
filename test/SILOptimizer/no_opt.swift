@@ -25,3 +25,4 @@ public func foo2() {
   bar(3)
   bar(4)
 }
+REQUIRES: updating_for_owned_noescape

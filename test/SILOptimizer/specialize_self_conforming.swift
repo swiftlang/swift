@@ -23,3 +23,4 @@ func callsTakesP<T : P>(_ t: T) {
 func callsTakesPWithP(_ p: P) {
   callsTakesP(p)
 }
+REQUIRES: updating_for_owned_noescape

@@ -17,3 +17,4 @@ public func test_raw_load(rp: UnsafeRawPointer) -> Int {
 public func test_mutableraw_load(rp: UnsafeMutableRawPointer) -> Int {
   return rp.load(as: Int.self)
 }
+REQUIRES: updating_for_owned_noescape

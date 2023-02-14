@@ -172,3 +172,4 @@ bb0(%0 : $X):
   return %10 : $X
 }
 
+REQUIRES: updating_for_owned_noescape

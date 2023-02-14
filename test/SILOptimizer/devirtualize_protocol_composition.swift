@@ -138,3 +138,4 @@ public func entryPoint5<T>(c: ClassG<T>) -> Int {
 public func entryPoint6(c: ClassE) -> Int {
   return shouldOptimize5(c)
 }
+REQUIRES: updating_for_owned_noescape

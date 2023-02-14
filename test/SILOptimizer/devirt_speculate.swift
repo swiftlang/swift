@@ -117,3 +117,4 @@ class Sub7 : Base {
 public func testMaxNumSpeculativeTargets(_ b: Base) {
   b.foo()
 }
+REQUIRES: updating_for_owned_noescape

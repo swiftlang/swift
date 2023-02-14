@@ -39,3 +39,4 @@ public func foo() -> Bool {
 // CHECK: sil @$s7Library1SV6memberSivg : $@convention(method) (@in_guaranteed S) -> Int
 // CHECK: sil @$s7Library1SV6memberSivs : $@convention(method) (Int, @inout S) -> ()
 // CHECK: sil @$s7Library1SV6memberSivM : $@yield_once @convention(method) (@inout S) -> @yields @inout Int
+REQUIRES: updating_for_owned_noescape

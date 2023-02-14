@@ -56,3 +56,4 @@ sil_vtable Bar {
   #Foo.ping: @_TFC8testcase3Foo4pingfS0_FT_T_ [inherited]
   #Foo.init!initializer: @_TFC8testcase3FoocfMS0_FT_S0_ [inherited]
 }
+REQUIRES: updating_for_owned_noescape

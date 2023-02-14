@@ -266,3 +266,4 @@ public class AnotherTest {
       self.obj.error = NSError(myError: 10)
   }
 }
+REQUIRES: updating_for_owned_noescape

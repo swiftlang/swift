@@ -132,3 +132,4 @@ func testRefinementProtocolImplKlass() -> MyEnum {
   let x = RefinementProtocolImplKlass()
   return transparentObjectCallee(x)
 }
+REQUIRES: updating_for_owned_noescape

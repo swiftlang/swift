@@ -212,3 +212,4 @@ func trivialStructContinueBreak(_ xx: AsyncLazySequence<[Int]>) async {
 
   funcEnd()
 }
+REQUIRES: updating_for_owned_noescape

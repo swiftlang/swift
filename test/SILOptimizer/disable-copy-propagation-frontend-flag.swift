@@ -101,3 +101,4 @@
 // CHECK-CPON-DHON: ssa-destroy-hoisting
 
 func foo() {}
+REQUIRES: updating_for_owned_noescape

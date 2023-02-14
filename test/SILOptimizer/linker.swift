@@ -21,3 +21,4 @@ doSomething2()
 // OPT: sil [noinline] @$ss12doSomething3yyxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (){{$}}
 
 callDoSomething3()
+REQUIRES: updating_for_owned_noescape

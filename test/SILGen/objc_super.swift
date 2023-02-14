@@ -44,3 +44,4 @@ class NonObjCSuperInit : Wotsit {
     super.init(nope: NotInObjC<Int>())
   }
 }
+REQUIRES: updating_for_owned_noescape

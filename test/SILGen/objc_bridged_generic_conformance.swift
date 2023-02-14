@@ -5,3 +5,4 @@ protocol P { func test() }
 extension Thingy: P {
   @objc func test() {}
 }
+REQUIRES: updating_for_owned_noescape

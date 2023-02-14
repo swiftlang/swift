@@ -133,3 +133,4 @@ class FinalEntity: NSObject, EntityIDProto {
 // CHECK-LABEL: sil_vtable ProtoAdopter {
 // CHECK-NOT: managed{{.*}}Prop
 // CHECK: {{^}$}}
+REQUIRES: updating_for_owned_noescape

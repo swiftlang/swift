@@ -76,3 +76,4 @@ class AgainCheckCompilerInitAttr {
     whenever = 0
   } // expected-error {{return from initializer without initializing all stored properties}}
 }
+REQUIRES: updating_for_owned_noescape

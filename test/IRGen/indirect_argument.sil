@@ -98,3 +98,4 @@ entry(%x : $Huge, %y : $Huge):
   %z = apply %a(%x) : $@convention(thick) @callee_owned (Huge) -> Huge
   return %z : $Huge
 }
+REQUIRES: updating_for_owned_noescape

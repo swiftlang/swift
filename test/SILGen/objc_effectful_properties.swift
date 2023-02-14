@@ -65,3 +65,4 @@ func testMainActorMethod(eff : EffProps) async {
   // CHECK: } // end sil function '${{.*}}19testMainActorMethod
   let _ = await eff.regularMainDog()
 }
+REQUIRES: updating_for_owned_noescape

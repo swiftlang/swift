@@ -97,3 +97,4 @@ bb0:
   %0 = pack_length $Pack{Int, Float, String}
   return %0 : $Builtin.Word
 }
+REQUIRES: updating_for_owned_noescape

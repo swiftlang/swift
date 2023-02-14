@@ -85,3 +85,4 @@ func test8() {
 }
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s36protocol_operators_local_conformance5test8yyF1CL_CSQAASQ2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed C, @in_guaranteed C, @thick C.Type) -> Bool {
 // CHECK: function_ref @$s36protocol_operators_local_conformance5test8yyF1CL_C2eeoiySbAD_ADtFZ : $@convention(method) (@guaranteed C, @guaranteed C, @thick C.Type) -> Bool
+REQUIRES: updating_for_owned_noescape

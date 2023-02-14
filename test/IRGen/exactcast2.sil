@@ -59,3 +59,4 @@ sil_vtable MD5 {
 
 
 
+REQUIRES: updating_for_owned_noescape

@@ -112,3 +112,4 @@ bb0(%0 : $*SomeInstance):
 sil_witness_table hidden SomeInstance: SomeProtocol module t {
   method #SomeProtocol.foo: <Self where Self : SomeProtocol> (Self) -> () -> () : @$s26escape_analysis_invalidate12SomeInstanceVAA0A8ProtocolA2aDP3fooyyFTW     // protocol witness for SomeProtocol.foo() in conformance SomeInstance
 }
+REQUIRES: updating_for_owned_noescape

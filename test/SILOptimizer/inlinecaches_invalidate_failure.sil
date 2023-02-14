@@ -106,3 +106,4 @@ sil_vtable Foo2 {
   #Foo.init!initializer: @_TFC4test4Foo2cfMS0_FT_S0_	// test.Foo2.init (test.Foo2.Type)() -> test.Foo2
   #Foo2.deinit!deallocator: @_TFC4test4Foo2D	// test.Foo2.__deallocating_deinit
 }
+REQUIRES: updating_for_owned_noescape

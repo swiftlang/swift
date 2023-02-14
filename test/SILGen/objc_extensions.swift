@@ -184,3 +184,4 @@ func testStaticVarAccess() {
   // CHECK: [[ADDR:%.*]] = pointer_to_address [[PTR]]
   _ = Base.x
 }
+REQUIRES: updating_for_owned_noescape

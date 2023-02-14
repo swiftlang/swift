@@ -26,3 +26,4 @@ func main_func<T>(In In : T) {
 func interesting() {
   main_func(In: 3)
 }
+REQUIRES: updating_for_owned_noescape

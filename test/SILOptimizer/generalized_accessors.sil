@@ -105,3 +105,4 @@ return %13 : $()                            // expected-error {{accessor must yi
 bb5:
 unwind
 }
+REQUIRES: updating_for_owned_noescape

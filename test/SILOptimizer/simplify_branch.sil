@@ -99,3 +99,4 @@ bb2:
   br bb1(%2 : $Builtin.Int64)
 }
 
+REQUIRES: updating_for_owned_noescape

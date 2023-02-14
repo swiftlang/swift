@@ -35,3 +35,4 @@ enum EU<T: P> {
 
 func zim(x: EU<ER>) -> EU<ER> { return x }
 func zang(x: E<ER>) -> E<ER> { return x }
+REQUIRES: updating_for_owned_noescape

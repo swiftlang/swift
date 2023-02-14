@@ -1078,3 +1078,4 @@ public func f540_takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
   let container = try decoder.unkeyedContainer()
   return container.isAtEnd
 }
+REQUIRES: updating_for_owned_noescape

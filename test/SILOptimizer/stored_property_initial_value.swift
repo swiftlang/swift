@@ -27,3 +27,4 @@ class C<T, U : BinaryInteger> {
 
   init() {}
 }
+REQUIRES: updating_for_owned_noescape

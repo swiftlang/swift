@@ -891,3 +891,4 @@ sil_vtable CP2 {
 sil_witness_table CP1: P module devirt_try_apply {
   method #P.foo: @_TTWC16devirt_try_apply3CP1S_1PS_FS1_3foouRq_S1__fq_FzT_Vs5Int32
 }
+REQUIRES: updating_for_owned_noescape

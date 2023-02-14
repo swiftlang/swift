@@ -119,3 +119,4 @@ bb0(%0 : $@thick WeakCycle.Type):
   %3 = apply %2(%1) : $@convention(method) (@owned WeakCycle) -> @owned WeakCycle
   return %3 : $WeakCycle
 }
+REQUIRES: updating_for_owned_noescape

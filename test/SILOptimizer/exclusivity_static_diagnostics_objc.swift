@@ -17,3 +17,4 @@ func testOptionalImport() {
   // expected-note@+1{{conflicting access is here}}
   SomeObjCInterface.perform(&x) { x += 1 }
 }
+REQUIRES: updating_for_owned_noescape

@@ -300,3 +300,4 @@ bb3(%25 : @owned $any Error):
 bb4(%29 : @owned $any Error):
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

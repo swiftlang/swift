@@ -21,3 +21,4 @@ bb0(%0 : $Int32):
   return %10 : $Int32                               // id: %11
 }
 
+REQUIRES: updating_for_owned_noescape

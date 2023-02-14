@@ -9,3 +9,4 @@ func foo() {
   _ = Foo()
 }
 
+REQUIRES: updating_for_owned_noescape

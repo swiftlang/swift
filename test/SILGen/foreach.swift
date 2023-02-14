@@ -641,3 +641,4 @@ func injectForEachElementIntoOptional(_ xs: [Int]) {
 func injectForEachElementIntoOptional<T>(_ xs: [T]) {
   for x : T? in xs {}
 }
+REQUIRES: updating_for_owned_noescape

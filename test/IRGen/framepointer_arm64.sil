@@ -69,3 +69,4 @@ entry(%i : $Int32):
 // CHECKASM-ALL: _leaf_function_no_frame_pointer
 // CHECKASM-ALL: ldp
 // CHECKASM-ALL: ret
+REQUIRES: updating_for_owned_noescape

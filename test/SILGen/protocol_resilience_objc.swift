@@ -7,3 +7,4 @@
 }
 
 // CHECK-NOT: sil_default_witness_table ObjCProtocol
+REQUIRES: updating_for_owned_noescape

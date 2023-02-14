@@ -1260,3 +1260,4 @@ bb6:
   %tuple = tuple()
   return %tuple : $()
 }
+REQUIRES: updating_for_owned_noescape

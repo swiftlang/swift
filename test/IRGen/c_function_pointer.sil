@@ -16,3 +16,4 @@ entry(%f : $@convention(c) () -> ()):
   return %z : $()
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -1453,3 +1453,4 @@ bb0(%0 : $Builtin.Word):
 
   return %10 : $Builtin.Word
 }
+REQUIRES: updating_for_owned_noescape

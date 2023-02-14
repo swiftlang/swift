@@ -41,3 +41,4 @@ bb0(%0 : @guaranteed $Saddle):
 // CHECK:         %6 = tuple ()
 // CHECK:         return %6 : $()
 // CHECK:       }
+REQUIRES: updating_for_owned_noescape

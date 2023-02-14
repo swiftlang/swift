@@ -281,3 +281,4 @@ bb5(%r : $Builtin.Int32):
   return %r : $Builtin.Int32
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -15,3 +15,4 @@ extension S where T == (Int, String) {
     t.0 = 1
   } // expected-error {{return from initializer without initializing all stored properties}}
 }
+REQUIRES: updating_for_owned_noescape

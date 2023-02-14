@@ -167,3 +167,4 @@ sil_differentiability_witness hidden [reverse] [parameters 0 1] [results 0] <τ_
 // IRGEN-SAME: @AD__generic__jvp_src_0_wrt_0_1
 // IRGEN-SAME: @AD__generic__vjp_src_0_wrt_0_1
 // IRGEN-SAME: }
+REQUIRES: updating_for_owned_noescape

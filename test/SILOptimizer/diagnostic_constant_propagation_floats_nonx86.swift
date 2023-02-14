@@ -71,3 +71,4 @@ func testHexFloatImprecision() {
   _blackHole(Double(0x1.0000000000001p-1023))
   _blackHole(Double(0x1.00000000000001p-1000))
 }
+REQUIRES: updating_for_owned_noescape

@@ -38,3 +38,4 @@ struct Rdar15410780_B {
 struct Rdar15410780_C {
   var d: String?
 }
+REQUIRES: updating_for_owned_noescape

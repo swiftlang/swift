@@ -42,3 +42,4 @@ sil_vtable Foo {
   #Foo.ping: @_TFC4main3Foo4pingfS0_FT_Si  // main.Foo.ping (main.Foo)() -> Swift.Int
   #Foo.init!initializer: @_TFC4main3FoocfMS0_FT_S0_  // main.Foo.init (main.Foo.Type)() -> main.Foo
 }
+REQUIRES: updating_for_owned_noescape

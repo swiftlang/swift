@@ -12,3 +12,4 @@
 func useTransparentFuncWithDefaultArgument() -> Int {
   return transparentFuncWithDefaultArgument()
 }
+REQUIRES: updating_for_owned_noescape

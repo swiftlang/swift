@@ -1607,3 +1607,4 @@ bb0(%0 : $*Int):
   %10 = tuple ()
   return %10 : $()
 }
+REQUIRES: updating_for_owned_noescape

@@ -851,3 +851,4 @@ bb2(%2 : @guaranteed $B):
   end_borrow %2 : $B
   return %99 : $()
 }
+REQUIRES: updating_for_owned_noescape

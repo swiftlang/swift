@@ -205,3 +205,4 @@ class OverridableReader : GettableTitle {
 // CHECK-LABEL: sil shared [ossa] @$s13read_accessor17OverridableReaderC5titleSSvg
 // CHECK:       class_method %0 : $OverridableReader, #OverridableReader.title!read
 // CHECK-LABEL: // end sil function '$s13read_accessor17OverridableReaderC5titleSSvg'
+REQUIRES: updating_for_owned_noescape

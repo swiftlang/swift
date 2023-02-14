@@ -559,3 +559,4 @@ class ClassIntTreeNode {
     return right.find(v)
   }
 }
+REQUIRES: updating_for_owned_noescape

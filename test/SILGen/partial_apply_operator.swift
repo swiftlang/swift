@@ -31,3 +31,4 @@ func passGenericOp<T : Group>(_: T) {
 // CHECK-LABEL: sil private [ossa] @$s22partial_apply_protocol6passOpyyFS2icfu0_ : $@convention(thin) (Int) -> Int
 
 // CHECK-LABEL: sil private [ossa] @$s22partial_apply_protocol13passGenericOpyyxAA5GroupRzlFS2i_Sitcfu_ : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out τ_0_2 for <Int, Int, Int>
+REQUIRES: updating_for_owned_noescape

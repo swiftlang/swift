@@ -98,3 +98,4 @@ bb0(%0 : @owned ${ var Builtin.Int64 }):
   %9 = tuple ()
   return %9 : $()
 }
+REQUIRES: updating_for_owned_noescape

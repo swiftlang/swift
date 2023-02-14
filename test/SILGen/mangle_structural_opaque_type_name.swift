@@ -34,3 +34,4 @@ struct ContentView: View {
         Button("And Here")
     }
 }
+REQUIRES: updating_for_owned_noescape

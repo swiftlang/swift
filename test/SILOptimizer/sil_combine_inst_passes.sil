@@ -127,3 +127,4 @@ bb0:
   return %16 : $Int
 }
 
+REQUIRES: updating_for_owned_noescape

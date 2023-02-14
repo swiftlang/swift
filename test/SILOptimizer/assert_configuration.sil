@@ -23,3 +23,4 @@ sil @assert_configuration : $@convention(thin) () -> Builtin.Int32 {
 // PERFONE-LABEL: @assert_configuration
 // PERFONE: [[RES:%.*]] = integer_literal $Builtin.Int32, 1
 // PERFONE: return [[RES]]
+REQUIRES: updating_for_owned_noescape

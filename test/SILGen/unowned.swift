@@ -175,3 +175,4 @@ struct UnownedGenericCapture<T : AnyObject> {
     return { [unowned optionalObject] in _ = optionalObject }
   }
 }
+REQUIRES: updating_for_owned_noescape

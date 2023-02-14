@@ -104,3 +104,4 @@ enum OurType<Value: P> {
 }
 func useDependentConformances<T: OurDerivedProtocol>(_: T.Type) -> OurType<AnotherExternalGeneric<T.Assoc>> {}
 // CHECK: sil hidden [ossa] @$s20mangling_retroactive24useDependentConformancesyAA7OurTypeOy12RetroactiveB22AnotherExternalGenericVy5AssocQzGAJ0H1A1PAAxAA0F15DerivedProtocolHD1_AA0f4BaseN0HI1_AikLHA2__HCg_GxmAaMRzlF
+REQUIRES: updating_for_owned_noescape

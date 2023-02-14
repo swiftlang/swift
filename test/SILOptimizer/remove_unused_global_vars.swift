@@ -74,3 +74,4 @@ public struct Baz {
   public static let darwin = Baz()
   public static var currentPlatform: Baz { return .darwin }
 }
+REQUIRES: updating_for_owned_noescape

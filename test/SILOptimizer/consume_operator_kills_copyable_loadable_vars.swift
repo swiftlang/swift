@@ -745,3 +745,4 @@ func inoutAndUseTest(_ x: Klass) {
     useValueAndInOut(&y, _move y) // expected-note {{use here}}
                                   // expected-note @-1 {{move here}}
 }
+REQUIRES: updating_for_owned_noescape

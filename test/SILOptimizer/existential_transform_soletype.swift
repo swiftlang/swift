@@ -50,3 +50,4 @@ internal class SCC: SPP {
   let x = opt1(b:b)
   return x
 }
+REQUIRES: updating_for_owned_noescape

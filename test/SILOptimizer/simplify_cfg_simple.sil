@@ -96,3 +96,4 @@ bb6:
   %19 = tuple ()
   return %19 : $()
 }
+REQUIRES: updating_for_owned_noescape

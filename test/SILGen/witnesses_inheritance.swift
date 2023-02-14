@@ -45,3 +45,4 @@ class B : A, Barrable {}
 // CHECK:         upcast {{%.*}} : $@thick B.Type to $@thick A.Type
 
 // Add tests to make sure that we handle address only case correctly.
+REQUIRES: updating_for_owned_noescape

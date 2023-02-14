@@ -96,3 +96,4 @@ func callBaz<T: P>(_ f: T, x: [Int]) {
 }
 
 #endif
+REQUIRES: updating_for_owned_noescape

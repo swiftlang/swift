@@ -248,3 +248,4 @@ sil_vtable Y {
   #X.init!initializer: @_TFC14devirt_access21YcfMS0_FT_S0_ [override]
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -11,3 +11,4 @@ class TestUndefined {
     let stringList = strings.filter({ $0 == "a" })
   }
 }
+REQUIRES: updating_for_owned_noescape

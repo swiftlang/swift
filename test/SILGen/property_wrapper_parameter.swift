@@ -537,3 +537,4 @@ func testCaptures(@ClassWrapper ref: Int, @Wrapper value: Int) {
   // closure #2 in closure #2 in implicit closure #2 in testCaptures(ref:value:)
   // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter12testCaptures3ref5valueySi_AA7WrapperVySiGtFyAA010ProjectionH0VySiGcfu0_yAJcfU1_AJycfU0_ : $@convention(thin) (ProjectionWrapper<Int>) -> ProjectionWrapper<Int>
 }
+REQUIRES: updating_for_owned_noescape

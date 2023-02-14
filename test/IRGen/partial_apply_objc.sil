@@ -272,3 +272,4 @@ entry(%c : $Gizmo):
 // CHECK-NOT: release
 // CHECK:   ret void
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

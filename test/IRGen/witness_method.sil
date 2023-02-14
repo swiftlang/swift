@@ -138,3 +138,4 @@ entry(%ret : $*T.GrowthHack, %self : $*T):
 }
 
 sil_vtable TPSReport {}
+REQUIRES: updating_for_owned_noescape

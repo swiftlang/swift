@@ -47,3 +47,4 @@ sil_vtable ABC {
   #ABC.member: @_TFC4main3ABC6memberfS0_FT_T_  // main.ABC.member (main.ABC)() -> ()
   #ABC.member2: @_TFC4main3ABC7member2fS0_FT_T_  // main.ABC.member2 (main.ABC)() -> ()
 }
+REQUIRES: updating_for_owned_noescape

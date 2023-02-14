@@ -39,3 +39,4 @@ bb3:
 }
 
 sil @writeEnum: $@convention(thin) (@inout TestEnum) -> ()
+REQUIRES: updating_for_owned_noescape

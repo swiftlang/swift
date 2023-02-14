@@ -253,3 +253,4 @@ func test() {
   var errors: [Error] = []
   test_property(errors[0].myError)
 }
+REQUIRES: updating_for_owned_noescape

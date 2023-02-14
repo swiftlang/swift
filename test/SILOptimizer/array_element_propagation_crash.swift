@@ -19,3 +19,4 @@ testit(&a)
 // CHECK: [27, 28]
 print(a)
 
+REQUIRES: updating_for_owned_noescape

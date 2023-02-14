@@ -20,3 +20,4 @@ bb0(%0 : $UInt8, %1 : $@thin Task.State.Type):
   %2 = enum $Task.State, #Task.State.Bits!enumelt, %0 : $UInt8
   return %2 : $Task.State
 }
+REQUIRES: updating_for_owned_noescape

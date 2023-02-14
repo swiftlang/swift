@@ -19,3 +19,4 @@ public func testit(_ N: Int, _ x: Int) {
     }
   }
 }
+REQUIRES: updating_for_owned_noescape

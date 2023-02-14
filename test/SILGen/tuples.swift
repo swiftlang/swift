@@ -217,3 +217,4 @@ public func testTupleSubtype(x: C, y: Int, z: String) {
   let input = (x: x, y: y, z: z)
   let output: (y: Int?, z: Any, x: AnyObject) = input
 }
+REQUIRES: updating_for_owned_noescape

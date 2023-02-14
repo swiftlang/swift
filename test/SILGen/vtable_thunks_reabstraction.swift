@@ -586,3 +586,4 @@ class SE_0267_Derived2: SE_0267_Base2<Int> {
 // CHECK-NEXT:   #SE_0267_Base2.init
 // CHECK-NEXT:   #SE_0267_Derived2.deinit
 // CHECK-NEXT:   }
+REQUIRES: updating_for_owned_noescape

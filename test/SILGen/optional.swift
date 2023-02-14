@@ -161,3 +161,4 @@ func implicit_iuo_unwrap_sourceLocation(_ value: Int!) {
   use_unwrapped(value)
 #sourceLocation() // reset
 }
+REQUIRES: updating_for_owned_noescape

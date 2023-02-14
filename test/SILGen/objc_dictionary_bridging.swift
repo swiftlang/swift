@@ -94,3 +94,4 @@ import gizmo
 }
 
 func ==(x: Foo, y: Foo) -> Bool { }
+REQUIRES: updating_for_owned_noescape

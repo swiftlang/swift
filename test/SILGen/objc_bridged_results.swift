@@ -152,3 +152,4 @@ func testPerformSelector(_ obj: NSObject) {
   // CHECK-NOT: {{(retain|release).+}}[[RESULT]]
   // CHECK-NOT: {{(retain|release).+}}[[RESULT]]
 } // CHECK: } // end sil function '$s20objc_bridged_results19testPerformSelectoryySo8NSObjectCF'
+REQUIRES: updating_for_owned_noescape

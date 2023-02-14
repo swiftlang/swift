@@ -56,3 +56,4 @@ bb0(%0 : $*AddressOnlyError):
   dealloc_stack %1 : $*Error
   return %9 : $Error
 }
+REQUIRES: updating_for_owned_noescape

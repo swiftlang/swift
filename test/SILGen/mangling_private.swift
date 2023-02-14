@@ -82,3 +82,4 @@ class Sub : Base {
   private func subMethod() {}
 } // CHECK: {{^[}]$}}
 
+REQUIRES: updating_for_owned_noescape

@@ -15,3 +15,4 @@ public func test() {
 // CHECK: %{{.*}} = class_method %{{.*}} : $Problem2, #Problem2.run : (Problem2) -> () -> Int, $@convention(method) (@guaranteed Problem2) -> Int
 // CHECK-NEXT: apply
 // CHECK: return
+REQUIRES: updating_for_owned_noescape

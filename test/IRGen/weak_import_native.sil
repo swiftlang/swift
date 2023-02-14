@@ -23,3 +23,4 @@ sil [weak_imported] @testWeak : $@convention(thin) () -> () {
   return %unit : $()
 }
 
+REQUIRES: updating_for_owned_noescape

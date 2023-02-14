@@ -26,3 +26,4 @@ entry:
   %w = integer_literal $Builtin.Word, 12345
   return %w : $Builtin.Word
 }
+REQUIRES: updating_for_owned_noescape

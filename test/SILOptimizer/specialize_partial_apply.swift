@@ -249,3 +249,4 @@ print(testit3_throwing(false))
 // CHECK-OUTPUT: 125
 print(testit3_throwing(true))
 
+REQUIRES: updating_for_owned_noescape

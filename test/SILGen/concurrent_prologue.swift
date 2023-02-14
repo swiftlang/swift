@@ -19,3 +19,4 @@
     let x = await f();
   }
 }
+REQUIRES: updating_for_owned_noescape

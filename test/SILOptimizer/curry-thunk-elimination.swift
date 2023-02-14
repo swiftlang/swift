@@ -43,3 +43,4 @@ let p: P = S(a: 1, b: 2, c: 3, d: 4)
 // CHECK-OUTPUT: 10
 print(testit(p)!)
 
+REQUIRES: updating_for_owned_noescape

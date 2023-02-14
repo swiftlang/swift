@@ -239,4 +239,4 @@ extension S<Int> {
       fatalError()
     }
   }
-}
+}REQUIRES: updating_for_owned_noescape

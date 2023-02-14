@@ -62,3 +62,4 @@ bb0(%0 : $MyCustomActor):
   %1 = builtin "buildOrdinarySerialExecutorRef"<MyCustomActor>(%0 : $MyCustomActor) : $Builtin.Executor
   return %1 : $Builtin.Executor
 }
+REQUIRES: updating_for_owned_noescape

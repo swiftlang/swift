@@ -455,3 +455,4 @@ bb5(%14 : $Optional<NSObject>):
 bb6:
   br bb5(%14 : $Optional<NSObject>)
 }
+REQUIRES: updating_for_owned_noescape

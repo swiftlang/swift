@@ -137,3 +137,4 @@ entry(%0 : $A):
   return %2 : $@callee_owned () -> @error Error
 }
 sil @partial_apply_single_helper : $@convention(thin) (@owned A) -> (@error Error)
+REQUIRES: updating_for_owned_noescape

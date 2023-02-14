@@ -308,3 +308,4 @@ bb0(%0 : $Int64, %1 : $HasObj):
   strong_release %lo : $HasHasInt64
   return %o : $AnyObject
 }
+REQUIRES: updating_for_owned_noescape

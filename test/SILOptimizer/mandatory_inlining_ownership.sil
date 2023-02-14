@@ -623,3 +623,4 @@ bb3:
 sil_vtable C2 {
   #C2.i!modify: (C2) -> () -> () : @devirt_callee
 }
+REQUIRES: updating_for_owned_noescape

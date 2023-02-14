@@ -286,3 +286,4 @@ extension Size {
     self = other
   }
 }
+REQUIRES: updating_for_owned_noescape

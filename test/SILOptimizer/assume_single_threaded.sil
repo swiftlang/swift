@@ -51,3 +51,4 @@ sil_vtable C {
   #C.deinit!deallocator: @_TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
 }
 
+REQUIRES: updating_for_owned_noescape

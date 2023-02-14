@@ -90,3 +90,4 @@ public func testSubscript(_ ubp: UnsafeRawBufferPointer) -> Int64 {
   }
   return sum
 }
+REQUIRES: updating_for_owned_noescape

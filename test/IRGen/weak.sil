@@ -169,3 +169,4 @@ bb0(%0 : $Optional<P>):
 
 // TAILCALL: {{_?}}$s4weak1AVwta:
 // TAILCALL:  jmp{{q?}} {{(\*__imp_)?_?}}swift_weakTakeAssign
+REQUIRES: updating_for_owned_noescape

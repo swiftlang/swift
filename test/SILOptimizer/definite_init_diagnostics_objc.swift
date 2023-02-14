@@ -35,3 +35,4 @@ class RequiresInitsDerived : Gizmo {
 
   func f() { }
 }
+REQUIRES: updating_for_owned_noescape

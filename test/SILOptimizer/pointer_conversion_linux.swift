@@ -52,3 +52,4 @@ public func testOptionalArray() {
   // CHECK-NEXT: br [[CALL_BRANCH]]([[NO_POINTER]] : $Optional<UnsafeRawPointer>, [[NO_OWNER]] : $Optional<AnyObject>)
 
 } // CHECK: end sil function '$s18pointer_conversion17testOptionalArrayyyF'
+REQUIRES: updating_for_owned_noescape

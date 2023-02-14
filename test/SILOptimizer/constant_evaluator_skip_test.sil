@@ -330,3 +330,4 @@ bb0:
   dealloc_stack %0 : $*Outer
   return %32 : $Builtin.Int64
 } // CHECK: Returns int: 103
+REQUIRES: updating_for_owned_noescape

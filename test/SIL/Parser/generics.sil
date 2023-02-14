@@ -111,3 +111,4 @@ bb0(%0 : $*I, %1 : $*Self):
   %11 = tuple ()                                  // user: %12
   return %11 : $()                                // id: %12
 }
+REQUIRES: updating_for_owned_noescape

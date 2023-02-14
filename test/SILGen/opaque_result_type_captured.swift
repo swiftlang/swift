@@ -24,3 +24,4 @@ public struct Butt {
         return Tubb(c: SQ(), t: { sp }, f: { sp })
     }
 }
+REQUIRES: updating_for_owned_noescape

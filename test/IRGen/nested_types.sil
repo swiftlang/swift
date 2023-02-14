@@ -26,3 +26,4 @@ bb0(%0 : $@thick Outer.Inner.Type):
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s12nested_types5OuterC5InnerVMa"(
 // CHECK:      ret %swift.metadata_response { %swift.type* bitcast {{.*}}@"$s12nested_types5OuterC5InnerVMf"{{.*}}, [[INT]] 0 }
+REQUIRES: updating_for_owned_noescape

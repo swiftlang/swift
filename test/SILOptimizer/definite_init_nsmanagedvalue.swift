@@ -32,3 +32,4 @@ extension Person {
 // CHECK: sil {{.*}}$s28definite_init_nsmanagedvalue6PersonCyACSiKcfc
 // CHECK: integer_literal $Builtin.Int2, {{.*}}, scope [[SCOPE:[0-9]+]]
 // CHECK-NEXT: store {{.*}}, scope [[SCOPE]]
+REQUIRES: updating_for_owned_noescape

@@ -549,3 +549,4 @@ enum HasInitializerEnum : Initializer {
   init(arg: Arg) { self = .A }
 }
   
+REQUIRES: updating_for_owned_noescape

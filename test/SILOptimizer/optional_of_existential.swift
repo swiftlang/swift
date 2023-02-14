@@ -25,3 +25,4 @@ struct X : Q {
 // CHECK-NEXT: } // end sil function '$s4test1XV0A2MeSiSgvg'
   var testMe: Int? { z }
 }
+REQUIRES: updating_for_owned_noescape

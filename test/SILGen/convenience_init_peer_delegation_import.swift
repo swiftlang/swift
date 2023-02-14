@@ -96,3 +96,4 @@ extension ImportedClass {
     self.init(normalFactory: false)
   }
 }
+REQUIRES: updating_for_owned_noescape

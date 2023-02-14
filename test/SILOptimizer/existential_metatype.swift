@@ -17,3 +17,4 @@ func checkProtocolType<P : SomeP>(existentialType: P.Type) -> Bool {
 public func testProtocolType() -> Bool {
   return checkProtocolType(existentialType: SpecialEnum.self)
 }
+REQUIRES: updating_for_owned_noescape

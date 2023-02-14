@@ -2476,3 +2476,4 @@ func enumSwitchTest1(_ e: __owned EnumSwitchTests.E) {
         break
     }
 }
+REQUIRES: updating_for_owned_noescape

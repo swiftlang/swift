@@ -21,3 +21,4 @@ extension Gizmo {
     self.init(bellsOn:i)
   }
 }
+REQUIRES: updating_for_owned_noescape

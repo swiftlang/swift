@@ -1633,3 +1633,4 @@ class DerivedWrappedProperty : SomeClass {
   }  // expected-error {{'super.init' isn't called on all paths before returning from initializer}}
 
 }
+REQUIRES: updating_for_owned_noescape

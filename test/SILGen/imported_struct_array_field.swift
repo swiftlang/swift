@@ -4,3 +4,4 @@
 func useImportedArrayTypedefInit() -> Name {
   return Name(name: (0, 0, 0, 0))
 }
+REQUIRES: updating_for_owned_noescape

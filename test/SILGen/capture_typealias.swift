@@ -20,3 +20,4 @@ func foo() {
 }
 
 // CHECK: sil private [ossa] @$s17capture_typealias3fooyyFBi64_yXEfU_ : $@convention(thin) () -> Builtin.Int64 {
+REQUIRES: updating_for_owned_noescape

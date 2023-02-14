@@ -106,3 +106,4 @@ bb0:
                                         // expected-note @-9 {{of 'swiftEmptyArrayStorage'}}
   return %2 : $EmptyArrayStorage
 }
+REQUIRES: updating_for_owned_noescape

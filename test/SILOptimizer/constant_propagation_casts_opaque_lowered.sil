@@ -20,3 +20,4 @@ sil [ossa] @checked_cast_same_type : $@convention(thin) <T> () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+REQUIRES: updating_for_owned_noescape

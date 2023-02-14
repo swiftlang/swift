@@ -48,4 +48,4 @@ public class SmallBarn : Barn<Cat> {
 // CHECK-NEXT:   #Barn.init!allocator: <T where T : AnyObject> (Barn<T>.Type) -> (T) -> Barn<T> : @$s45designated_init_inheritance_with_where_clause4BarnCyACyxGxcRlzClufC [inherited] // Barn.__allocating_init<A>(_:)
 // CHECK-NEXT:   <T where T : Domesticated><U where U : Ungulate> (Barn<T>.Type) -> (T, U) -> Barn<T> : @$s45designated_init_inheritance_with_where_clause9SmallBarnCyAcA3CatV_xtcAA8UngulateRzlufCAA0H0CyAHyxGx_qd__tcAA12DomesticatedRzAaFRd__lufCTV [override] // vtable thunk for Barn.__allocating_init<A>(_:_:) dispatching to SmallBarn.__allocating_init<A>(_:_:)
 // CHECK-NEXT:   #SmallBarn.deinit!deallocator: @$s45designated_init_inheritance_with_where_clause9SmallBarnCfD  // SmallBarn.__deallocating_deinit
-// CHECK-NEXT: }
+// CHECK-NEXT: }REQUIRES: updating_for_owned_noescape

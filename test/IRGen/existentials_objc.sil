@@ -228,3 +228,4 @@ bb0(%0 : $TestC):
 sil_vtable TestC { }
 
 sil_vtable NSObject { }
+REQUIRES: updating_for_owned_noescape

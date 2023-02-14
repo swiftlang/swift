@@ -39,3 +39,4 @@ public func testit<T: P>(_ t: T) {
   b.foo()
 }
 
+REQUIRES: updating_for_owned_noescape

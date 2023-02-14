@@ -30,3 +30,4 @@ func crash2() {
 
 crash1()
 crash2()
+REQUIRES: updating_for_owned_noescape

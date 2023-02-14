@@ -158,3 +158,4 @@ bb9:
   %999 = tuple ()
   return %999 : $()
 }
+REQUIRES: updating_for_owned_noescape

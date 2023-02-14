@@ -282,3 +282,4 @@ func optional_any_is_class_archetype<T : AnyObject>(_ x: Any?, _: T) -> Bool {
   // CHECK: checked_cast_addr_br take_always Any in {{%.*}} : $*Any to T in {{%.*}} : $*T
 }
 
+REQUIRES: updating_for_owned_noescape

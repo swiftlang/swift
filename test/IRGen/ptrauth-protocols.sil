@@ -92,3 +92,4 @@ bb0:
   apply %0<B>() : $@convention(thin) <T : Q> () -> ()
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

@@ -118,3 +118,4 @@ struct ModifyAndSet {
     readwrite(&modifiable)
   }
 }
+REQUIRES: updating_for_owned_noescape

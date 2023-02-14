@@ -123,3 +123,4 @@ entry(%0 : $*R<T>, %1 : $*E<(R<U>)->Int>, %2 : $*Int):
   %k = partial_apply [callee_guaranteed] %f<U>(%2, %b) : $@convention(thin) <V> (@in_guaranteed R<V>, @in_guaranteed Int, @guaranteed <τ_0_0> { var E<(R<τ_0_0>)->Int> } <V>) -> @out Int
   return %k : $@callee_guaranteed (@in_guaranteed R<U>) -> @out Int
 }
+REQUIRES: updating_for_owned_noescape

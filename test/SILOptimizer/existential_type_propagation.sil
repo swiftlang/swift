@@ -343,3 +343,4 @@ sil @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_ : $@convention(witness_method: PPP) (@g
 sil_witness_table XXX: PPP module nix2 {
   method #PPP.foo: @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_	// protocol witness for PPP.foo() -> () in conformance XXX
 }
+REQUIRES: updating_for_owned_noescape

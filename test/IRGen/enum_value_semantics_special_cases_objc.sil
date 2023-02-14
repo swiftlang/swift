@@ -17,3 +17,4 @@ enum NullableObjCRefcounted {
 // CHECK:   call void @swift_unknownObjectRelease(%objc_object* %2) {{#[0-9]+}}
 // CHECK:   ret void
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

@@ -37,3 +37,4 @@ func checkAgainstExclusivityViolations(x: inout MethodWithDefaultArgGenerator) {
   x.mutate(&x.b)
 }
 
+REQUIRES: updating_for_owned_noescape

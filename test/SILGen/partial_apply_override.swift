@@ -34,3 +34,4 @@ public func convert(strings: [String]) -> [Int] {
 
 // CHECK-LABEL: sil private [ossa] @$s22partial_apply_override7convert7stringsSaySiGSaySSG_tFSiSScAA18StringIntConverterCcfu_SiSScfu0_ : $@convention(thin) (@guaranteed String, @guaranteed StringIntConverter) -> Int
 // CHECK:      [[METHOD:%.*]] = class_method %1 : $StringIntConverter, #StringIntConverter.convert : (StringIntConverter) -> (String) -> Int, $@convention(method) (@in_guaranteed String, @guaranteed StringIntConverter) -> @out Int
+REQUIRES: updating_for_owned_noescape

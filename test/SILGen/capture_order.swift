@@ -190,3 +190,4 @@ func func77933460() {
   // expected-note@-3 {{captured value declared here}}
   // expected-warning@-4 {{variable 'obj' was never mutated; consider changing to 'let' constant}}
 }
+REQUIRES: updating_for_owned_noescape

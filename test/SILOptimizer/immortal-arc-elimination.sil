@@ -61,3 +61,4 @@ bb0:
   return %1 : $Builtin.BridgeObject
 }
 
+REQUIRES: updating_for_owned_noescape

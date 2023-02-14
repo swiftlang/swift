@@ -77,3 +77,4 @@ func useIndirectly(file: String = #file) {}
 // CONCISE-LABEL: // Mappings from '#fileID' to '#filePath':
 // CONCISE:       //   'Foo/magic_identifier_file.swift' => 'SOURCE_DIR/test/SILGen/magic_identifier_file.swift'
 
+REQUIRES: updating_for_owned_noescape

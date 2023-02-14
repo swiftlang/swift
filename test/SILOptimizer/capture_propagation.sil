@@ -606,3 +606,4 @@ bb0(%0 : $Str, %1 : @guaranteed $KeyPath<Str, Int>):
 }
 
 sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+REQUIRES: updating_for_owned_noescape

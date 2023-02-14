@@ -536,3 +536,4 @@ exit(%instance_2 : @owned $T, %s_2 : $S):
   %retval = tuple ()
   return %retval : $()
 }
+REQUIRES: updating_for_owned_noescape

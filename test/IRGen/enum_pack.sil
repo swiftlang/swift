@@ -56,3 +56,4 @@ bb2:                                              // Preds: bb0
   unreachable                                     // id: %6
 }
 
+REQUIRES: updating_for_owned_noescape

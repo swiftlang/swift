@@ -14,4 +14,4 @@ func testConcreteDefaultArguments() {
   calleeWithTupleOfLoadable()
   calleeWithTupleOfAddressOnly()
   calleeWithTupleOfMixed()
-}
+}REQUIRES: updating_for_owned_noescape

@@ -48,3 +48,4 @@ kevin.trot(shuffledLabelsTuple, halfhalt: false)
 
 kevin.canter((y: 1, x: "x"), counter: false)
 kevin.canter(shuffledLabelsTuple, counter: false)
+REQUIRES: updating_for_owned_noescape

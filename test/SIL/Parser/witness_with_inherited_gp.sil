@@ -60,3 +60,4 @@ sil_witness_table <T> _mmArrayBuffer<T>: _Sequence_Type module WitnessTableWithG
 // C.Index = Int, C.Index.Distance = Int, C.Index.Distance.IntegerLiteralType
 // = Int, C.Index._DisabledRangeIndex = Int, C._Element = T> (<C where
 // C : _CollectionType, C.Index : ForwardIndex, C.Index.Distance : _SignedInteger, C.Index.Distance.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral> IndexingIterator<C>: GeneratorType module Swift)
+REQUIRES: updating_for_owned_noescape

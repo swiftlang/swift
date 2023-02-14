@@ -492,3 +492,4 @@ bb3:
   %11 = tuple ()
   return %11 : $()
 }
+REQUIRES: updating_for_owned_noescape

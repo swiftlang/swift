@@ -41,3 +41,4 @@ bb0(%0 : @owned $C):
 // sometimes:   .code 32
 // CHECK:       @ InlineAsm End
 // CHECK-NEXT:  bl _objc_retainAutoreleasedReturnValue
+REQUIRES: updating_for_owned_noescape

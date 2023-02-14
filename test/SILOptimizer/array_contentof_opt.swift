@@ -76,3 +76,4 @@ public func dontPropagateContiguousArray(_ a: inout ContiguousArray<UInt8>) {
 
 // CHECK: } // end sil function '$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
 
+REQUIRES: updating_for_owned_noescape

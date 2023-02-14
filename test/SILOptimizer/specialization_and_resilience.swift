@@ -17,3 +17,4 @@ print(testReturn([Mystruct(101)]))
 // CHECK: Mystruct(x: 28)
 otherFunc()
 
+REQUIRES: updating_for_owned_noescape

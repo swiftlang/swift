@@ -498,3 +498,4 @@ bb6:
   %17 = tuple ()
   return %17 : $()
 }
+REQUIRES: updating_for_owned_noescape

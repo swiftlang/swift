@@ -39,3 +39,4 @@ bb0:
 sil_vtable A {
   #A.foo: @_TFC4test1A3foofS0_FT_Vs5Int32
 }
+REQUIRES: updating_for_owned_noescape

@@ -91,3 +91,4 @@ sil_witness_table hidden <E where E : CanAdd> S<E>: CanAdd module Test {
   method #CanAdd."+": @operator_plus_static_non_generic_witness_for_S
 }
 
+REQUIRES: updating_for_owned_noescape

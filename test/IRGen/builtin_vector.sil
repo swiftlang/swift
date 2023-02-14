@@ -26,3 +26,4 @@ bb0(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32):
   %2 = builtin "fadd_Vec4xFPIEEE32"(%0 : $Builtin.Vec4xFPIEEE32, %1 : $Builtin.Vec4xFPIEEE32) : $Builtin.Vec4xFPIEEE32
   return %2 : $Builtin.Vec4xFPIEEE32
 }
+REQUIRES: updating_for_owned_noescape

@@ -210,3 +210,4 @@ sil_vtable C {
   #C.init!allocator: (C.Type) -> () -> C : @$s4main1CCACycfC	
   #C.deinit!deallocator: @$s4main1CCfD	
 }
+REQUIRES: updating_for_owned_noescape

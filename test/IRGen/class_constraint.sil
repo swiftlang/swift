@@ -24,3 +24,4 @@ bb0(%0 : $T):
 }
 // CHECK: define {{.*}}void @foo(%T16class_constraint1AC* %0, %swift.type* %T)
 // CHECK: store i8** @"$s16class_constraint1ACAA1PAAWP",
+REQUIRES: updating_for_owned_noescape

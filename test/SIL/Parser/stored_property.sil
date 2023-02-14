@@ -24,3 +24,4 @@ sil_vtable Rect {
   // CHECK: #Rect.orgx!getter
   #Rect.orgx!getter: @_TFC4rect4Rectg4orgxSd
 }
+REQUIRES: updating_for_owned_noescape

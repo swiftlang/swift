@@ -51,3 +51,4 @@ func test5() {
   // CHECK: keypath $KeyPath<Subscript2, String>, (root $Subscript2; gettable_property $String, id @$s17default_arg_other10Subscript2VyS2Scig : $@convention(method) (@guaranteed String, Subscript2) -> @owned String, getter @$s17default_arg_other10Subscript2VyS2ScipACTK : $@convention(thin) (@in_guaranteed Subscript2, UnsafeRawPointer) -> @out String, indices [%$0 : $String : $String], indices_equals @$sSSTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSSTh : $@convention(thin) (UnsafeRawPointer) -> Int, external #Subscript2.subscript) ([[DEF_ARG]])
   _ = \Subscript2.[]
 }
+REQUIRES: updating_for_owned_noescape

@@ -41,3 +41,4 @@ bb0:
 
 // bar<A>(_:)
 sil hidden_external @bar : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+REQUIRES: updating_for_owned_noescape

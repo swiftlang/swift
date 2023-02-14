@@ -14,3 +14,4 @@ _ = Derived<C>()
 // CHECK-LABEL: sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 // CHECK: [[FN:%.*]] = function_ref @$s35default_arguments_inherited_generic4BaseC1xACyxGSi_tcfcfA_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> Int
 // CHECK: apply [[FN]]<C>() : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> Int
+REQUIRES: updating_for_owned_noescape

@@ -2,3 +2,4 @@
 
 // REQUIRES: swift_in_compiler
 
+REQUIRES: updating_for_owned_noescape

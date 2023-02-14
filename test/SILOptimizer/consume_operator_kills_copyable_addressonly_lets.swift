@@ -389,3 +389,4 @@ public func deferTest<T>(_ x: __owned T) { // expected-error {{'x' used after be
     }
     print("do Something")
 }
+REQUIRES: updating_for_owned_noescape

@@ -100,3 +100,4 @@ bb3(%8 : @owned $NSObjectSubclass):
   dealloc_stack %2 : $*NSObjectSubclass
   return %8 : $NSObjectSubclass
 }
+REQUIRES: updating_for_owned_noescape

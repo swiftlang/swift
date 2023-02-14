@@ -8,3 +8,4 @@ func foo(s: String?) {
 
   s.map { print("\($0) \(butz)") }
 }
+REQUIRES: updating_for_owned_noescape

@@ -25,3 +25,4 @@ func outer_function<T : P>(In In : T) { inner_function(In: In) }
 //CHECK: return
 
 outer_function(In: Foo())
+REQUIRES: updating_for_owned_noescape

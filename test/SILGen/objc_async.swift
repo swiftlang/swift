@@ -276,3 +276,4 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 func checkCostcoMembership() async -> Bool {
   return await CostcoManager.shared().isCustomerEnrolled(inExecutiveProgram: Person.asCustomer())
 }
+REQUIRES: updating_for_owned_noescape

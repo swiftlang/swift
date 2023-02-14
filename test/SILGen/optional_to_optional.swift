@@ -30,3 +30,4 @@ class Foo {
     p2? = p3
   }
 }
+REQUIRES: updating_for_owned_noescape

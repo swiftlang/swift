@@ -17,3 +17,4 @@ func customMessage() {
   // CHECK-NEXT: builtin "poundAssert"([[LOGIC_VALUE]] : $Builtin.Int1, [[MESSAGE]] : $Builtin.RawPointer)
 }
 // CHECK: } // end sil function '$s12pound_assert13customMessage{{[_0-9a-zA-Z]*}}'
+REQUIRES: updating_for_owned_noescape

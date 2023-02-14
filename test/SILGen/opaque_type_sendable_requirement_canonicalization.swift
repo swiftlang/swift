@@ -19,3 +19,4 @@ func bar() {
     a = foo { y }
     _ = a
 }
+REQUIRES: updating_for_owned_noescape

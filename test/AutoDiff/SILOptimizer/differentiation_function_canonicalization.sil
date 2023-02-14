@@ -139,3 +139,4 @@ bb0(%0 : $Class):
 // CHECK:  [[VJP_FN_PARTIALLY_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[VJP_FN]]([[ARG]])
 // CHECK:  differentiable_function [parameters 0] [results 0] [[ORIG_FN_PARTIALLY_APPLIED]] : {{.*}} with_derivative {[[JVP_FN_PARTIALLY_APPLIED]] : {{.*}}, [[VJP_FN_PARTIALLY_APPLIED]] : {{.*}}}
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

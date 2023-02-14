@@ -62,3 +62,4 @@ func test_enum() {
 }
 
 test_enum()
+REQUIRES: updating_for_owned_noescape

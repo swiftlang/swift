@@ -56,3 +56,4 @@ entry(%p : $*T, %i: $Builtin.Word):
   %q = index_addr %p : $*T, %i : $Builtin.Word
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

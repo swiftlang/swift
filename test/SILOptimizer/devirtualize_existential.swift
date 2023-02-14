@@ -17,3 +17,4 @@ public func interesting_stuff() {
  x.ping(1)
 }
 
+REQUIRES: updating_for_owned_noescape

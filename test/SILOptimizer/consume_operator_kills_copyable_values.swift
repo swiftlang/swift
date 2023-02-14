@@ -390,3 +390,4 @@ public func deferTest(_ x: __owned Klass) { // expected-error {{'x' used after b
     }
     print("do Something")
 }
+REQUIRES: updating_for_owned_noescape

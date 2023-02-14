@@ -362,3 +362,4 @@ bb9(%0 : @owned $Klass):
   destroy_value %0 : $Klass
   return %v : $Builtin.Int64
 }
+REQUIRES: updating_for_owned_noescape

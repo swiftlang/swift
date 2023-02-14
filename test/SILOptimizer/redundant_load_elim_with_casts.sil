@@ -547,3 +547,4 @@ bb0(%0 : $*(I32, I32, I32), %1 : $*((I32, I32), I32)):
   %63 = tuple (%60 : $(I32, I32), %61 : $(I32, I32), %62 : $(I32, I32, I32))
   return %63 : $((I32, I32), (I32, I32), (I32, I32, I32))
 }
+REQUIRES: updating_for_owned_noescape

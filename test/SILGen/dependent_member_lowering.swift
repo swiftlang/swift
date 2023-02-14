@@ -35,3 +35,4 @@ func existentialDependentMember(_ p1: any P1) -> String {
   // CHECK: $@convention(witness_method: P0) <τ_0_0 where τ_0_0 : P0> (@in_guaranteed τ_0_0) -> @out τ_0_0.Foo
   return p1.foo()
 }
+REQUIRES: updating_for_owned_noescape

@@ -43,3 +43,4 @@ bb0(%0 : $Optional<Builtin.Executor>):
 // CHECK:   {{(must)?}}tail call swift{{(tail)?}}cc void %2(%swift.context* swiftasync %1)
 // CHECK:   ret void
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

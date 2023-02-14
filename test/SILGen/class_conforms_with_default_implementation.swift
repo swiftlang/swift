@@ -46,3 +46,4 @@ class CC<T : QQ> : PP {}
 // CHECK-NEXT: associated_type T: T
 // CHECK-NEXT: method #PP.foo: <Self where Self : PP> (Self) -> () -> () : @$s42class_conforms_with_default_implementation2CCCyqd__GAA2PPA2aEP3fooyyFTW
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

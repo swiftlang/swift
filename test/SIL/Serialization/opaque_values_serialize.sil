@@ -82,3 +82,4 @@ bb0(%0 : $S):
   return %t : $()
 }
 // CHECK-LABEL: } // end sil function 'serialize_mutating'
+REQUIRES: updating_for_owned_noescape

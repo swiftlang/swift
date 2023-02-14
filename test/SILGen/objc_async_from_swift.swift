@@ -214,3 +214,4 @@ actor Dril: NSObject {
         return true
     }
 }
+REQUIRES: updating_for_owned_noescape

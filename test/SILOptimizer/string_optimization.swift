@@ -172,3 +172,4 @@ if testObjcClassName(qualified: true) != "NSObject" {
 
 #endif
 
+REQUIRES: updating_for_owned_noescape

@@ -23,3 +23,4 @@ extension HasPrivateInitValue {
 extension PublicStructHasInitValue {
   init(z: Int) {}
 }
+REQUIRES: updating_for_owned_noescape

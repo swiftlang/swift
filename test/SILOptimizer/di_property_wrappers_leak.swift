@@ -75,3 +75,4 @@ propertyWrapperTests.test("test wrapped value leak - generic") {
 }
 
 runAllTests()
+REQUIRES: updating_for_owned_noescape

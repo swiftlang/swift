@@ -63,3 +63,4 @@ public func useVarKlassErrorSimple() {
     let _ = k5
 }
 */
+REQUIRES: updating_for_owned_noescape

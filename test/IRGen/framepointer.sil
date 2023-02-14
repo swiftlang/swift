@@ -93,3 +93,4 @@ entry(%i : $Int32):
 // CHECKASM-macosx-x86_64:   callq _leaf_function_no_frame_pointer
 // CHECKASM-macosx-x86_64:   popq %rbp
 // CHECKASM-macosx-x86_64:   ret
+REQUIRES: updating_for_owned_noescape

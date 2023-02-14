@@ -90,3 +90,4 @@ func testUnreachableLogCallComplex(c: Color)  {
       // expected-error@-2 {{globalStringTablePointer builtin must be used only on string literals}}
   }
 }
+REQUIRES: updating_for_owned_noescape

@@ -23,3 +23,4 @@ entry(%w : $*@sil_weak Foo?, %x : $Foo?):
   store_weak %x to %w : $*@sil_weak Foo?
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

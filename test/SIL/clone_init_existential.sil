@@ -64,3 +64,4 @@ bb0(%0 : $*Proto1 & Proto2, %1 : $MyClass2):
   return %7 : $()
 }
 
+REQUIRES: updating_for_owned_noescape

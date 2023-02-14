@@ -11,3 +11,4 @@ public func warningForDeadDelegate() {
   listener.delegate = delegate  // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
   listener.resume()
 }
+REQUIRES: updating_for_owned_noescape

@@ -313,3 +313,4 @@ bb5:
   %22 = tuple ()
   return %22 : $()
 } // end sil function 'test_infinite_loop_in_unreachable_block'
+REQUIRES: updating_for_owned_noescape

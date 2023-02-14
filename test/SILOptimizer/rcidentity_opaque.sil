@@ -437,3 +437,4 @@ bb0(%0 : @owned $Base):
   %1 = unconditional_checked_cast %0 : $Base to AnyObject
   return %1 : $AnyObject
 }
+REQUIRES: updating_for_owned_noescape

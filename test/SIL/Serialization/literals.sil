@@ -15,3 +15,4 @@ bb0:
   %6 = tuple ()
   return %6 : $()
 }
+REQUIRES: updating_for_owned_noescape

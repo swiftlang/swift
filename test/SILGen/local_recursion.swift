@@ -156,3 +156,4 @@ func local_properties(_ x: Int, y: Int) -> Int {
   return self_recursive + transitive_capture_fn()
 }
 
+REQUIRES: updating_for_owned_noescape

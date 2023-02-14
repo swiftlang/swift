@@ -238,3 +238,4 @@ public func testAccessProp(c: C, v: Int) {
 // WMO: apply [[F1]]([[A4]], %1) : $@convention(thin) (@inout Int, Int) -> ()
 // WMO: end_access [[A4]]
 // WMO-LABEL: } // end sil function '$s10access_wmo14testAccessProp1c1vyAA1CC_SitF'
+REQUIRES: updating_for_owned_noescape

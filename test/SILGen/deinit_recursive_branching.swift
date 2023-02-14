@@ -20,4 +20,4 @@ class Tree {
 // CHECK:   [[SELF_NATIVE:%.*]] = unchecked_ref_cast [[SELF]] : $Tree to $Builtin.NativeObject
 // CHECK:   [[SELF_NATIVE_OWNED:%.*]] = unchecked_ownership_conversion [[SELF_NATIVE]] : $Builtin.NativeObject, @guaranteed to @owned
 // CHECK:   return [[SELF_NATIVE_OWNED]] : $Builtin.NativeObject
-// CHECK: } // end sil function '$s26deinit_recursive_branching4TreeCfd'
+// CHECK: } // end sil function '$s26deinit_recursive_branching4TreeCfd'REQUIRES: updating_for_owned_noescape

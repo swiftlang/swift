@@ -75,3 +75,4 @@ class DerivedClassWithNonTrivialProperties : RootClassWithoutProperties {
 // CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.deinit!deallocator
 // CHECK-NEXT:    #DerivedClassWithNonTrivialProperties!ivardestroyer
 // CHECK-NEXT:  }
+REQUIRES: updating_for_owned_noescape

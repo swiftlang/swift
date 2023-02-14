@@ -15,3 +15,4 @@ public func foo(_ p:UInt8) -> UInt64 {
   let q = UInt64(truncatingIfNeeded: p)
   return q
 }
+REQUIRES: updating_for_owned_noescape

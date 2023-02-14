@@ -28,3 +28,4 @@ public func usePrespecializedEntryPoints() {
 
 // OPT: sil [available 10.50] [noinline] {{.*}}@$s22pre_specialized_module21publicPrespecialized2yyxlFAA8SomeDataV_Ts5 : $@convention(thin) (SomeData) -> ()
 // OPT: sil [available 10.50] [noinline] {{.*}}@$s22pre_specialized_module21publicPrespecialized2yyxlF0a1_B8_module213SomeOtherDataV_Ts5 : $@convention(thin) (SomeOtherData) -> ()
+REQUIRES: updating_for_owned_noescape

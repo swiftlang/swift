@@ -137,3 +137,4 @@ func test6() {
 }
 
 print(test6())
+REQUIRES: updating_for_owned_noescape

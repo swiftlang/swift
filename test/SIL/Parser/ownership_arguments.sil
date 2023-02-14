@@ -19,3 +19,4 @@ bb1(%4 : @owned $Builtin.NativeObject, %5 : @unowned $Builtin.NativeObject, %6 :
   %9999 = tuple()
   return %9999 : $()
 }
+REQUIRES: updating_for_owned_noescape

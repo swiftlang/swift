@@ -18,3 +18,4 @@ func setStorageTo(_ newValue: String) {
   setStorage(to: newValue)
 }
 
+REQUIRES: updating_for_owned_noescape

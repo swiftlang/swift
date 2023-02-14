@@ -16,3 +16,4 @@ public protocol PlainOldProtocol {}
 // CHECK-SAME:         i32 65603,
 // CHECK-SAME:         i32 0,
 // CHECK-SAME:         i32 0 }
+REQUIRES: updating_for_owned_noescape

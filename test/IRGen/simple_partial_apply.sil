@@ -58,3 +58,4 @@ entry(%body : $@convention(method) (Int, Int) -> Int, %context : $Int, %cont : $
   dealloc_stack %closure : $@noescape @callee_guaranteed (Int) -> Int
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

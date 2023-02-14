@@ -236,3 +236,4 @@ func testArithmeticOverflow_UInt_32bit() {
 func testIntToFloatConversion() {
   _blackHole(Double(9_007_199_254_740_993)) // Ok
 }
+REQUIRES: updating_for_owned_noescape

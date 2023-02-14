@@ -326,3 +326,4 @@ public protocol ResilientAssocTypes {
 // CHECK-NEXT:   associated_type_protocol (AssocType: P): ConformsToP: P module protocol_resilience
 // CHECK-NEXT:   associated_type AssocType: ConformsToP
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

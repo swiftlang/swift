@@ -91,3 +91,4 @@ extension ObjCSubclass {
 }
 
 // CHECK-SWIFT3-NOT: builtin "swift3ImplicitObjCEntrypoint"
+REQUIRES: updating_for_owned_noescape

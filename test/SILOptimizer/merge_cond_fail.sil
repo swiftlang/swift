@@ -36,3 +36,4 @@ bb0 (%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1, %3: $Builtin.In
   cond_fail %10 : $Builtin.Int1
   return %9 : $Builtin.Int64
 }
+REQUIRES: updating_for_owned_noescape

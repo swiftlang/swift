@@ -216,3 +216,4 @@ class SecondClass {
     // CHECK:   return [[RESULT]] : $Optional<SecondClass>
   }
 }
+REQUIRES: updating_for_owned_noescape

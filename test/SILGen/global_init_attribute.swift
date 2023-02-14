@@ -29,3 +29,4 @@ var InternalFoo = foo()
 // CHECK-NOT: [global_init]
 // CHECK: // global_init_attribute.InternalFoo.unsafeMutableAddressor : Swift.Int
 // CHECK-NEXT: sil hidden [global_init] [ossa] @$s21global_init_attribute11InternalFooSivau
+REQUIRES: updating_for_owned_noescape

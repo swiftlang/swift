@@ -182,3 +182,4 @@ struct Foo {
         return staticSharedArguments(trivial: trivial, value: value, ref: ref)
     }
 }
+REQUIRES: updating_for_owned_noescape

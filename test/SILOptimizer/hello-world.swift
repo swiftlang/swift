@@ -4,3 +4,4 @@
 // RUN: %{python} %utils/process-stats-dir.py --evaluate 'NumSILOptFunctions < 20' %t/stats
 
 print("Hello world")
+REQUIRES: updating_for_owned_noescape

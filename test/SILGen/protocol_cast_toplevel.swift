@@ -6,3 +6,4 @@
 
 let c = C()
 let unrelated = c as! Unrelated
+REQUIRES: updating_for_owned_noescape

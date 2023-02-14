@@ -212,3 +212,4 @@ bbRet:
   %25 = tuple ()
   return %25 : $()
 } // end sil function 'multi_end_licm_loop_exit'
+REQUIRES: updating_for_owned_noescape

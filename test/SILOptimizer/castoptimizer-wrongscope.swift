@@ -12,3 +12,4 @@
 protocol R {}
 extension Float: R {}
 print(1.0 as Float? as! R)
+REQUIRES: updating_for_owned_noescape

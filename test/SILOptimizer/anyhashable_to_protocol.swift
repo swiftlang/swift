@@ -16,3 +16,4 @@ public func testit(_ x: AnyHashable) -> Bool {
   return (x as? FooProtocol) != nil
 }
 
+REQUIRES: updating_for_owned_noescape

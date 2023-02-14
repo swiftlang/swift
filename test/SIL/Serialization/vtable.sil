@@ -69,3 +69,4 @@ sil_vtable Derived {
 // CHECK-NEXT:  #Derived.m3: (Derived) -> () -> () : @$s1x7DerivedC2m3yyF
 // CHECK-NEXT:  #Derived.deinit!deallocator: @$s1x7DerivedCfD
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

@@ -26,3 +26,4 @@
 // CHECK-RESILIENT-DAG: sil [ossa] @$s27enum_raw_representable_objc5CLikeO0B5Value{{Si|s5Int32V}}vg
 // CHECK-RESILIENT-DAG: sil [ossa] @$s27enum_raw_representable_objc5CLikeO0B5ValueACSg{{Si|s5Int32V}}_tcfC
 
+REQUIRES: updating_for_owned_noescape

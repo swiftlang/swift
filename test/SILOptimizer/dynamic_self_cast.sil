@@ -44,3 +44,4 @@ bb2:
 bb3(%13 : $Optional<SelfCasts>):
   return %13 : $Optional<SelfCasts>
 }
+REQUIRES: updating_for_owned_noescape

@@ -156,3 +156,4 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   destroy_value %1 : $Builtin.NativeObject
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

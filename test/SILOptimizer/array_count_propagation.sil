@@ -207,3 +207,4 @@ bb0:
  strong_release %14 : $Builtin.BridgeObject
  return %10 : $MyInt
 }
+REQUIRES: updating_for_owned_noescape

@@ -12,3 +12,4 @@ struct PiggyBack: Gesture {
         return self
     }
 }
+REQUIRES: updating_for_owned_noescape

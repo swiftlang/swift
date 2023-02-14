@@ -203,3 +203,4 @@ sil_property #External.ro <T> (stored_property #External.ro : $T)
 sil_property #External.subscript <T><U: Hashable> (gettable_property $T,
   id @id_a : $@convention(thin) () -> (),
   getter @get_external_subscript : $@convention(thin) <T, U: Hashable> (@in_guaranteed External<T>, UnsafeRawPointer) -> @out T)
+REQUIRES: updating_for_owned_noescape

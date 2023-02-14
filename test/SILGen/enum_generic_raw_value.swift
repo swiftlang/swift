@@ -9,3 +9,4 @@ enum E<T>: Int {
 enum F<T: ExpressibleByIntegerLiteral>: T where T: Equatable {
   case a = 1
 }
+REQUIRES: updating_for_owned_noescape

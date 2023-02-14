@@ -38,3 +38,4 @@ func anyObjectToMetatype(o: AnyObject) -> FashionPolice.Type? {
   // CHECK: checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to FashionPolice.Type in {{%.*}}
   return o as? FashionPolice.Type
 }
+REQUIRES: updating_for_owned_noescape

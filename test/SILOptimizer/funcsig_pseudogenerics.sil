@@ -29,3 +29,4 @@ sil @objcMethod : $@convention(objc_method) @pseudogeneric <T: AnyObject> (Int64
 entry(%0 : $Int64, %1 : $GenericClass<T>):
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

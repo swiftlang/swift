@@ -43,3 +43,4 @@ sil_witness_table public_external [serialized] Int: Comparable module Swift {
   method #Comparable."<": <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Bool : @$sSiSLsSL1loiySbx_xtFZTW
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -246,3 +246,4 @@ unwind:
   // CHECK:         call i1 @llvm.coro.end(i8* [[BEGIN]], i1 false)
   // CHECK-NEXT:    unreachable
 }
+REQUIRES: updating_for_owned_noescape

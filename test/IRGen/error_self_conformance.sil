@@ -24,3 +24,4 @@ entry(%0 : $*Error):
   %ret = tuple ()
   return %ret : $()
 }
+REQUIRES: updating_for_owned_noescape

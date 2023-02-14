@@ -28,3 +28,4 @@ open class ConcreteSubclass : MySubclass<Int> {
 // CHECK:      sil_property #ConcreteSubclass.anotherStoredProperty (
 // CHECK-SAME:   stored_property #ConcreteSubclass.anotherStoredProperty : $Optional<Int>
 // CHECK-SAME: )
+REQUIRES: updating_for_owned_noescape

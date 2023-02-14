@@ -20,4 +20,4 @@ func makeGenericClosureWithNativeClass2<T>(t: T) where T : ClassProtocol, T : Ba
   _ = { [unowned t] in _ = t }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s4main34makeGenericClosureWithNativeClass21tyx_tAA9BaseClassCRbzAA0I8ProtocolRzlFyycfU_ : $@convention(thin) <T where T : BaseClass, T : ClassProtocol> (@guaranteed @sil_unowned T) -> () {
+// CHECK-LABEL: sil private [ossa] @$s4main34makeGenericClosureWithNativeClass21tyx_tAA9BaseClassCRbzAA0I8ProtocolRzlFyycfU_ : $@convention(thin) <T where T : BaseClass, T : ClassProtocol> (@guaranteed @sil_unowned T) -> () {REQUIRES: updating_for_owned_noescape

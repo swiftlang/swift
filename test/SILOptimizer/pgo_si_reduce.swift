@@ -60,3 +60,4 @@ public func foo(_ x: Int32) {
 // SIL-OPT-LABEL: } // end sil function '$s13pgo_si_reduce3fooyys5Int32VF'
 
 foo(100)
+REQUIRES: updating_for_owned_noescape

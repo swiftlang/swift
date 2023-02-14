@@ -279,3 +279,4 @@ sil_vtable Vista {
 
 // Mappings from '#fileID' to '#filePath':
 //   'bug/explore.swift' => 'explore.swift'
+REQUIRES: updating_for_owned_noescape

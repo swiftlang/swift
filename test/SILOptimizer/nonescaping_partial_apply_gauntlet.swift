@@ -105,3 +105,4 @@ public enum Optional<Wrapped> {
 public func xx(x: inout Z, y: Z) {
     x[{ let _ = y }] = y
 }
+REQUIRES: updating_for_owned_noescape

@@ -28,3 +28,4 @@ func indirectUse() {
 
 public func functionWithFilePathDefaultArgument(file: String = #filePath) {}
 // SWIFTINTERFACE: public func functionWithFilePathDefaultArgument(file: Swift.String = #filePath)
+REQUIRES: updating_for_owned_noescape

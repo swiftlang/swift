@@ -41,3 +41,4 @@ class Root {
 // CHECK-NOT: #Root.init!allocator
 // CHECK:     #Root.deinit!deallocator: @$s29objc_required_designated_init4RootCfD
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

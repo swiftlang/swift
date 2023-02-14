@@ -198,3 +198,4 @@ enum AllRefcountedTwoSimple {
 
 // CHECK-LABEL: define internal void @"$s34enum_value_semantics_special_cases22AllRefcountedTwoSimpleOwxx"
 // CHECK:   call void @"$s34enum_value_semantics_special_cases22AllRefcountedTwoSimpleOWOy"
+REQUIRES: updating_for_owned_noescape

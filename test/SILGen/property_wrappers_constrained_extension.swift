@@ -33,4 +33,4 @@ extension Dog where Pet == Cat {
 
 // CHECK-LABEL: sil [ossa] @$s39property_wrappers_constrained_extension3DogVA2A3CatVRszrlEACyAEGycfC : $@convention(method) (@thin Dog<Cat>.Type) -> Dog<Cat> {
 // CHECK: [[FN:%.*]] = function_ref @$s39property_wrappers_constrained_extension3DogV4_foo33_{{.*}}LLAA5HorseVySiGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : Fuzzball> () -> Int
-// CHECK: apply [[FN]]<Cat>() : $@convention(thin) <τ_0_0 where τ_0_0 : Fuzzball> () -> Int
+// CHECK: apply [[FN]]<Cat>() : $@convention(thin) <τ_0_0 where τ_0_0 : Fuzzball> () -> IntREQUIRES: updating_for_owned_noescape

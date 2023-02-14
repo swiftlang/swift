@@ -20,3 +20,4 @@ actor TestActor : TestableAsync {
   // CHECK: hop_to_executor {{%.*}} : $MainActor 
   func test() { }
 }
+REQUIRES: updating_for_owned_noescape

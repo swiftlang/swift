@@ -81,3 +81,4 @@ bb0:
   destroy_value %obj : $KlassWithTailAllocatedElems
   return %val : $Builtin.Word
 }
+REQUIRES: updating_for_owned_noescape

@@ -12,3 +12,4 @@ struct RequiresEq<T: Equatable> { }
 // CHECK: sil hidden [ossa] @$s28mangling_retroactive_overlay4testyyAA10RequiresEqVySo8NSObjectCGF 
 func test(_: RequiresEq<NSObject>) { }
 
+REQUIRES: updating_for_owned_noescape

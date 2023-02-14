@@ -74,3 +74,4 @@ public func hasNoEscapeClosureVar() {
   // CHECK-LABEL: sil shared [serialized] [ossa] @$s18capture_resilience30hasInlinableNoEscapeClosureVaryyFAA15ResilientStructVyXEfU_ : $@convention(thin) (@inout_aliasable ResilientStruct) -> @out ResilientStruct
   consume { s }
 }
+REQUIRES: updating_for_owned_noescape

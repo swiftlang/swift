@@ -253,3 +253,4 @@ public final class FinalDerived : Base<Int> {
 // CHECK-NEXT:   #Base.init!allocator: <T> (Base<T>.Type) -> () -> Base<T> : @$s17vtables_multifile12FinalDerivedCACycfC [override]	// FinalDerived.__allocating_init()
 // CHECK-NEXT:   #FinalDerived.deinit!deallocator: @$s17vtables_multifile12FinalDerivedCfD	// FinalDerived.__deallocating_deinit
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

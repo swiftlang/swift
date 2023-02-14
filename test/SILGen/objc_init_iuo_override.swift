@@ -16,3 +16,4 @@ class GrandchildClass: ChildClass {
 	}
 }
 
+REQUIRES: updating_for_owned_noescape

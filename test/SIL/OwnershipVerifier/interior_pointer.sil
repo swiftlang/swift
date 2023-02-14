@@ -152,3 +152,4 @@ bb0(%0 : @owned $Error):
   %result = apply %m<@opened("01234567-89AB-CDEF-0123-000000000000", Error) Self>(%2) : $@convention(witness_method: Error) <Self: Error> (@in_guaranteed Self) -> Int
   return %result : $Int
 }
+REQUIRES: updating_for_owned_noescape

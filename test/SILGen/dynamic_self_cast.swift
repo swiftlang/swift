@@ -77,3 +77,4 @@ public class SelfCasts {
 
   public required init() {}
 }
+REQUIRES: updating_for_owned_noescape

@@ -175,3 +175,4 @@ func varargsVsArray(arr: [Int], n: String) { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8mangling14varargsVsArray3arr1nySaySiGd_SStF : $@convention(thin) (@guaranteed Array<Array<Int>>, @guaranteed String) -> ()
 func varargsVsArray(arr: [Int]..., n: String) { }
+REQUIRES: updating_for_owned_noescape

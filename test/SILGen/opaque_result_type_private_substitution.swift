@@ -21,3 +21,4 @@ struct S1: P {
 private struct S2: P {
   var v: some P { S() }
 }
+REQUIRES: updating_for_owned_noescape

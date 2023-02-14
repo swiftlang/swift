@@ -31,3 +31,4 @@ bb0:
 
 // CHECK-LABEL: sil [serialized] [canonical] @test_dynamically_replaceable_impl
 // CHECK:  dynamic_function_ref @test_dynamically_replaceable
+REQUIRES: updating_for_owned_noescape

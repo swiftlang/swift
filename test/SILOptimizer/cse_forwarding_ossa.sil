@@ -221,3 +221,4 @@ bb0(%0 : @owned $Klass):
   return %res : $(SuperKlass, SuperKlass)
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -9,3 +9,4 @@
 public func min<T: Comparable>(_ x: T, _ y: T) -> T {
   return y < x ? y : x
 }
+REQUIRES: updating_for_owned_noescape

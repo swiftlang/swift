@@ -334,3 +334,4 @@ func capture_same_type_representative<Daisy: Doge, Roo: Doggo>(slobber: Roo, dai
   var s = DogSnacks<Daisy.Nose.Squeegee>()
   _ = { _ = s }
 }
+REQUIRES: updating_for_owned_noescape

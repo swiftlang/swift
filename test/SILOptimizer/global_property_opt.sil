@@ -511,3 +511,4 @@ sil @_provide_struct : $@convention(thin) () -> @owned DepStruct
 
 sil @provide_tuple : $@convention(thin) () -> @owned (Array<X>, Builtin.Int64)
 
+REQUIRES: updating_for_owned_noescape

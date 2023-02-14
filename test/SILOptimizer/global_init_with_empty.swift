@@ -32,3 +32,4 @@ print(Mystruct.tupleglobal.a)
 print(Mystruct.tupleglobal.b)
 // CHECK-OUTPUT-NEXT: 6
 print(Mystruct.tupleglobal.c)
+REQUIRES: updating_for_owned_noescape

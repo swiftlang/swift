@@ -85,3 +85,4 @@ func useConsumingGetterConcrete(_ c: Witness) {
 
   blackHole(c.explicitPropertyGet)
 }
+REQUIRES: updating_for_owned_noescape

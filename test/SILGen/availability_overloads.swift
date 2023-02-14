@@ -68,3 +68,4 @@ _ = BeforeAndAfterOther.computed
 BeforeAndAfterOther.computed = 10
 _ = try BeforeAndAfterOther().computed
 try BeforeAndAfterOther().computed = 10
+REQUIRES: updating_for_owned_noescape

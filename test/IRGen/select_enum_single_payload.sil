@@ -52,3 +52,4 @@ entry(%0 : $ManyEmptyCases):
   %6 = select_enum %0 : $ManyEmptyCases, case #ManyEmptyCases.B!enumelt: %4, default %5 : $Builtin.Int1
   return %6 : $Builtin.Int1
 }
+REQUIRES: updating_for_owned_noescape

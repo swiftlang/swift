@@ -1171,3 +1171,4 @@ bb0(%0 : $Int):
 
 sil [ossa] @closure2 : $@convention(thin) (Int) -> ()
 
+REQUIRES: updating_for_owned_noescape

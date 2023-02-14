@@ -50,3 +50,4 @@ final class Derived : Base, Initable {}
 // CHECK-NEXT:    store [[NEW_SELF]] to [init] %0 : $*Derived
 // CHECK-NEXT:    [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:    return [[TUPLE]]
+REQUIRES: updating_for_owned_noescape

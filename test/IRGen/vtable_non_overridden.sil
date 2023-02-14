@@ -303,3 +303,4 @@ entry(%a : $InternalA, %b : $InternalB):
 
 // LIBRARY-EVOLUTION-LABEL: define{{.*}}@"$s21vtable_non_overridden23PublicOnlyNonoverriddenCMu"
 
+REQUIRES: updating_for_owned_noescape

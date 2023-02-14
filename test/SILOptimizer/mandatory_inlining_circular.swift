@@ -9,3 +9,4 @@
   return waldo(x); // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 1 {{while inlining here}}
 }
 
+REQUIRES: updating_for_owned_noescape

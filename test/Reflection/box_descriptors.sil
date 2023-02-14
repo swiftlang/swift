@@ -43,3 +43,4 @@ sil @make_some_boxes : $@convention(thin) <T> () -> (<τ_0_0> { var τ_0_0 } <In
 // CHECK-NEXT: (bound_generic_class capture_descriptors.C
 // CHECK-NEXT:   (generic_type_parameter depth=0 index=0))
 // CHECK-NEXT: - Metadata sources:
+REQUIRES: updating_for_owned_noescape

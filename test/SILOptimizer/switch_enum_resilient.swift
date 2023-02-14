@@ -509,3 +509,4 @@ public func testFunctionalTails(_ coin: Coin) -> Int {
     action4(0, 0, 0, 0)
   }
 } // CHECK-ALL: end sil function '$s21switch_enum_resilient29inlineImperativeDefaultMiddleyyAA5AlphaOF'
+REQUIRES: updating_for_owned_noescape

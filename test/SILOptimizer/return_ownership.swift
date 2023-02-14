@@ -15,3 +15,4 @@ func testUnreachableAfterNoReturnMethod() -> Int {
   return 0; // expected-warning {{will never be executed}}
 }
 
+REQUIRES: updating_for_owned_noescape

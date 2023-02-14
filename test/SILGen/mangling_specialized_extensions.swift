@@ -35,3 +35,4 @@ extension Tree<Int>.Branch<String>.Nest.Egg { static func twote() {} }
 
 // CHECK: @$s31mangling_specialized_extensions4TreeV6BranchV4NestV3EggVAASiRszSSRsd__ytRsd0__rlE5twiteyyFZ : $@convention(method) (@thin Tree<Int>.Branch<String>.Nest<()>.Egg.Type) -> ()
 extension Tree<Int>.Branch<String>.Nest<Void>.Egg { static func twite() {} }
+REQUIRES: updating_for_owned_noescape

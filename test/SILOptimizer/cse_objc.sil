@@ -277,3 +277,4 @@ sil_vtable Bar {
   #Bar.walk: @_TFC4test3Bar4walkfS0_FT_T_	// test.Bar.walk (test.Bar)() -> ()
   #Bar.deinit!deallocator: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
 }
+REQUIRES: updating_for_owned_noescape

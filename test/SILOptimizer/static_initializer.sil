@@ -63,3 +63,4 @@ bb0:
   %3 = load %2 : $*Outer
   return %3 : $Outer
 }
+REQUIRES: updating_for_owned_noescape

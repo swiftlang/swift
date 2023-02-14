@@ -28,3 +28,4 @@ extension Klass {
   __consuming
   func noimplicitcopy_method_attr() {}
 }
+REQUIRES: updating_for_owned_noescape

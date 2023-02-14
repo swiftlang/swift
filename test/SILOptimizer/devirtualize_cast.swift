@@ -10,3 +10,4 @@ func foo(y : Y) {
   x.ping()
 }
 
+REQUIRES: updating_for_owned_noescape

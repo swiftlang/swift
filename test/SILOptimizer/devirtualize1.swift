@@ -15,3 +15,4 @@ func function_with_interesting_stuff() {
 }
 
 
+REQUIRES: updating_for_owned_noescape

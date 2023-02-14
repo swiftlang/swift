@@ -99,3 +99,4 @@ func callsExTakesErrorWithError(_ p: P, _ error: Error) {
 func test4(_ p: P, _ error: Error) {
   callsExTakesErrorWithError(p, error)
 }
+REQUIRES: updating_for_owned_noescape

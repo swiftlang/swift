@@ -115,3 +115,4 @@ sil_witness_table hidden <T where T : P> ConditionalStruct<T>: P module t4 {
 
 sil_default_witness_table hidden P {
 }
+REQUIRES: updating_for_owned_noescape

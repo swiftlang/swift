@@ -42,3 +42,4 @@ bb0:
 
 // X86_64: define{{( protected)?}} swiftcc void @baz{{.*}}#0
 // X86_64: #0 = {{.*}}"target-features"="+cx16,+cx8,+fxsr,+mmx,+sahf,+sse,+sse2,+sse3,+ssse3,+x87"
+REQUIRES: updating_for_owned_noescape

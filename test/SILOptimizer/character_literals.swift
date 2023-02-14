@@ -49,3 +49,4 @@ public func singleNonSmolChar() -> Character {
   return "👩‍👩‍👦‍👦"
 }
 
+REQUIRES: updating_for_owned_noescape

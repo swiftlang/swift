@@ -10,3 +10,4 @@ public class G<T : P> {}
 extension Q where Self : C {
   public func foo(_: (G<Self>) -> ()) {}
 }
+REQUIRES: updating_for_owned_noescape

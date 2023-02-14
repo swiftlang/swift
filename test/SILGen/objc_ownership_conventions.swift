@@ -229,3 +229,4 @@ func innerPointerMethod(_ g: Gizmo) {
 func innerPointerProperty(_ g: Gizmo) {
   useInnerPointer(g.innerProperty)
 }
+REQUIRES: updating_for_owned_noescape

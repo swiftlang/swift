@@ -24,3 +24,4 @@ bb0(%0 : $Float32):
   return %5 : $Float32
 }
 
+REQUIRES: updating_for_owned_noescape

@@ -21,3 +21,4 @@ entry(%0 : $*(X, Y), %1 : $*(X, Y)):
   copy_addr [take] %1 to [init] %0 : $*(X,Y)
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

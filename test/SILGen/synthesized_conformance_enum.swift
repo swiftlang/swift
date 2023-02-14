@@ -107,3 +107,4 @@ extension NoValues: Codable {}
 // CHECK-LABEL: sil_witness_table hidden NoValues: Encodable module synthesized_conformance_enum {
 // CHECK-NEXT:   method #Encodable.encode: <Self where Self : Encodable> (Self) -> (any Encoder) throws -> () : @$s28synthesized_conformance_enum8NoValuesOSEAASE6encode2toys7Encoder_p_tKFTW // protocol witness for Encodable.encode(to:) in conformance NoValues
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

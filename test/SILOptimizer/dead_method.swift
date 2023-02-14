@@ -13,3 +13,4 @@ private class Derived : Base {
 // CHECK-LABEL: sil_vtable
 // CHECK: Base.visible
 // CHECK-NOT: is_dead
+REQUIRES: updating_for_owned_noescape

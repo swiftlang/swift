@@ -46,3 +46,4 @@ var topLevelObject2:TopLevelObjectTyWithoutDestructor
 // Check implicit destructor
 // CHECK-LABEL: sil hidden [ossa] @$s23sil_locations_top_level33TopLevelObjectTyWithoutDestructorCfd
 // CHECK:   return {{.*}}// {{.*}} line:12:7:imp_return:auto_gen
+REQUIRES: updating_for_owned_noescape

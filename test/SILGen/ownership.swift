@@ -19,3 +19,4 @@ func test1(f: () throws -> ()) throws {
   } catch MyError.case1 {
   }
 }
+REQUIRES: updating_for_owned_noescape

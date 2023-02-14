@@ -19,3 +19,4 @@ struct A {
                 let b = g(recur)(self, self)
         }
 }
+REQUIRES: updating_for_owned_noescape

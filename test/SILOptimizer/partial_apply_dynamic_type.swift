@@ -27,3 +27,4 @@ public func test_PartialApplyDynamicType() -> Int {
   return result
 }
 
+REQUIRES: updating_for_owned_noescape

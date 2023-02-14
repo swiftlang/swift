@@ -23,3 +23,4 @@ public func foo(x: inout [A]) -> Bool {
 }
 
 #endif
+REQUIRES: updating_for_owned_noescape

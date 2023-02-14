@@ -233,3 +233,4 @@ func testFunctionalTails(_ coin: Coin) -> Int {
     return 9001
   }
 } // CHECK: end sil function '$s16switch_enum_objc19testFunctionalTailsySiSo4CoinVF'
+REQUIRES: updating_for_owned_noescape

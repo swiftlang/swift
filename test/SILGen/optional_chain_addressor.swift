@@ -4,3 +4,4 @@ func foo(x: UnsafeMutablePointer<UnsafeMutablePointer<()>?>) { // expected-warni
   _ = x.pointee?.pointee
   _ = x.pointee.map { type(of: $0) }
 }
+REQUIRES: updating_for_owned_noescape

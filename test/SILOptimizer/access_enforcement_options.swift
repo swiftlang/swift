@@ -35,3 +35,4 @@ public func accessIntTwice() {
 // OPT: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[PROJ]] : $*Int
 // UNCHECKED-NOT: = begin_access
 // CHECK-LABEL: } // end sil function '$s26access_enforcement_options0A8IntTwiceyyFyycfU_'
+REQUIRES: updating_for_owned_noescape

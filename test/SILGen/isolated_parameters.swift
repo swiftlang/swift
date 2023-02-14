@@ -35,3 +35,4 @@ public func testIsolatedExistential(_ a: isolated Actor) async {
   // CHECK: hop_to_executor [[ACTOR_OPENED]] : $@opened("{{.*}}", any Actor) Self
   // CHECK: return
 }
+REQUIRES: updating_for_owned_noescape

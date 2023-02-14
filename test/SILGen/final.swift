@@ -43,3 +43,4 @@ func testDirectDispatch(c : TestClass) -> Int {
 // CHECK-NEXT:  #TestClass.init!allocator: {{.*}} : @$s5final11TestDerivedC{{[_0-9a-zA-Z]*}}fC
 // CHECK-NEXT:  #TestDerived.deinit!
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

@@ -491,3 +491,4 @@ func test_nontrivial_gep(_ x: Trivial) {
     @_noImplicitCopy let y = x
     print2(y.value)
 }
+REQUIRES: updating_for_owned_noescape

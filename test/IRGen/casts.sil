@@ -407,3 +407,4 @@ bb2:
 bb3(%11 : $Optional<C & PAnyObject>):
   return %11 : $Optional<C & PAnyObject>
 }
+REQUIRES: updating_for_owned_noescape

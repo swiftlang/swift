@@ -114,3 +114,4 @@ func testInstrumentNonEmptyStruct() {
 // CHECK-LLVM-IR: tsan_external_write
   s.mutate()
 }
+REQUIRES: updating_for_owned_noescape

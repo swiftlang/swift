@@ -210,3 +210,4 @@ entry(%x : $Int, %y : $*Int):
   return %r : $Int
 }
 
+REQUIRES: updating_for_owned_noescape

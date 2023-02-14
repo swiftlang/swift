@@ -106,3 +106,4 @@ extension PC {
     self = type(of: self).init(0)
   } */
 }
+REQUIRES: updating_for_owned_noescape

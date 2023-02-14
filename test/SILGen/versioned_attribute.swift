@@ -24,3 +24,4 @@
 
 // CHECK-LABEL: sil [ossa] @$s19versioned_attribute9GiftHorseCfd : $@convention(method) (@guaranteed GiftHorse) -> @owned Builtin.NativeObject
 // CHECK-LABEL: sil [ossa] @$s19versioned_attribute9GiftHorseCfD : $@convention(method) (@owned GiftHorse) -> ()
+REQUIRES: updating_for_owned_noescape

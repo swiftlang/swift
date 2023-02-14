@@ -32,3 +32,4 @@ class D: C {}
 func test(_ x: Foo) -> D {
   return x.bar?.bas as! D
 }
+REQUIRES: updating_for_owned_noescape

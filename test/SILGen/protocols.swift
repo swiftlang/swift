@@ -466,3 +466,4 @@ public func testSelfReturningSubscript() {
 // CHECK-LABEL: sil_witness_table hidden StructWithStoredClassProperty: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter: {{.*}} : @$s9protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSivgTW
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

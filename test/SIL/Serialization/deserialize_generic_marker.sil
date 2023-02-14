@@ -22,3 +22,4 @@ bb0:
 // Make sure the function body is deserialized.
 // CHECK-LABEL: @$s18def_generic_marker4testyxx_q_tAA16mmCollectionTypeRzAaCR_9Generator_7ElementQY_AD_AERTzr0_lF : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator.Element == EC2.Generator.Element> (@in_guaranteed EC1, @in_guaranteed EC2) -> @out EC1 {
 sil @$s18def_generic_marker4testyxx_q_tAA16mmCollectionTypeRzAaCR_9Generator_7ElementQY_AD_AERTzr0_lF : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator.Element == EC2.Generator.Element> (@in_guaranteed EC1, @in_guaranteed EC2) -> @out EC1
+REQUIRES: updating_for_owned_noescape

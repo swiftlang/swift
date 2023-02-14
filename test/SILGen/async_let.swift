@@ -74,3 +74,4 @@ func testDecomposeAwait(cond: Bool) async -> Int {
   // CHECK: apply [[FINISH]]([[ASYNC_LET_START]], [[BUFFER]])
   // CHECK: builtin "endAsyncLetLifetime"([[ASYNC_LET_START]] : $Builtin.RawPointer)
 }
+REQUIRES: updating_for_owned_noescape

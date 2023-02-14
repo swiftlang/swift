@@ -49,3 +49,4 @@ public func testMayRelease() -> Base {
 // print("Object:")
 // print(testMayRelease())
 // -----------------------------------------------------------------------------
+REQUIRES: updating_for_owned_noescape

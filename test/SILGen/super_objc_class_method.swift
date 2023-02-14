@@ -10,3 +10,4 @@ class MyFunkyDictionary: NSDictionary {
   }
 }
 
+REQUIRES: updating_for_owned_noescape

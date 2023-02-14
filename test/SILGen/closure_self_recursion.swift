@@ -15,3 +15,4 @@ var recur_harder : (() -> ()) -> (() -> ()) {
   // CHECK-LABEL: function_ref @$s3foo12recur_harderyyycyyXEcvg
   return { f in recur_harder(f) } // expected-warning {{attempting to access 'recur_harder' within its own getter}}
 }
+REQUIRES: updating_for_owned_noescape

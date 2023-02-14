@@ -28,3 +28,4 @@ func createSetterSelector() -> Selector {
   // CHECK: string_literal objc_selector "setProperty:"
   return #selector(setter: Foo.isProperty)
 }
+REQUIRES: updating_for_owned_noescape

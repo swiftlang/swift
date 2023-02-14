@@ -114,3 +114,4 @@ entry:
   %2 = unconditional_checked_cast %1 : $@thick SomeClass.Type to @thick AnyObject.Type
   return %2 : $@thick AnyObject.Type
 }
+REQUIRES: updating_for_owned_noescape

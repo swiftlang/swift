@@ -71,3 +71,4 @@ variadicFirst(x)
 // CHECK: [[VARIADIC_SECOND:%.*]] = function_ref @$s20scalar_to_tuple_args14variadicSecondyySi_SidtF
 // CHECK: apply [[VARIADIC_SECOND]]([[X]], [[ARRAY]])
 variadicSecond(x)
+REQUIRES: updating_for_owned_noescape

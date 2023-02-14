@@ -38,3 +38,4 @@ func doIt() {
   // CHECK: apply [[ARG2]]<String, Int>(%{{.*}})
   _ = Goldfish<String>.Shark<Int>()
 }
+REQUIRES: updating_for_owned_noescape

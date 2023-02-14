@@ -65,3 +65,4 @@ public struct StructYieldingAResilientNonetrivialValue : ProtocolWithAYield {
     }
   }
 }
+REQUIRES: updating_for_owned_noescape

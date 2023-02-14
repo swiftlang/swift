@@ -108,3 +108,4 @@ func specialized_metatype() -> Dictionary<String, Int> {
   let dict = Swift.Dictionary<Swift.String, Int>()
   return dict
 }
+REQUIRES: updating_for_owned_noescape

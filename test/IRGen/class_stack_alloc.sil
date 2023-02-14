@@ -147,3 +147,4 @@ bb0:
 sil @not_inlined_destructor :  $@convention(thin) (TestClass) -> ()
 sil @unknown_func :  $@convention(thin) (@inout TestStruct) -> ()
 
+REQUIRES: updating_for_owned_noescape

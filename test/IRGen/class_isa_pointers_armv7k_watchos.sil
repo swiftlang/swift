@@ -65,3 +65,4 @@ sil private @$s33class_isa_pointers_armv7k_watchos7MongrelCACycfcTo : $@conventi
 entry(%0 : $Purebred):
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

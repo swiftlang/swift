@@ -47,3 +47,4 @@ public class Derived : Middle {
 // RESILIENT-CLIENT-NEXT:    #Middle.method: (Middle) -> () -> () : @$s30accessibility_vtables_testable7DerivedC6methodyyF [override]	// Derived.method()
 // RESILIENT-CLIENT-NEXT:    #Derived.deinit!deallocator: @$s30accessibility_vtables_testable7DerivedCfD	// Derived.__deallocating_deinit
 // RESILIENT-CLIENT-NEXT:  }
+REQUIRES: updating_for_owned_noescape

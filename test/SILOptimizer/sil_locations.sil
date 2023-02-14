@@ -64,3 +64,4 @@ bb0(%0 : $Int64):
   // CHECK: [[VAL22:%.*]] = metatype $@thin Int64.Type,   {{.*}} line:42:9
   // CHECK: [[VAL23:%.*]] = integer_literal $Builtin.Int128, 30,      {{.*}} line:43:9
 }
+REQUIRES: updating_for_owned_noescape

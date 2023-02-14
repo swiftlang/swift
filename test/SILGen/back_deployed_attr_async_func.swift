@@ -56,3 +56,4 @@ func caller() async {
   await asyncFunc()
 }
 
+REQUIRES: updating_for_owned_noescape

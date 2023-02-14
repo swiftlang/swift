@@ -449,3 +449,4 @@ func optOptStringToOptOptPointer(string: String??) {
   // CHECK:   br [[SOME_CONT_BB]]([[NO_VALUE]] : $Optional<Optional<UnsafeRawPointer>>, [[NO_OWNER]] : $Optional<AnyObject>)
   takesOptOptConstRawPointer(string, and: sideEffect1())
 }
+REQUIRES: updating_for_owned_noescape

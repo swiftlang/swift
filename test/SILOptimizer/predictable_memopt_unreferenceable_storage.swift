@@ -18,3 +18,4 @@ struct T {
 // CHECK:       bb0(%0 : $StructWithBitfields, %1 : $S, %2 : $@thin T.Type):
 // CHECK:         [[RESULT:%.*]] = struct $T (%0 : $StructWithBitfields, %1 : $S)
 // CHECK:         return [[RESULT]]
+REQUIRES: updating_for_owned_noescape

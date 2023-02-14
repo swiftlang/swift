@@ -342,3 +342,4 @@ extension InternalThing2 {
     }
   }
 }
+REQUIRES: updating_for_owned_noescape

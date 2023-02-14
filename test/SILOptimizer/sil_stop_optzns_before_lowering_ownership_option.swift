@@ -7,3 +7,4 @@ public class Klass {}
 
 // CHECK-LABEL: sil [ossa] @$s48sil_stop_optzns_before_lowering_ownership_option7theFuncAA5KlassCyF : $@convention(thin) () -> @owned Klass {
 public func theFunc() -> Klass { Klass() }
+REQUIRES: updating_for_owned_noescape

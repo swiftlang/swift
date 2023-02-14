@@ -9,3 +9,4 @@ struct Foo<T> {
   // CHECK-LABEL: sil hidden [ossa] @{{.*}}Foo{{.*}}bar{{.*}} : $@convention(method) <T><U where T : X<U>>
   func bar<U>(_: U) where T: X<U> {}
 }
+REQUIRES: updating_for_owned_noescape

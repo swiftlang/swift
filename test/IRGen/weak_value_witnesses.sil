@@ -61,3 +61,4 @@ struct Gen<T> {
 // Generic types must be taken using their value witness.
 // CHECK-LABEL: define internal %swift.opaque* @"$s20weak_value_witnesses3GenVwtk"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %"Gen<T>")
 // CHECK:         call %swift.opaque* %initializeWithTake
+REQUIRES: updating_for_owned_noescape

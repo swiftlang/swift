@@ -426,3 +426,4 @@ extension OptionalMemberLookups {
     await self.generateMaybe!()
   }
 }
+REQUIRES: updating_for_owned_noescape

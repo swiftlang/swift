@@ -263,3 +263,4 @@ class GenericChildToResilientGenericOutsideParent<A> : ResilientGenericOutsidePa
   // CHECK: super_method %0 : $@thick GenericChildToResilientGenericOutsideParent<A>.Type, #ResilientGenericOutsideParent.classMethod : <A> (ResilientGenericOutsideParent<A>.Type) -> () -> (), $@convention(method) <τ_0_0> (@thick ResilientGenericOutsideParent<τ_0_0>.Type) -> (
   // CHECK: } // end sil function '$s19partial_apply_super023GenericChildToResilientD13OutsideParentC11classMethodyyFZyycfu_'
 }
+REQUIRES: updating_for_owned_noescape

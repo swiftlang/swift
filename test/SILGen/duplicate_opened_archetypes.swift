@@ -31,3 +31,4 @@ struct Test {
 
   var t: S = S(i: .x)
 }
+REQUIRES: updating_for_owned_noescape

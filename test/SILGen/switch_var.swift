@@ -719,3 +719,4 @@ func test_multiple_patterns_value_semantics(_ y: C) {
     default: break
   }
 }
+REQUIRES: updating_for_owned_noescape

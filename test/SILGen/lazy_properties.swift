@@ -63,3 +63,4 @@ class Butt {
 
 // CHECK-LABEL: sil private [ossa] @$s15lazy_properties4ButtC4buttSivgSiyXEfU_ : $@convention(thin) (@guaranteed Butt) -> Int
 // CHECK-LABEL: sil private [ossa] @$s15lazy_properties4ButtC4buttSivgSiyXEfU_3barL_SiyF : $@convention(thin) (@guaranteed Butt) -> Int
+REQUIRES: updating_for_owned_noescape

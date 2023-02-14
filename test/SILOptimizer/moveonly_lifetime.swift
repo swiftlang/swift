@@ -59,3 +59,4 @@ func test_diamond(_ condition: Bool) {
     takeC(c)
   }
 }
+REQUIRES: updating_for_owned_noescape

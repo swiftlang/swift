@@ -46,3 +46,4 @@ func caller(_ s: TopLevelStruct) {
   // CHECK: {{%.*}} = function_ref @$s11back_deploy14TopLevelStructV8propertyACvgTwb : $@convention(method) (TopLevelStruct) -> TopLevelStruct
   _ = s.property
 }
+REQUIRES: updating_for_owned_noescape

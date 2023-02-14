@@ -17,3 +17,4 @@
 public func takesConcreteHasAssocType(c: ConcreteHasAssocType) {
   takesHasAssocType(t: c)
 }
+REQUIRES: updating_for_owned_noescape

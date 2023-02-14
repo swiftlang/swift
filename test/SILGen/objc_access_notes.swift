@@ -636,3 +636,4 @@ func buildGizmo1() -> Gizmo {
 func buildGizmo2() -> Gizmo {
   return Gizmo(whistles: 10)
 }
+REQUIRES: updating_for_owned_noescape

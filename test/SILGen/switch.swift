@@ -1738,3 +1738,4 @@ struct rdar49990484Struct {
     }
   }
 }
+REQUIRES: updating_for_owned_noescape

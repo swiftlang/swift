@@ -15,3 +15,4 @@ public class ClassWithDynamicObservedProperty : Proto {
 // CHECK: objc_method %0 : $ClassWithDynamicObservedProperty, #ClassWithDynamicObservedProperty.property!getter.foreign
 // CHECK: objc_method %0 : $ClassWithDynamicObservedProperty, #ClassWithDynamicObservedProperty.property!setter.foreign
 // CHECK: return
+REQUIRES: updating_for_owned_noescape

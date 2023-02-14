@@ -33,3 +33,4 @@ bb0(%0 : $*V, %1 : $@thick ItemStorage<V>.Type, %2 : $@thick ItemStorage<V>.Type
   return %6 : $ItemStorage<V>
 }
 
+REQUIRES: updating_for_owned_noescape

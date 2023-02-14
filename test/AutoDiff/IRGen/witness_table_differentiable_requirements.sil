@@ -79,3 +79,4 @@ sil_witness_table hidden DifferentiableConformance: DifferentiableRequirement mo
 // CHECK-SAME:   i8* bitcast ({ float, i8*, %swift.refcounted* } (float, %T41witness_table_differentiable_requirements25DifferentiableConformanceV*, %swift.type*, i8**)* @"AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_jvp_SU" to i8*),
 // CHECK-SAME:   i8* bitcast ({ float, i8*, %swift.refcounted* } (float, %T41witness_table_differentiable_requirements25DifferentiableConformanceV*, %swift.type*, i8**)* @"AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_vjp_SU" to i8*)
 // CHECK-SAME: ]
+REQUIRES: updating_for_owned_noescape

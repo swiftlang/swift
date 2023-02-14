@@ -19,3 +19,4 @@ func reasyncFunction(_ value: Optional<Int>, _ fn: () async throws -> Int) reasy
 func callsReasyncFunction() -> Int {
   return reasyncFunction(nil, { return 321 } )
 }
+REQUIRES: updating_for_owned_noescape

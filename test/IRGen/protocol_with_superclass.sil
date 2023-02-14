@@ -177,3 +177,4 @@ sil_vtable SubConcrete {}
 sil_vtable Derived {}
 sil_vtable SubDerived {}
 sil_vtable MoreDerived {}
+REQUIRES: updating_for_owned_noescape

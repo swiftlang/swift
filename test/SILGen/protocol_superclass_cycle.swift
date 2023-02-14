@@ -14,3 +14,4 @@ func f<T : P>(_ t: T) {
   // the problematic conformance popped up.
   _ = { [weak t] in _ = t }
 }
+REQUIRES: updating_for_owned_noescape

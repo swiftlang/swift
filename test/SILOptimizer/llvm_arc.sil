@@ -31,3 +31,4 @@ bb0:
   strong_release %obj : $T
   return %mt : $@objc_metatype T.Type
 }
+REQUIRES: updating_for_owned_noescape

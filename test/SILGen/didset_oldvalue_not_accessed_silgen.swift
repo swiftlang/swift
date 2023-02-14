@@ -51,3 +51,4 @@ let foo = Foo(value: "Hello")
 // CHECK-NEXT: end_access [[BEGIN_ACCESS]] : $*T
 // CHECK-NEXT: unwind
 foo.value = "World"
+REQUIRES: updating_for_owned_noescape

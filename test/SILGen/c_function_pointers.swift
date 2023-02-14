@@ -108,3 +108,4 @@ class Selfless {
     // expected-error@-1 {{a C function pointer cannot be formed from a closure that captures dynamic Self type}}
   }
 }
+REQUIRES: updating_for_owned_noescape

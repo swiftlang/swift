@@ -1044,3 +1044,4 @@ public func noImplicitCopyReturnUse(_ x: Int) -> Int {
     let _ = z
     return y // expected-note {{consuming use here}}
 }
+REQUIRES: updating_for_owned_noescape

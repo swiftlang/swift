@@ -9,3 +9,4 @@ func foo() {
   // CHECK-LABEL: sil private [thunk] [ossa] @$s10objc_local3fooyyF3FooL_C1xSivsTo
   class Foo : NSObject { @objc var x: Int = 0 }
 }
+REQUIRES: updating_for_owned_noescape

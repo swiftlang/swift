@@ -51,3 +51,4 @@ class StillOpaqueClass<T>: OpaqueClass<T> {
 // HECK:   [[RETVAL:%.*]] = enum $Optional<(T, (@thick T.Type, @callee_guaranteed (@in_guaranteed T) -> @out T))>, #Optional.some!enumelt, [[RETTUPLE1]] : $(T, (@thick T.Type, @callee_guaranteed (@in_guaranteed T) -> @out T))
 // HECK:   return [[RETVAL]]
 // CHECK-LABEL:  // end sil function '$s27opaque_values_silgen_vtable16StillOpaqueClassC24variantOptionalityTuples1xx_xm_xxcttx_xm_xxcttSg_tFAA0fG0CAdeFx_xm_xxctt_tFTV'
+REQUIRES: updating_for_owned_noescape

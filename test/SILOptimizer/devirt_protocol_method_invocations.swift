@@ -342,3 +342,4 @@ public func testNoDevirt() {
   p.assoc3 { _ in }
   p.assoc4 { _ in }
 }
+REQUIRES: updating_for_owned_noescape

@@ -541,3 +541,4 @@ bb2:
 bb3(%22 : $Builtin.Int32):
   return %22 : $Builtin.Int32
 }
+REQUIRES: updating_for_owned_noescape

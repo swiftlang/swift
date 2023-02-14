@@ -16,3 +16,4 @@ sil @patatino : $@convention(thin) () -> Never {
 bb0:
   br bb0
 }
+REQUIRES: updating_for_owned_noescape

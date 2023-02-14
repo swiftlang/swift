@@ -69,3 +69,4 @@ bb0(%0 :  @owned $WrapperStruct):
   return %res : $()
 }
 
+REQUIRES: updating_for_owned_noescape

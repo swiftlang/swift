@@ -3728,3 +3728,4 @@ bb5:
 bb6:
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

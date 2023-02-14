@@ -29,3 +29,4 @@ bb0:
   return %2 : $()
 // CHECK:   ret void
 }
+REQUIRES: updating_for_owned_noescape

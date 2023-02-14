@@ -60,3 +60,4 @@ sil @$s19objc_attr_NSManaged10SwiftGizmoC7bellsOnSQyACGSi_tcfc : $@convention(me
 
 sil_vtable SwiftGizmo {
 }
+REQUIRES: updating_for_owned_noescape

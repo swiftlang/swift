@@ -31,3 +31,4 @@ func test(a: A) {
   s = a.b.c?.d
   print(s)
 }
+REQUIRES: updating_for_owned_noescape

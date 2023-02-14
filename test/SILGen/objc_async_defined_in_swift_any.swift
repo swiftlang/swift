@@ -20,3 +20,4 @@ class FakeClassHolder {
         _ = await self.service.removeKey()
     }
 }
+REQUIRES: updating_for_owned_noescape

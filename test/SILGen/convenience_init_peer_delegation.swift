@@ -176,3 +176,4 @@ class ObjCBase {
 //                -- Y.init(convenience:) is a designated init
 // CHECK:         @$s32convenience_init_peer_delegation1YC0A0ACyt_tcfC
 // CHECK-NOT:     @$s32convenience_init_peer_delegation1YC0A0ACyt_tcfc
+REQUIRES: updating_for_owned_noescape

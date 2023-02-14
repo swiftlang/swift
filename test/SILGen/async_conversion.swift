@@ -86,3 +86,4 @@ actor AnActor {
 // CHECK-NOT: hop_to_executor
 // CHECK: end sil function '$sSiIegy_SiIegHy_TR'
 
+REQUIRES: updating_for_owned_noescape

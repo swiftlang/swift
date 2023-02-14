@@ -24,3 +24,4 @@ class CallerBImpl: CallerB {
   func use(_ x: Int, thenCall callback: @escaping () -> ()) throws { }
 }
 
+REQUIRES: updating_for_owned_noescape

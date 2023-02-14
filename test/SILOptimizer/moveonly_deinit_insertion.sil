@@ -339,4 +339,4 @@ sil_moveonlydeinit TrivialMoveOnlyEnum {
 
 sil_moveonlydeinit NonTrivialMoveOnlyEnum {
   @$s4main22NonTrivialMoveOnlyEnumOfD
-}
+}REQUIRES: updating_for_owned_noescape

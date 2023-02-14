@@ -11,3 +11,4 @@ func callsA() {
   let x = (2 as NSNumber) as AnyObject
   a(x.isEqual(2))
 }
+REQUIRES: updating_for_owned_noescape

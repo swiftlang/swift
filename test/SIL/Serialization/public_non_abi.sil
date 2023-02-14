@@ -28,3 +28,4 @@ sil hidden_external [serialized] @public_non_abi_function : $@convention(thin) (
 // Make sure the function body is deserialized.
 // CHECK-LABEL: sil shared @other_public_non_abi_function : $@convention(thin) () -> ()
 // CHECK: return
+REQUIRES: updating_for_owned_noescape

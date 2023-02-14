@@ -125,3 +125,4 @@ sil [serialized] @use_external_functions: $@convention(thin) () -> () {
 // CHECK-NOT: sil{{.*}}@used_external_fn : $@convention(thin) () -> () {
 // But declaration should be present.
 // CHECK: sil{{.*}}@used_external_fn : $@convention(thin) () -> ()
+REQUIRES: updating_for_owned_noescape

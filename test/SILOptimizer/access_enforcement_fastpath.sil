@@ -109,3 +109,4 @@ bb0(%0 : $TestEarlyBail):
   end_access %a2 : $*Int
   return %0 : $TestEarlyBail
 }
+REQUIRES: updating_for_owned_noescape

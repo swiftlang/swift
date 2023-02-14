@@ -141,3 +141,4 @@ bb6:
 bb7(%19 : $Int64):
   return %19 : $Int64
 }
+REQUIRES: updating_for_owned_noescape

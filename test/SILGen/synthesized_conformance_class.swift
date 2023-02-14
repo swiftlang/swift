@@ -123,3 +123,4 @@ func doIt(_ c: FinalHashableClass) -> Int {
 
 
 
+REQUIRES: updating_for_owned_noescape

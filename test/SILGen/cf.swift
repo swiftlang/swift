@@ -78,3 +78,4 @@ class MyMagnetism : CCMagnetismModel {
     return super.borrowRefrigerator()
   }
 }
+REQUIRES: updating_for_owned_noescape

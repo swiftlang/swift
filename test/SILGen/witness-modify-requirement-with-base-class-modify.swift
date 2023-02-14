@@ -24,4 +24,4 @@ public class Derived<T: P> : Base<T>, Q where T.A == S {}
 // CHECK-NEXT:    method #Q.foo!getter: <Self where Self : Q> (Self) -> () -> S? : @$s4main7DerivedCyxGAA1QA2aEP3fooAA1SVSgvgTW
 // CHECK-NEXT:    method #Q.foo!setter: <Self where Self : Q> (inout Self) -> (S?) -> () : @$s4main7DerivedCyxGAA1QA2aEP3fooAA1SVSgvsTW
 // CHECK-NEXT:    method #Q.foo!modify: <Self where Self : Q> (inout Self) -> () -> () : @$s4main7DerivedCyxGAA1QA2aEP3fooAA1SVSgvMTW
-// CHECK-NEXT:  }
+// CHECK-NEXT:  }REQUIRES: updating_for_owned_noescape

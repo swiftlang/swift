@@ -96,3 +96,4 @@ class Good: Foo {
     super.init(x)
   }
 }
+REQUIRES: updating_for_owned_noescape

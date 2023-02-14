@@ -14,3 +14,4 @@ func foo() {
     func bar(_: Any) {}
 
 }
+REQUIRES: updating_for_owned_noescape

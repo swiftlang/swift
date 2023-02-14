@@ -47,3 +47,4 @@ sil_default_witness_table hidden DerivedFromSimpleAssoc {
 // CHECK: define internal void @"$s4test15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"
 
 
+REQUIRES: updating_for_owned_noescape

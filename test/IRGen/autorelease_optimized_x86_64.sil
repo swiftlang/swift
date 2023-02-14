@@ -37,3 +37,4 @@ bb0(%0 : @owned $C):
 // CHECK:      callq _foo
 // CHECK-NEXT: movq %rax, %rdi
 // CHECK-NEXT: callq _objc_retainAutoreleasedReturnValue
+REQUIRES: updating_for_owned_noescape

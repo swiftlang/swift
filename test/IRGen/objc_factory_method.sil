@@ -29,3 +29,4 @@ bb0(%0 : $Optional<Bee>, %1 : $@thick Hive.Type):
   return %4 : $Optional<Hive>
 }
 
+REQUIRES: updating_for_owned_noescape

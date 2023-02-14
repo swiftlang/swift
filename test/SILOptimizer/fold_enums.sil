@@ -202,3 +202,4 @@ bb4(%32 : $F):                                    // Preds: bb1 bb2 bb3
   release_value %0 : $F                           // id: %33
   return %32 : $F                                 // id: %34
 }
+REQUIRES: updating_for_owned_noescape

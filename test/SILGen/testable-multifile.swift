@@ -65,3 +65,4 @@ public class PublicSub: Base {
 // CHECK-LABEL: sil_witness_table [serialized] PublicFooImpl: Fooable module main {
 // CHECK-NEXT:  method #Fooable.foo: {{.*}} : @$s4main13PublicFooImplVAA7FooableA2aDP3fooyyFTW
 // CHECK-NEXT: }
+REQUIRES: updating_for_owned_noescape

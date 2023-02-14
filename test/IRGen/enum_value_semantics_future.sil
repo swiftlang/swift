@@ -668,3 +668,4 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = bitcast [1 x i8]* [[EXTRA_TAG_ADDR_TMP]] to i1*
 // CHECK-NEXT: store i1 [[EXTRA_TAG]], i1* [[EXTRA_TAG_ADDR]], align 8
 // CHECK-NEXT: ret void
+REQUIRES: updating_for_owned_noescape

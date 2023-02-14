@@ -446,3 +446,4 @@ public class F<T> {
 public func testClosureMethodParam<T>(f: F<T>) throws {
   try f.test { return f.t! }
 }
+REQUIRES: updating_for_owned_noescape

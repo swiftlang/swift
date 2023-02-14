@@ -12,3 +12,4 @@ entry(%0 : $*@sil_unowned C, %1 : $C):
 }
 
 sil_vtable C {}
+REQUIRES: updating_for_owned_noescape

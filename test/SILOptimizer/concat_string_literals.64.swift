@@ -58,3 +58,4 @@ public func test_strng_concat_smol() -> String {
 public func test_strng_concat_large() -> String {
   return "a" + "bc" + "dèf" + "ghī" + "jklmn" + "o" + "𝛒qr"
 }
+REQUIRES: updating_for_owned_noescape

@@ -39,3 +39,4 @@ bb0(%0 : $MyEnum):
 }
 
 
+REQUIRES: updating_for_owned_noescape

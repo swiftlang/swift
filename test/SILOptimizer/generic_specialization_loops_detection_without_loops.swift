@@ -147,3 +147,4 @@ public func run_TypeFlood(_ N: Int) {
     flood2(Some0<Some0<Some0<Int>>>())
   }
 }
+REQUIRES: updating_for_owned_noescape

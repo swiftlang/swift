@@ -397,3 +397,4 @@ sil public_external @eatMyUnsignedShorts : $@convention(c) (CUnsignedShort) -> C
 sil public_external @ints : $@convention(c) (CInt) -> CInt
 sil public_external @unsigneds : $@convention(c) (CUnsignedInt) -> CUnsignedInt
 
+REQUIRES: updating_for_owned_noescape

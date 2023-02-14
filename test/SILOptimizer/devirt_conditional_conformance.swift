@@ -82,3 +82,4 @@ func callFish<T : Fish>(_ x: T) {
 public func testFish() {
   callFish(Outer(x: 0))
 }
+REQUIRES: updating_for_owned_noescape

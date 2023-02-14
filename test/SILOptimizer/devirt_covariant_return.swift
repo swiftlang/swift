@@ -350,3 +350,4 @@ public class H: F {
     return nil
   }
 }
+REQUIRES: updating_for_owned_noescape

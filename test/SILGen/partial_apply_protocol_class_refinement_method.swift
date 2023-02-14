@@ -15,3 +15,4 @@ func partialApply(_ q: Q) -> () -> () {
   // CHECK-NEXT: dealloc_stack [[TMP]]
   return q.foo
 }
+REQUIRES: updating_for_owned_noescape

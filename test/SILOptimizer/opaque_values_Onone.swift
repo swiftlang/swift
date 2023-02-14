@@ -250,3 +250,4 @@ func maybeCastGenericToMeta<T>(_ t: T) -> AnyObject.Type? {
   }
   return nil
 }
+REQUIRES: updating_for_owned_noescape

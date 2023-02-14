@@ -134,3 +134,4 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   var subscriptRef = t[5]
 }
 // CHECK: } // end sil function '$s17protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F'
+REQUIRES: updating_for_owned_noescape

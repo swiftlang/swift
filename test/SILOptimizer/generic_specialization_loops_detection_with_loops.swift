@@ -168,3 +168,4 @@ struct Outer5<Param>: P {
 testFoo6(Outer<Start>.self)
 // Check a more complex, but similar idea.
 testFoo7(Outer1<Start>.self)
+REQUIRES: updating_for_owned_noescape

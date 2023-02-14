@@ -162,3 +162,4 @@ func testUnreachablePlatformAvailableGuard() {
 
   doThing() // no-warning
 }
+REQUIRES: updating_for_owned_noescape

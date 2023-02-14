@@ -62,3 +62,4 @@ func testNeq(ptr: UnsafeMutablePointer<Int>) -> Bool {
   // CHECK: address_to_pointer [stack_protection] [[T0]]
   return &global != ptr
 }
+REQUIRES: updating_for_owned_noescape

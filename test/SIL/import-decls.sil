@@ -17,3 +17,4 @@ func foo() {}
 // CHECK-NOT: import Builtin
 // CHECK-NOT: import Swift{{$}}
 // CHECK: import TestModule
+REQUIRES: updating_for_owned_noescape

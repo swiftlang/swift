@@ -985,3 +985,4 @@ bb1(%9 : $()):
 bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
+REQUIRES: updating_for_owned_noescape

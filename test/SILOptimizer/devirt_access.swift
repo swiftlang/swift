@@ -80,3 +80,4 @@ func testPrivateOverridden() {
   let obj = getPrivateClass()
   obj.bar()
 }
+REQUIRES: updating_for_owned_noescape

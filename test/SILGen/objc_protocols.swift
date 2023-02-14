@@ -312,3 +312,4 @@ public func couldActuallyEscape(_ closure: @escaping () -> (), _ villain: Danger
   villain.malicious(closure)
 }
 
+REQUIRES: updating_for_owned_noescape

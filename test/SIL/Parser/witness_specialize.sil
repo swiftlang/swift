@@ -25,3 +25,4 @@ sil_witness_table <DD> ConformsWithDependentAssocType2<DD>: AssocTypeWithReqt mo
   associated_type AssocType: GenericAssocType<DD>
   associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <DD> (<T> GenericAssocType<T>: AssocReqt module witness_specialize)
 }
+REQUIRES: updating_for_owned_noescape

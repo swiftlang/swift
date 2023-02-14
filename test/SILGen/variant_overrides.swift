@@ -34,3 +34,4 @@ func useAtConcrete(b: B<Int>) {
 
 // CHECK-LABEL: sil_vtable B {
 // CHECK:          #A.foo: (A) -> (@escaping (A) -> ()) -> () : @$s17variant_overrides1BC3foo5blockyyACyxGc_tFAA1ACAdEyyAHc_tFTV [override]
+REQUIRES: updating_for_owned_noescape

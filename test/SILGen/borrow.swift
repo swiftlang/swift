@@ -37,3 +37,4 @@ func lvalueBorrowShouldBeAtEndOfFormalAccessScope() {
   var c = C()
   useD(c.d)
 }
+REQUIRES: updating_for_owned_noescape

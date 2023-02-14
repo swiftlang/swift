@@ -52,3 +52,4 @@ class HasComputedProperty: ProtocolWithProperty {
 }
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s10multi_file19HasComputedPropertyC3fooSivM : $@yield_once @convention(method) (@guaranteed HasComputedProperty) -> @yields @inout Int {
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s10multi_file19HasComputedPropertyCAA012ProtocolWithE0A2aDP3fooSivMTW : $@yield_once @convention(witness_method: ProtocolWithProperty) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout Int for <HasComputedProperty> {
+REQUIRES: updating_for_owned_noescape

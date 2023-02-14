@@ -58,3 +58,4 @@ func callee_owned_eagerMove(@_eagerMove _ p: __owned P) {
 public func caller_owned_eagerMove(s: S) {
   callee_owned_eagerMove(s)
 }
+REQUIRES: updating_for_owned_noescape

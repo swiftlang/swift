@@ -25,3 +25,4 @@ final class RPCServerHandler<Stream: ServerStream, Request: Message, Response: M
         self.userFunction = userFunction
     }
 }
+REQUIRES: updating_for_owned_noescape

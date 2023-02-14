@@ -92,3 +92,4 @@ class SwiftGizmo : Gizmo {
 // CHECK-NOT: sil private [thunk] [ossa] @$sSo11SwiftGizmo2CfETo : $@convention(objc_method) (SwiftGizmo2) -> ()
 class SwiftGizmo2 : Gizmo {
 }
+REQUIRES: updating_for_owned_noescape

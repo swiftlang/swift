@@ -5,3 +5,4 @@ class ConsumingClass {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s21value_ownership_class14ConsumingClassC15consumingMethodyyF : $@convention(method) (@owned ConsumingClass) -> () {
+REQUIRES: updating_for_owned_noescape

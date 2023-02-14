@@ -17,3 +17,4 @@ bb2:
   %r2 = tuple ()
   return %r2 : $()
 }
+REQUIRES: updating_for_owned_noescape

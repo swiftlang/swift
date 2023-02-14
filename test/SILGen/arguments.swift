@@ -101,3 +101,4 @@ extension Int : Runcible {}
 func variadic_address_only_arg(_ x: Runcible...) {}
 
 variadic_address_only_arg(i)
+REQUIRES: updating_for_owned_noescape

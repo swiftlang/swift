@@ -34,3 +34,4 @@ public func make(type: Cat.Type, cats: Int) {
 // CHECK: bb3:
 // CHECK:   alloc_ref [stack] $BigCat
 // CHECK:   br bb1
+REQUIRES: updating_for_owned_noescape

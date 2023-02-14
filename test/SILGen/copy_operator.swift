@@ -102,3 +102,4 @@ public func useCopy(_ k: Klass) -> Klass {
 public func useCopy<T : AnyObject>(_ k: T) -> T {
     _copy(k)
 }
+REQUIRES: updating_for_owned_noescape

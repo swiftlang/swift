@@ -63,3 +63,4 @@ class SubHive : Hive {
     self.init(queen: Bee())
   }
 }
+REQUIRES: updating_for_owned_noescape

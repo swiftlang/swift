@@ -30,3 +30,4 @@ func bas<T>(a: Bool, t: T) {
 
   x = t
 }
+REQUIRES: updating_for_owned_noescape

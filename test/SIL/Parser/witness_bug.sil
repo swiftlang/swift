@@ -12,3 +12,4 @@ bb0:
 sil_witness_table public_external Int: Comparable module Swift {
   base_protocol Equatable: Int: Equatable module Swift
 }
+REQUIRES: updating_for_owned_noescape

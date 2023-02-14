@@ -38,3 +38,4 @@ sil [serialized] [available 123.321] @version_minor : $@convention(thin) () -> (
 bb0:
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

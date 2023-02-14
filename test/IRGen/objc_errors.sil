@@ -15,3 +15,4 @@ entry(%0 : $NSError):
   return %1 : $Error
 }
 
+REQUIRES: updating_for_owned_noescape

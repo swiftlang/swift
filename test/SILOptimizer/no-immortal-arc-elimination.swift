@@ -27,3 +27,4 @@ func constantArray() -> [Int] {
   return [1, 2, 3]
 }
 
+REQUIRES: updating_for_owned_noescape

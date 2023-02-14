@@ -55,3 +55,4 @@ test1(E.one("payload1"))
 test2(E.two("payload2"))
 test3(E.three(3))
 test4(E.one("payload1"))
+REQUIRES: updating_for_owned_noescape

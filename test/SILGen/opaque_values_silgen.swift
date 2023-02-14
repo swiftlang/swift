@@ -645,3 +645,4 @@ func giveKeyPathString() {
 @available(SwiftStdlib 5.1, *)
 @backDeployed(before: SwiftStdlib 5.8)
 public func backDeployingReturningGeneric<T>(_ t: T) throws -> T { t }
+REQUIRES: updating_for_owned_noescape

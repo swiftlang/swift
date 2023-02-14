@@ -355,3 +355,4 @@ bb0(%0 : @guaranteed $E):
   return %1 : $E
 }
 
+REQUIRES: updating_for_owned_noescape

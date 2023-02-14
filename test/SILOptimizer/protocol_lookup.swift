@@ -30,3 +30,4 @@ class StaticWibble : StaticBar, StaticFoo {
 // CHECK: StaticWibble.foo
 print(StaticWibble.mightHaveFoo())
 
+REQUIRES: updating_for_owned_noescape

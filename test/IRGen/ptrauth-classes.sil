@@ -19,3 +19,4 @@ sil_vtable B {}
 // CHECK: [[PTR:%.*]] = inttoptr i64 [[SIGNED]] to %swift.type_descriptor*
 // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* [[PTR]], i8** %1, i8* %2)
 // CHECK: ret %swift.type* [[METADATA]]
+REQUIRES: updating_for_owned_noescape

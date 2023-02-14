@@ -37,3 +37,4 @@ bb0(%0 : $@thick C.Type):
 sil_vtable C {
   #C.init!allocator: @$s12dynamic_init1CCACycACmcfC // dynamic_init.C.__allocating_init (dynamic_init.C.Type)() -> dynamic_init.C
 }
+REQUIRES: updating_for_owned_noescape

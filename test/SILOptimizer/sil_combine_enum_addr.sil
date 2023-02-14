@@ -250,3 +250,4 @@ bb22:
   inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.none!enumelt
   br bb2
 }
+REQUIRES: updating_for_owned_noescape

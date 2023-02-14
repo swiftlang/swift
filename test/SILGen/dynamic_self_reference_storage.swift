@@ -20,3 +20,4 @@ class Foo {
     let g: () -> () = {[weak self] in ()}
   }
 }
+REQUIRES: updating_for_owned_noescape

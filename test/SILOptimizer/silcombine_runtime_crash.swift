@@ -20,3 +20,4 @@ save(value: 0)
 
 // CHECK: ok
 print("ok")
+REQUIRES: updating_for_owned_noescape

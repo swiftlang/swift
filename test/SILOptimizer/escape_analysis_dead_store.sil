@@ -138,3 +138,4 @@ bb0:
   dealloc_stack_ref %0 : $TestArrayContainer
   return %17 : $Bool
 }
+REQUIRES: updating_for_owned_noescape

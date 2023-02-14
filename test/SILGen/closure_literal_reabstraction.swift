@@ -190,3 +190,4 @@ func reabstractClassCompStaticMemberRefs<T>(
 func reabstractInstanceMethodRef(instance: Butt) {
     gen(f: instance.getX)
 }
+REQUIRES: updating_for_owned_noescape

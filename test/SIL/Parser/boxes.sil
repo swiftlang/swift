@@ -107,3 +107,4 @@ entry:
   dealloc_box %0: ${ let Int }
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

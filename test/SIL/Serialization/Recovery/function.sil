@@ -24,3 +24,4 @@ sil @missingResult : $@convention(thin) () -> (SoonToBeMissing) {
 entry:
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

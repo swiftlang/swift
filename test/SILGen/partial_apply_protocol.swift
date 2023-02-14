@@ -91,3 +91,4 @@ func testClonableInGenericContext<T>(c: Clonable, t: T) {
   // CHECK: [[THUNK:%.*]] = apply [[THUNK_FN]]<T>({{.*}})
   let _: (T) -> () -> Clonable = c.genericGetCloneFn
 }
+REQUIRES: updating_for_owned_noescape

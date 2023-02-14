@@ -26,3 +26,4 @@ func test() {
         consumeMoveIntPair(x)
     }
 }
+REQUIRES: updating_for_owned_noescape

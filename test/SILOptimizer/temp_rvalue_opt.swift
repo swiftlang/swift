@@ -22,3 +22,4 @@ public func test_global_side_effect() {
 // CHECK:      1
 // CHECK-NEXT: 1
 test_global_side_effect()
+REQUIRES: updating_for_owned_noescape

@@ -116,3 +116,4 @@ sil_witness_table public_external Int: Kindable module existential_metatypes {
 sil_witness_table public_external Float: Kindable module existential_metatypes {
   method #Kindable.kind!getter: @float_kind_getter_witness
 }
+REQUIRES: updating_for_owned_noescape

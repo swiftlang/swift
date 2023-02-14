@@ -23,3 +23,4 @@ public func callsPublicRequirement(s: S) {
 
   // CHECK: return
 }
+REQUIRES: updating_for_owned_noescape

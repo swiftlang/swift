@@ -39,3 +39,4 @@ bb0(%0 : $*Self):
   %8 = tuple ()                                   // user: %9
   return %8 : $()                                 // id: %9
 }
+REQUIRES: updating_for_owned_noescape

@@ -49,3 +49,4 @@ func reabstractMetatypeInOut() {
   // CHECK: apply [[FUNC]]<MyMetatypeIsThin.Type>([[BOX]])
   consumeGenericInOut(&thinMetatype)
 }
+REQUIRES: updating_for_owned_noescape

@@ -411,3 +411,4 @@ bb2(%8 : @owned $Error):
   unreachable
 }
 
+REQUIRES: updating_for_owned_noescape

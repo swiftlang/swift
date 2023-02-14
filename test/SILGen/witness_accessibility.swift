@@ -40,3 +40,4 @@ public struct S : R {}
 // should generate a warning, since it has no effect.
 
 // CHECK-LABEL: sil [transparent] [thunk] [ossa] @$s21witness_accessibility1SVAA1PA2aDP17publicRequirementyyFTW
+REQUIRES: updating_for_owned_noescape

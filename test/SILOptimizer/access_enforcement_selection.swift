@@ -138,3 +138,4 @@ func testRecursiveLocalCapture(i: inout Int64) {
   }
   local1()
 }
+REQUIRES: updating_for_owned_noescape

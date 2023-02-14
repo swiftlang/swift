@@ -44,3 +44,4 @@ func bar() {
   UIApplicationMain(0, nil, nil, nil)
 }
 #endif
+REQUIRES: updating_for_owned_noescape

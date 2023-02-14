@@ -159,3 +159,4 @@ func f_56075() -> Int {
   }
   func appendix() {} // no-warning
 }
+REQUIRES: updating_for_owned_noescape

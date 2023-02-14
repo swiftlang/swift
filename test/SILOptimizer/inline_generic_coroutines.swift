@@ -32,3 +32,4 @@ public final class MyBuffer<Element> {
     }
 }
 
+REQUIRES: updating_for_owned_noescape

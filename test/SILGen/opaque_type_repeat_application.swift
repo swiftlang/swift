@@ -19,3 +19,4 @@ func foo<T: P>(x: T) {
 
     _ = CWrap(x: y)
 }
+REQUIRES: updating_for_owned_noescape

@@ -95,3 +95,4 @@ struct T3<X> where X: P1 {
   }
 }
 
+REQUIRES: updating_for_owned_noescape

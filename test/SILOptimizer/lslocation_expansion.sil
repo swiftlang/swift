@@ -261,3 +261,4 @@ bb0:
   dealloc_stack %0 : $*S5        // id: %7
   return %6 : $()                                 // id: %8
 }
+REQUIRES: updating_for_owned_noescape

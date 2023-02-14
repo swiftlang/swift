@@ -61,3 +61,4 @@ bb0(%0 : $C):
   dealloc_stack %z : $*ClassProtocol
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

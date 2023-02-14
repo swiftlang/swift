@@ -47,3 +47,4 @@ bb0(%0 : $@thin S.Type):
   return %8 : $S
 }
 
+REQUIRES: updating_for_owned_noescape

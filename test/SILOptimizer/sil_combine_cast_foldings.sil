@@ -150,3 +150,4 @@ bb0(%0 : $*Optional<AnyObject>, %1: $*Optional<AnyObject>):
   %2 = tuple ()
   return %2 : $()
 }
+REQUIRES: updating_for_owned_noescape

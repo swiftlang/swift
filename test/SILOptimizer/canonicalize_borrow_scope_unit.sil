@@ -57,3 +57,4 @@ bb0(%instance : @guaranteed $Instance):
   %retval = struct $Unmanaged<Instance> (%unmanaged : $@sil_unmanaged Instance)
   return %retval : $Unmanaged<Instance>
 }
+REQUIRES: updating_for_owned_noescape

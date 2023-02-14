@@ -66,3 +66,4 @@ class HasBlockImpl: HasBlock {
 class GlobalProperty {
   public class var globalCFString: CFString { return constCGlobal }
 }
+REQUIRES: updating_for_owned_noescape

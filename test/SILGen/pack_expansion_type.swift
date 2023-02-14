@@ -45,3 +45,4 @@ func variadicMetatypes<T...>(_: repeat each T) {
   _ = ((repeat each T) -> ()).self
   _ = ((Int, repeat Array<each T>) -> ()).self
 }
+REQUIRES: updating_for_owned_noescape

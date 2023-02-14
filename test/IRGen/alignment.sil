@@ -104,3 +104,4 @@ entry(%0 : $Builtin.RawPointer, %1 : $Builtin.Int64):
   %12 = load %11 : $*Builtin.Int64
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

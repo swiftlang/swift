@@ -73,3 +73,4 @@ bb0(%0 : $CCRefrigerator, %1: $CCMutableRefrigerator):
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T2]], i32 2
 // CHECK-NEXT: store %swift.type* [[T1]], %swift.type** [[T3]], align
 // CHECK-NEXT: ret %swift.metadata_response zeroinitializer
+REQUIRES: updating_for_owned_noescape

@@ -16,3 +16,4 @@ entry(%10 : $Error):
   %11 = builtin "errorInMain"(%10 : $Error) : $()
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

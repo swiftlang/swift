@@ -584,3 +584,4 @@ func guardValueWithInlineStorage<U>(v: ValueWithInlineStorage<U>) {
     if case .box(let box) = v { return }
   }
 }
+REQUIRES: updating_for_owned_noescape

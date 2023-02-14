@@ -18,3 +18,4 @@ extension G : P where T : P {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s30mangle_conformance_access_path3fooyyAA2GGVy0a1_b1_c1_D7_helper1GVy1U_AHQY_GAjE1PAAq_AE1RHD1_AH_AHQZAeKHA2__HCg_G_xq_tAeLR_r0_lF : $@convention(thin) <X, Y where Y : R> (GG<G<Y.U.U>>, @in_guaranteed X, @in_guaranteed Y) -> ()
 func foo<X, Y : R>(_: GG<G<Y.U.U>>, _: X, _: Y) {}
+REQUIRES: updating_for_owned_noescape

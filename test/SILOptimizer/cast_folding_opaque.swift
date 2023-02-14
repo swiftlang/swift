@@ -10,3 +10,4 @@
 public func testCastOpaqueArchetype() -> Underlying {
   return returnOpaque() as! Underlying
 }
+REQUIRES: updating_for_owned_noescape

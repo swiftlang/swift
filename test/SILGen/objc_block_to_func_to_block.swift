@@ -13,3 +13,4 @@ typealias MyBlockWithEscapingParam = (@escaping () -> ()) -> Int
 @objc class ObjCClass : NSObject {
   @objc func blockWithBlockTypealias(_ block: MyBlockWithEscapingParam) {}
 }
+REQUIRES: updating_for_owned_noescape

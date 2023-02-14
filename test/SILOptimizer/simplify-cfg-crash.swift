@@ -21,3 +21,4 @@ public func testit(_ x: Base?) -> Derived? {
     return i as? Derived
 }
 
+REQUIRES: updating_for_owned_noescape

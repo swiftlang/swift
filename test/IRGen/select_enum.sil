@@ -91,3 +91,4 @@ bb0(%0 : $MyOptional<NoPayloadSingleton>):
   %7 = builtin "xor_Int1"(%6 : $Builtin.Int1, %4 : $Builtin.Int1) : $Builtin.Int1 // user: %8
   return %7 : $Builtin.Int1
 }
+REQUIRES: updating_for_owned_noescape

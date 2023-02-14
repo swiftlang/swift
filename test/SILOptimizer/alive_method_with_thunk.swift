@@ -26,3 +26,4 @@ public class DerivedClass: BaseClass<Double> {
 // CHECK-NEXT:  #DerivedClass.deinit!deallocator: @$s23alive_method_with_thunk12DerivedClassCfD
 // CHECK-NEXT: }
 
+REQUIRES: updating_for_owned_noescape

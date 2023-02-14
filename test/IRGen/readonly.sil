@@ -65,3 +65,4 @@ sil_vtable XXX {
   #XXX.deinit!deallocator: @XXX_dtor
   #XXX.init!initializer: @XXX_ctor
 }
+REQUIRES: updating_for_owned_noescape

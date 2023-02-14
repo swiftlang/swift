@@ -9,3 +9,4 @@
 // CHECK-LABEL: sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 // CHECK: function_ref @$s15attr_main_class5HorseC5$mainyyFZ : $@convention(method) (@thick Horse.Type) -> ()
 // CHECK: }
+REQUIRES: updating_for_owned_noescape

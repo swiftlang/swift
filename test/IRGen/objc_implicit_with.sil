@@ -46,3 +46,4 @@ sil @$s18objc_implicit_with10SwiftGizmoC13otherColorFor3red5green4blueySf_S2ftFT
 bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):
   return %3 : $SwiftGizmo
 }
+REQUIRES: updating_for_owned_noescape

@@ -144,3 +144,4 @@ func assign_bound_optional_computed_lvalue(_ co: inout ComputedOptional) {
 func assign_forced_optional_computed_lvalue(_ co: inout ComputedOptional) {
   co.computedOptional! = generate_int()
 }
+REQUIRES: updating_for_owned_noescape

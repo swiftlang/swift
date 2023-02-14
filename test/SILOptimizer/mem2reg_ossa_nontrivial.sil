@@ -1226,3 +1226,4 @@ entry(%instance : @owned $AnyObject):
   %82 = tuple ()
   return %82 : $()
 }
+REQUIRES: updating_for_owned_noescape

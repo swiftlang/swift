@@ -67,3 +67,4 @@ func testKeyPathAccessorsForOptionalStorageComponents() {
 }
 
 // CHECK-macosx-x86_64: sil [transparent] [serialized] @$s10ObjectiveC22_convertObjCBoolToBoolySbAA0cD0VF : $@convention(thin) (ObjCBool) -> Bool
+REQUIRES: updating_for_owned_noescape

@@ -30,4 +30,4 @@ struct G<T : P> {}
 
 extension G where T == S {
   func foo(_: T.T) {}
-}
+}REQUIRES: updating_for_owned_noescape

@@ -70,3 +70,4 @@ public func usesStaticProperty() {
 public func usesStaticPropertyInlinable() {
   _ = HasStaticProperty.staticProperty
 }
+REQUIRES: updating_for_owned_noescape

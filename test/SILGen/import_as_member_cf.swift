@@ -9,3 +9,4 @@ public func readSemiModularPowerSupply() -> CCPowerSupply {
   return CCPowerSupply.semiModular
 }
 
+REQUIRES: updating_for_owned_noescape

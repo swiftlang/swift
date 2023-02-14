@@ -19,3 +19,4 @@ func foo<T>(_ t: T) -> T {
 public func test() -> Int {
   return foo(27)
 }
+REQUIRES: updating_for_owned_noescape

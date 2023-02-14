@@ -52,3 +52,4 @@ func callerAddVectorsGenericTransparentUnguardedNoError(_ lhs: Builtin.Vec4xInt3
 func callerAddVectorsGenericTransparentUnguardedError(_ lhs: MyInt, _ rhs: MyInt) -> MyInt {
   return calleeAddVectorsGenericTransparentUnguarded(lhs, rhs) // expected-error {{Argument of type 'MyInt' can not be passed as an argument to a Polymorphic builtin. Polymorphic builtins can only be passed arguments that are trivial builtin typed}}
 }
+REQUIRES: updating_for_owned_noescape

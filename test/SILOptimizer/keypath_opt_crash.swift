@@ -32,3 +32,4 @@ public func test_get(s: S) -> (() -> ())? {
 }
 
 
+REQUIRES: updating_for_owned_noescape

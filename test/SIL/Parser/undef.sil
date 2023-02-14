@@ -377,3 +377,4 @@ bb2(%2 : $Error):
 bb3:
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

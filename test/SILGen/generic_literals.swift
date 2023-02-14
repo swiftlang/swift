@@ -48,3 +48,4 @@ func genericStringLiteral<T : ExpressibleByStringLiteral>(x: T) {
 
   x = "hello"
 }
+REQUIRES: updating_for_owned_noescape

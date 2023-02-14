@@ -30,3 +30,4 @@ enum E<T> {
   indirect case A(E)
   case B(T)
 }
+REQUIRES: updating_for_owned_noescape

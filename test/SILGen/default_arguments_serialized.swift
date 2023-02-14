@@ -56,3 +56,4 @@ public func callsOtherDefaultArguments() {
 
 // CHECK-LABEL: sil @$s23default_arguments_other0C16DefaultArguments1xySi_tF : $@convention(thin) (Int) -> ()
 
+REQUIRES: updating_for_owned_noescape

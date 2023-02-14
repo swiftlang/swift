@@ -101,3 +101,4 @@ bb0(%0 : $Int32):
   %11 = struct $Int32 (%9 : $Builtin.Int32)
   return %11 : $Int32
 }
+REQUIRES: updating_for_owned_noescape

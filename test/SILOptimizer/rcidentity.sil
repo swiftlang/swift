@@ -172,3 +172,4 @@ bb4(%6 : $Builtin.NativeObject):
 bb5:
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

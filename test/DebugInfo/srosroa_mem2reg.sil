@@ -53,3 +53,4 @@ bb0(%0 : $Int64, %1 : $Int64):
   dealloc_stack %4 : $*MyStruct, loc "sroa.swift":8:9, scope 2
   return %0 : $Int64, loc "sroa.swift":11:5, scope 2
 } // end sil function 'foo'
+REQUIRES: updating_for_owned_noescape

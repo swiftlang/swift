@@ -20,3 +20,4 @@ func callit(s: S<CB>) {
   // CHECK: function_ref @$ss3eeeoiySbyXlSg_ABtF : $@convention(thin) (@guaranteed Optional<AnyObject>, @guaranteed Optional<AnyObject>) -> Bool
   s.crash()
 }
+REQUIRES: updating_for_owned_noescape

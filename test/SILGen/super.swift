@@ -224,3 +224,4 @@ public class GenericDerived<T> : GenericBase<T> {
     genericFunction(0)
   }
 }
+REQUIRES: updating_for_owned_noescape

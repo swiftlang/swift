@@ -543,3 +543,4 @@ bb2(%14 : @owned $Error):
   destroy_value %6 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

@@ -1336,3 +1336,4 @@ bb0(%0 : $*AnyObject):
   %t = tuple ()
   return %t : $()
 }
+REQUIRES: updating_for_owned_noescape

@@ -81,3 +81,4 @@ func captureStackPromote() -> () -> Int {
   let f = { x }
   return f
 }
+REQUIRES: updating_for_owned_noescape

@@ -703,3 +703,4 @@ bb3(%7 : $Builtin.RawPointer):
   end_access %9 : $*Int64
   return %10 : $Int64
 }
+REQUIRES: updating_for_owned_noescape

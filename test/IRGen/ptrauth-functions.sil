@@ -88,3 +88,4 @@ bb0(%0 : $T):
 sil_vtable F {
 }
 // CHECK: #[[ATTRS]] = {{{.*}} "ptrauth-auth-traps" "ptrauth-calls" "ptrauth-indirect-gotos" "ptrauth-returns"
+REQUIRES: updating_for_owned_noescape

@@ -25,3 +25,4 @@ bb0(%0 : @owned $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T>):
   destroy_value %0 : $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T>
   return undef : $()
 }
+REQUIRES: updating_for_owned_noescape

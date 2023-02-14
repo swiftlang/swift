@@ -206,3 +206,4 @@ public func BooCall<T:Simple>(_ x:T, _ y:T) -> Bool {
 public func testBooCall() -> Bool {
   return BooCall(D(), D())
 }
+REQUIRES: updating_for_owned_noescape

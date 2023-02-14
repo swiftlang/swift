@@ -25,3 +25,4 @@ bb0:
 // CHECK-SAME:                         file:  ![[FILE_DI:[0-9]+]]
 // CHECK-SAME:                         line: 3, column: 5
 // CHECK:     ![[FILE_DI]] = !DIFile(filename: "the_file.swift"
+REQUIRES: updating_for_owned_noescape

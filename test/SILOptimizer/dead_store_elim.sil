@@ -1542,3 +1542,4 @@ bb0:
   dealloc_stack_ref %1 : $foo
   return %3 : $Int
 }
+REQUIRES: updating_for_owned_noescape

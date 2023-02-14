@@ -66,3 +66,4 @@ bb6:
   return %40 : $()                                // id: %41
 }
 
+REQUIRES: updating_for_owned_noescape

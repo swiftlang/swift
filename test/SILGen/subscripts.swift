@@ -134,3 +134,4 @@ do {
   t[1, 2, 3, flags: .flag] = 0
   inoutFunc(&t[1, 2, 3, flags: .flag])
 }
+REQUIRES: updating_for_owned_noescape

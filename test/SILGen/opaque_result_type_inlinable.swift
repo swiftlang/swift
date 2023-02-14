@@ -9,3 +9,4 @@
 @inlinable public func caller() -> some Any {
   return callee()
 }
+REQUIRES: updating_for_owned_noescape

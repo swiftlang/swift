@@ -107,3 +107,4 @@ internal func testSingedUnsignedConversions(a: Int64, b: UInt8) -> UInt64 {
 internal func interpretSingedUnsignedConversions() -> UInt64 {
   return testSingedUnsignedConversions(a: 100, b: 120)
 }
+REQUIRES: updating_for_owned_noescape

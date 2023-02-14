@@ -21,3 +21,4 @@ func closures(_ x: String) {
   print(Foo.foo { _ = x })
   print(Bar.foo { _ = x })
 }
+REQUIRES: updating_for_owned_noescape

@@ -236,3 +236,4 @@ public func keepPtrAlive() {
 
 // CHECK-TESTING-LABEL: sil_witness_table Adopt: Prot
 // CHECK-TESTING: DeadWitness{{.*}}: @{{.*}}DeadWitness
+REQUIRES: updating_for_owned_noescape

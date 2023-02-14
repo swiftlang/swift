@@ -67,3 +67,4 @@ sil private @$s18class_isa_pointers7MongrelCACycfcTo : $@convention(objc_method)
 entry(%0 : $Purebred):
   unreachable
 }
+REQUIRES: updating_for_owned_noescape

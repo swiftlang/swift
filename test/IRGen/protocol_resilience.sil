@@ -474,3 +474,4 @@ sil_witness_table ConformsWithRequirements : ProtocolWithRequirements module pro
   method #ProtocolWithRequirements.first: @firstWitness
   method #ProtocolWithRequirements.second: @secondWitness
 }
+REQUIRES: updating_for_owned_noescape

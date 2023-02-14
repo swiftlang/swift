@@ -504,3 +504,4 @@ func archetypeDowncasts<S,
   // CHECK:      return
   // CHECK-NEXT: }
 }
+REQUIRES: updating_for_owned_noescape

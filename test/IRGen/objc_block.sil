@@ -24,3 +24,4 @@ entry(%b : $@convention(block) (Foo) -> Foo, %x : $Foo):
 // CHECK:         [[T5:%.*]] = bitcast i8* [[T4]] to %T10objc_block3FooC*
 // CHECK:         ret %T10objc_block3FooC* [[T5]]
 // CHECK:       }
+REQUIRES: updating_for_owned_noescape

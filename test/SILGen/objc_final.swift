@@ -30,3 +30,4 @@ func callFoo(_ x: Foo) {
   // CHECK: assign {{%.*}} to [[WRITE]] : $*Int
   x.prop = prop
 }
+REQUIRES: updating_for_owned_noescape

@@ -155,3 +155,4 @@ func testDispatchedClassInstanceProperty(d: D) {
 // CHECK-NOT:   begin_access
 // CHECK:       end_apply
 
+REQUIRES: updating_for_owned_noescape

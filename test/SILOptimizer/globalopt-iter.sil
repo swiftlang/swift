@@ -25,3 +25,4 @@ sil @patatino : $@convention(thin) () -> () {
   %45 = tuple ()
   return %45 : $()
 }
+REQUIRES: updating_for_owned_noescape

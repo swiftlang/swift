@@ -118,3 +118,4 @@ func testIntToFloatConversion() {
 
   _blackHole(Float80(18_446_744_073_709_551_617)) // Ok
 }
+REQUIRES: updating_for_owned_noescape

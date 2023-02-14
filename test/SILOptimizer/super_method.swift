@@ -97,3 +97,4 @@ class ConcreteGrandchild : ConcreteChild {
     super.method()
   }
 }
+REQUIRES: updating_for_owned_noescape

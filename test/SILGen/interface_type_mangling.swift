@@ -222,3 +222,4 @@ struct GenericTypeContext<T>: GenericWitnessTest {
 
 // CHECK-LABEL: protocol witness for interface_type_mangling.GenericWitnessTest.twoParamsAtDepth<A, B>(_: A1, y: B1) -> () in conformance interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
 // CHECK-LABEL: @$s23interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestA2aEP16twoParamsAtDepth_1yyqd___qd_0_tr0_lFTW
+REQUIRES: updating_for_owned_noescape

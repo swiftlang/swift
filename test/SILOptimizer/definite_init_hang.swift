@@ -59,3 +59,4 @@ func testit() {
     if gg { f1() } else { f2() }
   }
 }
+REQUIRES: updating_for_owned_noescape

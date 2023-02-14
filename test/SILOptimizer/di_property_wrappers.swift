@@ -626,3 +626,4 @@ testWrapperInitWithDefaultArg()
 test54775()
 testNonMutatingSetterStruct()
 testStructWithClassWrapper()
+REQUIRES: updating_for_owned_noescape

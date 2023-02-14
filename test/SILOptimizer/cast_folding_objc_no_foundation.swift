@@ -65,3 +65,4 @@ print(testAnyObjectToArrayString(SomeObject()))
 print(testAnyObjectToArrayNotBridged(SomeObject()))
 print(testAnyObjectToDictionary(SomeObject()))
 print(testAnyObjectToString(SomeObject()))
+REQUIRES: updating_for_owned_noescape

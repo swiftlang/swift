@@ -53,3 +53,4 @@ enum MoveOnlyEnum {
         // expected-note @-1 {{consuming use here}}
     } // expected-note {{consuming use here}}
 }
+REQUIRES: updating_for_owned_noescape

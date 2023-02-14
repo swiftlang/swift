@@ -135,3 +135,4 @@ func testNestedArrayWithReadModify<T>(array: ArrayWithReadModify<ArrayWithReadMo
   var copy = array
   takeInOut(&copy[0][0])
 }
+REQUIRES: updating_for_owned_noescape

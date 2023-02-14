@@ -36,3 +36,4 @@ let value = d.property
 d.property = value
 
 d.property.0 += 1
+REQUIRES: updating_for_owned_noescape

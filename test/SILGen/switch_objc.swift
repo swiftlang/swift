@@ -52,3 +52,4 @@ func checkObjCEnumUnhandledCaseDiagnosticEmission(x: ObjCEnum) {
     break
   }
 }
+REQUIRES: updating_for_owned_noescape

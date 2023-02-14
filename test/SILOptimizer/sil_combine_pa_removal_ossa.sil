@@ -44,3 +44,4 @@ bb0(%0 : @owned $K):
 
 sil [ossa] @our_closure_function2 : $@convention(thin) (@owned K) -> Bool
 sil [ossa] @our_closure_function1 : $@convention(thin) (Int64) -> Bool
+REQUIRES: updating_for_owned_noescape

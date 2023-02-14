@@ -24,3 +24,4 @@ bb1:
   dealloc_stack %22 : $*Bool
   return %0 : $Bool
 }
+REQUIRES: updating_for_owned_noescape

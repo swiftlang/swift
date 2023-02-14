@@ -2389,3 +2389,4 @@ func moveOnlyGlobalAssignValue() {
     varGlobal = NonTrivialStruct()
     varGlobal.nonTrivialStruct2 = NonTrivialStruct2()
 }
+REQUIRES: updating_for_owned_noescape

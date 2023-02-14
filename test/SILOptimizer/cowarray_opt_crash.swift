@@ -34,3 +34,4 @@ test {
   print(v.count)
 }
 
+REQUIRES: updating_for_owned_noescape

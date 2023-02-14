@@ -11,3 +11,4 @@ public func caller_func() {
 	testfunc()
 }
 
+REQUIRES: updating_for_owned_noescape

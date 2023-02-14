@@ -90,3 +90,4 @@ func getterResultStaticStorageAccess() {
   // CHECK-NEXT: apply [[METHOD]]([[VALUE]])
   _type.value.method()
 }
+REQUIRES: updating_for_owned_noescape

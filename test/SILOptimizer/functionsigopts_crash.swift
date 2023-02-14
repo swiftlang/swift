@@ -35,3 +35,4 @@ func testit(_ p: P) {
 public func callit(s: S) {
   testit(s)
 }
+REQUIRES: updating_for_owned_noescape

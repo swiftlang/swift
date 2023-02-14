@@ -47,3 +47,4 @@ func test() {
   // CHECK:         class_method {{%.*}} : $GenericSub<C>, #GenericSub.foo : {{.*}}, $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (@in_guaranteed τ_0_0, @guaranteed GenericSub<τ_0_0>) -> @out Optional<τ_0_0>
   GenericSub<C>().foo(C())
 }
+REQUIRES: updating_for_owned_noescape

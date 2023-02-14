@@ -53,3 +53,4 @@ sil_vtable Y {
   #X.ping: @_TFC14devirt_access21X4pingfS0_FT_Si [inherited]
   #X.init!initializer: @_TFC14devirt_access21YcfMS0_FT_S0_ [override]
 }
+REQUIRES: updating_for_owned_noescape

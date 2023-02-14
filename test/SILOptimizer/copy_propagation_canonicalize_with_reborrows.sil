@@ -350,3 +350,4 @@ bb2(%6 : @guaranteed $X):
   %23 = tuple ()
   return %23 : $()
 }
+REQUIRES: updating_for_owned_noescape

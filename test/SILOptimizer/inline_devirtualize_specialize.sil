@@ -100,3 +100,4 @@ sil_witness_table C: P module main {
 sil_witness_table S: P module main {
   method #P.foo: @struct_witness
 }
+REQUIRES: updating_for_owned_noescape

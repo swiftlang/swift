@@ -47,3 +47,4 @@ func test5(outer: (() throws -> Int) throws -> Int) throws -> Int {
 
   return try descend(outer)
 }
+REQUIRES: updating_for_owned_noescape

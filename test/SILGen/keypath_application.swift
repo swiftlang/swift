@@ -221,3 +221,4 @@ func writebackNesting(x: inout Int,
 
   x.b[keyPath: y].u[keyPath: z].tt = w
 }
+REQUIRES: updating_for_owned_noescape

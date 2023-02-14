@@ -87,3 +87,4 @@ extension Generic {
 extension MyGeneric {
     @_dynamicReplacement(for: doIt()) func __replacement__doIt() {}
 }
+REQUIRES: updating_for_owned_noescape

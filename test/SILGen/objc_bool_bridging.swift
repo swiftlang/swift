@@ -192,3 +192,4 @@ class NewClass : NSObject {
   // CHECK-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass23takesDarwinBooleanBlock
   func takesDarwinBooleanBlock(_: @convention(block) (DarwinBoolean) -> DarwinBoolean) {}
 }
+REQUIRES: updating_for_owned_noescape

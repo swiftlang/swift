@@ -15,3 +15,4 @@ func forward_capture_generic_let<U>(with u: U) -> [U] {
   }
 }
 
+REQUIRES: updating_for_owned_noescape

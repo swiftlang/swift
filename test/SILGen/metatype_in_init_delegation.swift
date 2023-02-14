@@ -13,3 +13,4 @@ class Foo : NSManagedObject {
     self.init(entity: type(of: self).entity(), insertInto: context)
   }
 }
+REQUIRES: updating_for_owned_noescape

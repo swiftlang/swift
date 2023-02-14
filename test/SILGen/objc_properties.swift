@@ -312,3 +312,4 @@ class SomeWrapperTests {
     self.s = s
   }
 }
+REQUIRES: updating_for_owned_noescape

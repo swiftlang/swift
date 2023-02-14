@@ -53,3 +53,4 @@ sil_vtable NonTrivialDerived {
   #TrivialBase.init!allocator: @alloc_NonTrivialDerived [override]
   #NonTrivialDerived!ivardestroyer: @$s14ivar_destroyer17NonTrivialDerivedCfE
 }
+REQUIRES: updating_for_owned_noescape

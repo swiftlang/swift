@@ -45,3 +45,4 @@ sil_vtable Derived {
 
 // CHECK-LABEL: sil_vtable Derived
 // CHECK: DerivedInit
+REQUIRES: updating_for_owned_noescape

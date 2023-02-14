@@ -1909,3 +1909,4 @@ bb0(%0 : $*T):
 // CHECK: apply
 // CHECK: end sil function '$s31generic_in_to_guaranteed_callerTf4g_n'
 
+REQUIRES: updating_for_owned_noescape

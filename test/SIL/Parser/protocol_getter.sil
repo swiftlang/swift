@@ -30,3 +30,4 @@ bb0(%0 : $TestP):
   strong_release %0 : $TestP
   return %5 : $Optional<String>
 }
+REQUIRES: updating_for_owned_noescape

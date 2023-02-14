@@ -228,3 +228,4 @@ bb4(%39 : @owned $Error):
 // CHECK-NOT: function_ref @forEach : $@convention(method) <τ_0_0 where τ_0_0 : Sequence> (@noescape @callee_guaranteed (@in_guaranteed τ_0_0.Element) -> @error any Error, @in_guaranteed τ_0_0) -> @error any Error
 // CHECK: end sil function 'testUnrollOfArrayWithPhiArguments'
 
+REQUIRES: updating_for_owned_noescape
