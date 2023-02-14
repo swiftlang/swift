@@ -470,15 +470,9 @@ public:
 
   ASTScopeImpl *visitExpr(Expr *expr, ASTScopeImpl *p,
                           ScopeCreator &scopeCreator) {
-    if (!expr)
-      return p;
+    if (expr)
+      scopeCreator.addExprToScopeTree(expr, p);
 
-    // If we have a single value statement expression, we expand scopes based
-    // on the underlying statement.
-    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr))
-      return visit(SVE->getStmt(), p, scopeCreator);
-
-    scopeCreator.addExprToScopeTree(expr, p);
     return p;
   }
 };

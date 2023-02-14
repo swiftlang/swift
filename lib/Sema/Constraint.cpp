@@ -1089,11 +1089,7 @@ Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
                                                ContextualTypeInfo context,
                                                ConstraintLocator *locator,
                                                bool isDiscarded) {
-  // Collect type variables.
   SmallPtrSet<TypeVariableType *, 4> typeVars;
-  if (auto contextTy = context.getType())
-    contextTy->getTypeVariables(typeVars);
-
   unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(node, context, isDiscarded, locator, typeVars);

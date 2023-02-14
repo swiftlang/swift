@@ -50,7 +50,6 @@ namespace swift {
   class RequirementRepr;
   class SILParserStateBase;
   class ScopeInfo;
-  class SingleValueStmtExpr;
   class SourceManager;
   class TupleType;
   class TypeLoc;

@@ -35,7 +35,6 @@ class ASTContext;
 class ASTWalker;
 class Decl;
 class DeclContext;
-class Evaluator;
 class Expr;
 class FuncDecl;
 class Pattern;
@@ -43,7 +42,6 @@ class PatternBindingDecl;
 class VarDecl;
 class CaseStmt;
 class DoCatchStmt;
-class IsSingleValueStmtResult;
 class SwitchStmt;
 
 enum class StmtKind {
@@ -135,12 +133,7 @@ public:
   
   SourceRange getSourceRange() const;
   SourceLoc TrailingSemiLoc;
-
-  /// Whether the statement can produce a single value, and as such may be
-  /// treated as an expression.
-  IsSingleValueStmtResult mayProduceSingleValue(Evaluator &eval) const;
-  IsSingleValueStmtResult mayProduceSingleValue(ASTContext &ctx) const;
-
+  
   /// isImplicit - Determines whether this statement was implicitly-generated,
   /// rather than explicitly written in the AST.
   bool isImplicit() const { return Bits.Stmt.Implicit; }
@@ -210,10 +203,6 @@ public:
   }
 
   ASTNode findAsyncNode();
-
-  /// If this brace is wrapping a single expression, returns it. Otherwise
-  /// returns \c nullptr.
-  Expr *getSingleExpressionElement() const;
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
@@ -722,14 +711,7 @@ public:
 
   Stmt *getElseStmt() const { return Else; }
   void setElseStmt(Stmt *s) { Else = s; }
-
-  /// Retrieve the complete set of branches for this if statement, including
-  /// else if statements.
-  ArrayRef<Stmt *> getBranches(SmallVectorImpl<Stmt *> &scratch) const;
-
-  /// Whether the if statement has an unconditional \c else.
-  bool isSyntacticallyExhaustive() const;
-
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::If; }
 };
@@ -1301,10 +1283,7 @@ public:
   AsCaseStmtRange getCases() const {
     return AsCaseStmtRange(getRawCases(), AsCaseStmtWithSkippingNonCaseStmts());
   }
-
-  /// Retrieve the complete set of branches for this switch statement.
-  ArrayRef<Stmt *> getBranches(SmallVectorImpl<Stmt *> &scratch) const;
-
+  
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Switch;
   }

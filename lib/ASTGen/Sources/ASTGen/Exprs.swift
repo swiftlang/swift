@@ -62,15 +62,6 @@ extension ASTGenVisitor {
     return .expr(UnresolvedDotExpr_create(ctx, base, loc, name, loc))
   }
 
-  public func visit(_ node: IfExprSyntax) -> ASTNode {
-    let stmt = makeIfStmt(node).rawValue
-
-    // Wrap in a SingleValueStmtExpr to embed as an expression.
-    let sve = SingleValueStmtExpr_createWithWrappedBranches(
-      ctx, stmt, declContext, /*mustBeExpr*/ true)
-    return .expr(sve)
-  }
-
   public func visit(_ node: TupleExprElementListSyntax) -> ASTNode {
     let elements = node.map { self.visit($0).rawValue }
     let labels: [BridgedIdentifier?] = node.map {

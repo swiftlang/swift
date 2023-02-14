@@ -955,7 +955,6 @@ public:
 
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
-  bool isLabeledStmtLookupTerminator() const override;
 };
 
 /// The scope introduced by a conditional clause initializer in an
