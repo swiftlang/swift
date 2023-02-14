@@ -780,8 +780,7 @@ public struct WrapInType: PeerMacro {
       funcDecl
       .with(
         \.identifier,
-         // FIXME: 'createUniqueName' starts with an int
-         "method_\(context.createUniqueName(funcDecl.identifier.text))"
+         "\(context.createUniqueName(funcDecl.identifier.text))"
       )
       .with(
         \.signature,
@@ -800,10 +799,9 @@ public struct WrapInType: PeerMacro {
       )
       .with(\.attributes, newAttributeList)
 
-    // FIXME: 'createUniqueName' starts with an int
     let structType: DeclSyntax =
       """
-      struct Wrapper_\(context.createUniqueName(funcDecl.identifier.text)) {
+      struct \(context.createUniqueName(funcDecl.identifier.text)) {
         \(method)
       }
       """

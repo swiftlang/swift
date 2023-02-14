@@ -34,8 +34,8 @@ func global(a: Int, b: String) {
 }
 
 // CHECK-DUMP: @__swiftmacro_18macro_expand_peers6global1a1bySi_SStF10wrapInTypefMp_.swift
-// CHECK-DUMP: struct Wrapper_6globalfMu0_ {
-// CHECK-DUMP:   func method_6globalfMu_(a: Int, b: String)  {
+// CHECK-DUMP: struct $s18macro_expand_peers6global1a1bySi_SStF10wrapInTypefMp_6globalfMu0_ {
+// CHECK-DUMP:   func $s18macro_expand_peers6global1a1bySi_SStF10wrapInTypefMp_6globalfMu_(a: Int, b: String)  {
 // CHECK-DUMP:     global(a: a, b: b)
 // CHECK-DUMP:   }
 // CHECK-DUMP: }
