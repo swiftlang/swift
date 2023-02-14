@@ -732,3 +732,14 @@ func testSameType() {
 // SUGAR_TYPE: End completions
 }
 
+struct DispatchTime {
+  static func now() -> DispatchTime { .init() }
+}
+func +(_ x: DispatchTime, _ y: Double) -> DispatchTime { return x }
+
+let _: DispatchTime = .#^UNRESOLVED_FUNCTION_CALL^#now() + 0.2
+
+// UNRESOLVED_FUNCTION_CALL: Begin completions, 2 items
+// UNRESOLVED_FUNCTION_CALL-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: now()[#DispatchTime#];
+// UNRESOLVED_FUNCTION_CALL-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#DispatchTime#];
+// UNRESOLVED_FUNCTION_CALL: End completions

@@ -88,6 +88,15 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   while (ParentCall && ParentCall->getArgs() == nullptr) {
     ParentCall = CS.getParentExpr(ParentCall);
   }
+  if (auto TV = S.getType(CompletionExpr)->getAs<TypeVariableType>()) {
+    auto Locator = TV->getImpl().getLocator();
+    if (Locator->isLastElement<LocatorPathElt::PatternMatch>()) {
+      // The code completion token is inside a pattern, which got rewritten from
+      // a call by ResolvePattern. Thus, we aren't actually inside a call.
+      // Rest 'ParentCall' to nullptr to reflect that.
+      ParentCall = nullptr;
+    }
+  }
 
   if (!ParentCall || ParentCall == CompletionExpr) {
     // We might not have a call that contains the code completion expression if

@@ -1030,6 +1030,23 @@ private:
 
     SmallVector<ElementInfo, 4> elements;
     for (auto element : braceStmt->getElements()) {
+      if (cs.isForCodeCompletion() &&
+          !cs.containsIDEInspectionTarget(element)) {
+        // Statements and expressions can't influence the expresion that
+        // contains the code completion token. To improve performance, skip
+        // type checking them entirely.
+        if (element.is<Expr *>() && !element.isExpr(ExprKind::TypeJoin)) {
+          // Type join expressions are not really pure expressions, they kind of
+          // declare new type variables and are important to a result builder's
+          // structure. Don't skip them.
+          continue;
+        } else if (element.is<Stmt *>() && !element.isStmt(StmtKind::Guard)) {
+          // Guard statements might define variables that are used in the code
+          // completion expression. Don't skip them.
+          continue;
+        }
+      }
+
       if (auto *decl = element.dyn_cast<Decl *>()) {
         if (auto *PDB = dyn_cast<PatternBindingDecl>(decl)) {
           visitPatternBinding(PDB, elements);
