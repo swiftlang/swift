@@ -111,3 +111,10 @@ public func testWithUnsafeTemporaryAllocation() {
   }
 }
 
+// CHECK-LABEL: sil @$s4test13loadUnalignedySiSVF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test13loadUnalignedySiSVF'
+public func loadUnaligned(_ urp: UnsafeRawPointer) -> Int {
+  return urp.loadUnaligned(as: Int.self)
+}
+

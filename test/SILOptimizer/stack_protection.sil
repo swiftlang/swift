@@ -136,10 +136,10 @@ bb0:
   return %4 : $Int64
 }
 
-// CHECK-LABEL: sil [stack_protection] @stack_alloc_builtin_with_3_args
+// CHECK-LABEL: sil [stack_protection] @stack_alloc_builtin
 // CHECK-NOT:     copy_addr
-// CHECK:       } // end sil function 'stack_alloc_builtin_with_3_args'
-sil @stack_alloc_builtin_with_3_args : $@convention(thin) () -> () {
+// CHECK:       } // end sil function 'stack_alloc_builtin'
+sil @stack_alloc_builtin: $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Word, 8
   %1 = builtin "stackAlloc"(%0 : $Builtin.Word, %0 : $Builtin.Word, %0 : $Builtin.Word) : $Builtin.RawPointer
@@ -147,6 +147,20 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil @unprotected_stack_alloc_builtin
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'unprotected_stack_alloc_builtin'
+sil @unprotected_stack_alloc_builtin: $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 8
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = builtin "unprotectedStackAlloc"(%0 : $Builtin.Word, %0 : $Builtin.Word, %0 : $Builtin.Word, %1 : $Builtin.Int1) : $Builtin.RawPointer
+  %3 = builtin "stackDealloc"(%2 : $Builtin.RawPointer) : $()
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [stack_protection] @function_local_stack_obj
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function 'function_local_stack_obj'
