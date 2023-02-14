@@ -278,48 +278,6 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
                   file_types::TY_SwiftModuleFile, "-add_ast_path");
 }
 
-static void findARCLiteLibPath(const toolchains::Darwin &TC,
-                               llvm::SmallVectorImpl<char> &ARCLiteLib) {
-  auto& D = TC.getDriver();
-  llvm::sys::path::append(ARCLiteLib, D.getSwiftProgramPath());
-  
-  llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
-  llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
-  llvm::sys::path::append(ARCLiteLib, "lib", "arc");
-
-  if (!llvm::sys::fs::is_directory(ARCLiteLib)) {
-    // If we don't have a 'lib/arc/' directory, find the "arclite" library
-    // relative to the Clang in the active Xcode.
-    ARCLiteLib.clear();
-    findXcodeClangLibPath("arc", ARCLiteLib);
-  }
-}
-
-void
-toolchains::Darwin::addArgsToLinkARCLite(ArgStringList &Arguments,
-                                         const JobContext &context) const {
-  if (!context.Args.hasFlag(options::OPT_link_objc_runtime,
-                            options::OPT_no_link_objc_runtime,
-                            /*Default=*/wantsObjCRuntime(getTriple())))
-    return;
-
-  llvm::SmallString<128> ARCLiteLib;
-  findARCLiteLibPath(*this, ARCLiteLib);
-
-  if (!ARCLiteLib.empty()) {
-    llvm::sys::path::append(ARCLiteLib, "libarclite_");
-    ARCLiteLib += getPlatformNameForTriple(getTriple());
-    ARCLiteLib += ".a";
-
-    Arguments.push_back("-force_load");
-    Arguments.push_back(context.Args.MakeArgString(ARCLiteLib));
-
-    // Arclite depends on CoreFoundation.
-    Arguments.push_back("-framework");
-    Arguments.push_back("CoreFoundation");
-  }
-}
-
 void toolchains::Darwin::addLTOLibArgs(ArgStringList &Arguments,
                                        const JobContext &context) const {
   if (!context.OI.LibLTOPath.empty()) {
@@ -741,8 +699,6 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   if (llvm::sys::fs::exists(CompilerRTPath))
     Arguments.push_back(context.Args.MakeArgString(CompilerRTPath));
 
-  addArgsToLinkARCLite(Arguments, context);
-
   if (job.shouldPerformLTO()) {
     addLTOLibArgs(Arguments, context);
   }
@@ -857,23 +813,6 @@ std::string toolchains::Darwin::getGlobalDebugPathRemapping() const {
   return {};
 }
 
-static void validateLinkObjcRuntimeARCLiteLib(const toolchains::Darwin &TC,
-                                              DiagnosticEngine &diags,
-                                              const llvm::opt::ArgList &args) {
-  auto Triple = TC.getTriple();
-  if (args.hasFlag(options::OPT_link_objc_runtime,
-                   options::OPT_no_link_objc_runtime,
-                   /*Default=*/wantsObjCRuntime(Triple))) {
-    llvm::SmallString<128> ARCLiteLib;
-    findARCLiteLibPath(TC, ARCLiteLib);
-    
-    if (ARCLiteLib.empty()) {
-      diags.diagnose(SourceLoc(),
-                     diag::warn_arclite_not_found_when_link_objc_runtime);
-    }
-  }
-}
-
 static void validateDeploymentTarget(const toolchains::Darwin &TC,
                                      DiagnosticEngine &diags,
                                      const llvm::opt::ArgList &args) {
@@ -927,15 +866,6 @@ void
 toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
                                       const llvm::opt::ArgList &args,
                                       StringRef defaultTarget) const {
-  if (!getDriver().isDummyDriverForFrontendInvocation()) {
-    // Validating arclite library path when link-objc-runtime.
-    // If the driver is just set up to retrieve the swift-frontend invocation,
-    // we don't care about link-time, so we can skip this step, which may be
-    // expensive since it might call to `xcrun` to find `clang` and `arclite`
-    // relative to `clang`.
-    validateLinkObjcRuntimeARCLiteLib(*this, diags, args);
-  }
-
   // Validating apple platforms deployment targets.
   validateDeploymentTarget(*this, diags, args);
   validateTargetVariant(*this, diags, args, defaultTarget);
