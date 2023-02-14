@@ -8595,6 +8595,50 @@ bool RefactoringActionExpandMacro::isApplicable(const ResolvedCursorInfo &Info,
   return !getMacroExpansionBuffers(Diag.SourceMgr, Info).empty();
 }
 
+/// Given the expanded code for a particular macro, perform whitespace
+/// adjustments to make the refactoring more.
+static StringRef adjustMacroExpansionWhitespace(
+    GeneratedSourceInfo::Kind kind, StringRef expandedCode,
+    llvm::SmallString<64> &scratch
+) {
+  scratch.clear();
+
+  switch (kind) {
+  case GeneratedSourceInfo::ExpressionMacroExpansion:
+  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    return expandedCode;
+
+  case GeneratedSourceInfo::AccessorMacroExpansion:
+      // For accessor macros, wrap curly braces around the buffer contents.
+    scratch += "{\n";
+    scratch += expandedCode;
+    scratch += "\n}";
+    return scratch;
+
+  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+      // For member-attribute macros, add a space at the end.
+    scratch += expandedCode;
+    scratch += " ";
+    return scratch;
+
+  case GeneratedSourceInfo::PeerMacroExpansion:
+      // For peers, add a newline to create some separation.
+    scratch += "\n";
+    LLVM_FALLTHROUGH;
+
+  case GeneratedSourceInfo::MemberMacroExpansion:
+      // For members, add a newline.
+    scratch += "\n";
+    scratch += expandedCode;
+    scratch += "\n";
+    return scratch;
+
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+  case GeneratedSourceInfo::PrettyPrinted:
+    return expandedCode;
+  }
+}
+
 bool RefactoringActionExpandMacro::performChange() {
   auto bufferIDs = getMacroExpansionBuffers(SM, CursorInfo);
   if (bufferIDs.empty())
@@ -8637,14 +8681,10 @@ bool RefactoringActionExpandMacro::performChange() {
 
       auto afterLeftBraceLoc = Lexer::getLocForEndOfToken(SM, leftBraceLoc);
       originalSourceRange = CharSourceRange(afterLeftBraceLoc, 0);
-    } else if (generatedInfo->kind ==
-                   GeneratedSourceInfo::AccessorMacroExpansion) {
-      // For accessor macros, wrap curly braces around the buffer contents.
-      scratchBuffer += "{\n";
-      scratchBuffer += rewrittenBuffer;
-      scratchBuffer += "\n}";
-      rewrittenBuffer = scratchBuffer;
     }
+
+    rewrittenBuffer = adjustMacroExpansionWhitespace(
+        generatedInfo->kind, rewrittenBuffer, scratchBuffer);
 
     EditConsumer.accept(SM, originalSourceRange, rewrittenBuffer);
 

@@ -2586,7 +2586,7 @@ public:
 
     // FIXME(kavon): see if these can be integrated into other parts of Sema
     diagnoseCopyableTypeContainingMoveOnlyType(ED);
-    diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(ED);
+    diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
 
     checkExplicitAvailability(ED);
 
@@ -2645,7 +2645,7 @@ public:
     // are not move only.
     diagnoseCopyableTypeContainingMoveOnlyType(SD);
 
-    diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(SD);
+    diagnoseIncompatibleProtocolsForMoveOnlyType(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -2747,21 +2747,53 @@ public:
     }
   }
 
-  void diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(
-      NominalTypeDecl *nomDecl) {
-    if (!nomDecl->isMoveOnly())
-      return;
+  /// check to see if a move-only type can ever conform to the given type.
+  /// \returns true iff a diagnostic was emitted because it was not compatible
+  static bool diagnoseIncompatibleWithMoveOnlyType(SourceLoc loc,
+                                                 NominalTypeDecl *moveonlyType,
+                                                 Type type) {
+    assert(type && "got an empty type?");
+    assert(moveonlyType->isMoveOnly());
 
-    for (auto *prot : nomDecl->getLocalProtocols()) {
+    auto canType = type->getCanonicalType();
+    if (auto prot = canType->getAs<ProtocolType>()) {
       // Permit conformance to marker protocol Sendable.
-      if (prot->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-        assert(prot->isMarkerProtocol());
-        continue;
+      if (prot->getDecl()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        assert(prot->getDecl()->isMarkerProtocol());
+        return false;
       }
+    }
 
-      nomDecl->diagnose(diag::moveonly_cannot_conform_to_protocol_with_name,
-                        nomDecl->getDescriptiveKind(),
-                        nomDecl->getBaseName(), prot->getBaseName());
+    auto &ctx = moveonlyType->getASTContext();
+    ctx.Diags.diagnose(loc,
+                       diag::moveonly_cannot_conform_to_type,
+                       moveonlyType->getDescriptiveKind(),
+                       moveonlyType->getBaseName(),
+                       type);
+    return true;
+  }
+
+  static void diagnoseIncompatibleProtocolsForMoveOnlyType(Decl *decl) {
+    if (auto *nomDecl = dyn_cast<NominalTypeDecl>(decl)) {
+      if (!nomDecl->isMoveOnly())
+        return;
+
+      // go over the all protocols directly conformed-to by this nominal
+      for (auto *prot : nomDecl->getLocalProtocols())
+        diagnoseIncompatibleWithMoveOnlyType(nomDecl->getLoc(), nomDecl,
+                                             prot->getDeclaredInterfaceType());
+
+    } else if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+      if (auto *nomDecl = extension->getExtendedNominal()) {
+        if (!nomDecl->isMoveOnly())
+          return;
+
+        // go over the all types directly conformed-to by the extension
+        for (auto entry : extension->getInherited()) {
+          diagnoseIncompatibleWithMoveOnlyType(extension->getLoc(), nomDecl,
+                                               entry.getType());
+        }
+      }
     }
   }
 
@@ -2928,7 +2960,7 @@ public:
 
     maybeDiagnoseClassWithoutInitializers(CD);
 
-    diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(CD);
+    diagnoseIncompatibleProtocolsForMoveOnlyType(CD);
 
     // Ban non-final classes from having move only fields.
     if (!CD->isFinal()) {
@@ -3404,11 +3436,7 @@ public:
     if (nominal->isDistributedActor())
       TypeChecker::checkDistributedActor(SF, nominal);
 
-    // If we have a move only type and allow it to extend any protocol, error.
-    if (nominal->isMoveOnly() && ED->getInherited().size()) {
-      ED->diagnose(diag::moveonly_cannot_conform_to_protocol,
-                   nominal->getDescriptiveKind(), nominal->getBaseName());
-    }
+    diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
 
     TypeChecker::checkReflectionMetadataAttributes(ED);
   }
