@@ -57,12 +57,16 @@ struct S3 {
 //##-- Prepare the macro plugin.
 // RUN: %target-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: COMPILER_ARGS=( \
+// RUN: COMPILER_ARGS_WITHOUT_SOURCE=( \
 // RUN:   -swift-version 5 \
 // RUN:   -enable-experimental-feature Macros \
 // RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
 // RUN:   -I %swift-host-lib-dir \
 // RUN:   -module-name MacroUser \
+// RUN: )
+
+// RUN: COMPILER_ARGS=( \
+// RUN:   ${COMPILER_ARGS_WITHOUT_SOURCE[@]} \
 // RUN:   %s \
 // RUN: )
 
@@ -146,3 +150,17 @@ struct S3 {
 // PEER_EXPAND: }
 // PEER_EXPAND: source.edit.kind.active:
 // PEER_EXPAND:   42:3-42:24 ""
+
+//##-- Doc info, mostly just checking we don't crash because of the separate buffers
+// RUN: %sourcekitd-test -req=doc-info %s -- ${COMPILER_ARGS_WITHOUT_SOURCE[@]} | %FileCheck -check-prefix=DOCINFO %s
+// DOCINFO: key.name: "myTypeWrapper()"
+// DOCINFO-NEXT: key.usr: "s:9MacroUser13myTypeWrapperyycfm"
+// DOCINFO-NEXT: key.offset: 621
+// DOCINFO: key.name: "myTypeWrapper()"
+// DOCINFO-NEXT: key.usr: "s:9MacroUser13myTypeWrapperyycfm"
+// DOCINFO-NEXT: key.offset: 250
+
+//##-- Formatting shouldn't include the added attribute (or crash)
+// RUN: %sourcekitd-test -req=format -line=23 -length=1 %s | %FileCheck -check-prefix=FORMATTED %s
+// FORMATTED: "  var x: Int"
+

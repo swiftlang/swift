@@ -102,6 +102,11 @@ private:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override;
+
+  // We want to be able to resolve symbols within expansions
+  bool shouldWalkMacroExpansions() override {
+    return true;
+  }
 };
 
 SourceManager &CursorInfoResolver::getSourceMgr() const

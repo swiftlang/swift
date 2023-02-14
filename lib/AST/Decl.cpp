@@ -367,6 +367,10 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   llvm_unreachable("bad DescriptiveDeclKind");
 }
 
+OrigDeclAttributes Decl::getOriginalAttrs() const {
+  return OrigDeclAttributes(getAttrs(), getModuleContext());
+}
+
 DeclAttributes Decl::getSemanticAttrs() const {
   auto mutableThis = const_cast<Decl *>(this);
   (void)evaluateOrDefault(getASTContext().evaluator,
@@ -684,7 +688,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
 
     // Otherwise, include attributes directly attached to the accessor.
     SourceLoc VarLoc = AD->getStorage()->getStartLoc();
-    for (auto Attr : getAttrs()) {
+    for (auto *Attr : getOriginalAttrs()) {
       if (!Attr->getRange().isValid())
         continue;
 
@@ -703,17 +707,21 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   if (auto *PBD = dyn_cast<PatternBindingDecl>(this)) {
     for (auto i : range(PBD->getNumPatternEntries()))
       PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) {
-        for (auto Attr : VD->getAttrs())
+        for (auto *Attr : VD->getOriginalAttrs())
           if (Attr->getRange().isValid())
             Range.widen(Attr->getRangeWithAt());
       });
   }
 
-  for (auto Attr : getAttrs()) {
+  for (auto *Attr : getOriginalAttrs()) {
     if (Attr->getRange().isValid())
       Range.widen(Attr->getRangeWithAt());
   }
   return Range;
+}
+
+bool Decl::isInGeneratedBuffer() const {
+  return getModuleContext()->isInGeneratedBuffer(getStartLoc());
 }
 
 SourceLoc Decl::getLocFromSource() const {

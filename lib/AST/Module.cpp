@@ -648,6 +648,13 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   return foundSourceFile;
 }
 
+bool ModuleDecl::isInGeneratedBuffer(SourceLoc loc) {
+  SourceFile *file = getSourceFileContainingLocation(loc);
+  if (!file)
+    return false;
+  return file->Kind == SourceFileKind::MacroExpansion;
+}
+
 ArrayRef<SourceFile *>
 PrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
                                     ModuleDecl *mod) const {
