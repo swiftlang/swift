@@ -1056,6 +1056,13 @@ void NominalTypeDecl::prepareConformanceTable() const {
     if (!proto)
       return;
 
+    // No synthesized conformances for move-only nominals.
+    if (isMoveOnly()) {
+      // assumption is Sendable gets synthesized elsewhere.
+      assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
+      return;
+    }
+
     if (protocols.count(proto) == 0) {
       ConformanceTable->addSynthesizedConformance(
           mutableThis, proto, mutableThis);
