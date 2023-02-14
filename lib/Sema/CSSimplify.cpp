@@ -10879,8 +10879,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   // type as seen in the body of the closure and the external parameter
   // type.
   bool oneWayConstraints =
-    getASTContext().LangOpts.hasFeature(Feature::OneWayClosureParameters) ||
-    resultBuilderType;
+      getASTContext().LangOpts.hasFeature(Feature::OneWayClosureParameters);
 
   auto *paramList = closure->getParameters();
   SmallVector<AnyFunctionType::Param, 4> parameters;
