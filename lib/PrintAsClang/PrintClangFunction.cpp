@@ -1105,6 +1105,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     case DispatchKindTy::Direct:
       break;
     case DispatchKindTy::IndirectVTableStaticOffset:
+    case DispatchKindTy::IndirectVTableRelativeOffset:
       os << "void ***selfPtr_ = reinterpret_cast<void ***>( "
             "::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));"
             "\n";
@@ -1126,8 +1127,14 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       os << " func;\n";
       os << "};\n";
       os << "FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ "
-            "+ "
-         << (dispatchInfo->getStaticBitOffset() / 8) << ");\n";
+            "+ ";
+      if (dispatchInfo->getKind() == DispatchKindTy::IndirectVTableStaticOffset)
+        os << dispatchInfo->getStaticOffset();
+      else
+        os << '(' << cxx_synthesis::getCxxImplNamespaceName()
+           << "::" << dispatchInfo->getBaseOffsetSymbolName() << " + "
+           << dispatchInfo->getRelativeOffset() << ')';
+      os << " / sizeof(void *));\n";
       indirectFunctionVar = StringRef("fptrptr_->func");
       break;
     case DispatchKindTy::Thunk:
