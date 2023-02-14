@@ -735,7 +735,7 @@ extension _StringGuts {
 
     let mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>
     if hasNativeStorage {
-      mutPtr = _object.nativeStorage._breadcrumbsAddress
+      mutPtr = _object.withNativeStorage { $0._breadcrumbsAddress }
     } else {
       mutPtr = UnsafeMutablePointer(
         Builtin.addressof(&_object.sharedStorage._breadcrumbs))

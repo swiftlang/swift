@@ -13,13 +13,13 @@
 // COW helpers
 extension _StringGuts {
   internal var nativeCapacity: Int? {
-      guard hasNativeStorage else { return nil }
-      return _object.nativeStorage.capacity
+    guard hasNativeStorage else { return nil }
+    return _object.withNativeStorage { $0.capacity }
   }
 
   internal var nativeUnusedCapacity: Int? {
-      guard hasNativeStorage else { return nil }
-      return _object.nativeStorage.unusedCapacity
+    guard hasNativeStorage else { return nil }
+    return _object.withNativeStorage { $0.unusedCapacity }
   }
 
   // If natively stored and uniquely referenced, return the storage's total
@@ -27,7 +27,7 @@ extension _StringGuts {
   internal var uniqueNativeCapacity: Int? {
     @inline(__always) mutating get {
       guard isUniqueNative else { return nil }
-      return _object.nativeStorage.capacity
+      return _object.withNativeStorage { $0.capacity }
     }
   }
 
@@ -36,7 +36,7 @@ extension _StringGuts {
   internal var uniqueNativeUnusedCapacity: Int? {
     @inline(__always) mutating get {
       guard isUniqueNative else { return nil }
-      return _object.nativeStorage.unusedCapacity
+      return _object.withNativeStorage { $0.unusedCapacity }
     }
   }
 
@@ -54,6 +54,20 @@ extension _StringGuts {
 
 // Range-replaceable operation support
 extension _StringGuts {
+  @inline(__always)
+  internal mutating func updateNativeStorage<R>(
+    _ body: (__StringStorage) -> R
+  ) -> R {
+    let storage = self._object.nativeStorage
+    self = _StringGuts()
+    defer {
+      // We re-initialize from the modified storage to pick up new count, flags,
+      // etc.
+      self = _StringGuts(storage)
+    }
+    return body(storage)
+  }
+
   @inlinable
   internal init(_initialCapacity capacity: Int) {
     self.init()
@@ -243,11 +257,7 @@ extension _StringGuts {
   internal mutating func appendInPlace(
     _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) {
-    self._object.nativeStorage.appendInPlace(other, isASCII: isASCII)
-
-    // We re-initialize from the modified storage to pick up new count, flags,
-    // etc.
-    self = _StringGuts(self._object.nativeStorage)
+    updateNativeStorage { $0.appendInPlace(other, isASCII: isASCII) }
   }
 
   @inline(never) // slow-path
@@ -256,11 +266,7 @@ extension _StringGuts {
     _internalInvariant(self.uniqueNativeUnusedCapacity != nil)
 
     var iter = Substring(other).utf8.makeIterator()
-    self._object.nativeStorage.appendInPlace(&iter, isASCII: other.isASCII)
-
-    // We re-initialize from the modified storage to pick up new count, flags,
-    // etc.
-    self = _StringGuts(self._object.nativeStorage)
+    updateNativeStorage { $0.appendInPlace(&iter, isASCII: other.isASCII) }
   }
 
   internal mutating func clear() {
@@ -270,8 +276,7 @@ extension _StringGuts {
     }
 
     // Reset the count
-    _object.nativeStorage.clear()
-    self = _StringGuts(_object.nativeStorage)
+    updateNativeStorage { $0.clear() }
   }
 
   internal mutating func remove(from lower: Index, to upper: Index) {
@@ -281,10 +286,7 @@ extension _StringGuts {
     _internalInvariant(lowerOffset <= upperOffset && upperOffset <= self.count)
 
     if isUniqueNative {
-      _object.nativeStorage.remove(from: lowerOffset, to: upperOffset)
-      // We re-initialize from the modified storage to pick up new count, flags,
-      // etc.
-      self = _StringGuts(self._object.nativeStorage)
+      updateNativeStorage { $0.remove(from: lowerOffset, to: upperOffset) }
       return
     }
 
@@ -412,8 +414,9 @@ extension _StringGuts {
 
     let start = bounds.lowerBound._encodedOffset
     let end = bounds.upperBound._encodedOffset
-    _object.nativeStorage.replace(from: start, to: end, with: codeUnits)
-    self = _StringGuts(_object.nativeStorage)
+    updateNativeStorage {
+      $0.replace(from: start, to: end, with: codeUnits)
+    }
     return Range(_uncheckedBounds: (start, start + codeUnits.count))
   }
 
@@ -435,9 +438,10 @@ extension _StringGuts {
 
     let start = bounds.lowerBound._encodedOffset
     let end = bounds.upperBound._encodedOffset
-    _object.nativeStorage.replace(
-      from: start, to: end, with: codeUnits, replacementCount: replCount)
-    self = _StringGuts(_object.nativeStorage)
+    updateNativeStorage {
+      $0.replace(
+        from: start, to: end, with: codeUnits, replacementCount: replCount)
+    }
     return Range(_uncheckedBounds: (start, start + replCount))
   }
 

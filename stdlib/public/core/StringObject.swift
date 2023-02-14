@@ -894,6 +894,13 @@ extension _StringObject {
       discriminatedObjectRawBits & Nibbles.largeAddressMask)
   }
 
+  @inline(__always)
+  @_alwaysEmitIntoClient
+  internal var largeAddress: UnsafeRawPointer {
+    UnsafeRawPointer(bitPattern: largeAddressBits)
+      ._unsafelyUnwrappedUnchecked
+  }
+
   @inlinable @inline(__always)
   internal var nativeUTF8Start: UnsafePointer<UInt8> {
     _internalInvariant(largeFastIsTailAllocated)
@@ -940,10 +947,23 @@ extension _StringObject {
     return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
 #else
     _internalInvariant(hasNativeStorage)
-    let storageAddress =
-       UnsafeRawPointer(bitPattern:largeAddressBits)._unsafelyUnwrappedUnchecked
-    let unmanagedRef = Unmanaged<__StringStorage>.fromOpaque(storageAddress)
-    return unmanagedRef.takeUnretainedValue()
+    let unmanaged = Unmanaged<__StringStorage>.fromOpaque(largeAddress)
+    return unmanaged.takeUnretainedValue()
+#endif
+  }
+
+  /// Call `body` with the native storage object of `self`, without retaining
+  /// it.
+  @inline(__always)
+  internal func withNativeStorage<R>(
+    _ body: (__StringStorage) -> R
+  ) -> R {
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    return body(nativeStorage)
+#else
+    _internalInvariant(hasNativeStorage)
+    let unmanaged = Unmanaged<__StringStorage>.fromOpaque(largeAddress)
+    return unmanaged._withUnsafeGuaranteedRef { body($0) }
 #endif
   }
 
@@ -957,7 +977,8 @@ extension _StringObject {
 #else
     _internalInvariant(largeFastIsShared && !largeIsCocoa)
     _internalInvariant(hasSharedStorage)
-    return Builtin.reinterpretCast(largeAddressBits)
+    let unmanaged = Unmanaged<__SharedStringStorage>.fromOpaque(largeAddress)
+    return unmanaged.takeUnretainedValue()
 #endif
   }
 
@@ -970,7 +991,8 @@ extension _StringObject {
     return object
 #else
     _internalInvariant(largeIsCocoa && !isImmortal)
-    return Builtin.reinterpretCast(largeAddressBits)
+    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unmanaged.takeUnretainedValue()
 #endif
   }
 
@@ -979,7 +1001,8 @@ extension _StringObject {
   @inline(__always)
   internal var owner: AnyObject? {
     guard self.isMortal else { return nil }
-    return Builtin.reinterpretCast(largeAddressBits)
+    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unmanaged.takeUnretainedValue()
   }
 }
 
@@ -1058,7 +1081,8 @@ extension _StringObject {
   @inline(__always)
   internal var objCBridgeableObject: AnyObject {
     _internalInvariant(hasObjCBridgeableObject)
-    return Builtin.reinterpretCast(largeAddressBits)
+    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unmanaged.takeUnretainedValue()
   }
 
   // Whether the object provides fast UTF-8 contents that are nul-terminated
@@ -1222,7 +1246,8 @@ extension _StringObject {
         }
       }
       if _countAndFlags.isNativelyStored {
-        let anyObj = Builtin.reinterpretCast(largeAddressBits) as AnyObject
+        let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
+        let anyObj = unmanaged.takeUnretainedValue()
         _internalInvariant(anyObj is __StringStorage)
       }
     }
