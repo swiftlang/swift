@@ -50,8 +50,6 @@ void ClangClassTypePrinter::printClassTypeDecl(
     ClangSyntaxPrinter(baseQualNameOS)
         .printModuleNamespaceQualifiersIfNeeded(parentClass->getModuleContext(),
                                                 typeDecl->getModuleContext());
-    if (!baseQualNameOS.str().empty())
-      baseQualNameOS << "::";
     baseQualNameOS << baseNameOS.str();
   } else {
     baseClassName = "RefCountedClass";
