@@ -13,19 +13,29 @@
 // COW helpers
 extension _StringGuts {
   internal var nativeCapacity: Int? {
-    guard hasNativeStorage else { return nil }
-    return _object.withNativeStorage { $0.capacity }
+    @inline(never)
+    @_effects(releasenone)
+    get {
+      guard hasNativeStorage else { return nil }
+      return _object.withNativeStorage { $0.capacity }
+    }
   }
 
   internal var nativeUnusedCapacity: Int? {
-    guard hasNativeStorage else { return nil }
-    return _object.withNativeStorage { $0.unusedCapacity }
+    @inline(never)
+    @_effects(releasenone)
+    get {
+      guard hasNativeStorage else { return nil }
+      return _object.withNativeStorage { $0.unusedCapacity }
+    }
   }
 
   // If natively stored and uniquely referenced, return the storage's total
   // capacity. Otherwise, nil.
   internal var uniqueNativeCapacity: Int? {
-    @inline(__always) mutating get {
+    @inline(never)
+    @_effects(releasenone)
+    mutating get {
       guard isUniqueNative else { return nil }
       return _object.withNativeStorage { $0.capacity }
     }
@@ -34,7 +44,9 @@ extension _StringGuts {
   // If natively stored and uniquely referenced, return the storage's spare
   // capacity. Otherwise, nil.
   internal var uniqueNativeUnusedCapacity: Int? {
-    @inline(__always) mutating get {
+    @inline(never)
+    @_effects(releasenone)
+    mutating get {
       guard isUniqueNative else { return nil }
       return _object.withNativeStorage { $0.unusedCapacity }
     }
