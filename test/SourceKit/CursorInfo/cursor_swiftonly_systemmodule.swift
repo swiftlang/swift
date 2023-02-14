@@ -1,17 +1,5 @@
-// BEGIN SomeModule.swift
-
-/// Doc comment for 'someFunc()'
-public func someFunc() {}
-
-// BEGIN main.swift
-import SomeModule
-
-func test() {
-  someFunc()
-}
-
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: split-file %s %t
 
 // RUN: mkdir -p %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule
 // RUN: %target-swift-frontend \
@@ -38,3 +26,14 @@ func test() {
 // CHECK-NEXT: SYSTEM
 // CHECK-NEXT: <Declaration>func someFunc()</Declaration>
 // CHECK-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>someFunc</decl.name>()</decl.function.free>
+
+//--- SomeModule.swift
+/// Doc comment for 'someFunc()'
+public func someFunc() {}
+
+//--- main.swift
+import SomeModule
+
+func test() {
+  someFunc()
+}
