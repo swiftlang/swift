@@ -607,13 +607,10 @@ mapParsedParameters(Parser &parser,
           if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
             if (isa<IsolatedTypeRepr>(STR))
               param->setIsolated(true);
-            unwrappedType = STR->getBase();
-            continue;
-          }
+            else if (isa<CompileTimeConstTypeRepr>(STR))
+              param->setCompileTimeConst(true);
 
-          if (auto *CTR = dyn_cast<CompileTimeConstTypeRepr>(unwrappedType)) {
-            param->setCompileTimeConst(true);
-            unwrappedType = CTR->getBase();
+            unwrappedType = STR->getBase();
             continue;
           }
 
