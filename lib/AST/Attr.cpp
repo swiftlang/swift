@@ -2378,7 +2378,7 @@ bool CustomAttr::isArgUnsafe() const {
 
 bool CustomAttr::isAttachedMacro(const Decl *decl) const {
   auto &ctx = decl->getASTContext();
-  auto *dc = decl->getInnermostDeclContext();
+  auto *dc = decl->getDeclContext();
 
   auto *macroDecl = evaluateOrDefault(
       ctx.evaluator,
