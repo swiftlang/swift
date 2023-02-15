@@ -160,7 +160,7 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
   case .toArgument(let toArgIdx, let toPath):
     // Exclusive argument -> argument effects cannot appear because such an effect would
     // involve a store which is not permitted for exclusive escapes.
-    effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath, isExclusive: false),
+    effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
                                           argumentIndex: arg.index, pathPattern: argPath)
   }
   newEffects.append(effect)
@@ -176,8 +176,10 @@ private func getArgIndicesWithDefinedEscapingEffects(of function: Function) -> S
 
     argsWithDefinedEffects.insert(effect.argumentIndex)
     switch effect.kind {
-      case .notEscaping, .escapingToReturn:         break
-      case .escapingToArgument(let toArgIdx, _, _): argsWithDefinedEffects.insert(toArgIdx)
+    case .notEscaping, .escapingToReturn:
+      break
+    case .escapingToArgument(let toArgIdx, _):
+      argsWithDefinedEffects.insert(toArgIdx)
     }
   }
   return argsWithDefinedEffects
