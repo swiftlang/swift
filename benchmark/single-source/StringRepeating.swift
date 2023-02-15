@@ -28,11 +28,11 @@ public let benchmarks = [
   BenchmarkInfo(name: "StringRepeating26AsciiCharactersCount2",
                 runFunction: run_26AsciiCharactersCount2,
                 tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeatingSingleCyrilicCharacterCount5",
-                runFunction: run_singleCyrilicCharacterCount5,
+  BenchmarkInfo(name: "StringRepeatingSingleCyrillicCharacterCount5",
+                runFunction: run_singleCyrillicCharacterCount5,
                 tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeating33CyrilicCharactersCount2",
-                runFunction: run_33CyrilicCharactersCount2,
+  BenchmarkInfo(name: "StringRepeating33CyrillicCharactersCount2",
+                runFunction: run_33CyrillicCharactersCount2,
                 tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringRepeatingU1F1F8U1F1FACount2",
                 runFunction: run_U1F1F8U1F1FACount2,
@@ -87,14 +87,14 @@ public func run_26AsciiCharactersCount2(N: Int) {
 }
 
 @inline(never)
-public func run_singleCyrilicCharacterCount5(N: Int) {
+public func run_singleCyrillicCharacterCount5(N: Int) {
     for _ in 1...5000*N {
         blackHole(repeating("я", count: 5))
     }
 }
 
 @inline(never)
-public func run_33CyrilicCharactersCount2(N: Int) {
+public func run_33CyrillicCharactersCount2(N: Int) {
     for _ in 1...5000*N {
         blackHole(repeating("абвгґдеєжзиіїйклмнопрстуфхцчшщьюя", count: 2))
     }
