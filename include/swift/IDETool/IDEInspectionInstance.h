@@ -82,7 +82,7 @@ struct ConformingMethodListResults {
 /// The results returned from \c IDEInspectionInstance::cursorInfo.
 struct CursorInfoResults {
   /// The actual results.
-  SmallVector<ResolvedCursorInfoPtr> ResolvedCursorInfos;
+  std::vector<ResolvedCursorInfoPtr> ResolvedCursorInfos;
   /// Whether an AST was reused to produce the results.
   bool DidReuseAST;
 };

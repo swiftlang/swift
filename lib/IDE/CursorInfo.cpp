@@ -216,7 +216,9 @@ private:
     if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
       for (auto ShorthandShadows :
            getShorthandShadows(CaptureList, getCurrentDeclContext())) {
-        assert(ShorthandShadowedDecls.count(ShorthandShadows.first) == 0);
+        assert(ShorthandShadowedDecls.count(ShorthandShadows.first) == 0 ||
+               ShorthandShadowedDecls[ShorthandShadows.first] ==
+                   ShorthandShadows.second);
         ShorthandShadowedDecls[ShorthandShadows.first] =
             ShorthandShadows.second;
       }
@@ -346,7 +348,7 @@ public:
       : IDEInspectionCallbacks(P), Consumer(Consumer),
         RequestedLoc(RequestedLoc) {}
 
-  SmallVector<ResolvedCursorInfoPtr>
+  std::vector<ResolvedCursorInfoPtr>
   getDeclResult(NodeFinderDeclResult *DeclResult, SourceFile *SrcFile,
                 NodeFinder &Finder) const {
     typeCheckDeclAndParentClosures(DeclResult->getDecl());
@@ -363,7 +365,7 @@ public:
     return {CursorInfo};
   }
 
-  SmallVector<ResolvedCursorInfoPtr>
+  std::vector<ResolvedCursorInfoPtr>
   getExprResult(NodeFinderExprResult *ExprResult, SourceFile *SrcFile,
                 NodeFinder &Finder) const {
     Expr *E = ExprResult->getExpr();
@@ -371,10 +373,12 @@ public:
 
     // Type check the statemnt containing E and listen for solutions.
     CursorInfoTypeCheckSolutionCallback Callback(*DC, RequestedLoc);
-    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
-        DC->getASTContext().SolutionCallback, &Callback);
-    typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext::declContext(DC),
-                          E->getLoc());
+    {
+      llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+          DC->getASTContext().SolutionCallback, &Callback);
+      typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext::declContext(DC),
+                            E->getLoc());
+    }
 
     if (Callback.getResults().empty()) {
       // No results.
@@ -389,9 +393,14 @@ public:
 
     // Deliver results
 
-    SmallVector<ResolvedCursorInfoPtr> Results;
+    std::vector<ResolvedCursorInfoPtr> Results;
     for (auto Res : Callback.getResults()) {
       SmallVector<NominalTypeDecl *> ReceiverTypes;
+      if (isa<ModuleDecl>(Res.ReferencedDecl)) {
+        // ResolvedModuleRefCursorInfo is not supported by solver-based cursor
+        // info yet.
+        continue;
+      }
       if (Res.IsDynamicRef && Res.BaseType) {
         if (auto ReceiverType = Res.BaseType->getAnyNominal()) {
           ReceiverTypes = {ReceiverType};
@@ -426,7 +435,7 @@ public:
     if (!Result) {
       return;
     }
-    SmallVector<ResolvedCursorInfoPtr> CursorInfo;
+    std::vector<ResolvedCursorInfoPtr> CursorInfo;
     switch (Result->getKind()) {
     case NodeFinderResultKind::Decl:
       CursorInfo = getDeclResult(cast<NodeFinderDeclResult>(Result.get()),

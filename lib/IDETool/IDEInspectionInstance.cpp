@@ -827,7 +827,7 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
         : ReusingASTContext(ReusingASTContext),
           CancellationFlag(CancellationFlag), Callback(Callback) {}
 
-    void handleResults(SmallVector<ResolvedCursorInfoPtr> result) override {
+    void handleResults(std::vector<ResolvedCursorInfoPtr> result) override {
       HandleResultsCalled = true;
       if (CancellationFlag &&
           CancellationFlag->load(std::memory_order_relaxed)) {
