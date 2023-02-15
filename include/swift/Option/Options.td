@@ -1444,6 +1444,11 @@ def include_spi_symbols : Flag<["-"], "include-spi-symbols">,
          NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Add symbols with SPI information to the symbol graph">;
 
+def skip_protocol_implementations : Flag<["-"], "skip-protocol-implementations">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Skip emitting symbols that are implementations of protocol requirements or inherited from protocl extensions">;
+
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,

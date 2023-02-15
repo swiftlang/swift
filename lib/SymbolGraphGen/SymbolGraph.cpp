@@ -189,6 +189,10 @@ SymbolGraph::isRequirementOrDefaultImplementation(const ValueDecl *VD) const {
 // MARK: - Symbols (Nodes)
 
 void SymbolGraph::recordNode(Symbol S) {
+  if (Walker.Options.SkipProtocolImplementations && S.getInheritedDecl()) {
+    return;
+  }
+
   Nodes.insert(S);
 
   // Record all of the possible relationships (edges) originating
@@ -294,7 +298,7 @@ bool SymbolGraph::synthesizedMemberIsBestCandidate(const ValueDecl *VD,
 }
 
 void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
-  if (!Walker.Options.EmitSynthesizedMembers) {
+  if (!Walker.Options.EmitSynthesizedMembers || Walker.Options.SkipProtocolImplementations) {
     return;
   }
   const auto D = S.getLocalSymbolDecl();
