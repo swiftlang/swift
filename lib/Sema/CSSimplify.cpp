@@ -7968,6 +7968,54 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (conformance) {
       return recordConformance(conformance);
     }
+
+    // Consider the following debug constraint output:
+    //
+    //        (attempting disjunction choice (P)? bind ($T1)? [deep equality] [[locator@0x11d9ac9f0 [Call@/Users/nuriamari/git/swift-project/swift/test/Constraints/scratch.swift:10:3 -> apply argument -> comparing call argument #0 to parameter #0]]];
+    //          (considering -> $T1 conforms to P [[locator@0x11d9ac6d8 [DeclRef@/Users/nuriamari/git/swift-project/swift/test/Constraints/scratch.swift:10:3 -> opened generic -> type parameter requirement #0 (conformance)]]];
+    //            (simplification result:
+    //          (attempting fix [fix: add missing protocol conformance] @ locator@0x11d9ac6d8 [DeclRef@/Users/nuriamari/git/swift-project/swift/test/Constraints/scratch.swift:10:3 -> opened generic -> type parameter requirement #0 (conformance)])
+    //          (increasing 'applied fix' score by 1)
+    //              (removed constraint: $T1 conforms to P [[locator@0x11d9ac6d8 [DeclRef@/Users/nuriamari/git/swift-project/swift/test/Constraints/scratch.swift:10:3 -> opened generic -> type parameter requirement #0 (conformance)]]];)
+    //            )
+    //            (outcome: simplified)
+    //          )
+    //          (Changes:
+    //            (Newly Bound:
+    //              > $T1 := (P)
+    //            )
+    //            (Removed Constraint:
+    //              > $T1 conforms to P [[locator@0x11d9ac6d8 [DeclRef@/Users/nuriamari/git/swift-project/swift/test/Constraints/scratch.swift:10:3 -> opened generic -> type parameter requirement #0 (conformance)]]];
+    //            )
+    //          )
+    //          (found solution: [component: applied fix(s), value: 1])
+    //        )
+    //
+    //
+    // In this method, we are simplifying the `$T1 conforms to P` constraint. As a result of the above disjunction choice, we have `any P` -- that is existential P -- as a fixed type for $T1.
+    // Unless we open this existential, we will never pass the above lookup conformance and continue to report the `MissingConformance` fix. 
+    //
+    // By opening the existential, I have removed all errors from the test case, which obviously isn't what we want. We want to only open
+    // the existential when we are trying to bind `(any P)? to ($T1)?` and we've recorded a `ForceOptional` fix. The trouble is I don't have
+    // enough context here to know this. I don't know how we arrived at `any P` as a fixed type for `$T1`. 
+    //
+    // It seems like this change needs to be made elsewhere, but I'm not sure where. A method like `matchDeepEqualityTypes` gives us more context,
+    // but I'm not sure how to safely persist the opening of the existential until the conformance lookup above. Conceptually
+    // I understand that we are opening the existential so we can bind its underlying type to $T1, but I don't really understand
+    // what lasting side effects the below call to `openExistentialType` has on the constraint system if any.
+
+    if (shouldAttemptFixes()) {
+      if (type->isExistentialType()) {
+        type = openExistentialType(type, loc).first;
+
+        auto conformance = DC->getParentModule()->lookupConformance(
+            type, protocol, /*allowMissing=*/true);
+        if (conformance) {
+          return recordConformance(conformance);
+        }
+      }
+    }
+
   } break;
 
   default:
