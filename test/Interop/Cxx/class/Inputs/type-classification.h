@@ -197,4 +197,20 @@ struct HasUnsupportedUsingShadow : DependentParent<int> {
   using typename DependentParent<int>::Child;
 };
 
+struct __attribute__((swift_attr("import_iterator"))) Iterator {
+  int idx;
+};
+
+struct HasMethodThatReturnsIterator {
+  Iterator getIterator() const;
+};
+
+struct IteratorBox {
+  Iterator it;
+};
+
+struct HasMethodThatReturnsIteratorBox {
+  IteratorBox getIteratorBox() const;
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H
