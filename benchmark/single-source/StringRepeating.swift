@@ -13,34 +13,16 @@
 import TestsUtils
 
 public let benchmarks = [
-  BenchmarkInfo(name: "StringRepeatingSingleAsciiCharacterCount10",
-                runFunction: run_singleAsciiCharacterCount10,
+  BenchmarkInfo(name: "String.initRepeating.1AsciiChar.Count100",
+                runFunction: run_singleAsciiCharacterCount100,
                 tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeatingSingleAsciiCharacterCount1",
-                runFunction: run_singleAsciiCharacterCount1,
-                tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeatingEmptyStringCount10",
-                runFunction: run_emptyStringCount10,
-                tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeatingSingleAsciiCharacterCount0",
-                runFunction: run_singleAsciiCharacterCount0,
-                tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeating26AsciiCharactersCount2",
+  BenchmarkInfo(name: "String.initRepeating.26AsciiChar.Count2",
                 runFunction: run_26AsciiCharactersCount2,
                 tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeatingSingleCyrillicCharacterCount5",
-                runFunction: run_singleCyrillicCharacterCount5,
-                tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeating33CyrillicCharactersCount2",
+  BenchmarkInfo(name: "String.initRepeating.33CyrillicChar.Count2",
                 runFunction: run_33CyrillicCharactersCount2,
                 tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeatingU1F1F8U1F1FACount2",
-                runFunction: run_U1F1F8U1F1FACount2,
-                tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeatingU301cafeCount5",
-                runFunction: run_U301cafeCount5,
-                tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringRepeatingLongMixedStringCount100",
+  BenchmarkInfo(name: "String.initRepeating.longMixedString.Count100",
                 runFunction: run_longMixedStringCount100,
                 tags: [.validation, .api, .String])
 ]
@@ -52,30 +34,9 @@ func repeating(_ i: String, count: Int) -> String {
 }
 
 @inline(never)
-public func run_singleAsciiCharacterCount10(N: Int) {
+public func run_singleAsciiCharacterCount100(N: Int) {
     for _ in 1...5000*N {
-        blackHole(repeating("x", count: 10))
-    }
-}
-
-@inline(never)
-public func run_singleAsciiCharacterCount1(N: Int) {
-    for _ in 1...5000*N {
-        blackHole(repeating("x", count: 1))
-    }
-}
-
-@inline(never)
-public func run_emptyStringCount10(N: Int) {
-    for _ in 1...5000*N {
-        blackHole(repeating("", count: 10))
-    }
-}
-
-@inline(never)
-public func run_singleAsciiCharacterCount0(N: Int) {
-    for _ in 1...5000*N {
-        blackHole(repeating("x", count: 0))
+        blackHole(repeating("x", count: 100))
     }
 }
 
@@ -87,30 +48,9 @@ public func run_26AsciiCharactersCount2(N: Int) {
 }
 
 @inline(never)
-public func run_singleCyrillicCharacterCount5(N: Int) {
-    for _ in 1...5000*N {
-        blackHole(repeating("я", count: 5))
-    }
-}
-
-@inline(never)
 public func run_33CyrillicCharactersCount2(N: Int) {
     for _ in 1...5000*N {
         blackHole(repeating("абвгґдеєжзиіїйклмнопрстуфхцчшщьюя", count: 2))
-    }
-}
-
-@inline(never)
-public func run_U1F1F8U1F1FACount2(N: Int) {
-    for _ in 1...5000*N {
-        blackHole(repeating("\u{1F1F8}\u{1F1FA}\u{1F1F8}\u{1F1FA}", count: 2))
-    }
-}
-
-@inline(never)
-public func run_U301cafeCount5(N: Int) {
-    for _ in 1...5000*N {
-        blackHole(repeating("\u{301}cafe", count: 5))
     }
 }
 
