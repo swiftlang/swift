@@ -57,11 +57,10 @@ struct CursorInfoOwner {
 void simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner);
 
 /// Resolve cursor info at a given location.
-class CursorInfoRequest:
-    public SimpleRequest<CursorInfoRequest,
-                         ide::ResolvedCursorInfo(CursorInfoOwner),
-                         RequestFlags::Cached>
-{
+class CursorInfoRequest
+    : public SimpleRequest<CursorInfoRequest,
+                           ide::ResolvedCursorInfoPtr(CursorInfoOwner),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -69,8 +68,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ide::ResolvedCursorInfo evaluate(Evaluator &evaluator,
-                                   CursorInfoOwner CI) const;
+  ide::ResolvedCursorInfoPtr evaluate(Evaluator &evaluator,
+                                      CursorInfoOwner CI) const;
 
 public:
   // Caching
