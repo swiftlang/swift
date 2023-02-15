@@ -345,7 +345,7 @@ func expandAttachedMacro(
   // Create an expansion context
   let context = sourceManager.createMacroExpansionContext()
 
-  let macroName = customAttrNode.attributeName.description
+  let macroName = customAttrNode.attributeName.trimmedDescription
   var evaluatedSyntaxStr: String
   do {
     switch (macro, macroRole) {
