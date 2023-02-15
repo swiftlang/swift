@@ -686,7 +686,7 @@ extension MyType where T == Int {
 func testTypecheckedTypeExpr() {
   MyType(#^TYPECHECKED_TYPEEXPR^#
 }
-// TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg1: String#}, {#arg2: _#}[')'][#MyType<_>#]; name=arg1:arg2:
+// TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg1: String#}, {#arg2: T#}[')'][#MyType<T>#]; name=arg1:arg2:
 // TYPECHECKED_TYPEEXPR: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#(intVal): Int#}[')'][#MyType<Int>#]; name=:
 
 func testPamrameterFlags(_: Int, inoutArg: inout Int, autoclosureArg: @autoclosure () -> Int, iuoArg: Int!, variadicArg: Int...) {
@@ -1369,4 +1369,24 @@ func testParameterPack(intArray: [Int]) {
   myZip([1], #^PARAMETER_PACK_ARG^#)
   // PARAMETER_PACK_ARG: Pattern/Local/Flair[ArgLabels]:     {#otherParam: Int#}[#Int#]; name=otherParam:
   // PARAMETER_PACK_ARG: Decl[LocalVar]/Local/TypeRelation[Convertible]: intArray[#[Int]#]; name=intArray
+}
+
+struct AmbiguousCallInResultBuilder {
+  @resultBuilder
+  struct MyResultBuilder {
+    static func buildBlock(_ value: Int) -> Int {
+      return value
+    }
+  }
+
+  func ttroke(_ content: Int, style: String) -> Int { 41 }
+  func ttroke(_ content: Int, lineWidth: Int = 1) -> Int { 42 }
+  
+  @MyResultBuilder var body: Int {
+    self.ttroke(1, #^AMBIGUOUS_IN_RESULT_BUILDER?xfail=TODO^#)
+// AMBIGUOUS_IN_RESULT_BUILDER: Begin completions, 2 items
+// AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#style: String#}[#String#];
+// AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#lineWidth: Int#}[#Int#];
+// AMBIGUOUS_IN_RESULT_BUILDER: End completions
+  }
 }

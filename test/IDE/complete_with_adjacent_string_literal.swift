@@ -4,7 +4,7 @@ func takeClosure(x: () -> Void) {}
 func takeString(_ a: String) -> MyStruct {}
 
 struct MyStruct {
-  func style() {}
+  func style(arg: Int) {}
 }
 
 func foo() {
@@ -13,3 +13,8 @@ func foo() {
       .style(#^COMPLETE^#)
   }
 }
+
+// COMPLETE: Begin completions, 1 items
+// COMPLETE: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#arg: Int#}[')'][#Void#];
+// COMPLETE: End completions
+

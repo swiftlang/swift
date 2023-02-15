@@ -395,8 +395,12 @@ CreateThings {
 CreateThings {
     Thing { point in
       print("hello")
-      point. // ErrorExpr
-      point.#^MULTICLOSURE_FUNCBUILDER_ERROR?check=POINT_MEMBER^#
+      do {
+        point. // ErrorExpr
+      }
+      do {
+        point.#^MULTICLOSURE_FUNCBUILDER_ERROR?check=POINT_MEMBER^#
+      }
     }
     Thing { point in 
       print("hello")

@@ -349,7 +349,7 @@ func testUnqualified1(x: QuxEnum) {
   _ = (x == .Qux1#^UNRESOLVED_3^#) 
 // UNRESOLVED_3-DAG: Decl[InstanceVar]/CurrNominal:      .rawValue[#Int#]; name=rawValue
 // UNRESOLVED_3-DAG: Decl[InstanceVar]/Super/IsSystem:   .hashValue[#Int#]; name=hashValue
-// UNRESOLVED_3-DAG: Decl[InstanceMethod]/Super/IsSystem: .hash({#into: &Hasher#})[#Void#]; name=hash(into:)
+// UNRESOLVED_3-DAG: Decl[InstanceMethod]/Super/IsSystem/TypeRelation[Invalid]: .hash({#into: &Hasher#})[#Void#]; name=hash(into:)
 // UNRESOLVED_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  ~= {#QuxEnum#}[#Bool#]; name=~=
 // UNRESOLVED_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#QuxEnum#}[#Bool#]; name=!=
 // UNRESOLVED_3-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#QuxEnum#}[#Bool#]; name===
