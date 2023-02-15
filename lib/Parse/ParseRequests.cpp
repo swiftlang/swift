@@ -200,8 +200,12 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
     }
 
     case GeneratedSourceInfo::PeerMacroExpansion: {
-      // FIXME: this does not work for top-level or local peer expansions.
-      parser.parseExpandedMemberList(items);
+      if (parser.CurDeclContext->isTypeContext()) {
+        parser.parseExpandedMemberList(items);
+      } else {
+        parser.parseTopLevelItems(items);
+      }
+
       break;
     }
     }

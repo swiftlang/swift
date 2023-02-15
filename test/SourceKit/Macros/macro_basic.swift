@@ -139,7 +139,7 @@ struct S3 {
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=42:5 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=PEER_EXPAND %s
 // PEER_EXPAND: source.edit.kind.active:
 // PEER_EXPAND:   45:4-45:4 "
-// PEER_EXPAND: func f(a: Int, for b: String, _ value: Double, completionHandler: (String) -> Void) {
+// PEER_EXPAND: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
 // PEER_EXPAND:  Task {
 // PEER_EXPAND:    completionHandler(await f(a: a, for: b, value))
 // PEER_EXPAND:  }

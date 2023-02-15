@@ -622,7 +622,7 @@ func wrapperifyInfer<T, U>(_ cond: Bool, @WrapperBuilder body: (U) -> T) -> T {
 }
 
 let intValue = 17
-wrapperifyInfer(true) { x in // expected-error{{unable to infer type of a closure parameter 'x' in the current context}}
+_ = wrapperifyInfer(true) { x in // Ok
   intValue + x
 }
 
@@ -998,5 +998,19 @@ func test_requirement_failure_in_buildBlock() {
         B()
       }
     }
+  }
+}
+
+func test_partially_resolved_closure_params() {
+  struct S<T> {
+    var a: String = ""
+  }
+
+  func test<T>(@TupleBuilder _: (S<T>) -> T) { // expected-note {{in call to function 'test'}}
+  }
+
+  test { // expected-error {{generic parameter 'T' could not be inferred}}
+    $0.a
+    42
   }
 }

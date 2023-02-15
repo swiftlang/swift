@@ -58,6 +58,8 @@ extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
 
 extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
     void *diagEngine, void *macro,
+    const char *discriminator,
+    ptrdiff_t discriminatorLength,
     uint32_t rawMacroRole,
     void *customAttrSourceFile,
     const void *customAttrSourceLocation,
@@ -867,6 +869,7 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   // Evaluate the macro.
   NullTerminatedStringRef evaluatedSource;
 
+  std::string discriminator;
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
   case MacroDefinition::Kind::Undefined:
@@ -932,11 +935,18 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
     if (auto var = dyn_cast<VarDecl>(attachedTo))
       searchDecl = var->getParentPatternBinding();
 
+    {
+      Mangle::ASTMangler mangler;
+      discriminator =
+        mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
+    }
+
     const char *evaluatedSourceAddress;
     ptrdiff_t evaluatedSourceLength;
     swift_ASTGen_expandAttachedMacro(
         &ctx.Diags,
         externalDef.opaqueHandle,
+        discriminator.data(), discriminator.size(),
         static_cast<uint32_t>(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
@@ -955,14 +965,7 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   }
 
   // Figure out a reasonable name for the macro expansion buffer.
-  std::string discriminator;
-  std::string bufferName;
-  {
-    Mangle::ASTMangler mangler;
-    discriminator =
-      mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
-    bufferName = adjustMacroExpansionBufferName(discriminator);
-  }
+  std::string bufferName = adjustMacroExpansionBufferName(discriminator);
 
   // Dump macro expansions to standard output, if requested.
   if (ctx.LangOpts.DumpMacroExpansions) {
@@ -1194,9 +1197,6 @@ swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
       nominal->addMember(peer);
     } else if (auto *extension = dyn_cast<ExtensionDecl>(parent)) {
       extension->addMember(peer);
-    } else {
-      // TODO: Add peers to global or local contexts.
-      continue;
     }
   }
 
