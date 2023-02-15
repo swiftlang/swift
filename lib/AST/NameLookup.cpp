@@ -1523,7 +1523,7 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
     if (!med)
       continue;
     auto macro = evaluateOrDefault(
-        ctx.evaluator, ResolveMacroRequest{med, MacroRole::Declaration, dc},
+        ctx.evaluator, ResolveMacroRequest{med, dc},
         nullptr);
     if (!macro)
       continue;

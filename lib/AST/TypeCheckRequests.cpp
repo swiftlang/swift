@@ -1742,6 +1742,19 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
   llvm_unreachable("Unhandled case");
 }
 
+MacroRoles UnresolvedMacroReference::getMacroRoles() const {
+  if (pointer.is<MacroExpansionExpr *>())
+    return MacroRole::Expression;
+
+  if (pointer.is<MacroExpansionDecl *>())
+    return getFreestandingMacroRoles();
+
+  if (pointer.is<CustomAttr *>())
+    return getAttachedMacroRoles();
+
+  llvm_unreachable("Unsupported macro reference");
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
                            const UnresolvedMacroReference &ref) {
   if (ref.getDecl())
