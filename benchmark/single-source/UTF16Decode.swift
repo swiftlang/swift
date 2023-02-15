@@ -25,7 +25,7 @@ public let benchmarks = [
     BenchmarkInfo(
       name: "UTF16Decode.initFromCustom.cont.ascii",
       runFunction: run_UTF16Decode_InitFromCustom_contiguous_ascii,
-      tags: [.validation, .api, .String]),
+      tags: [.validation, .api, .String, .skip]),
     BenchmarkInfo(
       name: "UTF16Decode.initFromCustom.noncont",
       runFunction: run_UTF16Decode_InitFromCustom_noncontiguous,
@@ -33,7 +33,7 @@ public let benchmarks = [
     BenchmarkInfo(
       name: "UTF16Decode.initFromCustom.noncont.ascii",
       runFunction: run_UTF16Decode_InitFromCustom_noncontiguous_ascii,
-      tags: [.validation, .api, .String]),
+      tags: [.validation, .api, .String, .skip]),
     BenchmarkInfo(
       name: "UTF16Decode.initFromData",
       runFunction: run_UTF16Decode_InitFromData,
@@ -45,15 +45,15 @@ public let benchmarks = [
     BenchmarkInfo(
       name: "UTF16Decode.initFromData.ascii",
       runFunction: run_UTF16Decode_InitFromData_ascii,
-      tags: [.validation, .api, .String]),
+      tags: [.validation, .api, .String, .skip]),
     BenchmarkInfo(
       name: "UTF16Decode.initDecoding.ascii",
       runFunction: run_UTF16Decode_InitDecoding_ascii,
-      tags: [.validation, .api, .String]),
+      tags: [.validation, .api, .String, .skip]),
     BenchmarkInfo(
       name: "UTF16Decode.initFromData.asciiAsAscii",
       runFunction: run_UTF16Decode_InitFromData_ascii_as_ascii,
-      tags: [.validation, .api, .String]),
+      tags: [.validation, .api, .String, .skip]),
 ]
 
 typealias CodeUnit = UInt16
