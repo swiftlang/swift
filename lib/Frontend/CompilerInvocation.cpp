@@ -1474,6 +1474,15 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   Opts.setCompilerPluginLibraryPaths(CompilerPluginLibraryPaths);
 
+  std::vector<std::string> CompilerPluginExecutablePaths(
+      Opts.getCompilerPluginExecutablePaths());
+  for (const Arg *A : Args.filtered(OPT_load_plugin_executable)) {
+    // NOTE: The value has '#<module names>' after the path.
+    // But resolveSearchPath() works as long as the value starts with a path.
+    CompilerPluginExecutablePaths.push_back(resolveSearchPath(A->getValue()));
+  }
+  Opts.setCompilerPluginExecutablePaths(CompilerPluginExecutablePaths);
+
   return false;
 }
 
