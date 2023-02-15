@@ -487,6 +487,9 @@ public:
   /// expression.
   bool isCodeCompletionToken() const;
 
+  /// Determine whether this type variable represents an opened opaque type.
+  bool isOpaqueType() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
