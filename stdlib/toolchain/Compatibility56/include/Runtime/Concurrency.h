@@ -51,24 +51,6 @@ struct AsyncTaskAndContext {
   AsyncContext *InitialContext;
 };
 
-/// This should have the same representation as an enum like this:
-///    enum NearestTaskDeadline {
-///      case none
-///      case alreadyCancelled
-///      case active(TaskDeadline)
-///    }
-/// TODO: decide what this interface should really be.
-struct NearestTaskDeadline {
-  enum Kind : uint8_t {
-    None,
-    AlreadyCancelled,
-    Active
-  };
-
-  TaskDeadline Value;
-  Kind ValueKind;
-};
-
 
 /// Caution: not all future-initializing functions actually throw, so
 /// this signature may be incorrect.
