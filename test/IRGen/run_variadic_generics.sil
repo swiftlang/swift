@@ -353,7 +353,7 @@ entry(%intIndex : $Builtin.Word):
 // CHECK-LL:         [[METADATA_ADDRESS:%[^,]+]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA_PACK]], i{{(32|64)}} [[INDEX]]
 // CHECK-LL:         [[METADATA:%[^,]+]] = load %swift.type*, %swift.type** [[METADATA_ADDRESS]]
 // CHECK-LL:         [[WTABLE_ADDRESS:%[^,]+]] = getelementptr inbounds i8**, i8*** [[WTABLE_PACK]], i{{(32|64)}} [[INDEX]]
-// CHECK-LL:         [[WTABLE:%[^,]+]] = load i8**, i8*** [[WTABLE_ADDRESS]], align 8
+// CHECK-LL:         [[WTABLE:%[^,]+]] = load i8**, i8*** [[WTABLE_ADDRESS]], align
 // CHECK-LL:         call swiftcc void @printGenericType(%swift.type* [[METADATA]], %swift.type* [[METADATA]])
 sil @direct_access_from_parameter_with_conformance : $<T_1... : P> (Builtin.Word) -> () {
 entry(%intIndex : $Builtin.Word):
