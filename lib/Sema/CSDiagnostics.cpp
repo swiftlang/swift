@@ -3743,8 +3743,10 @@ bool SubscriptMisuseFailure::diagnoseAsNote() {
   return false;
 }
 
-static void diagnoseUnsafeCxxMethod(SourceLoc loc, Type baseType,
-                                    DeclName name) {
+void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
+                                                   ASTNode anchor,
+                                                   Type baseType,
+                                                   DeclName name) const {
   auto &ctx = baseType->getASTContext();
 
   if (baseType->getAnyNominal() == nullptr ||
@@ -3769,18 +3771,52 @@ static void diagnoseUnsafeCxxMethod(SourceLoc loc, Type baseType,
     } else if (cxxMethod->getReturnType()->isPointerType())
       ctx.Diags.diagnose(loc, diag::projection_not_imported,
                          name.getBaseIdentifier().str(), "pointer");
-    else if (cxxMethod->getReturnType()->isReferenceType())
-      ctx.Diags.diagnose(loc, diag::projection_not_imported,
-                         name.getBaseIdentifier().str(), "reference");
-    else if (cxxMethod->getReturnType()->isRecordType()) {
+    else if (cxxMethod->getReturnType()->isReferenceType()) {
+      auto conformsToRACollection = [&](auto baseType) {
+        auto raCollectionProto =
+            ctx.getProtocol(KnownProtocolKind::CxxRandomAccessCollection);
+        SmallVector<ProtocolConformance *, 2> scratch;
+        return baseType->getAnyNominal()->lookupConformance(raCollectionProto,
+                                                            scratch);
+      };
+
+      // Rewrite a call to .at(42) as a subscript.
+      if (name.getBaseIdentifier().str() == "at" &&
+          cxxMethod->getReturnType()->isReferenceType() &&
+          conformsToRACollection(baseType)) {
+        auto dotExpr = getAsExpr<UnresolvedDotExpr>(anchor);
+        auto callExpr = getAsExpr<CallExpr>(findParentExpr(dotExpr));
+
+        ctx.Diags
+            .diagnose(loc, diag::projection_not_imported,
+                      name.getBaseIdentifier().str(), "reference")
+            .fixItRemove(
+                {dotExpr->getDotLoc(), callExpr->getArgs()->getStartLoc()})
+            .fixItReplaceChars(
+                callExpr->getArgs()->getStartLoc(),
+                callExpr->getArgs()->getStartLoc().getAdvancedLoc(1), "[")
+            .fixItReplaceChars(
+                callExpr->getArgs()->getEndLoc(),
+                callExpr->getArgs()->getEndLoc().getAdvancedLoc(1), "]");
+      } else {
+        ctx.Diags.diagnose(loc, diag::projection_not_imported,
+                           name.getBaseIdentifier().str(), "reference");
+      }
+    } else if (cxxMethod->getReturnType()->isRecordType()) {
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(
               cxxMethod->getReturnType()->getAsRecordDecl())) {
-        assert(evaluateOrDefault(ctx.evaluator,
-                                 CxxRecordSemantics({cxxRecord, ctx}), {}) ==
-               CxxRecordSemanticsKind::UnsafePointerMember);
-        ctx.Diags.diagnose(loc, diag::projection_not_imported,
-                           name.getBaseIdentifier().str(),
-                           cxxRecord->getNameAsString());
+        auto methodSemantics = evaluateOrDefault(
+            ctx.evaluator, CxxRecordSemantics({cxxRecord, ctx}), {});
+        if (methodSemantics == CxxRecordSemanticsKind::Iterator) {
+          ctx.Diags.diagnose(loc, diag::dont_use_iterator_api,
+                             name.getBaseIdentifier().str());
+        } else {
+          assert(methodSemantics ==
+                 CxxRecordSemanticsKind::UnsafePointerMember);
+          ctx.Diags.diagnose(loc, diag::projection_not_imported,
+                             name.getBaseIdentifier().str(),
+                             cxxRecord->getNameAsString());
+        }
       }
     }
   }
@@ -3860,7 +3896,9 @@ bool MissingMemberFailure::diagnoseAsError() {
     if (!ctx.LangOpts.DisableExperimentalClangImporterDiagnostics) {
       ctx.getClangModuleLoader()->diagnoseMemberValue(getName().getFullName(),
                                                       baseType);
-      diagnoseUnsafeCxxMethod(getLoc(), baseType, getName().getFullName());
+      getSourceRange().dump(ctx.SourceMgr);
+      diagnoseUnsafeCxxMethod(getLoc(), anchor, baseType,
+                              getName().getFullName());
     }
   };
 
