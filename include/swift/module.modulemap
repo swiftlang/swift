@@ -6,6 +6,10 @@ module BasicBridging {
   export *
 }
 
+module CBasicBridging {
+  header "Basic/CBasicBridging.h"
+}
+
 module ASTBridging {
   header "AST/AnyFunctionRef.h"
   header "AST/ASTBridging.h"
