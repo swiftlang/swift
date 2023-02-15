@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
 
 // TODO: Add FileCheck
 
@@ -202,3 +203,75 @@ bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
   %33 = tuple ()
   return %33 : $()
 }
+
+// In this case, we already emitted an object error earlier so all of the
+// copy_value are explicit_copy_value. We shouldn't crash when processing
+// this. We used to due to borrow to destructure trying to delete
+// %14->getOperand(Src)->getDefiningInstruction() and not handling the case
+// where %10 was an argument.
+sil [ossa] @enumPatternMatchSwitch : $@convention(thin) (@guaranteed EnumTy) -> () {
+bb0(%0 : @guaranteed $EnumTy):
+  %1 = explicit_copy_value %0 : $EnumTy
+  debug_value %1 : $EnumTy, let, name "x", argno 1
+  %3 = alloc_box ${ var EnumTy }, let, name "x2"
+  %4 = project_box %3 : ${ var EnumTy }, 0
+  %5 = mark_must_check [consumable_and_assignable] %4 : $*EnumTy // expected-error {{'x2' used after consume}}
+  store %1 to [init] %5 : $*EnumTy
+  %7 = load [copy] %5 : $*EnumTy // expected-note {{consuming use here}}
+  %8 = begin_borrow %7 : $EnumTy
+  switch_enum %8 : $EnumTy, case #EnumTy.klass!enumelt: bb1, case #EnumTy.int!enumelt: bb2
+
+bb1(%10 : @guaranteed $NonTrivialStruct):
+  %11 = alloc_box ${ var NonTrivialStruct }, let, name "k"
+  %12 = project_box %11 : ${ var NonTrivialStruct }, 0
+  %13 = mark_must_check [consumable_and_assignable] %12 : $*NonTrivialStruct
+  %14 = explicit_copy_value %10 : $NonTrivialStruct
+  store %14 to [init] %13 : $*NonTrivialStruct
+  debug_value %13 : $*NonTrivialStruct, let, name "k", expr op_deref
+  %17 = load_borrow %13 : $*NonTrivialStruct
+  %18 = function_ref @nontrivialstruct_use : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  %19 = apply %18(%17) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  end_borrow %17 : $NonTrivialStruct
+  %21 = load_borrow %5 : $*EnumTy // expected-note {{non-consuming use here}}
+  %22 = function_ref @enumty_use : $@convention(thin) (@guaranteed EnumTy) -> ()
+  %23 = apply %22(%21) : $@convention(thin) (@guaranteed EnumTy) -> ()
+  end_borrow %21 : $EnumTy
+  destroy_value %11 : ${ var NonTrivialStruct }
+  end_borrow %8 : $EnumTy
+  destroy_value %7 : $EnumTy
+  br bb3
+
+bb2(%28 : $Builtin.Int32):
+  end_borrow %8 : $EnumTy
+  destroy_value %7 : $EnumTy
+  br bb3
+
+bb3:
+  destroy_value %3 : ${ var EnumTy }
+  %33 = tuple ()
+  return %33 : $()
+}
+
+///////////////////////////////////////////////////////////////////////
+// MARK: Tests that make sure we emit a nice error for missed copies //
+///////////////////////////////////////////////////////////////////////
+
+// CHECK-LABEL: sil [ossa] @missed_copy_diagnostic_test : $@convention(thin) (@guaranteed NonTrivialStruct, @in_guaranteed NonTrivialStruct) -> () {
+// CHECK: explicit_copy_value
+// CHECK: explicit_copy_value
+// CHECK: explicit_copy_addr
+// CHECK: } // end sil function 'missed_copy_diagnostic_test'
+sil [ossa] @missed_copy_diagnostic_test : $@convention(thin) (@guaranteed NonTrivialStruct, @in_guaranteed NonTrivialStruct) -> () {
+bb0(%arg0 : @guaranteed $NonTrivialStruct, %arg1 : $*NonTrivialStruct):
+  %1 = copy_value %arg0 : $NonTrivialStruct // expected-error {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
+  destroy_value %1 : $NonTrivialStruct
+  %2 = load [copy] %arg1 : $*NonTrivialStruct // expected-error {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
+  destroy_value %2 : $NonTrivialStruct
+  %3 = alloc_stack $NonTrivialStruct
+  copy_addr %arg1 to [init] %3 : $*NonTrivialStruct // expected-error {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
+  destroy_addr %3 : $*NonTrivialStruct
+  dealloc_stack %3 : $*NonTrivialStruct
+  %9999 = tuple ()
+  return %9999 : $()
+}
+

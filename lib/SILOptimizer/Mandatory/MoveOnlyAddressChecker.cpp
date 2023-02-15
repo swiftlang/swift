@@ -364,6 +364,62 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(SILValue value) {
 }
 
 //===----------------------------------------------------------------------===//
+//                  MARK: Cleanup After Emitting Diagnostic
+//===----------------------------------------------------------------------===//
+
+static bool cleanupAfterEmittingDiagnostic(SILFunction *fn) {
+  bool changed = false;
+  for (auto &block : *fn) {
+    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
+      auto *inst = &*ii;
+      ++ii;
+
+      // Convert load [copy] -> load_borrow + explicit_copy_value.
+      if (auto *li = dyn_cast<LoadInst>(inst)) {
+        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+          SILBuilderWithScope builder(li);
+          auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
+          auto *cvi = builder.createExplicitCopyValue(li->getLoc(), lbi);
+          builder.createEndBorrow(li->getLoc(), lbi);
+          li->replaceAllUsesWith(cvi);
+          li->eraseFromParent();
+          changed = true;
+        }
+      }
+
+      // Convert copy_addr !take of src to its explicit value form so we don't
+      // error.
+      if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
+        if (!copyAddr->isTakeOfSrc()) {
+          SILBuilderWithScope builder(copyAddr);
+          builder.createExplicitCopyAddr(
+              copyAddr->getLoc(), copyAddr->getSrc(), copyAddr->getDest(),
+              IsTake_t(copyAddr->isTakeOfSrc()),
+              IsInitialization_t(copyAddr->isInitializationOfDest()));
+          copyAddr->eraseFromParent();
+          changed = true;
+        }
+      }
+
+      // Convert any copy_value of move_only type to explicit copy value.
+      if (auto *cvi = dyn_cast<CopyValueInst>(inst)) {
+        if (!cvi->getOperand()->getType().isMoveOnly())
+          continue;
+        SILBuilderWithScope b(cvi);
+        auto *expCopy =
+            b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
+        cvi->replaceAllUsesWith(expCopy);
+        cvi->eraseFromParent();
+        changed = true;
+        continue;
+      }
+    }
+  }
+
+  return changed;
+}
+
+//===----------------------------------------------------------------------===//
 //                              MARK: Use State
 //===----------------------------------------------------------------------===//
 
@@ -1596,52 +1652,7 @@ bool GlobalLivenessChecker::compute() {
 //===----------------------------------------------------------------------===//
 
 void MoveOnlyChecker::cleanupAfterEmittingDiagnostic() {
-  for (auto &block : *fn) {
-    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-      auto *inst = &*ii;
-      ++ii;
-
-      // Convert load [copy] -> load_borrow + explicit_copy_value.
-      if (auto *li = dyn_cast<LoadInst>(inst)) {
-        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
-          SILBuilderWithScope builder(li);
-          auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
-          auto *cvi = builder.createExplicitCopyValue(li->getLoc(), lbi);
-          builder.createEndBorrow(li->getLoc(), lbi);
-          li->replaceAllUsesWith(cvi);
-          li->eraseFromParent();
-          changed = true;
-        }
-      }
-
-      // Convert copy_addr !take of src to its explicit value form so we don't
-      // error.
-      if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
-        if (!copyAddr->isTakeOfSrc()) {
-          SILBuilderWithScope builder(copyAddr);
-          builder.createExplicitCopyAddr(
-              copyAddr->getLoc(), copyAddr->getSrc(), copyAddr->getDest(),
-              IsTake_t(copyAddr->isTakeOfSrc()),
-              IsInitialization_t(copyAddr->isInitializationOfDest()));
-          copyAddr->eraseFromParent();
-          changed = true;
-        }
-      }
-
-      // Convert any copy_value of move_only type to explicit copy value.
-      if (auto *cvi = dyn_cast<CopyValueInst>(inst)) {
-        if (!cvi->getOperand()->getType().isMoveOnly())
-          continue;
-        SILBuilderWithScope b(cvi);
-        auto *expCopy =
-            b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
-        cvi->replaceAllUsesWith(expCopy);
-        cvi->eraseFromParent();
-        changed = true;
-        continue;
-      }
-    }
-  }
+  changed |= ::cleanupAfterEmittingDiagnostic(fn);
 }
 
 bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
@@ -2044,6 +2055,48 @@ bool MoveOnlyChecker::checkFunction() {
 }
 
 //===----------------------------------------------------------------------===//
+//                        MARK: Missed Copy Diagnostic
+//===----------------------------------------------------------------------===//
+
+/// A small diagnostic helper that causes us to emit a diagnostic error upon any
+/// copies we did not eliminate and ask the user for a test case.
+static bool checkForMissedCopies(SILFunction *fn) {
+  bool emittedDiagnostic = false;
+  DiagnosticEmitter diagnosticEmitter;
+  for (auto &block : *fn) {
+    for (auto &inst : block) {
+      if (auto *cvi = dyn_cast<CopyValueInst>(&inst)) {
+        if (cvi->getOperand()->getType().isMoveOnly()) {
+          diagnosticEmitter.emitCheckedMissedCopyError(cvi);
+          emittedDiagnostic = true;
+        }
+        continue;
+      }
+
+      if (auto *li = dyn_cast<LoadInst>(&inst)) {
+        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy &&
+            li->getType().isMoveOnly()) {
+          diagnosticEmitter.emitCheckedMissedCopyError(li);
+          emittedDiagnostic = true;
+        }
+        continue;
+      }
+
+      if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
+        if (!copyAddr->isTakeOfSrc() &&
+            copyAddr->getSrc()->getType().isMoveOnly()) {
+          diagnosticEmitter.emitCheckedMissedCopyError(copyAddr);
+          emittedDiagnostic = true;
+        }
+        continue;
+      }
+    }
+  }
+
+  return emittedDiagnostic;
+}
+
+//===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
@@ -2070,47 +2123,15 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
     auto *poa = getAnalysis<PostOrderAnalysis>();
 
-    if (MoveOnlyChecker(getFunction(), deAnalysis, domTree, poa)
-            .checkFunction()) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    bool shouldInvalidate =
+        MoveOnlyChecker(getFunction(), deAnalysis, domTree, poa)
+            .checkFunction();
+    if (checkForMissedCopies(getFunction())) {
+      cleanupAfterEmittingDiagnostic(getFunction());
+      shouldInvalidate = true;
     }
-
-    if (!getOptions().VerifyAll)
-      return;
-
-    // TODO: Enable this by default when verify all is disabled and make it a
-    // diagnostic error saying file a bug.
-    for (auto &block : *getFunction()) {
-      for (auto &inst : block) {
-        if (auto *cvi = dyn_cast<CopyValueInst>(&inst)) {
-          if (cvi->getOperand()->getType().isMoveOnly()) {
-            llvm::errs() << "Should have eliminated copy at this point: "
-                         << *cvi;
-            llvm::report_fatal_error("standard compiler error");
-          }
-          continue;
-        }
-
-        if (auto *li = dyn_cast<LoadInst>(&inst)) {
-          if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy &&
-              li->getType().isMoveOnly()) {
-            llvm::errs() << "Should have eliminated copy at this point: "
-                         << *li;
-            llvm::report_fatal_error("standard compiler error");
-          }
-          continue;
-        }
-
-        if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
-          if (!copyAddr->isTakeOfSrc() &&
-              copyAddr->getSrc()->getType().isMoveOnly()) {
-            llvm::errs() << "Should have eliminated copy at this point: "
-                         << *copyAddr;
-            llvm::report_fatal_error("standard compiler error");
-          }
-          continue;
-        }
-      }
+    if (shouldInvalidate) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
 };
