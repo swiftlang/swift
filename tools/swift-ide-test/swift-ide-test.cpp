@@ -1091,7 +1091,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
 static void printCodeCompletionResultsImpl(
     ArrayRef<CodeCompletionResult *> Results, llvm::raw_ostream &OS,
     bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
-    bool PrintAnnotatedDescription, const ASTContext &Ctx) {
+    bool PrintAnnotatedDescription, const ASTContext *Ctx) {
   unsigned NumResults = 0;
   for (auto Result : Results) {
     if (!IncludeKeywords &&
@@ -1134,30 +1134,33 @@ static void printCodeCompletionResultsImpl(
       OS << "; comment=" << comment;
     }
 
-    SmallString<256> Scratch;
-    auto DiagSeverityAndMessage =
-        Result->getDiagnosticSeverityAndMessage(Scratch, Ctx);
-    if (DiagSeverityAndMessage.first !=
-        CodeCompletionDiagnosticSeverity::None) {
-      OS << "; diagnostics=" << comment;
-      switch (DiagSeverityAndMessage.first) {
-      case CodeCompletionDiagnosticSeverity::Error:
-        OS << "error";
-        break;
-      case CodeCompletionDiagnosticSeverity::Warning:
-        OS << "warning";
-        break;
-      case CodeCompletionDiagnosticSeverity::Remark:
-        OS << "remark";
-        break;
-      case CodeCompletionDiagnosticSeverity::Note:
-        OS << "note";
-        break;
-      case CodeCompletionDiagnosticSeverity::None:
-        llvm_unreachable("none");
-      }
+    if (Ctx) {
+      // Only print diagnostics if we have an ASTContext
       SmallString<256> Scratch;
-      OS << ":" << DiagSeverityAndMessage.second;
+      auto DiagSeverityAndMessage =
+          Result->getDiagnosticSeverityAndMessage(Scratch, *Ctx);
+      if (DiagSeverityAndMessage.first !=
+          CodeCompletionDiagnosticSeverity::None) {
+        OS << "; diagnostics=" << comment;
+        switch (DiagSeverityAndMessage.first) {
+        case CodeCompletionDiagnosticSeverity::Error:
+          OS << "error";
+          break;
+        case CodeCompletionDiagnosticSeverity::Warning:
+          OS << "warning";
+          break;
+        case CodeCompletionDiagnosticSeverity::Remark:
+          OS << "remark";
+          break;
+        case CodeCompletionDiagnosticSeverity::Note:
+          OS << "note";
+          break;
+        case CodeCompletionDiagnosticSeverity::None:
+          llvm_unreachable("none");
+        }
+        SmallString<256> Scratch;
+        OS << ":" << DiagSeverityAndMessage.second;
+      }
     }
 
     OS << "\n";
@@ -1188,7 +1191,7 @@ static int printCodeCompletionResults(
         printCodeCompletionResultsImpl(
             Result.ResultSink.Results, OS, IncludeKeywords, IncludeComments,
             IncludeSourceText, PrintAnnotatedDescription,
-            Result.Info.compilerInstance->getASTContext());
+            &Result.Info.compilerInstance->getASTContext());
         printCodeCompletionLookedupTypeNames(
             Result.Info.completionContext->LookedupNominalTypeNames, OS);
         return 0;
@@ -1570,7 +1573,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                 Result->ResultSink.Results, OS, IncludeKeywords,
                 IncludeComments, IncludeSourceText,
                 CodeCompletionAnnotateResults,
-                Result->Info.compilerInstance->getASTContext());
+                &Result->Info.compilerInstance->getASTContext());
             printCodeCompletionLookedupTypeNames(
                 Result->Info.completionContext->LookedupNominalTypeNames, OS);
             break;
@@ -4249,12 +4252,11 @@ int main(int argc, char *argv[]) {
             ContextualNotRecommendedReason::None);
         contextualResults.push_back(contextualResult);
       }
-      auto CompInstance = std::make_unique<CompilerInstance>();
       printCodeCompletionResultsImpl(
           contextualResults, llvm::outs(), options::CodeCompletionKeywords,
           options::CodeCompletionComments, options::CodeCompletionSourceText,
           options::CodeCompletionAnnotateResults,
-          CompInstance->getASTContext());
+          /*Ctx=*/nullptr);
     }
 
     return 0;
