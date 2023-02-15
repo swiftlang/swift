@@ -197,7 +197,7 @@ bb0(%0 : @guaranteed $Z, %1 : @owned $Y):
 }
 
 sil [ossa] @self_arg_callee : $@convention(thin) (@inout Str) -> () {
-[%0: escape v** => %0.v**] 
+[%0: escape v** -> %0.v**] 
 }
 
 // CHECK-LABEL: sil [ossa] @test_self_arg_escape
