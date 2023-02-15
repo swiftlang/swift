@@ -1,4 +1,3 @@
-// REQUIRES: wip
 // RUN: %target-swift-frontend -enable-experimental-move-only -emit-sil -verify %s
 // TODO: test with (-DNONTRIVIAL | -DADDRESS_ONLY) * (REABSTRACT)
 // TODO: phantom diagnostic during verify
@@ -74,20 +73,17 @@ func f(x: __shared M) {
     clodger({ borrow(x) }, borrow: x)
 }
 
-// TODO: Interfering inout/borrow access
-func g(x: inout M) { // expected-error{{}}
-    clodger({ mutate(&x) }, borrow: x) // expected-note{{}}
+func g(x: inout M) {
+    clodger({ mutate(&x) }, borrow: x) // expected-error{{}} expected-note{{}}
 }
 
-// TODO: Interfering inout/borrow access
-func h(x: inout M) { // expected-error{{}}
-    clodger({ mutate(&x) }, consume: x) // expected-note{{}}
+func h(x: inout M) {
+    clodger({ mutate(&x) }, consume: x) // expected-error{{}} expected-note{{}}
     x = M()
 }
 
-// TODO: Interfering inout/inout access
-func i(x: inout M) { // expected-error{{}}
-    clodger({ mutate(&x) }, mutate: &x) // expected-note{{}}
+func i(x: inout M) {
+    clodger({ mutate(&x) }, mutate: &x) // expected-error{{}} expected-note{{}}
 }
 
 // Multiple closures are allowed to capture the same inout binding concurrently.
