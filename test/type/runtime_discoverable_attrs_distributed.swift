@@ -3,6 +3,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature RuntimeDiscoverableAttrs -I %t
 
 // REQUIRES: asserts
+// REQUIRES: distributed
 
 import RuntimeAttrs
 import Distributed
