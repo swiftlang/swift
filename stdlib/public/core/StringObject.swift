@@ -172,6 +172,17 @@ internal struct _StringObject {
     _internalInvariant(!isSmall)
     return CountAndFlags(rawUnchecked: _countAndFlagsBits)
   }
+
+  // FIXME: This ought to be the setter for property `_countAndFlags`.
+  @_alwaysEmitIntoClient
+  internal mutating func _setCountAndFlags(to value: CountAndFlags) {
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    self._count = value.count
+    self._flags = value.flags
+#else
+    self._countAndFlagsBits = value._storage
+#endif
+  }
 }
 
 // Raw

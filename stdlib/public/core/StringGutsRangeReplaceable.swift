@@ -70,14 +70,14 @@ extension _StringGuts {
   internal mutating func updateNativeStorage<R>(
     _ body: (__StringStorage) -> R
   ) -> R {
-    let storage = self._object.nativeStorage
-    self = _StringGuts()
-    defer {
-      // We re-initialize from the modified storage to pick up new count, flags,
-      // etc.
-      self = _StringGuts(storage)
+    let (r, cf) = self._object.withNativeStorage {
+      let r = body($0)
+      let cf = $0._countAndFlags
+      return (r, cf)
     }
-    return body(storage)
+    // We need to pick up new count/flags from the modified storage.
+    self._object._setCountAndFlags(to: cf)
+    return r
   }
 
   @inlinable
