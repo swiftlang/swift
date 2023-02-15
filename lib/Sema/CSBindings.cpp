@@ -1071,6 +1071,61 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
     if (forClosureResult() || forGenericParameter())
       return false;
   }
+
+  auto *locator = conjunction->getLocator();
+  if (locator->directlyAt<ClosureExpr>()) {
+    auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+
+    if (auto transform = CS.getAppliedResultBuilderTransform(closure)) {
+      // Conjunctions that represent closures with result builder transformed
+      // bodies could be attempted right after their resolution if they meet
+      // all of the following criteria:
+      //
+      // - Builder type doesn't have any unresolved generic parameters;
+      // - Closure doesn't have any parameters;
+      // - The contextual result type is either concrete or opaque type.
+      auto contextualType = transform->contextualType;
+      if (!(contextualType && contextualType->is<FunctionType>()))
+        return true;
+
+      auto *contextualFnType = contextualType->castTo<FunctionType>();
+      auto resultType = contextualFnType->getResult();
+      if (resultType->hasTypeVariable()) {
+        auto *typeVar = resultType->getAs<TypeVariableType>();
+        // If contextual result type is represented by an opaque type,
+        // it's a strong indication that body is self-contained, otherwise
+        // closure might rely on external types flowing into the body for
+        // disambiguation of `build{Partial}Block` or `buildFinalResult`
+        // calls.
+        if (!(typeVar && typeVar->getImpl().isOpaqueType()))
+          return true;
+      }
+
+      auto *closureType = CS.getClosureType(closure);
+      // If closure has parameters, it has to be delayed to give
+      // them a chance to be resolved.
+      //
+      // Note: Since we have access to a contextual type here it should be
+      // possible to transform this check into - if some of the parameters
+      // have type variables (that means not-yet-resolved generic parameters).
+      if (closureType->getNumParams() != 0)
+        return true;
+
+      // If conjunction references a single type variable (closure itself)
+      // it means that the builder is either not generic or has all of its
+      // generic parameter specified explicitly, and there are no references
+      // to declarations from outer context. Such conjunctions don't have to
+      // be delayed.
+      if (conjunction->getTypeVariables().size() == 1) {
+        assert(
+            conjunction->getTypeVariables()[0]->isEqual(CS.getType(closure)));
+        return false;
+      }
+
+      return true;
+    }
+  }
+
   return true;
 }
 
