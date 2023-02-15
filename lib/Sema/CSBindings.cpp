@@ -1111,18 +1111,18 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
           }))
         return true;
 
-      // If conjunction references a single type variable (closure itself)
-      // it means that the builder is either not generic or has all of its
-      // generic parameter specified explicitly, and there are no references
-      // to declarations from outer context. Such conjunctions don't have to
-      // be delayed.
-      if (conjunction->getTypeVariables().size() == 1) {
-        assert(
-            conjunction->getTypeVariables()[0]->isEqual(CS.getType(closure)));
-        return false;
-      }
-
-      return true;
+      // Check whether conjunction has any unresolved type variables
+      // besides the variable that represents the closure.
+      //
+      // Conjunction could refer to declarations from outer context
+      // (i.e. a variable declared in the outer closure) or generic
+      // parameters of the builder type), if any of such references
+      // are not yet inferred the conjunction has to be delayed.
+      auto *closureType = CS.getType(closure)->castTo<TypeVariableType>();
+      return llvm::any_of(
+          conjunction->getTypeVariables(), [&](TypeVariableType *typeVar) {
+            return !(typeVar == closureType || CS.getFixedType(typeVar));
+          });
     }
   }
 
