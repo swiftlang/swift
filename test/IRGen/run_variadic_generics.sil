@@ -46,6 +46,10 @@ struct G : P {
   static func static_member_fn()
 }
 
+struct GenFwdP<T : P> : P {
+  static func static_member_fn()
+}
+
 sil private @A_static_member_fn : $@convention(witness_method: P) (@thick A.Type) -> () {
 bb0(%0 : $@thick A.Type):
   %printGenericTypeAndWord = function_ref @printGenericTypeAndWord : $@convention(thin) <T> (@thick T.Type, Builtin.Word) -> ()
@@ -122,6 +126,21 @@ bb0(%0 : $@thick G.Type):
 }
 sil_witness_table G : P module main {
   method #P.static_member_fn: <Self where Self : P> (Self.Type) -> () -> () : @G_static_member_fn
+}
+
+sil private @GenFwdP_static_member_fn : $@convention(witness_method: P) <T : P> (@thick GenFwdP<T>.Type) -> () {
+bb0(%0 : $@thick GenFwdP<T>.Type):
+  %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<GenFwdP<T>>(%0) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %forwardee = metatype $@thick T.Type
+  %forwarded_static_member_fn = witness_method $T, #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T : P> (@thick T.Type) -> ()
+  apply %forwarded_static_member_fn<T>(%forwardee) : $@convention(witness_method: P) <T : P> (@thick T.Type) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil_witness_table <T : P> GenFwdP<T>: P module main {
+  method #P.static_member_fn: <Self where Self : P> (Self.Type) -> () -> () : @GenFwdP_static_member_fn
 }
 
 sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
@@ -315,6 +334,57 @@ bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<
   // CHECK: 5
   apply %direct_access_from_parameter_with_conformance<Pack{A, B, C, D, E, F}>(%5) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
 
+
+  /// Expect the following
+  /// GenFwdP<INNER> // from direct_access_from_parameter_with_conformance's call to printGenericType
+  /// GenFwdP<INNER> // from GenFwdP_static_member_fn's call to printGenericType
+  /// INNER          // from INNER::static_member_fn's call to printGenericTypeAndWord
+  /// INNER.INDEX    // from INNER::static_member_fn's call to printGenericTypeAndWord
+  %wrap_in_GenFwdP = function_ref @wrap_in_GenFwdP : $@convention(thin) <T_1...: P> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // --0---> ^
+  // CHECK: GenFwdP<A>
+  // CHECK: GenFwdP<A>
+  // CHECK: A
+  // CHECK: 0
+  apply %wrap_in_GenFwdP<Pack{A, B, C, D, E, F}>(%0) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ----1----> ^
+  // CHECK: GenFwdP<B>
+  // CHECK: GenFwdP<B>
+  // CHECK: B
+  // CHECK: 1
+  apply %wrap_in_GenFwdP<Pack{A, B, C, D, E, F}>(%1) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // -----2------> ^
+  // CHECK: GenFwdP<C>
+  // CHECK: GenFwdP<C>
+  // CHECK: C
+  // CHECK: 2
+  apply %wrap_in_GenFwdP<Pack{A, B, C, D, E, F}>(%2) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // -------3-------> ^
+  // CHECK: GenFwdP<D>
+  // CHECK: GenFwdP<D>
+  // CHECK: D
+  // CHECK: 3
+  apply %wrap_in_GenFwdP<Pack{A, B, C, D, E, F}>(%3) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // --------4---------> ^
+  // CHECK: GenFwdP<E>
+  // CHECK: GenFwdP<E>
+  // CHECK: E
+  // CHECK: 4
+  apply %wrap_in_GenFwdP<Pack{A, B, C, D, E, F}>(%4) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
+  // U_1 -> {A, B, C, D, E, F}
+  // ----------5----------> ^
+  // CHECK: GenFwdP<F>
+  // CHECK: GenFwdP<F>
+  // CHECK: F
+  // CHECK: 5
+  apply %wrap_in_GenFwdP<Pack{A, B, C, D, E, F}>(%5) : $@convention(thin) <T_1... : P> (Builtin.Word) -> ()
+
+
   %outb = integer_literal $Builtin.Int32, 0
   %out = struct $Int32 (%outb : $Builtin.Int32)
   return %out : $Int32
@@ -390,6 +460,14 @@ entry(%intIndex : $Builtin.Word):
   apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
   %static_member_fn = witness_method $(@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1), #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
   apply %static_member_fn<(@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1)>(%metatype_1) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @wrap_in_GenFwdP : $<T_1... : P> (Builtin.Word) -> () {
+entry(%intIndex : $Builtin.Word):
+  %direct_access_from_parameter_with_conformance = function_ref @direct_access_from_parameter_with_conformance : $@convention(thin) <T_1...: P> (Builtin.Word) -> ()
+  apply %direct_access_from_parameter_with_conformance<Pack{repeat GenFwdP<each T_1>}>(%intIndex) : $@convention(thin) <T_1...: P> (Builtin.Word) -> ()
   %t = tuple ()
   return %t : $()
 }
