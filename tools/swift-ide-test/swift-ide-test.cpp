@@ -3698,8 +3698,8 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufID, Offset.value());
   auto CursorInfo = evaluateOrDefault(
       SF->getASTContext().evaluator,
-      CursorInfoRequest{CursorInfoOwner(SF, Loc)}, ResolvedCursorInfo());
-  auto SemaT = dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo);
+      CursorInfoRequest{CursorInfoOwner(SF, Loc)}, new ResolvedCursorInfo());
+  auto SemaT = dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
   if (!SemaT) {
     llvm::errs() << "Cannot find sema token at the given location.\n";
     return 1;

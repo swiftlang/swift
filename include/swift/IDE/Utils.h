@@ -131,53 +131,15 @@ enum class CursorInfoKind {
 
 /// Base class of more specialized \c ResolvedCursorInfos that also represents
 /// and \c Invalid cursor info.
-/// Subclasses of \c ResolvedCursorInfo cannot add new stored properies because
-/// \c ResolvedCursorInfo is being passed around as its base class and thus any
-/// properties in subclasses would get lost.
-struct ResolvedCursorInfo {
+struct ResolvedCursorInfo : public llvm::RefCountedBase<ResolvedCursorInfo> {
 protected:
   CursorInfoKind Kind = CursorInfoKind::Invalid;
   SourceFile *SF = nullptr;
   SourceLoc Loc;
 
-  // Technically, these structs could form a union (because only one of them is
-  // active at a time). But I had issues with C++ complaining about copy
-  // constructors and gave up. At the moment it's only wasting 3 words for non
-  // ValueRef data.
-  struct {
-    ValueDecl *ValueD = nullptr;
-    TypeDecl *CtorTyRef = nullptr;
-    ExtensionDecl *ExtTyRef = nullptr;
-    bool IsRef = true;
-    Type Ty;
-    Type ContainerType;
-    Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef = None;
-
-    bool IsKeywordArgument = false;
-    /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
-    bool IsDynamic = false;
-    /// If this is a dynamic ref, the types of the base (multiple in the case of
-    /// protocol composition).
-    SmallVector<NominalTypeDecl *> ReceiverTypes;
-    /// Declarations that were shadowed by \c ValueD using a shorthand syntax
-    /// that names both the newly declared variable and the referenced variable
-    /// by the same identifier in the source text. This includes shorthand
-    /// closure captures (`[foo]`) and shorthand if captures
-    /// (`if let foo {`). Ordered from innermost to outermost shadows.
-    ///
-    /// Decls that are shadowed using shorthand syntax should be reported as
-    /// additional cursor info results.
-    SmallVector<ValueDecl *> ShorthandShadowedDecls;
-  } ValueRefInfo;
-  struct {
-    ModuleEntity Mod;
-  } ModuleRefInfo;
-  struct {
-    Expr *TrailingExpr = nullptr;
-  } ExprStartInfo;
-  struct {
-    Stmt *TrailingStmt = nullptr;
-  } StmtStartInfo;
+protected:
+  ResolvedCursorInfo(CursorInfoKind Kind, SourceFile *SF, SourceLoc Loc)
+      : Kind(Kind), SF(SF), Loc(Loc) {}
 
 public:
   ResolvedCursorInfo() = default;
@@ -200,75 +162,85 @@ public:
   bool isInvalid() const { return Kind == CursorInfoKind::Invalid; }
 };
 
+typedef llvm::IntrusiveRefCntPtr<ResolvedCursorInfo> ResolvedCursorInfoPtr;
+
 struct ResolvedValueRefCursorInfo : public ResolvedCursorInfo {
-  // IMPORTANT: Don't add stored properties here. See comment on
-  // ResolvedCursorInfo.
+private:
+  ValueDecl *ValueD = nullptr;
+  TypeDecl *CtorTyRef = nullptr;
+  ExtensionDecl *ExtTyRef = nullptr;
+  bool IsRef = true;
+  Type Ty;
+  Type ContainerType;
+  Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef = None;
 
+  bool IsKeywordArgument = false;
+  /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
+  bool IsDynamic = false;
+  /// If this is a dynamic ref, the types of the base (multiple in the case of
+  /// protocol composition).
+  SmallVector<NominalTypeDecl *> ReceiverTypes;
+  /// Declarations that were shadowed by \c ValueD using a shorthand syntax
+  /// that names both the newly declared variable and the referenced variable
+  /// by the same identifier in the source text. This includes shorthand
+  /// closure captures (`[foo]`) and shorthand if captures
+  /// (`if let foo {`). Ordered from innermost to outermost shadows.
+  ///
+  /// Decls that are shadowed using shorthand syntax should be reported as
+  /// additional cursor info results.
+  SmallVector<ValueDecl *> ShorthandShadowedDecls;
+
+public:
   ResolvedValueRefCursorInfo() = default;
-  explicit ResolvedValueRefCursorInfo(const ResolvedCursorInfo &Base,
-                                      ValueDecl *ValueD, TypeDecl *CtorTyRef,
-                                      ExtensionDecl *ExtTyRef, bool IsRef,
-                                      Type Ty, Type ContainerType)
-      : ResolvedCursorInfo(Base) {
-    assert(Base.getKind() == CursorInfoKind::Invalid &&
-           "Can only specialize from invalid");
-    Kind = CursorInfoKind::ValueRef;
-    ValueRefInfo.ValueD = ValueD;
-    ValueRefInfo.CtorTyRef = CtorTyRef;
-    ValueRefInfo.ExtTyRef = ExtTyRef;
-    ValueRefInfo.IsRef = IsRef;
-    ValueRefInfo.Ty = Ty;
-    ValueRefInfo.ContainerType = ContainerType;
-  }
+  explicit ResolvedValueRefCursorInfo(
+      SourceFile *SF, SourceLoc Loc, ValueDecl *ValueD, TypeDecl *CtorTyRef,
+      ExtensionDecl *ExtTyRef, bool IsRef, Type Ty, Type ContainerType,
+      Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef,
+      bool IsKeywordArgument, bool IsDynamic,
+      SmallVector<NominalTypeDecl *> ReceiverTypes,
+      SmallVector<ValueDecl *> ShorthandShadowedDecls)
+      : ResolvedCursorInfo(CursorInfoKind::ValueRef, SF, Loc), ValueD(ValueD),
+        CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), IsRef(IsRef), Ty(Ty),
+        ContainerType(ContainerType), CustomAttrRef(CustomAttrRef),
+        IsKeywordArgument(IsKeywordArgument), IsDynamic(IsDynamic),
+        ReceiverTypes(ReceiverTypes),
+        ShorthandShadowedDecls(ShorthandShadowedDecls) {}
 
-  ValueDecl *getValueD() const { return ValueRefInfo.ValueD; }
-  void setValueD(ValueDecl *ValueD) { ValueRefInfo.ValueD = ValueD; }
+  ValueDecl *getValueD() const { return ValueD; }
 
-  ExtensionDecl *getExtTyRef() const { return ValueRefInfo.ExtTyRef; }
+  ExtensionDecl *getExtTyRef() const { return ExtTyRef; }
 
-  TypeDecl *getCtorTyRef() const { return ValueRefInfo.CtorTyRef; }
+  TypeDecl *getCtorTyRef() const { return CtorTyRef; }
 
-  bool isRef() const { return ValueRefInfo.IsRef; }
-  void setIsRef(bool IsRef) { ValueRefInfo.IsRef = IsRef; }
+  bool isRef() const { return IsRef; }
 
-  Type getType() const { return ValueRefInfo.Ty; }
+  Type getType() const { return Ty; }
 
-  Type getContainerType() const { return ValueRefInfo.ContainerType; }
-  void setContainerType(Type Ty) { ValueRefInfo.ContainerType = Ty; }
+  Type getContainerType() const { return ContainerType; }
 
-  bool isKeywordArgument() const { return ValueRefInfo.IsKeywordArgument; }
+  bool isKeywordArgument() const { return IsKeywordArgument; }
   void setIsKeywordArgument(bool IsKeywordArgument) {
-    ValueRefInfo.IsKeywordArgument = IsKeywordArgument;
+    this->IsKeywordArgument = IsKeywordArgument;
   }
 
-  bool isDynamic() const { return ValueRefInfo.IsDynamic; }
-  void setIsDynamic(bool IsDynamic) { ValueRefInfo.IsDynamic = IsDynamic; }
+  bool isDynamic() const { return this->IsDynamic; }
 
   ArrayRef<NominalTypeDecl *> getReceiverTypes() const {
-    return ValueRefInfo.ReceiverTypes;
-  }
-  void setReceiverTypes(const SmallVector<NominalTypeDecl *> &ReceiverTypes) {
-    ValueRefInfo.ReceiverTypes = ReceiverTypes;
+    return this->ReceiverTypes;
   }
 
   ArrayRef<ValueDecl *> getShorthandShadowedDecls() const {
-    return ValueRefInfo.ShorthandShadowedDecls;
+    return this->ShorthandShadowedDecls;
   };
   void setShorthandShadowedDecls(
       const SmallVector<ValueDecl *> &ShorthandShadowedDecls) {
-    ValueRefInfo.ShorthandShadowedDecls = ShorthandShadowedDecls;
+    this->ShorthandShadowedDecls = ShorthandShadowedDecls;
   };
 
-  ValueDecl *typeOrValue() {
-    return ValueRefInfo.CtorTyRef ? ValueRefInfo.CtorTyRef
-                                  : ValueRefInfo.ValueD;
-  }
+  ValueDecl *typeOrValue() { return CtorTyRef ? CtorTyRef : ValueD; }
 
   Optional<std::pair<const CustomAttr *, Decl *>> getCustomAttrRef() const {
-    return ValueRefInfo.CustomAttrRef;
-  }
-  void setCustomAttrRef(Optional<std::pair<const CustomAttr *, Decl *>> ref) {
-    ValueRefInfo.CustomAttrRef = ref;
+    return CustomAttrRef;
   }
 
   static bool classof(const ResolvedCursorInfo *Info) {
@@ -276,19 +248,18 @@ struct ResolvedValueRefCursorInfo : public ResolvedCursorInfo {
   }
 };
 
+typedef llvm::IntrusiveRefCntPtr<ResolvedValueRefCursorInfo>
+    ResolvedValueRefCursorInfoPtr;
+
 struct ResolvedModuleRefCursorInfo : public ResolvedCursorInfo {
-  // IMPORTANT: Don't add stored properties here. See comment on
-  // ResolvedCursorInfo.
+private:
+  ModuleEntity Mod;
 
-  ResolvedModuleRefCursorInfo(const ResolvedCursorInfo &Base, ModuleEntity Mod)
-      : ResolvedCursorInfo(Base) {
-    assert(Base.getKind() == CursorInfoKind::Invalid &&
-           "Can only specialize from invalid");
-    Kind = CursorInfoKind::ModuleRef;
-    ModuleRefInfo.Mod = Mod;
-  }
+public:
+  ResolvedModuleRefCursorInfo(SourceFile *SF, SourceLoc Loc, ModuleEntity Mod)
+      : ResolvedCursorInfo(CursorInfoKind::ModuleRef, SF, Loc), Mod(Mod) {}
 
-  ModuleEntity getMod() const { return ModuleRefInfo.Mod; }
+  ModuleEntity getMod() const { return Mod; }
 
   static bool classof(const ResolvedCursorInfo *Info) {
     return Info->getKind() == CursorInfoKind::ModuleRef;
@@ -296,19 +267,15 @@ struct ResolvedModuleRefCursorInfo : public ResolvedCursorInfo {
 };
 
 struct ResolvedExprStartCursorInfo : public ResolvedCursorInfo {
-  // IMPORTANT: Don't add stored properties here. See comment on
-  // ResolvedCursorInfo.
+private:
+  Expr *TrailingExpr = nullptr;
 
-  ResolvedExprStartCursorInfo(const ResolvedCursorInfo &Base,
-                              Expr *TrailingExpr)
-      : ResolvedCursorInfo(Base) {
-    assert(Base.getKind() == CursorInfoKind::Invalid &&
-           "Can only specialize from invalid");
-    Kind = CursorInfoKind::ExprStart;
-    ExprStartInfo.TrailingExpr = TrailingExpr;
-  }
+public:
+  ResolvedExprStartCursorInfo(SourceFile *SF, SourceLoc Loc, Expr *TrailingExpr)
+      : ResolvedCursorInfo(CursorInfoKind::ExprStart, SF, Loc),
+        TrailingExpr(TrailingExpr) {}
 
-  Expr *getTrailingExpr() const { return ExprStartInfo.TrailingExpr; }
+  Expr *getTrailingExpr() const { return TrailingExpr; }
 
   static bool classof(const ResolvedCursorInfo *Info) {
     return Info->getKind() == CursorInfoKind::ExprStart;
@@ -316,26 +283,20 @@ struct ResolvedExprStartCursorInfo : public ResolvedCursorInfo {
 };
 
 struct ResolvedStmtStartCursorInfo : public ResolvedCursorInfo {
-  // IMPORTANT: Don't add stored properties here. See comment on
-  // ResolvedCursorInfo.
+  Stmt *TrailingStmt = nullptr;
 
-  ResolvedStmtStartCursorInfo(const ResolvedCursorInfo &Base,
-                              Stmt *TrailingStmt)
-      : ResolvedCursorInfo(Base) {
-    assert(Base.getKind() == CursorInfoKind::Invalid &&
-           "Can only specialize from invalid");
-    Kind = CursorInfoKind::StmtStart;
-    StmtStartInfo.TrailingStmt = TrailingStmt;
-  }
+  ResolvedStmtStartCursorInfo(SourceFile *SF, SourceLoc Loc, Stmt *TrailingStmt)
+      : ResolvedCursorInfo(CursorInfoKind::StmtStart, SF, Loc),
+        TrailingStmt(TrailingStmt) {}
 
-  Stmt *getTrailingStmt() const { return StmtStartInfo.TrailingStmt; }
+  Stmt *getTrailingStmt() const { return TrailingStmt; }
 
   static bool classof(const ResolvedCursorInfo *Info) {
     return Info->getKind() == CursorInfoKind::StmtStart;
   }
 };
 
-void simple_display(llvm::raw_ostream &out, const ResolvedCursorInfo &info);
+void simple_display(llvm::raw_ostream &out, ResolvedCursorInfoPtr info);
 
 struct UnresolvedLoc {
   SourceLoc Loc;
