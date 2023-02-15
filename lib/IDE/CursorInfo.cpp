@@ -321,24 +321,25 @@ public:
       : IDEInspectionCallbacks(P), Consumer(Consumer),
         RequestedLoc(RequestedLoc) {}
 
-  std::unique_ptr<ResolvedCursorInfo>
-  getDeclResult(NodeFinderDeclResult *DeclResult, SourceFile *SrcFile,
-                NodeFinder &Finder) const {
+  ResolvedCursorInfoPtr getDeclResult(NodeFinderDeclResult *DeclResult,
+                                      SourceFile *SrcFile,
+                                      NodeFinder &Finder) const {
     typeCheckDeclAndParentClosures(DeclResult->getDecl());
-    auto CursorInfo = std::make_unique<ResolvedValueRefCursorInfo>(
-        ResolvedCursorInfo(SrcFile), DeclResult->getDecl(),
+    return new ResolvedValueRefCursorInfo(
+        SrcFile, RequestedLoc, DeclResult->getDecl(),
         /*CtorTyRef=*/nullptr,
         /*ExtTyRef=*/nullptr, /*IsRef=*/false, /*Ty=*/Type(),
-        /*ContainerType=*/Type());
-    CursorInfo->setLoc(RequestedLoc);
-    CursorInfo->setShorthandShadowedDecls(
+        /*ContainerType=*/Type(),
+        /*CustomAttrRef=*/None,
+        /*IsKeywordArgument=*/false,
+        /*IsDynamic=*/false,
+        /*ReceiverTypes=*/{},
         Finder.getShorthandShadowedDecls(DeclResult->getDecl()));
-    return CursorInfo;
   }
 
-  std::unique_ptr<ResolvedCursorInfo>
-  getExprResult(NodeFinderExprResult *ExprResult, SourceFile *SrcFile,
-                NodeFinder &Finder) const {
+  ResolvedCursorInfoPtr getExprResult(NodeFinderExprResult *ExprResult,
+                                      SourceFile *SrcFile,
+                                      NodeFinder &Finder) const {
     Expr *E = ExprResult->getExpr();
     DeclContext *DC = ExprResult->getDeclContext();
 
@@ -368,25 +369,26 @@ public:
     // Deliver results
 
     auto Res = Callback.getResults()[0];
-    auto CursorInfo = std::make_unique<ResolvedValueRefCursorInfo>(
-        ResolvedCursorInfo(SrcFile), Res.ReferencedDecl, /*CtorTyRef=*/nullptr,
-        /*ExtTyRef=*/nullptr, /*IsRef=*/true, /*Ty=*/Type(),
-        /*ContainerType=*/Res.BaseType);
-    CursorInfo->setLoc(RequestedLoc);
-    CursorInfo->setIsDynamic(Res.IsDynamicRef);
+    SmallVector<NominalTypeDecl *> ReceiverTypes;
     if (Res.IsDynamicRef && Res.BaseType) {
       if (auto ReceiverType = Res.BaseType->getAnyNominal()) {
-        CursorInfo->setReceiverTypes({ReceiverType});
+        ReceiverTypes = {ReceiverType};
       } else if (auto MT = Res.BaseType->getAs<AnyMetatypeType>()) {
         // Look through metatypes to get the nominal type decl.
         if (auto ReceiverType = MT->getInstanceType()->getAnyNominal()) {
-          CursorInfo->setReceiverTypes({ReceiverType});
+          ReceiverTypes = {ReceiverType};
         }
       }
     }
-    CursorInfo->setShorthandShadowedDecls(
+
+    return new ResolvedValueRefCursorInfo(
+        SrcFile, RequestedLoc, Res.ReferencedDecl,
+        /*CtorTyRef=*/nullptr,
+        /*ExtTyRef=*/nullptr, /*IsRef=*/true, /*Ty=*/Type(),
+        /*ContainerType=*/Res.BaseType,
+        /*CustomAttrRef=*/None,
+        /*IsKeywordArgument=*/false, Res.IsDynamicRef, ReceiverTypes,
         Finder.getShorthandShadowedDecls(Res.ReferencedDecl));
-    return CursorInfo;
   }
 
   void doneParsing(SourceFile *SrcFile) override {
@@ -399,7 +401,7 @@ public:
     if (!Result) {
       return;
     }
-    std::unique_ptr<ResolvedCursorInfo> CursorInfo;
+    ResolvedCursorInfoPtr CursorInfo;
     switch (Result->getKind()) {
     case NodeFinderResultKind::Decl:
       CursorInfo = getDeclResult(cast<NodeFinderDeclResult>(Result.get()),
@@ -411,7 +413,7 @@ public:
       break;
     }
     if (Result) {
-      Consumer.handleResults(*CursorInfo);
+      Consumer.handleResults(CursorInfo);
     }
   }
 };
