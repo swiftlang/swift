@@ -2987,11 +2987,10 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow(
     return nullptr;
 
   auto argExpr = asKnownExpr();
-  auto *li = dyn_cast<LoadExpr>(argExpr);
-  if (!li)
-    return nullptr;
+  if (auto *li = dyn_cast<LoadExpr>(argExpr))
+    argExpr = li->getSubExpr();
 
-  auto *lvExpr = ::findStorageReferenceExprForBorrow(li->getSubExpr());
+  auto *lvExpr = ::findStorageReferenceExprForBorrow(argExpr);
 
   // Claim the value of this argument if we found a storage reference that has a
   // move only base.
