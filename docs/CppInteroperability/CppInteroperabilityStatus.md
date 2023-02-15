@@ -171,9 +171,9 @@ Swift functions can be called from C++, with some restrictions. See this table f
 | Resilient / opaque enums     | Yes                                                      |
 | Copy and destroy semantics   | Yes                                                      |
 | Creation                     | Yes                                                      |
-| Enums with associated values | Partially: only support structs and enums                |
-| Enums with raw values        | Yes                                                       |
-| Indirect enums               | No                                                       |
+| Enums with associated values | POD, structs, enums and classes are supported            |
+| Enums with raw values        | Yes                                                      |
+| Indirect enums               | Partially; only extracting values from an indirect enum  |
 
 **Class types**
 

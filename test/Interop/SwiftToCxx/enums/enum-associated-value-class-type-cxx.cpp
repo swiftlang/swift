@@ -50,6 +50,11 @@ int main() {
         extracted.setX(5678);
         assert(extracted.getX() == 5678);
         assert(c.getX() == 5678);
+
+        auto e2 = e;
+        assert(e2.isC());
+        assert(e2.getC().getX() == 5678);
+        assert(getRetainCount(c) == 4);
     }
 
     assert(getRetainCount(c) == 1);

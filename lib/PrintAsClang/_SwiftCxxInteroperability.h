@@ -76,6 +76,8 @@ extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
 
+extern "C" void *_Nonnull swift_projectBox(void *_Nonnull) noexcept;
+
 SWIFT_INLINE_THUNK void *_Nonnull opaqueAlloc(size_t size,
                                               size_t align) noexcept {
 #if defined(_WIN32)

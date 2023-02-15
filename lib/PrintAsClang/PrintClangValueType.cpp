@@ -453,6 +453,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
               "metadata._0);\n";
         os << "  }\n";
+        // Print out helper function for initializeWithCopy
+        os << "  static inline void initializeWithCopy(char * _Nonnull "
+              "destStorage, char * _Nonnull srcStorage) {\n";
+        ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+            os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+        os << "    vwTable->initializeWithCopy(destStorage, srcStorage, "
+              "metadata._0);\n";
+        os << "  }\n";
         os << "};\n";
       });
 

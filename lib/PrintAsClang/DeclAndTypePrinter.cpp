@@ -428,6 +428,11 @@ private:
       return p1.second.tag < p2.second.tag;
     });
 
+    auto isIndirectCase = [&](EnumElementDecl *elementDecl) {
+      return elementDecl->isIndirect() ||
+             elementDecl->getParentEnum()->isIndirect();
+    };
+
     auto printIsFunction = [&](StringRef caseName, EnumDecl *ED) {
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
@@ -513,16 +518,45 @@ private:
                 paramType->getNominalOrBoundGenericNominal(), paramType);
             auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
 
+            if (isIndirectCase(elementDecl)) {
+              outOfLineOS << "    void ** _Nonnull refCountedBox = "
+                             "reinterpret_cast<void ** "
+                             "_Nonnull>(payloadFromDestruction);\n";
+              outOfLineOS
+                  << "    void * _Nonnull actualPayload = "
+                     "::swift::_impl::swift_projectBox(*refCountedBox);\n";
+            }
+
             if (auto knownCxxType =
                     owningPrinter.typeMapping.getKnownCxxTypeInfo(
                         objectTypeDecl)) {
               outOfLineOS << "    " << types[paramType] << " result;\n";
-              outOfLineOS << "    "
-                             "memcpy(&result, payloadFromDestruction, "
-                             "sizeof(result));\n";
+              outOfLineOS << "    ";
+
+              if (isIndirectCase(elementDecl)) {
+                outOfLineOS << "memcpy(&result, actualPayload, ";
+              } else {
+                outOfLineOS << "memcpy(&result, payloadFromDestruction, ";
+              }
+              outOfLineOS << "sizeof(result));\n";
+              if (isIndirectCase(elementDecl)) {
+                outOfLineOS
+                    << "    ::swift::_impl::swift_release(*refCountedBox);\n";
+              }
               outOfLineOS << "    return result;\n  ";
             } else {
-              outOfLineOS << "    return swift::";
+              if (isIndirectCase(elementDecl)) {
+                if (isa<ClassDecl>(objectTypeDecl)) {
+                  outOfLineOS << "    void * _Nonnull actualObject = "
+                                 "*reinterpret_cast<void ** "
+                                 "_Nonnull>(actualPayload);\n";
+                  outOfLineOS
+                      << "    ::swift::_impl::swift_retain(actualObject);\n";
+                }
+                outOfLineOS << "    auto toReturn = swift::";
+              } else {
+                outOfLineOS << "    return swift::";
+              }
               outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
               outOfLineOS << "::implClassFor<";
               outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
@@ -531,8 +565,12 @@ private:
               outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
               outOfLineOS << ">::type";
               if (isa<ClassDecl>(objectTypeDecl)) {
-                outOfLineOS << "::makeRetained(*reinterpret_cast<void "
-                               "**>(payloadFromDestruction));\n  ";
+                if (isIndirectCase(elementDecl)) {
+                  outOfLineOS << "::makeRetained(actualObject);\n";
+                } else {
+                  outOfLineOS << "::makeRetained(*reinterpret_cast<void "
+                                 "**>(payloadFromDestruction));\n  ";
+                }
               } else {
                 outOfLineOS
                     << "::returnNewValue([&](char * _Nonnull result) {\n";
@@ -544,9 +582,21 @@ private:
                     elementDecl->getParentEnum()->getModuleContext());
                 outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
                 outOfLineOS << ">::type";
-                outOfLineOS << "::initializeWithTake(result, "
-                               "payloadFromDestruction);\n";
+                if (isIndirectCase(elementDecl)) {
+                  outOfLineOS
+                      << "::initializeWithCopy(result, "
+                         "static_cast<char * _Nonnull>(actualPayload));\n";
+                } else {
+                  outOfLineOS << "::initializeWithTake(result, "
+                                 "payloadFromDestruction);\n";
+                }
                 outOfLineOS << "    });\n  ";
+              }
+
+              if (isIndirectCase(elementDecl)) {
+                outOfLineOS
+                    << "    ::swift::_impl::swift_release(*refCountedBox);\n";
+                outOfLineOS << "    return toReturn;\n";
               }
             }
           },
