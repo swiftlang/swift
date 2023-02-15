@@ -82,16 +82,22 @@ _swift_installCrashHandler()
 {
   stack_t ss;
 
-  // Install an alternate signal handling stack
-  ss.ss_flags = 0;
-  ss.ss_size = SIGSTKSZ;
-  ss.ss_sp = mmap(0, ss.ss_size, PROT_READ | PROT_WRITE,
-                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  if (ss.ss_sp == MAP_FAILED)
+  // See if an alternate signal stack already exists
+  if (sigaltstack(NULL, &ss) < 0)
     return errno;
 
-  if (sigaltstack(&ss, 0) < 0)
-    return errno;
+  if (ss.ss_sp == 0) {
+    // No, so set one up
+    ss.ss_flags = 0;
+    ss.ss_size = SIGSTKSZ;
+    ss.ss_sp = mmap(0, ss.ss_size, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (ss.ss_sp == MAP_FAILED)
+      return errno;
+
+    if (sigaltstack(&ss, NULL) < 0)
+      return errno;
+  }
 
   // Now register signal handlers
   struct sigaction sa;
@@ -102,13 +108,21 @@ _swift_installCrashHandler()
   }
 
   sa.sa_handler = NULL;
+  sa.sa_flags = SA_ONSTACK | SA_SIGINFO | SA_NODEFER;
+  sa.sa_sigaction = handle_fatal_signal;
 
   for (unsigned n = 0; n < lengthof(signalsToHandle); ++n) {
-    sa.sa_flags = SA_ONSTACK | SA_SIGINFO | SA_NODEFER;
-    sa.sa_sigaction = handle_fatal_signal;
+    struct sigaction osa;
 
-    if (sigaction(signalsToHandle[n], &sa, NULL) < 0)
+    // See if a signal handler for this signal is already installed
+    if (sigaction(signalsToHandle[n], NULL, &osa) < 0)
       return errno;
+
+    if (osa.sa_handler == SIG_DFL) {
+      // No, so install ours
+      if (sigaction(signalsToHandle[n], &sa, NULL) < 0)
+        return errno;
+    }
   }
 
   return 0;
