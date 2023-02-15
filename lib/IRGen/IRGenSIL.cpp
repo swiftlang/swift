@@ -3237,7 +3237,8 @@ static Alignment getStackAllocationAlignment(IRGenSILFunction &IGF,
 /// some other builtin.)
 static bool emitStackAllocBuiltinCall(IRGenSILFunction &IGF,
                                       swift::BuiltinInst *i) {
-  if (i->getBuiltinKind() == BuiltinValueKind::StackAlloc) {
+  if (i->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
+      i->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
     // Stack-allocate a buffer with the specified size/alignment.
     auto loc = i->getLoc().getSourceLoc();
     auto size = getStackAllocationSize(
