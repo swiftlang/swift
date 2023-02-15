@@ -2806,7 +2806,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     (void)evaluateOrDefault(
         ctx.evaluator,
         ExpandPeerMacroRequest{member},
-        false);
+        {});
 
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have

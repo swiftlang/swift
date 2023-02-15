@@ -1852,6 +1852,11 @@ public:
   }
 
   void visit(Decl *decl) {
+    // Visit auxiliary decls first.
+    decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
+      this->visit(auxiliaryDecl);
+    });
+
     if (auto *Stats = getASTContext().Stats)
       ++Stats->getFrontendCounters().NumDeclsTypechecked;
 

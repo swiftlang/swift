@@ -867,6 +867,15 @@ public:
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
 
+  using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
+
+  /// Iterate over the auxiliary declarations for this declaration,
+  /// invoking the given callback with each auxiliary decl.
+  ///
+  /// Auxiliary declarations can be property wrapper backing variables,
+  /// backing variables for 'lazy' vars, or peer macro expansions.
+  void visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const;
+
   using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
 
   /// Iterate over each attached macro with the given role, invoking the

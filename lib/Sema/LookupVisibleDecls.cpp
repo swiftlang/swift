@@ -616,7 +616,7 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
     (void)evaluateOrDefault(
         ctx.evaluator,
         ExpandPeerMacroRequest{member},
-        false);
+        {});
   }
 
   synthesizePropertyWrapperVariables(NTD);
