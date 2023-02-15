@@ -933,11 +933,12 @@ extension _StringObject {
     _internalInvariant(largeFastIsShared)
 #if _runtime(_ObjC)
     if largeIsCocoa {
-      return stableCocoaUTF8Pointer(cocoaObject)._unsafelyUnwrappedUnchecked
+      return withCocoaObject {
+        stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
+      }
     }
 #endif
-
-    return sharedStorage.start
+    return withSharedStorage { $0.start }
   }
 
   @usableFromInline
@@ -970,6 +971,7 @@ extension _StringObject {
     _ body: (__StringStorage) -> R
   ) -> R {
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    // FIXME: Do this properly.
     return body(nativeStorage)
 #else
     _internalInvariant(hasNativeStorage)
@@ -994,6 +996,21 @@ extension _StringObject {
   }
 
   @inline(__always)
+  internal func withSharedStorage<R>(
+    _ body: (__SharedStringStorage) -> R
+  ) -> R {
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    // FIXME: Do this properly.
+    return body(sharedStorage)
+#else
+    _internalInvariant(largeFastIsShared && !largeIsCocoa)
+    _internalInvariant(hasSharedStorage)
+    let unmanaged = Unmanaged<__SharedStringStorage>.fromOpaque(largeAddress)
+    return unmanaged._withUnsafeGuaranteedRef { body($0) }
+#endif
+  }
+
+  @inline(__always)
   internal var cocoaObject: AnyObject {
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     guard case .bridged(let object) = _variant else {
@@ -1004,6 +1021,22 @@ extension _StringObject {
     _internalInvariant(largeIsCocoa && !isImmortal)
     let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
     return unmanaged.takeUnretainedValue()
+#endif
+  }
+
+  /// Call `body` with the bridged Cocoa object in `self`, without retaining
+  /// it.
+  @inline(__always)
+  internal func withCocoaObject<R>(
+    _ body: (AnyObject) -> R
+  ) -> R {
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    // FIXME: Do this properly.
+    return body(cocoaObject)
+#else
+    _internalInvariant(largeIsCocoa && !isImmortal)
+    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unmanaged._withUnsafeGuaranteedRef { body($0) }
 #endif
   }
 
