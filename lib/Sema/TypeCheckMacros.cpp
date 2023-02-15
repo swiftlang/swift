@@ -460,7 +460,7 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
       auto *decl = expansion.dyn_cast<Decl *>();
       auto &ctx = decl->getASTContext();
       auto *macroDecl = evaluateOrDefault(ctx.evaluator,
-          ResolveMacroRequest{macroAttr, role, decl->getDeclContext()},
+          ResolveMacroRequest{macroAttr, decl->getDeclContext()},
           nullptr);
       if (!macroDecl)
         return false;
@@ -1206,9 +1206,9 @@ swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
 MacroDecl *
 ResolveMacroRequest::evaluate(Evaluator &evaluator,
                               UnresolvedMacroReference macroRef,
-                              MacroRoles roles,
                               DeclContext *dc) const {
   auto &ctx = dc->getASTContext();
+  auto roles = macroRef.getMacroRoles();
   auto foundMacros = TypeChecker::lookupMacros(
       dc, macroRef.getMacroName(), SourceLoc(), roles);
   if (foundMacros.empty())

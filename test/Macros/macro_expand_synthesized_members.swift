@@ -39,3 +39,14 @@ public struct MyString {}
 let myString = MyString("hello")
 print(MyString.RawValue.self)
 print(myString.rawValue)
+
+struct Base {
+  static func member() -> Base { .init() }
+}
+
+@attached(member) macro empty(
+  _ : Base
+) = #externalMacro(module: "MacroDefinition", type: "EmptyMacro")
+
+@empty(.member())
+struct TestMacroTypechecking {}
