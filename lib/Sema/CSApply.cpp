@@ -5365,7 +5365,12 @@ namespace {
       ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
       E->setMacroRef(macroRef);
 
-      if (E->getMacroRoles().contains(MacroRole::Expression) &&
+      // For now, only expand macro expansion expressions that fulfill
+      // `MacroRole::Expression` exactly. Freestanding code item macros
+      // have a `getMacroRoles()` value equal to `getFreestandingMacroRoles()`,
+      // which includes expression macros, and they are expanded in a separate
+      // request.
+      if (E->getMacroRoles() == MacroRole::Expression &&
           !cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
         if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
           E->setRewritten(newExpr);

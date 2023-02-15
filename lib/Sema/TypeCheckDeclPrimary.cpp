@@ -3782,7 +3782,7 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   MacroDecl *macro;
   if (auto *args = MED->getArgs()) {
     macro = evaluateOrDefault(
-        ctx.evaluator, ResolveMacroRequest{MED, MacroRole::Declaration, dc},
+        ctx.evaluator, ResolveMacroRequest{MED, dc},
         nullptr);
   }
   else {

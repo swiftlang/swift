@@ -698,7 +698,6 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
       // If this attribute resolves to a macro, index that.
       ASTContext &ctx = D->getASTContext();
       ResolveMacroRequest req{const_cast<CustomAttr *>(customAttr),
-                              getAttachedMacroRoles(),
                               D->getInnermostDeclContext()};
       if (auto macroDecl = evaluateOrDefault(ctx.evaluator, req, nullptr)) {
         Type macroRefType = macroDecl->getDeclaredInterfaceType();

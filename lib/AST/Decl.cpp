@@ -406,7 +406,7 @@ void Decl::forEachAttachedMacro(MacroRole role,
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
     auto *macroDecl = evaluateOrDefault(
         ctx.evaluator,
-        ResolveMacroRequest{customAttr, getAttachedMacroRoles(), dc},
+        ResolveMacroRequest{customAttr, dc},
         nullptr);
 
     if (!macroDecl)
