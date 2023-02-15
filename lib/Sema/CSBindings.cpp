@@ -1088,27 +1088,27 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
       if (!(contextualType && contextualType->is<FunctionType>()))
         return true;
 
-      auto *contextualFnType = contextualType->castTo<FunctionType>();
-      auto resultType = contextualFnType->getResult();
-      if (resultType->hasTypeVariable()) {
-        auto *typeVar = resultType->getAs<TypeVariableType>();
-        // If contextual result type is represented by an opaque type,
-        // it's a strong indication that body is self-contained, otherwise
-        // closure might rely on external types flowing into the body for
-        // disambiguation of `build{Partial}Block` or `buildFinalResult`
-        // calls.
-        if (!(typeVar && typeVar->getImpl().isOpaqueType()))
-          return true;
+      auto *contextualFnType =
+          CS.simplifyType(contextualType)->castTo<FunctionType>();
+      {
+        auto resultType = contextualFnType->getResult();
+        if (resultType->hasTypeVariable()) {
+          auto *typeVar = resultType->getAs<TypeVariableType>();
+          // If contextual result type is represented by an opaque type,
+          // it's a strong indication that body is self-contained, otherwise
+          // closure might rely on external types flowing into the body for
+          // disambiguation of `build{Partial}Block` or `buildFinalResult`
+          // calls.
+          if (!(typeVar && typeVar->getImpl().isOpaqueType()))
+            return true;
+        }
       }
 
-      auto *closureType = CS.getClosureType(closure);
-      // If closure has parameters, it has to be delayed to give
-      // them a chance to be resolved.
-      //
-      // Note: Since we have access to a contextual type here it should be
-      // possible to transform this check into - if some of the parameters
-      // have type variables (that means not-yet-resolved generic parameters).
-      if (closureType->getNumParams() != 0)
+      // If some of the closure parameters are unresolved, the conjunction
+      // has to be delayed to give them a chance to be inferred.
+      if (llvm::any_of(contextualFnType->getParams(), [](const auto &param) {
+            return param.getPlainType()->hasTypeVariable();
+          }))
         return true;
 
       // If conjunction references a single type variable (closure itself)
