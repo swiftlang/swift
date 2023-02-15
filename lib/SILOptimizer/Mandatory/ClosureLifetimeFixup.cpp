@@ -351,6 +351,8 @@ static SILInstruction *lookThroughRebastractionUsers(
         auto *user = use->getUser();
         if (onlyAffectsRefCount(user))
           continue;
+        if (isa<EndBorrowInst>(user))
+          continue;
         if (singleNonDebugNonRefCountUser) {
           return nullptr;
         }
@@ -371,6 +373,16 @@ static SILInstruction *lookThroughRebastractionUsers(
   if (auto *pa = dyn_cast<PartialApplyInst>(inst))
     return memoizeResult(inst, lookThroughRebastractionUsers(
                              getSingleNonDebugNonRefCountUser(pa), memoized));
+
+  // TODO: If the single user is a borrow, then generally the lifetime of that
+  // borrow ought to delineate the lifetime of the closure. But some codegen
+  // patterns in SILGen will try to notionally lifetime-extend the value by
+  // copying it and putting the lifetime on the copy. So look at the single
+  // user of the borrow, if any, to determine the lifetime this should have.
+  if (auto borrow = dyn_cast<BeginBorrowInst>(inst)) {
+    return memoizeResult(inst, lookThroughRebastractionUsers(
+                           getSingleNonDebugNonRefCountUser(borrow), memoized));
+  }
 
   return inst;
 }
@@ -715,8 +727,8 @@ static bool tryExtendLifetimeToLastUse(
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
     llvm::DenseSet<SILBasicBlock *> &unreachableBlocks,
     InstructionDeleter &deleter, const bool &modifiedCFG) {
-  // If there is a single user that is a borrow this is simple: extend the
-  // lifetime of the operand until the borrow ends.
+  // If there is a single user, this is simple: extend the
+  // lifetime of the operand until the use ends.
   auto *singleUser = lookThroughRebastractionUsers(cvt, memoized);
   if (!singleUser)
     return false;
