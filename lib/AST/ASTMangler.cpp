@@ -3804,7 +3804,7 @@ void ASTMangler::appendMacroExpansionContext(
     auto *macroDecl = evaluateOrDefault(
         ctx.evaluator,
         ResolveMacroRequest{const_cast<CustomAttr *>(attr),
-                            getAttachedMacroRoles(), outerExpansionDC},
+                            outerExpansionDC},
         nullptr);
     if (macroDecl)
       baseName = macroDecl->getBaseName();
@@ -3898,7 +3898,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   StringRef macroName;
   auto *macroDecl = evaluateOrDefault(
       decl->getASTContext().evaluator,
-      ResolveMacroRequest{attr, role, macroDeclContext},
+      ResolveMacroRequest{attr, macroDeclContext},
       nullptr);
   if (macroDecl)
     macroName = macroDecl->getName().getBaseName().userFacingName();
