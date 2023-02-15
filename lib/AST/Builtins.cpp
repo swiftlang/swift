@@ -2707,6 +2707,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getDeallocOperation(Context, Id);
 
   case BuiltinValueKind::StackAlloc:
+  case BuiltinValueKind::UnprotectedStackAlloc:
     return getStackAllocOperation(Context, Id);
   case BuiltinValueKind::StackDealloc:
     return getStackDeallocOperation(Context, Id);
