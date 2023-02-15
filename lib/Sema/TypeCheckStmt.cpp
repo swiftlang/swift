@@ -2171,7 +2171,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         if (auto Init = PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i)) {
             typeCheckPatternBinding(PBD, i,
-                                    /*LeaveClosureBodyUnchecked=*/true);
+                                    /*LeaveClosureBodyUnchecked=*/false);
             // Retrieve the accessor's body to trigger RecontextualizeClosures
             // This is important to get the correct USR of variables defined
             // in closures initializing lazy variables.
