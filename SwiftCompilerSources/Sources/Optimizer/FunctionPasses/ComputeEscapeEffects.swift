@@ -155,12 +155,12 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
   case .toReturn(let toPath):
     let exclusive = isExclusiveEscapeToReturn(fromArgument: arg, fromPath: argPath,
                                               toPath: toPath, returnInst: returnInst, context)
-    effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath, exclusive),
+    effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath: toPath, isExclusive: exclusive),
                                           argumentIndex: arg.index, pathPattern: argPath)
   case .toArgument(let toArgIdx, let toPath):
     // Exclusive argument -> argument effects cannot appear because such an effect would
     // involve a store which is not permitted for exclusive escapes.
-    effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgIdx, toPath, /*exclusive*/ false),
+    effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath, isExclusive: false),
                                           argumentIndex: arg.index, pathPattern: argPath)
   }
   newEffects.append(effect)
