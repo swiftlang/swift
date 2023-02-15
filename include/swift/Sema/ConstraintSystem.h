@@ -985,6 +985,11 @@ struct AppliedBuilderTransform {
   /// converted. Opaque types should be unopened.
   Type bodyResultType;
 
+  /// If transform is applied to a closure, this type represents
+  /// contextual type the closure is converted type (e.g. a parameter
+  /// type or or pattern type).
+  Type contextualType;
+
   /// The version of the original body with result builder applied
   /// as AST transformation.
   NullablePtr<BraceStmt> transformedBody;
@@ -5727,7 +5732,7 @@ public:
   Optional<TypeMatchResult>
   matchResultBuilder(AnyFunctionRef fn, Type builderType, Type bodyResultType,
                      ConstraintKind bodyResultConstraintKind,
-                     ConstraintLocatorBuilder locator);
+                     Type contextualType, ConstraintLocatorBuilder locator);
 
   /// Matches a wrapped or projected value parameter type to its backing
   /// property wrapper type by applying the property wrapper.
