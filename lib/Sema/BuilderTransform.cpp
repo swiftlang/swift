@@ -2311,6 +2311,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 
   if (auto result = cs.matchResultBuilder(
           func, builderType, resultContextType, resultConstraintKind,
+          /*contextualType=*/Type(),
           cs.getConstraintLocator(func->getBody()))) {
     if (result->isFailure())
       return nullptr;
@@ -2398,6 +2399,7 @@ Optional<ConstraintSystem::TypeMatchResult>
 ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
                                      Type bodyResultType,
                                      ConstraintKind bodyResultConstraintKind,
+                                     Type contextualType,
                                      ConstraintLocatorBuilder locator) {
   builderType = simplifyType(builderType);
   auto builder = builderType->getAnyNominal();
@@ -2522,6 +2524,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
 
     transformInfo.builderType = builderType;
     transformInfo.bodyResultType = bodyResultType;
+    transformInfo.contextualType = contextualType;
     transformInfo.transformedBody = transformedBody->second;
 
     // Record the transformation.
