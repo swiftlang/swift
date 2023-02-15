@@ -373,7 +373,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       } else if (entryValue->getType().is<SILBoxType>()) {
         // If we have a box with a noncopyable field, project it out.
         auto fieldTy = entryValue->getType().getSILBoxFieldType(&F, 0);
-        if (fieldTy.isMoveOnlyType()) {
+        if (fieldTy.isMoveOnly()) {
           SILValue addr = B.createProjectBox(vd, entryValue, 0);
           if (vd->isLet()) {
             addr = B.createMarkMustCheckInst(

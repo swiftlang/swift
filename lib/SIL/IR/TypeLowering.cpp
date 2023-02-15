@@ -120,7 +120,8 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
           var->getType(),
           TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
               expansion.getResilienceExpansion()));
-      if (lowering.getLoweredType().isMoveOnlyType())
+      if (lowering.getLoweredType().isMoveOnly()
+          && !capture.isNoEscape())
         return CaptureKind::Box;
       if (!lowering.isAddressOnly())
         return CaptureKind::Constant;

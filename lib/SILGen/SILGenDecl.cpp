@@ -491,7 +491,7 @@ public:
       // escaping closures do not consume lets.
       needsTemporaryBuffer =
           (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
-          lowering->getLoweredType().isMoveOnlyType();
+          lowering->getLoweredType().isMoveOnly();
     }
 
     // Make sure that we have a non-address only type when binding a

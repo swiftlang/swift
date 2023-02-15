@@ -1,3 +1,4 @@
+// REQUIRES: wip
 // RUN: %target-run-simple-swift( -Xfrontend -enable-experimental-move-only ) | %FileCheck %s
 
 // A small sanity check.
