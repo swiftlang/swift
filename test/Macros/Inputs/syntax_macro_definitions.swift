@@ -637,7 +637,7 @@ public struct AddCompletionHandler: PeerMacro {
       FunctionParameterSyntax(
         firstName: .identifier("completionHandler"),
         colon: .colonToken(trailingTrivia: .space),
-        type: "(\(resultType ?? "")) -> Void" as TypeSyntax
+        type: "@escaping (\(resultType ?? "")) -> Void" as TypeSyntax
       )
 
     // Add the completion handler parameter to the parameter list.
@@ -729,6 +729,84 @@ public struct AddCompletionHandler: PeerMacro {
       .with(\.leadingTrivia, .newlines(2))
 
     return [DeclSyntax(newFunc)]
+  }
+}
+
+public struct WrapInType: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+      throw CustomError.message("@wrapInType only applies to functions")
+    }
+
+    // Build a new function with the same signature that forwards arguments
+    // to the the original function.
+    let parameterList = funcDecl.signature.input.parameterList
+    let callArguments: [String] = try parameterList.map { param in
+      guard let argName = param.secondName ?? param.firstName else {
+        throw CustomError.message("@wrapInType argument must have a name")
+      }
+
+      if let paramName = param.firstName, paramName.text != "_" {
+        return "\(paramName.text): \(argName.text)"
+      }
+
+      return "\(argName.text)"
+    }
+
+    let call: ExprSyntax =
+      """
+      \(funcDecl.identifier)(\(raw: callArguments.joined(separator: ", ")))
+      """
+
+    // Drop the peer macro attribute from the new declaration.
+    let newAttributeList = AttributeListSyntax(
+      funcDecl.attributes?.filter {
+        guard case let .attribute(attribute) = $0,
+              let attributeType = attribute.attributeName.as(SimpleTypeIdentifierSyntax.self),
+              let nodeType = node.attributeName.as(SimpleTypeIdentifierSyntax.self)
+        else {
+          return true
+        }
+
+        return attributeType.name.text != nodeType.name.text
+      } ?? []
+    )
+
+    let method =
+      funcDecl
+      .with(
+        \.identifier,
+         "\(context.createUniqueName(funcDecl.identifier.text))"
+      )
+      .with(
+        \.signature,
+        funcDecl.signature
+      )
+      .with(
+        \.body,
+        CodeBlockSyntax(
+          leftBrace: .leftBraceToken(leadingTrivia: .space),
+          statements: CodeBlockItemListSyntax(
+            [CodeBlockItemSyntax(item: .expr(call))]
+          )
+          .with(\.leadingTrivia, [.newlines(1), .spaces(2)]),
+          rightBrace: .rightBraceToken(leadingTrivia: .newline)
+        )
+      )
+      .with(\.attributes, newAttributeList)
+
+    let structType: DeclSyntax =
+      """
+      struct \(context.createUniqueName(funcDecl.identifier.text)) {
+        \(method)
+      }
+      """
+
+    return [structType]
   }
 }
 

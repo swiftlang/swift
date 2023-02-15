@@ -2188,6 +2188,13 @@ public:
 
     SourceFileScope scope(SGM, sf);
     for (auto *D : sf->getTopLevelDecls()) {
+      // Emit auxiliary decls.
+      D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
+        FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
+                                        "SILgen-decl", auxiliaryDecl);
+        SGM.visit(auxiliaryDecl);
+      });
+
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                       "SILgen-decl", D);
       SGM.visit(D);
