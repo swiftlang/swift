@@ -883,6 +883,10 @@ public:
   /// declaration.
   void forEachAttachedMacro(MacroRole role, MacroCallback) const;
 
+  /// Returns the resolved macro for the given custom attribute
+  /// attached to this declaration.
+  MacroDecl *getResolvedMacro(CustomAttr *attr) const;
+
   /// Retrieve the discriminator for the given custom attribute that names
   /// an attached macro.
   unsigned getAttachedMacroDiscriminator(
