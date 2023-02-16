@@ -123,7 +123,7 @@ extension _StringGuts {
   // Whether this string has breadcrumbs
   internal var hasBreadcrumbs: Bool {
     return hasSharedStorage
-      || (hasNativeStorage && _object.nativeStorage.hasBreadcrumbs)
+      || (hasNativeStorage && _object.withNativeStorage { $0.hasBreadcrumbs })
   }
 }
 
@@ -249,12 +249,11 @@ extension _StringGuts {
   ) -> Int? {
     #if _runtime(_ObjC)
     // Currently, foreign  means NSString
-    if let res = _cocoaStringCopyUTF8(_object.cocoaObject,
-      into: UnsafeMutableRawBufferPointer(start: mbp.baseAddress,
-                                          count: mbp.count)) {
-      return res
+    let res = _object.withCocoaObject {
+      _cocoaStringCopyUTF8($0, into: UnsafeMutableRawBufferPointer(mbp))
     }
-    
+    if let res { return res }
+
     // If the NSString contains invalid UTF8 (e.g. unpaired surrogates), we
     // can get nil from cocoaStringCopyUTF8 in situations where a character by
     // character loop would get something more useful like repaired contents

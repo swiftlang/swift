@@ -328,7 +328,7 @@ SwiftInt SILType_isTuple(BridgedType type);
 SwiftInt SILType_isEnum(BridgedType type);
 bool SILType_isFunction(BridgedType type);
 bool SILType_isMetatype(BridgedType type);
-BridgedType SILType_instanceTypeOfMetatype(BridgedType type);
+BridgedType SILType_instanceTypeOfMetatype(BridgedType type, BridgedFunction function);
 BridgedDecl SILType_getNominal(BridgedType type);
 bool SILType_isOrContainsObjectiveCClass(BridgedType type);
 bool SILType_isCalleeConsumedFunction(BridgedType type);
