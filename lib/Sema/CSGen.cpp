@@ -3062,7 +3062,7 @@ namespace {
         Type packType;
         if (auto *elementExpr = getAsExpr<PackElementExpr>(pack)) {
           packType = CS.getType(elementExpr->getPackRefExpr());
-        } else if (auto *elementType = getAsTypeRepr<PackReferenceTypeRepr>(pack)) {
+        } else if (auto *elementType = getAsTypeRepr<PackElementTypeRepr>(pack)) {
           packType = CS.getType(elementType->getPackType());
         } else {
           llvm_unreachable("unsupported pack reference ASTNode");
