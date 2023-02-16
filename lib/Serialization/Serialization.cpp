@@ -2867,7 +2867,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto theAttr = cast<CustomAttr>(DA);
 
       // Macro attributes are not serialized.
-      if (theAttr->isAttachedMacro(D))
+      if (D->getResolvedMacro(const_cast<CustomAttr *>(theAttr)))
         return;
 
       auto typeID = S.addTypeRef(theAttr->getType());

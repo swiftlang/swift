@@ -1702,10 +1702,6 @@ public:
   bool isArgUnsafe() const;
   void setArgIsUnsafe(bool unsafe) { isArgUnsafeBit = unsafe; }
 
-  /// Whether this custom attribute is a macro attached to the given
-  /// declaration.
-  bool isAttachedMacro(const Decl *decl) const;
-
   Expr *getSemanticInit() const { return semanticInit; }
   void setSemanticInit(Expr *expr) { semanticInit = expr; }
 

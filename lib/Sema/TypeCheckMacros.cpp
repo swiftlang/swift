@@ -458,10 +458,7 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
         return true;
     } else if (auto *macroAttr = sourceFile->getAttachedMacroAttribute()) {
       auto *decl = expansion.dyn_cast<Decl *>();
-      auto &ctx = decl->getASTContext();
-      auto *macroDecl = evaluateOrDefault(ctx.evaluator,
-          ResolveMacroRequest{macroAttr, decl->getDeclContext()},
-          nullptr);
+      auto *macroDecl = decl->getResolvedMacro(macroAttr);
       if (!macroDecl)
         return false;
 

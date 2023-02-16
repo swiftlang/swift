@@ -2376,18 +2376,6 @@ bool CustomAttr::isArgUnsafe() const {
   return isArgUnsafeBit;
 }
 
-bool CustomAttr::isAttachedMacro(const Decl *decl) const {
-  auto &ctx = decl->getASTContext();
-  auto *dc = decl->getDeclContext();
-
-  auto *macroDecl = evaluateOrDefault(
-      ctx.evaluator,
-      ResolveMacroRequest{const_cast<CustomAttr *>(this), dc},
-      nullptr);
-
-  return macroDecl != nullptr;
-}
-
 MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,
                              MacroSyntax syntax, SourceLoc lParenLoc,
                              MacroRole role,
