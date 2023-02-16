@@ -2545,7 +2545,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     if (isDebugMode()) {
       auto &log = llvm::errs();
       auto indent = solverState ? solverState->getCurrentIndent() : 0;
-      log.indent(indent) << "------- Transfomed Body -------\n";
+      log.indent(indent) << "------- Transformed Body -------\n";
       transformedBody->second->dump(log, &getASTContext(), indent);
       log << '\n';
     }
