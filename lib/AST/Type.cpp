@@ -4387,9 +4387,6 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     return DependentMemberType::get(baseType, name);
   };
 
-  // If we don't have a substituted base type, fail.
-  if (!substBase) return failed();
-
   if (auto *selfType = substBase->getAs<DynamicSelfType>())
     substBase = selfType->getSelfType();
 
@@ -4690,9 +4687,6 @@ static Type substType(Type derivedType,
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
       auto newBase = substType(depMemTy->getBase(),
                                substitutions, lookupConformances, options);
-      if (!newBase)
-        return Type();
-      
       return getMemberForBaseType(lookupConformances,
                                   depMemTy->getBase(), newBase,
                                   depMemTy->getAssocType(),
