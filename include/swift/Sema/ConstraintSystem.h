@@ -6216,7 +6216,7 @@ public:
     this->locator = cs.getConstraintLocator(locator);
   }
 
-  Type operator()(Type packType, PackReferenceTypeRepr *packRepr) const {
+  Type operator()(Type packType, PackElementTypeRepr *packRepr) const {
     // Only assert we have an element environment when invoking the function
     // object. In cases where pack elements are referenced outside of a
     // pack expansion, type resolution will error before opening the pack

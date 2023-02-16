@@ -3211,8 +3211,8 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitPackReferenceTypeRepr(PackReferenceTypeRepr *T) {
-    printCommon("pack_reference");
+  void visitPackElementTypeRepr(PackElementTypeRepr *T) {
+    printCommon("pack_element");
     printRec(T->getPackType());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
