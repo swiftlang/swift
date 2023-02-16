@@ -220,3 +220,30 @@ bb0:
   return %4 : $Builtin.Int1
 }
 
+// CHECK-LABEL: sil @same_function_metatype
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_function_metatype'
+sil @same_function_metatype : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int) -> Bool).Type
+  %1 = metatype $@thick ((Int) -> Bool).Type
+  %2 = init_existential_metatype %0 : $@thick ((Int) -> Bool).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick ((Int) -> Bool).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @different_function_metatype
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'different_function_metatype'
+sil @different_function_metatype : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int) -> Bool).Type
+  %1 = metatype $@thick ((Float) -> Bool).Type
+  %2 = init_existential_metatype %0 : $@thick ((Int) -> Bool).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick ((Float) -> Bool).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
