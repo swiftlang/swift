@@ -354,7 +354,7 @@ func expandAttachedMacro(
     discriminator: discriminator
   )
 
-  let macroName = customAttrNode.attributeName.description
+  let macroName = customAttrNode.attributeName.trimmedDescription
   var evaluatedSyntaxStr: String
   do {
     switch (macro, macroRole) {
