@@ -1044,6 +1044,10 @@ def parse_stdlib : Flag<["-"], "parse-stdlib">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
 
+def enable_builtin_module : Flag<["-"], "enable-builtin-module">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Enables the explicit import of the Builtin module">;
+
 def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
 
 class ModeOpt : Group<modes_Group>;
