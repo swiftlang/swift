@@ -1753,4 +1753,11 @@ def load_plugin_library:
            "macros">,
   MetaVarName<"<path>">;
 
+def load_plugin_executable:
+  Separate<["-"], "load-plugin-executable">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to an executable compiler plugins and providing module names "
+           "such as macros">,
+  MetaVarName<"<path>#<module-names>">;
+
 include "FrontendOptions.td"
