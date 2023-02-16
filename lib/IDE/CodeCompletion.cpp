@@ -1507,6 +1507,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     Lookup.deliverResults(CurDeclContext, DotLoc, CompletionContext, Consumer);
     return true;
   }
+  case CompletionKind::PostfixExprParen:
   case CompletionKind::CallArg: {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
@@ -1692,6 +1693,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AccessorBeginning:
   case CompletionKind::CaseStmtBeginning:
+  case CompletionKind::PostfixExprParen:
     llvm_unreachable("should be already handled");
     return;
 
@@ -1709,45 +1711,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     }
     Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
     Lookup.getPostfixKeywordCompletions(*ExprType, ParsedExpr);
-    break;
-  }
-
-  case CompletionKind::PostfixExprParen: {
-    Lookup.setHaveLParen(true);
-
-    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-
-    if (ShouldCompleteCallPatternAfterParen) {
-      ExprContextInfo ParentContextInfo(CurDeclContext, ParsedExpr);
-      Lookup.setExpectedTypes(
-          ParentContextInfo.getPossibleTypes(),
-          ParentContextInfo.isImplicitSingleExpressionReturn());
-      if (!ContextInfo.getPossibleCallees().empty()) {
-        for (auto &typeAndDecl : ContextInfo.getPossibleCallees())
-          Lookup.tryFunctionCallCompletions(typeAndDecl.Type, typeAndDecl.Decl,
-                                            typeAndDecl.SemanticContext);
-      } else if (ExprType && ((*ExprType)->is<AnyFunctionType>() ||
-                              (*ExprType)->is<AnyMetatypeType>())) {
-        Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
-      }
-    } else {
-      // Add argument labels, then fallthrough to get values.
-      Lookup.addCallArgumentCompletionResults(ContextInfo.getPossibleParams());
-    }
-
-    if (!Lookup.FoundFunctionCalls ||
-        (Lookup.FoundFunctionCalls &&
-         Lookup.FoundFunctionsWithoutFirstKeyword)) {
-      Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                              ContextInfo.isImplicitSingleExpressionReturn());
-      Lookup.setHaveLParen(false);
-
-      // Add any keywords that can be used in an argument expr position.
-      addSuperKeyword(CompletionContext.getResultSink(), CurDeclContext);
-      addExprKeywords(CompletionContext.getResultSink(), CurDeclContext);
-
-      DoPostfixExprBeginning();
-    }
     break;
   }
 

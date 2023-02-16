@@ -221,7 +221,7 @@ class C3 {
 // OVERLOAD6-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#(a1): C1#}, {#b1: C2#}[')'][#Void#]; name=:b1:
 // OVERLOAD6-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#a2: C2#}, {#b2: C1#}[')'][#Void#]; name=a2:b2:
 // OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: C1I[#C1#]; name=C1I
-// OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
+// OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: C2I[#C2#]; name=C2I
 
 extension C3 {
   func hasError(a1: C1, b1: TypeInvalid) -> Int {}
@@ -234,7 +234,7 @@ extension C3 {
   }
 }
 
-// HASERROR1-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#a1: C1#}, {#b1: <<error type>>#}[')'][#Int#];
+// HASERROR1-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#a1: C1#}, {#b1: _#}[')'][#Int#];
 
 // HASERROR2-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: C1I[#C1#];
 // HASERROR2-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#];
@@ -426,8 +426,8 @@ class Bar {
 func curry<T1, T2, R>(_ f: @escaping (T1, T2) -> R) -> (T1) -> (T2) -> R {
   return { t1 in { t2 in f(#^NESTED_CLOSURE^#, t2) } }
   // FIXME: Should be '/TypeRelation[Invalid]: t2[#T2#]'
-  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2; name=t2
-  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t1; name=t1
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:                           t2[#T2#]; name=t2
+  // NESTED_CLOSURE: Decl[LocalVar]/Local/TypeRelation[Convertible]: t1[#T1#]; name=t1
 }
 
 func trailingClosureLocal(x: Int, fn: (Int) -> Void) {
@@ -554,8 +554,8 @@ func testStaticMemberCall() {
 // STATIC_METHOD_AFTERPAREN_1: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
 
   let _ = TestStaticMemberCall.create2(#^STATIC_METHOD_AFTERPAREN_2^#)
-// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
-// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
+// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#(arg1): Int#}[')'][#TestStaticMemberCall#];
+// STATIC_METHOD_AFTERPAREN_2-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#(arg1): Int#}, {#arg2: Int#}, {#arg3: Int#}, {#arg4: Int#}[')'][#TestStaticMemberCall#];
 // STATIC_METHOD_AFTERPAREN_2-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem/TypeRelation[Convertible]: Int[#Int#];
 // STATIC_METHOD_AFTERPAREN_2-DAG: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#];
 
@@ -600,9 +600,8 @@ func testImplicitMember() {
 // IMPLICIT_MEMBER_SKIPPED: Pattern/Local/Flair[ArgLabels]: {#arg4: Int#}[#Int#];
 
   let _: TestStaticMemberCall = .createOverloaded(#^IMPLICIT_MEMBER_OVERLOADED^#)
-// IMPLICIT_MEMBER_OVERLOADED: Begin completions, 2 items
+// IMPLICIT_MEMBER_OVERLOADED: Begin completions, 1 item
 // IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#arg1: Int#}[')'][#TestStaticMemberCall#]; name=arg1:
-// IMPLICIT_MEMBER_OVERLOADED: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#arg1: String#}[')'][#String#]; name=arg1:
 }
 func testImplicitMemberInArrayLiteral() {
   struct Receiver {
@@ -664,7 +663,7 @@ struct TestHasErrorAutoclosureParam {
   func test() {
     hasErrorAutoclosureParam(#^PARAM_WITH_ERROR_AUTOCLOSURE^#
 // PARAM_WITH_ERROR_AUTOCLOSURE: Begin completions, 1 items
-// PARAM_WITH_ERROR_AUTOCLOSURE: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#value: <<error type>>#}[')'][#Void#];
+// PARAM_WITH_ERROR_AUTOCLOSURE: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#value: _#}[')'][#Void#];
   }
 }
 
@@ -1281,8 +1280,8 @@ extension Rdar89773376 {
 func testRdar89773376(arry: [Int]) {
   arry.map { Rdar89773376(#^RDAR89773376^#) }
 // RDAR89773376: Begin completions, 2 items
-// RDAR89773376-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#string: String#}[')'][#Rdar89773376#];
-// RDAR89773376-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#intVal: Int#}[')'][#Rdar89773376#];
+// RDAR89773376-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#string: String#}[')'][#Rdar89773376#];
+// RDAR89773376-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#intVal: Int#}[')'][#Rdar89773376#];
 }
 
 // This is an incomplete macro definition but it's sufficient to get the signature for code completion purposes

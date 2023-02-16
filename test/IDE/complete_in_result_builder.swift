@@ -40,20 +40,20 @@ func testGlobalLookup() {
 
   @TupleBuilder<String> var x2 {
     if true {
-      #^GLOBAL_LOOKUP_IN_IF_BODY?check=GLOBAL_LOOKUP_NO_TYPE_RELATION^#
-// GLOBAL_LOOKUP_NO_TYPE_RELATION: Decl[GlobalVar]/CurrModule:         MyConstantString[#String#];
+      #^GLOBAL_LOOKUP_IN_IF_BODY^#
+// GLOBAL_LOOKUP_IN_IF_BODY: Decl[GlobalVar]/CurrModule:         MyConstantString[#String#];
     }
   }
 
   @TupleBuilder<String> var x3 {
     if {
-      #^GLOBAL_LOOKUP_IN_IF_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP_NO_TYPE_RELATION^#
+      #^GLOBAL_LOOKUP_IN_IF_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP_IN_IF_BODY^#
     }
   }
 
   @TupleBuilder<String> var x4 {
     guard else {
-      #^GLOBAL_LOOKUP_IN_GUARD_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP_NO_TYPE_RELATION^#
+      #^GLOBAL_LOOKUP_IN_GUARD_BODY_WITHOUT_CONDITION?check=GLOBAL_LOOKUP_IN_IF_BODY^#
     }
   }
 
@@ -85,7 +85,7 @@ func testStaticMemberLookup() {
   }
 
   @TupleBuilder<String> var x3 {
-    "hello: \(StringFactory.#^COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL?xfail=rdar106720628^#)"
+    "hello: \(StringFactory.#^COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL^#)"
 // COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: Begin completions
 // COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]:     makeString({#x: String#})[#String#];
 // COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: End completions
@@ -135,7 +135,7 @@ func testCompleteFunctionArgumentLabels() {
   @TupleBuilder<String> var x1 {
     StringFactory.makeString(#^FUNCTION_ARGUMENT_LABEL^#)
     // FUNCTION_ARGUMENT_LABEL: Begin completions, 1 item
-    // FUNCTION_ARGUMENT_LABEL: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#x: String#}[')'][#String#];
+    // FUNCTION_ARGUMENT_LABEL: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#x: String#}[')'][#String#];
   }
 }
 
