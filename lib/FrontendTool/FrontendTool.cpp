@@ -1269,11 +1269,10 @@ static bool performAction(CompilerInstance &Instance,
                           int &ReturnValue,
                           FrontendObserver *observer) {
   const auto &opts = Instance.getInvocation().getFrontendOptions();
-  auto &Context = Instance.getASTContext();
   switch (Instance.getInvocation().getFrontendOptions().RequestedAction) {
   // MARK: Trivial Actions
   case FrontendOptions::ActionType::NoneAction:
-    return Context.hadError();
+    return Instance.getASTContext().hadError();
   case FrontendOptions::ActionType::PrintVersion:
     return printSwiftVersion(Instance.getInvocation());
   case FrontendOptions::ActionType::PrintFeature:
@@ -1332,7 +1331,7 @@ static bool performAction(CompilerInstance &Instance,
         }, /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::DumpInterfaceHash:
     getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
-    return Context.hadError();
+    return Instance.getASTContext().hadError();
   case FrontendOptions::ActionType::EmitImportedModules:
     return emitImportedModules(Instance.getMainModule(), opts);
 
@@ -1372,7 +1371,7 @@ static bool performAction(CompilerInstance &Instance,
   }
 
   assert(false && "Unhandled case in performCompile!");
-  return Context.hadError();
+  return Instance.getASTContext().hadError();
 }
 
 /// Performs the compile requested by the user.

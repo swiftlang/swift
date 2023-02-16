@@ -14,7 +14,7 @@
 
 func testThrownError() {
   let name = "hello"
-  #myWarning(name) // expected-error{{#myWarning macro requires a string literal (from macro 'myWarning')}}
+  #myWarning (name) // expected-error{{#myWarning macro requires a string literal (from macro 'myWarning')}}
 
   #myWarning("experimental features ahead") // expected-warning{{experimental features ahead}}
 }
