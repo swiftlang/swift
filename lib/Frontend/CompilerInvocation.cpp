@@ -1809,16 +1809,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     return true;
   }
 
-  if (Args.hasArg(OPT_enable_experimental_move_only) &&
-      !enableLexicalLifetimesFlag.value_or(true)) {
-    // Error if move-only is enabled and lexical lifetimes--on which it
-    // depends--has been disabled.
-    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
-                   "enable-experimental-move-only",
-                   "enable-lexical-lifetimes=false");
-    return true;
-  }
-
   // Unless overridden below, enabling copy propagation means enabling lexical
   // lifetimes.
   if (Opts.CopyPropagation == CopyPropagationOption::On) {
