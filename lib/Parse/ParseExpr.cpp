@@ -1433,7 +1433,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       assert(activeElements.size() == 1 && activeElements[0].is<Expr *>());
       auto expr = activeElements[0].get<Expr *>();
       ParserStatus status(ICD);
-      if (SourceMgr.rangeContainsIDEInspectionTarget(expr->getSourceRange()) &&
+      auto charRange = Lexer::getCharSourceRangeFromSourceRange(
+          SourceMgr, expr->getSourceRange());
+      if (SourceMgr.rangeContainsIDEInspectionTarget(charRange) &&
           L->isCodeCompletion())
         status.setHasCodeCompletion();
       hasBindOptional |= exprsWithBindOptional.contains(expr);
@@ -2826,7 +2828,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SmallVector<ASTNode, 4> bodyElements;
   Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
 
-  if (SourceMgr.rangeContainsIDEInspectionTarget({leftBrace, PreviousLoc})) {
+  if (SourceMgr.rangeContainsIDEInspectionTarget(
+          Lexer::getCharSourceRangeFromSourceRange(SourceMgr,
+                                                   {leftBrace, PreviousLoc}))) {
     // Ignore 'IDEInspectionDelayedDeclState' inside closures.
     // Completions inside functions body inside closures at top level should
     // be considered top-level completions.
