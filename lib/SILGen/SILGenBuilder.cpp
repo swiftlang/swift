@@ -1002,3 +1002,10 @@ ManagedValue SILGenBuilder::emitCopyValueOperation(SILLocation loc,
     return value;
   return SGF.emitManagedRValueWithCleanup(cvi);
 }
+
+void SILGenBuilder::emitCopyAddrOperation(SILLocation loc, SILValue srcAddr,
+                                          SILValue destAddr, IsTake_t isTake,
+                                          IsInitialization_t isInitialize) {
+  auto &lowering = getTypeLowering(srcAddr->getType());
+  lowering.emitCopyInto(*this, loc, srcAddr, destAddr, isTake, isInitialize);
+}
