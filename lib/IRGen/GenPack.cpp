@@ -689,9 +689,8 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
     auto response = IGF.emitTypeMetadataRef(ty, request);
     auto *metadata = response.getMetadata();
     for (auto protocol : protocols) {
-      llvm::Value *_metadata = nullptr;
       auto *wtable =
-          emitWitnessTableRef(IGF, ty, /*srcMetadataCache=*/&_metadata,
+          emitWitnessTableRef(IGF, ty, /*srcMetadataCache=*/&metadata,
                               ProtocolConformanceRef(protocol));
       wtables.push_back(wtable);
     }
