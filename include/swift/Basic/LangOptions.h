@@ -171,9 +171,6 @@ namespace swift {
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
-    /// Only check the availability of the API, ignore function bodies.
-    bool CheckAPIAvailabilityOnly = false;
-
     /// Causes the compiler to use weak linkage for symbols belonging to
     /// declarations introduced at the deployment target.
     bool WeakLinkAtTarget = false;

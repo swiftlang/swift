@@ -2052,9 +2052,6 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    if (!shouldCheckAvailability(PBD->getAnchoringVarDecl(0)))
-      return;
-
     llvm::DenseSet<const VarDecl *> seenVars;
     for (auto idx : range(PBD->getNumPatternEntries())) {
       PBD->getPattern(idx)->forEachNode([&](const Pattern *P) {
@@ -2351,22 +2348,5 @@ void swift::checkAccessControl(Decl *D) {
   if (where.isImplicit())
     return;
 
-  if (!shouldCheckAvailability(D))
-    return;
-
   DeclAvailabilityChecker(where).visit(D);
-}
-
-bool swift::shouldCheckAvailability(const Decl *D) {
-  if (D && D->getASTContext().LangOpts.CheckAPIAvailabilityOnly) {
-    // Skip whole decl if not API-public.
-    if (auto valueDecl = dyn_cast<const ValueDecl>(D)) {
-      AccessScope scope =
-        valueDecl->getFormalAccessScope(/*useDC*/nullptr,
-                                        /*treatUsableFromInlineAsPublic*/true);
-      if (!scope.isPublic())
-        return false;
-    }
-  }
-  return true;
 }

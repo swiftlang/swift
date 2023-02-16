@@ -256,11 +256,6 @@ bool ArgsToFrontendOptionsConverter::convert(
       Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
       return true;
     }
-
-    if (Args.hasArg(OPT_check_api_availability_only)) {
-      Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_checking_api_availability_only);
-      return true;
-    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_module_abi_name))
