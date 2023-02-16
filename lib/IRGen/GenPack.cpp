@@ -646,7 +646,7 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
     ArrayRef<ProtocolDecl *> protocols, llvm::Value *index,
     DynamicMetadataRequest request,
     llvm::SmallVectorImpl<llvm::Value *> &wtables) {
-  // If the packs have already been materialized, just gep into it.
+  // If the packs have already been materialized, just gep into them.
   auto materializedMetadataPack =
       tryGetLocalPackTypeMetadata(IGF, packType, request);
   llvm::SmallVector<llvm::Value *> materializedWtablePacks;
