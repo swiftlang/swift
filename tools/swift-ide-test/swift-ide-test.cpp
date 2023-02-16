@@ -852,18 +852,176 @@ SerializedPathObfuscate("serialized-path-obfuscate", llvm::cl::desc("Path to acc
 
 } // namespace options
 
+struct CompletionTestToken {
+  unsigned Line;
+  unsigned Column;
+  unsigned Offset;
+  StringRef Name;
+  SmallVector<StringRef, 1> CheckPrefixes;
+  StringRef Skip;
+  StringRef Xfail;
+  Optional<bool> IncludeKeywords = None;
+  Optional<bool> IncludeComments = None;
+
+  CompletionTestToken(unsigned Line, unsigned Column, unsigned Offset)
+      : Line(Line), Column(Column), Offset(Offset){};
+
+  static bool isStartOfToken(const char *Ptr) {
+    return Ptr[0] == '#' && Ptr[1] == '^';
+  }
+
+  static bool isEndOfToken(const char *Ptr) {
+    return Ptr[0] == '^' && Ptr[1] == '#';
+  }
+
+  static bool isValidTokenChar(char Chr) {
+    return (Chr >= 'A' && Chr <= 'Z') || (Chr >= 'a' && Chr <= 'z') ||
+           (Chr >= '0' && Chr <= '9') || Chr == '_' || Chr == '-' || Chr == '.';
+  }
+
+  static bool parseBooleanValue(StringRef Value, bool &Result,
+                                std::string &Error) {
+    if (Value.empty() || Value == "true" || Value == "1") {
+      Result = true;
+      return false;
+    }
+    if (Value == "false" || Value == "0") {
+      Result = false;
+      return false;
+    }
+
+    Error = "invalid value for keywords";
+    return true;
+  }
+
+  // #^TOKEN_NAME?check-prefix=CHECK1,CHECK2&keywords=1&comments=true^#
+  static bool parse(const char *&InputPtr, CompletionTestToken &Result,
+                    std::string &Error) {
+    auto Ptr = InputPtr;
+    assert(isStartOfToken(Ptr));
+    Ptr += 2;
+
+    // Parse the token name.
+    auto NameStart = Ptr;
+    while (isValidTokenChar(*Ptr)) { ++Ptr; }
+    Result.Name = StringRef(NameStart, Ptr - NameStart);
+
+    // Parse optional query string.
+    if (*Ptr == '?') {
+      ++Ptr;
+      auto QueryStart = Ptr;
+      while (!isEndOfToken(Ptr) && *Ptr != 0 && *Ptr != '\n' && *Ptr != '\r')
+        ++Ptr;
+      StringRef QueryString(QueryStart, Ptr - QueryStart);
+
+      while (!QueryString.empty()) {
+        StringRef Query, Key, Value;
+        std::tie(Query, QueryString) = QueryString.split(';');
+        std::tie(Key, Value) = Query.split('=');
+
+        if (Key == "check") {
+          // This value is passed to 'FileCheck --check-prefixes' as is.
+          Result.CheckPrefixes.push_back(Value);
+          continue;
+        }
+        if (Key == "keywords") {
+          Result.IncludeKeywords.emplace();
+          if (parseBooleanValue(Value, *Result.IncludeKeywords, Error))
+            return true;
+          continue;
+        }
+        if (Key == "comments") {
+          Result.IncludeComments.emplace();
+          if (parseBooleanValue(Value, *Result.IncludeComments, Error))
+            return true;
+          continue;
+        }
+        if (Key == "skip") {
+          Result.Skip = Value;
+          continue;
+        }
+        if (Key == "xfail") {
+          Result.Xfail = Value;
+          continue;
+        }
+        Error = "unknown option (" + Key.str() + ") for token";
+        return true;
+      }
+    }
+
+    // Default check prefix is the token name.
+    if (Result.CheckPrefixes.empty())
+      Result.CheckPrefixes.push_back(Result.Name);
+
+    // Tokens must end with '^#'.
+    if (!isEndOfToken(Ptr)) {
+      Error = "expected '^#' at the end of completion token";
+      return true;
+    }
+
+    InputPtr = Ptr + 2;
+    return false;;
+  }
+};
+
 static std::unique_ptr<llvm::MemoryBuffer>
 removeCodeCompletionTokens(llvm::MemoryBuffer *Input,
-                           StringRef TokenName,
-                           unsigned *CodeCompletionOffset) {
-  std::string CleanFile =
-      ide::removeCodeCompletionTokens(Input->getBuffer(),
-                                      TokenName,
-                                      CodeCompletionOffset);
-  return std::unique_ptr<llvm::MemoryBuffer>(
-      llvm::MemoryBuffer::getMemBufferCopy(CleanFile,
-                                           Input->getBufferIdentifier()));
+                           SmallVectorImpl<CompletionTestToken> &Tokens,
+                           std::string &Error) {
+  const char *Start = Input->getBufferStart();
+  const char *End = Input->getBufferEnd();
+  assert(*End == 0 && "buffer must be nul terminated");
+
+  std::string Out;
+  Out.reserve(Input->getBufferSize());
+
+  llvm::StringSet<> seenTokenName;
+  const char *Ptr = Start;
+  const char *SegmentStart = Ptr;
+  unsigned Removed = 0;
+  unsigned Line = 1;
+  unsigned Column = 1;
+  while (Ptr != End) {
+    if (CompletionTestToken::isStartOfToken(Ptr)) {
+      Out.append(SegmentStart, Ptr - SegmentStart);
+
+      // Emplace a token with the offset, and parse it.
+      const char *TokenStart = Ptr;
+      Tokens.emplace_back(Line, Column, Ptr - Start - Removed);
+      if (CompletionTestToken::parse(Ptr, Tokens.back(), Error)) {
+        Error = "while parsing a token at " +
+                (llvm::utostr(Line) + ":" + llvm::utostr(Column)) + ": " +
+                Error;
+        return nullptr;
+      }
+
+      if (!seenTokenName.insert(Tokens.back().Name).second) {
+        Error = "Duplicated token name '" + Tokens.back().Name.str() +
+                "' at " + (llvm::utostr(Line) + ":" + llvm::utostr(Column));
+        return nullptr;
+      }
+
+      auto TokLen =  Ptr - TokenStart;
+      SegmentStart = Ptr;
+      Removed += TokLen;
+      Column += TokLen;
+      continue;
+    }
+    if (*Ptr == '\r' || *Ptr == '\n') {
+      Ptr += (Ptr[0] == '\r' && Ptr[1] == '\n') ? 2 : 1;
+      Line += 1;
+      Column = 1;
+      continue;
+    }
+    ++Ptr;
+    ++Column;
+  }
+  Out.append(SegmentStart, Ptr - SegmentStart);
+
+  return llvm::MemoryBuffer::getMemBufferCopy(Out,
+                                              Input->getBufferIdentifier());
 }
+
 
 /// Returns true on error
 static bool setBufferForFile(StringRef SourceFilename,
@@ -904,10 +1062,21 @@ static bool performWithCompletionLikeOperationParams(
   if (setBufferForFile(SourceFilename, FileBuf))
     return true;
 
-  unsigned Offset;
+  SmallVector<CompletionTestToken> Tokens;
+  std::string Error;
+  auto CleanFile = removeCodeCompletionTokens(FileBuf.get(), Tokens, Error);
+  if (!CleanFile) {
+    llvm::errs() << "error: " << Error << '\n';
+    return true;
+  }
 
-  std::unique_ptr<llvm::MemoryBuffer> CleanFile(removeCodeCompletionTokens(
-      FileBuf.get(), CodeCompletionToken, &Offset));
+  unsigned Offset = ~0U;
+  for (auto Token : Tokens) {
+    if (Token.Name == CodeCompletionToken) {
+      Offset = Token.Offset;
+      break;
+    }
+  }
 
   if (Offset == ~0U) {
     llvm::errs() << "could not find code completion token \""
@@ -916,8 +1085,8 @@ static bool performWithCompletionLikeOperationParams(
   }
   llvm::outs() << "found code completion token " << CodeCompletionToken
                << " at offset " << Offset << "\n";
-  llvm::errs() << "found code completion token " << CodeCompletionToken
-               << " at offset " << Offset << "\n";
+
+  auto CompletionBuffer = ide::makeCodeCompletionMemoryBuffer(CleanFile.get(), Offset, CleanFile->getBufferIdentifier());
 
   CompilerInvocation Invocation(InitInvok);
 
@@ -931,7 +1100,7 @@ static bool performWithCompletionLikeOperationParams(
   CompletionLikeOperationParams Params{Invocation,
                                        /*Args=*/{},
                                        llvm::vfs::getRealFileSystem(),
-                                       CleanFile.get(),
+                                       CompletionBuffer.get(),
                                        Offset,
                                        CodeCompletionDiagnostics ? &PrintDiags
                                                                  : nullptr};
@@ -1240,178 +1409,6 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
       });
 }
 
-namespace {
-struct CompletionTestToken {
-  unsigned Line;
-  unsigned Column;
-  unsigned Offset;
-  StringRef Name;
-  SmallVector<StringRef, 1> CheckPrefixes;
-  StringRef Skip;
-  StringRef Xfail;
-  Optional<bool> IncludeKeywords = None;
-  Optional<bool> IncludeComments = None;
-
-  CompletionTestToken(unsigned Line, unsigned Column, unsigned Offset)
-      : Line(Line), Column(Column), Offset(Offset){};
-
-  static bool isStartOfToken(const char *Ptr) {
-    return Ptr[0] == '#' && Ptr[1] == '^';
-  }
-
-  static bool isEndOfToken(const char *Ptr) {
-    return Ptr[0] == '^' && Ptr[1] == '#';
-  }
-
-  static bool isValidTokenChar(char Chr) {
-    return (Chr >= 'A' && Chr <= 'Z') || (Chr >= 'a' && Chr <= 'z') ||
-           (Chr >= '0' && Chr <= '9') || Chr == '_' || Chr == '-' || Chr == '.';
-  }
-
-  static bool parseBooleanValue(StringRef Value, bool &Result,
-                                std::string &Error) {
-    if (Value.empty() || Value == "true" || Value == "1") {
-      Result = true;
-      return false;
-    }
-    if (Value == "false" || Value == "0") {
-      Result = false;
-      return false;
-    }
-
-    Error = "invalid value for keywords";
-    return true;
-  }
-
-  // #^TOKEN_NAME?check-prefix=CHECK1,CHECK2&keywords=1&comments=true^#
-  static bool parse(const char *&InputPtr, CompletionTestToken &Result,
-                    std::string &Error) {
-    auto Ptr = InputPtr;
-    assert(isStartOfToken(Ptr));
-    Ptr += 2;
-
-    // Parse the token name.
-    auto NameStart = Ptr;
-    while (isValidTokenChar(*Ptr)) { ++Ptr; }
-    Result.Name = StringRef(NameStart, Ptr - NameStart);
-
-    // Parse optional query string.
-    if (*Ptr == '?') {
-      ++Ptr;
-      auto QueryStart = Ptr;
-      while (!isEndOfToken(Ptr) && *Ptr != 0 && *Ptr != '\n' && *Ptr != '\r')
-        ++Ptr;
-      StringRef QueryString(QueryStart, Ptr - QueryStart);
-
-      while (!QueryString.empty()) {
-        StringRef Query, Key, Value;
-        std::tie(Query, QueryString) = QueryString.split(';');
-        std::tie(Key, Value) = Query.split('=');
-
-        if (Key == "check") {
-          // This value is passed to 'FileCheck --check-prefixes' as is.
-          Result.CheckPrefixes.push_back(Value);
-          continue;
-        }
-        if (Key == "keywords") {
-          Result.IncludeKeywords.emplace();
-          if (parseBooleanValue(Value, *Result.IncludeKeywords, Error))
-            return true;
-          continue;
-        }
-        if (Key == "comments") {
-          Result.IncludeComments.emplace();
-          if (parseBooleanValue(Value, *Result.IncludeComments, Error))
-            return true;
-          continue;
-        }
-        if (Key == "skip") {
-          Result.Skip = Value;
-          continue;
-        }
-        if (Key == "xfail") {
-          Result.Xfail = Value;
-          continue;
-        }
-        Error = "unknown option (" + Key.str() + ") for token";
-        return true;
-      }
-    }
-
-    // Default check prefix is the token name.
-    if (Result.CheckPrefixes.empty())
-      Result.CheckPrefixes.push_back(Result.Name);
-
-    // Tokens must end with '^#'.
-    if (!isEndOfToken(Ptr)) {
-      Error = "expected '^#' at the end of completion token";
-      return true;
-    }
-
-    InputPtr = Ptr + 2;
-    return false;;
-  }
-};
-
-static std::unique_ptr<llvm::MemoryBuffer>
-removeCodeCompletionTokens(llvm::MemoryBuffer *Input,
-                           SmallVectorImpl<CompletionTestToken> &Tokens,
-                           std::string &Error) {
-  const char *Start = Input->getBufferStart();
-  const char *End = Input->getBufferEnd();
-  assert(*End == 0 && "buffer must be nul terminated");
-
-  std::string Out;
-  Out.reserve(Input->getBufferSize());
-
-  llvm::StringSet<> seenTokenName;
-  const char *Ptr = Start;
-  const char *SegmentStart = Ptr;
-  unsigned Removed = 0;
-  unsigned Line = 1;
-  unsigned Column = 1;
-  while (Ptr != End) {
-    if (CompletionTestToken::isStartOfToken(Ptr)) {
-      Out.append(SegmentStart, Ptr - SegmentStart);
-
-      // Emplace a token with the offset, and parse it.
-      const char *TokenStart = Ptr;
-      Tokens.emplace_back(Line, Column, Ptr - Start - Removed);
-      if (CompletionTestToken::parse(Ptr, Tokens.back(), Error)) {
-        Error = "while parsing a token at " +
-                (llvm::utostr(Line) + ":" + llvm::utostr(Column)) + ": " +
-                Error;
-        return nullptr;
-      }
-
-      if (!seenTokenName.insert(Tokens.back().Name).second) {
-        Error = "Duplicated token name '" + Tokens.back().Name.str() +
-                "' at " + (llvm::utostr(Line) + ":" + llvm::utostr(Column));
-        return nullptr;
-      }
-
-      auto TokLen =  Ptr - TokenStart;
-      SegmentStart = Ptr;
-      Removed += TokLen;
-      Column += TokLen;
-      continue;
-    }
-    if (*Ptr == '\r' || *Ptr == '\n') {
-      Ptr += (Ptr[0] == '\r' && Ptr[1] == '\n') ? 2 : 1;
-      Line += 1;
-      Column = 1;
-      continue;
-    }
-    ++Ptr;
-    ++Column;
-  }
-  Out.append(SegmentStart, Ptr - SegmentStart);
-
-  return llvm::MemoryBuffer::getMemBufferCopy(Out,
-                                              Input->getBufferIdentifier());
-}
-
-} // namespace
 
 static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  StringRef SourceFilename,
