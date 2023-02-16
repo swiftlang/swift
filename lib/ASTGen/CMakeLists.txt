@@ -28,6 +28,8 @@ if (SWIFT_SWIFT_PARSER)
     Sources/ASTGen/LLVMJSON.swift
     Sources/ASTGen/Macros.swift
     Sources/ASTGen/Misc.swift
+    Sources/ASTGen/PluginHost.swift
+    Sources/ASTGen/PluginMessages.swift
     Sources/ASTGen/SourceFile.swift
     Sources/ASTGen/SourceManager.swift
     Sources/ASTGen/SourceManager+MacroExpansionContext.swift
