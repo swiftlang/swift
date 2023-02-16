@@ -223,54 +223,73 @@ struct ModuleRebuildInfo {
     Forwarding,
     Prebuilt
   };
-  struct OutOfDateModule {
+  enum class ReasonIgnored {
+    NotIgnored,
+    PublicFramework,
+    InterfacePreferred,
+  };
+  struct CandidateModule {
     std::string path;
     Optional<serialization::Status> serializationStatus;
     ModuleKind kind;
+    ReasonIgnored reasonIgnored;
     SmallVector<std::string, 10> outOfDateDependencies;
     SmallVector<std::string, 10> missingDependencies;
   };
-  SmallVector<OutOfDateModule, 3> outOfDateModules;
+  SmallVector<CandidateModule, 3> candidateModules;
 
-  OutOfDateModule &getOrInsertOutOfDateModule(StringRef path) {
-    for (auto &mod : outOfDateModules) {
+  CandidateModule &getOrInsertCandidateModule(StringRef path) {
+    for (auto &mod : candidateModules) {
       if (mod.path == path) return mod;
     }
-    outOfDateModules.push_back({path.str(), None, ModuleKind::Normal, {}, {}});
-    return outOfDateModules.back();
+    candidateModules.push_back({path.str(),
+                                None,
+                                ModuleKind::Normal,
+                                ReasonIgnored::NotIgnored,
+                                {},
+                                {}});
+    return candidateModules.back();
   }
 
   /// Sets the kind of a module that failed to load.
   void setModuleKind(StringRef path, ModuleKind kind) {
-    getOrInsertOutOfDateModule(path).kind = kind;
+    getOrInsertCandidateModule(path).kind = kind;
   }
 
   /// Sets the serialization status of the module at \c path. If this is
   /// anything other than \c Valid, a note will be added stating why the module
   /// was invalid.
   void setSerializationStatus(StringRef path, serialization::Status status) {
-    getOrInsertOutOfDateModule(path).serializationStatus = status;
+    getOrInsertCandidateModule(path).serializationStatus = status;
   }
 
   /// Registers an out-of-date dependency at \c depPath for the module
   /// at \c modulePath.
   void addOutOfDateDependency(StringRef modulePath, StringRef depPath) {
-    getOrInsertOutOfDateModule(modulePath)
+    getOrInsertCandidateModule(modulePath)
         .outOfDateDependencies.push_back(depPath.str());
   }
 
   /// Registers a missing dependency at \c depPath for the module
   /// at \c modulePath.
   void addMissingDependency(StringRef modulePath, StringRef depPath) {
-    getOrInsertOutOfDateModule(modulePath)
+    getOrInsertCandidateModule(modulePath)
         .missingDependencies.push_back(depPath.str());
+  }
+
+  /// Sets the reason that the module at \c path was ignored. If this is
+  /// anything besides \c NotIgnored a note will be added stating why the module
+  /// was ignored.
+  void addIgnoredModule(StringRef modulePath, ReasonIgnored reasonIgnored) {
+    getOrInsertCandidateModule(modulePath).reasonIgnored = reasonIgnored;
   }
 
   /// Determines if we saw the given module path and registered is as out of
   /// date.
   bool sawOutOfDateModule(StringRef modulePath) {
-    for (auto &mod : outOfDateModules)
-      if (mod.path == modulePath)
+    for (auto &mod : candidateModules)
+      if (mod.path == modulePath &&
+          mod.reasonIgnored == ReasonIgnored::NotIgnored)
         return true;
     return false;
   }
@@ -310,9 +329,15 @@ struct ModuleRebuildInfo {
     }
     // We may have found multiple failing modules, that failed for different
     // reasons. Emit a note for each of them.
-    for (auto &mod : outOfDateModules) {
-      diags.diagnose(loc, diag::out_of_date_module_here,
-                         (unsigned)mod.kind, mod.path);
+    for (auto &mod : candidateModules) {
+      // If a the compiled module was ignored, diagnose the reason.
+      if (mod.reasonIgnored != ReasonIgnored::NotIgnored) {
+        diags.diagnose(loc, diag::compiled_module_ignored_reason, mod.path,
+                       (unsigned)mod.reasonIgnored);
+      } else {
+        diags.diagnose(loc, diag::out_of_date_module_here, (unsigned)mod.kind,
+                       mod.path);
+      }
 
       // Diagnose any out-of-date dependencies in this module.
       for (auto &dep : mod.outOfDateDependencies) {
@@ -677,6 +702,7 @@ class ModuleInterfaceLoaderImpl {
   }
 
   std::pair<std::string, std::string> getCompiledModuleCandidates() {
+    using ReasonIgnored = ModuleRebuildInfo::ReasonIgnored;
     std::pair<std::string, std::string> result;
     // Should we attempt to load a swiftmodule adjacent to the swiftinterface?
     bool shouldLoadAdjacentModule = !ctx.IgnoreAdjacentModules;
@@ -690,6 +716,7 @@ class ModuleInterfaceLoaderImpl {
     if (!ctx.SearchPathOpts.getSDKPath().empty() &&
         modulePath.startswith(publicFrameworksPath)) {
       shouldLoadAdjacentModule = false;
+      rebuildInfo.addIgnoredModule(modulePath, ReasonIgnored::PublicFramework);
     }
 
     switch (loadMode) {
@@ -702,6 +729,8 @@ class ModuleInterfaceLoaderImpl {
       // skip the module adjacent to the interface, but use the caches if
       // they're present.
       shouldLoadAdjacentModule = false;
+      rebuildInfo.addIgnoredModule(modulePath,
+                                   ReasonIgnored::InterfacePreferred);
       break;
     case ModuleLoadingMode::PreferSerialized:
       // The rest of the function should be covered by this.
