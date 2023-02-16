@@ -724,20 +724,12 @@ private:
   friend class TypeRepr;
 };
 
-/// A pack expansion 'T...' with a pattern 'T'.
+/// A pack expansion 'repeat T' with a pattern 'T'.
 ///
 /// Can appear in the following positions:
 /// - The type of a parameter declaration in a function declaration
 /// - The type of a parameter in a function type
 /// - The element of a tuple
-///
-/// In the first two cases, it also spells an old-style variadic parameter
-/// desugaring to an array type. The two meanings are distinguished by the
-/// presence of at least one pack type parameter in the pack expansion
-/// pattern.
-///
-/// In the third case, tuples cannot contain an old-style variadic element,
-/// so the pack expansion must be a real variadic pack expansion.
 class PackExpansionTypeRepr final : public TypeRepr {
   SourceLoc RepeatLoc;
   TypeRepr *Pattern;
@@ -821,22 +813,22 @@ private:
 ///   func f(value: (each T)...) where each T: P {}
 /// }
 /// \endcode
-class PackReferenceTypeRepr: public TypeRepr {
+class PackElementTypeRepr: public TypeRepr {
   TypeRepr *PackType;
   SourceLoc EachLoc;
 
 public:
-  PackReferenceTypeRepr(SourceLoc eachLoc, TypeRepr *packType)
-    : TypeRepr(TypeReprKind::PackReference), PackType(packType),
+  PackElementTypeRepr(SourceLoc eachLoc, TypeRepr *packType)
+    : TypeRepr(TypeReprKind::PackElement), PackType(packType),
       EachLoc(eachLoc) {}
 
   TypeRepr *getPackType() const { return PackType; }
   SourceLoc getEachLoc() const { return EachLoc; }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::PackReference;
+    return T->getKind() == TypeReprKind::PackElement;
   }
-  static bool classof(const PackReferenceTypeRepr *T) { return true; }
+  static bool classof(const PackElementTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const { return EachLoc; }
@@ -1439,7 +1431,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
   case TypeReprKind::Existential:
-  case TypeReprKind::PackReference:
+  case TypeReprKind::PackElement:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:

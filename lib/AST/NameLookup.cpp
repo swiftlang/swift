@@ -2618,8 +2618,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
                                        allowUsableFromInline);
   }
 
-  case TypeReprKind::PackReference: {
-    auto packReferenceRepr = cast<PackReferenceTypeRepr>(typeRepr);
+  case TypeReprKind::PackElement: {
+    auto packReferenceRepr = cast<PackElementTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
                                        packReferenceRepr->getPackType(), dc,
                                        allowUsableFromInline);

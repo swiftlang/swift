@@ -1284,7 +1284,7 @@ void PackExpansionExpr::getExpandedPacks(SmallVectorImpl<ASTNode> &packs) {
         return Action::SkipChildren();
       }
 
-      if (isa<PackReferenceTypeRepr>(T)) {
+      if (isa<PackElementTypeRepr>(T)) {
         packs.push_back(T);
       }
 
