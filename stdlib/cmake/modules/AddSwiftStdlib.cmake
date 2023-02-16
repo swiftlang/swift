@@ -376,7 +376,7 @@ function(_add_target_variant_c_compile_flags)
   endif()
 
   if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
-    list(APPEND result "-D" "SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY")
+    list(APPEND result "-DSWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY")
   endif()
 
   string(TOUPPER "${SWIFT_SDK_${CFLAGS_SDK}_THREADING_PACKAGE}" _threading_package)
@@ -407,7 +407,7 @@ function(_add_target_variant_c_compile_flags)
   endif()
 
   if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
-    list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_UNICODE_DATA")
+    list(APPEND result "-DSWIFT_STDLIB_ENABLE_UNICODE_DATA")
   endif()
 
   if(SWIFT_STDLIB_CONCURRENCY_TRACING)
