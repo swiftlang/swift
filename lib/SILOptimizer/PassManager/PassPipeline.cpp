@@ -864,8 +864,7 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // In optimized builds, do the inter-procedural analysis in a module pass.
   P.addStackProtection();
 
-  // FIXME: rdar://72935649 (Miscompile on combining PruneVTables with WMO)
-  // P.addPruneVTables();
+  P.addPruneVTables();
 }
 
 static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
