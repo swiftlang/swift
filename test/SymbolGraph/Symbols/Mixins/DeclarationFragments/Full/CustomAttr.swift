@@ -35,7 +35,7 @@ public func wrapped(@SomeWrapper arg: Int) {}
 // CHECK-NEXT:    "spelling": "@"
 // CHECK-NEXT:  },
 // CHECK-NEXT:  {
-// CHECK-NEXT:    "kind": "typeIdentifier",
+// CHECK-NEXT:    "kind": "attribute",
 // CHECK-NEXT:    "spelling": "SomeWrapper",
 // CHECK-NEXT:    "preciseIdentifier": "s:10CustomAttr11SomeWrapperV"
 // CHECK-NEXT:  },
