@@ -2134,7 +2134,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
         assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
                typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
-          return {cast<NominalTypeDecl>(swiftEnum)->getDeclaredType(), false};
+          return {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
         }
       }
     }
@@ -2200,7 +2200,8 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
         assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
                typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
-          importedType = {cast<NominalTypeDecl>(swiftEnum)->getDeclaredType(), false};
+          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
+                          false};
         }
       }
     }
@@ -2301,7 +2302,7 @@ ClangImporter::Implementation::importParameterType(
                    ->getCanonicalTypeInternal() ==
                typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
-          swiftParamTy = cast<NominalTypeDecl>(swiftEnum)->getDeclaredType();
+          swiftParamTy = cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType();
         }
       }
     }
@@ -2892,7 +2893,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
         assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
                typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
-          importedType = {cast<NominalTypeDecl>(swiftEnum)->getDeclaredType(), false};
+          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
+                          false};
         }
       }
     }
