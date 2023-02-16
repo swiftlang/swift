@@ -39,7 +39,7 @@ func test1() {
 
   let _ = MyStruct[#^METATYPE_UNRESOLVED_BRACKET^#
 // METATYPE_UNRESOLVED_BRACKET: Begin completions
-// METATYPE_UNRESOLVED_BRACKET-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]:        ['[']{#(x): Int#}, {#static: _#}[']'][#MyStruct<_>#];
+// METATYPE_UNRESOLVED_BRACKET-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]:        ['[']{#(x): Int#}, {#static: T#}[']'][#MyStruct<T>#];
 // METATYPE_UNRESOLVED_BRACKET: End completions
 
   let _ = MyStruct<Int> #^METATYPE_INT^#
