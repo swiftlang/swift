@@ -15,7 +15,9 @@ import Swift
 /// A service that can execute jobs.
 @available(SwiftStdlib 5.1, *)
 public protocol Executor: AnyObject, Sendable {
+
   @available(*, deprecated, message: "Implement 'enqueue(_: __owned Job)' instead")
+  @available(SwiftStdlib 5.1, *)
   func enqueue(_ job: UnownedJob)
 
   @available(SwiftStdlib 5.9, *)
@@ -43,13 +45,14 @@ public protocol SerialExecutor: Executor {
 
   /// Convert this executor value to the optimized form of borrowed
   /// executor references.
+  @available(SwiftStdlib 5.9, *)
   func asUnownedSerialExecutor() -> UnownedSerialExecutor
 }
 
 @available(SwiftStdlib 5.9, *)
 extension Executor {
   public func enqueue(_ job: UnownedJob) {
-    fatalError("Please implement \(Self.self).enqueueJob(_:)")
+    self.enqueue(Job(job))
   }
 
   public func enqueue(_ job: __owned Job) {
@@ -59,6 +62,7 @@ extension Executor {
 
 @available(SwiftStdlib 5.9, *)
 extension SerialExecutor {
+  @available(SwiftStdlib 5.9, *)
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)
   }
@@ -107,18 +111,6 @@ public struct UnownedSerialExecutor: Sendable {
 
 }
 
-/// Checks if the current task is running on the expected executor.
-///
-/// Generally, Swift programs should be constructed such that it is statically
-/// known that a specific executor is used, for example by using global actors or
-/// custom executors. However, in some APIs it may be useful to provide an
-/// additional runtime check for this, especially when moving towards Swift
-/// concurrency from other runtimes which frequently use such assertions.
-/// - Parameter executor: The expected executor.
-@available(SwiftStdlib 5.9, *)
-@_silgen_name("swift_task_isOnExecutor")
-public func _taskIsOnExecutor<Executor: SerialExecutor>(_ executor: Executor) -> Bool
-
 /// Primarily a debug utility.
 ///
 /// If the passed in Job is a Task, returns the complete 64bit TaskId,
@@ -135,26 +127,10 @@ internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
 internal func _enqueueOnExecutor<E>(job unownedJob: UnownedJob, executor: E)
 where E: SerialExecutor {
   if #available(SwiftStdlib 5.9, *) {
-    executor.enqueue(Job(context: unownedJob.context))
+    executor.enqueue(Job(context: unownedJob._context))
   } else {
     executor.enqueue(unownedJob)
   }
-}
-
-@available(SwiftStdlib 5.1, *)
-@_transparent
-public // COMPILER_INTRINSIC
-func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
-                            _filenameLength: Builtin.Word,
-                            _filenameIsASCII: Builtin.Int1,
-                            _line: Builtin.Word,
-                            _executor: Builtin.Executor) {
-  if _taskIsCurrentExecutor(_executor) {
-    return
-  }
-
-  _reportUnexpectedExecutor(
-    _filenameStart, _filenameLength, _filenameIsASCII, _line, _executor)
 }
 
 #if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -185,3 +161,120 @@ internal final class DispatchQueueShim: @unchecked Sendable, SerialExecutor {
   }
 }
 #endif
+
+// ==== -----------------------------------------------------------------------
+// - MARK: Executor assertions
+
+/// Checks if the current task is running on the expected executor.
+///
+/// Do note that if multiple actors share the same serial executor,
+/// this assertion checks for the executor, not specific actor instance.
+///
+/// Generally, Swift programs should be constructed such that it is statically
+/// known that a specific executor is used, for example by using global actors or
+/// custom executors. However, in some APIs it may be useful to provide an
+/// additional runtime check for this, especially when moving towards Swift
+/// concurrency from other runtimes which frequently use such assertions.
+@available(SwiftStdlib 5.9, *)
+public func preconditionOnSerialExecutor(
+    _ executor: some SerialExecutor,
+    _ message: @autoclosure () -> String = "",
+    file: StaticString = #fileID, line: UInt = #line) {
+  preconditionOnSerialExecutor(executor.asUnownedSerialExecutor(), file: file, line: line)
+}
+
+@available(SwiftStdlib 5.9, *)
+public func preconditionOnSerialExecutor(
+    _ unowned: UnownedSerialExecutor,
+    _ message: @autoclosure () -> String = "",
+    file: StaticString = #fileID, line: UInt = #line) {
+  if _taskIsCurrentExecutor(unowned.executor) {
+    return
+  }
+
+  // TODO: log on what executor it was instead of the expected one
+  let message = "Expected executor \(unowned); \(message())"
+  preconditionFailure(
+      message,
+      file: file, line: line)
+}
+
+/// Same as ``preconditionOnSerialExecutor(_:_:file:line)`` however only in DEBUG mode.
+@available(SwiftStdlib 5.9, *)
+public func assertOnSerialExecutor(
+    _ executor: some SerialExecutor,
+    _ message: @autoclosure () -> String = "",
+    file: StaticString = #fileID, line: UInt = #line) {
+  assertOnSerialExecutor(executor.asUnownedSerialExecutor(), file: file, line: line)
+}
+
+@available(SwiftStdlib 5.9, *)
+public func assertOnSerialExecutor(
+    _ unowned: UnownedSerialExecutor,
+    _ message: @autoclosure () -> String = "",
+    file: StaticString = #fileID, line: UInt = #line) {
+  if _isDebugAssertConfiguration() {
+    if _taskIsCurrentExecutor(unowned.executor) {
+      return
+    }
+
+    // TODO: log on what executor it was instead of the expected one
+    // TODO: fixme use assertion here?
+    fatalError("Expected executor \(unowned); \(message())", file: file, line: line)
+  }
+}
+
+/// Checks if the current task is running on the expected executor.
+///
+/// Generally, Swift programs should be constructed such that it is statically
+/// known that a specific executor is used, for example by using global actors or
+/// custom executors. However, in some APIs it may be useful to provide an
+/// additional runtime check for this, especially when moving towards Swift
+/// concurrency from other runtimes which frequently use such assertions.
+/// - Parameter executor: The expected executor.
+@available(SwiftStdlib 5.9, *)
+@_silgen_name("swift_task_isOnExecutor")
+func _taskIsOnExecutor(_ executor: some SerialExecutor) -> Bool
+
+@available(SwiftStdlib 5.1, *)
+@_transparent
+public // COMPILER_INTRINSIC
+func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
+                            _filenameLength: Builtin.Word,
+                            _filenameIsASCII: Builtin.Int1,
+                            _line: Builtin.Word,
+                            _executor: Builtin.Executor) {
+  if _taskIsCurrentExecutor(_executor) {
+    return
+  }
+
+  _reportUnexpectedExecutor(
+    _filenameStart, _filenameLength, _filenameIsASCII, _line, _executor)
+}
+
+@available(SwiftStdlib 5.9, *)
+@_alwaysEmitIntoClient // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+func _checkExpectedExecutor(
+    _ _executor: Builtin.Executor,
+    file: String,
+    line: Int) {
+  if _taskIsCurrentExecutor(_executor) {
+    return
+  }
+
+  file.utf8CString.withUnsafeBufferPointer { (_ bufPtr: UnsafeBufferPointer<CChar>) in
+    let fileBasePtr: Builtin.RawPointer = bufPtr.baseAddress!._rawValue
+
+    // string lengths exclude trailing \0 byte, which should be there!
+    let fileLength: Builtin.Word = (bufPtr.count - 1)._builtinWordValue
+
+    // we're handing it UTF-8
+    let falseByte: Int8 = 0
+    let fileIsASCII: Builtin.Int1 = Builtin.trunc_Int8_Int1(falseByte._value)
+
+    _reportUnexpectedExecutor(
+        fileBasePtr, fileLength, fileIsASCII,
+        line._builtinWordValue,
+        _executor)
+  }
+}

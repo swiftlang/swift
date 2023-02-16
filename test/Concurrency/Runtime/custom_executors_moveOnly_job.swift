@@ -9,7 +9,7 @@
 
 final class InlineExecutor: SerialExecutor, CustomStringConvertible {
   public func enqueue(_ job: __owned Job) {
-    job.runSynchronously(on: self)
+    job.runSynchronously(on: self.asUnownedSerialExecutor())
   }
 
   var description: Swift.String {

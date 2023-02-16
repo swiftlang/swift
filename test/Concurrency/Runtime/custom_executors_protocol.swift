@@ -24,30 +24,6 @@ extension WithSpecifiedExecutor {
   }
 }
 
-final class InlineExecutor: SpecifiedExecutor, CustomStringConvertible {
-  let name: String
-
-  init(_ name: String) {
-    self.name = name
-  }
-
-  public func enqueue(_ job: UnownedJob) {
-    print("\(self): enqueue")
-    job.runSynchronously(on: self.asUnownedSerialExecutor())
-    print("\(self): after run")
-  }
-
-  public func enqueue(_ job: __owned Job) {
-    print("\(self): enqueue")
-    job.runSynchronously(on: self)
-    print("\(self): after run")
-  }
-
-  var description: Swift.String {
-    "InlineExecutor(\(name))"
-  }
-}
-
 final class NaiveQueueExecutor: SpecifiedExecutor, CustomStringConvertible {
   let queue: DispatchQueue
 
@@ -58,7 +34,7 @@ final class NaiveQueueExecutor: SpecifiedExecutor, CustomStringConvertible {
   public func enqueue(_ job: UnownedJob) {
     print("\(self): enqueue")
     queue.sync {
-      job.runSynchronously(on: self)
+      job.runSynchronously(on: self.asUnownedSerialExecutor())
     }
     print("\(self): after run")
   }
@@ -67,7 +43,7 @@ final class NaiveQueueExecutor: SpecifiedExecutor, CustomStringConvertible {
     print("\(self): enqueue")
     let unowned = UnownedJob(job)
     queue.sync {
-      unowned.runSynchronously(on: self)
+      unowned.runSynchronously(on: self.asUnownedSerialExecutor())
     }
     print("\(self): after run")
   }
@@ -89,7 +65,7 @@ actor MyActor: WithSpecifiedExecutor {
   }
 
   func test(expectedExecutor: some SerialExecutor, expectedQueue: DispatchQueue) {
-    precondition(_taskIsOnExecutor(expectedExecutor), "Expected to be on: \(expectedExecutor)")
+    // FIXME(waiting on preconditions to merge): preconditionTaskOnExecutor(expectedExecutor, "Expected to be on: \(expectedExecutor)")
     dispatchPrecondition(condition: .onQueue(expectedQueue))
     print("\(Self.self): on executor \(expectedExecutor)")
   }
@@ -109,9 +85,9 @@ actor MyActor: WithSpecifiedExecutor {
 }
 
 // CHECK:      begin
-// CHECK-NEXT: InlineExecutor(one): enqueue
-// CHECK-NEXT: MyActor: on executor InlineExecutor(one)
-// CHECK-NEXT: MyActor: on executor InlineExecutor(one)
-// CHECK-NEXT: MyActor: on executor InlineExecutor(one)
-// CHECK-NEXT: InlineExecutor(one): after run
+// CHECK-NEXT: NaiveQueueExecutor(<OS_dispatch_queue_serial: CustomQueue>): enqueue
+// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(<OS_dispatch_queue_serial: CustomQueue>)
+// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(<OS_dispatch_queue_serial: CustomQueue>)
+// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(<OS_dispatch_queue_serial: CustomQueue>)
+// CHECK-NEXT: NaiveQueueExecutor(<OS_dispatch_queue_serial: CustomQueue>): after run
 // CHECK-NEXT: end

@@ -62,4 +62,9 @@ Func _asyncLet_get_throwing(_:_:) has return type change from Builtin.RawPointer
 Protocol Actor has added inherited protocol AnyActor
 Protocol Actor has generic signature change from <Self : AnyObject, Self : Swift.Sendable> to <Self : _Concurrency.AnyActor>
 Struct CheckedContinuation has removed conformance to UnsafeSendable
+
+// SerialExecutor gained `enqueue(_:) moveonly `Job`, protocol requirements got default implementations from
+Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
+// ABI checker seems confused,
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

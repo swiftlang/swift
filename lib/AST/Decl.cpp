@@ -5266,15 +5266,12 @@ NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
     if (!isa<ProtocolDecl>(candidate->getDeclContext()))
       continue;
 
-    fprintf(stderr, "[%s:%d](%s) candidate\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    candidate->dump();
-
     if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(candidate)) {
       if (funcDecl->getParameters()->size() != 1)
         continue;
 
       auto params = funcDecl->getParameters();
-      if (params->get(0)->getSpecifier() == ParamSpecifier::Owned) {
+      if (params->get(0)->getSpecifier() == ParamSpecifier::LegacyOwned) { // TODO: make this Consuming
         return funcDecl;
       }
     }

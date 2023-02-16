@@ -74,7 +74,6 @@ public struct UnownedSerialExecutor: Sendable {
 @_silgen_name("_swift_task_enqueueOnExecutor")
 internal func _enqueueOnExecutor<E>(job: UnownedJob, executor: E)
 where E: SerialExecutor {
-  // TODO: something to do here?
   executor.enqueue(job)
 }
 

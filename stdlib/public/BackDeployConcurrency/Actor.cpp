@@ -285,14 +285,9 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
 SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorImpl(ExecutorRef executor) {
   if (auto currentTracking = ExecutorTrackingInfo::current()) {
-    fprintf(stderr, "[%s:%d](%s) current executor = %p, main:%s, default:%s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            currentTracking->getActiveExecutor().getIdentity(),
-            currentTracking->getActiveExecutor().isMainExecutor() ? "y" : "n",
-            currentTracking->getActiveExecutor().isDefaultActor() ? "y" : "n");
     return currentTracking->getActiveExecutor() == executor;
   }
 
-  fprintf(stderr, "[%s:%d](%s) no executor found in tracking\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   return executor.isMainExecutor() && isExecutingOnMainThread();
 }
 

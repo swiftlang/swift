@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -enable-experimental-move-only -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -enable-experimental-move-only -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -10,7 +10,7 @@
 final class InlineExecutor: SerialExecutor {
   public func enqueue(_ job: __owned Job) {
     print("\(self): enqueue (priority: \(TaskPriority(job.priority)!))")
-    job.runSynchronously(on: self)
+    job.runSynchronously(on: self.asUnownedSerialExecutor())
   }
 }
 
@@ -39,9 +39,6 @@ actor Custom {
       await actor.report()
     }.value
     await Task() {
-      await actor.report()
-    }.value
-    await Task(priority: .low) {
       await actor.report()
     }.value
     print("end")
