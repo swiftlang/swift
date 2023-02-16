@@ -1487,6 +1487,7 @@ bool PreCheckExpression::exprLooksLikeAType(Expr *expr) {
       isa<ParenExpr>(expr) ||
       isa<ArrowExpr>(expr) ||
       isa<PackExpansionExpr>(expr) ||
+      isa<PackElementExpr>(expr) ||
       isa<TupleExpr>(expr) ||
       (isa<ArrayExpr>(expr) &&
        cast<ArrayExpr>(expr)->getElements().size() == 1) ||
@@ -1980,6 +1981,15 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (auto *pattern = dyn_cast<TypeExpr>(expansion->getPatternExpr())) {
       auto *repr = new (Ctx) PackExpansionTypeRepr(expansion->getStartLoc(),
                                                    pattern->getTypeRepr());
+      return new (Ctx) TypeExpr(repr);
+    }
+  }
+
+  // Fold a PackElementExpr into a TypeExpr when the element is a TypeExpr
+  if (auto *element = dyn_cast<PackElementExpr>(E)) {
+    if (auto *refExpr = dyn_cast<TypeExpr>(element->getPackRefExpr())) {
+      auto *repr = new (Ctx) PackReferenceTypeRepr(element->getStartLoc(),
+                                                   refExpr->getTypeRepr());
       return new (Ctx) TypeExpr(repr);
     }
   }
