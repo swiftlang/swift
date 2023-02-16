@@ -1,5 +1,3 @@
-// REQUIRES: rdar104716322
-
 // RUN: %target-swift-emit-silgen %s -enable-experimental-feature VariadicGenerics | %FileCheck %s
 
 // Experimental features require an asserts compiler
