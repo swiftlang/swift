@@ -861,7 +861,7 @@ bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
                                        f->getResilienceExpansion());
 }
 
-SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) {
+SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) const {
   auto *boxTy = getASTType()->getAs<SILBoxType>();
   if (!boxTy)
     return SILType();
