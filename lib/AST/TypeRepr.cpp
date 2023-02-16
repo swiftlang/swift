@@ -473,8 +473,8 @@ void PackExpansionTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(Pattern, Printer, Opts);
 }
 
-void PackReferenceTypeRepr::printImpl(ASTPrinter &Printer,
-                                      const PrintOptions &Opts) const {
+void PackElementTypeRepr::printImpl(ASTPrinter &Printer,
+                                    const PrintOptions &Opts) const {
   Printer.printKeyword("each", Opts, /*Suffix=*/" ");
   printTypeRepr(PackType, Printer, Opts);
 }

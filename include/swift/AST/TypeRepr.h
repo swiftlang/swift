@@ -821,22 +821,22 @@ private:
 ///   func f(value: (each T)...) where each T: P {}
 /// }
 /// \endcode
-class PackReferenceTypeRepr: public TypeRepr {
+class PackElementTypeRepr: public TypeRepr {
   TypeRepr *PackType;
   SourceLoc EachLoc;
 
 public:
-  PackReferenceTypeRepr(SourceLoc eachLoc, TypeRepr *packType)
-    : TypeRepr(TypeReprKind::PackReference), PackType(packType),
+  PackElementTypeRepr(SourceLoc eachLoc, TypeRepr *packType)
+    : TypeRepr(TypeReprKind::PackElement), PackType(packType),
       EachLoc(eachLoc) {}
 
   TypeRepr *getPackType() const { return PackType; }
   SourceLoc getEachLoc() const { return EachLoc; }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::PackReference;
+    return T->getKind() == TypeReprKind::PackElement;
   }
-  static bool classof(const PackReferenceTypeRepr *T) { return true; }
+  static bool classof(const PackElementTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const { return EachLoc; }
@@ -1439,7 +1439,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
   case TypeReprKind::Existential:
-  case TypeReprKind::PackReference:
+  case TypeReprKind::PackElement:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:

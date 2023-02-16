@@ -1988,8 +1988,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   // Fold a PackElementExpr into a TypeExpr when the element is a TypeExpr
   if (auto *element = dyn_cast<PackElementExpr>(E)) {
     if (auto *refExpr = dyn_cast<TypeExpr>(element->getPackRefExpr())) {
-      auto *repr = new (Ctx) PackReferenceTypeRepr(element->getStartLoc(),
-                                                   refExpr->getTypeRepr());
+      auto *repr = new (Ctx) PackElementTypeRepr(element->getStartLoc(),
+                                                 refExpr->getTypeRepr());
       return new (Ctx) TypeExpr(repr);
     }
   }

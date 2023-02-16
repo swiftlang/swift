@@ -2066,8 +2066,8 @@ namespace {
                                   bool direct = false);
     NeverNullType resolvePackExpansionType(PackExpansionTypeRepr *repr,
                                            TypeResolutionOptions options);
-    NeverNullType resolvePackReference(PackReferenceTypeRepr *repr,
-                                       TypeResolutionOptions options);
+    NeverNullType resolvePackElement(PackElementTypeRepr *repr,
+                                     TypeResolutionOptions options);
     NeverNullType resolveTupleType(TupleTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveCompositionType(CompositionTypeRepr *repr,
@@ -2337,8 +2337,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::PackExpansion:
     return resolvePackExpansionType(cast<PackExpansionTypeRepr>(repr), options);
 
-  case TypeReprKind::PackReference:
-    return resolvePackReference(cast<PackReferenceTypeRepr>(repr), options);
+  case TypeReprKind::PackElement:
+    return resolvePackElement(cast<PackElementTypeRepr>(repr), options);
 
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
@@ -4507,8 +4507,8 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
   return PackExpansionType::get(patternType, rootParameterPacks[0]);
 }
 
-NeverNullType TypeResolver::resolvePackReference(PackReferenceTypeRepr *repr,
-                                                 TypeResolutionOptions options) {
+NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
+                                               TypeResolutionOptions options) {
   auto &ctx = getASTContext();
   options |= TypeResolutionFlags::FromPackReference;
   auto packReference = resolveType(repr->getPackType(), options);
@@ -5038,7 +5038,7 @@ public:
     case TypeReprKind::Vararg:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
-    case TypeReprKind::PackReference:
+    case TypeReprKind::PackElement:
       return false;
     }
   }

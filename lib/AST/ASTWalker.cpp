@@ -2034,7 +2034,7 @@ bool Traversal::visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
   return doIt(T->getPatternType());
 }
 
-bool Traversal::visitPackReferenceTypeRepr(PackReferenceTypeRepr *T) {
+bool Traversal::visitPackElementTypeRepr(PackElementTypeRepr *T) {
   return doIt(T->getPackType());
 }
 
