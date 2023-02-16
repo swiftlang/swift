@@ -2589,7 +2589,11 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
       // behave like a C enum in the presence of C++.
       auto enumName = typedefType->getDecl()->getName();
       ArgumentAttrs argumentAttrs(DefaultArgumentKind::None, true, enumName);
-      for (auto word : llvm::reverse(camel_case::getWords(enumName))) {
+      auto camelCaseWords = camel_case::getWords(enumName);
+      for (auto it = camelCaseWords.rbegin(); it != camelCaseWords.rend();
+           ++it) {
+        auto word = *it;
+        auto next = std::next(it);
         if (camel_case::sameWordIgnoreFirstCase(word, "options")) {
           argumentAttrs.argumentKind = DefaultArgumentKind::EmptyArray;
           return argumentAttrs;
@@ -2600,13 +2604,17 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
           return argumentAttrs;
         if (camel_case::sameWordIgnoreFirstCase(word, "action"))
           return argumentAttrs;
-        if (camel_case::sameWordIgnoreFirstCase(word, "controlevents"))
+        if (camel_case::sameWordIgnoreFirstCase(word, "events") &&
+            next != camelCaseWords.rend() &&
+            camel_case::sameWordIgnoreFirstCase(*next, "control"))
           return argumentAttrs;
         if (camel_case::sameWordIgnoreFirstCase(word, "state"))
           return argumentAttrs;
         if (camel_case::sameWordIgnoreFirstCase(word, "unit"))
           return argumentAttrs;
-        if (camel_case::sameWordIgnoreFirstCase(word, "scrollposition"))
+        if (camel_case::sameWordIgnoreFirstCase(word, "position") &&
+            next != camelCaseWords.rend() &&
+            camel_case::sameWordIgnoreFirstCase(*next, "scroll"))
           return argumentAttrs;
         if (camel_case::sameWordIgnoreFirstCase(word, "edge"))
           return argumentAttrs;
