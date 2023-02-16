@@ -724,20 +724,12 @@ private:
   friend class TypeRepr;
 };
 
-/// A pack expansion 'T...' with a pattern 'T'.
+/// A pack expansion 'repeat T' with a pattern 'T'.
 ///
 /// Can appear in the following positions:
 /// - The type of a parameter declaration in a function declaration
 /// - The type of a parameter in a function type
 /// - The element of a tuple
-///
-/// In the first two cases, it also spells an old-style variadic parameter
-/// desugaring to an array type. The two meanings are distinguished by the
-/// presence of at least one pack type parameter in the pack expansion
-/// pattern.
-///
-/// In the third case, tuples cannot contain an old-style variadic element,
-/// so the pack expansion must be a real variadic pack expansion.
 class PackExpansionTypeRepr final : public TypeRepr {
   SourceLoc RepeatLoc;
   TypeRepr *Pattern;
