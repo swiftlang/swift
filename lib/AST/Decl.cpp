@@ -399,15 +399,9 @@ void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
 
 void Decl::forEachAttachedMacro(MacroRole role,
                                 MacroCallback macroCallback) const {
-  auto *dc = getDeclContext();
-  auto &ctx = dc->getASTContext();
-
   for (auto customAttrConst : getSemanticAttrs().getAttributes<CustomAttr>()) {
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto *macroDecl = evaluateOrDefault(
-        ctx.evaluator,
-        ResolveMacroRequest{customAttr, dc},
-        nullptr);
+    auto *macroDecl = getResolvedMacro(customAttr);
 
     if (!macroDecl)
       continue;
@@ -417,6 +411,13 @@ void Decl::forEachAttachedMacro(MacroRole role,
 
     macroCallback(customAttr, macroDecl);
   }
+}
+
+MacroDecl *Decl::getResolvedMacro(CustomAttr *customAttr) const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      ResolveMacroRequest{customAttr, getDeclContext()},
+      nullptr);
 }
 
 unsigned Decl::getAttachedMacroDiscriminator(

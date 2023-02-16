@@ -696,10 +696,8 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
   for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
     if (auto *Repr = customAttr->getTypeRepr()) {
       // If this attribute resolves to a macro, index that.
-      ASTContext &ctx = D->getASTContext();
-      ResolveMacroRequest req{const_cast<CustomAttr *>(customAttr),
-                              D->getInnermostDeclContext()};
-      if (auto macroDecl = evaluateOrDefault(ctx.evaluator, req, nullptr)) {
+      auto *mutableAttr = const_cast<CustomAttr *>(customAttr);
+      if (auto macroDecl = D->getResolvedMacro(mutableAttr)) {
         Type macroRefType = macroDecl->getDeclaredInterfaceType();
         if (!passReference(
               macroDecl, macroRefType, DeclNameLoc(Repr->getStartLoc()),
