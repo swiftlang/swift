@@ -541,10 +541,10 @@ extension String.UTF8View {
 
     #if _runtime(_ObjC)
     // Currently, foreign means NSString
-    if let count = _cocoaStringUTF8Count(
-      _guts._object.cocoaObject,
-      range: i._encodedOffset ..< j._encodedOffset
-    ) {
+    let count = _guts._object.withCocoaObject {
+      _cocoaStringUTF8Count($0, range: i._encodedOffset ..< j._encodedOffset)
+    }
+    if let count {
       // _cocoaStringUTF8Count gave us the scalar aligned count, but we still
       // need to compensate for sub-scalar indexing, e.g. if `i` is in the
       // middle of a two-byte UTF8 scalar.

@@ -247,10 +247,10 @@ extension _StringGuts {
   @_effects(releasenone)
   private func _getForeignCodeUnit(at i: Int) -> UInt16 {
 #if _runtime(_ObjC)
-    // Currently, foreign  means NSString
-    return _cocoaStringSubscript(_object.cocoaObject, i)
+    // Currently, foreign means NSString
+    return _object.withCocoaObject { _cocoaStringSubscript($0, i) }
 #else
-  fatalError("No foreign strings on Linux in this version of Swift")
+    fatalError("No foreign strings on Linux in this version of Swift")
 #endif
   }
 
@@ -386,11 +386,13 @@ extension _StringGuts {
     return withUnsafeTemporaryAllocation(
       of: UInt16.self, capacity: count
     ) { buffer in
-      _cocoaStringCopyCharacters(
-        from: self._object.cocoaObject,
-        range: start..<end,
-        into: buffer.baseAddress._unsafelyUnwrappedUnchecked
-      )
+      self._object.withCocoaObject {
+        _cocoaStringCopyCharacters(
+          from: $0,
+          range: start..<end,
+          into: buffer.baseAddress._unsafelyUnwrappedUnchecked
+        )
+      }
       return Character(String._uncheckedFromUTF16(UnsafeBufferPointer(buffer)))
     }
 #else
