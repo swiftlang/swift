@@ -136,7 +136,13 @@ void DeclarationFragmentPrinter::printStructurePre(PrintStructureKind Kind,
 void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
     Identifier Name,
     PrintNameContext NameContext) {
-  openFragment(FragmentKind::TypeIdentifier);
+  if (Kind != FragmentKind::Attribute) {
+    openFragment(FragmentKind::TypeIdentifier);
+  } else {
+    // create a separate fragment so that only the attribute name is linkable
+    closeFragment();
+    openFragment(FragmentKind::Attribute);
+  }
   printText(Name.str());
   USR.clear();
 
