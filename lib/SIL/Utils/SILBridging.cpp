@@ -545,10 +545,12 @@ bool SILType_isMetatype(BridgedType type) {
   return castToSILType(type).is<MetatypeType>();
 }
 
-BridgedType SILType_instanceTypeOfMetatype(BridgedType type) {
+BridgedType SILType_instanceTypeOfMetatype(BridgedType type, BridgedFunction function) {
   auto metaType = castToSILType(type).castTo<MetatypeType>();
-  SILType instanceTy = SILType::getPrimitiveObjectType(metaType.getInstanceType());
-  return {instanceTy.getOpaqueValue()};
+  CanType instanceTy = metaType.getInstanceType();
+  SILFunction *f = castToFunction(function);
+  auto &tl = f->getModule().Types.getTypeLowering(instanceTy, TypeExpansionContext(*f));
+  return {tl.getLoweredType().getOpaqueValue()};
 }
 
 BridgedDecl SILType_getNominal(BridgedType type) {
