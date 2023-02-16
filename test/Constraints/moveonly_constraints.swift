@@ -42,7 +42,7 @@ enum Maybe<T> {
   case just(T)
 }
 
-func takeConcrete(_ m: MO) {}
+func takeConcrete(_ m: __shared MO) {}
 func takeGeneric<T>(_ t: T) {}
 func takeGenericSendable<T>(_ t: T) where T: Sendable {}
 func takeMaybe<T>(_ m: Maybe<T>) {}
@@ -71,7 +71,7 @@ func testAny() {
   takeAny(MO()) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 }
 
-func testBasic(_ mo: MO) {
+func testBasic(_ mo: __shared MO) {
   takeConcrete(globalMO)
   takeConcrete(MO())
 
@@ -139,7 +139,7 @@ func checkMethodCalls() {
   takeMaybe(true ? .none : .just(MO())) // expected-error 3{{move-only type 'MO' cannot be used with generics yet}}
 }
 
-func checkCasting(_ b: any Box, _ mo: MO, _ a: Any) {
+func checkCasting(_ b: any Box, _ mo: __shared MO, _ a: Any) {
   // casting dynamically is allowed, but should always fail since you can't
   // construct such a type.
   let box = b as! ValBox<MO> // expected-error {{move-only type 'MO' cannot be used with generics yet}}
@@ -221,7 +221,7 @@ func checkCasting(_ b: any Box, _ mo: MO, _ a: Any) {
 
 }
 
-func checkStdlibTypes(_ mo: MO) {
+func checkStdlibTypes(_ mo: __shared MO) {
   let _: [MO] = // expected-error {{move-only type 'MO' cannot be used with generics yet}}
       [MO(), MO()]
   let _: [MO] = // expected-error {{move-only type 'MO' cannot be used with generics yet}}
