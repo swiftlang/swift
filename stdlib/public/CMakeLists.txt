@@ -151,6 +151,10 @@ if(SWIFT_BUILD_STDLIB)
   if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
     add_subdirectory(Reflection)
   endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+    add_subdirectory(Observation)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
