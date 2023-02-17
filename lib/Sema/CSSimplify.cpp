@@ -2361,7 +2361,7 @@ struct PackTypeVariableCollector: TypeWalker {
 /// pack type. The original pack type is then matched against the instantiated
 /// pack type.
 ///
-/// As a side effect, it binds each pack type variable occuring in the pattern
+/// As a side effect, it binds each pack type variable occurring in the pattern
 /// type to a new pack with the same shape as the original pack, but where the
 /// elements are fresh type variables.
 ///

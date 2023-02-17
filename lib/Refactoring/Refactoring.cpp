@@ -997,7 +997,7 @@ public:
 ExtractCheckResult checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
                                           DiagnosticEngine &DiagEngine) {
   SmallVector<CannotExtractReason, 2> AllReasons;
-  // If any declared declaration is refered out of the given range, return false.
+  // If any declared declaration is referred out of the given range, return false.
   auto Declared = RangeInfo.DeclaredDecls;
   auto It = std::find_if(Declared.begin(), Declared.end(),
                          [](DeclaredDecl DD) { return DD.ReferredAfterRange; });

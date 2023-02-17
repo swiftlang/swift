@@ -20,7 +20,7 @@
 //
 // func test() {
 //   let k = Klass()
-//   // k is deallocated immediatly after the closure capture (a store_weak).
+//   // k is deallocated immediately after the closure capture (a store_weak).
 //   functionWithClosure({ [weak k] in
 //                         // crash!
 //                         k!.foo()
