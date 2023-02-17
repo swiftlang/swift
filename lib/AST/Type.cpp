@@ -3564,9 +3564,14 @@ bool ArchetypeType::requiresClass() const {
 Type ArchetypeType::getNestedType(AssociatedTypeDecl *assocType) {
   Type interfaceType = getInterfaceType();
   Type memberInterfaceType =
-      DependentMemberType::get(interfaceType, assocType->getName());
-  return getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
-      memberInterfaceType);
+      DependentMemberType::get(interfaceType, assocType);
+  auto genericSig = getGenericEnvironment()->getGenericSignature();
+  if (genericSig->isValidTypeParameter(memberInterfaceType)) {
+    return getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
+        memberInterfaceType);
+  }
+
+  return Type();
 }
 
 Type ArchetypeType::getNestedTypeByName(Identifier name) {
