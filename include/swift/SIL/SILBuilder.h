@@ -2760,7 +2760,7 @@ public:
       SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
       SILValue Function, Optional<SILType> ExtracteeType = None) {
     return createDifferentiableFunctionExtract(
-        Loc, Extractee, Function, Function->getOwnershipKind(), ExtracteeType);
+        Loc, Extractee, Function, OwnershipKind::Guaranteed, ExtracteeType);
   }
 
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(

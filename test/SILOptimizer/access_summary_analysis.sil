@@ -499,6 +499,7 @@ entry:
   %n2 = mark_dependence %n : $@noescape @callee_guaranteed () -> () on %e : $@callee_guaranteed () -> ()
   %f2 = function_ref @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   apply %f2(%n2) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %n2 : $@noescape @callee_guaranteed () -> ()
   end_borrow %b : $@callee_guaranteed () -> ()
   destroy_value %e : $@callee_guaranteed () -> ()
   %t = tuple ()

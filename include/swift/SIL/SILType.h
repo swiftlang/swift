@@ -631,7 +631,7 @@ public:
 
   /// Returns true if and only if this type is a first class move only
   /// type. NOTE: Returns false if the type is a move only wrapped type.
-  bool isMoveOnlyType() const;
+  bool isMoveOnlyNominalType() const;
 
   /// Returns true if this SILType is a move only wrapper type.
   ///

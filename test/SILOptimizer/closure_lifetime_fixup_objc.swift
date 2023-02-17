@@ -24,8 +24,8 @@ public protocol DangerousEscaper {
 // CHECK:   strong_retain [[ARG]] : $@callee_guaranteed () -> ()
 
 // CHECK:   [[NE:%.*]] = convert_escape_to_noescape [[ARG]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK:   [[WITHOUT_ACTUALLY_ESCAPING_THUNK:%.*]] = function_ref @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-// CHECK:   [[C:%.*]] = partial_apply [callee_guaranteed] [[WITHOUT_ACTUALLY_ESCAPING_THUNK]]([[NE]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:   [[WITHOUT_ACTUALLY_ESCAPING_THUNK:%.*]] = function_ref @$sIg_Ieg_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:   [[C:%.*]] = partial_apply [callee_guaranteed] [[WITHOUT_ACTUALLY_ESCAPING_THUNK]]([[NE]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
 
 // Sentinel without actually escaping closure (3).
 // CHECK:   [[SENTINEL:%.*]] = mark_dependence [[C]] : $@callee_guaranteed () -> () on [[NE]] : $@noescape @callee_guaranteed () -> ()

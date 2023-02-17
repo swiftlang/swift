@@ -333,6 +333,7 @@ bb2(%e : $Error):
 	br bb3(%r1 : $Builtin.Int32)
 
 bb3(%res : $Builtin.Int32):
+  destroy_value %ne : $@noescape @callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
   destroy_value %conv : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
   return  %res : $Builtin.Int32
 }
