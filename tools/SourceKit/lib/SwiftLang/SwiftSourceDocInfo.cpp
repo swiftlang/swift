@@ -1013,18 +1013,12 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   if (AddSymbolGraph) {
     SmallVector<symbolgraphgen::PathComponent, 4> PathComponents;
     SmallVector<symbolgraphgen::FragmentInfo, 8> FragmentInfos;
-    symbolgraphgen::SymbolGraphOptions Options{
-        "",
-        Invoc.getLangOptions().Target,
-        /*PrettyPrint=*/false,
-        AccessLevel::Private,
-        /*EmitSynthesizedMembers=*/false,
-        /*PrintMessages=*/false,
-        /*SkipInheritedDocs=*/false,
-        /*IncludeSPISymbols=*/true,
-        /*IncludeClangDocs=*/true,
-        /*EmitExtensionBlockSymbols=*/false,
-    };
+
+    symbolgraphgen::SymbolGraphOptions Options;
+    Options.Target = Invoc.getLangOptions().Target;
+    Options.MinimumAccessLevel = AccessLevel::Private;
+    Options.IncludeSPISymbols = true;
+    Options.IncludeClangDocs = true;
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
                                             DInfo.InSynthesizedExtension,
