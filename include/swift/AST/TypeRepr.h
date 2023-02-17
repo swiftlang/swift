@@ -1054,6 +1054,8 @@ class SpecifierTypeRepr : public TypeRepr {
 public:
   SpecifierTypeRepr(TypeReprKind Kind, TypeRepr *Base, SourceLoc Loc)
     : TypeRepr(Kind), Base(Base), SpecifierLoc(Loc) {
+    // ensure the kind passed-in matches up with our TypeRepr classof.
+    assert(SpecifierTypeRepr::classof(cast<TypeRepr>(this)));
   }
   
   TypeRepr *getBase() const { return Base; }
@@ -1063,7 +1065,8 @@ public:
     return T->getKind() == TypeReprKind::InOut ||
            T->getKind() == TypeReprKind::Shared ||
            T->getKind() == TypeReprKind::Owned ||
-           T->getKind() == TypeReprKind::Isolated;
+           T->getKind() == TypeReprKind::Isolated ||
+           T->getKind() == TypeReprKind::CompileTimeConst;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1073,15 +1076,33 @@ private:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
+
+// This repr holds types that are associated with some ownership specifier
+// like 'inout', '__shared', etc. It's a simple grouping of those specifiers.
+class OwnershipTypeRepr : public SpecifierTypeRepr {
+public:
+  OwnershipTypeRepr(TypeReprKind Kind, TypeRepr *Base, SourceLoc OwnershipLoc)
+      : SpecifierTypeRepr(Kind, Base, OwnershipLoc) {
+    assert(OwnershipTypeRepr::classof(cast<TypeRepr>(this)));
+  }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::InOut ||
+           T->getKind() == TypeReprKind::Shared ||
+           T->getKind() == TypeReprKind::Owned;
+  }
+  static bool classof(const OwnershipTypeRepr *T) { return true; }
+  friend class SpecifierTypeRepr;
+};
   
 /// An 'inout' type.
 /// \code
 ///   x : inout Int
 /// \endcode
-class InOutTypeRepr : public SpecifierTypeRepr {
+class InOutTypeRepr : public OwnershipTypeRepr {
 public:
   InOutTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-    : SpecifierTypeRepr(TypeReprKind::InOut, Base, InOutLoc) {}
+    : OwnershipTypeRepr(TypeReprKind::InOut, Base, InOutLoc) {}
   
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::InOut;
@@ -1089,14 +1110,15 @@ public:
   static bool classof(const InOutTypeRepr *T) { return true; }
 };
   
-/// A 'shared' type.
+/// A 'borrowing' parameter type.
 /// \code
-///   x : shared Int
+///   x : borrowing Int
 /// \endcode
-class SharedTypeRepr : public SpecifierTypeRepr {
+/// Historically, this attribute was spelled '__shared'.
+class SharedTypeRepr : public OwnershipTypeRepr {
 public:
   SharedTypeRepr(TypeRepr *Base, SourceLoc SharedLoc)
-    : SpecifierTypeRepr(TypeReprKind::Shared, Base, SharedLoc) {}
+    : OwnershipTypeRepr(TypeReprKind::Shared, Base, SharedLoc) {}
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Shared;
@@ -1104,14 +1126,15 @@ public:
   static bool classof(const SharedTypeRepr *T) { return true; }
 };
 
-/// A 'owned' type.
+/// A 'consuming' parameter type.
 /// \code
-///   x : owned Int
+///   x : consuming Int
 /// \endcode
-class OwnedTypeRepr : public SpecifierTypeRepr {
+/// Historically, this attribute was spelled '__owned'.
+class OwnedTypeRepr : public OwnershipTypeRepr {
 public:
   OwnedTypeRepr(TypeRepr *Base, SourceLoc OwnedLoc)
-      : SpecifierTypeRepr(TypeReprKind::Owned, Base, OwnedLoc) {}
+      : OwnershipTypeRepr(TypeReprKind::Owned, Base, OwnedLoc) {}
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Owned;
