@@ -215,6 +215,8 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
       closure = pai->getCallee();
     } else if (auto *tfi = dyn_cast<ThinToThickFunctionInst>(closure)) {
       closure = tfi->getOperand();
+    } else if (auto *cp = dyn_cast<CopyValueInst>(closure)) {
+      closure = cp->getOperand();
     } else if (acceptFunctionArgs && isa<SILFunctionArgument>(closure)) {
       // We can assume that a function closure argument is already checked at
       // the call site.

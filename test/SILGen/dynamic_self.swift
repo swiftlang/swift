@@ -479,10 +479,10 @@ public extension EmptyProtocol {
 func doEscaping<T>(_: @escaping (T) -> ()) {}
 
 public class FunctionConversionTest : EmptyProtocol {
-  // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self22FunctionConversionTestC07convertC0yACXDyypXEF : $@convention(method) (@noescape @callee_guaranteed (@in_guaranteed Any) -> (), @guaranteed FunctionConversionTest) -> @owned FunctionConversionTest {
+  // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self22FunctionConversionTestC07convertC0yACXDyypXEF :
   func convertFunction(_ fn: (Any) -> ()) -> Self {
     // The reabstraction thunk captures a self metatype here:
-    // CHECK: function_ref @$s12dynamic_self22FunctionConversionTestCIgg_ACIegn_ACXMTTy : $@convention(thin) (@in_guaranteed FunctionConversionTest, @noescape @callee_guaranteed (@guaranteed FunctionConversionTest) -> (), @thick FunctionConversionTest.Type) -> ()
+    // CHECK: function_ref @$s12dynamic_self22FunctionConversionTestCIgg_ACIegn_ACXMTTy : $@convention(thin) ({{.*}}, @thick FunctionConversionTest.Type) -> ()
     run(fn)
     return self
   }
@@ -524,9 +524,9 @@ final class Final {
   static func useSelf(_ body: (Self) -> ()) {}
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self13testNoErasureyyyAA5FinalCXEF : $@convention(thin) (@noescape @callee_guaranteed (@guaranteed Final) -> ()) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self13testNoErasureyyyAA5FinalCXEF :
 func testNoErasure(_ body: (Final) -> ()) {
-  // CHECK: function_ref @$s12dynamic_self5FinalC7useSelfyyyACXDXEFZ : $@convention(method) (@noescape @callee_guaranteed (@guaranteed Final) -> (), @thick Final.Type) -> ()
+  // CHECK: function_ref @$s12dynamic_self5FinalC7useSelfyyyACXDXEFZ :
   return Final.useSelf(body)
 }
 

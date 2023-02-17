@@ -991,21 +991,25 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     // the stack. The partial_apply had ownership of this box so we must now
     // release it explicitly when the partial_apply is released.
     if (Apply.getKind() == ApplySiteKind::PartialApplyInst) {
-      if (PAFrontier.empty()) {
-        auto *PAI = cast<PartialApplyInst>(Apply);
-        ValueLifetimeAnalysis VLA(PAI, PAI->getUses());
-        pass.CFGChanged |= !VLA.computeFrontier(
-            PAFrontier, ValueLifetimeAnalysis::AllowToModifyCFG);
-        assert(!PAFrontier.empty() &&
-               "partial_apply must have at least one use "
-               "to release the returned function");
-      }
+      auto *PAI = cast<PartialApplyInst>(Apply);
+      // If it's already been stack promoted, then the stack closure only
+      // borrows its captures, and we don't need to adjust capture lifetimes.
+      if (!PAI->isOnStack()) {
+        if (PAFrontier.empty()) {
+          ValueLifetimeAnalysis VLA(PAI, PAI->getUses());
+          pass.CFGChanged |= !VLA.computeFrontier(
+              PAFrontier, ValueLifetimeAnalysis::AllowToModifyCFG);
+          assert(!PAFrontier.empty() &&
+                 "partial_apply must have at least one use "
+                 "to release the returned function");
+        }
 
-      // Insert destroys of the box at each point where the partial_apply
-      // becomes dead.
-      for (SILInstruction *FrontierInst : PAFrontier) {
-        SILBuilderWithScope Builder(FrontierInst);
-        Builder.emitDestroyValueOperation(Apply.getLoc(), Box);
+        // Insert destroys of the box at each point where the partial_apply
+        // becomes dead.
+        for (SILInstruction *FrontierInst : PAFrontier) {
+          SILBuilderWithScope Builder(FrontierInst);
+          Builder.emitDestroyValueOperation(Apply.getLoc(), Box);
+        }
       }
     }
   }

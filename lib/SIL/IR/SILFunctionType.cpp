@@ -1212,10 +1212,20 @@ public:
                                 unsigned index, const AbstractionPattern &type,
                                 const TypeLowering &substTL) const {
     switch (ownership) {
-    case ValueOwnership::Default:
+    case ValueOwnership::Default: {
       if (forSelf)
         return getDirectSelfParameter(type);
-      return getDirectParameter(index, type, substTL);
+      auto convention = getDirectParameter(index, type, substTL);
+      // Nonescaping closures can only be borrowed across calls currently.
+      if (convention == ParameterConvention::Direct_Owned) {
+        if (auto fnTy = substTL.getLoweredType().getAs<SILFunctionType>()) {
+          if (fnTy->isTrivialNoEscape()) {
+            return ParameterConvention::Direct_Guaranteed;
+          }
+        }
+      }
+      return convention;
+    }
     case ValueOwnership::InOut:
       return ParameterConvention::Indirect_Inout;
     case ValueOwnership::Shared:

@@ -6,8 +6,8 @@ import resilient_struct
 
 // Resilient structs from outside our resilience domain are always address-only
 
-// CHECK-LABEL: sil hidden [ossa] @$s17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FXEtF : $@convention(thin) (@in_guaranteed Size, @noescape @callee_guaranteed (@in_guaranteed Size) -> @out Size) -> @out Size
-// CHECK:       bb0(%0 : $*Size, %1 : $*Size, %2 : $@noescape @callee_guaranteed (@in_guaranteed Size) -> @out Size):
+// CHECK-LABEL: sil hidden [ossa] @$s17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FXEtF : $@convention(thin) (@in_guaranteed Size, @guaranteed @noescape @callee_guaranteed (@in_guaranteed Size) -> @out Size) -> @out Size
+// CHECK:       bb0(%0 : $*Size, %1 : $*Size, %2 : @guaranteed $@noescape @callee_guaranteed (@in_guaranteed Size) -> @out Size):
 func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
   // Stored properties of resilient structs from outside our resilience
@@ -29,8 +29,7 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
   _ = s.h
 
-// CHECK:         apply %2(%0, %1)
-// CHECK-NOT:         destroy_value %2
+// CHECK:         apply {{.*}}(%0, %1)
 // CHECK:         return
   return f(s)
 }
@@ -54,8 +53,8 @@ func resilientInOutTest(_ s: inout Size) {
 
 // Fixed-layout structs may be trivial or loadable
 
-// CHECK-LABEL: sil hidden [ossa] @$s17struct_resilience28functionWithFixedLayoutTypes_1f010resilient_A05PointVAF_A2FXEtF : $@convention(thin) (Point, @noescape @callee_guaranteed (Point) -> Point) -> Point
-// CHECK:       bb0(%0 : $Point, %1 : $@noescape @callee_guaranteed (Point) -> Point):
+// CHECK-LABEL: sil hidden [ossa] @$s17struct_resilience28functionWithFixedLayoutTypes_1f010resilient_A05PointVAF_A2FXEtF : $@convention(thin) (Point, @guaranteed @noescape @callee_guaranteed (Point) -> Point) -> Point
+// CHECK:       bb0(%0 : $Point, %1 : @guaranteed $@noescape @callee_guaranteed (Point) -> Point):
 func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
 
   // Stored properties of fixed layout structs are accessed directly
@@ -69,15 +68,15 @@ func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
 // CHECK:         [[RESULT:%.*]] = struct_extract %0 : $Point, #Point.y
   _ = p.y
 
-// CHECK:         [[NEW_POINT:%.*]] = apply %1(%0)
+// CHECK:         [[NEW_POINT:%.*]] = apply {{.*}}(%0)
 // CHECK:         return [[NEW_POINT]]
   return f(p)
 }
 
 // Fixed-layout struct with resilient stored properties is still address-only
 
-// CHECK-LABEL: sil hidden [ossa] @$s17struct_resilience39functionWithFixedLayoutOfResilientTypes_1f010resilient_A09RectangleVAF_A2FXEtF : $@convention(thin) (@in_guaranteed Rectangle, @noescape @callee_guaranteed (@in_guaranteed Rectangle) -> @out Rectangle) -> @out Rectangle
-// CHECK:        bb0(%0 : $*Rectangle, %1 : $*Rectangle, %2 : $@noescape @callee_guaranteed (@in_guaranteed Rectangle) -> @out Rectangle):
+// CHECK-LABEL: sil hidden [ossa] @$s17struct_resilience39functionWithFixedLayoutOfResilientTypes_1f010resilient_A09RectangleVAF_A2FXEtF : $@convention(thin) (@in_guaranteed Rectangle, @guaranteed @noescape @callee_guaranteed (@in_guaranteed Rectangle) -> @out Rectangle) -> @out Rectangle
+// CHECK:        bb0(%0 : $*Rectangle, %1 : $*Rectangle, %2 : @guaranteed $@noescape @callee_guaranteed (@in_guaranteed Rectangle) -> @out Rectangle):
 func functionWithFixedLayoutOfResilientTypes(_ r: Rectangle, f: (Rectangle) -> Rectangle) -> Rectangle {
   return f(r)
 }
@@ -132,7 +131,7 @@ public struct MySize {
   public static var copyright: Int = 0
 }
 
-// CHECK-LABEL: sil [ossa] @$s17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EXEtF : $@convention(thin) (@in_guaranteed MySize, @noescape @callee_guaranteed (@in_guaranteed MySize) -> @out MySize) -> @out MySize
+// CHECK-LABEL: sil [ossa] @$s17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EXEtF : $@convention(thin) (@in_guaranteed MySize, @guaranteed @noescape @callee_guaranteed (@in_guaranteed MySize) -> @out MySize) -> @out MySize
 public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> MySize {
 
   // Stored properties of resilient structs from inside our resilience
@@ -152,8 +151,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK:         [[RESULT:%.*]] = load [trivial] [[RESULT_ADDR]] : $*Int
   _ = s.h
 
-// CHECK:         apply %2(%0, %1)
-// CHECK-NOT:         destroy_value %2
+// CHECK:         apply {{.*}}(%0, %1)
 // CHECK:         return
   return f(s)
 }

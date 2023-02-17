@@ -903,7 +903,7 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
       defUseWorklist.insert(copy);
       return true;
     }
-    if (auto *destroy = dyn_cast<DestroyValueInst>(user)) {
+    if (auto *destroy = dynCastToDestroyOf(user, getCurrentDef())) {
       // If this destroy was marked as a final destroy, ignore it; otherwise,
       // delete it.
       if (!consumes.claimConsume(destroy)) {

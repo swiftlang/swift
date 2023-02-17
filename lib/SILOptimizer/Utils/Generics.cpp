@@ -2268,9 +2268,17 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
 
     // An argument is converted from indirect to direct. Instead of the
     // address we pass the loaded value.
-    auto argConv = substConv.getSILArgumentConvention(ArgIdx);
+    SILArgumentConvention argConv(SILArgumentConvention::Direct_Unowned);
+    if (auto pai = dyn_cast<PartialApplyInst>(AI)) {
+      // On-stack partial applications borrow their captures, whereas heap
+      // partial applications take ownership.
+      argConv = pai->isOnStack() ? SILArgumentConvention::Direct_Guaranteed
+                                 : SILArgumentConvention::Direct_Owned;
+    } else {
+      argConv = substConv.getSILArgumentConvention(ArgIdx);
+    }
     SILValue Val;
-    if (!argConv.isGuaranteedConvention() || isa<PartialApplyInst>(AI)) {
+    if (!argConv.isGuaranteedConvention()) {
       Val = Builder.emitLoadValueOperation(Loc, InputValue,
                                            LoadOwnershipQualifier::Take);
     } else {
@@ -2432,15 +2440,19 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
   }
   case ApplySiteKind::PartialApplyInst: {
     auto *pai = cast<PartialApplyInst>(applySite);
+    // Let go of borrows introduced for stack closures.
+    if (pai->isOnStack() && pai->getFunction()->hasOwnership()) {
+      pai->visitOnStackLifetimeEnds([&](Operand *op) -> bool {
+        SILBuilderWithScope argBuilder(op->getUser()->getNextInstruction());
+        cleanupCallArguments(argBuilder, loc, arguments, argsNeedingEndBorrow);
+        return true;
+      });
+    }
     auto *newPAI = builder.createPartialApply(
         loc, callee, subs, arguments,
         pai->getType().getAs<SILFunctionType>()->getCalleeConvention(),
         pai->isOnStack());
-    // When we have a partial apply, we should always perform a load [take].
     pai->replaceAllUsesWith(newPAI);
-    assert(llvm::none_of(arguments,
-                         [](SILValue v) { return isa<LoadBorrowInst>(v); }) &&
-           "Partial apply consumes all of its parameters?!");
     return newPAI;
   }
   }

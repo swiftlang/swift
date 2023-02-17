@@ -152,9 +152,17 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 }
 
 const ParamDecl *getParamDeclFromOperand(SILValue value) {
-  // Look through mark must check.
-  if (auto *mmci = dyn_cast<MarkMustCheckInst>(value))
-    value = mmci->getOperand();
+  while (true) {
+    // Look through mark must check.
+    if (auto *mmci = dyn_cast<MarkMustCheckInst>(value)) {
+      value = mmci->getOperand();
+    // Look through copies.
+    } else if (auto *ci = dyn_cast<CopyValueInst>(value)) {
+      value = ci->getOperand();
+    } else {
+      break;
+    }
+  }
 
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *decl = dyn_cast_or_null<ParamDecl>(arg->getDecl()))
@@ -267,6 +275,14 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
   while (!uses.empty()) {
     Operand *oper = uses.pop_back_val();
     SILInstruction *user = oper->getUser();
+
+    // Look through copy_value.
+    if (auto *ci = dyn_cast<CopyValueInst>(user)) {
+      for (auto *use : ci->getUses()) {
+        uselistInsert(use);
+      }
+      continue;
+    }
 
     if (isIncidentalUse(user) || onlyAffectsRefCount(user))
       continue;
@@ -482,6 +498,10 @@ static void checkApply(ASTContext &Context, FullApplySite site) {
     if (auto *CI = dyn_cast<ConversionInst>(arg)) {
       arglistInsert(CI->getConverted(), /*capture=*/false);
       continue;
+    }
+    
+    if (auto *Copy = dyn_cast<CopyValueInst>(arg)) {
+      arglistInsert(Copy->getOperand(), capture);
     }
 
     // If one of our call arguments is a noescape parameter, diagnose the

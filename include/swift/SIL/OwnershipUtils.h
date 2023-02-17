@@ -285,6 +285,8 @@ public:
     Apply,
     TryApply,
     Yield,
+    PartialApplyStack,
+    BeginAsyncLet,
   };
 
 private:
@@ -295,8 +297,8 @@ public:
 
   operator Kind() const { return value; }
 
-  static BorrowingOperandKind get(SILInstructionKind kind) {
-    switch (kind) {
+  static BorrowingOperandKind get(SILInstruction *i) {
+    switch (i->getKind()) {
     default:
       return Kind::Invalid;
     case SILInstructionKind::BeginBorrowInst:
@@ -311,6 +313,15 @@ public:
       return Kind::TryApply;
     case SILInstructionKind::YieldInst:
       return Kind::Yield;
+    case SILInstructionKind::PartialApplyInst:
+      return Kind::PartialApplyStack;
+    case SILInstructionKind::BuiltinInst: {
+      auto bi = cast<BuiltinInst>(i);
+      if (bi->getBuiltinKind() == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+        return Kind::BeginAsyncLet;
+      }
+      return Kind::Invalid;
+    }
     }
   }
 
@@ -338,7 +349,7 @@ struct BorrowingOperand {
   BorrowingOperandKind kind;
 
   BorrowingOperand(Operand *op)
-      : op(op), kind(BorrowingOperandKind::get(op->getUser()->getKind())) {
+      : op(op), kind(BorrowingOperandKind::get(op->getUser())) {
     auto ownership = op->getOperandOwnership();
     if (ownership != OperandOwnership::Borrow
         && ownership != OperandOwnership::Reborrow) {
@@ -405,6 +416,8 @@ struct BorrowingOperand {
     case BorrowingOperandKind::Apply:
     case BorrowingOperandKind::TryApply:
     case BorrowingOperandKind::Yield:
+    case BorrowingOperandKind::PartialApplyStack:
+    case BorrowingOperandKind::BeginAsyncLet:
       return false;
     case BorrowingOperandKind::Branch:
       return true;
@@ -435,6 +448,8 @@ struct BorrowingOperand {
     case BorrowingOperandKind::Apply:
     case BorrowingOperandKind::TryApply:
     case BorrowingOperandKind::Yield:
+    case BorrowingOperandKind::PartialApplyStack:
+    case BorrowingOperandKind::BeginAsyncLet:
       return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
