@@ -81,6 +81,9 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether this is a resolution based on a pack reference.
   FromPackReference = 1 << 12,
+
+  /// Whether this resolution happens under an explicit ownership specifier.
+  HasOwnership = 1 << 13,
 };
 
 /// Type resolution contexts that require special handling.
