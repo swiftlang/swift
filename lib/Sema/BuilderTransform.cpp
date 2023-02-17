@@ -886,15 +886,15 @@ protected:
     }
 
     if (cs) {
-     SolutionApplicationTarget target(
-         throwStmt->getSubExpr(), dc, CTP_ThrowStmt,
-         ctx.getErrorExistentialType(),
-         /*isDiscarded=*/false);
-     if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
-       hadError = true;
+      SolutionApplicationTarget target(throwStmt->getSubExpr(), dc,
+                                       CTP_ThrowStmt,
+                                       ctx.getErrorExistentialType(),
+                                       /*isDiscarded=*/false);
+      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
+        hadError = true;
 
-     cs->setSolutionApplicationTarget(throwStmt, target);
-   }
+      cs->setSolutionApplicationTarget(throwStmt, target);
+    }
 
     return nullptr;
   }
