@@ -4411,7 +4411,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    if (Type memberArchetypeByName = archetypeParent->getNestedTypeByName(name))
+    if (Type memberArchetypeByName = archetypeParent->getNestedType(assocType))
       return memberArchetypeByName;
 
     // If looking for an associated type and the archetype is constrained to a
