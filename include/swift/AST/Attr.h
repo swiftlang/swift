@@ -58,6 +58,7 @@ class ClassDecl;
 class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
+class ModuleDecl;
 class PatternBindingInitializer;
 class TrailingWhereClause;
 class TypeExpr;
@@ -2579,6 +2580,59 @@ public:
   }
 
   SourceLoc getStartLoc(bool forModifiers = false) const;
+};
+
+/// Attributes applied directly to the declaration.
+///
+/// We should really just have \c DeclAttributes and \c SemanticDeclAttributes,
+/// but currently almost all callers expect the latter. Instead of changing all
+/// callers of \c getAttrs, instead provide a way to retrieive the original
+/// attributes.
+class OrigDeclAttributes {
+  SmallVector<DeclAttribute *> attributes;
+  using AttrListTy = SmallVectorImpl<DeclAttribute *>;
+
+public:
+  OrigDeclAttributes() = default;
+
+  OrigDeclAttributes(DeclAttributes semanticAttrs, ModuleDecl *mod);
+
+
+  using iterator = AttrListTy::iterator;
+  using const_iterator = AttrListTy::const_iterator;
+
+  iterator begin() { return attributes.begin(); }
+  iterator end() { return attributes.end(); }
+  const_iterator begin() const { return attributes.begin(); }
+  const_iterator end() const { return attributes.end(); }
+
+  template <typename AttrType, bool AllowInvalid>
+  using AttributeKindRange =
+  OptionalTransformRange<iterator_range<const_iterator>,
+  ToAttributeKind<AttrType, AllowInvalid>, const_iterator>;
+
+  template <typename AttrType, bool AllowInvalid = false>
+  AttributeKindRange<AttrType, AllowInvalid> getAttributes() const {
+    return AttributeKindRange<AttrType, AllowInvalid>(make_range(begin(), end()), ToAttributeKind<AttrType, AllowInvalid>());
+  }
+
+  /// Retrieve the first attribute of the given attribute class.
+  template <typename AttrType>
+  const AttrType *getAttribute(bool allowInvalid = false) const {
+    for (auto *attr : attributes) {
+      if (auto *specificAttr = dyn_cast<AttrType>(attr)) {
+        if (specificAttr->isValid() || allowInvalid)
+          return specificAttr;
+      }
+    }
+    return nullptr;
+  }
+
+  /// Determine whether there is an attribute with the given attribute class.
+  template <typename AttrType>
+  bool hasAttribute(bool allowInvalid = false) const {
+    return getAttribute<AttrType>(allowInvalid) != nullptr;
+  }
 };
 
 /// TypeAttributes - These are attributes that may be applied to types.

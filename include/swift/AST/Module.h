@@ -349,6 +349,10 @@ public:
   /// \c nullptr if the source location isn't in this module.
   SourceFile *getSourceFileContainingLocation(SourceLoc loc);
 
+  /// Whether the given location is inside a generated buffer, \c false if
+  /// the given location isn't in this module.
+  bool isInGeneratedBuffer(SourceLoc loc);
+
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
   /// strings, diagnosing any conflicts.
   ///
