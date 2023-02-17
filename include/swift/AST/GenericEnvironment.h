@@ -200,6 +200,9 @@ public:
   void forEachPackElementArchetype(
           llvm::function_ref<void(ElementArchetypeType*)> function) const;
 
+  void forEachPackElementGenericTypeParam(
+      llvm::function_ref<void(GenericTypeParamType *)> function) const;
+
   using PackElementBindingCallback =
     llvm::function_ref<void(ElementArchetypeType *elementType,
                             PackType *packSubstitution)>;
