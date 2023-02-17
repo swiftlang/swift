@@ -132,6 +132,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   case swift::DeclKind::TypeAlias:
   case swift::DeclKind::AssociatedType:
   case swift::DeclKind::Extension:
+  case swift::DeclKind::Macro:
     break;
 
   // We'll descend into everything else.
