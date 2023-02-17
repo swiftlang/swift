@@ -5240,7 +5240,7 @@ public:
           baseTy,
           leafTy,
           component,
-          KPI->getAllOperands(),
+          KPI->getPatternOperands(),
           KPI->getPattern()->getGenericSignature(),
           KPI->getSubstitutions(),
           /*property descriptor*/false,
