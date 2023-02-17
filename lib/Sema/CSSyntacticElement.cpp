@@ -580,7 +580,7 @@ private:
         forEachStmt, context.getAsDeclContext(),
         /*bindTypeVarsOneWay=*/false);
 
-    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+    if (cs.generateConstraints(target)) {
       hadError = true;
       return;
     }
@@ -734,7 +734,7 @@ private:
     if (isPlaceholderVar(patternBinding))
       return;
 
-    if (cs.generateConstraints(*target, FreeTypeVariableBinding::Disallow)) {
+    if (cs.generateConstraints(*target)) {
       hadError = true;
       return;
     }
@@ -1128,7 +1128,7 @@ private:
                                      contextualResultInfo.getType(),
                                      /*isDiscarded=*/false);
 
-    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+    if (cs.generateConstraints(target)) {
       hadError = true;
       return;
     }
@@ -1430,7 +1430,7 @@ ConstraintSystem::simplifySyntacticElementConstraint(
                                      contextInfo.purpose, contextInfo.getType(),
                                      contextualTypeLoc, isDiscarded);
 
-    if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+    if (generateConstraints(target))
       return SolutionKind::Error;
 
     setSolutionApplicationTarget(expr, target);

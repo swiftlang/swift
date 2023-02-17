@@ -4074,7 +4074,7 @@ namespace {
         auto &CS = CG.getConstraintSystem();
         for (const auto &capture : captureList->getCaptureList()) {
           SolutionApplicationTarget target(capture.PBD);
-          if (CS.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+          if (CS.generateConstraints(target))
             return Action::Stop();
         }
       }
@@ -4327,8 +4327,7 @@ generateForEachStmtConstraints(
         TypeLoc::withoutLoc(sequenceProto->getDeclaredInterfaceType()),
         CTP_ForEachSequence);
 
-    if (cs.generateConstraints(makeIteratorTarget,
-                               FreeTypeVariableBinding::Disallow))
+    if (cs.generateConstraints(makeIteratorTarget))
       return None;
 
     forEachStmtInfo.makeIteratorVar = PB;
@@ -4613,7 +4612,7 @@ bool ConstraintSystem::generateConstraints(
                          : SolutionApplicationTarget::forUninitializedVar(
                                patternBinding, index, patternType);
 
-      if (generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      if (generateConstraints(target)) {
         hadError = true;
         continue;
       }
@@ -4698,7 +4697,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
       auto target = SolutionApplicationTarget(symbolExpr, dc, CTP_Unused,
                                               Type(), /*isDiscarded=*/false);
 
-      if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+      if (generateConstraints(target))
         return true;
 
       setSolutionApplicationTarget(&condElement, target);
