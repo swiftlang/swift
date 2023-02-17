@@ -1865,7 +1865,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
           NewVarInfo.Type = STI->getType();
 
         // Create a new debug_value
-        SILBuilder(DbgInst, DbgInst->getDebugScope())
+        SILBuilder(STI, DbgInst->getDebugScope())
           .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
       }
     }
@@ -1892,7 +1892,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
             continue;
           VarInfo->DIExpr.prependElements(ExprElements);
           // Create a new debug_value
-          SILBuilder(DbgInst, DbgInst->getDebugScope())
+          SILBuilder(IA, DbgInst->getDebugScope())
             .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
         }
       }
