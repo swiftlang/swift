@@ -225,3 +225,13 @@ func testCompleteAfterPatternInClosure() {
 
   // AFTER_PATTERN_IN_CLOSURE-NOT: Begin completions
 }
+
+func testIfLetInClosure(foo: Int?) {
+  func takeClosure(_ x: () -> Void) {}
+
+  takeClosure {
+    if let items#^IF_LET_IN_CLOSURE^# = foo {
+    }
+  }
+  // IF_LET_IN_CLOSURE-NOT: Begin completions
+}

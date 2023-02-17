@@ -156,6 +156,10 @@ void PostfixCompletionCallback::sawSolutionImpl(
   auto *ParsedExpr = CompletionExpr->getBase();
   auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
 
+  if (!S.hasType(ParsedExpr)) {
+    return;
+  }
+
   auto BaseTy = getTypeForCompletion(S, ParsedExpr);
   // If base type couldn't be determined (e.g. because base expression
   // is an invalid reference), let's not attempt to do a lookup since
