@@ -28,6 +28,21 @@ public var benchmarks: [BenchmarkInfo] = [
     setUpFunction: buffer1000Setup,
     tearDownFunction: bufferTeardown
   ),
+  // size 128, alignment 0
+  BenchmarkInfo(
+    name: "RawBuffer.128.findFirst",
+    runFunction: run_BufferFindFirst,
+    tags: [.validation, .api, .skip],
+    setUpFunction: buffer128Setup,
+    tearDownFunction: bufferTeardown
+  ),
+  BenchmarkInfo(
+    name: "RawBuffer.128.findLast",
+    runFunction: run_BufferFindLast,
+    tags: [.validation, .api],
+    setUpFunction: buffer128Setup,
+    tearDownFunction: bufferTeardown
+  ),
   // size 39, alignment 0
   BenchmarkInfo(
     name: "RawBuffer.39.findFirst",
@@ -64,6 +79,10 @@ var buffer: UnsafeMutableRawBufferPointer = .init(start: nil, count: 0)
 
 func buffer1000Setup() {
   bufferSetup(size: 1000, alignment: 0)
+}
+
+func buffer128Setup() {
+  bufferSetup(size: 128, alignment: 0)
 }
 
 func buffer39Setup() {

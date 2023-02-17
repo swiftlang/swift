@@ -53,6 +53,10 @@ emitTypeMetadataPackRef(IRGenFunction &IGF,
                         CanPackType packType,
                         DynamicMetadataRequest request);
 
+void bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
+                                        GenericEnvironment *env,
+                                        llvm::Value *index);
+
 llvm::Value *
 emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
                                ArrayRef<ProtocolDecl *> protocols,

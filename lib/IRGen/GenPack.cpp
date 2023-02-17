@@ -262,16 +262,13 @@ static llvm::Value *bindWitnessTableAtIndex(IRGenFunction &IGF,
 }
 
 struct OpenedElementContext {
-  GenericEnvironment *packEnvironment;
-  CanGenericSignature packSignature;
-
-  GenericEnvironment *elementEnvironment;
-  CanGenericSignature elementSignature;
+  GenericEnvironment *environment;
+  CanGenericSignature signature;
 
   static OpenedElementContext
   createForPackExpansion(IRGenFunction &IGF, CanPackExpansionType expansionTy) {
     // Get the outer generic signature and environment.
-    auto *genericEnv = cast<PackArchetypeType>(expansionTy.getCountType())
+    auto *genericEnv = cast<ArchetypeType>(expansionTy.getCountType())
                            ->getGenericEnvironment();
     auto subMap = genericEnv->getForwardingSubstitutionMap();
 
@@ -282,7 +279,7 @@ struct OpenedElementContext {
     auto *elementEnv = GenericEnvironment::forOpenedElement(
         elementSig, UUID::fromTime(), expansionTy.getCountType(), subMap);
 
-    return {genericEnv, genericSig, elementEnv, elementSig};
+    return {elementEnv, elementSig};
   }
 };
 
@@ -290,7 +287,7 @@ static void bindElementSignatureRequirementsAtIndex(
     IRGenFunction &IGF, OpenedElementContext const &context, llvm::Value *index,
     DynamicMetadataRequest request) {
   enumerateGenericSignatureRequirements(
-      context.elementSignature, [&](GenericRequirement requirement) {
+      context.signature, [&](GenericRequirement requirement) {
         switch (requirement.getKind()) {
         case GenericRequirement::Kind::Shape:
         case GenericRequirement::Kind::Metadata:
@@ -299,12 +296,12 @@ static void bindElementSignatureRequirementsAtIndex(
         case GenericRequirement::Kind::MetadataPack: {
           auto ty = requirement.getTypeParameter();
           auto patternPackArchetype = cast<PackArchetypeType>(
-              context.packEnvironment->mapTypeIntoContext(ty)
+              context.environment->maybeApplyOuterContextSubstitutions(ty)
                   ->getCanonicalType());
           auto response =
               IGF.emitTypeMetadataRef(patternPackArchetype, request);
           auto elementArchetype =
-              context.elementEnvironment
+              context.environment
                   ->mapPackTypeIntoElementContext(
                       patternPackArchetype->getInterfaceType())
                   ->getCanonicalType();
@@ -319,20 +316,20 @@ static void bindElementSignatureRequirementsAtIndex(
           auto ty = requirement.getTypeParameter();
           auto proto = requirement.getProtocol();
           auto patternPackArchetype = cast<PackArchetypeType>(
-              context.packEnvironment->mapTypeIntoContext(ty)
+              context.environment->maybeApplyOuterContextSubstitutions(ty)
                   ->getCanonicalType());
           auto elementArchetype =
-              context.elementEnvironment
+              context.environment
                   ->mapPackTypeIntoElementContext(
                       patternPackArchetype->getInterfaceType())
                   ->getCanonicalType();
           llvm::Value *_metadata = nullptr;
           auto packConformance =
-              context.packSignature->lookupConformance(ty, proto);
+              context.signature->lookupConformance(ty, proto);
           auto *wtablePack = emitWitnessTableRef(IGF, patternPackArchetype,
                                                  &_metadata, packConformance);
           auto elementConformance =
-              context.elementSignature->lookupConformance(ty, proto);
+              context.signature->lookupConformance(ty, proto);
           auto *wtable = bindWitnessTableAtIndex(
               IGF, elementArchetype, elementConformance, wtablePack, index);
           assert(wtable);
@@ -350,7 +347,7 @@ static llvm::Value *emitPackExpansionElementMetadata(
 
   // Replace pack archetypes with element archetypes in the pattern type.
   auto instantiatedPatternTy =
-      context.elementEnvironment
+      context.environment
           ->mapPackTypeIntoElementContext(patternTy->mapTypeOutOfContext())
           ->getCanonicalType();
 
@@ -526,11 +523,11 @@ static llvm::Value *emitPackExpansionElementWitnessTable(
 
   // Replace pack archetypes with element archetypes in the pattern type.
   auto instantiatedPatternTy =
-      context.elementEnvironment
+      context.environment
           ->mapPackTypeIntoElementContext(patternTy->mapTypeOutOfContext())
           ->getCanonicalType();
   auto instantiatedConformance =
-      context.elementEnvironment->getGenericSignature()->lookupConformance(
+      context.environment->getGenericSignature()->lookupConformance(
           instantiatedPatternTy, conformance.getRequirement());
 
   // Emit the element witness table.
@@ -646,7 +643,7 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
     ArrayRef<ProtocolDecl *> protocols, llvm::Value *index,
     DynamicMetadataRequest request,
     llvm::SmallVectorImpl<llvm::Value *> &wtables) {
-  // If the packs have already been materialized, just gep into it.
+  // If the packs have already been materialized, just gep into them.
   auto materializedMetadataPack =
       tryGetLocalPackTypeMetadata(IGF, packType, request);
   llvm::SmallVector<llvm::Value *> materializedWtablePacks;
@@ -692,9 +689,8 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
     auto response = IGF.emitTypeMetadataRef(ty, request);
     auto *metadata = response.getMetadata();
     for (auto protocol : protocols) {
-      llvm::Value *_metadata = nullptr;
       auto *wtable =
-          emitWitnessTableRef(IGF, ty, /*srcMetadataCache=*/&_metadata,
+          emitWitnessTableRef(IGF, ty, /*srcMetadataCache=*/&metadata,
                               ProtocolConformanceRef(protocol));
       wtables.push_back(wtable);
     }
@@ -916,6 +912,71 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
     wtables.push_back(wtablePhi);
   }
   return metadataPhi;
+}
+
+void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
+                                               GenericEnvironment *environment,
+                                               llvm::Value *index) {
+  assert(environment->getKind() == GenericEnvironment::Kind::OpenedElement);
+
+  // Record the generic type parameters of interest.
+  llvm::SmallPtrSet<CanType, 2> openablePackParams;
+  environment->forEachPackElementGenericTypeParam([&](auto *genericParam) {
+    openablePackParams.insert(genericParam->getCanonicalType());
+  });
+
+  // Find the archetypes and conformances which must be bound.
+  llvm::SmallSetVector<CanType, 2> types;
+  llvm::DenseMap<CanType, llvm::SmallVector<ProtocolDecl *, 2>>
+      protocolsForType;
+  auto isDerivedFromPackElementGenericTypeParam = [&](CanType ty) -> bool {
+    // Is this type itself an openable pack parameter OR a dependent type of
+    // one?
+    return openablePackParams.contains(
+        ty->getRootGenericParam()->getCanonicalType());
+  };
+  enumerateGenericSignatureRequirements(
+      environment->getGenericSignature().getCanonicalSignature(),
+      [&](GenericRequirement requirement) {
+        switch (requirement.getKind()) {
+        case GenericRequirement::Kind::MetadataPack: {
+          auto ty = requirement.getTypeParameter();
+          if (!isDerivedFromPackElementGenericTypeParam(ty))
+            return;
+          types.insert(ty);
+          protocolsForType.insert({ty, {}});
+          break;
+        }
+        case GenericRequirement::Kind::WitnessTablePack: {
+          auto ty = requirement.getTypeParameter();
+          if (!isDerivedFromPackElementGenericTypeParam(ty))
+            return;
+          types.insert(ty);
+          auto iterator = protocolsForType.insert({ty, {}}).first;
+          iterator->getSecond().push_back(requirement.getProtocol());
+          break;
+        }
+        case GenericRequirement::Kind::Shape:
+        case GenericRequirement::Kind::Metadata:
+        case GenericRequirement::Kind::WitnessTable:
+          break;
+        }
+      });
+
+  // For each archetype to be bound, find the corresponding conformances and
+  // bind the metadata and wtables.
+  for (auto ty : types) {
+    auto protocols = protocolsForType.find(ty)->getSecond();
+    auto archetype = cast<ElementArchetypeType>(
+        environment->mapPackTypeIntoElementContext(ty)->getCanonicalType());
+    auto pack =
+        cast<PackType>(environment->maybeApplyOuterContextSubstitutions(ty)
+                           ->getCanonicalType());
+    llvm::SmallVector<llvm::Value *, 2> wtables;
+    auto *metadata = emitTypeMetadataPackElementRef(
+        IGF, pack, protocols, index, MetadataState::Complete, wtables);
+    IGF.bindArchetype(archetype, metadata, MetadataState::Complete, wtables);
+  }
 }
 
 void irgen::cleanupTypeMetadataPack(IRGenFunction &IGF,
