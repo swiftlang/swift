@@ -1275,9 +1275,11 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
               first = builder.createOwnedMoveOnlyWrapperToCopyableValue(
                   getSafeLoc(inst), first);
             }
+            // NOTE: oldInst may be nullptr if our operand is a SILArgument
+            // which can happen with switch_enum.
             SILInstruction *oldInst = operand.get()->getDefiningInstruction();
             operand.set(first);
-            if (deleter)
+            if (oldInst && deleter)
               deleter->forceTrackAsDead(oldInst);
             continue;
           }
@@ -1309,9 +1311,11 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
           // NOTE: This needs to be /after/the interior pointer operand usage
           // above so that we can use the end scope of our interior pointer base
           // value.
+          // NOTE: oldInst may be nullptr if our operand is a SILArgument
+          // which can happen with switch_enum.
           SILInstruction *oldInst = operand.get()->getDefiningInstruction();
           operand.set(innerValue);
-          if (deleter)
+          if (oldInst && deleter)
             deleter->forceTrackAsDead(oldInst);
           continue;
         }
@@ -1370,9 +1374,11 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 borrowBuilder.createGuaranteedMoveOnlyWrapperToCopyableValue(
                     loc, value);
           }
+          // NOTE: oldInst may be nullptr if our operand is a SILArgument
+          // which can happen with switch_enum.
           auto *oldInst = operand.get()->getDefiningInstruction();
           operand.set(value);
-          if (deleter)
+          if (oldInst && deleter)
             deleter->forceTrackAsDead(oldInst);
 
           // If we have a terminator that is a trivial use (e.x.: we
@@ -1443,9 +1449,11 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
           iterValue = consumeBuilder.createOwnedMoveOnlyWrapperToCopyableValue(
               loc, iterValue);
         }
+        // NOTE: oldInst may be nullptr if our operand is a SILArgument
+        // which can happen with switch_enum.
         auto *oldInst = operand.get()->getDefiningInstruction();
         operand.set(iterValue);
-        if (deleter)
+        if (oldInst && deleter)
           deleter->forceTrackAsDead(oldInst);
 
         // Then go through our available values and use the interval map to
