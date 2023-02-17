@@ -7,11 +7,11 @@ add_swift_host_tool(swift-compatibility-symbols
 set(syms_file "${CMAKE_BINARY_DIR}/share/swift/compatibility-symbols")
 
 add_custom_command_target(copy_compat_target
-  OUTPUT
-    ${syms_file}
   COMMAND
     "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swift-compatibility-symbols"
-      --output-filename ${syms_file}
+    --output-filename ${syms_file}
+  OUTPUT
+    ${syms_file}
   DEPENDS
     swift-compatibility-symbols
 )
