@@ -62,7 +62,7 @@ struct OverrideSection {
 };
 
 OverrideSection RuntimeOverrides
-    __attribute__((section("__DATA,__swift58_hooks"))) = {
+    __attribute__((section("__DATA," COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime))) = {
         0,
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   name ## Override,
