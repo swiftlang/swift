@@ -35,9 +35,9 @@ enum GeneralCategory: String {
   case currencySymbol = "Sc"
   case modifierSymbol = "Sk"
   case otherSymbol = "So"
-  case spaceSeperator = "Zs"
-  case lineSeperator = "Zl"
-  case paragraphSeperator = "Zp"
+  case spaceSeparator = "Zs"
+  case lineSeparator = "Zl"
+  case paragraphSeparator = "Zp"
   case control = "Cc"
   case format = "Cf"
   case surrogate = "Cs"
@@ -90,11 +90,11 @@ enum GeneralCategory: String {
       return 20
     case .otherSymbol:
       return 21
-    case .spaceSeperator:
+    case .spaceSeparator:
       return 22
-    case .lineSeperator:
+    case .lineSeparator:
       return 23
-    case .paragraphSeperator:
+    case .paragraphSeparator:
       return 24
     case .control:
       return 25
