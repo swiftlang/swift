@@ -3764,22 +3764,50 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
     if (!cxxMethod)
       continue;
 
+    auto conformsToRACollection = [&](auto baseType) {
+      auto raCollectionProto =
+          ctx.getProtocol(KnownProtocolKind::CxxRandomAccessCollection);
+      SmallVector<ProtocolConformance *, 2> scratch;
+      return baseType->getAnyNominal()->lookupConformance(raCollectionProto,
+                                                          scratch);
+    };
+
+    // Rewrite front() and back() as first and last.
+    if ((name.getBaseIdentifier().str() == "front" ||
+         name.getBaseIdentifier().str() == "back") &&
+        cxxMethod->getReturnType()->isReferenceType() &&
+        conformsToRACollection(baseType)) {
+      auto dotExpr = getAsExpr<UnresolvedDotExpr>(anchor);
+      auto callExpr = getAsExpr<CallExpr>(findParentExpr(dotExpr));
+
+      ctx.Diags
+          .diagnose(loc, diag::projection_not_imported,
+                    name.getBaseIdentifier().str(), "reference")
+          .fixItReplaceChars(
+              loc, loc.getAdvancedLoc(name.getBaseIdentifier().str().size()),
+              name.getBaseIdentifier().str() == "front" ? "first" : "last")
+          .fixItRemove({callExpr->getArgs()->getStartLoc(),
+                        callExpr->getArgs()->getEndLoc().getAdvancedLoc(1)});
+    }
+
+    // Rewrite begin() and end() as calls to makeIterator().
     if (name.getBaseIdentifier().str() == "begin" ||
         name.getBaseIdentifier().str() == "end") {
-      ctx.Diags.diagnose(loc, diag::dont_use_iterator_api,
-                         name.getBaseIdentifier().str());
+      if (conformsToRACollection(baseType)) {
+        ctx.Diags
+            .diagnose(loc, diag::dont_use_iterator_api,
+                      name.getBaseIdentifier().str())
+            .fixItReplaceChars(
+                loc, loc.getAdvancedLoc(name.getBaseIdentifier().str().size()),
+                "makeIterator");
+      } else {
+        ctx.Diags.diagnose(loc, diag::dont_use_iterator_api,
+                           name.getBaseIdentifier().str());
+      }
     } else if (cxxMethod->getReturnType()->isPointerType())
       ctx.Diags.diagnose(loc, diag::projection_not_imported,
                          name.getBaseIdentifier().str(), "pointer");
     else if (cxxMethod->getReturnType()->isReferenceType()) {
-      auto conformsToRACollection = [&](auto baseType) {
-        auto raCollectionProto =
-            ctx.getProtocol(KnownProtocolKind::CxxRandomAccessCollection);
-        SmallVector<ProtocolConformance *, 2> scratch;
-        return baseType->getAnyNominal()->lookupConformance(raCollectionProto,
-                                                            scratch);
-      };
-
       // Rewrite a call to .at(42) as a subscript.
       if (name.getBaseIdentifier().str() == "at" &&
           cxxMethod->getReturnType()->isReferenceType() &&
@@ -3787,8 +3815,9 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
         auto dotExpr = getAsExpr<UnresolvedDotExpr>(anchor);
         auto callExpr = getAsExpr<CallExpr>(findParentExpr(dotExpr));
 
+        // Note "did you want to use subscript" only applies to at
         ctx.Diags
-            .diagnose(loc, diag::projection_not_imported,
+            .diagnose(loc, diag::projection_at_not_imported,
                       name.getBaseIdentifier().str(), "reference")
             .fixItRemove(
                 {dotExpr->getDotLoc(), callExpr->getArgs()->getStartLoc()})
@@ -3896,7 +3925,6 @@ bool MissingMemberFailure::diagnoseAsError() {
     if (!ctx.LangOpts.DisableExperimentalClangImporterDiagnostics) {
       ctx.getClangModuleLoader()->diagnoseMemberValue(getName().getFullName(),
                                                       baseType);
-      getSourceRange().dump(ctx.SourceMgr);
       diagnoseUnsafeCxxMethod(getLoc(), anchor, baseType,
                               getName().getFullName());
     }

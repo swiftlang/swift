@@ -171,7 +171,10 @@ NOTE(record_not_automatically_importable, none, "record '%0' is not "
                                                 "Manual to classify this type.",
      (StringRef, StringRef))
 NOTE(projection_not_imported, none, "C++ method '%0' that returns unsafe "
-                                    "projection of type '%1' not imported. "
+                                    "projection of type '%1' is unavailable. ",
+     (StringRef, StringRef))
+NOTE(projection_at_not_imported, none, "C++ method '%0' that returns unsafe "
+                                    "projection of type '%1' is unavailable. "
                                     "Do you want to replace it with a call "
                                     "to the subscript operator?",
      (StringRef, StringRef))
