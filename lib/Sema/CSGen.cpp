@@ -4768,9 +4768,15 @@ bool ConstraintSystem::generateConstraints(
     // Generate constraints for the guard expression, if there is one.
     Expr *guardExpr = caseLabelItem.getGuardExpr();
     if (guardExpr) {
-      guardExpr = generateConstraints(guardExpr, dc);
-      if (!guardExpr)
+      auto &ctx = dc->getASTContext();
+      SolutionApplicationTarget guardTarget(
+          guardExpr, dc, CTP_Condition, ctx.getBoolType(), /*discarded*/ false);
+
+      if (generateConstraints(guardTarget))
         return true;
+
+      guardExpr = guardTarget.getAsExpr();
+      setSolutionApplicationTarget(guardExpr, guardTarget);
     }
 
     // Save this info.

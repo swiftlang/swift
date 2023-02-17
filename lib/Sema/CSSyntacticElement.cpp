@@ -529,6 +529,9 @@ public:
   void visitCaseItem(CaseLabelItem *caseItem, ContextualTypeInfo contextInfo) {
     assert(contextInfo.purpose == CTP_CaseStmt);
 
+    auto *DC = context.getAsDeclContext();
+    auto &ctx = DC->getASTContext();
+
     // Resolve the pattern.
     auto *pattern = caseItem->getPattern();
     if (!caseItem->isPatternResolved()) {
@@ -554,11 +557,15 @@ public:
 
     // Generate constraints for `where` clause (if any).
     if (guardExpr) {
-      guardExpr = cs.generateConstraints(guardExpr, context.getAsDeclContext());
-      if (!guardExpr) {
+      SolutionApplicationTarget guardTarget(
+          guardExpr, DC, CTP_Condition, ctx.getBoolType(), /*discarded*/ false);
+
+      if (cs.generateConstraints(guardTarget)) {
         hadError = true;
         return;
       }
+      guardExpr = guardTarget.getAsExpr();
+      cs.setSolutionApplicationTarget(guardExpr, guardTarget);
     }
 
     // Save information about case item so it could be referenced during
