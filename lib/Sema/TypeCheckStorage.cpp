@@ -282,10 +282,20 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
 /// This query is careful not to trigger accessor macro expansion, which
 /// creates a cycle. It conservatively assumes that all accessor macros
 /// produce computed properties, which is... incorrect.
+///
+/// The query also avoids triggering a `StorageImplInfoRequest` for patterns
+/// involved in a ProtocolDecl, because we know they can never contain storage.
+/// For background, vars of noncopyable type have their OpaqueReadOwnership
+/// determined by the type of the var decl, but that type hasn't always been
+/// determined when this query is made.
 static bool mayHaveStorage(Pattern *pattern) {
-  // Check whether there are any accessor macros.
+  // Check whether there are any accessor macros, or it's a protocol member.
   bool hasAccessorMacros = false;
+  bool inProtocolDecl = false;
   pattern->forEachVariable([&](VarDecl *VD) {
+    if (isa<ProtocolDecl>(VD->getDeclContext()))
+      inProtocolDecl = true;
+
     VD->forEachAttachedMacro(MacroRole::Accessor,
       [&](CustomAttr *customAttr, MacroDecl *macro) {
         hasAccessorMacros = true;
@@ -293,6 +303,10 @@ static bool mayHaveStorage(Pattern *pattern) {
   });
 
   if (hasAccessorMacros)
+    return false;
+
+  // protocol members can never contain storage; avoid triggering request.
+  if (inProtocolDecl)
     return false;
 
   return pattern->hasStorage();
@@ -599,9 +613,13 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
 OpaqueReadOwnership
 OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
                                      AbstractStorageDecl *storage) const {
-  return (storage->getAttrs().hasAttribute<BorrowedAttr>()
-          ? OpaqueReadOwnership::Borrowed
-          : OpaqueReadOwnership::Owned);
+  if (storage->getAttrs().hasAttribute<BorrowedAttr>())
+    return OpaqueReadOwnership::Borrowed;
+
+  if (storage->getValueInterfaceType()->isPureMoveOnly())
+    return OpaqueReadOwnership::Borrowed;
+
+  return OpaqueReadOwnership::Owned;
 }
 
 /// Insert the specified decl into the DeclContext's member list.  If the hint
