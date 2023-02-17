@@ -1541,6 +1541,10 @@ def disable_remove_deprecated_check: Flag<["-", "--"], "disable-remove-deprecate
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Skip diagnosing removal of deprecated symbols">;
 
+def enable_remove_deprecated_check: Flag<["-", "--"], "enable-remove-deprecated-check">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Diagnosing removal of deprecated symbols">;
+
 def print_module: Flag<["-", "--"], "print-module">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Print module names in diagnostics">;
