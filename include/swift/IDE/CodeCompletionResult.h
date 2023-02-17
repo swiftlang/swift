@@ -337,7 +337,7 @@ class ContextFreeCodeCompletionResult {
   bool IsSystem : 1;
   bool IsAsync : 1;
   /// Whether the result has been annotated as having an async alternative that
-  /// should be prefered in async contexts.
+  /// should be preferred in async contexts.
   bool HasAsyncAlternative : 1;
   CodeCompletionString *CompletionString;
   NullTerminatedStringRef ModuleName;
@@ -355,7 +355,7 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef FilterName;
 
   /// If the result represents a \c ValueDecl the name by which this decl should
-  /// be refered to in diagnostics.
+  /// be referred to in diagnostics.
   NullTerminatedStringRef NameForDiagnostics;
 
 public:

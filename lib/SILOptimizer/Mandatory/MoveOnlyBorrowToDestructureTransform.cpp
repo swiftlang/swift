@@ -606,7 +606,7 @@ struct TypeOffsetSizePair {
       }
 
       // At this point, we know that our type is not a subtype of this
-      // type. Some sort of logic error occured.
+      // type. Some sort of logic error occurred.
       llvm_unreachable("Not a child of this type?!");
     }
 
@@ -640,7 +640,7 @@ struct TypeOffsetSizePair {
       }
 
       // At this point, we know that our type is not a subtype of this
-      // type. Some sort of logic error occured.
+      // type. Some sort of logic error occurred.
       llvm_unreachable("Not a child of this type?!");
     }
 
@@ -699,7 +699,7 @@ struct TypeOffsetSizePair {
       }
 
       // At this point, we know that our type is not a subtype of this
-      // type. Some sort of logic error occured.
+      // type. Some sort of logic error occurred.
       llvm_unreachable("Not a child of this type?!");
     }
 
@@ -736,7 +736,7 @@ struct TypeOffsetSizePair {
       }
 
       // At this point, we know that our type is not a subtype of this
-      // type. Some sort of logic error occured.
+      // type. Some sort of logic error occurred.
       llvm_unreachable("Not a child of this type?!");
     }
 
