@@ -2419,10 +2419,6 @@ private:
   }
 
   bool passId(CharSourceRange Range) {
-    // FIXME: Ignore things that don't come from this buffer.
-    if (!SourceMgr.getRangeForBuffer(BufferID).contains(Range.getStart()))
-      return !Cancelled;
-
     unsigned Offset = SourceMgr.getLocOffsetInBuffer(Range.getStart(),BufferID);
     Ranges.insert({Offset, Range.getByteLength()});
     return !Cancelled;

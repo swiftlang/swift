@@ -201,6 +201,10 @@ public:
 
   virtual bool shouldWalkIntoGenericParams() { return true; }
 
+  /// Whether we should walk into expanded macros, whether it be from a
+  /// \c MacroExpansionExpr or declarations created by attached macros.
+  virtual bool shouldWalkMacroExpansions() { return false; }
+
 protected:
   SourceEntityWalker() = default;
   SourceEntityWalker(const SourceEntityWalker &) = default;

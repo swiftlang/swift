@@ -111,6 +111,8 @@ std::pair<StringRef, StringRef> Symbol::getKind(const Decl *D) {
     return {"swift.associatedtype", "Associated Type"};
   case swift::DeclKind::Extension:
     return {"swift.extension", "Extension"};
+  case swift::DeclKind::Macro:
+    return {"swift.macro", "Macro"};
   default:
     llvm::errs() << "Unsupported kind: " << D->getKindName(D->getKind());
     llvm_unreachable("Unsupported declaration kind for symbol graph");
@@ -784,7 +786,8 @@ bool Symbol::supportsKind(DeclKind Kind) {
   case DeclKind::Subscript: LLVM_FALLTHROUGH;
   case DeclKind::TypeAlias: LLVM_FALLTHROUGH;
   case DeclKind::AssociatedType: LLVM_FALLTHROUGH;
-  case DeclKind::Extension:
+  case DeclKind::Extension: LLVM_FALLTHROUGH;
+  case DeclKind::Macro:
     return true;
   default:
     return false;

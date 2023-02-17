@@ -174,7 +174,7 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
     }
   }
 
-  for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+  for (auto *customAttr : D->getOriginalAttrs().getAttributes<CustomAttr, true>()) {
     if (shouldSkip(customAttr->getRangeWithAt()))
       continue;
     auto *Args = customAttr->getArgs();

@@ -541,6 +541,10 @@ public:
   /// TODO: Consider changing this to false by default.
   virtual bool shouldWalkSerializedTopLevelInternalDecls() { return true; }
 
+  /// Whether we should walk into expanded macros, whether it be from a
+  /// \c MacroExpansionExpr or declarations created by attached macros.
+  virtual bool shouldWalkMacroExpansions() { return true; }
+
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.
   ///

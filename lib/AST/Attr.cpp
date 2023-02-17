@@ -851,6 +851,14 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
   return lastAttr ? lastAttr->getRangeWithAt().Start : SourceLoc();
 }
 
+OrigDeclAttributes::OrigDeclAttributes(DeclAttributes allAttributes, ModuleDecl *mod) {
+  for (auto *attr : allAttributes) {
+    if (!mod->isInGeneratedBuffer(attr->AtLoc)) {
+      attributes.emplace_back(attr);
+    }
+  }
+}
+
 static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
                                const PrintOptions &Options) {
   if (Attr->isLanguageVersionSpecific())

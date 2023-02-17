@@ -432,9 +432,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     if (MED->getArgs() && doIt(MED->getArgs()))
       return true;
-    for (auto *decl : MED->getRewritten())
-      if (doIt(decl))
-        return true;
+    if (Walker.shouldWalkMacroExpansions()) {
+      for (auto *decl : MED->getRewritten())
+        if (doIt(decl))
+          return true;
+    }
     return false;
   }
 
@@ -1295,17 +1297,19 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
-    Expr *rewritten = nullptr;
-    if (E->getRewritten()) {
-      rewritten = doIt(E->getRewritten());
-      if (!rewritten) return nullptr;
-    }
     ArgumentList *args = nullptr;
     if (E->getArgs()) {
       args = doIt(E->getArgs());
       if (!args) return nullptr;
     }
-    E->setRewritten(rewritten);
+    if (Walker.shouldWalkMacroExpansions()) {
+      Expr *rewritten = nullptr;
+      if (E->getRewritten()) {
+        rewritten = doIt(E->getRewritten());
+        if (!rewritten) return nullptr;
+      }
+      E->setRewritten(rewritten);
+    }
     E->setArgs(args);
     return E;
   }
@@ -1421,6 +1425,9 @@ public:
   }
   
   bool shouldSkip(Decl *D) {
+    if (!Walker.shouldWalkMacroExpansions() && D->isInGeneratedBuffer())
+      return true;
+
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       // VarDecls are walked via their NamedPattern, ignore them if we encounter
       // then in the few cases where they are also pushed outside as members.
