@@ -36,8 +36,7 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
     return true;
   }
 
-  ArrayRef<AnyFunctionType::Param> ParamsToPass =
-      Res.FuncTy->getAs<AnyFunctionType>()->getParams();
+  ArrayRef<AnyFunctionType::Param> ParamsToPass = Res.FuncTy->getParams();
 
   ParameterList *PL = nullptr;
   if (Res.FuncD) {
@@ -176,8 +175,12 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
   getSolutionSpecificVarTypes(S, SolutionSpecificVarTypes);
 
+  AnyFunctionType *FuncTy = nullptr;
+  if (Info.ValueTy) {
+    FuncTy = Info.ValueTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
+  }
   Results.push_back({ExpectedTy, isa<SubscriptExpr>(ParentCall), Info.Value,
-                     Info.ValueTy, ArgIdx, ParamIdx, std::move(ClaimedParams),
+                     FuncTy, ArgIdx, ParamIdx, std::move(ClaimedParams),
                      IsNoninitialVariadic, Info.BaseTy, HasLabel, IsAsync,
                      SolutionSpecificVarTypes});
 }
@@ -225,8 +228,7 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
         }
       }
       if (Result.FuncTy) {
-        if (auto FuncTy = Result.FuncTy->lookThroughAllOptionalTypes()
-                              ->getAs<AnyFunctionType>()) {
+        if (auto FuncTy = Result.FuncTy) {
           if (Result.IsSubscript) {
             assert(SemanticContext != SemanticContextKind::None);
             auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
