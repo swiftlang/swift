@@ -933,7 +933,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // will occur while building the Swift module because the overriding decl
     // doesn't override anything.
     // We couldn't skip every `override` keywords because they change the
-    // ABI if the overridden decl is also publically visible.
+    // ABI if the overridden decl is also publicly visible.
     // For public-override-internal case, having `override` doesn't have ABI
     // implication. Thus we can skip them.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {

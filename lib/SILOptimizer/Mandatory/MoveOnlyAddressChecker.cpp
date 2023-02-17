@@ -1374,7 +1374,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
     if (!liveness.isWithinBoundary(takeInstAndValue.first,
                                    takeInstAndValue.second)) {
       // TODO: Today, we don't tell the user the actual field itself where the
-      // violation occured and just instead just shows the two instructions. We
+      // violation occurred and just instead just shows the two instructions. We
       // could be more specific though...
       LLVM_DEBUG(llvm::dbgs() << "        Not within the boundary.\n");
       continue;

@@ -5661,7 +5661,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
 
 /// Can not treat a treat the layout of a class as resilient if the current
 ///    class is defined in an external module and
-///    not publically accessible (e.g private or internal).
+///    not publicly accessible (e.g private or internal).
 /// This would normally not happen except if we compile theClass's module with
 /// enable-testing.
 /// Do we have to use resilient access patterns when working with this

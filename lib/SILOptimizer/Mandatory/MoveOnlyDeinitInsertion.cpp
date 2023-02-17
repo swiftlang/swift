@@ -12,7 +12,7 @@
 ///
 /// \file
 ///
-/// This pass runs after move only checking has occured and transforms last
+/// This pass runs after move only checking has occurred and transforms last
 /// destroy_value of move only types into a call to the move only types deinit.
 ///
 //===----------------------------------------------------------------------===//

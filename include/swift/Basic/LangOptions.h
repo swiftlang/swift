@@ -831,7 +831,7 @@ namespace swift {
 
     /// When building a PCM, rely on the Swift frontend's command-line -Xcc flags
     /// to build the Clang module via Clang frontend directly,
-    /// and completly bypass the Clang driver.
+    /// and completely bypass the Clang driver.
     bool DirectClangCC1ModuleBuild = false;
 
     /// Return a hash code of any components from these options that should
