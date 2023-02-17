@@ -4390,6 +4390,19 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   if (auto *selfType = substBase->getAs<DynamicSelfType>())
     substBase = selfType->getSelfType();
 
+  // If the parent is a type variable or a member rooted in a type variable,
+  // or if the parent is a type parameter, we're done. Also handle
+  // UnresolvedType here, which can come up in diagnostics.
+  if (substBase->isTypeVariableOrMember() ||
+      substBase->isTypeParameter() ||
+      substBase->is<UnresolvedType>())
+    return getDependentMemberType(substBase);
+
+  // All remaining cases require an associated type declaration and not just
+  // the name of a member type.
+  if (!assocType)
+    return failed();
+
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
@@ -4402,61 +4415,46 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
       return failed();
   }
 
-  // If the parent is a type variable or a member rooted in a type variable,
-  // or if the parent is a type parameter, we're done. Also handle
-  // UnresolvedType here, which can come up in diagnostics.
-  if (substBase->isTypeVariableOrMember() ||
-      substBase->isTypeParameter() ||
-      substBase->is<UnresolvedType>())
-    return getDependentMemberType(substBase);
+  auto proto = assocType->getProtocol();
+  ProtocolConformanceRef conformance =
+      lookupConformances(origBase->getCanonicalType(), substBase, proto);
 
-  // Retrieve the member type with the given name.
+  if (conformance.isInvalid())
+    return failed();
 
-  // If we know the associated type, look in the witness table.
-  if (assocType) {
-    auto proto = assocType->getProtocol();
-    ProtocolConformanceRef conformance =
-        lookupConformances(origBase->getCanonicalType(), substBase, proto);
+  Type witnessTy;
 
-    if (conformance.isInvalid())
+  // Retrieve the type witness.
+  if (conformance.isPack()) {
+    auto *packConformance = conformance.getPack();
+
+    witnessTy = packConformance->getAssociatedType(
+        assocType->getDeclaredInterfaceType());
+  } else if (conformance.isConcrete()) {
+    auto witness =
+        conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
+
+    witnessTy = witness.getWitnessType();
+    if (!witnessTy || witnessTy->hasError())
       return failed();
 
-    Type witnessTy;
+    // This is a hacky feature allowing code completion to migrate to
+    // using Type::subst() without changing output.
+    if (options & SubstFlags::DesugarMemberTypes) {
+      if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
+        witnessTy = aliasType->getSinglyDesugaredType();
 
-    // Retrieve the type witness.
-    if (conformance.isPack()) {
-      auto *packConformance = conformance.getPack();
-
-      witnessTy = packConformance->getAssociatedType(
-          assocType->getDeclaredInterfaceType());
-    } else if (conformance.isConcrete()) {
-      auto witness =
-          conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
-
-      witnessTy = witness.getWitnessType();
-      if (!witnessTy || witnessTy->hasError())
-        return failed();
-
-      // This is a hacky feature allowing code completion to migrate to
-      // using Type::subst() without changing output.
-      if (options & SubstFlags::DesugarMemberTypes) {
-        if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
-          witnessTy = aliasType->getSinglyDesugaredType();
-
-        // Another hack. If the type witness is a opaque result type. They can
-        // only be referred using the name of the associated type.
-        if (witnessTy->is<OpaqueTypeArchetypeType>())
-          witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
-      }
+      // Another hack. If the type witness is a opaque result type. They can
+      // only be referred using the name of the associated type.
+      if (witnessTy->is<OpaqueTypeArchetypeType>())
+        witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
     }
-
-    if (!witnessTy || witnessTy->is<ErrorType>())
-      return failed();
-
-    return witnessTy;
   }
 
-  return failed();
+  if (!witnessTy || witnessTy->is<ErrorType>())
+    return failed();
+
+  return witnessTy;
 }
 
 ProtocolConformanceRef LookUpConformanceInModule::
