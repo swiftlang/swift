@@ -2393,8 +2393,6 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     }
   }
 
-  bool LeaveBodyUnchecked = !ctx.CompletionCallback;
-
   // The enclosing closure might be a single expression closure or a function
   // builder closure. In such cases, the body elements are type checked with
   // the closure itself. So we need to try type checking the enclosing closure
@@ -2418,17 +2416,13 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       auto ActorIsolation = determineClosureActorIsolation(
           CE, __Expr_getType, __AbstractClosureExpr_getActorIsolation);
       CE->setActorIsolation(ActorIsolation);
-      if (!LeaveBodyUnchecked) {
-        // Type checking the parent closure also type checked this node.
-        // Nothing to do anymore.
-        return false;
-      }
-      if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
-        return false;
+      // Type checking the parent closure also type checked this node.
+      // Nothing to do anymore.
+      return false;
     }
   }
 
-  TypeChecker::typeCheckASTNode(finder.getRef(), DC, LeaveBodyUnchecked);
+  TypeChecker::typeCheckASTNode(finder.getRef(), DC, /*LeaveBodyUnchecked=*/false);
   return false;
 }
 
