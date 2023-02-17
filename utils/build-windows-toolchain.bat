@@ -472,6 +472,7 @@ cmake ^
 
   -G Ninja ^
   -S %SourceRoot%\Yams || (exit /b)
+cmake --build %BuildRoot%\10 || (exit /b)
 
 :: Build swift-driver
 cmake ^
@@ -527,6 +528,7 @@ cmake ^
 
   -G Ninja ^
   -S %SourceRoot%\swift-crypto || (exit /b)
+cmake --build %BuildRoot%\12 || (exit /b)
 
 :: Build swift-collections
 cmake ^
@@ -605,6 +607,7 @@ cmake ^
 
   -G Ninja ^
   -S %SourceRoot%\indexstore-db || (exit /b)
+cmake --build %BuildRoot%\15 || (exit /b)
 
 :: Build swift-syntax
 cmake ^
