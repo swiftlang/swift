@@ -223,7 +223,7 @@ public:
   void visitReturnInst(ReturnInst *ri) {
     Builder.setCurrentDebugScope(getOpScope(ri->getDebugScope()));
     auto loc = ri->getOperand().getLoc();
-    // Build pullback struct value for original block.
+    // Build pullback tuple value for original block.
     auto *origExit = ri->getParent();
 
     // Get the value in the VJP corresponding to the original result.

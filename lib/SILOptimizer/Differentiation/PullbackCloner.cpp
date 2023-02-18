@@ -163,10 +163,10 @@ private:
     auto *pbTupleTyple = getPullbackInfo().getLinearMapTupleType(origBB);
     assert(pbTupleTyple->getNumElements() == values.size() &&
            "The number of pullback tuple fields must equal the number of "
-           "pullback struct element values");
+           "pullback tuple element values");
     auto res = pullbackTupleElements.insert({origBB, { values.begin(), values.end() }});
     (void)res;
-    assert(res.second && "A pullback struct element already exists!");
+    assert(res.second && "A pullback tuple element already exists!");
   }
 
   void initializePullbackTupleElements(SILBasicBlock *origBB,
@@ -174,7 +174,7 @@ private:
     auto *pbTupleTyple = getPullbackInfo().getLinearMapTupleType(origBB);
     assert(pbTupleTyple->getNumElements() == values.size() &&
            "The number of pullback tuple fields must equal the number of "
-           "pullback struct element values");
+           "pullback tuple element values");
     auto res = pullbackTupleElements.insert({origBB, { values.begin(), values.end() }});
     (void)res;
     assert(res.second && "A pullback struct element already exists!");
