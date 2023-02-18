@@ -477,7 +477,7 @@ public:
 
 class TextReplacementsRenamer : public Renamer {
   llvm::StringSet<> &ReplaceTextContext;
-  std::vector<Replacement> Replacements;
+  SmallVector<Replacement> Replacements;
 
 public:
   const DeclNameViewer New;
@@ -571,7 +571,8 @@ private:
     StringRef Text =
         getReplacementText(ExistingLabel, RangeKind, OldLabel, NewLabel);
     if (Text != ExistingLabel)
-      Replacements.push_back({LabelRange, Text, {}});
+      Replacements.push_back({/*Path=*/{}, LabelRange, /*BufferName=*/{}, Text,
+                              /*RegionsWorthNote=*/{}});
   }
 
   void doRenameLabel(CharSourceRange Label, RefactoringRangeKind RangeKind,
@@ -582,7 +583,9 @@ private:
 
   void doRenameBase(CharSourceRange Range, RefactoringRangeKind) override {
     if (Old.base() != New.base())
-      Replacements.push_back({Range, registerText(New.base()), {}});
+      Replacements.push_back({/*Path=*/{}, Range, /*BufferName=*/{},
+                              registerText(New.base()),
+                              /*RegionsWorthNote=*/{}});
   }
 
 public:
@@ -595,9 +598,7 @@ public:
     assert(Old.partsCount() == New.partsCount());
   }
 
-  std::vector<Replacement> getReplacements() const {
-    return std::move(Replacements);
-  }
+  ArrayRef<Replacement> getReplacements() const { return Replacements; }
 };
 
 static const ValueDecl *getRelatedSystemDecl(const ValueDecl *VD) {
@@ -8688,7 +8689,37 @@ bool RefactoringActionExpandMacro::performChange() {
     rewrittenBuffer = adjustMacroExpansionWhitespace(
         generatedInfo->kind, rewrittenBuffer, scratchBuffer);
 
-    EditConsumer.accept(SM, originalSourceRange, rewrittenBuffer);
+    // `TheFile` is the file of the actual expansion site, where as
+    // `OriginalFile` is the possibly enclosing buffer. Concretely:
+    // ```
+    // // m.swift
+    // @AddMemberAttributes
+    // struct Foo {
+    //   // --- expanded from @AddMemberAttributes eg. @_someBufferName ---
+    //   @AddedAttribute
+    //   // ---
+    //   let someMember: Int
+    // }
+    // ```
+    //
+    // When expanding `AddedAttribute`, the expansion actually applies to the
+    // original source (`m.swift`) rather than the buffer of the expansion
+    // site (`@_someBufferName`). Thus, we need to include the path to the
+    // original source as well. Note that this path could itself be another
+    // expansion.
+    SourceFile *originalFile =
+        MD->getSourceFileContainingLocation(originalSourceRange.getStart());
+    StringRef originalPath;
+    if (originalFile->getBufferID().hasValue() &&
+        TheFile->getBufferID() != originalFile->getBufferID()) {
+      originalPath = SM.getIdentifierForBuffer(*originalFile->getBufferID());
+    }
+
+    EditConsumer.accept(SM, {originalPath,
+                             originalSourceRange,
+                             SM.getIdentifierForBuffer(bufferID),
+                             rewrittenBuffer,
+                             {}});
 
     if (generatedInfo->attachedMacroCustomAttr && !attachedMacroAttr)
       attachedMacroAttr = generatedInfo->attachedMacroCustomAttr;
@@ -8780,7 +8811,8 @@ struct swift::ide::FindRenameRangesAnnotatingConsumer::Implementation {
     if (Range.Index.has_value())
       OS << " index=" << *Range.Index;
     OS << ">" << Range.Range.str() << "</" << Tag << ">";
-    pRewriter->accept(SM, {Range.Range, OS.str(), {}});
+    pRewriter->accept(SM, {/*Path=*/{}, Range.Range, /*BufferName=*/{},
+                           OS.str(), /*RegionsWorthNote=*/{}});
   }
 };
 

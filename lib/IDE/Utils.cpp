@@ -607,7 +607,8 @@ accept(SourceManager &SM, SourceLoc Loc, StringRef Text,
 void swift::ide::SourceEditConsumer::
 accept(SourceManager &SM, CharSourceRange Range, StringRef Text,
        ArrayRef<NoteRegion> SubRegions) {
-  accept(SM, RegionType::ActiveCode, {{Range, Text, SubRegions}});
+  accept(SM, RegionType::ActiveCode,
+         {{/*Path=*/{}, Range, /*BufferName=*/{}, Text, SubRegions}});
 }
 
 void swift::ide::SourceEditConsumer::
@@ -649,15 +650,27 @@ accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
 void swift::ide::SourceEditTextConsumer::
 accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
   for (const auto &Replacement: Replacements) {
-    CharSourceRange Range = Replacement.Range;
-    unsigned BufID = SM.findBufferContainingLoc(Range.getStart());
-    auto Path(SM.getIdentifierForBuffer(BufID));
-    auto Start = SM.getLineAndColumnInBuffer(Range.getStart());
-    auto End = SM.getLineAndColumnInBuffer(Range.getEnd());
+    OS << "// ";
+    StringRef Path = Replacement.Path;
+    if (Path.empty()) {
+      unsigned BufID = SM.findBufferContainingLoc(Replacement.Range.getStart());
+      Path = SM.getIdentifierForBuffer(BufID);
+    } else {
+      OS << "explicit ";
+    }
+    OS << Path.str() << " ";
 
-    OS << "// " << Path.str() << " ";
+    auto Start = SM.getLineAndColumnInBuffer(Replacement.Range.getStart());
+    auto End = SM.getLineAndColumnInBuffer(Replacement.Range.getEnd());
     OS << Start.first << ":" << Start.second << " -> ";
-    OS << End.first << ":" << End.second << "\n";
+    OS << End.first << ":" << End.second;
+
+    if (Replacement.BufferName.empty()) {
+      OS << " (" << Replacement.BufferName << ")\n";
+    } else {
+      OS << "\n";
+    }
+
     OS << Replacement.Text << "\n";
   }
 }
