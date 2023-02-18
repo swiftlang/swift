@@ -22,6 +22,9 @@ class LexicalLifetimeEliminatorPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
+    if (fn->forceEnableLexicalLifetimes())
+      return;
+
     // If we are already canonical, we do not have any diagnostics to emit.
     if (fn->wasDeserializedCanonical())
       return;

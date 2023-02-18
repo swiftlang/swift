@@ -3094,6 +3094,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isRuntimeAccessible()) {
     OS << "[runtime_accessible] ";
   }
+  if (forceEnableLexicalLifetimes()) {
+    OS << "[lexical_lifetimes] ";
+  }
 
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";
