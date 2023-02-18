@@ -882,7 +882,7 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
 
   // For simplicity just bail if the keypath has a non-trivial operands.
   // TODO: don't bail but insert compensating destroys for such operands.
-  for (const Operand &Op : KPI->getAllOperands()) {
+  for (const Operand &Op : KPI->getPatternOperands()) {
     if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
       return false;
   }
