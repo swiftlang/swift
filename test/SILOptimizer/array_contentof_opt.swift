@@ -71,8 +71,8 @@ public func dontPropagateContiguousArray(_ a: inout ContiguousArray<UInt8>) {
 
 // CHECK-NOT: apply
 // CHECK: [[F:%[0-9]+]] = function_ref @{{.*(_consumeAndCreateNew|reserveCapacity).*}}
-// CHECK-NEXT: apply [[F]]
+// CHECK: apply [[F]]
 // CHECK-NOT: apply
 
-// CHECK: } // end sil function '$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
+// CHECK-LABEL: } // end sil function '$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
 

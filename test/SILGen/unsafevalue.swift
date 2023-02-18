@@ -68,10 +68,11 @@ public struct UnsafeValue<Element: AnyObject> {
   // Access the underlying value at +0, guaranteeing its lifetime by base.
   //
   // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base_qd_0_qd___qd_0_xXEtr0_lF :
-  // CHECK: bb0([[RESULT:%.*]] : $*Result, [[BASE:%.*]] : $*Base, [[CLOSURE:%.*]] : $@noescape @callee_guaranteed {{.*}}, [[UNSAFE_VALUE:%.*]] : $UnsafeValue<Element>):
+  // CHECK: bb0([[RESULT:%.*]] : $*Result, [[BASE:%.*]] : $*Base, [[CLOSURE:%.*]] : @guaranteed $@noescape @callee_guaranteed {{.*}}, [[UNSAFE_VALUE:%.*]] : $UnsafeValue<Element>):
   // CHECK:  [[COPY_BOX:%.*]] = alloc_box
   // CHECK:  [[COPY_PROJ:%.*]] = project_box [[COPY_BOX]]
   // CHECK:  store [[UNSAFE_VALUE]] to [trivial] [[COPY_PROJ]]
+  // CHECK:  [[CLOSUREC:%.*]] = copy_value [[CLOSURE]]
   // CHECK:  [[VALUE_ADDR:%.*]] = begin_access [read] [unknown] [[COPY_PROJ]]
   // CHECK:  [[STR_VALUE_ADDR:%.*]] = struct_element_addr [[VALUE_ADDR]]
   // CHECK:  [[UNMANAGED_VALUE:%.*]] = load [trivial] [[STR_VALUE_ADDR]]
@@ -79,7 +80,8 @@ public struct UnsafeValue<Element: AnyObject> {
   // CHECK:  [[GUARANTEED_REF:%.*]] = unchecked_ownership_conversion [[UNOWNED_REF]]
   // CHECK:  [[GUARANTEED_REF_DEP_ON_BASE:%.*]] = mark_dependence [[GUARANTEED_REF]] : $Element on [[BASE]]
   // CHECK:  end_access [[VALUE_ADDR]]
-  // CHECK:  apply [[CLOSURE]]([[RESULT]], [[GUARANTEED_REF_DEP_ON_BASE]])
+  // CHECK:  [[CLOSUREB:%.*]] = begin_borrow [[CLOSUREC]]
+  // CHECK:  apply [[CLOSUREB]]([[RESULT]], [[GUARANTEED_REF_DEP_ON_BASE]])
   // CHECK:  end_borrow [[GUARANTEED_REF]]
   // CHECK:  destroy_value [[COPY_BOX]]
   // CHECK: } // end sil function '$s11unsafevalue11UnsafeValueV20withGuaranteeingBase4base_qd_0_qd___qd_0_xXEtr0_lF'

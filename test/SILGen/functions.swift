@@ -394,7 +394,7 @@ func testNoReturnAttr() -> Never {}
 // CHECK-LABEL: sil hidden [ossa] @$s9functions20testNoReturnAttrPoly{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@in_guaranteed T) -> Never
 func testNoReturnAttrPoly<T>(_ x: T) -> Never {}
 
-// CHECK-LABEL: sil hidden [ossa] @$s9functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@noescape @callee_guaranteed () -> Never) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s9functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Never) -> ()
 func testNoReturnAttrParam(_ fptr: () -> Never) -> () {}
 
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s9functions15testTransparent{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int1) -> Builtin.Int1

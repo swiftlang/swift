@@ -679,9 +679,10 @@ class SuperSub : SuperBase {
 // -- closure takes unowned ownership
 // CHECK:         [[OUTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[UNOWNED_SELF2_COPY]])
 // CHECK:         [[OUTER_CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[OUTER_CLOSURE]]
+// CHECK:         [[OUTER_CONVERT_B:%.*]] = begin_borrow [[OUTER_CONVERT]]
 // -- call consumes closure
 // -- strong +1, unowned +1
-// CHECK:         [[INNER_CLOSURE:%.*]] = apply [[OUTER_CONVERT]]
+// CHECK:         [[INNER_CLOSURE:%.*]] = apply [[OUTER_CONVERT_B]]
 // CHECK:         [[B:%.*]] = begin_borrow [[INNER_CLOSURE]]
 // CHECK:         [[CONSUMED_RESULT:%.*]] = apply [[B]]()
 // CHECK:         destroy_value [[CONSUMED_RESULT]]
@@ -772,7 +773,7 @@ struct r29810997 {
 }
 
 //   DI will turn this into a direct capture of the specific stored property.
-// CHECK-LABEL: sil hidden [ossa] @$s8closures16r29810997_helperyS3iXEF : $@convention(thin) (@noescape @callee_guaranteed (Int) -> Int) -> Int
+// CHECK-LABEL: sil hidden [ossa] @$s8closures16r29810997_helperyS3iXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Int) -> Int) -> Int
 
 // rdar://problem/37790062
 

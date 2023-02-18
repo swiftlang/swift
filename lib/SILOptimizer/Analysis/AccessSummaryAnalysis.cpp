@@ -89,6 +89,12 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
     }
 
     switch (user->getKind()) {
+    case SILInstructionKind::MarkMustCheckInst: {
+      // Pass through to the address being checked.
+      auto inst = cast<MarkMustCheckInst>(user);
+      worklist.append(inst->use_begin(), inst->use_end());
+      break;
+    }
     case SILInstructionKind::BeginAccessInst: {
       auto *BAI = cast<BeginAccessInst>(user);
       if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe) {
@@ -636,4 +642,9 @@ void AccessSummaryAnalysis::FunctionSummary::print(raw_ostream &os,
   }
 
   os << ")";
+}
+
+void AccessSummaryAnalysis::FunctionSummary::dump(SILFunction *fn) const {
+  print(llvm::errs(), fn);
+  llvm::errs() << '\n';
 }
