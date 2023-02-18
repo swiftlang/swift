@@ -2104,7 +2104,7 @@ private:
   NullablePtr<Stmt> transformIf(IfStmt *ifStmt, TypeJoinExpr *join,
                                 unsigned index) {
     // FIXME: Turn this into a condition once warning is an error.
-    (void)diagnoseMissingBuildWithAvailability(ifStmt);
+    (void)diagnoseMissingBuildWithAvailability(ifStmt, join);
 
     auto *joinVar = join->getVar();
 
@@ -2206,7 +2206,8 @@ private:
   /// have had the chance to adopt buildLimitedAvailability(), we'll upgrade
   /// this warning to an error.
   LLVM_NODISCARD
-  bool diagnoseMissingBuildWithAvailability(IfStmt *ifStmt) {
+  bool diagnoseMissingBuildWithAvailability(IfStmt *ifStmt,
+                                            TypeJoinExpr *join) {
     auto findAvailabilityCondition =
         [](StmtCondition stmtCond) -> const StmtConditionElement * {
       for (const auto &cond : stmtCond) {
@@ -2230,27 +2231,10 @@ private:
       return false;
 
     SourceLoc loc = availabilityCond->getStartLoc();
-    Type bodyType;
-    if (availabilityCond->getAvailability()->isUnavailability()) {
-      BraceStmt *elseBody = nullptr;
-      // For #unavailable, we need to check the "else".
-      if (auto *innerIf = getAsStmt<IfStmt>(ifStmt->getElseStmt())) {
-        elseBody = castToStmt<BraceStmt>(innerIf->getThenStmt());
-      } else {
-        elseBody = castToStmt<BraceStmt>(ifStmt->getElseStmt());
-      }
-
-      Type elseBodyType =
-        solution.simplifyType(solution.getType(elseBody->getLastElement()));
-      bodyType = elseBodyType;
-    } else {
-      auto *thenBody = castToStmt<BraceStmt>(ifStmt->getThenStmt());
-      Type thenBodyType =
-          solution.simplifyType(solution.getType(thenBody->getLastElement()));
-      bodyType = thenBodyType;
-    }
-
     auto builderType = solution.simplifyType(Transform.builderType);
+    // Since all of the branches of `if` statement have to join into the same
+    // type we can just use the type of the join variable here.
+    Type bodyType = solution.getResolvedType(join->getVar());
 
     return bodyType.findIf([&](Type type) {
       auto nominal = type->getAnyNominal();
