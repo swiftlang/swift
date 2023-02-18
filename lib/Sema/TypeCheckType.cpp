@@ -2261,17 +2261,24 @@ bool TypeResolver::diagnoseMoveOnly(TypeRepr *repr, Type genericArgTy) {
 bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
                                               TypeRepr *repr,
                                               TypeResolutionOptions options) {
-  // only required on function inputs.
-  // we can ignore InoutFunctionInput since it's already got ownership.
+  // Though this is only required on function inputs... we can ignore
+  // InoutFunctionInput since it's already got ownership.
   if (!options.is(TypeResolverContext::FunctionInput))
     return false;
 
-  // enum cases don't need to specify ownership for associated values
+  // Enum cases don't need to specify ownership for associated values
   if (options.hasBase(TypeResolverContext::EnumElementDecl))
     return false;
 
-  // otherwise, we require ownership.
+  // Otherwise, we require ownership.
   if (options.contains(TypeResolutionFlags::HasOwnership))
+    return false;
+
+  // Do not run this on SIL files since there is currently a bug where we are
+  // trying to parse it in SILBoxes.
+  //
+  // To track what we want to do long term: rdar://105635373.
+  if (options.contains(TypeResolutionFlags::SILType))
     return false;
 
   diagnose(repr->getLoc(),
