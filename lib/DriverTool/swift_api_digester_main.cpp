@@ -2371,6 +2371,9 @@ public:
         ParsedArgs.hasArg(OPT_abi) || ParsedArgs.hasArg(OPT_swift_only);
     CheckerOpts.SkipOSCheck = ParsedArgs.hasArg(OPT_disable_os_checks);
     CheckerOpts.SkipRemoveDeprecatedCheck = ParsedArgs.hasArg(OPT_disable_remove_deprecated_check);
+    if (ParsedArgs.hasArg(OPT_enable_remove_deprecated_check)) {
+      CheckerOpts.SkipRemoveDeprecatedCheck = false;
+    }
     CheckerOpts.CompilerStyle =
         CompilerStyleDiags || !SerializedDiagPath.empty();
     for (auto Arg : Args)
