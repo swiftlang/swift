@@ -90,7 +90,7 @@ private:
   /// elements destructured from the linear map basic block argument. In the
   /// beginning of each pullback basic block, the block's pullback struct is
   /// destructured into individual elements stored here.
-  llvm::DenseMap<SILBasicBlock*, SILInstructionResultArray> pullbackTupleElements;
+  llvm::DenseMap<SILBasicBlock*, SmallVector<SILValue, 4>> pullbackTupleElements;
 
   /// Mapping from original basic blocks and successor basic blocks to
   /// corresponding pullback trampoline basic blocks. Trampoline basic blocks
@@ -164,7 +164,18 @@ private:
     assert(pbTupleTyple->getNumElements() == values.size() &&
            "The number of pullback tuple fields must equal the number of "
            "pullback struct element values");
-    auto res = pullbackTupleElements.insert({origBB, values});
+    auto res = pullbackTupleElements.insert({origBB, { values.begin(), values.end() }});
+    (void)res;
+    assert(res.second && "A pullback struct element already exists!");
+  }
+
+  void initializePullbackTupleElements(SILBasicBlock *origBB,
+                                       const llvm::ArrayRef<SILArgument *> &values) {
+    auto *pbTupleTyple = getPullbackInfo().getLinearMapTupleType(origBB);
+    assert(pbTupleTyple->getNumElements() == values.size() &&
+           "The number of pullback tuple fields must equal the number of "
+           "pullback struct element values");
+    auto res = pullbackTupleElements.insert({origBB, { values.begin(), values.end() }});
     (void)res;
     assert(res.second && "A pullback struct element already exists!");
   }
@@ -1917,34 +1928,36 @@ bool PullbackCloner::Implementation::run() {
       builder.setInsertionPoint(pullbackBB);
       // Obtain the context object, if any, and the top-level subcontext, i.e.
       // the main pullback struct.
-      SILValue mainPullbackTuple;
       if (getPullbackInfo().hasLoops()) {
         // The last argument is the context object (`Builtin.NativeObject`).
         contextValue = pullbackBB->getArguments().back();
         assert(contextValue->getType() ==
                SILType::getNativeObjectType(getASTContext()));
-        // Load the pullback struct.
+        // Load the pullback context.
         auto subcontextAddr = emitProjectTopLevelSubcontext(
             builder, pbLoc, contextValue, pbTupleLoweredType);
-        mainPullbackTuple = builder.createLoad(
+        SILValue mainPullbackTuple = builder.createLoad(
             pbLoc, subcontextAddr,
             pbTupleLoweredType.isTrivial(getPullback()) ?
                 LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take);
+        auto *dsi = builder.createDestructureTuple(pbLoc, mainPullbackTuple);
+        initializePullbackTupleElements(origBB, dsi->getAllResults());
       } else {
         // Obtain and destructure pullback struct elements.
-        mainPullbackTuple = pullbackBB->getArguments().back();
-        assert(mainPullbackTuple->getType() == pbTupleLoweredType);
+        unsigned numVals = pbTupleLoweredType.getAs<TupleType>()->getNumElements();
+        initializePullbackTupleElements(origBB,
+                                        pullbackBB->getArguments().take_back(numVals));
       }
 
-      auto *dsi = builder.createDestructureTuple(pbLoc, mainPullbackTuple);
-      initializePullbackTupleElements(origBB, dsi->getResults());
       continue;
     }
+
     // Get all active values in the original block.
     // If the original block has no active values, continue.
     auto &bbActiveValues = activeValues[origBB];
     if (bbActiveValues.empty())
       continue;
+
     // Otherwise, if the original block has active values:
     // - For each active buffer in the original block, allocate a new local
     //   buffer in the pullback entry. (All adjoint buffers are allocated in
@@ -2008,11 +2021,17 @@ bool PullbackCloner::Implementation::run() {
   }
 
   auto *pullbackEntry = pullback.getEntryBlock();
+  auto pbTupleLoweredType =
+    remapType(getPullbackInfo().getLinearMapTupleLoweredType(originalExitBlock));
+  unsigned numVals = (getPullbackInfo().hasLoops() ?
+                      1 : pbTupleLoweredType.getAs<TupleType>()->getNumElements());
+  (void)numVals;
+
   // The pullback function has type:
-  // `(seed0, seed1, ..., exit_pb_struct|context_obj) -> (d_arg0, ..., d_argn)`.
+  // `(seed0, seed1, ..., (exit_pb_tuple_el0, ..., )|context_obj) -> (d_arg0, ..., d_argn)`.
   auto pbParamArgs = pullback.getArgumentsWithoutIndirectResults();
-  assert(getConfig().resultIndices->getNumIndices() == pbParamArgs.size() - 1 &&
-         pbParamArgs.size() >= 2);
+  assert(getConfig().resultIndices->getNumIndices() == pbParamArgs.size() - numVals &&
+         pbParamArgs.size() >= 1);
   // Assign adjoints for original result.
   builder.setCurrentDebugScope(
       remapScope(originalExitBlock->getTerminator()->getDebugScope()));
@@ -2637,9 +2656,9 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
 
   // Get getter argument and result values.
   //   Getter type: $(Self) -> Result
-  // Pullback type: $(Result', PB_Struct|Context) -> Self'
+  // Pullback type: $(Result') -> Self'
   assert(original.getLoweredFunctionType()->getNumParameters() == 1);
-  assert(pullback.getLoweredFunctionType()->getNumParameters() == 2);
+  assert(pullback.getLoweredFunctionType()->getNumParameters() == 1);
   assert(pullback.getLoweredFunctionType()->getNumResults() == 1);
   SILValue origSelf = original.getArgumentsWithoutIndirectResults().front();
 
@@ -2752,10 +2771,10 @@ bool PullbackCloner::Implementation::runForSemanticMemberSetter() {
 
   // Get setter argument values.
   //              Setter type: $(inout Self, Argument) -> ()
-  // Pullback type (wrt self): $(inout Self', PB_Struct) -> ()
-  // Pullback type (wrt both): $(inout Self', PB_Struct) -> Argument'
+  // Pullback type (wrt self): $(inout Self') -> ()
+  // Pullback type (wrt both): $(inout Self') -> Argument'
   assert(original.getLoweredFunctionType()->getNumParameters() == 2);
-  assert(pullback.getLoweredFunctionType()->getNumParameters() == 2);
+  assert(pullback.getLoweredFunctionType()->getNumParameters() == 1);
   assert(pullback.getLoweredFunctionType()->getNumResults() == 0 ||
          pullback.getLoweredFunctionType()->getNumResults() == 1);
 
