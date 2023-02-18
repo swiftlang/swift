@@ -6,13 +6,8 @@ func takeGuaranteed(_ a: AnyObject) -> AnyObject {
   return a
 }
 
-@_silgen_name("getOwned")
-@inline(never)
-func getOwned() -> AnyObject
-
-// CHECK-LABEL: // testLexical()
-// CHECK: [[A:%.*]] = apply %{{.*}}()
-// CHECK: [[B:%.*]] = begin_borrow [lexical] [[A]]
+// CHECK-LABEL: // testLexical(a:)
+// CHECK: [[B:%.*]] = begin_borrow [lexical] %0
 // CHECK: apply %{{.*}}([[B]])
 // CHECK: apply
 // CHECK: end_borrow [[B]]
@@ -24,9 +19,8 @@ func getOwned() -> AnyObject
 // CHECK-NOT: *** SIL function after {{.*}} (semantic-arc-opts)
 
 // CHECK-LABEL: *** SIL function after {{.*}} (sil-lexical-lifetime-eliminator)
-// CHECK-LABEL: // testLexical()
-// CHECK: [[A:%.*]] = apply %{{.*}}()
-// CHECK: [[B:%.*]] = begin_borrow [[A]]
+// CHECK-LABEL: // testLexical(a:)
+// CHECK: [[B:%.*]] = begin_borrow %0
 // CHECK: apply %{{.*}}([[B]])
 // CHECK: apply
 // CHECK: end_borrow [[B]]
@@ -36,12 +30,10 @@ func getOwned() -> AnyObject
 // that was only needed for a lexical lifetime.
 
 // CHECK-LABEL: *** SIL function after {{.*}} (semantic-arc-opts)
-// CHECK-LABEL: // testLexical()
-// CHECK: [[A:%.*]] = apply %{{.*}}()
-// CHECK: apply %{{.*}}([[A]])
+// CHECK-LABEL: // testLexical(a:)
+// CHECK: apply %{{.*}}(%0)
 // CHECK-LABEL: } // end sil function
-public func testLexical() -> AnyObject {
-  let a = getOwned()
+public func testLexical(a: __owned AnyObject) -> AnyObject {
   // Without lexical lifetimes, the lifetime of 'a' ends in between the two calls:
   return takeGuaranteed(takeGuaranteed(a))
 }

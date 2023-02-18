@@ -88,8 +88,8 @@ func lexical_borrow_let_class_in_enum() {
 
 // CHECK-LABEL: sil hidden [ossa] @lexical_borrow_arg_owned_class : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         debug_value [[INSTANCE]]
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]] 
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] 
+// CHECK:         debug_value [[LIFETIME]] 
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
 // CHECK:         [[SB:%.*]] = store_borrow [[LIFETIME]] to [[ADDR]] 
 // CHECK:         [[USE_GENERIC:%[^,]+]] = function_ref @use_generic

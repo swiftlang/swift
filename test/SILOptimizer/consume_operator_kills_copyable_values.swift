@@ -232,13 +232,13 @@ public func patternMatchSwitchLet2(_ x: __owned (Klass?, Klass?)?) {
 
 public func patternMatchSwitchLet3(_ x: __owned (Klass?, Klass?)?) { // expected-error {{'x' used after being moved}}
     let _ = _move x // expected-note {{move here}}
-    switch x {
+    switch x { // expected-note {{use here}}
     case .some((.some(_), .some(let z))): // expected-error {{'z' used after being moved}}
         let _ = _move z // expected-note {{move here}}
         nonConsumingUse(z) // expected-note {{use here}}
     default:
         break
-    } // expected-note {{use here}} expected-note {{use here}}
+    }
 }
 
 ////////////////
@@ -296,11 +296,11 @@ public func castTest2(_ x: __owned Klass) -> SubKlass1? { // expected-error {{'x
 public func castTestSwitch1(_ x : __owned Klass) { // expected-error {{'x' used after being moved}}
     let _ = _move x // expected-note {{move here}}
     switch x {
-    case let k as SubKlass1:
+    case let k as SubKlass1: // expected-note {{use here}}
         print(k)
     default:
         print("Nope")
-    } // expected-note {{use here}} expected-note {{use here}}
+    }
 }
 
 public func castTestSwitch2(_ x : __owned Klass) { // expected-error {{'x' used after being moved}}
@@ -308,11 +308,11 @@ public func castTestSwitch2(_ x : __owned Klass) { // expected-error {{'x' used 
     switch x {
     case let k as SubKlass1:
         print(k)
-    case let k as SubKlass2:
+    case let k as SubKlass2: // expected-note {{use here}}
         print(k)
     default:
         print("Nope")
-    } // expected-note {{use here}} expected-note {{use here}} expected-note {{use here}}
+    }
 }
 
 public func castTestSwitchInLoop(_ x : __owned Klass) { // expected-error {{'x' used after being moved}}
@@ -320,7 +320,7 @@ public func castTestSwitchInLoop(_ x : __owned Klass) { // expected-error {{'x' 
 
     for _ in 0..<1024 {
         switch x {
-        case let k as SubKlass1:
+        case let k as SubKlass1: // expected-note {{use here}}
             print(k)
         default:
             print("Nope")

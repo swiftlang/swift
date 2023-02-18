@@ -67,6 +67,13 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
+static SILValue stripCopiesAndBorrows(SILValue v) {
+  while (isa<CopyValueInst>(v) || isa<BeginBorrowInst>(v)) {
+    v = cast<SingleValueInstruction>(v)->getOperand(0);
+  }
+  return v;
+}
+
 /// Fixup reference counts after inlining a function call (which is a no-op
 /// unless the function is a thick function).
 ///
@@ -387,7 +394,7 @@ static void cleanupCalleeValue(SILValue calleeValue,
   if (auto loadedValue = cleanupLoadedCalleeValue(calleeValue))
     calleeValue = loadedValue;
 
-  calleeValue = lookThroughOwnershipInsts(calleeValue);
+  calleeValue = stripCopiesAndBorrows(calleeValue);
 
   // Inline constructor
   auto calleeSource = ([&]() -> SILValue {
@@ -397,12 +404,12 @@ static void cleanupCalleeValue(SILValue calleeValue,
     // will delete any uses of the closure, including a
     // convert_escape_to_noescape conversion.
     if (auto *cfi = dyn_cast<ConvertFunctionInst>(calleeValue))
-      return lookThroughOwnershipInsts(cfi->getOperand());
+      return stripCopiesAndBorrows(cfi->getOperand());
 
     if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(calleeValue))
-      return lookThroughOwnershipInsts(cvt->getOperand());
+      return stripCopiesAndBorrows(cvt->getOperand());
 
-    return lookThroughOwnershipInsts(calleeValue);
+    return stripCopiesAndBorrows(calleeValue);
   })();
 
   if (auto *pai = dyn_cast<PartialApplyInst>(calleeSource)) {
@@ -418,7 +425,7 @@ static void cleanupCalleeValue(SILValue calleeValue,
   }
   invalidatedStackNesting = true;
 
-  calleeValue = lookThroughOwnershipInsts(calleeValue);
+  calleeValue = stripCopiesAndBorrows(calleeValue);
 
   // Handle function_ref -> convert_function -> partial_apply/thin_to_thick.
   if (auto *cfi = dyn_cast<ConvertFunctionInst>(calleeValue)) {
@@ -598,7 +605,7 @@ static SILValue getLoadedCalleeValue(LoadInst *li) {
 // a cast.
 static SILValue stripFunctionConversions(SILValue CalleeValue) {
   // Skip any copies that we see.
-  CalleeValue = lookThroughOwnershipInsts(CalleeValue);
+  CalleeValue = stripCopiesAndBorrows(CalleeValue);
 
   // We can also allow a thin @escape to noescape conversion as such:
   // %1 = function_ref @thin_closure_impl : $@convention(thin) () -> ()
@@ -625,7 +632,7 @@ static SILValue stripFunctionConversions(SILValue CalleeValue) {
     if (FromCalleeTy != EscapingCalleeTy)
       return CalleeValue;
 
-    return lookThroughOwnershipInsts(ConvertFn->getOperand());
+    return stripCopiesAndBorrows(ConvertFn->getOperand());
   }
 
   // Ignore mark_dependence users. A partial_apply [stack] uses them to mark
@@ -641,7 +648,7 @@ static SILValue stripFunctionConversions(SILValue CalleeValue) {
 
   auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeValue);
   if (!CFI)
-    return lookThroughOwnershipInsts(CalleeValue);
+    return stripCopiesAndBorrows(CalleeValue);
 
   // TODO: Handle argument conversion. All the code in this file needs to be
   // cleaned up and generalized. The argument conversion handling in
@@ -657,9 +664,9 @@ static SILValue stripFunctionConversions(SILValue CalleeValue) {
   auto EscapingCalleeTy =
     ToCalleeTy->getWithExtInfo(ToCalleeTy->getExtInfo().withNoEscape(false));
   if (FromCalleeTy != EscapingCalleeTy)
-    return lookThroughOwnershipInsts(CalleeValue);
+    return stripCopiesAndBorrows(CalleeValue);
 
-  return lookThroughOwnershipInsts(CFI->getOperand());
+  return stripCopiesAndBorrows(CFI->getOperand());
 }
 
 /// Returns the callee SILFunction called at a call site, in the case
@@ -686,7 +693,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
 
   // Then grab a first approximation of our apply by stripping off all copy
   // operations.
-  SILValue CalleeValue = lookThroughOwnershipInsts(AI.getCallee());
+  SILValue CalleeValue = stripCopiesAndBorrows(AI.getCallee());
 
   // If after stripping off copy_values, we have a load then see if we the
   // function we want to inline has a simple available value through a simple
@@ -695,7 +702,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     CalleeValue = getLoadedCalleeValue(li);
     if (!CalleeValue)
       return nullptr;
-    CalleeValue = lookThroughOwnershipInsts(CalleeValue);
+    CalleeValue = stripCopiesAndBorrows(CalleeValue);
   }
 
   // Look through a escape to @noescape conversion.
@@ -708,11 +715,11 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     // Collect the applied arguments and their convention.
     collectPartiallyAppliedArguments(PAI, CapturedArgConventions, FullArgs);
 
-    CalleeValue = lookThroughOwnershipInsts(PAI->getCallee());
+    CalleeValue = stripCopiesAndBorrows(PAI->getCallee());
     IsThick = true;
     PartialApply = PAI;
   } else if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
-    CalleeValue = lookThroughOwnershipInsts(TTTFI->getOperand());
+    CalleeValue = stripCopiesAndBorrows(TTTFI->getOperand());
     IsThick = true;
   }
 

@@ -190,10 +190,10 @@ class VeryErrorProne : ErrorProne {
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]
 // CHECK:      [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_BOX]]
 // CHECK:      [[PB:%.*]] = project_box [[LIFETIME]]
+// CHECK:      [[BORROWED_ARG1:%.*]] = begin_borrow [lexical] [[ARG1]]
 // CHECK:      store [[ARG2]] to [init] [[PB]]
 // CHECK:      [[T0:%.*]] = load [take] [[PB]]
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $VeryErrorProne to $ErrorProne
-// CHECK:      [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:      [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK-NOT:  [[BOX]]{{^[0-9]}}
 // CHECK-NOT:  [[PB]]{{^[0-9]}}

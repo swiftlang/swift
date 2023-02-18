@@ -31,7 +31,6 @@ SILValue swift::lookThroughOwnershipInsts(SILValue v) {
     switch (v->getKind()) {
     default:
       return v;
-    case ValueKind::MoveValueInst:
     case ValueKind::CopyValueInst:
     case ValueKind::BeginBorrowInst:
       v = cast<SingleValueInstruction>(v)->getOperand(0);
@@ -256,7 +255,6 @@ SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::MarkDependenceInst:
-  case SILInstructionKind::MoveValueInst:
     return cast<SingleValueInstruction>(I);
   }
 }

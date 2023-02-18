@@ -124,7 +124,6 @@ public func registerSILClasses() {
   register(BeginBorrowInst.self)
   register(ProjectBoxInst.self)
   register(CopyValueInst.self)
-  register(MoveValueInst.self)
   register(EndCOWMutationInst.self)
   register(ClassifyBridgeObjectInst.self)
   register(PartialApplyInst.self)

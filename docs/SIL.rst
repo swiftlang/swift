@@ -2414,55 +2414,27 @@ Variable Lifetimes
 In order for programmer intended lifetimes to be maintained under optimization,
 the lifetimes of SIL values which correspond to named source-level values can
 only be modified in limited ways.  Generally, the behavior is that the lifetime
-of a named source-level value is anchored to the variable's lexical scope and
-confined by **deinit barriers**.  Specifically, code motion may not move the
-ends of these lifetimes across a deinit barrier.
+of a named source-level value cannot _observably_ end before the end of the
+lexical scope in which that value is defined.  Specifically, code motion may
+not move the ends of these lifetimes across a **deinit barrier**.
 
-Source level variables (lets, vars, ...) and function arguments will result in
-SIL-level lexical lifetimes if either of the two sets of circumstances apply:
-(1) Inferred lexicality.
-- the type is non-trivial
-- the type is not eager-move
-- the variable or argument is not annotated to be eager-move
-OR
-(2) Explicit lexicality.
-- the type, variable, or argument is annotated `@_lexical`
-
-A type is eager-move by satisfying one of two conditions:
-(1) Inferred: An aggregate is inferred to be eager-move if all of its fields are
-    eager-move.
-(2) Annotated: Any type can be eager-move if it is annotated with an attribute
-    that explicitly specifies it to be: `@_eagerMove`, `@_noImplicitCopy`.
-
-A variable or argument is eager-move by satisfying one of two conditions:
-(1) Inferred: Its type is eager-move.
-(2) Annotated: The variable or argument is annotated with an attribute that
-    specifies it to be: `@_eagerMove`, `@_noImplicitCopy`.
-
-These source-level rules result in a few sorts of SIL value whose destroys must
-not be moved across deinit barriers:
+A few sorts of SIL value have lifetimes that are constrained that way:
 
 1: `begin_borrow [lexical]`
 2: `move_value [lexical]`
-3: function arguments
+3: @owned function arguments
 4: `alloc_stack [lexical]`
 
-To translate from the source-level representation of lexicality to the
-SIL-level representation, for source-level variables (vars, lets, ...) SILGen
-generates `begin_borrow [lexical]`, `move_value [lexical]`, `alloc_stack
-[lexical]` .  For function arguments, there is no work to do:
-a `SILFunctionArgument` itself can be lexical
-(`SILFunctionArgument::isLexical`).
+That these three have constrained lifetimes is encoded in ValueBase::isLexical,
+which should be checked before changing the lifetime of a value.
 
-That the first three have constrained lifetimes is encoded in
-ValueBase::isLexical, which should be checked before changing the lifetime of a
-value.
-
-When a function is inlined into its caller, a lexical borrow scope is added for
-each of its @guaranteed arguments, and a lexical move is added for each of its
-@owned arguments, (unless the values being passed are already lexical
-themselves) ensuring that the lifetimes of the corresponding source-level
-values are not shortened in a way that doesn't respect deinit barriers.
+The reason that only @owned function arguments are constrained is that a
+@guaranteed function argument is guaranteed by the function's caller to live for
+the full duration of the function already.  Optimization of the function alone
+can't shorten it.  When such a function is inlined into its caller, though, a
+lexical borrow scope is added for each of its @guaranteed arguments, ensuring
+that the lifetime of the corresponding source-level value is not shortened in a
+way that doesn't respect deinit barriers.
 
 Unlike the other sorts, `alloc_stack [lexical]` isn't a SILValue.  Instead, it
 constrains the lifetime of an addressable variable.  Since the constraint is

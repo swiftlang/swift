@@ -44,24 +44,16 @@ static bool hasValueOwnership(SILValue value) {
          value->getOwnershipKind() == OwnershipKind::Owned;
 }
 
-static SingleValueInstruction *asCopyOrMove(SILValue v) {
-  if (auto *copy = dyn_cast<CopyValueInst>(v))
-    return copy;
-  if (auto *move = dyn_cast<MoveValueInst>(v))
-    return move;
-  return nullptr;
-}
-
-/// Delete a chain of unused copies and moves leading to \p v.
-static void deleteCopyAndMoveChain(SILValue v, InstructionDeleter &deleter) {
-  while (auto *inst = asCopyOrMove(v)) {
-    if (!onlyHaveDebugUses(inst))
+/// Delete a chain of unused copies leading to \p v.
+static void deleteCopyChain(SILValue v, InstructionDeleter &deleter) {
+  while (auto *copy = dyn_cast<CopyValueInst>(v)) {
+    if (!onlyHaveDebugUses(copy))
       break;
 
-    v = inst->getOperand(CopyLikeInstruction::Src);
-    LLVM_DEBUG(llvm::dbgs() << "  Deleting " << *inst);
-    ++NumCopiesAndMovesEliminated;
-    deleter.forceDelete(inst);
+    v = copy->getOperand();
+    LLVM_DEBUG(llvm::dbgs() << "  Deleting " << *copy);
+    ++NumCopiesEliminated;
+    deleter.forceDelete(copy);
   }
 }
 
@@ -190,12 +182,11 @@ bool CanonicalizeBorrowScope::computeBorrowLiveness() {
 /// equivalent to the logic in visitBorrowScopeUses that recurses through
 /// copies. The use-def and def-use logic must be consistent.
 SILValue CanonicalizeBorrowScope::findDefInBorrowScope(SILValue value) {
-  while (auto *inst = asCopyOrMove(value)) {
-    auto *copy = dyn_cast<CopyValueInst>(inst);
-    if (copy && isPersistentCopy(copy))
+  while (auto *copy = dyn_cast<CopyValueInst>(value)) {
+    if (isPersistentCopy(copy))
       return copy;
 
-    value = inst->getOperand(0);
+    value = copy->getOperand();
   }
   return value;
 }
@@ -233,9 +224,8 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
     // Gather the uses before updating any of them.
     // 'value' may be deleted in this loop after rewriting its last use.
     // 'use' may become invalid after processing its user.
-
     SmallVector<Operand *, 4> uses(value->getUses());
-    for (auto *use : uses) {
+    for (Operand *use : uses) {
       auto *user = use->getUser();
       // Incidental uses, such as debug_value may be deleted before they can be
       // processed. Their user will now be nullptr. This means that value
@@ -243,15 +233,10 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       if (!user)
         break;
 
-      // Recurse through copies and moves.
+      // Recurse through copies.
       if (auto *copy = dyn_cast<CopyValueInst>(user)) {
         if (!isPersistentCopy(copy)) {
           defUseWorklist.insert(copy);
-          continue;
-        }
-      } else if (auto *move = dyn_cast<MoveValueInst>(user)) {
-        if (!move->isLexical() || innerValue->isLexical()) {
-          defUseWorklist.insert(move);
           continue;
         }
       }
@@ -448,7 +433,7 @@ public:
     // destroys are never needed within a borrow scope.
     if (isa<DestroyValueInst>(user)) {
       scope.getDeleter().forceDelete(user);
-      deleteCopyAndMoveChain(value, scope.getDeleter());
+      deleteCopyChain(value, scope.getDeleter());
       return true;
     }
     SILValue def = scope.findDefInBorrowScope(value);
@@ -462,12 +447,12 @@ public:
         use->set(def);
         copyLiveUse(use, scope.getCallbacks());
       }
-      deleteCopyAndMoveChain(value, scope.getDeleter());
+      deleteCopyChain(value, scope.getDeleter());
       return true;
     }
     // Non-consuming use.
     use->set(def);
-    deleteCopyAndMoveChain(value, scope.getDeleter());
+    deleteCopyChain(value, scope.getDeleter());
     return true;
   }
 
@@ -489,7 +474,7 @@ public:
     use->set(scope.findDefInBorrowScope(value));
     ForwardingOperand(use).setForwardingOwnershipKind(
         OwnershipKind::Guaranteed);
-    deleteCopyAndMoveChain(value, scope.getDeleter());
+    deleteCopyChain(value, scope.getDeleter());
     return true;
   }
 };
@@ -608,7 +593,7 @@ public:
       ForwardingOperand(use).setForwardingOwnershipKind(
           OwnershipKind::Guaranteed);
     }
-    deleteCopyAndMoveChain(innerValue, scope.getDeleter());
+    deleteCopyChain(innerValue, scope.getDeleter());
     return true;
   }
 
@@ -659,7 +644,7 @@ protected:
 
     use->set(outerValue);
 
-    deleteCopyAndMoveChain(innerValue, scope.getDeleter());
+    deleteCopyChain(innerValue, scope.getDeleter());
 
     recordOuterUse(use);
   };

@@ -136,10 +136,6 @@ struct OwnershipModelEliminatorVisitor
   bool visitExplicitCopyValueInst(ExplicitCopyValueInst *cvi);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
   bool visitLoadBorrowInst(LoadBorrowInst *lbi);
-  bool visitMoveValueInst(MoveValueInst *mvi) {
-    eraseInstructionAndRAUW(mvi, mvi->getOperand());
-    return true;
-  }
   bool visitBeginBorrowInst(BeginBorrowInst *bbi) {
     eraseInstructionAndRAUW(bbi, bbi->getOperand());
     return true;

@@ -367,7 +367,7 @@ func projectTailElems<T>(h: Header, ty: T.Type) -> Builtin.RawPointer {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins21projectTailElemsOwned{{[_0-9a-zA-Z]*}}F
 func projectTailElemsOwned<T>(h: __owned Header, ty: T.Type) -> Builtin.RawPointer {
   // CHECK: bb0([[ARG1:%.*]] : @owned $Header
-  // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+  // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [lexical] [[ARG1]]
   // CHECK:   [[TA:%.*]] = ref_tail_addr [[BORROWED_ARG1]] : $Header
   //   -- Once we have passed the address through a2p, we no longer provide any guarantees.
   //   -- We still need to make sure that the a2p itself is in the borrow site though.

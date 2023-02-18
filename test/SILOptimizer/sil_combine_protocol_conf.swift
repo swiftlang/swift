@@ -248,10 +248,10 @@ public class OtherClass {
 // CHECK: load [[S11]] 
 // CHECK: [[R2:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg2
 // CHECK: [[ACC2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R2]]
-// CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[ACC2]] : $*any GenericPropProtocol to $*@opened("{{.*}}", any GenericPropProtocol) Self
-// CHECK: copy_addr [[O2]] to [init] [[T1:%[0-9]*]]
+// CHECK: copy_addr [[ACC2]] to [init] [[T1:%[0-9]*]]
+// CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[T1]] : $*any GenericPropProtocol to $*@opened("{{.*}}", any GenericPropProtocol) Self
 // CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}", any GenericPropProtocol) Self, #GenericPropProtocol.val!getter : <Self where Self : GenericPropProtocol> (Self) -> () -> Int, [[O2]] : $*@opened("{{.*}}", any GenericPropProtocol) Self : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK: apply [[W2]]<@opened("{{.*}}", any GenericPropProtocol) Self>([[T1]]) : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: apply [[W2]]<@opened("{{.*}}", any GenericPropProtocol) Self>([[O2]]) : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: integer_literal
 // CHECK: builtin
@@ -271,10 +271,10 @@ public class OtherClass {
 // CHECK: cond_fail
 // CHECK: [[R5:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg4
 // CHECK: [[ACC5:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R5]]
-// CHECK: [[O5:%.*]] = open_existential_addr immutable_access [[ACC5]] : $*any GenericNestedPropProtocol to $*@opened("{{.*}}", any GenericNestedPropProtocol) Self
-// CHECK: copy_addr [[O5]] to [init] [[T2:%[0-9]+]]
+// CHECK: copy_addr [[ACC5]] to [init] [[T2:%[0-9]+]]
+// CHECK: [[O5:%.*]] = open_existential_addr immutable_access [[T2]] : $*any GenericNestedPropProtocol to $*@opened("{{.*}}", any GenericNestedPropProtocol) Self
 // CHECK: [[W5:%.*]] = witness_method $@opened("{{.*}}", any GenericNestedPropProtocol) Self, #GenericNestedPropProtocol.val!getter : <Self where Self : GenericNestedPropProtocol> (Self) -> () -> Int, [[O5:%.*]] : $*@opened("{{.*}}", any GenericNestedPropProtocol) Self : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int 
-// CHECK: apply [[W5]]<@opened("{{.*}}", any GenericNestedPropProtocol) Self>([[T2]]) : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: apply [[W5]]<@opened("{{.*}}", any GenericNestedPropProtocol) Self>([[O5]]) : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: builtin
 // CHECK: tuple_extract
@@ -341,10 +341,10 @@ public class OtherKlass {
 // CHECK: integer_literal
 // CHECK: [[R1:%.*]] = ref_element_addr [[ARG]] : $OtherKlass, #OtherKlass.arg2
 // CHECK: [[ACC1:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R1]]
-// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[ACC1]] : $*any AGenericProtocol to $*@opened("{{.*}}", any AGenericProtocol) Self
-// CHECK: copy_addr [[O1]] to [init] [[T1:%[0-9]+]]
+// CHECK: copy_addr [[ACC1]] to [init] [[T1:%[0-9]+]]
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[T1]] : $*any AGenericProtocol to $*@opened("{{.*}}", any AGenericProtocol) Self
 // CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}", any AGenericProtocol) Self, #AGenericProtocol.val!getter : <Self where Self : AGenericProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}", any AGenericProtocol) Self : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK: apply [[W1]]<@opened("{{.*}}", any AGenericProtocol) Self>([[T1]]) : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: apply [[W1]]<@opened("{{.*}}", any AGenericProtocol) Self>([[O1]]) : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: integer_literal
 // CHECK: builtin

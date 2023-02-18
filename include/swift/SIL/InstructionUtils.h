@@ -88,8 +88,8 @@ SILValue stripBorrow(SILValue V);
 //===----------------------------------------------------------------------===//
 
 /// Return a non-null SingleValueInstruction if the given instruction merely
-/// copies or moves the value of its first operand, possibly changing its type
-/// or ownership state, but otherwise having no effect.
+/// copies the value of its first operand, possibly changing its type or
+/// ownership state, but otherwise having no effect.
 ///
 /// The returned instruction may have additional "incidental" operands;
 /// mark_dependence for example.

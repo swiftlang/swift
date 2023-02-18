@@ -252,11 +252,6 @@ bool ObjectOutliner::getObjectInitVals(SILValue Val,
       if (!getObjectInitVals(UC, MemberStores, TailStores, NumTailTupleElements,
                              toIgnore))
         return false;
-    } else if (auto *mvi = dyn_cast<MoveValueInst>(User)) {
-      // move_value is transparent.
-      if (!getObjectInitVals(mvi, MemberStores, TailStores,
-                             NumTailTupleElements, toIgnore))
-        return false;
     } else if (auto *REA = dyn_cast<RefElementAddrInst>(User)) {
       // The address of a stored property.
       for (Operand *ElemAddrUse : REA->getUses()) {
@@ -320,9 +315,6 @@ static EndCOWMutationInst *getEndCOWMutation(SILValue object) {
     if (auto *upCast = dyn_cast<UpcastInst>(user)) {
       // Look through upcast instructions.
       if (EndCOWMutationInst *ecm = getEndCOWMutation(upCast))
-        return ecm;
-    } else if (auto *mvi = dyn_cast<MoveValueInst>(user)) {
-      if (auto *ecm = getEndCOWMutation(mvi))
         return ecm;
     } else if (auto *ecm = dyn_cast<EndCOWMutationInst>(use->getUser())) {
       return ecm;

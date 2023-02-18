@@ -178,7 +178,7 @@ func test11(_ g: Gizmo) -> AnyClass {
 func applyBlock(_ f: @convention(block) (Gizmo) -> Gizmo, x: Gizmo) -> Gizmo {
   // CHECK:     bb0([[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape (Gizmo) -> @autoreleased Gizmo, [[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
-  // CHECK:       [[BORROWED_BLOCK_COPY:%.*]] = begin_borrow [[BLOCK_COPY]]
+  // CHECK:       [[BORROWED_BLOCK_COPY:%.*]] = begin_borrow [lexical] [[BLOCK_COPY]]
   // CHECK:       [[BLOCK_COPY_COPY:%.*]] = copy_value [[BORROWED_BLOCK_COPY]]
   // CHECK:       [[RESULT:%.*]] = apply [[BLOCK_COPY_COPY]]([[ARG]])
   // CHECK:       destroy_value [[BLOCK_COPY_COPY]]

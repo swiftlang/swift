@@ -341,7 +341,7 @@ extension ValueDefUseWalker {
         return unmatchedPath(value: operand, path: path)
       }
     case is InitExistentialRefInst, is OpenExistentialRefInst,
-      is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
+      is BeginBorrowInst, is CopyValueInst,
       is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
       is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkMustCheckInst:
       return walkDownUses(ofValue: (instruction as! SingleValueInstruction), path: path)
@@ -618,7 +618,7 @@ extension ValueUseDefWalker {
         return rootDef(value: mvr, path: path)
       }
     case is InitExistentialRefInst, is OpenExistentialRefInst,
-      is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
+      is BeginBorrowInst, is CopyValueInst,
       is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
       is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkMustCheckInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)

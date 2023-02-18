@@ -387,7 +387,7 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
     // TODO: migrate users to getProjectionPath to the AccessPath utility to
     // avoid this hack.
     if (!isa<EndCOWMutationInst>(Iter) && !isa<BeginAccessInst>(Iter) &&
-        !isa<BeginBorrowInst>(Iter) && !isa<MoveValueInst>(Iter)) {
+        !isa<BeginBorrowInst>(Iter)) {
       Projection AP(Iter);
       if (!AP.isValid())
         break;

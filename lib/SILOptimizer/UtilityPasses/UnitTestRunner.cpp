@@ -401,23 +401,6 @@ struct CanonicalizeOSSALifetimeTest : UnitTest {
 };
 
 // Arguments:
-// - SILValue: value to canonicalize
-// Dumps:
-// - function after value canonicalization
-struct CanonicalizeBorrowScopeTest : UnitTest {
-  CanonicalizeBorrowScopeTest(UnitTestRunner *pass) : UnitTest(pass) {}
-  void invoke(Arguments &arguments) override {
-    auto value = arguments.takeValue();
-    auto borrowedValue = BorrowedValue(value);
-    assert(borrowedValue && "specified value isn't a BorrowedValue!?");
-    InstructionDeleter deleter;
-    CanonicalizeBorrowScope canonicalizer(deleter);
-    canonicalizer.canonicalizeBorrowScope(borrowedValue);
-    getFunction()->dump();
-  }
-};
-
-// Arguments:
 // - instruction
 // Dumps:
 // - instruction
@@ -750,8 +733,6 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     // Alphabetical mapping from string to unit test subclass.
     ADD_UNIT_TEST_SUBCLASS("accesspath-base", AccessPathBaseTest)
     ADD_UNIT_TEST_SUBCLASS("canonicalize-ossa-lifetime", CanonicalizeOSSALifetimeTest)
-    ADD_UNIT_TEST_SUBCLASS("canonicalize-borrow-scope",
-                           CanonicalizeBorrowScopeTest)
     ADD_UNIT_TEST_SUBCLASS("dump-function", DumpFunction)
     ADD_UNIT_TEST_SUBCLASS("extended-liveness", ExtendedLinearLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("find-borrow-introducers", FindBorrowIntroducers)
