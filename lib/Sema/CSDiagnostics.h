@@ -1256,6 +1256,14 @@ private:
   /// defines only `dynamicallyCall(withArguments:)` variant.
   bool diagnoseForDynamicCallable() const;
 
+  /// Diagnose methods that return unsafe projections and suggest fixits.
+  /// For example, if Swift cannot find "vector::data" because it is unsafe, try
+  /// to diagnose this and tell the user why we did not import "vector::data".
+  ///
+  /// Provides fixits for:
+  /// at -> subscript
+  /// begin, end -> makeIterator
+  /// front, back -> first, last
   void diagnoseUnsafeCxxMethod(SourceLoc loc, ASTNode anchor, Type baseType,
                                DeclName name) const;
 
