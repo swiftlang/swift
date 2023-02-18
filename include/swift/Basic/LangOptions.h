@@ -219,6 +219,9 @@ namespace swift {
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
 
+    /// Enable 'availability' restrictions for App Extension Libraries.
+    bool EnableAppExtensionLibraryRestrictions = false;
+
     /// Diagnostic level to report when a public declarations doesn't declare
     /// an introduction OS version.
     llvm::Optional<DiagnosticBehavior> RequireExplicitAvailability = llvm::None;
