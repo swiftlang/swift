@@ -154,14 +154,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // resolution of nonescaping closure lifetimes to correctly check the use
   // of move-only values as captures in nonescaping closures as borrows.
 
-  // Check noImplicitCopy and move only types for objects
-  //
-  // NOTE: It is important that this is run /before/ move only address checker
-  // since if the address checker emits an error, it will cleanup copy_value of
-  // move only objects meaning that we could lose object level diagnostics.
-  P.addMoveOnlyObjectChecker();
-  // Check noImplicitCopy and move only types for addresses.
-  P.addMoveOnlyAddressChecker();
+  // Check noImplicitCopy and move only types for objects and addresses.
+  P.addMoveOnlyChecker();
   // Convert last destroy_value to deinits.
   P.addMoveOnlyDeinitInsertion();
   // Lower move only wrapped trivial types.
