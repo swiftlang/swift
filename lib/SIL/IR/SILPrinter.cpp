@@ -2673,10 +2673,10 @@ public:
       *this << ' ';
       printSubstitutions(KPI->getSubstitutions());
     }
-    if (!KPI->getAllOperands().empty()) {
+    if (!KPI->getPatternOperands().empty()) {
       *this << " (";
       
-      interleave(KPI->getAllOperands(),
+      interleave(KPI->getPatternOperands(),
         [&](const Operand &operand) {
           *this << Ctx.getID(operand.get());
         }, [&]{

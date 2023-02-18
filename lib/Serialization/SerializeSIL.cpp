@@ -2490,7 +2490,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       writeKeyPathPatternComponent(component, ListOfValues);
     }
     
-    for (auto &operand : KPI->getAllOperands()) {
+    for (auto &operand : KPI->getPatternOperands()) {
       auto value = operand.get();
       ListOfValues.push_back(addValueRef(value));
       ListOfValues.push_back(S.addTypeRef(value->getType().getASTType()));
