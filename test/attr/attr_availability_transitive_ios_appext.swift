@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -application-extension
+// RUN: %target-typecheck-verify-swift -application-extension-library
 // REQUIRES: OS=ios
 
 // Allow referencing unavailable API in situations where the caller is marked unavailable in the same circumstances.
