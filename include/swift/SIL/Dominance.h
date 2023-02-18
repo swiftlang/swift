@@ -86,10 +86,6 @@ public:
   void reset() {
     super::reset();
   }
-
-#ifndef NDEBUG
-  void dump() { print(llvm::errs()); };
-#endif
 };
 
 /// Compute a single block's dominance frontier.
