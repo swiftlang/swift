@@ -1083,6 +1083,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     return E;
   }
+  
+  Expr *visitIsCaseExpr(IsCaseExpr *E) {
+    Pattern *sub = doIt(E->getPattern());
+    if (!sub) return nullptr;
+    
+    E->setPattern(sub);
+    return E;
+  }
 
   Expr *visitTernaryExpr(TernaryExpr *E) {
     if (Expr *Cond = E->getCondExpr()) {

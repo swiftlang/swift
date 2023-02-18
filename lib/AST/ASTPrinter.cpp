@@ -4993,6 +4993,9 @@ void PrintAST::visitSubscriptExpr(SubscriptExpr *expr) {
 void PrintAST::visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
 }
 
+void PrintAST::visitIsCaseExpr(IsCaseExpr *expr) {
+}
+
 void PrintAST::visitForceValueExpr(ForceValueExpr *expr) {
 }
 

@@ -79,6 +79,16 @@ ParserResult<Expr> Parser::parseExprIs() {
   return makeParserResult(IsExpr::create(Context, isLoc, type.get()));
 }
 
+/// parseExprIsPattern
+ParserResult<Expr> Parser::parseExprIsCase() {
+  SourceLoc isLoc = consumeToken(tok::kw_is);
+  SourceLoc caseLoc = consumeToken(tok::kw_case);
+  
+  ParserResult<Pattern> patternResult = parseMatchingPattern(true);
+  
+  return makeParserResult(IsCaseExpr::create(Context, patternResult.get(), isLoc, caseLoc));
+}
+
 /// parseExprAs
 ///   expr-as:
 ///     'as' type
@@ -288,7 +298,14 @@ parse_operator:
         
     case tok::kw_is: {
       // Parse a type after the 'is' token instead of an expression.
-      ParserResult<Expr> is = parseExprIs();
+      ParserResult<Expr> is;
+      
+      if (peekToken().is(tok::kw_case)) {
+        is = parseExprIsCase();
+      } else {
+        is = parseExprIs();
+      }
+      
       if (is.isNull() || is.hasCodeCompletion())
         return is;
       

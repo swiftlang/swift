@@ -471,6 +471,7 @@ namespace {
     RValue visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                            SGFContext C);
     RValue visitIsExpr(IsExpr *E, SGFContext C);
+    RValue visitIsCaseExpr(IsCaseExpr *E, SGFContext C);
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
@@ -2149,6 +2150,11 @@ RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
                          E->getCastType(), E->getCastKind());
   return emitBoolLiteral(SGF, E, isa, C);
+}
+
+RValue RValueEmitter::visitIsCaseExpr(IsCaseExpr *E, SGFContext C) {
+  // TODO: Emit SIL for IsCaseExpr. Not sure how.
+  abort();
 }
 
 RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,

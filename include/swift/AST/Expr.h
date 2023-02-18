@@ -26,6 +26,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/FunctionRefKind.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
@@ -5113,6 +5114,41 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Is;
+  }
+};
+
+class IsCaseExpr final : public Expr {
+  /// The LHS value of the expression
+  Expr *SubExpr;
+  /// The RHS pattern of the expression
+  Pattern *CasePattern;
+  SourceLoc isLoc;
+  SourceLoc caseLoc;
+  
+  IsCaseExpr(Pattern *CasePattern, SourceLoc isLoc, SourceLoc caseLoc)
+    : Expr(ExprKind::IsCase, /*implicit*/ false), SubExpr(nullptr), CasePattern(CasePattern), isLoc(isLoc), caseLoc(caseLoc) {}
+  
+public:
+  static IsCaseExpr *create(ASTContext &ctx, Pattern *CasePattern, SourceLoc isLoc, SourceLoc caseLoc);
+
+  Pattern *getPattern() { return CasePattern; }
+  void setPattern(Pattern *p) { CasePattern = p; }
+  
+  SourceLoc getStartLoc() const {
+    if (SubExpr) {
+      return SubExpr->getStartLoc();
+    } else {
+      return isLoc;
+    }
+  }
+  
+  SourceLoc getEndLoc() const { return CasePattern->getEndLoc(); }
+  
+  Expr *getSubExpr() { return SubExpr; }
+  void setSubExpr(Expr *e) { SubExpr = e; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::IsCase;
   }
 };
 

@@ -4619,6 +4619,12 @@ namespace {
       // Should already be type-checked.
       return simplifyExprType(expr);
     }
+    
+    Expr *visitIsCaseExpr(IsCaseExpr *expr) {
+      // TODO: What do we do here?
+      return simplifyExprType(expr);
+    }
+    
 
     Expr *visitLazyInitializerExpr(LazyInitializerExpr *expr) {
       llvm_unreachable("Already type-checked");

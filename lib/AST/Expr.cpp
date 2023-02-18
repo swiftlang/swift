@@ -461,6 +461,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(Arrow);
   NO_REFERENCE(Ternary);
   NO_REFERENCE(EnumIsCase);
+  NO_REFERENCE(IsCase);
   NO_REFERENCE(Assign);
   NO_REFERENCE(CodeCompletion);
   NO_REFERENCE(UnresolvedPattern);
@@ -825,6 +826,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::ConditionalCheckedCast:
   case ExprKind::Is:
   case ExprKind::Coerce:
+  case ExprKind::IsCase:
     return false;
 
   case ExprKind::Arrow:
@@ -1006,6 +1008,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Arrow:
   case ExprKind::Ternary:
   case ExprKind::EnumIsCase:
+  case ExprKind::IsCase:
   case ExprKind::Assign:
   case ExprKind::CodeCompletion:
   case ExprKind::UnresolvedPattern:
@@ -1816,6 +1819,10 @@ ConditionalCheckedCastExpr::createImplicit(ASTContext &ctx, Expr *sub,
 
 IsExpr *IsExpr::create(ASTContext &ctx, SourceLoc isLoc, TypeRepr *tyRepr) {
   return new (ctx) IsExpr(nullptr, isLoc, new (ctx) TypeExpr(tyRepr));
+}
+
+IsCaseExpr *IsCaseExpr::create(ASTContext &ctx, Pattern *CasePattern, SourceLoc isLoc, SourceLoc caseLoc) {
+  return new (ctx) IsCaseExpr(CasePattern, isLoc, caseLoc);
 }
 
 CoerceExpr *CoerceExpr::create(ASTContext &ctx, SourceLoc asLoc,

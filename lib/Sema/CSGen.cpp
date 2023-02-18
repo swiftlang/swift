@@ -3407,6 +3407,40 @@ namespace {
 
       return boolDecl->getDeclaredInterfaceType();
     }
+    
+    Type visitIsCaseExpr(IsCaseExpr *expr) {
+      
+      // TODO: Add a constraint that the type of the LHS (`expr->getSubExpr()`)
+      // is the same as the type of the RHS (`expr->getPattern()`)
+      
+      // Some potentially relevant code copied from elsewhere about getting types from patterns:
+      
+      auto exprPattern = expr->getPattern();
+      Pattern *pattern = TypeChecker::resolvePattern(exprPattern, CurDC,
+                                                     /*isStmtCondition*/ false);
+      if (!pattern) {
+        return nullptr;
+      }
+
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, CurDC);
+      auto contextualPatternPattern = contextualPattern.getPattern();
+      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+      if (patternType->hasError()) {
+        return nullptr;
+      }
+      
+      
+      // The `IsCaseExpr` itself always has `Bool` type
+      auto &ctx = CS.getASTContext();
+      auto boolDecl = ctx.getBoolDecl();
+
+      if (!boolDecl) {
+        ctx.Diags.diagnose(SourceLoc(), diag::broken_bool);
+        return nullptr;
+      }
+
+      return boolDecl->getDeclaredInterfaceType();
+    }
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);

@@ -146,6 +146,14 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E,
                                      diagnose ? castExpr->getAsLoc()
                                               : SourceLoc());
   }
+  
+  // TODO: What should the precedence group for `is case` be?
+  // For now just using the same precedence group as `is` casts
+  if (auto isCaseExpr = dyn_cast<IsCaseExpr>(E)) {
+    return getBuiltinPrecedenceGroup(DC, Context.Id_CastingPrecedence,
+                                     diagnose ? isCaseExpr->getStartLoc()
+                                              : SourceLoc());
+  }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     Identifier name = DRE->getDecl()->getBaseIdentifier();
@@ -373,8 +381,14 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
       assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     }
     assert(RHS == as && "'as' with non-type RHS?!");
-    as->setSubExpr(LHS);    
+    as->setSubExpr(LHS);
     return as;
+  }
+  
+  if (auto *isCaseExpr = dyn_cast<IsCaseExpr>(Op)) {
+    assert(RHS == isCaseExpr);
+    isCaseExpr->setSubExpr(LHS);
+    return isCaseExpr;
   }
 
   if (auto *arrow = dyn_cast<ArrowExpr>(Op)) {
