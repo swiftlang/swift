@@ -5110,7 +5110,8 @@ public:
   /// \returns true if an error occurred, false otherwise.
   LLVM_NODISCARD
   bool generateConstraints(SolutionApplicationTarget &target,
-                           FreeTypeVariableBinding allowFreeTypeVariables);
+                           FreeTypeVariableBinding allowFreeTypeVariables =
+                               FreeTypeVariableBinding::Disallow);
 
   /// Generate constraints for the body of the given function or closure.
   ///

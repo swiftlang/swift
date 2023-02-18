@@ -9224,20 +9224,13 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     }
 
     // If there is a guard expression, coerce that.
-    if (auto guardExpr = info.guardExpr) {
-      guardExpr = guardExpr->walk(*this);
-      if (!guardExpr)
+    if (auto *guardExpr = info.guardExpr) {
+      auto target = *cs.getSolutionApplicationTarget(guardExpr);
+      auto resultTarget = rewriteTarget(target);
+      if (!resultTarget)
         return None;
 
-      // FIXME: Feels like we could leverage existing code more.
-      Type boolType = cs.getASTContext().getBoolType();
-      guardExpr = solution.coerceToType(
-          guardExpr, boolType, cs.getConstraintLocator(info.guardExpr));
-      if (!guardExpr)
-        return None;
-
-      (*caseLabelItem)->setGuardExpr(guardExpr);
-      solution.setExprTypes(guardExpr);
+      (*caseLabelItem)->setGuardExpr(resultTarget->getAsExpr());
     }
 
     return target;

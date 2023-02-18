@@ -529,6 +529,9 @@ public:
   void visitCaseItem(CaseLabelItem *caseItem, ContextualTypeInfo contextInfo) {
     assert(contextInfo.purpose == CTP_CaseStmt);
 
+    auto *DC = context.getAsDeclContext();
+    auto &ctx = DC->getASTContext();
+
     // Resolve the pattern.
     auto *pattern = caseItem->getPattern();
     if (!caseItem->isPatternResolved()) {
@@ -554,11 +557,15 @@ public:
 
     // Generate constraints for `where` clause (if any).
     if (guardExpr) {
-      guardExpr = cs.generateConstraints(guardExpr, context.getAsDeclContext());
-      if (!guardExpr) {
+      SolutionApplicationTarget guardTarget(
+          guardExpr, DC, CTP_Condition, ctx.getBoolType(), /*discarded*/ false);
+
+      if (cs.generateConstraints(guardTarget)) {
         hadError = true;
         return;
       }
+      guardExpr = guardTarget.getAsExpr();
+      cs.setSolutionApplicationTarget(guardExpr, guardTarget);
     }
 
     // Save information about case item so it could be referenced during
@@ -580,7 +587,7 @@ private:
         forEachStmt, context.getAsDeclContext(),
         /*bindTypeVarsOneWay=*/false);
 
-    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+    if (cs.generateConstraints(target)) {
       hadError = true;
       return;
     }
@@ -734,7 +741,7 @@ private:
     if (isPlaceholderVar(patternBinding))
       return;
 
-    if (cs.generateConstraints(*target, FreeTypeVariableBinding::Disallow)) {
+    if (cs.generateConstraints(*target)) {
       hadError = true;
       return;
     }
@@ -1128,7 +1135,7 @@ private:
                                      contextualResultInfo.getType(),
                                      /*isDiscarded=*/false);
 
-    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+    if (cs.generateConstraints(target)) {
       hadError = true;
       return;
     }
@@ -1430,7 +1437,7 @@ ConstraintSystem::simplifySyntacticElementConstraint(
                                      contextInfo.purpose, contextInfo.getType(),
                                      contextualTypeLoc, isDiscarded);
 
-    if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+    if (generateConstraints(target))
       return SolutionKind::Error;
 
     setSolutionApplicationTarget(expr, target);

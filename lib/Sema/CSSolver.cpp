@@ -1684,7 +1684,7 @@ bool ConstraintSystem::solveForCodeCompletion(
         << "--- Code Completion ---\n";
   }
 
-  if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+  if (generateConstraints(target))
     return false;
 
   solveForCodeCompletion(solutions);
