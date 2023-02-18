@@ -9869,7 +9869,7 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
     }
   }
 
-  if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+  if (cs.generateConstraints(target))
     return true;
 
   // Sub-expression associated with expression pattern is the enum element
