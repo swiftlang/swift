@@ -867,7 +867,7 @@ def enable_app_extension : Flag<["-"], "application-extension">,
 
 def enable_app_extension_library : Flag<["-"], "application-extension-library">,
   Flags<[FrontendOption, NoInteractiveOption]>,
-  HelpText<"Restrict code to those available for App Extensions">;
+  HelpText<"Restrict code to those available for App Extension Libraries">;
 
 def libc : Separate<["-"], "libc">,
            Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
