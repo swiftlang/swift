@@ -359,7 +359,7 @@ protected:
     // binding.
     if (cs) {
       SolutionApplicationTarget target(patternBinding);
-      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
+      if (cs->generateConstraints(target))
         hadError = true;
     }
   }
@@ -661,7 +661,7 @@ protected:
       // FIXME: Add contextual type purpose for switch subjects?
       SolutionApplicationTarget target(subjectExpr, dc, CTP_Unused, Type(),
                                        /*isDiscarded=*/false);
-      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      if (cs->generateConstraints(target)) {
         hadError = true;
         return nullptr;
       }
@@ -789,7 +789,7 @@ protected:
     auto target = SolutionApplicationTarget::forForEachStmt(
         forEachStmt, dc, /*bindPatternVarsOneWay=*/true);
     if (cs) {
-      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      if (cs->generateConstraints(target)) {
         hadError = true;
         return nullptr;
       }
@@ -886,15 +886,15 @@ protected:
     }
 
     if (cs) {
-     SolutionApplicationTarget target(
-         throwStmt->getSubExpr(), dc, CTP_ThrowStmt,
-         ctx.getErrorExistentialType(),
-         /*isDiscarded=*/false);
-     if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
-       hadError = true;
+      SolutionApplicationTarget target(throwStmt->getSubExpr(), dc,
+                                       CTP_ThrowStmt,
+                                       ctx.getErrorExistentialType(),
+                                       /*isDiscarded=*/false);
+      if (cs->generateConstraints(target))
+        hadError = true;
 
-     cs->setSolutionApplicationTarget(throwStmt, target);
-   }
+      cs->setSolutionApplicationTarget(throwStmt, target);
+    }
 
     return nullptr;
   }
