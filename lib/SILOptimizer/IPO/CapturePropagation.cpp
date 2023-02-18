@@ -73,7 +73,7 @@ static SILInstruction *getConstant(SILValue V) {
     // mangling scheme.
     // But currently it's not worth it because we do not optimize subscript
     // keypaths in SILCombine.
-    if (kp->getNumOperands() != 0)
+    if (kp->getPatternOperands().size() != 0)
       return nullptr;
     if (!kp->hasPattern())
       return nullptr;
