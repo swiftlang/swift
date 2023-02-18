@@ -170,14 +170,36 @@ NOTE(record_not_automatically_importable, none, "record '%0' is not "
                                                 "Refer to the C++ Interop User "
                                                 "Manual to classify this type.",
      (StringRef, StringRef))
-NOTE(projection_not_imported, none, "C++ method '%0' that returns unsafe "
-                                    "projection of type '%1' is unavailable. ",
+
+NOTE(projection_value_not_imported, none, "C++ method '%0' that returns a value "
+                                          "of type '%1' is unavailable. ",
      (StringRef, StringRef))
-NOTE(projection_at_not_imported, none, "C++ method '%0' that returns unsafe "
-                                    "projection of type '%1' is unavailable. "
-                                    "Do you want to replace it with a call "
-                                    "to the subscript operator?",
+NOTE(projection_ptr_not_imported, none, "C++ method '%0' that returns a pointer "
+                                          "of type '%1' is unavailable. ",
      (StringRef, StringRef))
+NOTE(projection_reference_not_imported, none, "C++ method '%0' that returns a reference "
+                                          "of type '%1' is unavailable. ",
+     (StringRef, StringRef))
+NOTE(projection_may_return_interior_ptr, none, "C++ method '%0' may return an "
+                                    "interior pointer. ",
+     (StringRef))
+NOTE(mark_self_contained, none, "Mark type '%0' as 'self_contained' in C++ to "
+                                 "make methods that use it available in Swift. ",
+     (StringRef))
+NOTE(mark_safe_to_import, none, "Mark method '%0' as 'safe_to_import' in C++ to "
+                                "make it available in Swift. ",
+     (StringRef))
+
+NOTE(at_to_subscript, none, "Do you want to replace it with a call "
+                            "to the subscript operator?",
+     ())
+NOTE(get_swift_iterator, none, "Do you want to make a Swift iterator instead?",
+     ())
+NOTE(get_first_element, none, "Do you want to get the first element instead?",
+     ())
+NOTE(get_last_element, none, "Do you want to get the last element instead?",
+     ())
+
 NOTE(iterator_method_unavailable, none, "C++ method '%0' that returns an "
                                   "iterator unavailable",
      (StringRef))
