@@ -517,7 +517,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   };
 
   auto expansion = SGF.getTypeExpansionContext();
-  switch (SGF.SGM.Types.getDeclCaptureKind(capture, expansion)) {
+  auto captureKind = SGF.SGM.Types.getDeclCaptureKind(capture, expansion);
+  switch (captureKind) {
   case CaptureKind::Constant: {
     auto type = getVarTypeInCaptureContext();
     auto &lowering = SGF.getTypeLowering(type);
@@ -569,24 +570,31 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     break;
   }
 
+  case CaptureKind::ImmutableBox:
   case CaptureKind::Box: {
     // LValues are captured as a retained @box that owns
     // the captured value.
     auto type = getVarTypeInCaptureContext();
     // Get the content for the box in the minimal  resilience domain because we
     // are declaring a type.
+    bool isMutable = captureKind != CaptureKind::ImmutableBox;
     auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(
         VD,
         SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
                                            type),
-        SGF.F.getGenericEnvironment(), /*mutable*/ true);
+        SGF.F.getGenericEnvironment(), /*mutable*/ isMutable);
     auto *box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
     box->setClosureCapture(true);
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
-    if (addr->getType().isMoveOnly())
-      addr = SGF.B.createMarkMustCheckInst(
-          VD, addr, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+    if (addr->getType().isMoveOnly()) {
+      if (isMutable)
+        addr = SGF.B.createMarkMustCheckInst(
+            VD, addr, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+      else
+        addr = SGF.B.createMarkMustCheckInst(
+            VD, addr, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+    }
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     SGF.B.createDebugValueAddr(Loc, addr, DbgVar);

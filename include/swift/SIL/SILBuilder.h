@@ -439,6 +439,16 @@ public:
         ElementTypes, ElementCountOperands));
   }
 
+  /// Helper function that calls \p createAllocBox after constructing a
+  /// SILBoxType for \p fieldType.
+  AllocBoxInst *createAllocBox(SILLocation loc, SILType fieldType,
+                               Optional<SILDebugVariable> Var = None,
+                               bool hasDynamicLifetime = false,
+                               bool reflection = false) {
+    return createAllocBox(loc, SILBoxType::get(fieldType.getASTType()), Var,
+                          hasDynamicLifetime, reflection);
+  }
+
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                Optional<SILDebugVariable> Var = None,
                                bool hasDynamicLifetime = false,

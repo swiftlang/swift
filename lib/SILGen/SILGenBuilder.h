@@ -449,6 +449,10 @@ public:
 
   using SILBuilder::emitCopyValueOperation;
   ManagedValue emitCopyValueOperation(SILLocation Loc, ManagedValue v);
+
+  void emitCopyAddrOperation(SILLocation loc, SILValue srcAddr,
+                             SILValue destAddr, IsTake_t isTake,
+                             IsInitialization_t isInitialize);
 };
 
 } // namespace Lowering

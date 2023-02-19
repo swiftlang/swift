@@ -168,6 +168,11 @@ void DiagnosticEmitter::emitCheckerDoesntUnderstandDiagnostic(
   emittedCheckerDoesntUnderstandDiagnostic = true;
 }
 
+void DiagnosticEmitter::emitCheckedMissedCopyError(SILInstruction *copyInst) {
+  diagnose(copyInst->getFunction()->getASTContext(), copyInst,
+           diag::sil_moveonlychecker_missed_copy);
+}
+
 //===----------------------------------------------------------------------===//
 //                          MARK: Object Diagnostics
 //===----------------------------------------------------------------------===//

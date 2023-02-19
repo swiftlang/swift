@@ -1,0 +1,65 @@
+// RUN: %target-sil-opt -enable-experimental-move-only -enable-sil-verify-all %s -allocbox-to-stack -enable-copy-propagation=requested-passes-only -enable-lexical-borrow-scopes=false | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+@_moveOnly
+struct NonTrivialStruct {
+  var i: Builtin.Int32
+}
+
+sil @use_nontrivialstruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+
+sil [ossa] @host_markmustcheck_closure : $@convention(thin) (@guaranteed { var NonTrivialStruct }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var NonTrivialStruct }):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_markmustcheck : $@convention(thin) (@owned NonTrivialStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] : @owned
+// CHECK-NEXT:   [[STACK1:%.*]] = alloc_stack $NonTrivialStruct
+// CHECK-NEXT:   [[MARKED1:%.*]] = mark_must_check [consumable_and_assignable] [[STACK1]]
+// CHECK-NEXT:   store [[ARG]] to [init] [[MARKED1]]
+// CHECK-NEXT:   [[LOADED_VALUE:%.*]] = load [take] [[MARKED1]]
+// CHECK-NEXT:   [[STACK2:%.*]] = alloc_stack $NonTrivialStruct
+// CHECK-NEXT:   [[MARKED2:%.*]] = mark_must_check [consumable_and_assignable] [[STACK2]]
+// CHECK-NEXT:   store [[LOADED_VALUE]] to [init] [[MARKED2]]
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[FUNC:%.*]] = function_ref @$s26host_markmustcheck_closureTf0s_n : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> ()
+// CHECK-NEXT:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[FUNC]]([[MARKED2]]) : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> ()
+// CHECK-NEXT:   apply [[PA]]()
+// CHECK-NEXT:   destroy_value [[PA]]
+// CHECK-NEXT:   destroy_addr [[MARKED2]]
+// CHECK-NEXT:   dealloc_stack [[STACK2]]
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK: } // end sil function 'hoist_markmustcheck'
+sil [ossa] @hoist_markmustcheck : $@convention(thin) (@owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_box ${ var NonTrivialStruct }
+  %2 = project_box %1 : ${ var NonTrivialStruct }, 0
+  store %0 to [init] %2 : $*NonTrivialStruct
+
+  %3 = project_box %1 : ${ var NonTrivialStruct }, 0
+  %3a = mark_must_check [assignable_but_not_consumable] %3 : $*NonTrivialStruct
+  %3b = load [take] %3a : $*NonTrivialStruct
+
+  %4 = alloc_box ${ var NonTrivialStruct }
+  %4a = project_box %4 : ${ var NonTrivialStruct }, 0
+  %4b = mark_must_check [assignable_but_not_consumable] %4a : $*NonTrivialStruct
+  store %3b to [init] %4b : $*NonTrivialStruct
+
+  %f = function_ref @host_markmustcheck_closure : $@convention(thin) (@guaranteed { var NonTrivialStruct }) -> ()
+  %5c = copy_value %4 : ${ var NonTrivialStruct }
+  %g = partial_apply [callee_guaranteed] %f(%5c) : $@convention(thin) (@guaranteed { var NonTrivialStruct }) -> ()
+  apply %g() : $@callee_guaranteed () -> ()
+
+  destroy_value %g : $@callee_guaranteed () -> ()
+  destroy_value %4 : ${ var NonTrivialStruct }
+  dealloc_box %1 : ${ var NonTrivialStruct }
+  %9999 = tuple()
+  return %9999 : $()
+}

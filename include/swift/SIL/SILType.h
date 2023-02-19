@@ -695,7 +695,7 @@ public:
   ///
   /// \p field Return the type of the ith field of the box. Default set to 0
   /// since we only support one field today. This is just future proofing.
-  SILType getSILBoxFieldType(const SILFunction *f, unsigned field = 0);
+  SILType getSILBoxFieldType(const SILFunction *f, unsigned field = 0) const;
 
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
@@ -707,6 +707,17 @@ public:
   /// type of its field, which it is guaranteed to have identical layout to.
   SILType getSingletonAggregateFieldType(SILModule &M,
                                          ResilienceExpansion expansion) const;
+
+  /// \returns true if this is a SILBoxType containing a noncopyable type.
+  bool isBoxedNonCopyableType(const SILFunction *fn) const {
+    if (!this->is<SILBoxType>())
+      return false;
+    return getSILBoxFieldType(fn).isMoveOnly();
+  }
+
+  bool isBoxedNonCopyableType(const SILFunction &fn) const {
+    return isBoxedNonCopyableType(&fn);
+  }
 
   //
   // Accessors for types used in SIL instructions:

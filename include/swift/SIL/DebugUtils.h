@@ -556,11 +556,24 @@ inline DebugVarCarryingInst DebugVarCarryingInst::getFromValue(SILValue value) {
   return DebugVarCarryingInst();
 }
 
+static_assert(sizeof(DebugVarCarryingInst) == sizeof(VarDeclCarryingInst) &&
+                  alignof(DebugVarCarryingInst) == alignof(VarDeclCarryingInst),
+              "Expected debug var carrying inst to have the same "
+              "size/alignment/layout as VarDeclCarryingInst!");
+
 /// Attempt to discover a StringRef varName for the value \p value based only
 /// off of debug var information. If we fail, we return the name "unknown".
 inline StringRef getDebugVarName(SILValue value) {
   auto inst = DebugVarCarryingInst::getFromValue(value);
   return DebugVarCarryingInst::getName(inst);
+}
+
+inline StringRef getDiagnosticName(SILValue value) {
+  if (auto inst = DebugVarCarryingInst::getFromValue(value))
+    return inst.getName();
+  if (auto inst = VarDeclCarryingInst::getFromValue(value))
+    return inst.getName();
+  return "unknown";
 }
 
 } // end namespace swift
