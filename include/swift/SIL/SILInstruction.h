@@ -643,7 +643,7 @@ public:
   NonTypeDependentOperandValueRange getNonTypeDependentOperandValues() const;
 
   TransformedOperandValueRange
-  getOperandValues(std::function<SILValue(SILValue)> transformFn,
+  getOperandValues(std::function<SILValue(const Operand *)> transformFn,
                    bool skipTypeDependentOperands) const;
 
   SILValue getOperand(unsigned Num) const {
@@ -720,8 +720,9 @@ public:
   /// Returns true if the given instruction is completely identical to RHS,
   /// using \p opEqual to compare operands.
   ///
-  template <typename OpCmp>
-  bool isIdenticalTo(const SILInstruction *RHS, OpCmp &&opEqual) const {
+  bool
+  isIdenticalTo(const SILInstruction *RHS,
+                llvm::function_ref<bool(SILValue, SILValue)> opEqual) const {
     // Quick check if both instructions have the same kind, number of operands,
     // and types. This should filter out most cases.
     if (getKind() != RHS->getKind() ||
@@ -735,6 +736,29 @@ public:
     // Check operands.
     for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
       if (!opEqual(getOperand(i), RHS->getOperand(i)))
+        return false;
+
+    // Check any special state of instructions that are not represented in the
+    // instructions operands/type.
+    return hasIdenticalState(RHS);
+  }
+
+  bool isIdenticalTo(const SILInstruction *RHS,
+                     llvm::function_ref<bool(const Operand *, const Operand *)>
+                         opEqual) const {
+    // Quick check if both instructions have the same kind, number of operands,
+    // and types. This should filter out most cases.
+    if (getKind() != RHS->getKind() ||
+        getNumOperands() != RHS->getNumOperands()) {
+      return false;
+    }
+
+    if (!getResults().hasSameTypes(RHS->getResults()))
+      return false;
+
+    // Check operands.
+    for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
+      if (!opEqual(&getOperandRef(i), &RHS->getOperandRef(i)))
         return false;
 
     // Check any special state of instructions that are not represented in the
@@ -972,19 +996,20 @@ struct SILInstruction::NonTypeDependentOperandToValue {
 
 struct SILInstruction::OperandToTransformedValue {
   const SILInstruction &i;
-  std::function<SILValue(SILValue)> transformFn;
+  std::function<SILValue(const Operand *)> transformFn;
   bool skipTypeDependentOps;
 
-  OperandToTransformedValue(const SILInstruction &i,
-                            std::function<SILValue(SILValue)> transformFn,
-                            bool skipTypeDependentOps)
+  OperandToTransformedValue(
+      const SILInstruction &i,
+      std::function<SILValue(const Operand *)> transformFn,
+      bool skipTypeDependentOps)
       : i(i), transformFn(transformFn),
         skipTypeDependentOps(skipTypeDependentOps) {}
 
   Optional<SILValue> operator()(const Operand &use) const {
     if (skipTypeDependentOps && i.isTypeDependentOperand(use))
       return None;
-    return transformFn(use.get());
+    return transformFn(&use);
   }
 };
 
@@ -1005,10 +1030,9 @@ SILInstruction::getNonTypeDependentOperandValues() const
                                            NonTypeDependentOperandToValue(*this));
 }
 
-inline auto
-SILInstruction::getOperandValues(std::function<SILValue(SILValue)> transformFn,
-                                 bool skipTypeDependentOperands) const
-    -> TransformedOperandValueRange {
+inline auto SILInstruction::getOperandValues(
+    std::function<SILValue(const Operand *)> transformFn,
+    bool skipTypeDependentOperands) const -> TransformedOperandValueRange {
   return TransformedOperandValueRange(
       getAllOperands(),
       OperandToTransformedValue(*this, transformFn, skipTypeDependentOperands));
@@ -6539,7 +6563,8 @@ public:
 
   SILValue getOperand() const { return getAllOperands()[0].get(); }
   SILValue getEnumOperand() const { return getOperand(); }
-  
+  const Operand &getEnumOperandRef() const { return getAllOperands()[0]; }
+
   std::pair<EnumElementDecl*, SILValue>
   getCase(unsigned i) const {
     return std::make_pair(getEnumElementDeclStorage()[i],
@@ -8716,6 +8741,8 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  const Operand &getBaseOperandRef() const { return getAllOperands()[Base]; }
 
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(IndexingInst)
 };
