@@ -505,6 +505,15 @@ struct ImmutableAddressUseVerifier {
     return false;
   }
 
+  bool isConsumingOrMutatingExplicitCopyAddrUse(Operand *use) {
+    auto *copyAddr = cast<ExplicitCopyAddrInst>(use->getUser());
+    if (copyAddr->getDest() == use->get())
+      return true;
+    if (copyAddr->getSrc() == use->get() && copyAddr->isTakeOfSrc() == IsTake)
+      return true;
+    return false;
+  }
+
   bool isAddrCastToNonConsuming(SingleValueInstruction *i) {
     // Check if any of our uses are consuming. If none of them are consuming, we
     // are good to go.
@@ -604,6 +613,11 @@ struct ImmutableAddressUseVerifier {
         // mutation can happen. The checker will prove eventually that we can
         // convert it to a copy_addr [take] [init].
         break;
+      case SILInstructionKind::ExplicitCopyAddrInst:
+        if (isConsumingOrMutatingExplicitCopyAddrUse(use))
+          return true;
+        else
+          break;
       case SILInstructionKind::CopyAddrInst:
         if (isConsumingOrMutatingCopyAddrUse(use))
           return true;
