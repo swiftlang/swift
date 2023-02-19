@@ -665,6 +665,8 @@ struct SILConstantInfo {
 enum class CaptureKind {
   /// A local value captured as a mutable box.
   Box,
+  /// A local value captured as an immutable box.
+  ImmutableBox,
   /// A local value captured as a single pointer to storage (formed with
   /// @noescape closures).
   StorageAddress,
@@ -673,7 +675,6 @@ enum class CaptureKind {
   /// A let constant captured as a pointer to storage
   Immutable
 };
-
 
 /// TypeConverter - helper class for creating and managing TypeLowerings.
 class TypeConverter {

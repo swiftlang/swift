@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
 
 // TODO: Add FileCheck
 
@@ -104,7 +105,7 @@ bb0(%arg : @owned $AggStruct):
   // expected-error @-1 {{'x2' consumed more than once}}
   // expected-error @-2 {{'x2' consumed by a use in a loop}}
   %9 = begin_access [modify] [static] %1 : $*AggStruct
-  store %arg to [assign] %9 : $*AggStruct
+  store %arg to [init] %9 : $*AggStruct
   end_access %9 : $*AggStruct
   %12 = begin_access [read] [static] %1 : $*AggStruct
   %13 = struct_element_addr %12 : $*AggStruct, #AggStruct.pair
@@ -202,3 +203,27 @@ bb0(%arg : @owned $NonTrivialStruct, %arg1 : @owned $NonTrivialStruct):
   %33 = tuple ()
   return %33 : $()
 }
+
+///////////////////////////////////////////////////////////////////////
+// MARK: Tests that make sure we emit a nice error for missed copies //
+///////////////////////////////////////////////////////////////////////
+
+// CHECK-LABEL: sil [ossa] @missed_copy_diagnostic_test : $@convention(thin) (@guaranteed NonTrivialStruct, @in_guaranteed NonTrivialStruct) -> () {
+// CHECK: explicit_copy_value
+// CHECK: explicit_copy_value
+// CHECK: explicit_copy_addr
+// CHECK: } // end sil function 'missed_copy_diagnostic_test'
+sil [ossa] @missed_copy_diagnostic_test : $@convention(thin) (@guaranteed NonTrivialStruct, @in_guaranteed NonTrivialStruct) -> () {
+bb0(%arg0 : @guaranteed $NonTrivialStruct, %arg1 : $*NonTrivialStruct):
+  %1 = copy_value %arg0 : $NonTrivialStruct // expected-error {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
+  destroy_value %1 : $NonTrivialStruct
+  %2 = load [copy] %arg1 : $*NonTrivialStruct // expected-error {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
+  destroy_value %2 : $NonTrivialStruct
+  %3 = alloc_stack $NonTrivialStruct
+  copy_addr %arg1 to [init] %3 : $*NonTrivialStruct // expected-error {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
+  destroy_addr %3 : $*NonTrivialStruct
+  dealloc_stack %3 : $*NonTrivialStruct
+  %9999 = tuple ()
+  return %9999 : $()
+}
+

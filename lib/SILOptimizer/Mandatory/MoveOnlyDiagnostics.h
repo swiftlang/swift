@@ -71,6 +71,10 @@ public:
     return emittedCheckerDoesntUnderstandDiagnostic;
   }
 
+  /// Used at the end of the MoveOnlyAddressChecker to tell the user in a nice
+  /// way to file a bug.
+  void emitCheckedMissedCopyError(SILInstruction *copyInst);
+
   void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectGuaranteedDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectOwnedDiagnostic(MarkMustCheckInst *markedValue);

@@ -1853,6 +1853,21 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       inputs.push_back(param);
       break;
     }
+    case CaptureKind::ImmutableBox: {
+      // The type in the box is lowered in the minimal context.
+      auto minimalLoweredTy =
+          TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
+                             TypeExpansionContext::minimal())
+              .getLoweredType();
+      // Lvalues are captured as a box that owns the captured value.
+      auto boxTy =
+          TC.getInterfaceBoxTypeForCapture(VD, minimalLoweredTy.getASTType(),
+                                           /*mutable*/ false);
+      auto convention = ParameterConvention::Direct_Guaranteed;
+      auto param = SILParameterInfo(boxTy, convention);
+      inputs.push_back(param);
+      break;
+    }
     case CaptureKind::StorageAddress: {
       // Non-escaping lvalues are captured as the address of the value.
       SILType ty = loweredTy.getAddressType();
