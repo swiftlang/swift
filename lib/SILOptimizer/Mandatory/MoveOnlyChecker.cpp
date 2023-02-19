@@ -81,7 +81,8 @@ struct MoveOnlyChecker {
 
   MoveOnlyChecker(SILFunction *fn, DominanceInfo *domTree,
                   PostOrderAnalysis *poa)
-      : fn(fn), domTree(domTree), poa(poa) {}
+      : diagnosticEmitter(fn), fn(fn), domTree(domTree), poa(poa) {
+  }
 
   void checkObjects();
   void checkAddresses();

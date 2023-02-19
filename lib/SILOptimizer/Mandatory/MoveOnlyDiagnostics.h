@@ -53,8 +53,9 @@ class DiagnosticEmitter {
   bool emittedCheckerDoesntUnderstandDiagnostic = false;
 
 public:
-  void init(SILFunction *inputFn, OSSACanonicalizer *inputCanonicalizer) {
-    fn = inputFn;
+  DiagnosticEmitter(SILFunction *inputFn) : fn(inputFn) {}
+
+  void initCanonicalizer(OSSACanonicalizer *inputCanonicalizer) {
     canonicalizer = inputCanonicalizer;
   }
 
@@ -75,7 +76,7 @@ public:
   /// way to file a bug.
   void emitCheckedMissedCopyError(SILInstruction *copyInst);
 
-  void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue);
+  void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue) __attribute__((optnone));
   void emitObjectGuaranteedDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectOwnedDiagnostic(MarkMustCheckInst *markedValue);
 

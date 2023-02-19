@@ -531,13 +531,14 @@ static void hoistMarkMustCheckInsts(SingleValueInstruction *stackBox) {
     worklist.push_back(use);
   }
 
-  bool foundTarget = false;
+  StackList<MarkMustCheckInst *> targets(stackBox->getFunction());
   while (!worklist.empty()) {
     auto *nextUse = worklist.pop_back_val();
     auto *nextUser = nextUse->getUser();
 
     if (isa<BeginBorrowInst>(nextUser) || isa<BeginAccessInst>(nextUser) ||
-        isa<CopyValueInst>(nextUser) || isa<MarkUninitializedInst>(nextUser)) {
+        isa<CopyValueInst>(nextUser) || isa<MarkUninitializedInst>(nextUser) ||
+        isa<MarkMustCheckInst>(nextUser)) {
       for (auto result : nextUser->getResults()) {
         for (auto *use : result->getUses())
           worklist.push_back(use);
@@ -545,14 +546,18 @@ static void hoistMarkMustCheckInsts(SingleValueInstruction *stackBox) {
     }
 
     if (auto *mmci = dyn_cast<MarkMustCheckInst>(nextUser)) {
-      foundTarget = true;
-      mmci->replaceAllUsesWith(mmci->getOperand());
-      mmci->eraseFromParent();
+      targets.push_back(mmci);
     }
   }
 
-  if (!foundTarget)
+  if (targets.empty())
     return;
+
+  while (!targets.empty()) {
+    auto *mmci = targets.pop_back_val();
+    mmci->replaceAllUsesWith(mmci->getOperand());
+    mmci->eraseFromParent();
+  }
 
   SILBuilderWithScope builder(stackBox);
   builder.insertAfter(stackBox, [&](SILBuilder &b) {

@@ -28,7 +28,7 @@ class DiagnosticEmitter;
 void searchForCandidateAddressMarkMustChecks(
     SILFunction *fn,
     SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
-    DiagnosticEmitter &diagnosticEmitter);
+    DiagnosticEmitter &diagnosticEmitter) __attribute__((optnone));
 
 struct MoveOnlyAddressChecker {
   SILFunction *fn;

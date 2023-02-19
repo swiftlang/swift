@@ -93,7 +93,7 @@ class MoveOnlyObjectCheckerTesterPass : public SILFunctionTransform {
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *poa = getAnalysis<PostOrderAnalysis>();
 
-    DiagnosticEmitter diagnosticEmitter;
+    DiagnosticEmitter diagnosticEmitter(fn);
     borrowtodestructure::IntervalMapAllocator allocator;
 
     unsigned diagCount = diagnosticEmitter.getDiagnosticCount();

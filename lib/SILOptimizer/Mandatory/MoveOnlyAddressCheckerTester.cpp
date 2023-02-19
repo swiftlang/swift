@@ -94,7 +94,7 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *poa = getAnalysis<PostOrderAnalysis>();
 
-    DiagnosticEmitter diagnosticEmitter;
+    DiagnosticEmitter diagnosticEmitter(fn);
     SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
     searchForCandidateAddressMarkMustChecks(fn, moveIntroducersToProcess,
                                             diagnosticEmitter);

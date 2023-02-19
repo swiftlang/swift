@@ -634,7 +634,7 @@ void UseState::initializeLiveness(
   // See if our address is from a closure guaranteed box that we did not promote
   // to an address. In such a case, just treat our mark_must_check as the init
   // of our value.
-  if (auto *projectBox = dyn_cast<ProjectBoxInst>(address->getOperand())) {
+  if (auto *projectBox = dyn_cast<ProjectBoxInst>(stripAccessMarkers(address->getOperand()))) {
     if (auto *fArg = dyn_cast<SILFunctionArgument>(projectBox->getOperand())) {
       if (fArg->isClosureCapture()) {
         assert(fArg->getArgumentConvention() ==
@@ -648,12 +648,19 @@ void UseState::initializeLiveness(
         initInsts.insert({address, liveness.getTopLevelSpan()});
         liveness.initializeDef(address, liveness.getTopLevelSpan());
       }
+    } else if (auto *box = dyn_cast<AllocBoxInst>(
+                   lookThroughOwnershipInsts(projectBox->getOperand()))) {
+      LLVM_DEBUG(llvm::dbgs() << "Found move only var allocbox use... "
+                 "adding mark_must_check as init!\n");
+      initInsts.insert({address, liveness.getTopLevelSpan()});
+      liveness.initializeDef(address, liveness.getTopLevelSpan());
     }
   }
 
   // Check if our address is from a ref_element_addr. In such a case, we treat
   // the mark_must_check as the initialization.
-  if (auto *refEltAddr = dyn_cast<RefElementAddrInst>(address->getOperand())) {
+  if (auto *refEltAddr = dyn_cast<RefElementAddrInst>(
+          stripAccessMarkers(address->getOperand()))) {
     LLVM_DEBUG(llvm::dbgs() << "Found ref_element_addr use... "
                                "adding mark_must_check as init!\n");
     initInsts.insert({address, liveness.getTopLevelSpan()});
@@ -662,7 +669,8 @@ void UseState::initializeLiveness(
 
   // Check if our address is from a global_addr. In such a case, we treat the
   // mark_must_check as the initialization.
-  if (auto *globalAddr = dyn_cast<GlobalAddrInst>(address->getOperand())) {
+  if (auto *globalAddr =
+          dyn_cast<GlobalAddrInst>(stripAccessMarkers(address->getOperand()))) {
     LLVM_DEBUG(llvm::dbgs() << "Found global_addr use... "
                                "adding mark_must_check as init!\n");
     initInsts.insert({address, liveness.getTopLevelSpan()});
@@ -952,7 +960,7 @@ struct MoveOnlyAddressCheckerPImpl {
           instToDelete->eraseFromParent();
         })));
     canonicalizer.init(fn, domTree, deleter);
-    diagnosticEmitter.init(fn, &canonicalizer);
+    diagnosticEmitter.initCanonicalizer(&canonicalizer);
   }
 
   /// Search through the current function for candidate mark_must_check

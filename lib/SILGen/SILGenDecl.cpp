@@ -376,12 +376,8 @@ public:
       }
     }
 
-    Addr = SGF.B.createProjectBox(decl, Box, 0);
-    if (Addr->getType().isMoveOnly()) {
-      // TODO: Handle no implicit copy here.
-      Addr = SGF.B.createMarkMustCheckInst(
-          decl, Addr, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
-    }
+    if (!Box->getType().isBoxedNonCopyableType(Box->getFunction()))
+      Addr = SGF.B.createProjectBox(decl, Box, 0);
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
@@ -401,16 +397,24 @@ public:
   }
 
   SILValue getAddress() const {
+    assert(Addr);
     return Addr;
   }
 
+  /// If we have an address, returns the address. Otherwise, if we only have a
+  /// box, lazily projects it out and returns it.
   SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
                                               SILLocation loc) override {
+    if (!Addr && Box) {
+      auto pbi = SGF.B.createProjectBox(loc, Box, 0);
+      return pbi;
+    }
+
     return getAddress();
   }
 
   bool isInPlaceInitializationOfGlobal() const override {
-    return isa<GlobalAddrInst>(getAddress());
+    return dyn_cast_or_null<GlobalAddrInst>(Addr);
   }
 
   void finishUninitialized(SILGenFunction &SGF) override {
@@ -421,7 +425,11 @@ public:
     /// Remember that this is the memory location that we've emitted the
     /// decl to.
     assert(SGF.VarLocs.count(decl) == 0 && "Already emitted the local?");
-    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(Addr, Box);
+
+    if (Addr)
+      SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(Addr, Box);
+    else
+      SGF.VarLocs[decl] = SILGenFunction::VarLoc::getForBox(Box);
 
     SingleBufferInitialization::finishInitialization(SGF);
     assert(!DidFinish &&

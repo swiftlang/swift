@@ -2708,7 +2708,7 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           // Emit a debug description for the variable, nested within a scope
           // for the pattern match.
           SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
-          SGF.B.emitDebugDescription(vd, v.value, dbgVar);
+          SGF.B.emitDebugDescription(vd, v.getValueOrBoxedValue(SGF), dbgVar);
         }
       }
     }
@@ -2748,7 +2748,7 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
       if (!var->hasName() || var->getName() != expected->getName())
         continue;
 
-      SILValue value = SGF.VarLocs[var].value;
+      SILValue value = SGF.VarLocs[var].getValueOrBoxedValue(SGF);
       SILType type = value->getType();
 
       // If we have an address-only type, initialize the temporary
@@ -3008,7 +3008,7 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
       }
 
       auto varLoc = VarLocs[var];
-      SILValue value = varLoc.value;
+      SILValue value = varLoc.getValueOrBoxedValue(*this);
 
       if (value->getType().isAddressOnly(F)) {
         context->Emission.emitAddressOnlyInitialization(expected, value);
@@ -3074,7 +3074,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
             // Emit a debug description of the incoming arg, nested within the scope
             // for the pattern match.
             SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
-            B.emitDebugDescription(vd, v.value, dbgVar);
+            B.emitDebugDescription(vd, v.getValueOrBoxedValue(*this), dbgVar);
           }
         }
       }
@@ -3121,7 +3121,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
         if (!var->hasName() || var->getName() != expected->getName())
           continue;
 
-        SILValue value = VarLocs[var].value;
+        SILValue value = VarLocs[var].getValueOrBoxedValue(*this);
         SILType type = value->getType();
 
         // If we have an address-only type, initialize the temporary

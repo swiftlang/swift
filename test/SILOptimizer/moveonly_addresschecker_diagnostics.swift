@@ -2475,3 +2475,30 @@ func moveOnlyGlobalAssignValue() {
     varGlobal = NonTrivialStruct()
     varGlobal.nonTrivialStruct2 = NonTrivialStruct2()
 }
+
+///////////////////
+// InOut Capture //
+///////////////////
+
+func inoutCaptureTest() -> (() -> ()) {
+    var x = NonTrivialStruct() // expected-error {{'x' consumed in closure but not reinitialized before end of closure}}
+    x = NonTrivialStruct()
+
+    func useInOut(_ x: inout NonTrivialStruct) {}
+    let f = {
+        useInOut(&x)
+    }
+
+    borrowVal(x)
+    consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it}}
+    x = NonTrivialStruct()
+
+    let g = {
+        x = NonTrivialStruct()
+        useInOut(&x)
+        consumeVal(x) // expected-note {{consuming use here}}
+    }
+    g()
+
+    return f
+}
