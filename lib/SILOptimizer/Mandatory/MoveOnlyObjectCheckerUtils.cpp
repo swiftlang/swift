@@ -57,9 +57,9 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/RecyclingAllocator.h"
 
-#include "MoveOnlyBorrowToDestructure.h"
+#include "MoveOnlyBorrowToDestructureUtils.h"
 #include "MoveOnlyDiagnostics.h"
-#include "MoveOnlyObjectChecker.h"
+#include "MoveOnlyObjectCheckerUtils.h"
 
 using namespace swift;
 using namespace swift::siloptimizer;
@@ -273,51 +273,6 @@ bool swift::siloptimizer::searchForCandidateObjectMarkMustChecks(
 }
 
 //===----------------------------------------------------------------------===//
-//                  MARK: Cleanup After Emitting Diagnostic
-//===----------------------------------------------------------------------===//
-
-bool swift::siloptimizer::cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(
-    SILFunction *fn) {
-  bool localChanged = false;
-  for (auto &block : *fn) {
-    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-      if (auto *cvi = dyn_cast<CopyValueInst>(&*ii)) {
-        ++ii;
-
-        if (!cvi || !cvi->getOperand()->getType().isMoveOnly())
-          continue;
-
-        SILBuilderWithScope b(cvi);
-        auto *expCopy =
-            b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
-        cvi->replaceAllUsesWith(expCopy);
-        cvi->eraseFromParent();
-        localChanged = true;
-        continue;
-      }
-
-      // Also eliminate any mark_must_check on objects, just to be safe. We
-      // emitted an object level diagnostic and if the user wants to get more
-      // diagnostics, they should fix these diagnostics and recompile.
-      if (auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii)) {
-        ++ii;
-
-        if (mmci->getType().isAddress())
-          continue;
-
-        mmci->replaceAllUsesWith(mmci->getOperand());
-        mmci->eraseFromParent();
-        localChanged = true;
-        continue;
-      }
-
-      ++ii;
-    }
-  }
-  return localChanged;
-}
-
-//===----------------------------------------------------------------------===//
 //                          MARK: OSSACanonicalizer
 //===----------------------------------------------------------------------===//
 
@@ -383,46 +338,36 @@ bool OSSACanonicalizer::canonicalize(SILValue value) {
 
 namespace {
 
-struct MoveOnlyChecker {
+struct MoveOnlyObjectCheckerPImpl {
   SILFunction *fn;
+  borrowtodestructure::IntervalMapAllocator &allocator;
+  DiagnosticEmitter &diagnosticEmitter;
+
+  /// A set of mark_must_check that we are actually going to process.
+  llvm::SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess;
 
   bool changed = false;
 
-  /// A set of mark_must_check that we are actually going to process.
-  SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
-
-  borrowtodestructure::IntervalMapAllocator allocator;
-
-  MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks) : fn(fn) {}
+  MoveOnlyObjectCheckerPImpl(
+      SILFunction *fn, borrowtodestructure::IntervalMapAllocator &allocator,
+      DiagnosticEmitter &diagnosticEmitter,
+      llvm::SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess)
+      : fn(fn), allocator(allocator), diagnosticEmitter(diagnosticEmitter),
+        moveIntroducersToProcess(moveIntroducersToProcess) {}
 
   void check(DominanceInfo *domTree, PostOrderAnalysis *poa);
 
   bool convertBorrowExtractsToOwnedDestructures(MarkMustCheckInst *mmci,
-                                                DiagnosticEmitter &emitter,
                                                 DominanceInfo *domTree,
                                                 PostOrderAnalysis *poa);
 
-  /// After we have emitted a diagnostic, we need to clean up the instruction
-  /// stream by converting /all/ copies of move only typed things to use
-  /// explicit_copy_value so that we maintain the SIL invariant that in
-  /// canonical SIL move only types are not copied by normal copies.
-  ///
-  /// Returns true if we actually changed any instructions.
-  bool cleanupAfterEmittingDiagnostic() {
-    bool localChange = cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(fn);
-    changed |= localChange;
-    return localChange;
-  }
-
-  bool checkForSameInstMultipleUseErrors(MarkMustCheckInst *base,
-                                         DiagnosticEmitter &emitter);
+  bool checkForSameInstMultipleUseErrors(MarkMustCheckInst *base);
 };
 
 } // namespace
 
-bool MoveOnlyChecker::convertBorrowExtractsToOwnedDestructures(
-    MarkMustCheckInst *mmci, DiagnosticEmitter &diagnosticEmitter,
-    DominanceInfo *domTree, PostOrderAnalysis *poa) {
+bool MoveOnlyObjectCheckerPImpl::convertBorrowExtractsToOwnedDestructures(
+    MarkMustCheckInst *mmci, DominanceInfo *domTree, PostOrderAnalysis *poa) {
   BorrowToDestructureTransform transform(allocator, mmci, mmci,
                                          diagnosticEmitter, poa);
   if (!transform.transform()) {
@@ -434,8 +379,8 @@ bool MoveOnlyChecker::convertBorrowExtractsToOwnedDestructures(
   return true;
 }
 
-bool MoveOnlyChecker::checkForSameInstMultipleUseErrors(
-    MarkMustCheckInst *mmci, DiagnosticEmitter &diagnosticEmitter) {
+bool MoveOnlyObjectCheckerPImpl::checkForSameInstMultipleUseErrors(
+    MarkMustCheckInst *mmci) {
   LLVM_DEBUG(llvm::dbgs() << "Checking for same inst multiple use error!\n");
 
   SmallFrozenMultiMap<SILInstruction *, Operand *, 8> instToOperandsMap;
@@ -561,10 +506,11 @@ bool MoveOnlyChecker::checkForSameInstMultipleUseErrors(
 }
 
 //===----------------------------------------------------------------------===//
-//                             MARK: Main Routine
+//                          MARK: Main PImpl Routine
 //===----------------------------------------------------------------------===//
 
-void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
+void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
+                                       PostOrderAnalysis *poa) {
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
         if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
@@ -574,40 +520,12 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
   InstructionDeleter deleter(std::move(callbacks));
   OSSACanonicalizer canonicalizer;
   canonicalizer.init(fn, domTree, deleter);
-  DiagnosticEmitter diagnosticEmitter;
   diagnosticEmitter.init(fn, &canonicalizer);
 
-  // First search for candidates to process and emit diagnostics on any
-  // mark_must_check [noimplicitcopy] we didn't recognize.
-  bool madeChange = searchForCandidateObjectMarkMustChecks(
-      fn, moveIntroducersToProcess, diagnosticEmitter);
-  LLVM_DEBUG(llvm::dbgs()
-             << "Emitting diagnostic when checking for mark must check inst: "
-             << (diagnosticEmitter.emittedAnyDiagnostics() ? "yes" : "no")
-             << '\n');
-
-  // If we didn't find any introducers to check, just return if we emitted an
-  // error (which is the only way we emitted a change to the instruction
-  // stream).
-  //
-  // NOTE: changed /can/ be true here if we had any mark_must_check
-  // [noimplicitcopy] that we didn't understand and emitting a diagnostic upon
-  // and then deleting.
-  if (moveIntroducersToProcess.empty()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "No move introducers found?! Returning early?!\n");
-    if (madeChange) {
-      cleanupAfterEmittingDiagnostic();
-    }
-    return;
-  }
+  unsigned initialDiagCount = diagnosticEmitter.getDiagnosticCount();
 
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
-  for (auto *introducer : moveIntroducers) {
-    LLVM_DEBUG(llvm::dbgs() << "Found move introducer: " << *introducer);
-  }
-
   while (!moveIntroducers.empty()) {
     SWIFT_DEFER { canonicalizer.clear(); };
 
@@ -617,9 +535,8 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
 
     // Before we do anything, we need to look for borrowed extracted values and
     // convert them to destructure operations.
-    unsigned diagnosticCount = diagnosticEmitter.getDiagnosticCount();
-    if (!convertBorrowExtractsToOwnedDestructures(
-            markedValue, diagnosticEmitter, domTree, poa)) {
+    unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
+    if (!convertBorrowExtractsToOwnedDestructures(markedValue, domTree, poa)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Borrow extract to owned destructure transformation didn't "
                     "understand part of the SIL\n");
@@ -632,7 +549,7 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
     // instruction. The user can fix and re-compile. We want the OSSA
     // canonicalizer to be able to assume that all such borrow + struct_extract
     // uses were already handled.
-    if (diagnosticCount != diagnosticEmitter.getDiagnosticCount()) {
+    if (diagCount != diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Emitting diagnostic in BorrowExtractToOwnedDestructure "
                     "transformation!\n");
@@ -642,14 +559,14 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
     // First search for transitive consuming uses and prove that we do not have
     // any errors where a single instruction consumes the same value twice or
     // consumes and uses a value.
-    if (!checkForSameInstMultipleUseErrors(markedValue, diagnosticEmitter)) {
+    if (!checkForSameInstMultipleUseErrors(markedValue)) {
       LLVM_DEBUG(llvm::dbgs() << "checkForSameInstMultipleUseError didn't "
                                  "understand part of the SIL\n");
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
       continue;
     }
 
-    if (diagnosticCount != diagnosticEmitter.getDiagnosticCount()) {
+    if (diagCount != diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs() << "Found single inst multiple user error!\n");
       continue;
     }
@@ -707,7 +624,8 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
     canonicalizer.rewriteLifetimes();
   }
 
-  bool emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
+  bool emittedDiagnostic =
+      initialDiagCount != diagnosticEmitter.getDiagnosticCount();
   LLVM_DEBUG(llvm::dbgs() << "Emitting checker based diagnostic: "
                           << (emittedDiagnostic ? "yes" : "no") << '\n');
 
@@ -760,62 +678,18 @@ void MoveOnlyChecker::check(DominanceInfo *domTree, PostOrderAnalysis *poa) {
     markedInst->eraseFromParent();
     changed = true;
   }
-
-  // Once we have finished processing, if we emitted any diagnostics, then we
-  // may have copy_value of move only and @moveOnly wrapped type values. This is
-  // not valid in Canonical SIL, so we need to ensure that those copy_value
-  // become explicit_copy_value. This is ok to do since we are already going to
-  // fail the compilation and just are trying to maintain SIL invariants.
-  //
-  // It is also ok that we use a little more compile time and go over the
-  // function again, since we are going to fail the compilation and not codegen.
-  if (emittedDiagnostic) {
-    changed |= cleanupAfterEmittingDiagnostic();
-  }
 }
 
 //===----------------------------------------------------------------------===//
-//                         MARK: Top Level Entrypoint
+//                            MARK: Driver Routine
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-class MoveOnlyCheckerPass : public SILFunctionTransform {
-  void run() override {
-    auto *fn = getFunction();
-
-    // Only run this pass if the move only language feature is enabled.
-    if (!fn->getASTContext().LangOpts.Features.contains(Feature::MoveOnly))
-      return;
-
-    // Don't rerun diagnostics on deserialized functions.
-    if (getFunction()->wasDeserializedCanonical())
-      return;
-
-    assert(fn->getModule().getStage() == SILStage::Raw &&
-           "Should only run on Raw SIL");
-
-    LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Object Checker. Visiting: "
-                            << fn->getName() << '\n');
-
-    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
-    DominanceInfo *domTree = dominanceAnalysis->get(fn);
-    auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
-    auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
-
-    MoveOnlyChecker checker(getFunction(), deAnalysis);
-    checker.check(domTree, postOrderAnalysis);
-    if (checker.changed) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-    }
-
-    // NOTE: We validate in the MoveOnlyAddressChecker (which runs after this)
-    // that we eliminated all copy_value and emit errors otherwise.
-  }
-};
-
-} // anonymous namespace
-
-SILTransform *swift::createMoveOnlyObjectChecker() {
-  return new MoveOnlyCheckerPass();
+bool MoveOnlyObjectChecker::check(
+    llvm::SmallSetVector<MarkMustCheckInst *, 32> &instsToCheck) {
+  assert(instsToCheck.size() &&
+         "Should only call this with actual insts to check?!");
+  MoveOnlyObjectCheckerPImpl checker(instsToCheck[0]->getFunction(), allocator,
+                                     diagnosticEmitter, instsToCheck);
+  checker.check(domTree, poa);
+  return checker.changed;
 }

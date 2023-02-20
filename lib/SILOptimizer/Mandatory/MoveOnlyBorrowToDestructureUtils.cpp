@@ -25,9 +25,9 @@
 
 #define DEBUG_TYPE "sil-move-only-checker"
 
-#include "MoveOnlyBorrowToDestructure.h"
+#include "MoveOnlyBorrowToDestructureUtils.h"
 #include "MoveOnlyDiagnostics.h"
-#include "MoveOnlyObjectChecker.h"
+#include "MoveOnlyObjectCheckerUtils.h"
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Defer.h"
@@ -319,8 +319,7 @@ bool Implementation::gatherUses(SILValue value) {
           {nextUse, {*leafRange, false /*is lifetime ending*/}});
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             false /*is lifetime ending*/);
-      instToInterestingOperandIndexMap.insert(nextUse->getUser(),
-                                                        nextUse);
+      instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
       continue;
     }
 
@@ -341,13 +340,11 @@ bool Implementation::gatherUses(SILValue value) {
 
       LLVM_DEBUG(llvm::dbgs() << "        Found lifetime ending use!\n");
       destructureNeedingUses.push_back(nextUse);
-      blocksToUses.insert(
-          nextUse->getParentBlock(),
-          {nextUse, {*leafRange, true /*is lifetime ending*/}});
+      blocksToUses.insert(nextUse->getParentBlock(),
+                          {nextUse, {*leafRange, true /*is lifetime ending*/}});
       liveness.updateForUse(nextUse->getUser(), *leafRange,
                             true /*is lifetime ending*/);
-      instToInterestingOperandIndexMap.insert(nextUse->getUser(),
-                                                        nextUse);
+      instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
       continue;
     }
 
@@ -387,8 +384,7 @@ void Implementation::checkForErrorsOnSameInstruction() {
   instToInterestingOperandIndexMap.setFrozen();
   SmallBitVector usedBits(liveness.getNumSubElements());
 
-  for (auto instRangePair :
-       instToInterestingOperandIndexMap.getRange()) {
+  for (auto instRangePair : instToInterestingOperandIndexMap.getRange()) {
     SWIFT_DEFER { usedBits.reset(); };
 
     // First loop through our uses and handle any consuming twice errors. We
