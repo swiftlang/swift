@@ -76,7 +76,7 @@ public:
   /// way to file a bug.
   void emitCheckedMissedCopyError(SILInstruction *copyInst);
 
-  void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue) __attribute__((optnone));
+  void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectGuaranteedDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectOwnedDiagnostic(MarkMustCheckInst *markedValue);
 

@@ -159,9 +159,8 @@ static void getVariableNameForValue(SILValue value2,
   }
 }
 
-
 static void getVariableNameForValue(MarkMustCheckInst *mmci,
-                                    SmallString<64> &resultingString) __attribute__((optnone)) {
+                                    SmallString<64> &resultingString) {
   return getVariableNameForValue(mmci, mmci->getOperand(), resultingString);
 }
 
