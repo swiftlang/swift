@@ -3428,7 +3428,11 @@ namespace {
       if (patternType->hasError()) {
         return nullptr;
       }
-      
+
+      // This doesn't work because `CS.setType` hasn't been called?
+//      auto fromType = CS.getType(expr->getSubExpr());
+//      CS.addConstraint(ConstraintKind::Equal, fromType, patternType,
+//                       CS.getConstraintLocator(expr));
       
       // The `IsCaseExpr` itself always has `Bool` type
       auto &ctx = CS.getASTContext();

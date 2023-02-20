@@ -4621,6 +4621,9 @@ namespace {
     }
     
     Expr *visitIsCaseExpr(IsCaseExpr *expr) {
+      auto &e = llvm::errs();
+      e << "IsCaseExpr CSApply \n";
+      
       // TODO: What do we do here?
       return simplifyExprType(expr);
     }
