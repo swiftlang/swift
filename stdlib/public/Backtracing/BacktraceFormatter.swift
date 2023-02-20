@@ -38,8 +38,9 @@ public protocol BacktraceFormattingTheme {
   func sourceLocation(_ s: String) -> String
   func lineNumber(_ s: String) -> String
   func code(_ s: String) -> String
+  func crashedLineNumber(_ s: String) -> String
   func crashedLine(_ s: String) -> String
-  func crashLocation(_ s: String) -> String
+  func crashLocation() -> String
   func imageName(_ s: String) -> String
   func imageAddressRange(_ s: String) -> String
   func imageBuildID(_ s: String) -> String
@@ -53,10 +54,11 @@ extension BacktraceFormattingTheme {
   public func symbol(_ s: String) -> String { return s }
   public func offset(_ s: String) -> String { return s }
   public func sourceLocation(_ s: String) -> String { return s }
-  public func lineNumber(_ s: String) -> String { return s }
+  public func lineNumber(_ s: String) -> String { return " \(s)|" }
   public func code(_ s: String) -> String { return s }
+  public func crashedLineNumber(_ s: String) -> String { return "*\(s)|" }
   public func crashedLine(_ s: String) -> String { return s }
-  public func crashLocation(_ s: String) -> String { return s }
+  public func crashLocation() -> String { return "^" }
   public func imageName(_ s: String) -> String { return s }
   public func imageAddressRange(_ s: String) -> String { return s }
   public func imageBuildID(_ s: String) -> String { return s }
@@ -638,16 +640,19 @@ public struct BacktraceFormatter {
            && line <= sourceLocation.line + options._sourceContextLines {
         let untabified = untabify(sourceLine)
         let code = options._theme.code(untabified)
-        let lineNumber = options._theme.lineNumber(pad("\(line)",
-                                                       to: maxLineWidth,
-                                                       aligned: .right))
         let theLine: String
         if line == sourceLocation.line {
+          let lineNumber = options._theme.crashedLineNumber(pad("\(line)",
+                                                                to: maxLineWidth,
+                                                                aligned: .right))
           let highlightWidth = options._width - 2 * theIndent
-          theLine = options._theme.crashedLine(pad("\(lineNumber)│ \(code) ",
+          theLine = options._theme.crashedLine(pad("\(lineNumber) \(code)",
                                                    to: highlightWidth))
         } else {
-          theLine = "\(lineNumber)│ \(code)"
+          let lineNumber = options._theme.lineNumber(pad("\(line)",
+                                                         to: maxLineWidth,
+                                                         aligned: .right))
+          theLine = "\(lineNumber) \(code)"
         }
         lines.append("\(indent)\(theLine)")
 
@@ -676,10 +681,11 @@ public struct BacktraceFormatter {
           let pad = String(repeating: " ",
                            count: max(terminalWidth - 1, 0))
 
-          let marker = options._theme.crashLocation("▲")
-          let blankForNumber = String(repeating: " ", count: maxLineWidth)
+          let marker = options._theme.crashLocation()
+          let blankForNumber = options._theme.lineNumber(
+            String(repeating: " ", count: maxLineWidth))
 
-          lines.append("\(indent)\(blankForNumber)│ \(pad)\(marker)")
+          lines.append("\(indent)\(blankForNumber) \(pad)\(marker)")
         }
       }
     }

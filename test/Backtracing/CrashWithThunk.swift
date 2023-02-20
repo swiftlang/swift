@@ -49,18 +49,18 @@ struct CrashWithThunk {
 
 // FRIENDLY: 0 crash() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:17:15
 
-// FRIENDLY: 15│   print("I'm going to crash here")
-// FRIENDLY-NEXT: 16│   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
-// FRIENDLY-NEXT: 17│   ptr.pointee = 42
-// FRIENDLY-NEXT:   │               ▲
-// FRIENDLY-NEXT: 18│ }
-// FRIENDLY-NEXT: 19│
+// FRIENDLY: 15|   print("I'm going to crash here")
+// FRIENDLY-NEXT: 16|   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
+// FRIENDLY-NEXT: 17|   ptr.pointee = 42
+// FRIENDLY-NEXT:   |               ^
+// FRIENDLY-NEXT: 18| }
+// FRIENDLY-NEXT: 19|
 
 // FRIENDLY: 1 static CrashWithThunk.main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:25:9
 
-// FRIENDLY: 23│     let foo = Foo(value: crash)
-// FRIENDLY-NEXT: 24│
-// FRIENDLY-NEXT: 25│     foo.value()
-// FRIENDLY-NEXT:   │         ▲
-// FRIENDLY-NEXT: 26│   }
-// FRIENDLY-NEXT: 27│ }
+// FRIENDLY: 23|     let foo = Foo(value: crash)
+// FRIENDLY-NEXT: 24|
+// FRIENDLY-NEXT: 25|     foo.value()
+// FRIENDLY-NEXT:   |         ^
+// FRIENDLY-NEXT: 26|   }
+// FRIENDLY-NEXT: 27| }
