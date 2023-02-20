@@ -71,57 +71,57 @@ struct Crash {
 
 // FRIENDLY: 0 level5() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:38:15
 
-// FRIENDLY: 36│   print("About to crash")
-// FRIENDLY-NEXT: 37│   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
-// FRIENDLY-NEXT: 38│   ptr.pointee = 42
-// FRIENDLY-NEXT:   │               ▲
-// FRIENDLY-NEXT: 39│ }
-// FRIENDLY-NEXT: 40│
+// FRIENDLY: 36|   print("About to crash")
+// FRIENDLY-NEXT: 37|   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
+// FRIENDLY-NEXT: 38|   ptr.pointee = 42
+// FRIENDLY-NEXT:   |               ^
+// FRIENDLY-NEXT: 39| }
+// FRIENDLY-NEXT: 40|
 
 // FRIENDLY: 1 level4() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:32:3
 
-// FRIENDLY: 30│
-// FRIENDLY-NEXT: 31│ func level4() {
-// FRIENDLY-NEXT: 32│   level5()
-// FRIENDLY-NEXT:   │   ▲
-// FRIENDLY-NEXT: 33│ }
-// FRIENDLY-NEXT: 34│
+// FRIENDLY: 30|
+// FRIENDLY-NEXT: 31| func level4() {
+// FRIENDLY-NEXT: 32|   level5()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT: 33| }
+// FRIENDLY-NEXT: 34|
 
 // FRIENDLY: 2 level3() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:28:3
 
-// FRIENDLY: 26│
-// FRIENDLY-NEXT: 27│ func level3() {
-// FRIENDLY-NEXT: 28│   level4()
-// FRIENDLY-NEXT:   │   ▲
-// FRIENDLY-NEXT: 29│ }
-// FRIENDLY-NEXT: 30│
+// FRIENDLY: 26|
+// FRIENDLY-NEXT: 27| func level3() {
+// FRIENDLY-NEXT: 28|   level4()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT: 29| }
+// FRIENDLY-NEXT: 30|
 
 // FRIENDLY: 3 level2() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:24:3
 
-// FRIENDLY: 22│
-// FRIENDLY-NEXT: 23│ func level2() {
-// FRIENDLY-NEXT: 24│   level3()
-// FRIENDLY-NEXT:   │   ▲
-// FRIENDLY-NEXT: 25│ }
-// FRIENDLY-NEXT: 26│
+// FRIENDLY: 22|
+// FRIENDLY-NEXT: 23| func level2() {
+// FRIENDLY-NEXT: 24|   level3()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT: 25| }
+// FRIENDLY-NEXT: 26|
 
 // FRIENDLY: 4 level1() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:20:3
 
-// FRIENDLY:  18│
-// FRIENDLY-NEXT: 19│ func level1() {
-// FRIENDLY-NEXT: 20│   level2()
-// FRIENDLY-NEXT:   │   ▲
-// FRIENDLY-NEXT: 21│ }
-// FRIENDLY-NEXT: 22│
+// FRIENDLY:  18|
+// FRIENDLY-NEXT: 19| func level1() {
+// FRIENDLY-NEXT: 20|   level2()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT: 21| }
+// FRIENDLY-NEXT: 22|
 
 // FRIENDLY: 5 static Crash.main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:44:5
 
-// FRIENDLY: 42│ struct Crash {
-// FRIENDLY-NEXT: 43│   static func main() {
-// FRIENDLY-NEXT: 44│     level1()
-// FRIENDLY-NEXT:   │     ▲
-// FRIENDLY-NEXT: 45│   }
-// FRIENDLY-NEXT: 46│ }
+// FRIENDLY: 42| struct Crash {
+// FRIENDLY-NEXT: 43|   static func main() {
+// FRIENDLY-NEXT: 44|     level1()
+// FRIENDLY-NEXT:   |     ^
+// FRIENDLY-NEXT: 45|   }
+// FRIENDLY-NEXT: 46| }
 
 // NODEBUG: *** Program crashed: Bad pointer dereference at 0x{{0*}}4 ***
 

@@ -64,47 +64,47 @@ struct Overflow {
 
 // FRIENDLY: 0 level5() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:30:5
 
-// FRIENDLY: 28│   print("About to overflow")
-// FRIENDLY-NEXT: 29│
-// FRIENDLY-NEXT: 30│   x -= 1
-// FRIENDLY-NEXT:   │     ▲
-// FRIENDLY-NEXT: 31│ }
+// FRIENDLY: 28|   print("About to overflow")
+// FRIENDLY-NEXT: 29|
+// FRIENDLY-NEXT: 30|   x -= 1
+// FRIENDLY-NEXT:   |     ^
+// FRIENDLY-NEXT: 31| }
 
 // FRIENDLY: 1 level4() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:24:3
 
-// FRIENDLY: 22│
-// FRIENDLY-NEXT: 23│ func level4() {
-// FRIENDLY-NEXT: 24│   level5()
-// FRIENDLY-NEXT:   │   ▲
-// FRIENDLY-NEXT: 25│ }
-// FRIENDLY-NEXT: 26│
+// FRIENDLY: 22|
+// FRIENDLY-NEXT: 23| func level4() {
+// FRIENDLY-NEXT: 24|   level5()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT: 25| }
+// FRIENDLY-NEXT: 26|
 
 // FRIENDLY: 2 level3() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:20:3
 
-// FRIENDLY: 18│
-// FRIENDLY-NEXT: 19│ func level3() {
-// FRIENDLY-NEXT: 20│   level4()
-// FRIENDLY-NEXT:   │   ▲
-// FRIENDLY-NEXT: 21│ }
-// FRIENDLY-NEXT: 22│
+// FRIENDLY: 18|
+// FRIENDLY-NEXT: 19| func level3() {
+// FRIENDLY-NEXT: 20|   level4()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT: 21| }
+// FRIENDLY-NEXT: 22|
 
 // FRIENDLY: 3 level2() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:16:3
 
-// FRIENDLY: 14│
-// FRIENDLY-NEXT: 15│ func level2() {
-// FRIENDLY-NEXT: 16│   level3()
-// FRIENDLY-NEXT:   │   ▲
-// FRIENDLY-NEXT: 17│ }
-// FRIENDLY-NEXT: 18│
+// FRIENDLY: 14|
+// FRIENDLY-NEXT: 15| func level2() {
+// FRIENDLY-NEXT: 16|   level3()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT: 17| }
+// FRIENDLY-NEXT: 18|
 
 // FRIENDLY: 4 level1() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:12:3
 
-// FRIENDLY: 10│
-// FRIENDLY-NEXT: 11│ func level1() {
-// FRIENDLY-NEXT: 12│   level2()
-// FRIENDLY-NEXT:   │   ▲
-// FRIENDLY-NEXT: 13│ }
-// FRIENDLY-NEXT: 14│
+// FRIENDLY: 10|
+// FRIENDLY-NEXT: 11| func level1() {
+// FRIENDLY-NEXT: 12|   level2()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT: 13| }
+// FRIENDLY-NEXT: 14|
 
 // FRIENDLY: 5 static Overflow.main() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift
 

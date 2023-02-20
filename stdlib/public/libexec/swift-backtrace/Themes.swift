@@ -95,16 +95,19 @@ enum Themes {
       return "\(fg: .yellow)\(s)\(fg: .normal)"
     }
     public func lineNumber(_ s: String) -> String {
-      return "\(fg: .gray)\(s)\(fg: .normal)"
+      return "\(fg: .gray)\(s)\(fg: .normal)│"
     }
     public func code(_ s: String) -> String {
       return "\(s)"
     }
-    public func crashedLine(_ s: String) -> String {
-      return "\(bg: .grayscale(2))\(s)\(bg: .normal)"
+    public func crashedLineNumber(_ s: String) -> String {
+      return "\(fg: .gray)\(s)\(fg: .brightWhite)│"
     }
-    public func crashLocation(_ s: String) -> String {
-      return "\(fg: .brightRed)\(s)\(fg: .normal)"
+    public func crashedLine(_ s: String) -> String {
+      return "\(bg: .grayscale(2))\(fg: .brightWhite)\(s)\(fg: .normal)\(bg: .normal)"
+    }
+    public func crashLocation() -> String {
+      return "\(fg: .brightRed)▲\(fg: .normal)"
     }
     public func imageName(_ s: String) -> String {
       return "\(fg: .cyan)\(s)\(fg: .normal)"
