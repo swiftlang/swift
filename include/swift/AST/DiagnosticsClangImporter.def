@@ -149,7 +149,7 @@ NOTE(macro_not_imported_nested_cast, none, "non-null nested casts not supported"
 
 NOTE(macro_not_imported_function_like, none, "macro '%0' unavailable: function like macros not supported", (StringRef))
 NOTE(macro_not_imported_unsupported_structure, none, "macro '%0' unavailable: structure not supported", (StringRef))
-NOTE(macro_not_imported, none, "macro '%0' unavailable", (StringRef))
+NOTE(macro_not_imported, none, "macro '%0' unavailable (cannot import)", (StringRef))
 
 NOTE(return_type_not_imported, none, "return type unavailable (cannot import)", ())
 NOTE(parameter_type_not_imported, none, "parameter %0 unavailable (cannot import)", (const clang::NamedDecl*))
