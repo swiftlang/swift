@@ -180,7 +180,6 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
   /// Holds information about the shared cache.
   public struct SharedCacheInfo: Sendable {
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
     /// The UUID from the shared cache.
     public var uuid: [UInt8]
 
@@ -189,7 +188,6 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
     /// Says whether there is in fact a shared cache.
     public var noCache: Bool
-    #endif
   }
 
   /// Information about the shared cache.
@@ -401,34 +399,31 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// Capture shared cache information.
   ///
   /// @returns A `SharedCacheInfo`.
-  public static func captureSharedCacheInfo() -> SharedCacheInfo {
+  public static func captureSharedCacheInfo() -> SharedCacheInfo? {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
     return captureSharedCacheInfo(for: mach_task_self_)
     #else
-    return SharedCacheInfo()
+    return nil
     #endif
   }
 
   @_spi(Internal)
-  public static func captureSharedCacheInfo(for t: Any) -> SharedCacheInfo {
+  public static func captureSharedCacheInfo(for t: Any) -> SharedCacheInfo? {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
     let task = t as! task_t
     return withDyldProcessInfo(for: task){ dyldInfo in
       var cacheInfo = dyld_process_cache_info()
       _dyld_process_info_get_cache(dyldInfo, &cacheInfo)
       let theUUID = withUnsafePointer(to: cacheInfo.cacheUUID){
-        $0.withMemoryRebound(to: UInt8.self,
-                             capacity: MemoryLayout<uuid_t>.size) {
-          Array(UnsafeBufferPointer(start: $0,
-                                    count: MemoryLayout<uuid_t>.size))
-        }
+        Array(UnsafeRawBufferPointer(start: $0,
+                                     count: MemoryLayout<uuid_t>.size))
       }
       return SharedCacheInfo(uuid: theUUID,
                              baseAddress: cacheInfo.cacheBaseAddress,
                              noCache: cacheInfo.noCache)
     }
     #else // !os(Darwin)
-    return SharedCacheInfo()
+    return nil
     #endif
   }
 

@@ -690,7 +690,7 @@ public struct BacktraceFormatter {
 
     while feof(fp) == 0 && ferror(fp) == 0 {
       guard let result = fgets(buffer.baseAddress,
-                               Int32(buffer.count), fp) else {
+                               CInt(buffer.count), fp) else {
         break
       }
 

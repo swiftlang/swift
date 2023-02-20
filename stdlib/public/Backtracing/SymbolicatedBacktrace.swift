@@ -211,7 +211,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   public var images: [Backtrace.Image]
 
   /// Shared cache information.
-  public var sharedCacheInfo: Backtrace.SharedCacheInfo
+  public var sharedCacheInfo: Backtrace.SharedCacheInfo?
 
   /// True if this backtrace is a Swift runtime failure.
   public var isSwiftRuntimeFailure: Bool {
@@ -233,7 +233,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
   /// Construct a SymbolicatedBacktrace from a backtrace and a list of images.
   private init(backtrace: Backtrace, images: [Backtrace.Image],
-               sharedCacheInfo: Backtrace.SharedCacheInfo,
+               sharedCacheInfo: Backtrace.SharedCacheInfo?,
                frames: [Frame]) {
     self.backtrace = backtrace
     self.images = images
@@ -258,7 +258,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
   /// Create a symbolicator.
   private static func withSymbolicator<T>(images: [Backtrace.Image],
-                                          sharedCacheInfo: Backtrace.SharedCacheInfo,
+                                          sharedCacheInfo: Backtrace.SharedCacheInfo?,
                                           fn: (CSSymbolicatorRef) throws -> T) rethrows -> T {
     let binaryImageList = images.map{ image in
       BinaryImageInformation(
@@ -357,7 +357,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       theImages = Backtrace.captureImages()
     }
 
-    let theCacheInfo: Backtrace.SharedCacheInfo
+    let theCacheInfo: Backtrace.SharedCacheInfo?
     if let sharedCacheInfo = sharedCacheInfo {
       theCacheInfo = sharedCacheInfo
     } else if let sharedCacheInfo = backtrace.sharedCacheInfo {
@@ -450,14 +450,14 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       lines.append("\(n)\t\(image)")
     }
 
-    #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-    lines.append("")
-    lines.append("Shared Cache:")
-    lines.append("")
-    lines.append("    UUID: \(hex(sharedCacheInfo.uuid))")
-    lines.append("    Base: \(hex(sharedCacheInfo.baseAddress))")
-    lines.append("  Active: \(!sharedCacheInfo.noCache)")
-    #endif
+    if let sharedCacheInfo = sharedCacheInfo {
+      lines.append("")
+      lines.append("Shared Cache:")
+      lines.append("")
+      lines.append("    UUID: \(hex(sharedCacheInfo.uuid))")
+      lines.append("    Base: \(hex(sharedCacheInfo.baseAddress))")
+      lines.append("  Active: \(!sharedCacheInfo.noCache)")
+    }
 
     return lines.joined(separator: "\n")
   }
