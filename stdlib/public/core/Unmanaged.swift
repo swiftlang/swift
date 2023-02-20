@@ -64,7 +64,9 @@ public struct Unmanaged<Instance: AnyObject> {
   /// - Returns: An unmanaged reference to the object passed as `value`.
   @_transparent
   public static func passRetained(_ value: Instance) -> Unmanaged {
-    return Unmanaged(_private: value).retain()
+    // Retain 'value' before it becomes unmanaged. This may be its last use.
+    Builtin.retain(value)
+    return Unmanaged(_private: value)
   }
 
   /// Creates an unmanaged reference without performing an unbalanced
@@ -219,6 +221,11 @@ public struct Unmanaged<Instance: AnyObject> {
   }
 
   /// Performs an unbalanced retain of the object.
+  ///
+  /// Note: Use Umanaged.passRetained(object) instead to ensure that
+  /// the reference to object is retained before it becomes
+  /// unmanaged. Once a reference is unmanaged, its underlying object
+  /// may be freed by the system.
   @_transparent
   public func retain() -> Unmanaged {
     Builtin.retain(_value)
