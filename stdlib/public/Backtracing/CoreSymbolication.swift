@@ -117,8 +117,8 @@ private enum Sym {
 // CFString.  As a result, we need to do the dance manually.
 
 private func toCFString(_ s: String) -> CFString! {
-  let bytes = Array<UInt8>(s.utf8)
-  return bytes.withUnsafeBufferPointer{
+  var s = s
+  return s.withUTF8 {
     return CFStringCreateWithBytes(nil,
                                    $0.baseAddress,
                                    $0.count,
@@ -135,10 +135,8 @@ private func fromCFString(_ cf: CFString) -> String {
 
   if let ptr = CFStringGetCStringPtr(cf,
                                      CFStringBuiltInEncodings.ASCII.rawValue) {
-    return ptr.withMemoryRebound(to: UInt8.self, capacity: length) {
-      return String(decoding: UnsafeBufferPointer(start: $0, count: length),
-                    as: UTF8.self)
-    }
+    return String(decoding: UnsafeRawBufferPointer(start: ptr, count: length),
+                  as: UTF8.self)
   } else {
     var byteLen = CFIndex(0)
 
