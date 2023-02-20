@@ -1888,13 +1888,15 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
 struct ExplicitSwiftModuleLoader::Implementation {
   ASTContext &Ctx;
   llvm::BumpPtrAllocator Allocator;
-  llvm::StringMap<ExplicitModuleInfo> ExplicitModuleMap;
+  llvm::StringMap<ExplicitSwiftModuleInputInfo> ExplicitModuleMap;
   Implementation(ASTContext &Ctx) : Ctx(Ctx) {}
 
   void parseSwiftExplicitModuleMap(StringRef fileName) {
     ExplicitModuleMapParser parser(Allocator);
+    llvm::StringMap<ExplicitClangModuleInputInfo> ExplicitClangModuleMap;
     auto result =
-        parser.parseSwiftExplicitModuleMap(fileName, ExplicitModuleMap);
+        parser.parseSwiftExplicitModuleMap(fileName, ExplicitModuleMap,
+                                           ExplicitClangModuleMap);
     if (result == std::errc::invalid_argument)
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
                          fileName);
@@ -1906,8 +1908,8 @@ struct ExplicitSwiftModuleLoader::Implementation {
     // we've seen so that we don't generate duplicate flags.
     std::set<std::string> moduleMapsSeen;
     std::vector<std::string> &extraClangArgs = Ctx.ClangImporterOpts.ExtraArgs;
-    for (auto &entry : ExplicitModuleMap) {
-      const auto &moduleMapPath = entry.getValue().clangModuleMapPath;
+    for (auto &entry : ExplicitClangModuleMap) {
+      const auto &moduleMapPath = entry.getValue().moduleMapPath;
       if (!moduleMapPath.empty() &&
           moduleMapsSeen.find(moduleMapPath) == moduleMapsSeen.end()) {
         moduleMapsSeen.insert(moduleMapPath);
@@ -1915,7 +1917,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
             (Twine("-fmodule-map-file=") + moduleMapPath).str());
       }
 
-      const auto &modulePath = entry.getValue().clangModulePath;
+      const auto &modulePath = entry.getValue().modulePath;
       if (!modulePath.empty()) {
         extraClangArgs.push_back(
             (Twine("-fmodule-file=") + entry.getKey() + "=" + modulePath)
@@ -1928,8 +1930,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
       const std::vector<std::pair<std::string, std::string>>
           &commandLineExplicitInputs) {
     for (const auto &moduleInput : commandLineExplicitInputs) {
-      ExplicitModuleInfo entry;
-      entry.modulePath = moduleInput.second;
+      ExplicitSwiftModuleInputInfo entry(moduleInput.second, {}, {});
       ExplicitModuleMap.try_emplace(moduleInput.first, std::move(entry));
     }
   }
@@ -1967,16 +1968,6 @@ bool ExplicitSwiftModuleLoader::findModule(
     return false;
   }
   auto &moduleInfo = it->getValue();
-
-  // If this is only a Clang module with no paired Swift module, return false
-  // now so that we don't emit diagnostics about it being missing. This gives
-  // ClangImporter an opportunity to import it.
-  bool hasClangModule = !moduleInfo.clangModuleMapPath.empty() ||
-                        !moduleInfo.clangModulePath.empty();
-  bool hasSwiftModule = !moduleInfo.modulePath.empty();
-  if (hasClangModule && !hasSwiftModule) {
-    return false;
-  }
 
   // Set IsFramework bit according to the moduleInfo
   IsFramework = moduleInfo.isFramework;
@@ -2019,14 +2010,14 @@ bool ExplicitSwiftModuleLoader::findModule(
   *ModuleBuffer = std::move(moduleBuf.get());
 
   // Open .swiftdoc file
-  if (!moduleInfo.moduleDocPath.empty()) {
-    auto moduleDocBuf = fs.getBufferForFile(moduleInfo.moduleDocPath);
+  if (moduleInfo.moduleDocPath.has_value()) {
+    auto moduleDocBuf = fs.getBufferForFile(moduleInfo.moduleDocPath.value());
     if (moduleBuf)
       *ModuleDocBuffer = std::move(moduleDocBuf.get());
   }
   // Open .swiftsourceinfo file
-  if (!moduleInfo.moduleSourceInfoPath.empty()) {
-    auto moduleSourceInfoBuf = fs.getBufferForFile(moduleInfo.moduleSourceInfoPath);
+  if (moduleInfo.moduleSourceInfoPath.has_value()) {
+    auto moduleSourceInfoBuf = fs.getBufferForFile(moduleInfo.moduleSourceInfoPath.value());
     if (moduleSourceInfoBuf)
       *ModuleSourceInfoBuffer = std::move(moduleSourceInfoBuf.get());
   }

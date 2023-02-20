@@ -83,8 +83,11 @@ bool PlaceholderSwiftModuleScanner::findModule(
   }
   auto &moduleInfo = it->getValue();
   auto dependencies = ModuleDependencyInfo::forPlaceholderSwiftModuleStub(
-      moduleInfo.modulePath, moduleInfo.moduleDocPath,
-      moduleInfo.moduleSourceInfoPath);
+      moduleInfo.modulePath,
+      moduleInfo.moduleDocPath.has_value() ?
+            moduleInfo.moduleDocPath.value() : "",
+      moduleInfo.moduleSourceInfoPath.has_value() ?
+            moduleInfo.moduleSourceInfoPath.value() : "");
   this->dependencies = std::move(dependencies);
   return true;
 }
