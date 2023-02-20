@@ -69,7 +69,8 @@ swift_getRootPath();
 ///
 /// \param name      The name of the executable to locate.
 ///
-/// \return A string containing the full path to the executable.
+/// \return A string containing the full path to the executable.  This string
+///         should be released with `free()` when no longer required.
 SWIFT_RUNTIME_EXPORT
 const char *
 swift_getAuxiliaryExecutablePath(const char *name);
