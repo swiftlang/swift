@@ -687,10 +687,10 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         //   %a = pointer_to_address %l           // the up-walk starts at %a
         return isEscaping
       }
-      return walkUp(address: (def as! UnaryInstruction).operand,
+      return walkUp(address: (def as! UnaryInstruction).operand.value,
                     path: path.with(followStores: true).with(knownType: nil))
     case let atp as AddressToPointerInst:
-      return walkUp(address: atp.operand, path: path.with(knownType: nil))
+      return walkUp(address: atp.address, path: path.with(knownType: nil))
     default:
       return isEscaping
     }
@@ -727,11 +727,11 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case is PointerToAddressInst, is IndexAddrInst:
       return walkUp(value: (def as! SingleValueInstruction).operands[0].value, path: path.with(knownType: nil))
     case let rta as RefTailAddrInst:
-      return walkUp(value: rta.operand, path: path.push(.tailElements, index: 0).with(knownType: nil))
+      return walkUp(value: rta.instance, path: path.push(.tailElements, index: 0).with(knownType: nil))
     case let rea as RefElementAddrInst:
-      return walkUp(value: rea.operand, path: path.push(.classField, index: rea.fieldIndex).with(knownType: nil))
+      return walkUp(value: rea.instance, path: path.push(.classField, index: rea.fieldIndex).with(knownType: nil))
     case let pb as ProjectBoxInst:
-      return walkUp(value: pb.operand, path: path.push(.classField, index: pb.fieldIndex).with(knownType: nil))
+      return walkUp(value: pb.box, path: path.push(.classField, index: pb.fieldIndex).with(knownType: nil))
     default:
       return isEscaping
     }

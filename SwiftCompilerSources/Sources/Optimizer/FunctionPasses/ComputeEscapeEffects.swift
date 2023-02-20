@@ -209,7 +209,7 @@ private struct IsExclusiveReturnEscapeVisitor : EscapeVisitorWithResult {
   var result = false
 
   func isExclusiveEscape(returnInst: ReturnInst, _ context: FunctionPassContext) -> Bool {
-    return returnInst.operand.at(returnPath).visit(using: self, context) ?? false
+    return returnInst.returnedValue.at(returnPath).visit(using: self, context) ?? false
   }
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {

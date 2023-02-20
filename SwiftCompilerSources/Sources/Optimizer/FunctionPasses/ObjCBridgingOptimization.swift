@@ -237,9 +237,9 @@ private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: F
     
     let en = branch.operands[0].value as! EnumInst
     context.erase(instruction: branch)
-    let op = en.operand
+    let payload = en.payload
     context.erase(instruction: en)
-    if let bridgingCall = op {
+    if let bridgingCall = payload {
       context.erase(instruction: bridgingCall as! ApplyInst)
     }
   }
@@ -249,7 +249,7 @@ private func lookThroughOwnershipInsts(_ value: Value) -> Value {
   // Looks like it's sufficient to support begin_borrow for now.
   // TODO: add copy_value if needed.
   if let bbi = value as? BeginBorrowInst {
-    return bbi.operand
+    return bbi.borrowedValue
   }
   return value
 }
@@ -286,10 +286,10 @@ private func isOptionalBridging(of value: Value, isBridging: (Value) -> ApplyIns
           singleEnumUse.instruction is BranchInst else {
       return nil
     }
-    if let enumOp = enumInst.operand {
+    if let payload = enumInst.payload {
       // The some-case
       if someSwitch != nil { return nil }
-      guard let bridgingCall = isBridging(enumOp),
+      guard let bridgingCall = isBridging(payload),
             bridgingCall.uses.isSingleUse else {
         return nil
       }
@@ -298,8 +298,8 @@ private func isOptionalBridging(of value: Value, isBridging: (Value) -> ApplyIns
       // If it's an ObjC -> Swift bridging call the argument is wrapped into an optional enum.
       if callArgument.type.isEnum {
         guard let sourceEnum = callArgument as? EnumInst,
-              let sourceEnumOp = sourceEnum.operand,
-              let (se, someCase) = isPayloadOfSwitchEnum(sourceEnumOp),
+              let sourcePayload = sourceEnum.payload,
+              let (se, someCase) = isPayloadOfSwitchEnum(sourcePayload),
               enumInst.caseIndex == someCase,
               sourceEnum.caseIndex == someCase,
               sourceEnum.type == se.enumOp.type else {
