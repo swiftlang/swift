@@ -8175,8 +8175,15 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
 
   // Don't allow getBody() to trigger parsing of an unparsed body containing the
   // IDE inspection location.
+  // FIXME: We should be properly constructing the range of the the body as a
+  // CharSourceRange but we can't because we don't have access to the lexer
+  // here. Using the end location of the SourceRange works good enough here
+  // because the last token is a '}' and the IDE inspection point is not inside
+  // the closing brace.
   if (getBodyKind() == BodyKind::Unparsed &&
-      ctx.SourceMgr.rangeContainsIDEInspectionTarget(getBodySourceRange())) {
+      ctx.SourceMgr.rangeContainsIDEInspectionTarget(
+          CharSourceRange(ctx.SourceMgr, getBodySourceRange().Start,
+                          getBodySourceRange().End))) {
     return nullptr;
   }
 

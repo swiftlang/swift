@@ -31,6 +31,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -353,18 +354,14 @@ ConstraintSystem::getAlternativeLiteralTypes(KnownProtocolKind kind,
 }
 
 bool ConstraintSystem::containsIDEInspectionTarget(ASTNode node) const {
-  SourceRange range = node.getSourceRange();
-  if (range.isInvalid())
-    return false;
-  return Context.SourceMgr.rangeContainsIDEInspectionTarget(range);
+  return swift::containsIDEInspectionTarget(node.getSourceRange(),
+                                            Context.SourceMgr);
 }
 
 bool ConstraintSystem::containsIDEInspectionTarget(
     const ArgumentList *args) const {
-  SourceRange range = args->getSourceRange();
-  if (range.isInvalid())
-    return false;
-  return Context.SourceMgr.rangeContainsIDEInspectionTarget(range);
+  return swift::containsIDEInspectionTarget(args->getSourceRange(),
+                                            Context.SourceMgr);
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(

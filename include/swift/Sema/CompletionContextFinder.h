@@ -126,6 +126,14 @@ private:
   }
 };
 
+
+/// Returns \c true if \p range is valid and contains the IDE inspection
+/// target. This performs the underlying check based on \c CharSourceRange
+/// to make sure we correctly return \c true if the ide inspection target
+/// is inside a string literal that's the last token in \p range.
+bool containsIDEInspectionTarget(SourceRange range,
+                                 const SourceManager &SourceMgr);
+
 } // end namespace swift
 
 #endif // SWIFT_SEMA_COMPLETIONCONTEXTFINDER_H

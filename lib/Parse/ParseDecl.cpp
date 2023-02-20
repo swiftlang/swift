@@ -7986,8 +7986,10 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   auto BodyPreviousLoc = PreviousLoc;
   SourceRange BodyRange(Tok.getLoc());
   auto setIDEInspectionDelayedDeclStateIfNeeded = [&] {
+    auto CharBodyRange =
+        Lexer::getCharSourceRangeFromSourceRange(SourceMgr, BodyRange);
     if (!isIDEInspectionFirstPass() ||
-        !SourceMgr.rangeContainsIDEInspectionTarget(BodyRange)) {
+        !SourceMgr.rangeContainsIDEInspectionTarget(CharBodyRange)) {
       return;
     }
     if (State->hasIDEInspectionDelayedDeclState())
