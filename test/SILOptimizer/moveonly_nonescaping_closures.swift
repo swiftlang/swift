@@ -58,6 +58,8 @@ func c(x: __owned M) {
 
 func d(x: __owned M) { // expected-error{{}}
     clodger({ consume(x) }) // expected-note{{}}
+    // TODO: This will go away once the box capture support is there.
+    // expected-error @-2 {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
 }
 
 func e(x: inout M) {

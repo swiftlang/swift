@@ -87,8 +87,11 @@ public func useNonTrivialStruct(_ s: __shared NonTrivialStruct) {
 
 // CHECK-LABEL: sil [ossa] @$s8moveonly24useNonTrivialOwnedStructyyAA0cdF0VnF : $@convention(thin) (@owned NonTrivialStruct) -> () {
 // CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialStruct):
-// CHECK:   [[MOVED_ARG:%.*]] = move_value [lexical] [[ARG]]
-// CHECK:   mark_must_check [consumable_and_assignable] [[MOVED_ARG]]
+// CHECK:   [[BOX:%.*]] = alloc_box
+// CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK:   store [[ARG]] to [init] [[PROJECT]]
+// CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK:   mark_must_check [assignable_but_not_consumable] [[PROJECT]]
 // CHECK: } // end sil function '$s8moveonly24useNonTrivialOwnedStructyyAA0cdF0VnF'
 public func useNonTrivialOwnedStruct(_ s: __owned NonTrivialStruct) {
     borrowVal(s)
@@ -117,8 +120,11 @@ public func useNonTrivialEnum(_ s: __shared NonTrivialEnum) {
 
 // CHECK-LABEL: sil [ossa] @$s8moveonly22useNonTrivialOwnedEnumyyAA0cdF0OnF : $@convention(thin) (@owned NonTrivialEnum) -> () {
 // CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialEnum):
-// CHECK:   [[MOVED_ARG:%.*]] = move_value [lexical] [[ARG]]
-// CHECK:   mark_must_check [consumable_and_assignable] [[MOVED_ARG]]
+// CHECK:   [[BOX:%.*]] = alloc_box
+// CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK:   store [[ARG]] to [init] [[PROJECT]]
+// CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK:   mark_must_check [assignable_but_not_consumable] [[PROJECT]]
 // CHECK: } // end sil function '$s8moveonly22useNonTrivialOwnedEnumyyAA0cdF0OnF'
 public func useNonTrivialOwnedEnum(_ s: __owned NonTrivialEnum) {
     borrowVal(s)

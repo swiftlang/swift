@@ -271,6 +271,8 @@ bool Implementation::gatherUses(SILValue value) {
   while (!useWorklist.empty()) {
     auto *nextUse = useWorklist.pop_back_val();
     LLVM_DEBUG(llvm::dbgs() << "    NextUse: " << *nextUse->getUser());
+    LLVM_DEBUG(llvm::dbgs() << "    Operand Ownership: "
+                            << nextUse->getOperandOwnership() << '\n');
     switch (nextUse->getOperandOwnership()) {
     case OperandOwnership::NonUse:
       continue;
@@ -358,15 +360,35 @@ bool Implementation::gatherUses(SILValue value) {
       });
       continue;
 
-    case OperandOwnership::Borrow:
-      LLVM_DEBUG(llvm::dbgs() << "        Found recursive borrow!\n");
+    case OperandOwnership::Borrow: {
       // Look through borrows.
-      for (auto value : nextUse->getUser()->getResults()) {
-        for (auto *use : value->getUses()) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(nextUse->getUser())) {
+        LLVM_DEBUG(llvm::dbgs() << "        Found recursive borrow!\n");
+        for (auto *use : bbi->getUses()) {
           useWorklist.push_back(use);
         }
+        continue;
       }
+
+      auto leafRange =
+          TypeTreeLeafTypeRange::get(nextUse->get(), getRootValue());
+      if (!leafRange) {
+        LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
+        return false;
+      }
+
+      // Otherwise, treat it as a normal use.
+      LLVM_DEBUG(llvm::dbgs() << "        Treating non-begin_borrow borrow as "
+                                 "a non lifetime ending use!\n");
+      blocksToUses.insert(
+          nextUse->getParentBlock(),
+          {nextUse, {*leafRange, false /*is lifetime ending*/}});
+      liveness.updateForUse(nextUse->getUser(), *leafRange,
+                            false /*is lifetime ending*/);
+      instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
+
       continue;
+    }
     case OperandOwnership::EndBorrow:
       LLVM_DEBUG(llvm::dbgs() << "        Found end borrow!\n");
       continue;
@@ -1162,6 +1184,10 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
 
   LLVM_DEBUG(llvm::dbgs()
              << "Performing BorrowToDestructureTransform::rewriteUses()!\n");
+  SWIFT_DEFER {
+    LLVM_DEBUG(llvm::dbgs() << "Function after rewriting!\n";
+               getMarkedValue()->getFunction()->dump());
+  };
 
   llvm::SmallPtrSet<Operand *, 8> seenOperands;
   SmallBitVector bitsNeededInBlock(liveness.getNumSubElements());
@@ -1693,10 +1719,10 @@ gatherSwitchEnum(SILValue value,
       continue;
 
     case OperandOwnership::Borrow:
-      LLVM_DEBUG(llvm::dbgs() << "        Found recursive borrow!\n");
       // Look through borrows.
-      for (auto value : nextUse->getUser()->getResults()) {
-        for (auto *use : value->getUses()) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(nextUse->getUser())) {
+        LLVM_DEBUG(llvm::dbgs() << "        Found recursive borrow!\n");
+        for (auto *use : bbi->getUses()) {
           useWorklist.push_back(use);
         }
       }
@@ -1734,6 +1760,7 @@ gatherSwitchEnum(SILValue value,
 //===----------------------------------------------------------------------===//
 
 bool BorrowToDestructureTransform::transform() {
+  LLVM_DEBUG(llvm::dbgs() << "Performing Borrow To Destructure Tranform!\n");
   auto *fn = mmci->getFunction();
   StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
 
@@ -1746,8 +1773,10 @@ bool BorrowToDestructureTransform::transform() {
 
   // If we do not have any borrows to process, return true early to show we
   // succeeded in processing.
-  if (borrowWorklist.empty())
+  if (borrowWorklist.empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "No borrows found!\n");
     return true;
+  }
 
   // Then go through our borrows and attempt to gather up guaranteed
   // switch_enums. If we see any of them, we need to transform them into owned

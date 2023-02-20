@@ -733,12 +733,11 @@ void UseState::initializeLiveness(
         liveness.updateForUse(endAccess, livenessInstAndValue.second,
                               false /*lifetime ending*/);
       }
-    } else {
-      for (auto *ebi : li->getConsumingUses()) {
-        liveness.updateForUse(ebi->getUser(), livenessInstAndValue.second,
-                              false /*lifetime ending*/);
-      }
     }
+    // NOTE: We used to add the destroy_value of our loads here to liveness. We
+    // instead add them to the livenessUses array so that we can successfully
+    // find them later when performing a forward traversal to find them for
+    // error purposes.
     LLVM_DEBUG(llvm::dbgs() << "Added liveness for borrow: "
                             << *livenessInstAndValue.first;
                liveness.print(llvm::dbgs()));
@@ -1363,6 +1362,7 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
       }
 
       // Canonicalize the lifetime of the load [take], load [copy].
+      LLVM_DEBUG(llvm::dbgs() << "Running copy propagation!\n");
       moveChecker.changed |= moveChecker.canonicalizer.canonicalize(li);
 
       // If we are asked to perform no_consume_or_assign checking or
@@ -1397,6 +1397,18 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
         }
 
         useState.borrows.insert({user, *leafRange});
+
+        // If we had a load [copy], borrow then we know that all of its destroys
+        // must have been destroy_value. So we can just gather up those
+        // destroy_value and use then to create liveness to ensure that our
+        // value is alive over the entire borrow scope we are going to create.
+        LLVM_DEBUG(llvm::dbgs() << "Adding destroys from load as liveness uses "
+                                   "since they will become end_borrows.\n");
+        for (auto *consumeUse : li->getConsumingUses()) {
+          auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
+          useState.livenessUses.insert({dvi, *leafRange});
+        }
+
         return true;
       }
 
@@ -1433,6 +1445,16 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
         }
 
         useState.borrows.insert({user, *leafRange});
+        // If we had a load [copy], borrow then we know that all of its destroys
+        // must have been destroy_value. So we can just gather up those
+        // destroy_value and use then to create liveness to ensure that our
+        // value is alive over the entire borrow scope we are going to create.
+        LLVM_DEBUG(llvm::dbgs() << "Adding destroys from load as liveness uses "
+                                   "since they will become end_borrows.\n");
+        for (auto *consumeUse : li->getConsumingUses()) {
+          auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
+          useState.livenessUses.insert({dvi, *leafRange});
+        }
       } else {
         // If we had a load [copy], store this into the copy list. These are the
         // things that we must merge into destroy_addr or reinits after we are
@@ -1460,19 +1482,15 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return true;
   }
 
-  auto insertLivenessUseForApply = [&](const Operand &op) -> bool {
-    auto leafRange = TypeTreeLeafTypeRange::get(op.get(), getRootAddress());
-    if (!leafRange)
-      return false;
-
-    useState.livenessUses.insert({user, *leafRange});
-    return true;
-  };
-
   if (auto fas = FullApplySite::isa(user)) {
     switch (fas.getArgumentConvention(*op)) {
     case SILArgumentConvention::Indirect_In_Guaranteed: {
-      return insertLivenessUseForApply(*op);
+      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      if (!leafRange)
+        return false;
+
+      useState.livenessUses.insert({user, *leafRange});
+      return true;
     }
 
     case SILArgumentConvention::Indirect_Inout:
@@ -1490,11 +1508,25 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     }
   }
 
-  if (PartialApplyInst *pas = dyn_cast<PartialApplyInst>(user)) {
+  if (auto *pas = dyn_cast<PartialApplyInst>(user)) {
     if (pas->isOnStack()) {
-      // On-stack partial applications are always a liveness use of their
-      // captures.
-      return insertLivenessUseForApply(*op);
+      LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply!\n");
+      // On-stack partial applications and their final consumes are always a
+      // liveness use of their captures.
+      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      if (!leafRange) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
+        return false;
+      }
+
+      useState.livenessUses.insert({user, *leafRange});
+      for (auto *use : pas->getConsumingUses()) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Adding consuming use of partial apply as liveness use: "
+                   << *use->getUser());
+        useState.livenessUses.insert({use->getUser(), *leafRange});
+      }
+      return true;
     }
   }
 
@@ -1921,6 +1953,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
 void MoveOnlyAddressCheckerPImpl::rewriteUses(
     FieldSensitiveMultiDefPrunedLiveRange &liveness,
     const FieldSensitivePrunedLivenessBoundary &boundary) {
+  LLVM_DEBUG(llvm::dbgs() << "MoveOnlyAddressChecker Rewrite Uses!\n");
   // First remove all destroy_addr that have not been claimed.
   for (auto destroyPair : addressUseState.destroys) {
     if (!consumes.claimConsume(destroyPair.first, destroyPair.second)) {

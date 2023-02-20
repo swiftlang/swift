@@ -16,11 +16,13 @@
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
+
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILInstruction.h"
@@ -293,13 +295,24 @@ struct ArgumentInitHelper {
     return argEmitter.visit(canTy, origTy);
   }
 
-  SILValue updateArgumentValueForBinding(ManagedValue argrv, SILLocation loc,
-                                         ParamDecl *pd, SILValue value,
-                                         const SILDebugVariable &varinfo) {
+  void updateArgumentValueForBinding(ManagedValue argrv, SILLocation loc,
+                                     ParamDecl *pd, SILValue value,
+                                     const SILDebugVariable &varinfo) {
+    bool calledCompletedUpdate = false;
+    SWIFT_DEFER {
+      assert(calledCompletedUpdate && "Forgot to call completed update along "
+                                      "all paths or manually turn it off");
+    };
+    auto completeUpdate = [&](SILValue value) -> void {
+      SGF.B.createDebugValue(loc, value, varinfo);
+      SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
+      calledCompletedUpdate = true;
+    };
+
     // If we do not need to support lexical lifetimes, just return value as the
     // updated value.
     if (!SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()))
-      return value;
+      return completeUpdate(value);
 
     // Look for the following annotations on the function argument:
     // - @noImplicitCopy
@@ -314,17 +327,32 @@ struct ArgumentInitHelper {
       if (!value->getType().isMoveOnly()) {
         // Follow the normal path.  The value's lifetime will be enforced based
         // on its ownership.
-        return value;
+        return completeUpdate(value);
       }
 
-      // At this point, we have a move only type.
+      // At this point, we have a noncopyable type. If it is owned, create an
+      // alloc_box for it.
       if (value->getOwnershipKind() == OwnershipKind::Owned) {
-        value = SGF.B.createMoveValue(loc, argrv.forward(SGF),
-                                      /*isLexical*/ true);
-        value = SGF.B.createMarkMustCheckInst(
-            loc, value, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
-        SGF.emitManagedRValueWithCleanup(value);
-        return value;
+        // TODO: Once owned values are mutable, this needs to become mutable.
+        auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
+            pd,
+            SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                               pd->getType()),
+            SGF.F.getGenericEnvironment(),
+            /*mutable*/ true);
+
+        auto *box = SGF.B.createAllocBox(loc, boxType, varinfo);
+        SILValue destAddr = SGF.B.createProjectBox(loc, box, 0);
+        SGF.B.emitStoreValueOperation(loc, argrv.forward(SGF), destAddr,
+                                      StoreOwnershipQualifier::Init);
+        SGF.emitManagedRValueWithCleanup(box);
+
+        // We manually set calledCompletedUpdate to true since we want to use
+        // VarLoc::getForBox and use the debug info from the box rather than
+        // insert a custom debug_value.
+        calledCompletedUpdate = true;
+        SGF.VarLocs[pd] = SILGenFunction::VarLoc::getForBox(box);
+        return;
       }
 
       assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
@@ -332,7 +360,7 @@ struct ArgumentInitHelper {
       value = SGF.B.createMarkMustCheckInst(
           loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
       SGF.emitManagedRValueWithCleanup(value);
-      return value;
+      return completeUpdate(value);
     }
 
     if (value->getType().isTrivial(SGF.F)) {
@@ -346,7 +374,7 @@ struct ArgumentInitHelper {
         kind = MarkMustCheckInst::CheckKind::ConsumableAndAssignable;
       value = SGF.B.createMarkMustCheckInst(loc, value, kind);
       SGF.emitManagedRValueWithCleanup(value);
-      return value;
+      return completeUpdate(value);
     }
 
     if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
@@ -355,7 +383,7 @@ struct ArgumentInitHelper {
       value = SGF.B.createMarkMustCheckInst(
           loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
       SGF.emitManagedRValueWithCleanup(value);
-      return value;
+      return completeUpdate(value);
     }
 
     if (value->getOwnershipKind() == OwnershipKind::Owned) {
@@ -367,10 +395,10 @@ struct ArgumentInitHelper {
       value = SGF.B.createMarkMustCheckInst(
           loc, value, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
       SGF.emitManagedRValueWithCleanup(value);
-      return value;
+      return completeUpdate(value);
     }
 
-    return value;
+    return completeUpdate(value);
   }
 
   /// Create a SILArgument and store its value into the given Initialization,
@@ -405,8 +433,8 @@ struct ArgumentInitHelper {
     SILValue value = argrv.getValue();
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
-      value = updateArgumentValueForBinding(argrv, loc, pd, value, varinfo);
-      SGF.B.createDebugValue(loc, value, varinfo);
+      // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
+      updateArgumentValueForBinding(argrv, loc, pd, value, varinfo);
     } else {
       if (auto *allocStack = dyn_cast<AllocStackInst>(value)) {
         allocStack->setArgNo(ArgNo);
@@ -417,8 +445,8 @@ struct ArgumentInitHelper {
       } else {
         SGF.B.createDebugValueAddr(loc, value, varinfo);
       }
+      SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
     }
-    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
   }
 
   void emitParam(ParamDecl *PD) {

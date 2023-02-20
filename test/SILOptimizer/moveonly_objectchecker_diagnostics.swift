@@ -154,7 +154,7 @@ public func classLoopConsumeArg(_ x2: __shared Klass) { // expected-error {{'x2'
 
 public func classLoopConsumeOwnedArg(_ x2: __owned Klass) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -214,7 +214,7 @@ public func classDiamondInLoopOwnedArg(_ x2: __owned Klass) { // expected-error 
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -494,7 +494,7 @@ public func finalClassLoopConsumeArg(_ x2: __shared FinalKlass) { // expected-er
 
 public func finalClassLoopConsumeOwnedArg(_ x2: __owned FinalKlass) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -554,7 +554,7 @@ public func finalClassDiamondInLoopOwnedArg(_ x2: __owned FinalKlass) { // expec
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -837,7 +837,7 @@ public func aggStructLoopConsumeArg(_ x2: __shared AggStruct) { // expected-erro
 
 public func aggStructLoopConsumeOwnedArg(_ x2: __owned AggStruct) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -897,7 +897,7 @@ public func aggStructDiamondInLoopOwnedArg(_ x2: __owned AggStruct) { // expecte
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -945,11 +945,12 @@ public func aggStructConsumeFieldArg(_ x2: __shared AggStruct) {
 }
 
 public func aggStructConsumeFieldOwnedArg(_ x2: __owned AggStruct) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -996,11 +997,12 @@ public func aggStructConsumeGrandFieldArg(_ x2: __shared AggStruct) {
 }
 
 public func aggStructConsumeGrandFieldOwnedArg(_ x2: __owned AggStruct) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1014,13 +1016,13 @@ public func aggStructConsumeFieldNoError(_ x2: __owned AggStruct) {
 }
 
 public func aggStructConsumeFieldError(_ x2: __owned AggStruct) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' used after consume}}
     if boolValue {
         consumeVal(x2.lhs)
     } else {
         consumeVal(x2.pair.rhs) // expected-note {{consuming use here}}
     }
-    borrowVal(x2.pair) // expected-note {{boundary use here}}
+    borrowVal(x2.pair) // expected-note {{non-consuming use here}}
 }
 
 public func aggStructConsumeFieldError2(_ x2: __owned AggStruct) {
@@ -1152,7 +1154,7 @@ public func aggGenericStructLoopConsumeArg(_ x2: __shared AggGenericStruct<Strin
 
 public func aggGenericStructLoopConsumeOwnedArg(_ x2: __owned AggGenericStruct<String>) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -1212,7 +1214,7 @@ public func aggGenericStructDiamondInLoopOwnedArg(_ x2: __owned AggGenericStruct
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -1260,11 +1262,12 @@ public func aggGenericStructConsumeFieldArg(_ x2: __shared AggGenericStruct<Stri
 }
 
 public func aggGenericStructConsumeFieldOwnedArg(_ x2: __owned AggGenericStruct<String>) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1311,11 +1314,12 @@ public func aggGenericStructConsumeGrandFieldArg(_ x2: __shared AggGenericStruct
 }
 
 public func aggGenericStructConsumeGrandFieldOwnedArg(_ x2: __owned AggGenericStruct<String>) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1427,7 +1431,7 @@ public func aggGenericStructLoopConsumeArg<T>(_ x2: __shared AggGenericStruct<T>
 
 public func aggGenericStructLoopConsumeOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -1487,7 +1491,7 @@ public func aggGenericStructDiamondInLoopOwnedArg<T>(_ x2: __owned AggGenericStr
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -1535,11 +1539,12 @@ public func aggGenericStructConsumeFieldArg<T>(_ x2: __shared AggGenericStruct<T
 }
 
 public func aggGenericStructConsumeFieldOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1586,11 +1591,12 @@ public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: __shared AggGenericStr
 }
 
 public func aggGenericStructConsumeGrandFieldOwnedArg<T>(_ x2: __owned AggGenericStruct<T>) {
-    // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
-    // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
     }
 }
 
@@ -1710,7 +1716,7 @@ public func enumLoopConsumeArg(_ x2: __shared EnumTy) { // expected-error {{'x2'
 
 public func enumLoopConsumeOwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -1770,7 +1776,7 @@ public func enumDiamondInLoopOwnedArg(_ x2: __owned EnumTy) { // expected-error 
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -1934,7 +1940,7 @@ public func enumPatternMatchIfLet2Arg(_ x2: __shared EnumTy) { // expected-error
 
 public func enumPatternMatchIfLet2OwnedArg(_ x2: __owned EnumTy) { // expected-error {{'x2' consumed by a use in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming in loop use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
             borrowVal(x)
         }
     }
@@ -2154,7 +2160,12 @@ public func closureCaptureClassArgUseAfterConsume(_ x2: __shared Klass) {
 
 public func closureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
     // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
-    let f = {
+
+    let f = {        
+        // NOTE: This errors will go away once I change to pass these by box in
+        // a commit later in this PR.
+        //
+        // expected-error @-4 {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
         borrowVal(x2)
         consumeVal(x2) // expected-note {{consuming use here}}
         consumeVal(x2) // expected-note {{consuming use here}}
@@ -2213,6 +2224,10 @@ public func deferCaptureClassArgUseAfterConsume(_ x2: __shared Klass) {
 public func deferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
     // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     defer {
+        // NOTE: This errors will go away once I change to pass these by box in
+        // a commit later in this PR.
+        //
+        // expected-error @-4 {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
         borrowVal(x2)
         consumeVal(x2) // expected-note {{consuming use here}}
         consumeVal(x2) // expected-note {{consuming use here}}
@@ -2296,6 +2311,10 @@ public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: __shared Klass) 
 public func closureAndDeferCaptureClassOwnedArgUseAfterConsume(_ x2: __owned Klass) {
     // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
+        // NOTE: This errors will go away once I change to pass these by box in
+        // a commit later in this PR.
+        //
+        // expected-error @-4 {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
         defer {
             borrowVal(x2)
             consumeVal(x2) // expected-note {{consuming use here}}
@@ -2373,6 +2392,10 @@ public func closureAndClosureCaptureClassOwnedArgUseAfterConsume(_ x2: __owned K
     // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     let f = {
+        // NOTE: This errors will go away once I change to pass these by box in
+        // a commit later in this PR.
+        //
+        // expected-error @-4 {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
         let g = { // expected-note {{closure capture here}}
             borrowVal(x2)
             consumeVal(x2) // expected-note {{consuming use here}}
@@ -2426,12 +2449,16 @@ func blackHoleTestCase(_ k: __owned Klass) {
 
 func sameCallSiteTestConsumeTwice(_ k: __owned Klass) { // expected-error {{'k' consumed more than once}}
     func consumeKlassTwice(_ k: __owned Klass, _ k2: __owned Klass) {}
-    consumeKlassTwice(k, k) // expected-note {{two consuming uses here}}
+    consumeKlassTwice(k, k)
+    // expected-note @-1 {{consuming use here}}
+    // expected-note @-2 {{consuming use here}}
 }
 
-func sameCallSiteConsumeAndUse(_ k: __owned Klass) { // expected-error {{'k' consumed and used at the same time}}
+func sameCallSiteConsumeAndUse(_ k: __owned Klass) { // expected-error {{'k' used after consume}}
     func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: __shared Klass) {}
-    consumeKlassAndUseKlass(k, k) // expected-note {{consuming and non-consuming uses here}}
+    consumeKlassAndUseKlass(k, k)
+    // expected-note @-1 {{consuming use here}}
+    // expected-note @-2 {{non-consuming use here}}
 }
 
 ////////////////////////////////
