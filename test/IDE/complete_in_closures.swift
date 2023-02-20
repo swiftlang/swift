@@ -551,3 +551,15 @@ func testCompleteAfterClosureWithIfExprThatContainErrors() {
   // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS-DAG: Pattern/CurrModule/Flair[ArgLabels]: ()[#Void#]; name=()
   // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS: End completions
 }
+
+func testVariableInClosureHasArchetype<K>(_ key: K) {
+  func takeClosure(_ x: () -> Void) {}
+
+  takeClosure {
+    var varWithArchetype = key
+    #^VAR_WITH_ARCHETYPE^#
+    // VAR_WITH_ARCHETYPE: Begin completions
+    // VAR_WITH_ARCHETYPE: Decl[LocalVar]/Local:               varWithArchetype[#K#];
+    // VAR_WITH_ARCHETYPE: End completions
+  }
+}
