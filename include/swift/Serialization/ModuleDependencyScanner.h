@@ -84,8 +84,10 @@ namespace swift {
       /// Scan the given placeholder module map
       void parsePlaceholderModuleMap(StringRef fileName) {
         ExplicitModuleMapParser parser(Allocator);
+        llvm::StringMap<ExplicitClangModuleInputInfo> ClangDependencyModuleMap;
         auto result =
-          parser.parseSwiftExplicitModuleMap(fileName, PlaceholderDependencyModuleMap);
+          parser.parseSwiftExplicitModuleMap(fileName, PlaceholderDependencyModuleMap,
+                                             ClangDependencyModuleMap);
         if (result == std::errc::invalid_argument) {
           Ctx.Diags.diagnose(SourceLoc(),
                              diag::placeholder_dependency_module_map_corrupted,
@@ -98,7 +100,7 @@ namespace swift {
         }
       }
 
-      llvm::StringMap<ExplicitModuleInfo> PlaceholderDependencyModuleMap;
+      llvm::StringMap<ExplicitSwiftModuleInputInfo> PlaceholderDependencyModuleMap;
       llvm::BumpPtrAllocator Allocator;
 
     public:
