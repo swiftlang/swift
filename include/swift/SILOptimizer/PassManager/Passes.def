@@ -439,9 +439,11 @@ PASS(BugReducerTester, "bug-reducer-tester",
 PASS(AssemblyVisionRemarkGenerator, "assembly-vision-remark-generator",
      "Emit assembly vision remarks that provide source level guidance of where runtime calls ended up")
 PASS(MoveOnlyObjectChecker, "sil-move-only-object-checker",
-     "Pass that enforces move only invariants on raw SIL for objects")
+     "Utility pass that enforces move only invariants on raw SIL for objects for testing purposes")
 PASS(MoveOnlyAddressChecker, "sil-move-only-address-checker",
-     "Pass that enforces move only invariants on raw SIL for addresses")
+     "Utility pass that enforces move only invariants on raw SIL for addresses for testing purposes")
+PASS(MoveOnlyChecker, "sil-move-only-checker",
+     "Pass that enforces move only invariants on raw SIL for addresses and objects")
 PASS(ConsumeOperatorCopyableValuesChecker, "sil-consume-operator-copyable-values-checker",
      "Pass that performs checking of the consume operator for copyable values")
 PASS(TrivialMoveOnlyTypeEliminator, "sil-trivial-move-only-type-eliminator",
