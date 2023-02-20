@@ -645,7 +645,12 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
     fArg->setClosureCapture(true);
     SILValue arg = SILValue(fArg);
-    if (isInOut && (ty.isMoveOnly() && !ty.isMoveOnlyWrapped())) {
+
+    // If our capture is no escape and we have a noncopyable value, insert a
+    // consumable and assignable. If we have an escaping closure, we are going
+    // to emit an error later in SIL since it is illegal to capture an inout
+    // value in an escaping closure.
+    if (isInOut && ty.isPureMoveOnly() && capture.isNoEscape()) {
       arg = SGF.B.createMarkMustCheckInst(
           Loc, arg, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
     }

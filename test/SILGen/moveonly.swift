@@ -772,3 +772,25 @@ func testGlobalAssign() {
     varGlobal.nonTrivialStruct2 = NonTrivialStruct2()
     varGlobal.nonTrivialStruct2 = NonTrivialStruct2()
 }
+
+/////////////////////////////////
+// MARK: Closure Capture Tests //
+/////////////////////////////////
+
+// Make sure that we insert a mark_must_check on the capture value.
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly28checkMarkMustCheckOnCaptured1xyAA2FDVn_tF : $@convention(thin) (@owned FD) -> () {
+// CHECK: bb0([[ARG:%.*]] : @owned
+// CHECK:   [[BOX:%.*]] = alloc_box
+// CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK:   store [[ARG]] to [init] [[PROJECT]]
+//
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly28checkMarkMustCheckOnCaptured1xyAA2FDVn_tFyyXEfU_ : $@convention(thin) @substituted <τ_0_0> (@guaranteed FD) -> @out τ_0_0 for <()>
+// CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK:   [[MARK:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK:   [[VALUE:%.*]] = load [copy] [[MARK]]
+// CHECK:   [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[FN]]([[VALUE]])
+// CHECK: } // end sil function '$s8moveonly28checkMarkMustCheckOnCaptured1xyAA2FDVn_tF'
+func checkMarkMustCheckOnCaptured(x: __owned FD) {
+    func clodger<T>(_: () -> T) {}
+    clodger({ consumeVal(x) })
+}
