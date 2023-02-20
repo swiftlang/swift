@@ -794,8 +794,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   } else if (Args.hasArg(OPT_warn_concurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
   } else {
-    // Default to "limited" checking in Swift 5.x.
-    Opts.StrictConcurrencyLevel = StrictConcurrency::Targeted;
+    // Default to minimal checking in Swift 5.x.
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Minimal;
   }
 
   Opts.WarnImplicitOverrides =
