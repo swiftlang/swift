@@ -27,6 +27,10 @@
 
 #include "swift/Demangling/Demangler.h"
 
+#ifdef __linux__
+#include <sys/auxv.h>
+#endif
+
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -212,17 +216,29 @@ const char *presetToString(Preset preset) {
 }
 #endif
 
+#ifdef __linux__
+bool isPrivileged() {
+  return getauxval(AT_SECURE);
+}
+#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+bool isPrivileged() {
+  return issetugid();
+}
+#elif _WIN32
+bool isPrivileged() {
+  return false;
+}
+#endif
+
 } // namespace
 
 BacktraceInitializer::BacktraceInitializer() {
   const char *backtracing = swift::runtime::environment::SWIFT_BACKTRACE();
 
-#if !_WIN32
   // Force off for setuid processes.
-  if (issetugid()) {
+  if (isPrivileged()) {
     _swift_backtraceSettings.enabled = OnOffTty::Off;
   }
-#endif
 
   if (backtracing)
     _swift_parseBacktracingSettings(backtracing);
@@ -246,25 +262,22 @@ BacktraceInitializer::BacktraceInitializer() {
     _swift_backtraceSettings.enabled = OnOffTty::Off;
   }
 #else
-  #if !_WIN32
-  if (issetugid()) {
-    if (_swift_backtraceSettings.enabled != OnOffTty::Off) {
-      // You'll only see this warning if you do e.g.
-      //
-      //    SWIFT_BACKTRACE=enable=on /path/to/some/setuid/binary
-      //
-      // as opposed to
-      //
-      //    /path/to/some/setuid/binary
-      //
-      // i.e. when you're trying to force matters.
-      swift::warning(0,
-                     "swift runtime: backtrace-on-crash is not supported for "
-                     "setuid executables.\n");
-      _swift_backtraceSettings.enabled = OnOffTty::Off;
-    }
+
+  if (isPrivileged() && _swift_backtraceSettings.enabled != OnOffTty::Off) {
+    // You'll only see this warning if you do e.g.
+    //
+    //    SWIFT_BACKTRACE=enable=on /path/to/some/setuid/binary
+    //
+    // as opposed to
+    //
+    //    /path/to/some/setuid/binary
+    //
+    // i.e. when you're trying to force matters.
+    swift::warning(0,
+                   "swift runtime: backtrace-on-crash is not supported for "
+                   "privileged executables.\n");
+    _swift_backtraceSettings.enabled = OnOffTty::Off;
   }
-  #endif // !_WIN32
 
   if (_swift_backtraceSettings.enabled == OnOffTty::TTY)
     _swift_backtraceSettings.enabled =
