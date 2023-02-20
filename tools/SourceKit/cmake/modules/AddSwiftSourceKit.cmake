@@ -123,7 +123,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
       # installed host toolchain.
       get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
       get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
-      set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
 
       target_link_libraries(${target} PRIVATE ${swiftrt})
       target_link_libraries(${target} PRIVATE "swiftCore")
@@ -132,7 +132,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
       if(ASKD_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
         list(APPEND RPATH_LIST "${host_lib_dir}")
       else()
-        file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+        file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
         list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
       endif()
 
@@ -144,7 +144,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
 
       # At runtime link against the built swift libraries from the current
       # bootstrapping stage.
-      file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
       list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
 
     elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")

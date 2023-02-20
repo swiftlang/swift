@@ -1452,6 +1452,11 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
                                        StringRef SDKPath, bool shared) const {
   SmallString<128> scratchPath;
   getResourceDirPath(scratchPath, args, shared);
+  // Since only Darwin doesn't have separate libraries per architecture, link
+  // against the architecture-specific version of the library everywhere else.
+  if (!getTriple().isOSDarwin())
+    llvm::sys::path::append(scratchPath,
+                            swift::getMajorArchitectureName(getTriple()));
   runtimeLibPaths.push_back(std::string(scratchPath.str()));
 
   // If there's a secondary resource dir, add it too.

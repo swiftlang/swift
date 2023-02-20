@@ -121,13 +121,13 @@ listed when you run the `adb devices` command - **currently this example works o
 commands to copy the Swift Android stdlib:
 
 ```
-$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftCore.so /data/local/tmp
-$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftGlibc.so /data/local/tmp
-$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftSwiftOnoneSupport.so /data/local/tmp
-$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswiftRemoteMirror.so /data/local/tmp
-$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswift_Concurrency.so /data/local/tmp
-$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libdispatch.so /data/local/tmp
-$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libBlocksRuntime.so /data/local/tmp
+$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/aarch64/libswiftCore.so /data/local/tmp
+$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/aarch64/libswiftGlibc.so /data/local/tmp
+$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/aarch64/libswiftSwiftOnoneSupport.so /data/local/tmp
+$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/aarch64/libswiftRemoteMirror.so /data/local/tmp
+$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/aarch64/libswift_Concurrency.so /data/local/tmp
+$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/aarch64/libdispatch.so /data/local/tmp
+$ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/aarch64/libBlocksRuntime.so /data/local/tmp
 ```
 
 In addition, you'll also need to copy the Android NDK's libc++:

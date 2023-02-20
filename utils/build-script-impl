@@ -3287,7 +3287,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 ICU_BUILD_DIR=$(build_directory ${host} ${product})
                 ICU_INSTALL_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
                 ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
-                LIBICU_DEST_DIR="${ICU_INSTALL_DIR}lib/swift/${SWIFT_HOST_VARIANT}"
+                LIBICU_DEST_DIR="${ICU_INSTALL_DIR}lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 call mkdir -p ${LIBICU_DEST_DIR}
 
                 for l in uc i18n data
@@ -3298,7 +3298,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 done
 
                 if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
-                    LIBICU_DEST_DIR_STATIC="${ICU_INSTALL_DIR}lib/swift_static/${SWIFT_HOST_VARIANT}"
+                    LIBICU_DEST_DIR_STATIC="${ICU_INSTALL_DIR}lib/swift_static/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                     call mkdir -p ${LIBICU_DEST_DIR_STATIC}
                     for l in uc i18n data
                     do

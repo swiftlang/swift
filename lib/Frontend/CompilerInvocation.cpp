@@ -168,8 +168,11 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     LibSubDir = "maccatalyst";
 
   llvm::sys::path::append(LibPath, LibSubDir);
+  llvm::SmallString<128> runtimeLibPath = LibPath;
+  if (!Triple.isOSDarwin())
+    llvm::sys::path::append(runtimeLibPath, swift::getMajorArchitectureName(Triple));
   SearchPathOpts.RuntimeLibraryPaths.clear();
-  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(LibPath.str()));
+  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(runtimeLibPath.str()));
   if (Triple.isOSDarwin())
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
 

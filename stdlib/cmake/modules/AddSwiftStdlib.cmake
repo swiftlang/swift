@@ -803,11 +803,11 @@ function(add_swift_target_library_single target name)
         "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
   endif()
 
-  if ("${SWIFTLIB_SINGLE_BOOTSTRAPPING}" STREQUAL "")
+  if ("${SWIFTLIB_SINGLE_BOOTSTRAPPING}" STREQUAL "" OR NOT SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(output_sub_dir ${SWIFTLIB_SINGLE_SUBDIR})
   else()
     # In the bootstrapping builds, we only have the single host architecture.
-    # So generated the library directly in the parent SDK specific directory
+    # So generate the Darwin library directly in the parent SDK specific directory
     # (avoiding to lipo/copy the library).
     set(output_sub_dir ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR})
   endif()
@@ -1257,11 +1257,12 @@ function(add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_C_COMPILE_FLAGS}  "-DSWIFT_TARGET_LIBRARY_NAME=${name}")
   set(link_flags ${SWIFTLIB_SINGLE_LINK_FLAGS})
 
-  set(library_search_subdir "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
   set(library_search_directories
       "${lib_dir}/${output_sub_dir}"
-      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
-      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
+      "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}")
+  if("${SWIFTLIB_SINGLE_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+    list(APPEND library_search_directories "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
+  endif()
 
   # In certain cases when building, the environment variable SDKROOT is set to override
   # where the sdk root is located in the system. If that environment variable has been
@@ -1487,8 +1488,10 @@ function(add_swift_target_library_single target name)
     endif()
     set(library_search_directories
         "${search_base_dir}/${SWIFTLIB_SINGLE_SUBDIR}"
-        "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
-        "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
+        "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}")
+    if("${SWIFTLIB_SINGLE_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+      list(APPEND library_search_directories "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
+    endif()
     target_link_directories(${target_static} PRIVATE
       ${library_search_directories})
     target_link_libraries("${target_static}" PRIVATE
@@ -2377,8 +2380,10 @@ function(add_swift_target_library name)
         if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
           # Back-deployment libraries get installed into a versioned directory.
           set(install_dest "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}-${SWIFTLIB_BACK_DEPLOYMENT_LIBRARY}/${resource_dir_sdk_subdir}")
-        else()
+        elseif(sdk STREQUAL WINDOWS OR sdk IN_LIST SWIFT_DARWIN_PLATFORMS)
           set(install_dest "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}")
+        else()
+          set(install_dest "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}")
         endif()
 
         swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
@@ -2454,6 +2459,10 @@ function(add_swift_target_library name)
             "${name}-${library_subdir}-static")
         set(UNIVERSAL_LIBRARY_NAME
             "${universal_subdir}/${library_subdir}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+        set(install_dest "lib${LLVM_LIBDIR_SUFFIX}/${install_subdir}/${resource_dir_sdk_subdir}")
+        if(NOT sdk STREQUAL WINDOWS AND NOT sdk IN_LIST SWIFT_DARWIN_PLATFORMS)
+          set(install_dest "${install_dest}/${SWIFT_PRIMARY_VARIANT_ARCH}")
+        endif()
         _add_swift_lipo_target(SDK
                                  ${sdk}
                                TARGET
@@ -2463,7 +2472,7 @@ function(add_swift_target_library name)
                                ${THIN_INPUT_TARGETS_STATIC})
         add_dependencies(${SWIFTLIB_INSTALL_IN_COMPONENT} ${lipo_target_static})
         swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
-                                   DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${install_subdir}/${resource_dir_sdk_subdir}"
+                                   DESTINATION "${install_dest}"
                                    PERMISSIONS
                                      OWNER_READ OWNER_WRITE
                                      GROUP_READ
@@ -2542,6 +2551,10 @@ function(_add_swift_target_executable_single name)
   # Prepare linker search directories.
   set(library_search_directories
         "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+  if(NOT ${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS AND NOT ${SWIFTEXE_SINGLE_SDK} STREQUAL WINDOWS)
+    set(library_search_directories
+          "${library_search_directories}/${SWIFTEXE_SINGLE_ARCHITECTURE}")
+  endif()
 
   # Add variant-specific flags.
   _add_target_variant_c_compile_flags(
