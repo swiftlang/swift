@@ -143,6 +143,10 @@ private:
   /// The scope map that describes this source file.
   NullablePtr<ASTScope> Scope = nullptr;
 
+   /// The set of parsed decls with opaque return types that have not yet
+   /// been validated.
+   llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
+  
   /// The set of validated opaque return type decls in the source file.
   llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
   llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
@@ -663,6 +667,13 @@ public:
   bool hasDelayedBodyParsing() const;
 
   OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) override;
+
+  /// Do not call when inside an inactive clause (\c
+  /// InInactiveClauseEnvironment)) because it will later on result in a lookup
+  /// to something that won't be in the ASTScope tree.
+  void addUnvalidatedDeclWithOpaqueResultType(ValueDecl *vd) {
+    UnvalidatedDeclsWithOpaqueReturnTypes.insert(vd);
+  }
 
   void addOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
     UnvalidatedOpaqueReturnTypes.insert(decl);
