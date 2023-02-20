@@ -339,3 +339,24 @@ func testSwitchInResultBuilder() {
 // SWITCH_IN_RESULT_BUILDER: Begin completions, 1 item
 // SWITCH_IN_RESULT_BUILDER-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: alertDismissed[#Action#];
 }
+
+func testCompleteIfLetInResultBuilder() {
+  func takeClosure(_ x: () -> Void) -> Int {
+    return 0
+  }
+
+  @resultBuilder struct MyResultBuilder {
+    static func buildBlock() -> Int { return 0 }
+    static func buildBlock(_ content: Int) -> Int { content }
+  }
+
+  @MyResultBuilder func test(integer: Int?) -> Int {
+    takeClosure {
+      if let #^IF_LET_IN_RESULT_BUILDER^#integer = integer {
+      }
+    }
+    // IF_LET_IN_RESULT_BUILDER: Begin completions, 1 items
+    // IF_LET_IN_RESULT_BUILDER: Decl[LocalVar]/Local:               integer[#Int?#]; name=integer
+    // IF_LET_IN_RESULT_BUILDER: End completions
+  }
+}
