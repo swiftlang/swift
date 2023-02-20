@@ -49,6 +49,21 @@ TemporaryAllocationTestSuite.test("untypedAllocationOnHeap") {
   }
 }
 
+TemporaryAllocationTestSuite.test("unprotectedUntypedAllocationOnStack") {
+  _withUnprotectedUnsafeTemporaryAllocation(byteCount: 8, alignment: 1) { buffer in
+      expectStackAllocated(buffer.baseAddress!)
+  }
+}
+
+TemporaryAllocationTestSuite.test("unprotectedUntypedAllocationOnHeap") {
+  // EXPECTATION: a very large allocated buffer is heap-allocated. (Note if
+  // swift_stdlib_isStackAllocationSafe() gets fleshed out, this test may need
+  // to be changed.)
+  _withUnprotectedUnsafeTemporaryAllocation(byteCount: 100_000, alignment: 1) { buffer in
+      expectNotStackAllocated(buffer.baseAddress!)
+  }
+}
+
 TemporaryAllocationTestSuite.test("untypedEmptyAllocationIsStackAllocated") {
   withUnsafeTemporaryAllocation(byteCount: 0, alignment: 1) { buffer in
       expectStackAllocated(buffer.baseAddress!)
@@ -92,6 +107,21 @@ TemporaryAllocationTestSuite.test("typedAllocationOnHeap") {
   // swift_stdlib_isStackAllocationSafe() gets fleshed out, this test may need
   // to be changed.)
   withUnsafeTemporaryAllocation(of: Int.self, capacity: 100_000) { buffer in
+      expectNotStackAllocated(buffer.baseAddress!)
+  }
+}
+
+TemporaryAllocationTestSuite.test("unprotectedTypedAllocationOnStack") {
+  _withUnprotectedUnsafeTemporaryAllocation(of: Int.self, capacity: 1) { buffer in
+      expectStackAllocated(buffer.baseAddress!)
+  }
+}
+
+TemporaryAllocationTestSuite.test("unprotectedTypedAllocationOnHeap") {
+  // EXPECTATION: a very large allocated buffer is heap-allocated. (Note if
+  // swift_stdlib_isStackAllocationSafe() gets fleshed out, this test may need
+  // to be changed.)
+  _withUnprotectedUnsafeTemporaryAllocation(of: Int.self, capacity: 100_000) { buffer in
       expectNotStackAllocated(buffer.baseAddress!)
   }
 }

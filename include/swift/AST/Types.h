@@ -72,7 +72,6 @@ class InOutType;
 class OpaqueTypeDecl;
 class OpenedArchetypeType;
 class PackType;
-class PackReferenceTypeRepr;
 class PlaceholderTypeRepr;
 enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;

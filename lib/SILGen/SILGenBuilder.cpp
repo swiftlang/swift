@@ -93,7 +93,8 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
   SILValue fnValue = fn.getValue();
   SILValue result =
       createConvertEscapeToNoEscape(loc, fnValue, resultTy, false);
-  return ManagedValue::forTrivialObjectRValue(result);
+  
+  return SGF.emitManagedRValueWithCleanup(result);
 }
 
 ManagedValue SILGenBuilder::createInitExistentialValue(
@@ -1000,4 +1001,11 @@ ManagedValue SILGenBuilder::emitCopyValueOperation(SILLocation loc,
   if (cvi == value.getValue())
     return value;
   return SGF.emitManagedRValueWithCleanup(cvi);
+}
+
+void SILGenBuilder::emitCopyAddrOperation(SILLocation loc, SILValue srcAddr,
+                                          SILValue destAddr, IsTake_t isTake,
+                                          IsInitialization_t isInitialize) {
+  auto &lowering = getTypeLowering(srcAddr->getType());
+  lowering.emitCopyInto(*this, loc, srcAddr, destAddr, isTake, isInitialize);
 }

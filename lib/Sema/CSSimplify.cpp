@@ -2361,7 +2361,7 @@ struct PackTypeVariableCollector: TypeWalker {
 /// pack type. The original pack type is then matched against the instantiated
 /// pack type.
 ///
-/// As a side effect, it binds each pack type variable occuring in the pattern
+/// As a side effect, it binds each pack type variable occurring in the pattern
 /// type to a new pack with the same shape as the original pack, but where the
 /// elements are fresh type variables.
 ///
@@ -9869,7 +9869,7 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
     }
   }
 
-  if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+  if (cs.generateConstraints(target))
     return true;
 
   // Sub-expression associated with expression pattern is the enum element
@@ -11037,7 +11037,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   if (resultBuilderType) {
     if (auto result = matchResultBuilder(
             closure, resultBuilderType, closureType->getResult(),
-            ConstraintKind::Conversion, locator)) {
+            ConstraintKind::Conversion, contextualType, locator)) {
       return result->isSuccess();
     }
   }

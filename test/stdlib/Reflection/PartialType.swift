@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// REQUIRES: reflection
+// REQUIRES: reflection_runtime
 // UNSUPPORTED: freestanding
 // XFAIL: OS=wasi
 

@@ -792,6 +792,8 @@ ERROR(sil_moveonlychecker_not_understand_consumable_and_assignable, none,
 ERROR(sil_moveonlychecker_not_understand_moveonly, none,
       "Usage of a move only type that the move checker does not know how to "
       "check!", ())
+ERROR(sil_moveonlychecker_missed_copy, none,
+      "copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
 
 // move kills copyable values checker diagnostics
 ERROR(sil_movekillscopyablevalue_value_consumed_more_than_once, none,

@@ -1990,6 +1990,8 @@ namespace {
     }
 
     bool diagnoseMoveOnly(TypeRepr *repr, Type genericArgTy);
+    bool diagnoseMoveOnlyMissingOwnership(TypeRepr *repr,
+                                          TypeResolutionOptions options);
     
     bool diagnoseDisallowedExistential(TypeRepr *repr);
     
@@ -2044,7 +2046,7 @@ namespace {
                                 Optional<SILResultInfo> &errorResult);
     NeverNullType resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
                                          TypeResolutionOptions options);
-    NeverNullType resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
+    NeverNullType resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
                                            TypeResolutionOptions options);
     NeverNullType resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
                                           TypeResolutionOptions options);
@@ -2066,8 +2068,8 @@ namespace {
                                   bool direct = false);
     NeverNullType resolvePackExpansionType(PackExpansionTypeRepr *repr,
                                            TypeResolutionOptions options);
-    NeverNullType resolvePackReference(PackReferenceTypeRepr *repr,
-                                       TypeResolutionOptions options);
+    NeverNullType resolvePackElement(PackElementTypeRepr *repr,
+                                     TypeResolutionOptions options);
     NeverNullType resolveTupleType(TupleTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveCompositionType(CompositionTypeRepr *repr,
@@ -2250,6 +2252,58 @@ bool TypeResolver::diagnoseMoveOnly(TypeRepr *repr, Type genericArgTy) {
   return false;
 }
 
+/// Assuming this repr has resolved to a move-only / noncopyable type, checks
+/// to see if that resolution happened in a context requiring an ownership
+/// annotation. If it did and there was no ownership specified, emits a
+/// diagnostic.
+///
+/// \returns true if an error diagnostic was emitted
+bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
+                                              TypeRepr *repr,
+                                              TypeResolutionOptions options) {
+  // Though this is only required on function inputs... we can ignore
+  // InoutFunctionInput since it's already got ownership.
+  if (!options.is(TypeResolverContext::FunctionInput))
+    return false;
+
+  // Enum cases don't need to specify ownership for associated values
+  if (options.hasBase(TypeResolverContext::EnumElementDecl))
+    return false;
+
+  // Otherwise, we require ownership.
+  if (options.contains(TypeResolutionFlags::HasOwnership))
+    return false;
+
+  // Do not run this on SIL files since there is currently a bug where we are
+  // trying to parse it in SILBoxes.
+  //
+  // To track what we want to do long term: rdar://105635373.
+  if (options.contains(TypeResolutionFlags::SILType))
+    return false;
+
+  diagnose(repr->getLoc(),
+           diag::moveonly_parameter_missing_ownership);
+
+  // FIXME: this should be 'borrowing'
+  diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
+           "__shared", "for an immutable reference")
+      .fixItInsert(repr->getStartLoc(), "__shared ");
+
+  diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
+           "inout", "for a mutable reference")
+      .fixItInsert(repr->getStartLoc(), "inout ");
+
+  // FIXME: this should be 'consuming'
+  diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
+           "__owned", "to take the value from callers")
+      .fixItInsert(repr->getStartLoc(), "__owned ");
+
+  // to avoid duplicate diagnostics
+  repr->setInvalid();
+
+  return true;
+}
+
 NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                                         TypeResolutionOptions options) {
   assert(repr && "Cannot validate null TypeReprs!");
@@ -2284,7 +2338,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::InOut:
   case TypeReprKind::Shared:
   case TypeReprKind::Owned:
-    return resolveSpecifierTypeRepr(cast<SpecifierTypeRepr>(repr), options);
+    return resolveOwnershipTypeRepr(cast<OwnershipTypeRepr>(repr), options);
 
   case TypeReprKind::Isolated:
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
@@ -2337,8 +2391,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::PackExpansion:
     return resolvePackExpansionType(cast<PackExpansionTypeRepr>(repr), options);
 
-  case TypeReprKind::PackReference:
-    return resolvePackReference(cast<PackReferenceTypeRepr>(repr), options);
+  case TypeReprKind::PackElement:
+    return resolvePackElement(cast<PackElementTypeRepr>(repr), options);
 
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
@@ -4146,6 +4200,10 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     }
   }
 
+  // move-only types must have an ownership specifier when used as a parameter of a function.
+  if (result->isPureMoveOnly())
+    diagnoseMoveOnlyMissingOwnership(repr, options);
+
   // Hack to apply context-specific @escaping to a typealias with an underlying
   // function type.
   if (result->is<FunctionType>())
@@ -4155,9 +4213,9 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
 }
 
 NeverNullType
-TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
+TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
                                        TypeResolutionOptions options) {
-  // inout is only valid for (non-Subscript and non-EnumCaseDecl)
+  // ownership is only valid for (non-Subscript and non-EnumCaseDecl)
   // function parameters.
   if (!options.is(TypeResolverContext::FunctionInput) ||
       options.hasBase(TypeResolverContext::SubscriptDecl) ||
@@ -4177,10 +4235,10 @@ TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
       name = "inout";
       break;
     case TypeReprKind::Shared:
-      name = "__shared";
+      name = "__shared"; // FIXME: use 'borrowing'
       break;
     case TypeReprKind::Owned:
-      name = "__owned";
+      name = "__owned";  // FIXME: use 'consuming'
       break;
     default:
       llvm_unreachable("unknown SpecifierTypeRepr kind");
@@ -4194,6 +4252,9 @@ TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     // Anything within an inout isn't a parameter anymore.
     options.setContext(TypeResolverContext::InoutFunctionInput);
   }
+
+  // Remember that we've seen an ownership specifier for this base type.
+  options |= TypeResolutionFlags::HasOwnership;
 
   return resolveType(repr->getBase(), options);
 }
@@ -4507,8 +4568,8 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
   return PackExpansionType::get(patternType, rootParameterPacks[0]);
 }
 
-NeverNullType TypeResolver::resolvePackReference(PackReferenceTypeRepr *repr,
-                                                 TypeResolutionOptions options) {
+NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
+                                               TypeResolutionOptions options) {
   auto &ctx = getASTContext();
   options |= TypeResolutionFlags::FromPackReference;
   auto packReference = resolveType(repr->getPackType(), options);
@@ -5038,7 +5099,7 @@ public:
     case TypeReprKind::Vararg:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
-    case TypeReprKind::PackReference:
+    case TypeReprKind::PackElement:
       return false;
     }
   }

@@ -245,8 +245,8 @@ class ReabstractDefaultArgument<T> {
 // CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[RESULT_CONV]]) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Int, @in_guaranteed Int) -> Bool) -> Bool
 // CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[FN]]
 // function_ref reabstraction thunk helper from @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_guaranteed (@in_guaranteed Swift.Int, @in_guaranteed Swift.Int) -> (@unowned Swift.Bool)
-// CHECK: [[THUNK:%.*]] = function_ref @$sS2iSbIgyyd_S2iSbIegnnd_TR : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int, @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CONV_FN]]) : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int, @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
+// CHECK: [[THUNK:%.*]] = function_ref @$sS2iSbIgyyd_S2iSbIegnnd_TR :
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CONV_FN]]) :
 // CHECK-NEXT: [[CONV_FN_0:%.*]] = convert_function [[FN]]
 // CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CONV_FN_0]]
 // CHECK: [[INITFN:%[0-9]+]] = function_ref @$s17default_arguments25ReabstractDefaultArgumentC{{[_0-9a-zA-Z]*}}fC
@@ -338,25 +338,25 @@ func autoclosureDefaultEscaping(closure: @escaping @autoclosure () -> Bool  = tr
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments15throwingDefault7closureySbyKXE_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 // CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 // CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
-// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments15throwingDefault7closureySbyKXE_tKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Bool, @error any Error)) -> @error any Error
+// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments15throwingDefault7closureySbyKXE_tKF :
 // CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 // CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 // CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
-// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Bool, @error any Error)) -> @error any Error
+// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKF :
 // CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:   [[F:%.*]] = function_ref @$s17default_arguments0A3Arg7closureySbyXE_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:   [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:   [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
-// CHECK:   [[R:%.*]] = function_ref @$s17default_arguments0A3Arg7closureySbyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
+// CHECK:   [[R:%.*]] = function_ref @$s17default_arguments0A3Arg7closureySbyXE_tF :
 // CHECK:   apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments21autoclosureDefaultArg7closureySbyXK_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Boo
 // CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
-// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments21autoclosureDefaultArg7closureySbyXK_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
+// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments21autoclosureDefaultArg7closureySbyXK_tF :
 // CHECK:  apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments23throwingDefaultEscaping7closureySbyKc_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)

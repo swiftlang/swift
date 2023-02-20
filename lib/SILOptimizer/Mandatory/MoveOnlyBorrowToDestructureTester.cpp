@@ -1,4 +1,4 @@
-//===--- MoveOnlyBorrowToDestructureTransform.cpp -------------------------===//
+//===--- MoveOnlyBorrowToDestructureTester.cpp ----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,17 +20,18 @@
 
 #define DEBUG_TYPE "sil-move-only-checker"
 
-#include "MoveOnlyBorrowToDestructure.h"
+#include "MoveOnlyBorrowToDestructureUtils.h"
 #include "MoveOnlyDiagnostics.h"
-#include "MoveOnlyObjectChecker.h"
+#include "MoveOnlyObjectCheckerUtils.h"
+#include "MoveOnlyUtils.h"
 
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
-#include "swift/Basic/BlotSetVector.h"
-#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -88,28 +89,30 @@ class MoveOnlyBorrowToDestructureTransformPass : public SILFunctionTransform {
     auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
 
     SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
-    DiagnosticEmitter emitter;
+    DiagnosticEmitter diagnosticEmitter;
 
+    unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
     bool madeChange = searchForCandidateObjectMarkMustChecks(
-        getFunction(), moveIntroducersToProcess, emitter);
+        getFunction(), moveIntroducersToProcess, diagnosticEmitter);
     if (madeChange) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
 
-    if (emitter.emittedAnyDiagnostics()) {
-      if (cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(fn))
+    if (diagCount != diagnosticEmitter.getDiagnosticCount()) {
+      if (cleanupNonCopyableCopiesAfterEmittingDiagnostic(fn))
         invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
       return;
     }
 
+    diagCount = diagnosticEmitter.getDiagnosticCount();
     auto introducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                           moveIntroducersToProcess.end());
-    if (runTransform(fn, introducers, postOrderAnalysis, emitter)) {
+    if (runTransform(fn, introducers, postOrderAnalysis, diagnosticEmitter)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
 
-    if (emitter.emittedAnyDiagnostics()) {
-      if (cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(fn))
+    if (diagCount != diagnosticEmitter.getDiagnosticCount()) {
+      if (cleanupNonCopyableCopiesAfterEmittingDiagnostic(fn))
         invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }

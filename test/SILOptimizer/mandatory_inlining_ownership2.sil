@@ -1250,7 +1250,7 @@ bb3:
   br bb4
 
 bb4:
-  dealloc_stack %closure : $@noescape @callee_guaranteed () -> ()
+  destroy_value %closure2 : $@noescape @callee_guaranteed () -> ()
   cond_br undef, bb5, bb6
 
 bb5:

@@ -145,7 +145,7 @@ CONSTANT_OWNERSHIP_INST(None, UncheckedTrivialBitCast)
 CONSTANT_OWNERSHIP_INST(None, ValueMetatype)
 CONSTANT_OWNERSHIP_INST(None, WitnessMethod)
 CONSTANT_OWNERSHIP_INST(None, StoreBorrow)
-CONSTANT_OWNERSHIP_INST(None, ConvertEscapeToNoEscape)
+CONSTANT_OWNERSHIP_INST(Owned, ConvertEscapeToNoEscape)
 CONSTANT_OWNERSHIP_INST(Unowned, InitBlockStorageHeader)
 CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
 // TODO: It would be great to get rid of these.
@@ -355,7 +355,11 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitPartialApplyInst(PartialApplyInst *PA) {
-  if (PA->isOnStack())
+  // partial_apply instructions are modeled as creating an owned value during
+  // OSSA, to track borrows of their captures, and so that they can themselves
+  // be borrowed during calls, but they become trivial once ownership is
+  // lowered away.
+  if (PA->isOnStack() && !PA->getFunction()->hasOwnership())
     return OwnershipKind::None;
   return OwnershipKind::Owned;
 }
@@ -498,6 +502,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, AllocRaw)
 CONSTANT_OWNERSHIP_BUILTIN(None, AssertConf)
 CONSTANT_OWNERSHIP_BUILTIN(None, UToSCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, StackAlloc)
+CONSTANT_OWNERSHIP_BUILTIN(None, UnprotectedStackAlloc)
 CONSTANT_OWNERSHIP_BUILTIN(None, StackDealloc)
 CONSTANT_OWNERSHIP_BUILTIN(None, SToSCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, SToUCheckedTrunc)

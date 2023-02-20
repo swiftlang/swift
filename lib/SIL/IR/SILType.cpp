@@ -861,7 +861,7 @@ bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
                                        f->getResilienceExpansion());
 }
 
-SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) {
+SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) const {
   auto *boxTy = getASTType()->getAs<SILBoxType>();
   if (!boxTy)
     return SILType();
@@ -946,13 +946,26 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
 }
 
 bool SILType::isMoveOnly() const {
-  if (auto *nom = getNominalOrBoundGenericNominal())
-    if (nom->isMoveOnly())
-      return true;
+  // Nominal types are move-only if declared as such.
+  if (isMoveOnlyNominalType())
+    return true;
+
+
+  // TODO: Nonescaping closures ought to be treated as move-only in SIL.
+  // They aren't marked move-only now, because the necessary move-only passes
+  // haven't yet been enabled. We can get away without this because we don't
+  // ever copy them after SILGen and any incidental copies we emit are always
+  // optimized out, but we ought to enforce this once move-only type support
+  // is robust.
+  /*
+  if (auto fnTy = getAs<SILFunctionType>()) {
+    return fnTy->isTrivialNoEscape();
+  }
+   */
   return isMoveOnlyWrapped();
 }
 
-bool SILType::isMoveOnlyType() const {
+bool SILType::isMoveOnlyNominalType() const {
   if (auto *nom = getNominalOrBoundGenericNominal())
     if (nom->isMoveOnly())
       return true;

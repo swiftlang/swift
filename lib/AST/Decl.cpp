@@ -367,6 +367,10 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   llvm_unreachable("bad DescriptiveDeclKind");
 }
 
+OrigDeclAttributes Decl::getOriginalAttrs() const {
+  return OrigDeclAttributes(getAttrs(), getModuleContext());
+}
+
 DeclAttributes Decl::getSemanticAttrs() const {
   auto mutableThis = const_cast<Decl *>(this);
   (void)evaluateOrDefault(getASTContext().evaluator,
@@ -376,17 +380,32 @@ DeclAttributes Decl::getSemanticAttrs() const {
   return getAttrs();
 }
 
+void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<Decl *>(this);
+  auto peerBuffers =
+      evaluateOrDefault(ctx.evaluator,
+                        ExpandPeerMacroRequest{mutableThis},
+                        {});
+
+  SourceManager &sourceMgr = ctx.SourceMgr;
+  auto *moduleDecl = getModuleContext();
+  for (auto bufferID : peerBuffers) {
+    auto startLoc = sourceMgr.getLocForBufferStart(bufferID);
+    auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
+    for (auto *peer : sourceFile->getTopLevelDecls()) {
+      callback(peer);
+    }
+  }
+
+  // FIXME: fold VarDecl::visitAuxiliaryDecls into this.
+}
+
 void Decl::forEachAttachedMacro(MacroRole role,
                                 MacroCallback macroCallback) const {
-  auto *dc = getDeclContext();
-  auto &ctx = dc->getASTContext();
-
   for (auto customAttrConst : getSemanticAttrs().getAttributes<CustomAttr>()) {
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto *macroDecl = evaluateOrDefault(
-        ctx.evaluator,
-        ResolveMacroRequest{customAttr, getAttachedMacroRoles(), dc},
-        nullptr);
+    auto *macroDecl = getResolvedMacro(customAttr);
 
     if (!macroDecl)
       continue;
@@ -396,6 +415,13 @@ void Decl::forEachAttachedMacro(MacroRole role,
 
     macroCallback(customAttr, macroDecl);
   }
+}
+
+MacroDecl *Decl::getResolvedMacro(CustomAttr *customAttr) const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      ResolveMacroRequest{customAttr, getDeclContext()},
+      nullptr);
 }
 
 unsigned Decl::getAttachedMacroDiscriminator(
@@ -662,7 +688,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
 
     // Otherwise, include attributes directly attached to the accessor.
     SourceLoc VarLoc = AD->getStorage()->getStartLoc();
-    for (auto Attr : getAttrs()) {
+    for (auto *Attr : getOriginalAttrs()) {
       if (!Attr->getRange().isValid())
         continue;
 
@@ -681,17 +707,21 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   if (auto *PBD = dyn_cast<PatternBindingDecl>(this)) {
     for (auto i : range(PBD->getNumPatternEntries()))
       PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) {
-        for (auto Attr : VD->getAttrs())
+        for (auto *Attr : VD->getOriginalAttrs())
           if (Attr->getRange().isValid())
             Range.widen(Attr->getRangeWithAt());
       });
   }
 
-  for (auto Attr : getAttrs()) {
+  for (auto *Attr : getOriginalAttrs()) {
     if (Attr->getRange().isValid())
       Range.widen(Attr->getRangeWithAt());
   }
   return Range;
+}
+
+bool Decl::isInGeneratedBuffer() const {
+  return getModuleContext()->isInGeneratedBuffer(getStartLoc());
 }
 
 SourceLoc Decl::getLocFromSource() const {

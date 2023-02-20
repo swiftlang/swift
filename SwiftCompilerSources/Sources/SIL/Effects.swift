@@ -240,9 +240,9 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
       ///    [%0: escape s1 => %r]   // field 2 of argument 0 exclusively escapes via return.
       ///    [%0: escape s1 -> %r]   // field 2 of argument 0 - and other values - escape via return
       ///
-      /// The "exclusive" flag (= second payload) is true if only the argument escapes,
-      /// but nothing else escapes to the return value.
-      /// For example, "exclusive" is true for the following function:
+      /// The `isExclusive` flag is true if only the argument escapes, but nothing else escapes to
+      /// the return value.
+      /// For example, `isExclusive` is true for the following function:
       ///
       ///   @_effect(escaping c => return)
       ///   func exclusiveEscape(_ c: Class) -> Class { return c }
@@ -254,17 +254,40 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
       ///   @_effect(escaping c -> return)
       ///   func notExclusiveEscape(_ c: Class) -> Class { return cond ? c : global }
       ///
-      case escapingToReturn(SmallProjectionPath, Bool)         // toPath, exclusive
+      /// Also, if `isExclusive` is true, there must not be a store in the chain from the argument to
+      /// the return, e.g.
+      ///
+      ///   @_effect(escaping x -> return)
+      ///   func notExclusiveEscape(_ s: String) -> Class {
+      ///     c = new Class()
+      ///     c.s = s             // Store, which prevents the effect to be `isExclusive`
+      ///     return s
+      ///   }
+      case escapingToReturn(toPath: SmallProjectionPath, isExclusive: Bool)
 
       /// Like `escapingToReturn`, but the argument escapes to another argument.
       ///
       /// Example: The argument effects of
+      ///
       ///   func argToArgEscape(_ r: inout Class, _ c: Class) { r = c }
       ///
       /// would be
       ///    [%1: escape => %0]   // Argument 1 escapes to argument 0
       ///
-      case escapingToArgument(Int, SmallProjectionPath, Bool)  // toArgumentIndex, toPath, exclusive
+      /// It's not allowed that the argument (or a derived value) is _stored_ to an object which is loaded from somewhere.
+      /// In the following example `c` is loaded from the indirect inout argument and `s` is stored to a field of `c`:
+      ///
+      ///   func noEscapeEffect(_ c: inout Class, s: String) {
+      ///     c.s = s
+      ///   }
+      ///
+      /// In this case there is no escaping effect from `s` to `c`.
+      /// Note that theoretically this rule also applies to the `escapingToReturn` effect, but it's impossible
+      /// to construct such a situation for an argument which is only escaping to the function return.
+      ///
+      /// The `escapingToArgument` doesn't have an `isExclusive` flag, because an argument-to-argument escape
+      /// always involves a store, which makes an exclusive escape impossible.
+      case escapingToArgument(toArgumentIndex: Int, toPath: SmallProjectionPath)
     }
 
     /// To which argument does this effect apply to?
@@ -309,19 +332,19 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
           if resultArgDelta != 1 {
             return nil
           }
-          self.kind = .escapingToArgument(0, toPath, exclusive)
+          self.kind = .escapingToArgument(toArgumentIndex: 0, toPath: toPath)
         } else {
-          self.kind = .escapingToReturn(toPath, exclusive)
+          self.kind = .escapingToReturn(toPath: toPath, isExclusive: exclusive)
         }
-      case .escapingToArgument(let toArgIdx, let toPath, let exclusive):
+      case .escapingToArgument(let toArgIdx, let toPath):
         let resultingToArgIdx = toArgIdx + resultArgDelta
         if resultingToArgIdx < 0 {
           if resultingToArgIdx != -1 {
             return nil
           }
-          self.kind = .escapingToReturn(toPath, exclusive)
+          self.kind = .escapingToReturn(toPath: toPath, isExclusive: false)
         } else {
-          self.kind = .escapingToArgument(resultingToArgIdx, toPath, exclusive)
+          self.kind = .escapingToArgument(toArgumentIndex: resultingToArgIdx, toPath: toPath)
         }
       }
     }
@@ -341,9 +364,9 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
         case .escapingToReturn(let toPath, let exclusive):
           let toPathStr = (toPath.isEmpty ? "" : ".\(toPath)")
           return "escape\(patternStr) \(exclusive ? "=>" : "->") %r\(toPathStr)"
-        case .escapingToArgument(let toArgIdx, let toPath, let exclusive):
+        case .escapingToArgument(let toArgIdx, let toPath):
           let toPathStr = (toPath.isEmpty ? "" : ".\(toPath)")
-          return "escape\(patternStr) \(exclusive ? "=>" : "->") %\(toArgIdx)\(toPathStr)"
+          return "escape\(patternStr) -> %\(toArgIdx)\(toPathStr)"
       }
     }
 
@@ -642,16 +665,21 @@ extension StringParser {
             try throwError("multi-value returns not supported yet")
           }
           let toPath = try parsePathPatternFromSource(for: function, type: function.argumentTypes[0])
-          return EscapeEffects.ArgumentEffect(.escapingToArgument(0, toPath, exclusive),
+
+          // Exclusive escapes are ignored for indirect return values.
+          return EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: 0, toPath: toPath),
                                       argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: false)
         }
         let toPath = try parsePathPatternFromSource(for: function, type: function.resultType)
-        return EscapeEffects.ArgumentEffect(.escapingToReturn(toPath, exclusive),
+        return EscapeEffects.ArgumentEffect(.escapingToReturn(toPath: toPath, isExclusive: exclusive),
                                     argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: false)
+      }
+      if exclusive {
+        try throwError("exclusive escapes to arguments are not supported")
       }
       let toArgIdx = try parseArgumentIndexFromSource(for: function, params: params)
       let toPath = try parsePathPatternFromSource(for: function, type: function.argumentTypes[toArgIdx])
-      return EscapeEffects.ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
+      return EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
                                   argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: false)
     }
     try throwError("unknown effect")
@@ -715,12 +743,15 @@ extension StringParser {
         let effect: EscapeEffects.ArgumentEffect
         if consume("%r") {
           let toPath = consume(".") ? try parseProjectionPathFromSIL() : SmallProjectionPath()
-          effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath, exclusive),
+          effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath: toPath, isExclusive: exclusive),
                                                 argumentIndex: argumentIndex, pathPattern: fromPath, isDerived: isDerived)
         } else {
+          if exclusive {
+            try throwError("exclusive escapes to arguments are not supported")
+          }
           let toArgIdx = try parseArgumentIndexFromSIL()
           let toPath = consume(".") ? try parseProjectionPathFromSIL() : SmallProjectionPath()
-          effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
+          effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
                                                 argumentIndex: argumentIndex, pathPattern: fromPath, isDerived: isDerived)
         }
         effects.escapeEffects.arguments.append(effect)

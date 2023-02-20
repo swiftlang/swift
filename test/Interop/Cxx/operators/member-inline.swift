@@ -363,4 +363,16 @@ OperatorsTestSuite.test("ConstIteratorByVal.pointee") {
   expectEqual(456, res)
 }
 
+OperatorsTestSuite.test("AmbiguousOperatorStar.pointee") {
+  let stars = AmbiguousOperatorStar()
+  let res = stars.pointee
+  expectEqual(567, res)
+}
+
+OperatorsTestSuite.test("AmbiguousOperatorStar2.pointee") {
+  let stars = AmbiguousOperatorStar2()
+  let res = stars.pointee
+  expectEqual(678, res)
+}
+
 runAllTests()

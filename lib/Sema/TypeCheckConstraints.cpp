@@ -154,6 +154,22 @@ bool TypeVariableType::Implementation::isCodeCompletionToken() const {
   return locator && locator->directlyAt<CodeCompletionExpr>();
 }
 
+bool TypeVariableType::Implementation::isOpaqueType() const {
+  if (!locator)
+    return false;
+
+  auto GP = locator->getLastElementAs<LocatorPathElt::GenericParameter>();
+  if (!GP)
+    return false;
+
+  if (auto *GPT = GP->getType()->getAs<GenericTypeParamType>()) {
+    auto *decl = GPT->getDecl();
+    return decl && decl->isOpaqueType();
+  }
+
+  return false;
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);

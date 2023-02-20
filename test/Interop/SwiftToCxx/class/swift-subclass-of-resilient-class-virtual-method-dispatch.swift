@@ -11,6 +11,9 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/fixed-useclass.h)
 
+// rdar://105396625
+// UNSUPPORTED: CPU=arm64e
+
 #if RESILIENT_MODULE
 
 open class BaseClass {

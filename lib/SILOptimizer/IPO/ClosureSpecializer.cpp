@@ -210,9 +210,21 @@ public:
     auto *PA = dyn_cast<PartialApplyInst>(newClosure);
     if (!PA || !PA->isOnStack())
       return false;
-    insertDestroyOfCapturedArguments(PA, B);
-    B.createDeallocStack(getClosure()->getLoc(), PA);
-    return true;
+
+    if (B.getFunction().hasOwnership()) {
+      // Under OSSA, the closure acts as an owned value whose lifetime is a
+      // borrow scope for the captures, so we need to end the borrow scope
+      // before ending the lifetimes of the captures themselves.
+      B.createDestroyValue(getClosure()->getLoc(), PA);
+      insertDestroyOfCapturedArguments(PA, B);
+      // The stack slot for the partial_apply doesn't get reified until after
+      // OSSA.
+      return false;
+    } else {
+      insertDestroyOfCapturedArguments(PA, B);
+      B.createDeallocStack(getClosure()->getLoc(), PA);
+      return true;
+    }
   }
 
   unsigned getClosureIndex() const { return ClosureIndex; }

@@ -3237,7 +3237,8 @@ static Alignment getStackAllocationAlignment(IRGenSILFunction &IGF,
 /// some other builtin.)
 static bool emitStackAllocBuiltinCall(IRGenSILFunction &IGF,
                                       swift::BuiltinInst *i) {
-  if (i->getBuiltinKind() == BuiltinValueKind::StackAlloc) {
+  if (i->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
+      i->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
     // Stack-allocate a buffer with the specified size/alignment.
     auto loc = i->getLoc().getSourceLoc();
     auto size = getStackAllocationSize(
@@ -6901,17 +6902,8 @@ void IRGenSILFunction::visitScalarPackIndexInst(ScalarPackIndexInst *i) {
 void IRGenSILFunction::visitOpenPackElementInst(swift::OpenPackElementInst *i) {
   llvm::Value *index = getLoweredSingletonExplosion(i->getIndexOperand());
 
-  i->getOpenedGenericEnvironment()->forEachPackElementBinding(
-      [&](auto *archetype, auto *pack) {
-        auto protocols = archetype->getConformsTo();
-        llvm::SmallVector<llvm::Value *, 2> wtables;
-        auto *metadata = emitTypeMetadataPackElementRef(
-            *this, CanPackType(pack), protocols, index, MetadataState::Complete,
-            wtables);
-        bindArchetype(CanElementArchetypeType(archetype), metadata,
-                      MetadataState::Complete, wtables);
-      });
-
+  auto *env = i->getOpenedGenericEnvironment();
+  bindOpenedElementArchetypesAtIndex(*this, env, index);
   // The result is just used for type dependencies.
 }
 

@@ -724,20 +724,12 @@ private:
   friend class TypeRepr;
 };
 
-/// A pack expansion 'T...' with a pattern 'T'.
+/// A pack expansion 'repeat T' with a pattern 'T'.
 ///
 /// Can appear in the following positions:
 /// - The type of a parameter declaration in a function declaration
 /// - The type of a parameter in a function type
 /// - The element of a tuple
-///
-/// In the first two cases, it also spells an old-style variadic parameter
-/// desugaring to an array type. The two meanings are distinguished by the
-/// presence of at least one pack type parameter in the pack expansion
-/// pattern.
-///
-/// In the third case, tuples cannot contain an old-style variadic element,
-/// so the pack expansion must be a real variadic pack expansion.
 class PackExpansionTypeRepr final : public TypeRepr {
   SourceLoc RepeatLoc;
   TypeRepr *Pattern;
@@ -821,22 +813,22 @@ private:
 ///   func f(value: (each T)...) where each T: P {}
 /// }
 /// \endcode
-class PackReferenceTypeRepr: public TypeRepr {
+class PackElementTypeRepr: public TypeRepr {
   TypeRepr *PackType;
   SourceLoc EachLoc;
 
 public:
-  PackReferenceTypeRepr(SourceLoc eachLoc, TypeRepr *packType)
-    : TypeRepr(TypeReprKind::PackReference), PackType(packType),
+  PackElementTypeRepr(SourceLoc eachLoc, TypeRepr *packType)
+    : TypeRepr(TypeReprKind::PackElement), PackType(packType),
       EachLoc(eachLoc) {}
 
   TypeRepr *getPackType() const { return PackType; }
   SourceLoc getEachLoc() const { return EachLoc; }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::PackReference;
+    return T->getKind() == TypeReprKind::PackElement;
   }
-  static bool classof(const PackReferenceTypeRepr *T) { return true; }
+  static bool classof(const PackElementTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const { return EachLoc; }
@@ -1062,6 +1054,8 @@ class SpecifierTypeRepr : public TypeRepr {
 public:
   SpecifierTypeRepr(TypeReprKind Kind, TypeRepr *Base, SourceLoc Loc)
     : TypeRepr(Kind), Base(Base), SpecifierLoc(Loc) {
+    // ensure the kind passed-in matches up with our TypeRepr classof.
+    assert(SpecifierTypeRepr::classof(cast<TypeRepr>(this)));
   }
   
   TypeRepr *getBase() const { return Base; }
@@ -1071,7 +1065,8 @@ public:
     return T->getKind() == TypeReprKind::InOut ||
            T->getKind() == TypeReprKind::Shared ||
            T->getKind() == TypeReprKind::Owned ||
-           T->getKind() == TypeReprKind::Isolated;
+           T->getKind() == TypeReprKind::Isolated ||
+           T->getKind() == TypeReprKind::CompileTimeConst;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1081,15 +1076,33 @@ private:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
+
+// This repr holds types that are associated with some ownership specifier
+// like 'inout', '__shared', etc. It's a simple grouping of those specifiers.
+class OwnershipTypeRepr : public SpecifierTypeRepr {
+public:
+  OwnershipTypeRepr(TypeReprKind Kind, TypeRepr *Base, SourceLoc OwnershipLoc)
+      : SpecifierTypeRepr(Kind, Base, OwnershipLoc) {
+    assert(OwnershipTypeRepr::classof(cast<TypeRepr>(this)));
+  }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::InOut ||
+           T->getKind() == TypeReprKind::Shared ||
+           T->getKind() == TypeReprKind::Owned;
+  }
+  static bool classof(const OwnershipTypeRepr *T) { return true; }
+  friend class SpecifierTypeRepr;
+};
   
 /// An 'inout' type.
 /// \code
 ///   x : inout Int
 /// \endcode
-class InOutTypeRepr : public SpecifierTypeRepr {
+class InOutTypeRepr : public OwnershipTypeRepr {
 public:
   InOutTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-    : SpecifierTypeRepr(TypeReprKind::InOut, Base, InOutLoc) {}
+    : OwnershipTypeRepr(TypeReprKind::InOut, Base, InOutLoc) {}
   
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::InOut;
@@ -1097,14 +1110,15 @@ public:
   static bool classof(const InOutTypeRepr *T) { return true; }
 };
   
-/// A 'shared' type.
+/// A 'borrowing' parameter type.
 /// \code
-///   x : shared Int
+///   x : borrowing Int
 /// \endcode
-class SharedTypeRepr : public SpecifierTypeRepr {
+/// Historically, this attribute was spelled '__shared'.
+class SharedTypeRepr : public OwnershipTypeRepr {
 public:
   SharedTypeRepr(TypeRepr *Base, SourceLoc SharedLoc)
-    : SpecifierTypeRepr(TypeReprKind::Shared, Base, SharedLoc) {}
+    : OwnershipTypeRepr(TypeReprKind::Shared, Base, SharedLoc) {}
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Shared;
@@ -1112,14 +1126,15 @@ public:
   static bool classof(const SharedTypeRepr *T) { return true; }
 };
 
-/// A 'owned' type.
+/// A 'consuming' parameter type.
 /// \code
-///   x : owned Int
+///   x : consuming Int
 /// \endcode
-class OwnedTypeRepr : public SpecifierTypeRepr {
+/// Historically, this attribute was spelled '__owned'.
+class OwnedTypeRepr : public OwnershipTypeRepr {
 public:
   OwnedTypeRepr(TypeRepr *Base, SourceLoc OwnedLoc)
-      : SpecifierTypeRepr(TypeReprKind::Owned, Base, OwnedLoc) {}
+      : OwnershipTypeRepr(TypeReprKind::Owned, Base, OwnedLoc) {}
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Owned;
@@ -1439,7 +1454,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
   case TypeReprKind::Existential:
-  case TypeReprKind::PackReference:
+  case TypeReprKind::PackElement:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:

@@ -1474,6 +1474,15 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   Opts.setCompilerPluginLibraryPaths(CompilerPluginLibraryPaths);
 
+  std::vector<std::string> CompilerPluginExecutablePaths(
+      Opts.getCompilerPluginExecutablePaths());
+  for (const Arg *A : Args.filtered(OPT_load_plugin_executable)) {
+    // NOTE: The value has '#<module names>' after the path.
+    // But resolveSearchPath() works as long as the value starts with a path.
+    CompilerPluginExecutablePaths.push_back(resolveSearchPath(A->getValue()));
+  }
+  Opts.setCompilerPluginExecutablePaths(CompilerPluginExecutablePaths);
+
   return false;
 }
 
@@ -1806,16 +1815,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
                    "enable-experimental-move-only",
                    "enable-lexical-borrow-scopes=false");
-    return true;
-  }
-
-  if (Args.hasArg(OPT_enable_experimental_move_only) &&
-      !enableLexicalLifetimesFlag.value_or(true)) {
-    // Error if move-only is enabled and lexical lifetimes--on which it
-    // depends--has been disabled.
-    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
-                   "enable-experimental-move-only",
-                   "enable-lexical-lifetimes=false");
     return true;
   }
 

@@ -3162,6 +3162,9 @@ public:
   ArrayRef<TypeRepr *> getGenericArgs() const;
   ArgumentList *getArgs() const;
 
+  /// Returns the macro roles corresponding to this macro reference.
+  MacroRoles getMacroRoles() const;
+
   friend bool operator==(const UnresolvedMacroReference &lhs,
                          const UnresolvedMacroReference &rhs) {
     return lhs.getOpaqueValue() == rhs.getOpaqueValue();
@@ -3178,7 +3181,7 @@ void simple_display(llvm::raw_ostream &out,
 /// Resolve a given custom attribute to an attached macro declaration.
 class ResolveMacroRequest
     : public SimpleRequest<ResolveMacroRequest,
-                           MacroDecl *(UnresolvedMacroReference, MacroRoles,
+                           MacroDecl *(UnresolvedMacroReference,
                                        DeclContext *),
                            RequestFlags::Cached> {
 public:
@@ -3189,7 +3192,7 @@ private:
 
   MacroDecl *
   evaluate(Evaluator &evaluator, UnresolvedMacroReference macroRef,
-           MacroRoles roles, DeclContext *dc) const;
+           DeclContext *dc) const;
 
 public:
   bool isCached() const { return true; }

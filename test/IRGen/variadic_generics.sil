@@ -108,10 +108,10 @@ bb0(%pack : $*Pack{Int, repeat each T, Int}, %value : $Int):
  }
 
 // CHECK-LABEL: define {{.*}}@test_pack_alloc_1_dynamic(
-// CHECK-SAME:       i{{(32|64)}} [[PACK_SIZE:%[^,]+]]
-// CHECK:        [[SIZE:%[^,]+]] = add i64 [[PACK_SIZE]], [[PACK_SIZE]]
+// CHECK-SAME:       [[INT]] [[PACK_SIZE:%[^,]+]]
+// CHECK:        [[SIZE:%[^,]+]] = add [[INT]] [[PACK_SIZE]], [[PACK_SIZE]]
 // CHECK:        [[SP_SAVE:%[^,]+]] = call i8* @llvm.stacksave()
-// CHECK:        alloca %swift.opaque*, i{{(32|64)}} [[SIZE]]
+// CHECK:        alloca %swift.opaque*, [[INT]] [[SIZE]]
 // CHECK:        call void @llvm.stackrestore(i8* [[SP_SAVE]])
 sil @test_pack_alloc_1_dynamic : $<T...> () -> () {
 // Control flow so that stack saving/restoring is emitted
@@ -151,7 +151,7 @@ entry(%addr : $*T):
 // CHECK:         [[UNCAST_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK:         [[METADATA:%[^,]+]] = bitcast %swift.type* [[UNCAST_METADATA]] to %swift.tuple_type*
 // CHECK:         [[OFFSET_PTR:%[^,]+]] = getelementptr inbounds %swift.tuple_type, %swift.tuple_type* [[METADATA]], i{{(64|32)}} 0, i32 3, i{{(64|32)}} [[INDEX]]
-// CHECK:         [[OFFSET:%[^,]+]] = load i32, i32* [[OFFSET_PTR]], align 8
+// CHECK:         [[OFFSET:%[^,]+]] = load i32, i32* [[OFFSET_PTR]], align
 // CHECK:         [[CAST_TUPLE_ADDR:%[^,]+]] = bitcast <{ %TSS }>* [[TUPLE_ADDR]] to i8*
 // CHECK:         [[UNCAST_ELEMENT_ADDR:%[^,]+]] = getelementptr inbounds i8, i8* [[CAST_TUPLE_ADDR]], i32 [[OFFSET]]
 // CHECK:         [[ELEMENT_ADDR:%[^,]+]] = bitcast i8* [[UNCAST_ELEMENT_ADDR]] to %swift.opaque*

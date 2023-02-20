@@ -77,9 +77,8 @@
 // RUN: echo "int dummy;" >%t/a.cpp
 // RUN: %target-clang -c %t/a.cpp -o %t/a.o
 // RUN: %swiftc_driver -save-temps -driver-print-jobs %S/../Inputs/empty.swift %t/a.o -lto=llvm-full -target x86_64-apple-macosx10.9 -driver-filelist-threshold=0 -o filelist 2>&1 | tee -a %t/forFilelistCapture | %FileCheck -check-prefix FILELIST %s
-// RUN: echo "# A comment so it's less likely this file will be 4096 in size\n" >> %t/forFilelistCapture
-// RUN: tail -3 %t/forFilelistCapture | head -1 | sed 's/.*-output-filelist //' | sed 's/ .*//' > %t/output-filelist
-// RUN: tail -2 %t/forFilelistCapture | head -1 | sed 's/.*-filelist //' | sed 's/ .*//' > %t/input-filelist
+// RUN: sed 's/.*-output-filelist //' %t/forFilelistCapture | sed 's/ .*//' | tail -2 | head -1 > %t/output-filelist
+// RUN: sed 's/.*-filelist //' %t/forFilelistCapture | sed 's/ .*//' | tail -1 | head -1 > %t/input-filelist
 // RUN: cat $(cat %t/output-filelist) | %FileCheck -check-prefix OUTPUT-FILELIST-CONTENTS %s
 // RUN: cat $(cat %t/input-filelist)  | %FileCheck -check-prefix INPUT-FILELIST-CONTENTS %s
 

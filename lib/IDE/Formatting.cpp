@@ -462,7 +462,7 @@ private:
         return true;
       }
     }
-    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+    for (auto *customAttr : D->getOriginalAttrs().getAttributes<CustomAttr, true>()) {
       if (auto *Repr = customAttr->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
@@ -1338,7 +1338,7 @@ private:
         return true;
       }
     }
-    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+    for (auto *customAttr : D->getOriginalAttrs().getAttributes<CustomAttr, true>()) {
       if (auto *Repr = customAttr->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;

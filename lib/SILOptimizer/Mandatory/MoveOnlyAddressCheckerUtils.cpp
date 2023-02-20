@@ -1,4 +1,4 @@
-//===--- MoveOnlyAddressChecker.cpp ---------------------------------------===//
+//===--- MoveOnlyAddressCheckerUtils.cpp ----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -156,9 +156,11 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 
-#include "MoveOnlyBorrowToDestructure.h"
+#include "MoveOnlyAddressCheckerUtils.h"
+#include "MoveOnlyBorrowToDestructureUtils.h"
 #include "MoveOnlyDiagnostics.h"
-#include "MoveOnlyObjectChecker.h"
+#include "MoveOnlyObjectCheckerUtils.h"
+#include "MoveOnlyUtils.h"
 
 #include <utility>
 
@@ -361,6 +363,49 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(SILValue value) {
   }
 
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+//                   MARK: Find Candidate Mark Must Checks
+//===----------------------------------------------------------------------===//
+
+void swift::siloptimizer::searchForCandidateAddressMarkMustChecks(
+    SILFunction *fn,
+    llvm::SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
+    DiagnosticEmitter &diagnosticEmitter) {
+  for (auto &block : *fn) {
+    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
+      auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
+      ++ii;
+
+      if (!mmci || !mmci->hasMoveCheckerKind() || !mmci->getType().isAddress())
+        continue;
+
+      // Skip any alloc_box due to heap to stack failing on a box capture. This
+      // will just cause an error.
+      if (auto *pbi = dyn_cast<ProjectBoxInst>(mmci->getOperand())) {
+        if (isa<AllocBoxInst>(pbi->getOperand())) {
+          LLVM_DEBUG(
+              llvm::dbgs()
+              << "Early emitting diagnostic for unsupported alloc box!\n");
+          diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
+          continue;
+        }
+
+        if (auto *bbi = dyn_cast<BeginBorrowInst>(pbi->getOperand())) {
+          if (isa<AllocBoxInst>(bbi->getOperand())) {
+            LLVM_DEBUG(
+                llvm::dbgs()
+                << "Early emitting diagnostic for unsupported alloc box!\n");
+            diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
+            continue;
+          }
+        }
+      }
+
+      moveIntroducersToProcess.insert(mmci);
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -864,7 +909,7 @@ public:
   ConsumeInfo &operator=(ConsumeInfo const &) = delete;
 };
 
-struct MoveOnlyChecker {
+struct MoveOnlyAddressCheckerPImpl {
   bool changed = false;
 
   SILFunction *fn;
@@ -883,20 +928,23 @@ struct MoveOnlyChecker {
 
   /// Diagnostic emission routines wrapped around a consuming use cache. This
   /// ensures that we only emit a single error per use per marked value.
-  DiagnosticEmitter diagnosticEmitter;
+  DiagnosticEmitter &diagnosticEmitter;
 
   /// Information about destroys that we use when inserting destroys.
   ConsumeInfo consumes;
 
-  /// Allocator used by the BorrowToDestructureTransform.
-  borrowtodestructure::IntervalMapAllocator allocator;
-
   /// PostOrderAnalysis used by the BorrowToDestructureTransform.
   PostOrderAnalysis *poa;
 
-  MoveOnlyChecker(SILFunction *fn, DeadEndBlocks *deBlocks,
-                  DominanceInfo *domTree, PostOrderAnalysis *poa)
-      : fn(fn), deleter(), canonicalizer(), diagnosticEmitter(), poa(poa) {
+  /// Allocator used by the BorrowToDestructureTransform.
+  borrowtodestructure::IntervalMapAllocator &allocator;
+
+  MoveOnlyAddressCheckerPImpl(
+      SILFunction *fn, DiagnosticEmitter &diagnosticEmitter,
+      DominanceInfo *domTree, PostOrderAnalysis *poa,
+      borrowtodestructure::IntervalMapAllocator &allocator)
+      : fn(fn), deleter(), canonicalizer(),
+        diagnosticEmitter(diagnosticEmitter), poa(poa), allocator(allocator) {
     deleter.setCallbacks(std::move(
         InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
           if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
@@ -915,20 +963,10 @@ struct MoveOnlyChecker {
   /// Returns true if we emitted a diagnostic. Returns false otherwise.
   bool searchForCandidateMarkMustChecks();
 
-  /// After we have emitted a diagnostic, we need to clean up the instruction
-  /// stream by converting /all/ copies of move only typed things to use
-  /// explicit_copy_value so that we maintain the SIL invariant that in
-  /// canonical SIL move only types are not copied by normal copies.
-  ///
-  /// Returns true if we actually changed any instructions.
-  void cleanupAfterEmittingDiagnostic();
-
   /// Emits an error diagnostic for \p markedValue.
   void performObjectCheck(MarkMustCheckInst *markedValue);
 
   bool performSingleCheck(MarkMustCheckInst *markedValue);
-
-  bool checkFunction();
 
   void insertDestroysOnBoundary(FieldSensitiveMultiDefPrunedLiveRange &liveness,
                                 FieldSensitivePrunedLivenessBoundary &boundary);
@@ -949,7 +987,7 @@ namespace {
 
 /// Visit all of the uses of value in preparation for running our algorithm.
 struct GatherUsesVisitor : public AccessUseVisitor {
-  MoveOnlyChecker &moveChecker;
+  MoveOnlyAddressCheckerPImpl &moveChecker;
   UseState &useState;
   MarkMustCheckInst *markedValue;
   bool emittedEarlyDiagnostic = false;
@@ -959,8 +997,8 @@ struct GatherUsesVisitor : public AccessUseVisitor {
   // converted to load_borrow without violating exclusivity.
   SSAPrunedLiveness &liveness;
 
-  GatherUsesVisitor(MoveOnlyChecker &moveChecker, UseState &useState,
-                    MarkMustCheckInst *markedValue,
+  GatherUsesVisitor(MoveOnlyAddressCheckerPImpl &moveChecker,
+                    UseState &useState, MarkMustCheckInst *markedValue,
                     DiagnosticEmitter &diagnosticEmitter,
                     SSAPrunedLiveness &gatherUsesLiveness)
       : AccessUseVisitor(AccessUseType::Overlapping,
@@ -1273,15 +1311,19 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return true;
   }
 
-  if (auto fas = FullApplySite::isa(op->getUser())) {
+  auto insertLivenessUseForApply = [&](const Operand &op) -> bool {
+    auto leafRange = TypeTreeLeafTypeRange::get(op.get(), getRootAddress());
+    if (!leafRange)
+      return false;
+
+    useState.livenessUses.insert({user, *leafRange});
+    return true;
+  };
+
+  if (auto fas = FullApplySite::isa(user)) {
     switch (fas.getArgumentConvention(*op)) {
     case SILArgumentConvention::Indirect_In_Guaranteed: {
-      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-      if (!leafRange)
-        return false;
-
-      useState.livenessUses.insert({user, *leafRange});
-      return true;
+      return insertLivenessUseForApply(*op);
     }
 
     case SILArgumentConvention::Indirect_Inout:
@@ -1296,6 +1338,14 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     case SILArgumentConvention::Pack_Guaranteed:
     case SILArgumentConvention::Pack_Out:
       break;
+    }
+  }
+
+  if (PartialApplyInst *pas = dyn_cast<PartialApplyInst>(user)) {
+    if (pas->isOnStack()) {
+      // On-stack partial applications are always a liveness use of their
+      // captures.
+      return insertLivenessUseForApply(*op);
     }
   }
 
@@ -1374,7 +1424,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
     if (!liveness.isWithinBoundary(takeInstAndValue.first,
                                    takeInstAndValue.second)) {
       // TODO: Today, we don't tell the user the actual field itself where the
-      // violation occured and just instead just shows the two instructions. We
+      // violation occurred and just instead just shows the two instructions. We
       // could be more specific though...
       LLVM_DEBUG(llvm::dbgs() << "        Not within the boundary.\n");
       continue;
@@ -1583,95 +1633,6 @@ bool GlobalLivenessChecker::compute() {
 //                       MARK: Main Pass Implementation
 //===----------------------------------------------------------------------===//
 
-void MoveOnlyChecker::cleanupAfterEmittingDiagnostic() {
-  for (auto &block : *fn) {
-    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-      auto *inst = &*ii;
-      ++ii;
-
-      // Convert load [copy] -> load_borrow + explicit_copy_value.
-      if (auto *li = dyn_cast<LoadInst>(inst)) {
-        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
-          SILBuilderWithScope builder(li);
-          auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
-          auto *cvi = builder.createExplicitCopyValue(li->getLoc(), lbi);
-          builder.createEndBorrow(li->getLoc(), lbi);
-          li->replaceAllUsesWith(cvi);
-          li->eraseFromParent();
-          changed = true;
-        }
-      }
-
-      // Convert copy_addr !take of src to its explicit value form so we don't
-      // error.
-      if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
-        if (!copyAddr->isTakeOfSrc()) {
-          SILBuilderWithScope builder(copyAddr);
-          builder.createExplicitCopyAddr(
-              copyAddr->getLoc(), copyAddr->getSrc(), copyAddr->getDest(),
-              IsTake_t(copyAddr->isTakeOfSrc()),
-              IsInitialization_t(copyAddr->isInitializationOfDest()));
-          copyAddr->eraseFromParent();
-          changed = true;
-        }
-      }
-
-      // Convert any copy_value of move_only type to explicit copy value.
-      if (auto *cvi = dyn_cast<CopyValueInst>(inst)) {
-        if (!cvi->getOperand()->getType().isMoveOnly())
-          continue;
-        SILBuilderWithScope b(cvi);
-        auto *expCopy =
-            b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
-        cvi->replaceAllUsesWith(expCopy);
-        cvi->eraseFromParent();
-        changed = true;
-        continue;
-      }
-    }
-  }
-}
-
-bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
-  bool emittedDiagnostic = false;
-  for (auto &block : *fn) {
-    for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-      auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
-      ++ii;
-
-      if (!mmci || !mmci->hasMoveCheckerKind() || !mmci->getType().isAddress())
-        continue;
-
-      // Skip any alloc_box due to heap to stack failing on a box capture. This
-      // will just cause an error.
-      if (auto *pbi = dyn_cast<ProjectBoxInst>(mmci->getOperand())) {
-        if (isa<AllocBoxInst>(pbi->getOperand())) {
-          LLVM_DEBUG(
-              llvm::dbgs()
-              << "Early emitting diagnostic for unsupported alloc box!\n");
-          diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
-          emittedDiagnostic = true;
-          continue;
-        }
-
-        if (auto *bbi = dyn_cast<BeginBorrowInst>(pbi->getOperand())) {
-          if (isa<AllocBoxInst>(bbi->getOperand())) {
-            LLVM_DEBUG(
-                llvm::dbgs()
-                << "Early emitting diagnostic for unsupported alloc box!\n");
-            diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
-            emittedDiagnostic = true;
-            continue;
-          }
-        }
-      }
-
-      moveIntroducersToProcess.insert(mmci);
-    }
-  }
-  return emittedDiagnostic;
-}
-
 /// Create a new destroy_value instruction before the specified instruction and
 /// record it as a final consume.
 static void insertDestroyBeforeInstruction(UseState &addressUseState,
@@ -1718,7 +1679,7 @@ static void insertDestroyBeforeInstruction(UseState &addressUseState,
   }
 }
 
-void MoveOnlyChecker::insertDestroysOnBoundary(
+void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
     FieldSensitiveMultiDefPrunedLiveRange &liveness,
     FieldSensitivePrunedLivenessBoundary &boundary) {
   using IsInterestingUser = FieldSensitivePrunedLiveness::IsInterestingUser;
@@ -1808,7 +1769,7 @@ void MoveOnlyChecker::insertDestroysOnBoundary(
   consumes.finishRecordingFinalConsumes();
 }
 
-void MoveOnlyChecker::rewriteUses(
+void MoveOnlyAddressCheckerPImpl::rewriteUses(
     FieldSensitiveMultiDefPrunedLiveRange &liveness,
     const FieldSensitivePrunedLivenessBoundary &boundary) {
   // First remove all destroy_addr that have not been claimed.
@@ -1911,8 +1872,10 @@ void MoveOnlyChecker::rewriteUses(
 #endif
 }
 
-bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
+bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
+    MarkMustCheckInst *markedAddress) {
   SWIFT_DEFER { diagnosticEmitter.clearUsesWithDiagnostic(); };
+  unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
 
   auto accessPathWithBase = AccessPathWithBase::compute(markedAddress);
   auto accessPath = accessPathWithBase.accessPath;
@@ -1946,7 +1909,7 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   // emitted a copy from the base address + a destroy_addr of the use. By
   // bailing here, we can make that assumption since we would have errored
   // earlier otherwise.
-  if (diagnosticEmitter.emittedAnyDiagnostics())
+  if (diagCount != diagnosticEmitter.getDiagnosticCount())
     return true;
 
   //===---
@@ -1977,134 +1940,28 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   return true;
 }
 
-bool MoveOnlyChecker::checkFunction() {
-  // First search for candidates to process and emit diagnostics on any
-  // mark_must_check [noimplicitcopy] we didn't recognize.
-  bool emittedDiagnostic = searchForCandidateMarkMustChecks();
+//===----------------------------------------------------------------------===//
+//                         MARK: Top Level Entrypoint
+//===----------------------------------------------------------------------===//
 
-  // If we didn't find any introducers to check, just return changed.
-  //
-  // NOTE: changed /can/ be true here if we had any mark_must_check
-  // [noimplicitcopy] that we didn't understand and emitting a diagnostic upon
-  // and then deleting.
-  if (moveIntroducersToProcess.empty()) {
-    if (emittedDiagnostic)
-      cleanupAfterEmittingDiagnostic();
-    return changed;
-  }
+bool MoveOnlyAddressChecker::check(
+    SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess) {
+  assert(moveIntroducersToProcess.size() &&
+         "Must have checks to process to call this function");
+  MoveOnlyAddressCheckerPImpl pimpl(fn, diagnosticEmitter, domTree, poa,
+                                    allocator);
 
   for (auto *markedValue : moveIntroducersToProcess) {
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
 
     // Perform our address check.
-    if (!performSingleCheck(markedValue)) {
+    if (!pimpl.performSingleCheck(markedValue)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed to perform single check! Emitting error!\n");
       // If we fail the address check in some way, set the diagnose!
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
     }
   }
-  emittedDiagnostic = diagnosticEmitter.emittedAnyDiagnostics();
 
-  // Ok, now that we have performed our checks, we need to eliminate all mark
-  // must check inst since it is invalid for these to be in canonical SIL and
-  // our work is done here.
-  while (!moveIntroducersToProcess.empty()) {
-    auto *markedInst = moveIntroducersToProcess.pop_back_val();
-    markedInst->replaceAllUsesWith(markedInst->getOperand());
-    markedInst->eraseFromParent();
-    changed = true;
-  }
-
-  // Once we have finished processing, if we emitted any diagnostics, then we
-  // may have copy_addr [init], load [copy] of @moveOnly typed values. This is
-  // not valid in Canonical SIL, so we need to ensure that those copy_value
-  // become explicit_copy_value. This is ok to do since we are already going to
-  // fail the compilation and just are trying to maintain SIL invariants.
-  //
-  // It is also ok that we use a little more compile time and go over the
-  // function again, since we are going to fail the compilation and not codegen.
-  if (emittedDiagnostic) {
-    cleanupAfterEmittingDiagnostic();
-  }
-
-  return changed;
-}
-
-//===----------------------------------------------------------------------===//
-//                            Top Level Entrypoint
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-class MoveOnlyCheckerPass : public SILFunctionTransform {
-  void run() override {
-    auto *fn = getFunction();
-
-    // Only run this pass if the move only language feature is enabled.
-    if (!fn->getASTContext().LangOpts.Features.contains(Feature::MoveOnly))
-      return;
-
-    // Don't rerun diagnostics on deserialized functions.
-    if (getFunction()->wasDeserializedCanonical())
-      return;
-
-    assert(fn->getModule().getStage() == SILStage::Raw &&
-           "Should only run on Raw SIL");
-    LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Addr Checker. Visiting: "
-                            << fn->getName() << '\n');
-    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
-    DominanceInfo *domTree = dominanceAnalysis->get(fn);
-    auto *deAnalysis = getAnalysis<DeadEndBlocksAnalysis>()->get(fn);
-    auto *poa = getAnalysis<PostOrderAnalysis>();
-
-    if (MoveOnlyChecker(getFunction(), deAnalysis, domTree, poa)
-            .checkFunction()) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-    }
-
-    if (!getOptions().VerifyAll)
-      return;
-
-    // TODO: Enable this by default when verify all is disabled and make it a
-    // diagnostic error saying file a bug.
-    for (auto &block : *getFunction()) {
-      for (auto &inst : block) {
-        if (auto *cvi = dyn_cast<CopyValueInst>(&inst)) {
-          if (cvi->getOperand()->getType().isMoveOnly()) {
-            llvm::errs() << "Should have eliminated copy at this point: "
-                         << *cvi;
-            llvm::report_fatal_error("standard compiler error");
-          }
-          continue;
-        }
-
-        if (auto *li = dyn_cast<LoadInst>(&inst)) {
-          if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy &&
-              li->getType().isMoveOnly()) {
-            llvm::errs() << "Should have eliminated copy at this point: "
-                         << *li;
-            llvm::report_fatal_error("standard compiler error");
-          }
-          continue;
-        }
-
-        if (auto *copyAddr = dyn_cast<CopyAddrInst>(&inst)) {
-          if (!copyAddr->isTakeOfSrc() &&
-              copyAddr->getSrc()->getType().isMoveOnly()) {
-            llvm::errs() << "Should have eliminated copy at this point: "
-                         << *copyAddr;
-            llvm::report_fatal_error("standard compiler error");
-          }
-          continue;
-        }
-      }
-    }
-  }
-};
-
-} // anonymous namespace
-
-SILTransform *swift::createMoveOnlyAddressChecker() {
-  return new MoveOnlyCheckerPass();
+  return pimpl.changed;
 }

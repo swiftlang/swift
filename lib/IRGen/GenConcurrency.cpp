@@ -330,8 +330,8 @@ llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {
   llvm::Value *context = suspendFn->getArg(0);
   auto *call =
       Builder.CreateCall(getContinuationAwaitFunctionPointer(), {context});
-  call->setDoesNotThrow();
   call->setCallingConv(SwiftAsyncCC);
+  call->setDoesNotThrow();
   call->setTailCallKind(AsyncTailCallKind);
 
   Builder.CreateRetVoid();

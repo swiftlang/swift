@@ -735,10 +735,11 @@ extension _StringGuts {
 
     let mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>
     if hasNativeStorage {
-      mutPtr = _object.nativeStorage._breadcrumbsAddress
+      mutPtr = _object.withNativeStorage { $0._breadcrumbsAddress }
     } else {
-      mutPtr = UnsafeMutablePointer(
-        Builtin.addressof(&_object.sharedStorage._breadcrumbs))
+      mutPtr = _object.withSharedStorage {
+        UnsafeMutablePointer(Builtin.addressof(&$0._breadcrumbs))
+      }
     }
 
     if let breadcrumbs = _stdlib_atomicAcquiringLoadARCRef(object: mutPtr) {

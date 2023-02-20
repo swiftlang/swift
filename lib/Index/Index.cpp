@@ -586,6 +586,12 @@ public:
     assert(Cancelled || Containers.empty());
   }
 
+  // FIXME: The index should walk expansions but give locations to the
+  // expansion site instead.
+  bool shouldWalkMacroExpansions() override {
+    return true;
+  }
+
   void visitModule(ModuleDecl &Mod);
   void visitDeclContext(DeclContext *DC);
 

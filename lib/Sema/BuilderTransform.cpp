@@ -359,7 +359,7 @@ protected:
     // binding.
     if (cs) {
       SolutionApplicationTarget target(patternBinding);
-      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
+      if (cs->generateConstraints(target))
         hadError = true;
     }
   }
@@ -661,7 +661,7 @@ protected:
       // FIXME: Add contextual type purpose for switch subjects?
       SolutionApplicationTarget target(subjectExpr, dc, CTP_Unused, Type(),
                                        /*isDiscarded=*/false);
-      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      if (cs->generateConstraints(target)) {
         hadError = true;
         return nullptr;
       }
@@ -789,7 +789,7 @@ protected:
     auto target = SolutionApplicationTarget::forForEachStmt(
         forEachStmt, dc, /*bindPatternVarsOneWay=*/true);
     if (cs) {
-      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      if (cs->generateConstraints(target)) {
         hadError = true;
         return nullptr;
       }
@@ -886,15 +886,15 @@ protected:
     }
 
     if (cs) {
-     SolutionApplicationTarget target(
-         throwStmt->getSubExpr(), dc, CTP_ThrowStmt,
-         ctx.getErrorExistentialType(),
-         /*isDiscarded=*/false);
-     if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
-       hadError = true;
+      SolutionApplicationTarget target(throwStmt->getSubExpr(), dc,
+                                       CTP_ThrowStmt,
+                                       ctx.getErrorExistentialType(),
+                                       /*isDiscarded=*/false);
+      if (cs->generateConstraints(target))
+        hadError = true;
 
-     cs->setSolutionApplicationTarget(throwStmt, target);
-   }
+      cs->setSolutionApplicationTarget(throwStmt, target);
+    }
 
     return nullptr;
   }
@@ -2341,6 +2341,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 
   if (auto result = cs.matchResultBuilder(
           func, builderType, resultContextType, resultConstraintKind,
+          /*contextualType=*/Type(),
           cs.getConstraintLocator(func->getBody()))) {
     if (result->isFailure())
       return nullptr;
@@ -2428,6 +2429,7 @@ Optional<ConstraintSystem::TypeMatchResult>
 ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
                                      Type bodyResultType,
                                      ConstraintKind bodyResultConstraintKind,
+                                     Type contextualType,
                                      ConstraintLocatorBuilder locator) {
   builderType = simplifyType(builderType);
   auto builder = builderType->getAnyNominal();
@@ -2543,7 +2545,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     if (isDebugMode()) {
       auto &log = llvm::errs();
       auto indent = solverState ? solverState->getCurrentIndent() : 0;
-      log.indent(indent) << "------- Transfomed Body -------\n";
+      log.indent(indent) << "------- Transformed Body -------\n";
       transformedBody->second->dump(log, &getASTContext(), indent);
       log << '\n';
     }
@@ -2552,6 +2554,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
 
     transformInfo.builderType = builderType;
     transformInfo.bodyResultType = bodyResultType;
+    transformInfo.contextualType = contextualType;
     transformInfo.transformedBody = transformedBody->second;
 
     // Record the transformation.

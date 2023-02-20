@@ -218,6 +218,15 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@autoclosure") << " ";
   if (hasAttr(TAK_escaping))
     Printer.printSimpleAttr("@escaping") << " ";
+
+  for (auto customAttr : Attrs.getCustomAttrs()) {
+    Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+    Printer << "@";
+    customAttr->getTypeRepr()->print(Printer, Options);
+    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+    Printer << " ";
+  }
+
   if (hasAttr(TAK_Sendable))
     Printer.printSimpleAttr("@Sendable") << " ";
   if (hasAttr(TAK_noDerivative))
@@ -473,8 +482,8 @@ void PackExpansionTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(Pattern, Printer, Opts);
 }
 
-void PackReferenceTypeRepr::printImpl(ASTPrinter &Printer,
-                                      const PrintOptions &Opts) const {
+void PackElementTypeRepr::printImpl(ASTPrinter &Printer,
+                                    const PrintOptions &Opts) const {
   Printer.printKeyword("each", Opts, /*Suffix=*/" ");
   printTypeRepr(PackType, Printer, Opts);
 }

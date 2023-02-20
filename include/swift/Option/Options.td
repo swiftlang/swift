@@ -1541,6 +1541,10 @@ def disable_remove_deprecated_check: Flag<["-", "--"], "disable-remove-deprecate
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Skip diagnosing removal of deprecated symbols">;
 
+def enable_remove_deprecated_check: Flag<["-", "--"], "enable-remove-deprecated-check">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Diagnosing removal of deprecated symbols">;
+
 def print_module: Flag<["-", "--"], "print-module">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Print module names in diagnostics">;
@@ -1752,5 +1756,12 @@ def load_plugin_library:
   HelpText<"Path to a dynamic library containing compiler plugins such as "
            "macros">,
   MetaVarName<"<path>">;
+
+def load_plugin_executable:
+  Separate<["-"], "load-plugin-executable">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to an executable compiler plugins and providing module names "
+           "such as macros">,
+  MetaVarName<"<path>#<module-names>">;
 
 include "FrontendOptions.td"

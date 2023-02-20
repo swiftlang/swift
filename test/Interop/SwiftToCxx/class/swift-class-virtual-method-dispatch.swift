@@ -4,9 +4,12 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/class.h)
 
+// rdar://105396625
+// UNSUPPORTED: CPU=arm64e
+
 public class BaseClass {
   var field: Int64
-    
+
   init() {
     field = 0
   }

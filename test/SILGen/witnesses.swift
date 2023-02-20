@@ -435,7 +435,7 @@ struct GenericParameterNameCollision<T: HasAssoc> :
   func foo<U>(_ x: U) {}
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolA2aEP3baryy6Assoc2Qzqd__XElFTW :
-  // CHECK:       bb0(%0 : ${{.*}}, %1 : $*{{.*}}):
+  // CHECK:       bb0(%0 : @guaranteed ${{.*}}, %1 : $*{{.*}}):
   // CHECK:         apply {{%.*}}<τ_0_0, τ_1_0>
   func bar<V>(_ x: (V) -> T.Assoc) {}
 }

@@ -3848,7 +3848,7 @@ namespace {
         subExpr = subExpr->getValueProvidingExpr();
 
         // Diagnose if we find a 'try?'.
-        // FIXME: We could put up with occurences of 'try?' if they do not apply
+        // FIXME: We could put up with occurrences of 'try?' if they do not apply
         // directly to the called ctor, e.g. 'try? try self.init()', or if the
         // called ctor isn't throwing.
         if (auto *OTE = dyn_cast<OptionalTryExpr>(subExpr)) {
@@ -5365,7 +5365,12 @@ namespace {
       ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
       E->setMacroRef(macroRef);
 
-      if (E->getMacroRoles().contains(MacroRole::Expression) &&
+      // For now, only expand macro expansion expressions that fulfill
+      // `MacroRole::Expression` exactly. Freestanding code item macros
+      // have a `getMacroRoles()` value equal to `getFreestandingMacroRoles()`,
+      // which includes expression macros, and they are expanded in a separate
+      // request.
+      if (E->getMacroRoles() == MacroRole::Expression &&
           !cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
         if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
           E->setRewritten(newExpr);
@@ -9219,20 +9224,13 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     }
 
     // If there is a guard expression, coerce that.
-    if (auto guardExpr = info.guardExpr) {
-      guardExpr = guardExpr->walk(*this);
-      if (!guardExpr)
+    if (auto *guardExpr = info.guardExpr) {
+      auto target = *cs.getSolutionApplicationTarget(guardExpr);
+      auto resultTarget = rewriteTarget(target);
+      if (!resultTarget)
         return None;
 
-      // FIXME: Feels like we could leverage existing code more.
-      Type boolType = cs.getASTContext().getBoolType();
-      guardExpr = solution.coerceToType(
-          guardExpr, boolType, cs.getConstraintLocator(info.guardExpr));
-      if (!guardExpr)
-        return None;
-
-      (*caseLabelItem)->setGuardExpr(guardExpr);
-      solution.setExprTypes(guardExpr);
+      (*caseLabelItem)->setGuardExpr(resultTarget->getAsExpr());
     }
 
     return target;

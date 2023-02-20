@@ -1,4 +1,4 @@
-// RUN: %swift-frontend %s -enable-import-ptrauth-field-function-pointers -emit-ir -target arm64e-apple-ios13.0 -I %S/Inputs/ -validate-tbd-against-ir=none | %FileCheck %s
+// RUN: %swift-frontend %s -enable-import-ptrauth-field-function-pointers -emit-ir -target arm64e-apple-ios13.0 -I %S/Inputs/ -validate-tbd-against-ir=none -Xllvm -sil-disable-pass=OnoneSimplification | %FileCheck %s
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
 
@@ -53,7 +53,7 @@ func test_field_fn_ptr_modify() {
 // CHECK: 12:
 // CHECK:   [[AddressDiscriminatedSecureStruct:%.*]] = phi i8* [ [[CAST0]], %5 ]
 // CHECK:   [[CAST1:%.*]] = bitcast i8* [[AddressDiscriminatedSecureStruct]] to %TSo32AddressDiscriminatedSecureStructV*
-// CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo32AddressDiscriminatedSecureStructV, %TSo32AddressDiscriminatedSecureStructV* %14, i32 0, i32 0
+// CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo32AddressDiscriminatedSecureStructV, %TSo32AddressDiscriminatedSecureStructV* [[CAST1]], i32 0, i32 0
 // CHECK:   [[CAST2:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %.secure_func_ptr to i64**
 // CHECK:   [[PTR:%.*]] = load i64*, i64** [[CAST2]], align 8
 // CHECK:   [[ADDR:%.*]] = ptrtoint %Ts5Int32VIetCd_Sg* %.secure_func_ptr to i64

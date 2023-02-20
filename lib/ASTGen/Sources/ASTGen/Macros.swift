@@ -293,6 +293,8 @@ private func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
 func expandAttachedMacro(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
   macroPtr: UnsafeRawPointer,
+  discriminatorText: UnsafePointer<UInt8>,
+  discriminatorTextLength: Int,
   rawMacroRole: UInt8,
   customAttrSourceFilePtr: UnsafeRawPointer,
   customAttrSourceLocPointer: UnsafePointer<UInt8>?,
@@ -344,9 +346,15 @@ func expandAttachedMacro(
   sourceManager.insert(declarationSourceFilePtr)
 
   // Create an expansion context
-  let context = sourceManager.createMacroExpansionContext()
+  let discriminatorBuffer = UnsafeBufferPointer(
+    start: discriminatorText, count: discriminatorTextLength
+  )
+  let discriminator = String(decoding: discriminatorBuffer, as: UTF8.self)
+  let context = sourceManager.createMacroExpansionContext(
+    discriminator: discriminator
+  )
 
-  let macroName = customAttrNode.attributeName.description
+  let macroName = customAttrNode.attributeName.trimmedDescription
   var evaluatedSyntaxStr: String
   do {
     switch (macro, macroRole) {

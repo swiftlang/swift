@@ -89,7 +89,7 @@ public final class CopyableKlassWithMoveOnlyField {
 // Class Tests //
 /////////////////
 
-public func classSimpleChainTest(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classSimpleChainTest(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
                // expected-error @-1 {{'x2' consumed more than once}}
     x2 = x // expected-note {{consuming use here}}
@@ -110,7 +110,7 @@ public func classSimpleChainArgTest(_ x2: inout Klass) {
     borrowVal(k2)
 }
 
-public func classSimpleNonConsumingUseTest(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classSimpleNonConsumingUseTest(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
     x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
@@ -120,7 +120,7 @@ public func classSimpleNonConsumingUseArgTest(_ x2: inout Klass) {
     borrowVal(x2)
 }
 
-public func classMultipleNonConsumingUseTest(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classMultipleNonConsumingUseTest(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
     x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
@@ -159,7 +159,7 @@ public func classMultipleNonConsumingUseArgTest4(_ x2: inout Klass) { // expecte
 }
 
 
-public func classUseAfterConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classUseAfterConsume(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     x2 = x // expected-note {{consuming use here}}
@@ -176,7 +176,7 @@ public func classUseAfterConsumeArg(_ x2: inout Klass) { // expected-error {{'x2
                    // expected-note @-1 {{consuming use here}}
 }
 
-public func classDoubleConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classDoubleConsume(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x  // expected-error {{'x2' consumed more than once}}
                 // expected-note @-1 {{consuming use here}}
     x2 = Klass()
@@ -191,7 +191,7 @@ public func classDoubleConsumeArg(_ x2: inout Klass) { // expected-error {{'x2' 
                      // expected-note @-1 {{consuming use here}}
 }
 
-public func classLoopConsume(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classLoopConsume(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     x2 = Klass()
@@ -213,7 +213,7 @@ public func classLoopConsumeArg2(_ x2: inout Klass) { // expected-error {{'x2' c
     x2 = Klass()
 }
 
-public func classDiamond(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classDiamond(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
     x2 = Klass()
     if boolValue {
@@ -232,7 +232,7 @@ public func classDiamondArg(_ x2: inout Klass) { // expected-error {{'x2' consum
     }
 }
 
-public func classDiamondInLoop(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classDiamondInLoop(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-error @-1 {{'x2' consumed more than once}}
                // expected-note @-2 {{consuming use here}}
@@ -271,7 +271,7 @@ public func classDiamondInLoopArg2(_ x2: inout Klass) { // expected-error {{'x2'
     x2 = Klass()
 }
 
-public func classAssignToVar1(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar1(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     x2 = Klass()
@@ -290,7 +290,7 @@ public func classAssignToVar1Arg(_ x2: inout Klass) { // expected-error {{'x2' c
     consumeVal(x3)
 }
 
-public func classAssignToVar2(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar2(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     x2 = Klass()
@@ -307,7 +307,7 @@ public func classAssignToVar2Arg(_ x2: inout Klass) { // expected-error {{'x2' c
     borrowVal(x3)
 }
 
-public func classAssignToVar3(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar3(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
     x2 = Klass()
     var x3 = x2
@@ -315,21 +315,21 @@ public func classAssignToVar3(_ x: Klass) { // expected-error {{'x' has guarante
     consumeVal(x3)
 }
 
-public func classAssignToVar3Arg(_ x: Klass, _ x2: inout Klass) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+public func classAssignToVar3Arg(_ x: __shared Klass, _ x2: inout Klass) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
                                                             // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func classAssignToVar3Arg2(_ x: Klass, _ x2: inout Klass) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+public func classAssignToVar3Arg2(_ x: __shared Klass, _ x2: inout Klass) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
                                                                    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func classAssignToVar4(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar4(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     x2 = Klass()
@@ -357,7 +357,7 @@ public func classAssignToVar5() {
     consumeVal(x3)
 }
 
-public func classAssignToVar5Arg(_ x: Klass, _ x2: inout Klass) {
+public func classAssignToVar5Arg(_ x: __shared Klass, _ x2: inout Klass) {
     // expected-error @-1 {{'x2' used after consume}}
     // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
@@ -366,7 +366,7 @@ public func classAssignToVar5Arg(_ x: Klass, _ x2: inout Klass) {
     consumeVal(x3)
 }
 
-public func classAssignToVar5Arg2(_ x: Klass, _ x2: inout Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar5Arg2(_ x: __shared Klass, _ x2: inout Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
                                                                    // expected-error @-1 {{'x2' used after consume}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -375,7 +375,7 @@ public func classAssignToVar5Arg2(_ x: Klass, _ x2: inout Klass) { // expected-e
     x2 = Klass()
 }
 
-public func classAccessAccessField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAccessAccessField(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
@@ -395,7 +395,7 @@ public func classAccessAccessFieldArg(_ x2: inout Klass) {
     }
 }
 
-public func classAccessConsumeField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAccessConsumeField(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
@@ -1896,9 +1896,8 @@ public func closureCaptureClassUseAfterConsume() {
     var x2 = Klass()
     // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{'x2' consumed more than once}}
-    // expected-error @-3 {{Usage of a move only type that the move checker does not know how to check!}}
+    // expected-error @-3 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
-    // expected-error @-5 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
     let f = {
         borrowVal(x2)
@@ -1916,9 +1915,8 @@ public func closureCaptureClassUseAfterConsume() {
 
 public func closureCaptureClassUseAfterConsume2() {
     var x2 = Klass()
-    // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
+    // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-2 {{'x2' consumed in closure but not reinitialized before end of closure}}
-    // expected-error @-3 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
     let f = {
         borrowVal(x2)
@@ -1931,13 +1929,13 @@ public func closureCaptureClassUseAfterConsume2() {
 
 public func closureCaptureClassUseAfterConsumeError() {
     var x2 = Klass()
-    // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
+    // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' consumed more than once}}
     // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-5 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
-    let f = {
+    let f = { // expected-note {{consuming use here}}
         borrowVal(x2)
         consumeVal(x2)
         // expected-note @-1 {{consuming use here}}
@@ -1949,7 +1947,7 @@ public func closureCaptureClassUseAfterConsumeError() {
         // expected-note @-4 {{consuming use here}}
     }
     f()
-    let x3 = x2
+    let x3 = x2 // expected-note {{consuming use here}}
     let _ = x3
 }
 
@@ -2017,9 +2015,8 @@ public func deferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 
 public func closureAndDeferCaptureClassUseAfterConsume() {
     var x2 = Klass()
-    // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-2 {{'x2' consumed in closure but not reinitialized before end of closure}}
-    // expected-error @-3 {{'x2' consumed more than once}}
+    // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = {
         defer {
@@ -2037,10 +2034,9 @@ public func closureAndDeferCaptureClassUseAfterConsume() {
 public func closureAndDeferCaptureClassUseAfterConsume2() {
     var x2 = Klass()
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-3 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    // expected-error @-3 {{'x2' used after consume}}
     // expected-error @-4 {{'x2' used after consume}}
-    // expected-error @-5 {{'x2' used after consume}}
     x2 = Klass()
     let f = {
         consumeVal(x2)
@@ -2063,12 +2059,12 @@ public func closureAndDeferCaptureClassUseAfterConsume2() {
 public func closureAndDeferCaptureClassUseAfterConsume3() {
     var x2 = Klass()
     // expected-error @-1 {{'x2' consumed in closure but not reinitialized before end of closure}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' consumed more than once}}
     // expected-error @-4 {{'x2' used after consume}}
     // expected-error @-5 {{'x2' used after consume}}
     x2 = Klass()
-    let f = {
+    let f = { // expected-note {{consuming use here}}
         consumeVal(x2)
         // expected-note @-1 {{consuming use here}}
         // expected-note @-2 {{consuming use here}}
@@ -2084,7 +2080,7 @@ public func closureAndDeferCaptureClassUseAfterConsume3() {
         print("foo")
     }
     f()
-    consumeVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
 }
 
 public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
@@ -2110,11 +2106,10 @@ public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 public func closureAndClosureCaptureClassUseAfterConsume() {
     var x2 = Klass()
     // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-3 {{'x2' consumed more than once}}
-    // expected-error @-4 {{'x2' consumed in closure but not reinitialized before end of closure}}
-    // expected-error @-5 {{'x2' consumed more than once}}
-    // expected-error @-6 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    // expected-error @-3 {{'x2' consumed in closure but not reinitialized before end of closure}}
+    // expected-error @-4 {{'x2' consumed more than once}}
+    // expected-error @-5 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
     let f = {
         let g = {
@@ -2136,13 +2131,13 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
 public func closureAndClosureCaptureClassUseAfterConsume2() {
     var x2 = Klass()
     // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
+    // expected-error @-2 {{'x2' consumed more than once}}
     // expected-error @-3 {{'x2' consumed in closure but not reinitialized before end of closure}}
     // expected-error @-4 {{'x2' consumed more than once}}
     // expected-error @-5 {{'x2' consumed more than once}}
     // expected-error @-6 {{'x2' consumed in closure but not reinitialized before end of closure}}
     x2 = Klass()
-    let f = {
+    let f = { // expected-note {{consuming use here}}
         let g = {
             borrowVal(x2)
             consumeVal(x2)
@@ -2157,7 +2152,7 @@ public func closureAndClosureCaptureClassUseAfterConsume2() {
         g()
     }
     f()
-    consumeVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
 }
 
 
@@ -2409,7 +2404,7 @@ func sameCallSiteTestConsumeTwice(_ k: inout Klass) { // expected-error {{'k' co
 }
 
 func sameCallSiteConsumeAndUse(_ k: inout Klass) { // expected-error {{'k' used after consume}}
-    func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: Klass) {}
+    func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: __shared Klass) {}
     consumeKlassAndUseKlass(k, k) // expected-error {{overlapping accesses to 'k', but deinitialization requires exclusive access; consider copying to a local variable}}
     // expected-note @-1 {{consuming use here}}
     // expected-note @-2 {{non-consuming use here}}

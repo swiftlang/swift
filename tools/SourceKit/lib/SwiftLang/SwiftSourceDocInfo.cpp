@@ -715,7 +715,7 @@ collectAvailableRenameInfo(const ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
 }
 
 static void collectAvailableRefactoringsOtherThanRename(
-    ResolvedCursorInfo CursorInfo,
+    ResolvedCursorInfoPtr CursorInfo,
     SmallVectorImpl<RefactoringInfo> &Refactorings) {
   SmallVector<RefactoringKind, 8> Kinds;
   collectAvailableRefactorings(CursorInfo, Kinds, /*ExcludeRename*/ true);
@@ -1160,15 +1160,15 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
 /// Returns true on success, false on error (and sets `Diagnostic` accordingly).
 static bool passCursorInfoForDecl(
-    const ResolvedValueRefCursorInfo &Info, bool AddRefactorings,
+    ResolvedValueRefCursorInfoPtr Info, bool AddRefactorings,
     bool AddSymbolGraph, ArrayRef<RefactoringInfo> KnownRefactoringInfo,
     SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
     std::string &Diagnostic, ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
     bool DidReuseAST,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
-  DeclInfo OrigInfo(Info.getValueD(), Info.getContainerType(), Info.isRef(),
-                    Info.isDynamic(), Info.getReceiverTypes(), Invoc);
-  DeclInfo CtorTypeInfo(Info.getCtorTyRef(), Type(), true, false,
+  DeclInfo OrigInfo(Info->getValueD(), Info->getContainerType(), Info->isRef(),
+                    Info->isDynamic(), Info->getReceiverTypes(), Invoc);
+  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Type(), true, false,
                         ArrayRef<NominalTypeDecl *>(), Invoc);
   DeclInfo &MainInfo = CtorTypeInfo.VD ? CtorTypeInfo : OrigInfo;
   if (MainInfo.Unavailable) {
@@ -1184,7 +1184,7 @@ static bool passCursorInfoForDecl(
   // the type itself, rather than the constructor. The constructor will be
   // added as a secondary result.
   if (auto Err =
-          fillSymbolInfo(MainSymbol, MainInfo, Info.getLoc(), AddSymbolGraph,
+          fillSymbolInfo(MainSymbol, MainInfo, Info->getLoc(), AddSymbolGraph,
                          Lang, Invoc, PreviousSnaps, Allocator)) {
     llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {
       Diagnostic = E.message();
@@ -1195,7 +1195,7 @@ static bool passCursorInfoForDecl(
   if (MainInfo.VD != OrigInfo.VD && !OrigInfo.Unavailable) {
     CursorSymbolInfo &CtorSymbol = Symbols.emplace_back();
     if (auto Err =
-            fillSymbolInfo(CtorSymbol, OrigInfo, Info.getLoc(), AddSymbolGraph,
+            fillSymbolInfo(CtorSymbol, OrigInfo, Info->getLoc(), AddSymbolGraph,
                            Lang, Invoc, PreviousSnaps, Allocator)) {
       // Ignore but make sure to remove the partially-filled symbol
       llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
@@ -1205,14 +1205,14 @@ static bool passCursorInfoForDecl(
 
   // Add in shadowed declarations if on a decl. For references just go to the
   // actual declaration.
-  if (!Info.isRef()) {
-    for (auto D : Info.getShorthandShadowedDecls()) {
+  if (!Info->isRef()) {
+    for (auto D : Info->getShorthandShadowedDecls()) {
       CursorSymbolInfo &SymbolInfo = Symbols.emplace_back();
       DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
                      ArrayRef<NominalTypeDecl *>(), Invoc);
       if (auto Err =
-          fillSymbolInfo(SymbolInfo, DInfo, Info.getLoc(), AddSymbolGraph,
-                         Lang, Invoc, PreviousSnaps, Allocator)) {
+              fillSymbolInfo(SymbolInfo, DInfo, Info->getLoc(), AddSymbolGraph,
+                             Lang, Invoc, PreviousSnaps, Allocator)) {
         // Ignore but make sure to remove the partially-filled symbol
         llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
         Symbols.pop_back();
@@ -1223,8 +1223,9 @@ static bool passCursorInfoForDecl(
   SmallVector<RefactoringInfo, 8> Refactorings;
   if (AddRefactorings) {
     Optional<RenameRefInfo> RefInfo;
-    if (Info.isRef())
-      RefInfo = {Info.getSourceFile(), Info.getLoc(), Info.isKeywordArgument()};
+    if (Info->isRef())
+      RefInfo = {Info->getSourceFile(), Info->getLoc(),
+                 Info->isKeywordArgument()};
     collectAvailableRenameInfo(MainInfo.VD, RefInfo, Refactorings);
     collectAvailableRefactoringsOtherThanRename(Info, Refactorings);
   }
@@ -1306,7 +1307,7 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
 
 /// Returns true on success, false on error (and sets `Diagnostic` accordingly).
 static bool passNameInfoForDecl(
-    ResolvedValueRefCursorInfo CursorInfo, NameTranslatingInfo &Info,
+    const ResolvedValueRefCursorInfo &CursorInfo, NameTranslatingInfo &Info,
     std::string &Diagnostic,
     std::function<void(const RequestResult<NameTranslatingInfo> &)> Receiver) {
   auto *VD = CursorInfo.getValueD();
@@ -1553,18 +1554,18 @@ static void resolveCursor(
       }
 
       auto *File = &AstUnit->getPrimarySourceFile();
-      ResolvedCursorInfo CursorInfo =
-        evaluateOrDefault(File->getASTContext().evaluator,
-                          CursorInfoRequest{CursorInfoOwner(File, Loc)},
-                          ResolvedCursorInfo());
+      ResolvedCursorInfoPtr CursorInfo =
+          evaluateOrDefault(File->getASTContext().evaluator,
+                            CursorInfoRequest{CursorInfoOwner(File, Loc)},
+                            new ResolvedCursorInfo());
 
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
-      switch (CursorInfo.getKind()) {
+      switch (CursorInfo->getKind()) {
       case CursorInfoKind::ModuleRef: {
         auto ModuleRefInfo = cast<ResolvedModuleRefCursorInfo>(CursorInfo);
-        passCursorInfoForModule(ModuleRefInfo.getMod(),
+        passCursorInfoForModule(ModuleRefInfo->getMod(),
                                 Lang.getIFaceGenContexts(), CompInvok,
                                 Receiver);
         return;
@@ -1718,11 +1719,11 @@ static void resolveName(
       }
 
       auto *File = &AstUnit->getPrimarySourceFile();
-      ResolvedCursorInfo CursorInfo =
-        evaluateOrDefault(File->getASTContext().evaluator,
-                          CursorInfoRequest{CursorInfoOwner(File, Loc)},
-                          ResolvedCursorInfo());
-      if (CursorInfo.isInvalid()) {
+      ResolvedCursorInfoPtr CursorInfo =
+          evaluateOrDefault(File->getASTContext().evaluator,
+                            CursorInfoRequest{CursorInfoOwner(File, Loc)},
+                            new ResolvedCursorInfo());
+      if (CursorInfo->isInvalid()) {
         NameTranslatingInfo Info;
         Info.InternalDiagnostic = "Unable to resolve cursor info.";
         Receiver(RequestResult<NameTranslatingInfo>::fromResult(Info));
@@ -1732,14 +1733,14 @@ static void resolveName(
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
-      switch (CursorInfo.getKind()) {
+      switch (CursorInfo->getKind()) {
       case CursorInfoKind::ModuleRef:
         return;
 
       case CursorInfoKind::ValueRef: {
         std::string Diagnostic;
         bool Success =
-            passNameInfoForDecl(cast<ResolvedValueRefCursorInfo>(CursorInfo),
+            passNameInfoForDecl(*cast<ResolvedValueRefCursorInfo>(CursorInfo),
                                 Input, Diagnostic, Receiver);
         if (!Success) {
           if (!getPreviousASTSnaps().empty()) {
@@ -1893,7 +1894,7 @@ static void deliverCursorInfoResults(
     if (auto Result = dyn_cast_or_null<ResolvedValueRefCursorInfo>(
             Results.getResult().Result)) {
       std::string Diagnostic; // Unused
-      passCursorInfoForDecl(*Result, AddRefactorings, AddSymbolGraph, {}, Lang,
+      passCursorInfoForDecl(Result, AddRefactorings, AddSymbolGraph, {}, Lang,
                             Invoc, Diagnostic, /*PreviousSnaps=*/{},
                             Results->DidReuseAST, Receiver);
     }
@@ -1933,9 +1934,18 @@ void SwiftLangSupport::getCursorInfo(
                                   Receiver);
         } else {
           std::string Diagnostic; // Unused.
-          ResolvedValueRefCursorInfo Info;
-          Info.setValueD(const_cast<ValueDecl *>(Entity.Dcl));
-          Info.setIsRef(Entity.IsRef);
+          ResolvedValueRefCursorInfoPtr Info = new ResolvedValueRefCursorInfo(
+              /*SourcFile=*/nullptr, SourceLoc(),
+              const_cast<ValueDecl *>(Entity.Dcl),
+              /*CtorTyRef=*/nullptr,
+              /*ExtTyRef=*/nullptr, Entity.IsRef,
+              /*Ty=*/Type(),
+              /*ContainerType=*/Type(),
+              /*CustomAttrRef=*/None,
+              /*IsKeywordArgument=*/false,
+              /*IsDynamic=*/false,
+              /*ReceiverTypes=*/{},
+              /*ShorthandShadowedDecls=*/{});
           passCursorInfoForDecl(
               Info, Actionables, SymbolGraph, {}, *this, Invok, Diagnostic,
               /*PreviousSnaps=*/{},
@@ -2176,17 +2186,28 @@ static void resolveCursorFromUSR(
         passCursorInfoForModule(M, Lang.getIFaceGenContexts(), CompInvok,
                                 Receiver);
       } else {
-        ResolvedValueRefCursorInfo Info;
-        Info.setValueD(D);
-        Info.setIsRef(false);
-
         auto *DC = D->getDeclContext();
-        Type selfTy;
+
+        Type ContainerType;
         if (DC->isTypeContext()) {
           auto ContainerType = DC->getSelfInterfaceType();
-          Info.setContainerType(
-              D->getInnermostDeclContext()->mapTypeIntoContext(ContainerType));
+          ContainerType =
+              D->getInnermostDeclContext()->mapTypeIntoContext(ContainerType);
         }
+
+        ResolvedValueRefCursorInfoPtr Info = new ResolvedValueRefCursorInfo(
+            /*SourceFile=*/nullptr, SourceLoc(), D,
+            /*CtorTyRef=*/nullptr,
+            /*ExtTyRef=*/nullptr,
+            /*IsRef=*/false,
+            /*Ty=*/Type(), ContainerType,
+            /*CustomAttrRef=*/None,
+            /*IsKeywordArgument=*/false,
+            /*IsDynamic=*/false,
+            /*ReceiverTypes=*/{},
+            /*ShorthandShadowedDecls=*/{});
+
+        Type selfTy;
 
         std::string Diagnostic;
         bool Success = passCursorInfoForDecl(
@@ -2398,10 +2419,6 @@ private:
   }
 
   bool passId(CharSourceRange Range) {
-    // FIXME: Ignore things that don't come from this buffer.
-    if (!SourceMgr.getRangeForBuffer(BufferID).contains(Range.getStart()))
-      return !Cancelled;
-
     unsigned Offset = SourceMgr.getLocOffsetInBuffer(Range.getStart(),BufferID);
     Ranges.insert({Offset, Range.getByteLength()});
     return !Cancelled;
@@ -2450,12 +2467,12 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
         if (Loc.isInvalid())
           return;
 
-        ResolvedCursorInfo CursorInfo =
-          evaluateOrDefault(SrcFile.getASTContext().evaluator,
-                            CursorInfoRequest{CursorInfoOwner(&SrcFile, Loc)},
-                            ResolvedCursorInfo());
+        ResolvedCursorInfoPtr CursorInfo =
+            evaluateOrDefault(SrcFile.getASTContext().evaluator,
+                              CursorInfoRequest{CursorInfoOwner(&SrcFile, Loc)},
+                              new ResolvedCursorInfo());
         auto ValueRefCursorInfo =
-            dyn_cast<ResolvedValueRefCursorInfo>(&CursorInfo);
+            dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
         if (!ValueRefCursorInfo)
           return;
         if (ValueRefCursorInfo->isKeywordArgument())
