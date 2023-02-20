@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Sema/CompletionContextFinder.h"
+#include "swift/Parse/Lexer.h"
 
 using namespace swift;
 using Fallback = CompletionContextFinder::Fallback;
@@ -131,4 +132,12 @@ Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
   if (getCompletionExpr() != InitialExpr)
     return Fallback{getCompletionExpr(), fallbackDC, separatePrecheck};
   return None;
+}
+
+bool swift::containsIDEInspectionTarget(SourceRange range,
+                                        const SourceManager &SourceMgr) {
+  if (range.isInvalid())
+    return false;
+  auto charRange = Lexer::getCharSourceRangeFromSourceRange(SourceMgr, range);
+  return SourceMgr.rangeContainsIDEInspectionTarget(charRange);
 }
