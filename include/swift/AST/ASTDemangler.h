@@ -37,13 +37,16 @@ namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
 
 Type getTypeForMangling(ASTContext &ctx,
-                        llvm::StringRef mangling);
+                        llvm::StringRef mangling,
+                        GenericSignature genericSig=GenericSignature());
 
 TypeDecl *getTypeDeclForMangling(ASTContext &ctx,
-                                 llvm::StringRef mangling);
+                                 llvm::StringRef mangling,
+                                 GenericSignature genericSig=GenericSignature());
 
 TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
-                            llvm::StringRef usr);
+                            llvm::StringRef usr,
+                            GenericSignature genericSig=GenericSignature());
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
@@ -54,6 +57,11 @@ class ASTBuilder {
   /// The notional context in which we're writing and type-checking code.
   /// Created lazily.
   DeclContext *NotionalDC = nullptr;
+
+  /// The generic signature for interpreting type parameters. This is used
+  /// because the mangling for a type parameter doesn't record whether it
+  /// is a pack or not, so we have to find it here.
+  GenericSignature GenericSig;
 
 public:
   using BuiltType = swift::Type;
@@ -66,7 +74,8 @@ public:
 
   static constexpr bool needsToPrecomputeParentGenericContextShapes = false;
 
-  explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
+  explicit ASTBuilder(ASTContext &ctx, GenericSignature genericSig)
+    : Ctx(ctx), GenericSig(genericSig) {}
 
   ASTContext &getASTContext() { return Ctx; }
   DeclContext *getNotionalDC();
