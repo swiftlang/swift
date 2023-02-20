@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s --dump-input=always
+// RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
