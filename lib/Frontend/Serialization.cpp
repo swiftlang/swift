@@ -12,6 +12,7 @@
 
 #include "swift/Serialization/Serialization.h"
 #include "swift/APIDigester/ModuleAnalyzerNodes.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
@@ -36,8 +37,22 @@ static void emitABIDescriptor(ModuleOrSourceFile DC,
   using namespace swift::ide::api;
   if (!options.ABIDescriptorPath.empty()) {
     if (DC.is<ModuleDecl *>()) {
-      dumpModuleContent(DC.get<ModuleDecl *>(), options.ABIDescriptorPath, true,
+      auto &OutputBackend = getContext(DC).getOutputBackend();
+      auto ABIDesFile = OutputBackend.createFile(options.ABIDescriptorPath);
+      if (!ABIDesFile) {
+        getContext(DC).Diags.diagnose(SourceLoc(), diag::cannot_open_file,
+                                      options.ABIDescriptorPath,
+                                      toString(ABIDesFile.takeError()));
+        return;
+      }
+      dumpModuleContent(DC.get<ModuleDecl *>(), *ABIDesFile, true,
                         options.emptyABIDescriptor);
+      if (auto E = ABIDesFile->keep()) {
+        getContext(DC).Diags.diagnose(SourceLoc(), diag::cannot_open_file,
+                                      options.ABIDescriptorPath,
+                                      toString(std::move(E)));
+        return;
+      }
     }
   }
 }
