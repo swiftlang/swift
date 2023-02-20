@@ -111,6 +111,12 @@ public:
 
   Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels);
 
+  Type createPackType(ArrayRef<Type> eltTypes);
+
+  Type createSILPackType(ArrayRef<Type> eltTypes, bool isElementAddress);
+
+  Type createPackExpansionType(Type patternType, Type countType);
+
   Type createFunctionType(
       ArrayRef<Demangle::FunctionParam<Type>> params,
       Type output, FunctionTypeFlags flags,

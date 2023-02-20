@@ -344,6 +344,25 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, StringRef labels) {
   return TupleType::get(elements, Ctx);
 }
 
+Type ASTBuilder::createPackType(ArrayRef<Type> eltTypes) {
+  return PackType::get(Ctx, eltTypes);
+}
+
+Type ASTBuilder::createSILPackType(ArrayRef<Type> eltTypes,
+                                   bool isElementAddress) {
+  auto extInfo = SILPackType::ExtInfo(isElementAddress);
+
+  SmallVector<CanType, 4> elements;
+  for (auto eltType : eltTypes)
+    elements.push_back(eltType->getCanonicalType());
+
+  return SILPackType::get(Ctx, extInfo, elements);
+}
+
+Type ASTBuilder::createPackExpansionType(Type patternType, Type countType) {
+  return PackExpansionType::get(patternType, countType);
+}
+
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags,
