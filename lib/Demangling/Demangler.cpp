@@ -1564,6 +1564,38 @@ NodePointer Demangler::popPack() {
   return createType(Root);
 }
 
+NodePointer Demangler::popSILPack() {
+  NodePointer Root;
+
+  switch (nextChar()) {
+  case 'd':
+    Root = createNode(Node::Kind::SILPackDirect);
+    break;
+
+  case 'i':
+    Root = createNode(Node::Kind::SILPackIndirect);
+    break;
+
+  default:
+    return nullptr;
+  }
+
+  if (!popNode(Node::Kind::EmptyList)) {
+    bool firstElem = false;
+    do {
+      firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
+      NodePointer Ty = popNode(Node::Kind::Type);
+      if (!Ty)
+        return nullptr;
+      Root->addChild(Ty, *this);
+    } while (!firstElem);
+
+    Root->reverseChildren();
+  }
+
+  return createType(Root);
+}
+
 NodePointer Demangler::popTypeList() {
   NodePointer Root = createNode(Node::Kind::TypeList);
 
@@ -2364,6 +2396,8 @@ NodePointer Demangler::demangleArchetype() {
   }
   case 'P':
     return popPack();
+  case 'S':
+    return popSILPack();
   default:
     return nullptr;
   }

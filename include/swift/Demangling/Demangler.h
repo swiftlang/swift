@@ -530,6 +530,7 @@ protected:
   NodePointer popTuple();
   NodePointer popTypeList();
   NodePointer popPack();
+  NodePointer popSILPack();
   NodePointer popProtocol();
   NodePointer demangleBoundGenericType();
   NodePointer demangleBoundGenericArgs(NodePointer nominalType,
