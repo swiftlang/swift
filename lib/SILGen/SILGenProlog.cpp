@@ -306,7 +306,6 @@ struct ArgumentInitHelper {
     // - @_eagerMove
     // - @_noEagerMove
     auto isNoImplicitCopy = pd->isNoImplicitCopy();
-    auto lifetime = SGF.F.getLifetime(pd, value->getType());
 
     // If we have a no implicit copy argument and the argument is trivial,
     // we need to use copyable to move only to convert it to its move only

@@ -134,6 +134,7 @@ struct OwnershipModelEliminatorVisitor
   bool visitStoreBorrowInst(StoreBorrowInst *si);
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitExplicitCopyValueInst(ExplicitCopyValueInst *cvi);
+  bool visitExplicitCopyAddrInst(ExplicitCopyAddrInst *cai);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
   bool visitLoadBorrowInst(LoadBorrowInst *lbi);
   bool visitMoveValueInst(MoveValueInst *mvi) {
@@ -331,6 +332,18 @@ bool OwnershipModelEliminatorVisitor::visitExplicitCopyValueInst(
     b.emitCopyValueOperation(loc, cvi->getOperand());
   });
   eraseInstructionAndRAUW(cvi, cvi->getOperand());
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitExplicitCopyAddrInst(
+    ExplicitCopyAddrInst *ecai) {
+  // Now that we have set the unqualified ownership flag, destroy value
+  // operation will delegate to the appropriate strong_release, etc.
+  withBuilder<void>(ecai, [&](SILBuilder &b, SILLocation loc) {
+    b.createCopyAddr(loc, ecai->getSrc(), ecai->getDest(), ecai->isTakeOfSrc(),
+                     ecai->isInitializationOfDest());
+  });
+  eraseInstruction(ecai);
   return true;
 }
 

@@ -1,4 +1,4 @@
-//===--- MoveOnlyObjectChecker.h ------------------------------------------===//
+//===--- MoveOnlyObjectCheckerUtils.h -------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,11 +17,13 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYOBJECTCHECKER_H
-#define SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYOBJECTCHECKER_H
+#ifndef SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYOBJECTCHECKERUTILS_H
+#define SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYOBJECTCHECKERUTILS_H
 
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "llvm/Support/Compiler.h"
+
+#include "MoveOnlyBorrowToDestructureUtils.h"
 
 namespace swift {
 namespace siloptimizer {
@@ -121,16 +123,26 @@ struct OSSACanonicalizer {
 /// \returns true if we deleted a mark_must_check inst that we didn't recognize
 /// after emitting the diagnostic.
 ///
-/// To check if an error was emitted call checker.emittedAnyDiagnostics().
+/// To check if an error was emitted call \p
+/// diagnosticEmitter.getDiagnosticCount().
 ///
 /// NOTE: This is the routine used by the move only object checker to find mark
 /// must checks to process.
 bool searchForCandidateObjectMarkMustChecks(
     SILFunction *fn,
     SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
-    DiagnosticEmitter &emitter);
+    DiagnosticEmitter &diagnosticEmitter);
 
-bool cleanupSILAfterEmittingObjectMoveOnlyDiagnostics(SILFunction *fn);
+struct MoveOnlyObjectChecker {
+  DiagnosticEmitter &diagnosticEmitter;
+  DominanceInfo *domTree;
+  PostOrderAnalysis *poa;
+  borrowtodestructure::IntervalMapAllocator &allocator;
+
+  /// Returns true if we changed the IR in any way. Check with \p
+  /// diagnosticEmitter to see if we emitted any diagnostics.
+  bool check(llvm::SmallSetVector<MarkMustCheckInst *, 32> &instsToCheck);
+};
 
 } // namespace siloptimizer
 } // namespace swift
