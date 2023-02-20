@@ -65,16 +65,14 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   [[ADD_VJP_FN:%.*]] = differentiable_function_extract [vjp] [[ADD_DIFF_FN]]
 // CHECK-SIL:   [[ADD_RESULT:%.*]] = apply [[ADD_VJP_FN]]([[X]], [[X]], {{.*}})
 // CHECK-SIL:   ([[ORIG_RES:%.*]], [[ADD_PB:%.*]]) = destructure_tuple [[ADD_RESULT]]
-// CHECK-SIL:   [[PB_STRUCT:%.*]] = tuple ([[ADD_PB]] : $@callee_guaranteed (Float) -> (Float, Float))
-// CHECK-SIL:   [[PB_REF:%.*]] = function_ref @fooTJpSpSr : $@convention(thin) (Float, @owned (_: @callee_guaranteed (Float) -> (Float, Float))) -> Float
-// CHECK-SIL:   [[PB_FN:%.*]] = partial_apply [callee_guaranteed] [[PB_REF]]([[PB_STRUCT]])
+// CHECK-SIL:   [[PB_REF:%.*]] = function_ref @fooTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float
+// CHECK-SIL:   [[PB_FN:%.*]] = partial_apply [callee_guaranteed] [[PB_REF]]([[ADD_PB]])
 // CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB_FN]] : $@callee_guaranteed (Float) -> Float)
 // CHECK-SIL:   return [[VJP_RESULT]] : $(Float, @callee_guaranteed (Float) -> Float)
 // CHECK-SIL: }
 
-// CHECK-SIL-LABEL: sil private [ossa] @fooTJpSpSr : $@convention(thin) (Float, @owned (_: @callee_guaranteed (Float) -> (Float, Float))) -> Float {
-// CHECK-SIL: bb0([[DY:%.*]] : $Float, [[PB_STRUCT:%.*]] : @owned $(_: @callee_guaranteed (Float) -> (Float, Float))):
-// CHECK-SIL:   [[ADD_PB:%.*]] = destructure_tuple [[PB_STRUCT]] : $(_: @callee_guaranteed (Float) -> (Float, Float))
+// CHECK-SIL-LABEL: sil private [ossa] @fooTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float {
+// CHECK-SIL: bb0([[DY:%.*]] : $Float, [[ADD_PB:%.*]] : @owned $@callee_guaranteed (Float) -> (Float, Float)):
 // CHECK-SIL:   debug_value [[DY]] : $Float, let, name "y"
 // CHECK-SIL:   [[ADD_PB_RES:%.*]] = apply [[ADD_PB]]([[DY]]) : $@callee_guaranteed (Float) -> (Float, Float)
 // CHECK-SIL:   ([[DX_1:%.*]], [[DX_2:%.*]]) = destructure_tuple [[ADD_PB_RES]] : $(Float, Float)
@@ -112,4 +110,4 @@ struct ExampleStruct {
 
 // CHECK-SIL-LABEL: sil hidden [ossa] @fooMethodTJrSUpSr : $@convention(method) (Float, ExampleStruct) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 
-// CHECK-SIL-LABEL: sil private [ossa] @fooMethodTJpSUpSr : $@convention(thin) (Float, @owned (_: @callee_guaranteed (Float) -> (Float, Float))) -> Float {
+// CHECK-SIL-LABEL: sil private [ossa] @fooMethodTJpSUpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float {
