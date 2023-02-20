@@ -106,8 +106,9 @@ static void getVariableNameForValue(SILValue value2,
     // Otherwise, try to see if we have a single value instruction we can look
     // through.
     if (isa<BeginBorrowInst>(searchValue) || isa<LoadInst>(searchValue) ||
-        isa<BeginAccessInst>(searchValue) || isa<MarkMustCheckInst>(searchValue) ||
-        isa<ProjectBoxInst>(searchValue)) {
+        isa<LoadBorrowInst>(searchValue) || isa<BeginAccessInst>(searchValue) ||
+        isa<MarkMustCheckInst>(searchValue) ||
+        isa<ProjectBoxInst>(searchValue) || isa<CopyValueInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }

@@ -493,9 +493,13 @@ public:
       isUninitialized = true;
     } else {
       // If this is a let with an initializer or bound value, we only need a
-      // buffer if the type is address only.
+      // buffer if the type is address only or is noncopyable.
+      //
+      // For noncopyable types, we always need to box them and eagerly
+      // reproject.
       needsTemporaryBuffer =
-          lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses();
+          (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
+        lowering->getLoweredType().isPureMoveOnly();
     }
 
     // Make sure that we have a non-address only type when binding a
@@ -642,8 +646,7 @@ public:
     // We do this before the begin_borrow "normal" path below since move only
     // types do not have no implicit copy attr on them.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
-        value->getType().isMoveOnly() &&
-        !value->getType().isMoveOnlyWrapped()) {
+        value->getType().isPureMoveOnly()) {
       value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
       return SGF.B.createMarkMustCheckInst(
           PrologueLoc, value,
@@ -1261,10 +1264,10 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
 
   assert(!isa<InOutType>(varType) && "local variables should never be inout");
 
-  // If this is a 'let' initialization for a non-global, set up a
-  // let binding, which stores the initialization value into VarLocs directly.
+  // If this is a 'let' initialization for a copyable non-global, set up a let
+  // binding, which stores the initialization value into VarLocs directly.
   if (forceImmutable && vd->getDeclContext()->isLocalContext() &&
-      !isa<ReferenceStorageType>(varType))
+      !isa<ReferenceStorageType>(varType) && !varType->isPureMoveOnly())
     return InitializationPtr(new LetValueInitialization(vd, *this));
 
   // If the variable has no initial value, emit a mark_uninitialized instruction

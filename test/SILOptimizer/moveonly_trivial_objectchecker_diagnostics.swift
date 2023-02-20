@@ -150,7 +150,7 @@ public func aggStructLoopConsume(_ x: __shared AggStruct) { // expected-error {{
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -200,7 +200,7 @@ public func aggStructDiamondInLoop(_ x: __shared AggStruct) { // expected-error 
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -420,7 +420,7 @@ public func aggGenericStructLoopConsume(_ x: __shared AggGenericStruct<CopyableK
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -470,7 +470,7 @@ public func aggGenericStructDiamondInLoop(_ x: __shared AggGenericStruct<Copyabl
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -681,7 +681,7 @@ public func aggGenericStructLoopConsume<T>(_ x: __shared AggGenericStruct<T>) { 
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -731,7 +731,7 @@ public func aggGenericStructDiamondInLoop<T>(_ x: __shared AggGenericStruct<T>) 
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -950,7 +950,7 @@ public func enumLoopConsume(_ x: __shared EnumTy) { // expected-error {{'x' has 
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        consumeVal(x2) // expected-note {{consuming in loop use here}}
+        consumeVal(x2) // expected-note {{consuming use here}}
     }
 }
 
@@ -1000,7 +1000,7 @@ public func enumDiamondInLoop(_ x: __shared EnumTy) { // expected-error {{'x' ha
           consumeVal(x2) // expected-note {{consuming use here}}
       } else {
           consumeVal(x2) // expected-note {{consuming use here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consuming use here}}
       }
     }
 }
@@ -1172,7 +1172,7 @@ public func enumPatternMatchIfLet2(_ x: __shared EnumTy) { // expected-error {{'
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming in loop use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
             borrowVal(x)
         }
     }

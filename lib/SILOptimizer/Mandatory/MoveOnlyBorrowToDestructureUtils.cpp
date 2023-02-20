@@ -1574,7 +1574,13 @@ static bool gatherBorrows(SILValue rootValue,
       if (!use->get()->getType().isMoveOnly())
         continue;
 
+      // Do not look through apply sites.
+      if (ApplySite::isa(use->getUser()))
+        continue;
+
       // Search through forwarding consumes.
+      //
+      // TODO: Can this just not return a forwarded value for ApplySites?
       ForwardingOperand(use).visitForwardedValues([&](SILValue value) -> bool {
         for (auto *use : value->getUses())
           worklist.push_back(use);

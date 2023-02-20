@@ -168,13 +168,17 @@ extension NonTrivialEnum {
 ///////////////////////////////
 
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly27blackHoleLetInitialization1yyF : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = alloc_box
+// CHECK: [[BORROWED_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
 // CHECK: [[FN:%.*]] = function_ref @$s8moveonly2FDVACycfC :
 // CHECK: [[X:%.*]] = apply [[FN]](
-// CHECK: [[X_MV_LEXICAL:%.*]] = move_value [lexical] [[X]]
-// CHECK: [[X_MV_ONLY:%.*]] = mark_must_check [consumable_and_assignable] [[X_MV_LEXICAL]]
-// CHECK: [[X_MV_ONLY_BORROW:%.*]] = begin_borrow [[X_MV_ONLY]]
-// CHECK: [[X_MV_ONLY_COPY:%.*]] = copy_value [[X_MV_ONLY_BORROW]]
-// CHECK: [[X_MV_ONLY_CONSUME:%.*]] = move_value [[X_MV_ONLY_COPY]]
+// CHECK: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
+// CHECK: store [[X]] to [init] [[PROJECT]]
+//
+// CHECK: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
+// CHECK: [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK: [[VALUE:%.*]] = load [copy] [[MARKED]]
+// CHECK: move_value [[VALUE]]
 // CHECK: } // end sil function '$s8moveonly27blackHoleLetInitialization1yyF'
 func blackHoleLetInitialization1() {
     let x = FD()
@@ -182,13 +186,17 @@ func blackHoleLetInitialization1() {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly27blackHoleLetInitialization2yyF : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = alloc_box
+// CHECK: [[BORROWED_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
 // CHECK: [[FN:%.*]] = function_ref @$s8moveonly2FDVACycfC :
 // CHECK: [[X:%.*]] = apply [[FN]](
-// CHECK: [[X_MV_LEXICAL:%.*]] = move_value [lexical] [[X]]
-// CHECK: [[X_MV_ONLY:%.*]] = mark_must_check [consumable_and_assignable] [[X_MV_LEXICAL]]
-// CHECK: [[X_MV_ONLY_BORROW:%.*]] = begin_borrow [[X_MV_ONLY]]
-// CHECK: [[X_MV_ONLY_COPY:%.*]] = copy_value [[X_MV_ONLY_BORROW]]
-// CHECK: [[X_MV_ONLY_CONSUME:%.*]] = move_value [[X_MV_ONLY_COPY]]
+// CHECK: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
+// CHECK: store [[X]] to [init] [[PROJECT]]
+//
+// CHECK: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
+// CHECK: [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK: [[VALUE:%.*]] = load [copy] [[MARKED]]
+// CHECK: move_value [[VALUE]]
 // CHECK: } // end sil function '$s8moveonly27blackHoleLetInitialization2yyF'
 func blackHoleLetInitialization2() {
     let x = FD()
@@ -274,8 +282,15 @@ func blackHoleVarInitialization3() {
 ////////////////////////////////
 
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly24borrowObjectFunctionCallyyF : $@convention(thin) () -> () {
-// CHECK: [[CLS:%.*]] = mark_must_check [consumable_and_assignable]
-// CHECK: [[BORROW:%.*]] = begin_borrow [[CLS]]
+// CHECK: [[BOX:%.*]] = alloc_box
+// CHECK: [[BORROW_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
+//
+// CHECK: [[PROJECT:%.*]] = project_box [[BORROW_BOX]]
+// CHECK: store {{%.*}} to [init] [[PROJECT]]
+//
+// CHECK: [[PROJECT:%.*]] = project_box [[BORROW_BOX]]
+// CHECK: [[CLS:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK: [[BORROW:%.*]] = load_borrow [[CLS]]
 // CHECK: [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA2FDVhF :
 // CHECK: apply [[FN]]([[BORROW]])
 // CHECK: end_borrow [[BORROW]]
@@ -565,8 +580,11 @@ var booleanGuard2: Bool { false }
 // CHECK:   br [[BB_CONT:bb[0-9]+]]
 //
 // CHECK: [[BB_E_2]]([[BBARG:%.*]] : @guaranteed
+// CHECK:   [[NEW_BOX:%.*]] = alloc_box
+// CHECK:   [[NEW_BOX_BORROW:%.*]] = begin_borrow [lexical] [[NEW_BOX]]
+// CHECK:   [[NEW_BOX_PROJECT:%.*]] = project_box [[NEW_BOX_BORROW]]
 // CHECK:   [[BBARG_COPY:%.*]] = copy_value [[BBARG]]
-// CHECK:   [[NEW_VAL:%.*]] = move_value [lexical] [[BBARG_COPY]]
+// CHECK:   store [[BBARG_COPY]] to [init] [[NEW_BOX_PROJECT]]
 // CHECK:   end_borrow [[BORROWED_VALUE]]
 // CHECK:   br [[BB_CONT]]
 //
@@ -597,8 +615,11 @@ var booleanGuard2: Bool { false }
 //
 // Move only case.
 // CHECK: [[BB_E2_RHS]]([[BBARG:%.*]] : @guaranteed
+// CHECK:   [[NEW_BOX:%.*]] = alloc_box
+// CHECK:   [[NEW_BOX_BORROW:%.*]] = begin_borrow [lexical] [[NEW_BOX]]
+// CHECK:   [[NEW_BOX_PROJECT:%.*]] = project_box [[NEW_BOX_BORROW]]
 // CHECK:   [[BBARG_COPY:%.*]] = copy_value [[BBARG]]
-// CHECK:   move_value [lexical] [[BBARG_COPY]]
+// CHECK:   store [[BBARG_COPY]] to [init] [[NEW_BOX_PROJECT]]
 // CHECK:   end_borrow [[BORROWED_VALUE]]
 // CHECK:   br [[BB_CONT]]
 //

@@ -314,8 +314,14 @@ static bool memInstMustConsume(Operand *memOper) {
     return applySite.getArgumentOperandConvention(*memOper).isOwnedConvention();
   }
   case SILInstructionKind::PartialApplyInst: {
-    // If we are on the stack, we do not consume. Otherwise, we do.
-    return !cast<PartialApplyInst>(memInst)->isOnStack();
+    // If we are on the stack or have an inout convention, we do not
+    // consume. Otherwise, we do.
+    auto *pai = cast<PartialApplyInst>(memInst);
+    if (pai->isOnStack())
+      return false;
+    ApplySite applySite(pai);
+    auto convention = applySite.getArgumentConvention(*memOper);
+    return convention.isInoutConvention();
   }
   case SILInstructionKind::DestroyAddrInst:
     return true;
@@ -983,6 +989,141 @@ struct MoveOnlyAddressCheckerPImpl {
                    const FieldSensitivePrunedLivenessBoundary &boundary);
 
   void handleSingleBlockDestroy(SILInstruction *destroy, bool isReinit);
+};
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
+//                     MARK: CopiedLoadBorrowElimination
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// An early transform that we run to convert any load_borrow that are copied
+/// directly or that have any subelement that is copied to a load [copy]. This
+/// lets the rest of the optimization handle these as appropriate.
+struct CopiedLoadBorrowEliminationVisitor : public AccessUseVisitor {
+  SILFunction *fn;
+  StackList<LoadBorrowInst *> targets;
+
+  CopiedLoadBorrowEliminationVisitor(SILFunction *fn)
+      : AccessUseVisitor(AccessUseType::Overlapping,
+                         NestedAccessType::IgnoreAccessBegin),
+        fn(fn), targets(fn) {}
+
+  bool visitUse(Operand *op, AccessUseType useTy) override {
+    LLVM_DEBUG(llvm::dbgs() << "CopiedLBElim. Visiting: " << *op->getUser());
+    auto *lbi = dyn_cast<LoadBorrowInst>(op->getUser());
+    if (!lbi)
+      return true;
+
+    LLVM_DEBUG(llvm::dbgs() << "Found load_borrow: " << *lbi);
+
+    StackList<Operand *> useWorklist(lbi->getFunction());
+    for (auto *use : lbi->getUses())
+      useWorklist.push_back(use);
+
+    bool shouldConvertToLoadCopy = false;
+    while (!useWorklist.empty()) {
+      auto *nextUse = useWorklist.pop_back_val();
+      switch (nextUse->getOperandOwnership()) {
+      case OperandOwnership::NonUse:
+      case OperandOwnership::ForwardingUnowned:
+      case OperandOwnership::PointerEscape:
+        continue;
+
+        // These might be uses that we need to perform a destructure or insert
+        // struct_extracts for.
+      case OperandOwnership::TrivialUse:
+      case OperandOwnership::InstantaneousUse:
+      case OperandOwnership::UnownedInstantaneousUse:
+      case OperandOwnership::InteriorPointer:
+      case OperandOwnership::BitwiseEscape: {
+        // Look through copy_value of a move only value. We treat copy_value of
+        // copyable values as normal uses.
+        if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
+          if (cvi->getOperand()->getType().isMoveOnly()) {
+            shouldConvertToLoadCopy = true;
+            break;
+          }
+        }
+        continue;
+      }
+
+      case OperandOwnership::ForwardingConsume:
+      case OperandOwnership::DestroyingConsume:
+        // We can only hit this if our load_borrow was copied.
+        llvm_unreachable("We should never hit this");
+
+      case OperandOwnership::GuaranteedForwarding:
+        // If we have a switch_enum, we always need to convert it to a load
+        // [copy] since we need to destructure through it.
+        shouldConvertToLoadCopy |= isa<SwitchEnumInst>(nextUse->getUser());
+
+        ForwardingOperand(nextUse).visitForwardedValues([&](SILValue value) {
+          for (auto *use : value->getUses()) {
+            useWorklist.push_back(use);
+          }
+          return true;
+        });
+        continue;
+
+      case OperandOwnership::Borrow:
+        LLVM_DEBUG(llvm::dbgs() << "        Found recursive borrow!\n");
+        // Look through borrows.
+        for (auto value : nextUse->getUser()->getResults()) {
+          for (auto *use : value->getUses()) {
+            useWorklist.push_back(use);
+          }
+        }
+        continue;
+      case OperandOwnership::EndBorrow:
+        LLVM_DEBUG(llvm::dbgs() << "        Found end borrow!\n");
+        continue;
+      case OperandOwnership::Reborrow:
+        llvm_unreachable("Unsupported for now?!");
+      }
+
+      if (shouldConvertToLoadCopy)
+        break;
+    }
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "Load Borrow was copied: "
+               << (shouldConvertToLoadCopy ? "true" : "false") << '\n');
+    if (!shouldConvertToLoadCopy)
+      return true;
+
+    targets.push_back(lbi);
+    return true;
+  }
+
+  void process() {
+    if (targets.empty())
+      return;
+
+    while (!targets.empty()) {
+      auto *lbi = targets.pop_back_val();
+      SILBuilderWithScope builder(lbi);
+      SILValue li = builder.emitLoadValueOperation(
+          lbi->getLoc(), lbi->getOperand(), LoadOwnershipQualifier::Copy);
+      SILValue borrow = builder.createBeginBorrow(lbi->getLoc(), li);
+
+      for (auto *ebi : lbi->getEndBorrows()) {
+        auto *next = ebi->getNextInstruction();
+        SILBuilderWithScope builder(next);
+        auto loc = RegularLocation::getAutoGeneratedLocation();
+        builder.emitDestroyValueOperation(loc, li);
+      }
+
+      lbi->replaceAllUsesWith(borrow);
+      lbi->eraseFromParent();
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "After Load Borrow Elim. Func Dump Start! ";
+               fn->print(llvm::dbgs()));
+    LLVM_DEBUG(llvm::dbgs() << "After Load Borrow Elim. Func Dump End!\n");
+  }
 };
 
 } // namespace
@@ -1890,6 +2031,19 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   if (!accessPath.isValid()) {
     LLVM_DEBUG(llvm::dbgs() << "Invalid access path: " << *markedAddress);
     return false;
+  }
+
+  // Before we do anything, convert any load_borrow + copy_value into load
+  // [copy] + begin_borrow for further processing.
+  {
+    CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(fn);
+    if (!visitAccessPathBaseUses(copiedLoadBorrowEliminator, accessPathWithBase,
+                                 fn)) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed copied load borrow eliminator visit: "
+                              << *markedAddress);
+      return false;
+    }
+    copiedLoadBorrowEliminator.process();
   }
 
   // Then gather all uses of our address by walking from def->uses. We use this

@@ -383,7 +383,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::Constant: {
       // let declarations.
       auto &tl = getTypeLowering(valueType);
-      SILValue Val = Entry.value;
+      SILValue Val = Entry.getValueOrBoxedValue(*this);
       bool eliminateMoveOnlyWrapper =
           Val->getType().isMoveOnlyWrapped() &&
           !vd->getInterfaceType()->is<SILMoveOnlyWrappedType>();
