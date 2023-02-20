@@ -46,21 +46,22 @@ func a(x: __shared M) {
     borrow(x)
 }
 
-func b(x: __owned M) {
+func b(x: __owned M) { // expected-error {{'x' used after consume}}
     clodger({ borrow(x) }, consume: x)
-    // expected-error @-1 {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
+    // expected-note @-1:25 {{non-consuming use here}}
+    // expected-note @-2:37 {{consuming use here}}
 }
 
 func c(x: __owned M) {
     clodger({ borrow(x) })
     borrow(x)
     consume(x)
-    // expected-error @-1 {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
 }
 
-func d(x: __owned M) {
+func d(x: __owned M) { // expected-error {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     clodger({ consume(x) })
-    // expected-error @-1 {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
+    // expected-error @-1 {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
+    // expected-note @-2 {{consuming use here}}
 }
 
 func e(x: inout M) {
