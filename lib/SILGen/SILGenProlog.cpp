@@ -339,7 +339,7 @@ struct ArgumentInitHelper {
             SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
                                                pd->getType()),
             SGF.F.getGenericEnvironment(),
-            /*mutable*/ true);
+            /*mutable*/ false);
 
         auto *box = SGF.B.createAllocBox(loc, boxType, varinfo);
         SILValue destAddr = SGF.B.createProjectBox(loc, box, 0);
@@ -355,6 +355,13 @@ struct ArgumentInitHelper {
         return;
       }
 
+      // If we have a guaranteed noncopyable argument, we do something a little
+      // different. Specifically, we emit it as normal and do a non-consume or
+      // assign. The reason why we do this is that a guaranteed argument cannot
+      // be used in an escaping closure. So today, we leave it with the
+      // misleading consuming message. We still are able to pass it to
+      // non-escaping closures though since the onstack partial_apply does not
+      // consume the value.
       assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
       value = SGF.B.createCopyValue(loc, value);
       value = SGF.B.createMarkMustCheckInst(
@@ -601,10 +608,10 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   case CaptureKind::Box: {
     // LValues are captured as a retained @box that owns
     // the captured value.
+    bool isMutable = captureKind == CaptureKind::Box;
     auto type = getVarTypeInCaptureContext();
     // Get the content for the box in the minimal  resilience domain because we
     // are declaring a type.
-    bool isMutable = captureKind != CaptureKind::ImmutableBox;
     auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(
         VD,
         SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
@@ -613,18 +620,14 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     auto *box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
     box->setClosureCapture(true);
-    SILValue addr = SGF.B.createProjectBox(VD, box, 0);
-    if (addr->getType().isMoveOnly()) {
-      if (isMutable)
-        addr = SGF.B.createMarkMustCheckInst(
-            VD, addr, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
-      else
-        addr = SGF.B.createMarkMustCheckInst(
-            VD, addr, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+    if (box->getType().getSILBoxFieldType(&SGF.F, 0).isMoveOnly()) {
+      SGF.VarLocs[VD] = SILGenFunction::VarLoc::getForBox(box);
+    } else {
+      SILValue addr = SGF.B.createProjectBox(VD, box, 0);
+      SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
+      SILDebugVariable DbgVar(VD->isLet(), ArgNo);
+      SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
     }
-    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
-    SILDebugVariable DbgVar(VD->isLet(), ArgNo);
-    SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
     break;
   }
   case CaptureKind::Immutable:

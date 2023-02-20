@@ -387,28 +387,6 @@ void swift::siloptimizer::searchForCandidateAddressMarkMustChecks(
       if (!mmci || !mmci->hasMoveCheckerKind() || !mmci->getType().isAddress())
         continue;
 
-      // Skip any alloc_box due to heap to stack failing on a box capture. This
-      // will just cause an error.
-      if (auto *pbi = dyn_cast<ProjectBoxInst>(mmci->getOperand())) {
-        if (isa<AllocBoxInst>(pbi->getOperand())) {
-          LLVM_DEBUG(
-              llvm::dbgs()
-              << "Early emitting diagnostic for unsupported alloc box!\n");
-          diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
-          continue;
-        }
-
-        if (auto *bbi = dyn_cast<BeginBorrowInst>(pbi->getOperand())) {
-          if (isa<AllocBoxInst>(bbi->getOperand())) {
-            LLVM_DEBUG(
-                llvm::dbgs()
-                << "Early emitting diagnostic for unsupported alloc box!\n");
-            diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(mmci);
-            continue;
-          }
-        }
-      }
-
       moveIntroducersToProcess.insert(mmci);
     }
   }
@@ -1368,15 +1346,21 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
       // If we are asked to perform no_consume_or_assign checking or
       // assignable_but_not_consumable checking, if we found any consumes of our
       // load, then we need to emit an error.
-      if (markedValue->getCheckKind() ==
-              MarkMustCheckInst::CheckKind::NoConsumeOrAssign ||
-          markedValue->getCheckKind() ==
-              MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
+      auto checkKind = markedValue->getCheckKind();
+      if (checkKind != MarkMustCheckInst::CheckKind::ConsumableAndAssignable) {
         if (moveChecker.canonicalizer.foundAnyConsumingUses()) {
           LLVM_DEBUG(llvm::dbgs()
                      << "Found mark must check [nocopy] error: " << *user);
-          moveChecker.diagnosticEmitter.emitAddressInstLoadedAndConsumed(
-              markedValue);
+          auto *fArg = dyn_cast<SILFunctionArgument>(
+              stripAccessMarkers(markedValue->getOperand()));
+          if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
+            moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(
+                markedValue, fArg);
+          } else {
+            moveChecker.diagnosticEmitter
+                .emitAddressEscapingClosureCaptureLoadedAndConsumed(
+                    markedValue);
+          }
           emittedEarlyDiagnostic = true;
           return true;
         }

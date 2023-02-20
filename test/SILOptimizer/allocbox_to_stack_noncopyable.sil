@@ -10,6 +10,8 @@ struct NonTrivialStruct {
 }
 
 sil @use_nontrivialstruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+sil @consume_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+sil @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
 
 sil [ossa] @host_markmustcheck_closure : $@convention(thin) (@guaranteed { var NonTrivialStruct }) -> () {
 bb0(%0 : @closureCapture @guaranteed ${ var NonTrivialStruct }):
@@ -62,4 +64,99 @@ bb0(%0 : @owned $NonTrivialStruct):
   dealloc_box %1 : ${ var NonTrivialStruct }
   %9999 = tuple()
   return %9999 : $()
+}
+
+// MARK: Test that we properly handle let alloc_box.
+//
+// CHECK-LABEL: sil hidden [ossa] @captured_let_allocstack_caller : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[STACK:%.*]] = alloc_stack
+// CHECK:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[STACK]]
+// CHECK:   partial_apply [callee_guaranteed] {{%.*}}([[MARK]]) : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> ()
+// CHECK: } // end sil function 'captured_let_allocstack_caller'
+
+// CHECK-LABEL: sil private [ossa] @$s31captured_let_allocstack_closureTf0s_n : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> () {
+// CHECK: // [[ARG:.*]]{{ .*}}// user: [[MARK:%[0-9][0-9]*]]
+// CHECK: bb0([[ARG]] : @closureCapture $*NonTrivialStruct):
+// CHECK:   [[MARK]] = mark_must_check [no_consume_or_assign] [[ARG]]
+// CHECK:   [[LOAD:%.*]] = load [copy] [[MARK]]
+// CHECK:   [[VALUE:%.*]] = move_value [[LOAD]]
+// CHECK:   destroy_value [[VALUE]]
+// CHECK:   [[LOAD:%.*]] = load [copy] [[MARK]]
+// CHECK:   [[VALUE:%.*]] = move_value [[LOAD]]
+// CHECK:   destroy_value [[VALUE]]
+// CHECK:   cond_br undef, [[LHS:bb[0-9]+]], [[RHS:bb[0-9]+]]
+//
+// CHECK: [[LHS]]:
+// CHECK:   [[VALUE:%.*]] = load [copy] [[MARK]]
+// CHECK:   apply {{%.*}}([[VALUE]]) : $@convention(thin) (@owned NonTrivialStruct) -> ()
+// CHECK:   [[VALUE:%.*]] = load_borrow [[MARK]]
+// CHECK:   apply {{%.*}}([[VALUE]]) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+// CHECK: } // end sil function 'captured_let_allocstack_closure'
+sil hidden [ossa] @captured_let_allocstack_caller : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ let NonTrivialStruct }, let, name "x"
+  %2 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %3 = apply %2() : $@convention(thin) () -> @owned NonTrivialStruct
+  %4 = project_box %0 : ${ let NonTrivialStruct }, 0
+  store %3 to [init] %4 : $*NonTrivialStruct
+  %6 = function_ref @captured_let_allocstack_closure : $@convention(thin) (@guaranteed { let NonTrivialStruct }) -> ()
+  %7 = project_box %0 : ${ let NonTrivialStruct }, 0
+  %8 = copy_value %0 : ${ let NonTrivialStruct }
+  mark_function_escape %7 : $*NonTrivialStruct
+  %10 = partial_apply [callee_guaranteed] %6(%8) : $@convention(thin) (@guaranteed { let NonTrivialStruct }) -> ()
+  %11 = begin_borrow [lexical] %10 : $@callee_guaranteed () -> ()
+  debug_value %11 : $@callee_guaranteed () -> (), let, name "f"
+  %13 = project_box %0 : ${ let NonTrivialStruct }, 0
+  %13a = mark_must_check [assignable_but_not_consumable] %13 : $*NonTrivialStruct
+  %14 = load_borrow %13a : $*NonTrivialStruct
+  %15 = function_ref @use_nontrivialstruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  %16 = apply %15(%14) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  end_borrow %14 : $NonTrivialStruct
+  %18 = project_box %0 : ${ let NonTrivialStruct }, 0
+  %18a = mark_must_check [assignable_but_not_consumable] %18 : $*NonTrivialStruct
+  %19 = load [copy] %18a : $*NonTrivialStruct
+  %20 = function_ref @consume_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  %21 = apply %20(%19) : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  end_borrow %11 : $@callee_guaranteed () -> ()
+  destroy_value %10 : $@callee_guaranteed () -> ()
+  destroy_value %0 : ${ let NonTrivialStruct }
+  %25 = tuple ()
+  return %25 : $()
+}
+
+sil private [ossa] @captured_let_allocstack_closure : $@convention(thin) (@guaranteed { let NonTrivialStruct }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ let NonTrivialStruct }):
+  %1 = project_box %0 : ${ let NonTrivialStruct }, 0
+  %2 = mark_must_check [assignable_but_not_consumable] %1 : $*NonTrivialStruct
+  %3 = load [copy] %2 : $*NonTrivialStruct
+  %4 = move_value %3 : $NonTrivialStruct
+  destroy_value %4 : $NonTrivialStruct
+  %6 = project_box %0 : ${ let NonTrivialStruct }, 0
+  %7 = mark_must_check [assignable_but_not_consumable] %6 : $*NonTrivialStruct
+  %8 = load [copy] %7 : $*NonTrivialStruct
+  %9 = move_value %8 : $NonTrivialStruct
+  destroy_value %9 : $NonTrivialStruct
+  cond_br undef, bb1, bb2
+
+bb1:
+  %17 = project_box %0 : ${ let NonTrivialStruct }, 0
+  %18 = mark_must_check [assignable_but_not_consumable] %17 : $*NonTrivialStruct
+  %19 = load [copy] %18 : $*NonTrivialStruct
+  %20 = function_ref @consume_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  %21 = apply %20(%19) : $@convention(thin) (@owned NonTrivialStruct) -> ()
+  %22 = project_box %0 : ${ let NonTrivialStruct }, 0
+  %23 = mark_must_check [assignable_but_not_consumable] %22 : $*NonTrivialStruct
+  %24 = load_borrow %23 : $*NonTrivialStruct
+  %25 = function_ref @use_nontrivialstruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  %26 = apply %25(%24) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  end_borrow %24 : $NonTrivialStruct
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %30 = tuple ()
+  return %30 : $()
 }

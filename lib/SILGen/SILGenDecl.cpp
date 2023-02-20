@@ -351,13 +351,13 @@ public:
            "can't emit a local var for a non-local var decl");
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
+
     // The box type's context is lowered in the minimal resilience domain.
+    auto instanceType = SGF.SGM.Types.getLoweredRValueType(
+        TypeExpansionContext::minimal(), decl->getType());
     auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
-        decl,
-        SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
-                                           decl->getType()),
-        SGF.F.getGenericEnvironment(),
-        /*mutable*/ true);
+        decl, instanceType, SGF.F.getGenericEnvironment(),
+        /*mutable*/ !instanceType->isPureMoveOnly() || !decl->isLet());
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.

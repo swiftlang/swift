@@ -106,7 +106,10 @@ public:
                                           Operand *consumingUse,
                                           Operand *nonConsumingUse);
 
-  void emitAddressInstLoadedAndConsumed(MarkMustCheckInst *markedValue);
+  void emitAddressEscapingClosureCaptureLoadedAndConsumed(
+      MarkMustCheckInst *markedValue);
+  void emitPromotedBoxArgumentError(MarkMustCheckInst *markedValue,
+                                    SILFunctionArgument *arg);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing

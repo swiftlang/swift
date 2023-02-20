@@ -46,20 +46,21 @@ func a(x: __shared M) {
     borrow(x)
 }
 
-func b(x: __owned M) { // expected-error{{}}
-    clodger({ borrow(x) }, consume: x) // expected-note{{}} expected-note{{}}
+func b(x: __owned M) {
+    clodger({ borrow(x) }, consume: x)
+    // expected-error @-1 {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
 }
 
 func c(x: __owned M) {
     clodger({ borrow(x) })
     borrow(x)
     consume(x)
+    // expected-error @-1 {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
 }
 
-func d(x: __owned M) { // expected-error{{}}
-    clodger({ consume(x) }) // expected-note{{}}
-    // TODO: This will go away once the box capture support is there.
-    // expected-error @-2 {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
+func d(x: __owned M) {
+    clodger({ consume(x) })
+    // expected-error @-1 {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
 }
 
 func e(x: inout M) {

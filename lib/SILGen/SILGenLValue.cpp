@@ -3164,18 +3164,9 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
                                                         SILAccessKind::Read);
 
     if (accessAddr->getType().isMoveOnly()) {
-      bool needCheck = true;
-      SILValue tmp = destAddr;
-      if (auto *mmci = dyn_cast<MarkMustCheckInst>(tmp))
-        tmp = mmci->getOperand();
-      if (auto *pbi = dyn_cast<ProjectBoxInst>(tmp)) {
-        auto boxType = pbi->getOperand()->getType().castTo<SILBoxType>();
-        needCheck = boxType->getLayout()->getFields()[0].isMutable();
-      }
-      if (needCheck)
-        accessAddr = B.createMarkMustCheckInst(
-            loc, accessAddr,
-            MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
+      accessAddr = B.createMarkMustCheckInst(
+          loc, accessAddr,
+          MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
     }
 
     auto propagateRValuePastAccess = [&](RValue &&rvalue) {
