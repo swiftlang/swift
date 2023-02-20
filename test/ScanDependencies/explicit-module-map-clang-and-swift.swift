@@ -3,6 +3,7 @@
 // RUN: mkdir -p %t/inputs
 // RUN: echo "public func anotherFuncA() {}" > %t/A.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/inputs/A.swiftmodule -emit-module-doc-path %t/inputs/A.swiftdoc -emit-module-source-info -emit-module-source-info-path %t/inputs/A.swiftsourceinfo -import-underlying-module -I%S/Inputs/CHeaders -module-cache-path %t.module-cache %t/A.swift -module-name A
+// RUN: %target-swift-emit-pcm -module-name A -o %t/inputs/A.pcm %S/Inputs/CHeaders/module.modulemap
 
 // RUN: echo "[{" > %/t/inputs/map.json
 // RUN: echo "\"moduleName\": \"A\"," >> %/t/inputs/map.json
@@ -10,6 +11,10 @@
 // RUN: echo "\"docPath\": \"%/t/inputs/A.swiftdoc\"," >> %/t/inputs/map.json
 // RUN: echo "\"sourceInfoPath\": \"%/t/inputs/A.swiftsourceinfo\"," >> %/t/inputs/map.json
 // RUN: echo "\"isFramework\": false," >> %/t/inputs/map.json
+// RUN: echo "}," >> %/t/inputs/map.json
+// RUN: echo "{" >> %/t/inputs/map.json
+// RUN: echo "\"moduleName\": \"A\"," >> %/t/inputs/map.json
+// RUN: echo "\"clangModulePath\": \"%/t/inputs/A.pcm\"," >> %/t/inputs/map.json
 // RUN: echo "\"clangModuleMapPath\": \"%/S/Inputs/CHeaders/module.modulemap\"" >> %/t/inputs/map.json
 // RUN: echo "}," >> %/t/inputs/map.json
 // RUN: echo "{" >> %/t/inputs/map.json
@@ -33,7 +38,9 @@
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}]" >> %/t/inputs/map.json
 
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/Foo.swiftmodule -module-cache-path %t.module-cache -explicit-swift-module-map-file %t/inputs/map.json %s
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/Foo.swiftmodule -disable-implicit-swift-modules -module-cache-path %t.module-cache -explicit-swift-module-map-file %t/inputs/map.json -Rmodule-loading -Xcc -Rmodule-import %s 2>&1 | %FileCheck %s
+
+// CHECK: <unknown>:0: remark: importing module 'A' from {{.*}}{{/|\\}}explicit-module-map-clang-and-swift.swift.tmp{{/|\\}}inputs{{/|\\}}A.pcm'
 
 import A
 
