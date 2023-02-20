@@ -3798,12 +3798,11 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
               loc, loc.getAdvancedLoc(name.getBaseIdentifier().str().size()),
               isFront ? "first" : "last")
           .fixItRemove({callExpr->getArgs()->getStartLoc(),
-                        callExpr->getArgs()->getEndLoc().getAdvancedLoc(1)});
+                        callExpr->getArgs()->getEndLoc()});
     }
 
-    // Rewrite begin() and end() as calls to makeIterator().
-    if (name.getBaseIdentifier().is("begin") ||
-        name.getBaseIdentifier().is("end")) {
+    // Rewrite begin() as a call to makeIterator() and end as nil.
+    if (name.getBaseIdentifier().is("begin")) {
       if (conformsToRACollection(baseType)) {
         ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                            name.getBaseIdentifier().str());
@@ -3811,6 +3810,20 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
             .fixItReplaceChars(
                 loc, loc.getAdvancedLoc(name.getBaseIdentifier().str().size()),
                 "makeIterator");
+      } else {
+        ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
+                           name.getBaseIdentifier().str());
+        ctx.Diags.diagnose(loc, diag::iterator_potentially_unsafe);
+      }
+    } else if (name.getBaseIdentifier().is("end")) {
+      if (conformsToRACollection(baseType)) {
+        auto dotExpr = getAsExpr<UnresolvedDotExpr>(anchor);
+        auto callExpr = getAsExpr<CallExpr>(findParentExpr(dotExpr));
+
+        ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
+                           name.getBaseIdentifier().str());
+        ctx.Diags.diagnose(loc, diag::replace_with_nil)
+            .fixItReplaceChars(loc, callExpr->getArgs()->getEndLoc(), "nil");
       } else {
         ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                            name.getBaseIdentifier().str());

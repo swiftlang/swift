@@ -195,6 +195,8 @@ NOTE(at_to_subscript, none, "Do you want to replace it with a call "
      ())
 NOTE(get_swift_iterator, none, "Do you want to make a Swift iterator instead?",
      ())
+NOTE(replace_with_nil, none, "Do you want to compare against 'nil' instead?'",
+     ())
 NOTE(get_first_element, none, "Do you want to get the first element instead?",
      ())
 NOTE(get_last_element, none, "Do you want to get the last element instead?",
