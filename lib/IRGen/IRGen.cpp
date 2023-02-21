@@ -659,7 +659,8 @@ bool swift::compileAndWriteLLVM(llvm::Module *module,
 }
 
 static void setPointerAuthOptions(PointerAuthOptions &opts,
-                                  const clang::PointerAuthOptions &clangOpts){
+                                  const clang::PointerAuthOptions &clangOpts,
+                                  const IRGenOptions &irgenOpts) {
   // Intentionally do a slice-assignment to copy over the clang options.
   static_cast<clang::PointerAuthOptions&>(opts) = clangOpts;
 
@@ -801,6 +802,11 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.StoreExtraInhabitantTagFunction = PointerAuthSchema(
       codeKey, /*address*/ false, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::StoreExtraInhabitantTagFunction);
+
+  if (irgenOpts.UseRelativeProtocolWitnessTables)
+    opts.RelativeProtocolWitnessTable = PointerAuthSchema(
+        dataKey, /*address*/ false, Discrimination::Constant,
+        SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
 }
 
 std::unique_ptr<llvm::TargetMachine>
@@ -835,7 +841,7 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
       // after the module loaders are set up, and where these options are
       // formally not const.
       setPointerAuthOptions(const_cast<IRGenOptions &>(Opts).PointerAuth,
-                            clangInstance.getCodeGenOpts().PointerAuth);
+                            clangInstance.getCodeGenOpts().PointerAuth, Opts);
     }
   }
 

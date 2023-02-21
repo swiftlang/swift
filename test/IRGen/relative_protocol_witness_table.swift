@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -enable-relative-protocol-witness-tables -module-name A -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-relative-protocol-witness-tables -module-name A -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-cpu --check-prefix=CHECK
 
-// REQUIRES: CPU=x86_64 || CPU=arm64
-// UNSUPPORTED: CPU=arm64e
+// REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
 
 func testVWT<T>(_ t: T) {
   var local = t
@@ -216,8 +215,15 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:   br label %[[LBL2]]
 // CHECK:[[LBL2]]:
 // CHECK:   [[T5:%.*]] = phi i8** [ [[PWT]], %[[ENTRY]] ], [ [[T4]], %[[LBL1]] ]
-// CHECK:   [[CAST:%.*]] = bitcast i8** [[T5]] to i32*
-// CHECK:   [[SLOT:%.*]] = getelementptr inbounds i32, i32* [[CAST]], i32 1
+// CHECK-arm64e:   [[T6:%.*]] = ptrtoint i8** [[T5]] to i64
+// CHECK-arm64e:   [[T7:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[T6]], i32 2, i64 47152)
+// CHECK-arm64e:   [[T8:%.*]] = inttoptr i64 [[T7]] to i8**
+// CHECK-arm64e:   [[CAST:%.*]] = bitcast i8** [[T8]] to i32*
+// CHECK-arm64e:   [[SLOT:%.*]] = getelementptr inbounds i32, i32* [[CAST]], i32 1
+// CHECK-arm64:   [[CAST:%.*]] = bitcast i8** [[T5]] to i32*
+// CHECK-arm64:   [[SLOT:%.*]] = getelementptr inbounds i32, i32* [[CAST]], i32 1
+// CHECK-x86_64:   [[CAST:%.*]] = bitcast i8** [[T5]] to i32*
+// CHECK-x86_64:   [[SLOT:%.*]] = getelementptr inbounds i32, i32* [[CAST]], i32 1
 // CHECK:   [[T0:%.*]] = load i32, i32* [[SLOT]]
 // CHECK:   [[T1:%.*]] = sext i32 [[T0]] to i64
 // CHECK:   [[T2:%.*]] = ptrtoint i32* [[SLOT]] to i64
@@ -243,7 +249,12 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:  br label %[[L3:.*]]
 
 // CHECK:[[L2]]:
-// CHECK:  [[T8:%.*]] = bitcast i8** [[T_INHERITED]] to i32*
+// CHECK-arm64e:  [[P0:%.*]] = ptrtoint i8** [[T_INHERITED]] to i64
+// CHECK-arm64e:  [[P1:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[P0]], i32 2, i64 47152)
+// CHECK-arm64e:  [[P2:%.*]] = inttoptr i64 [[P1]] to i8**
+// CHECK-arm64e:  [[T8:%.*]] = bitcast i8** [[P2]] to i32*
+// CHECK-arm64:  [[T8:%.*]] = bitcast i8** [[T_INHERITED]] to i32*
+// CHECK-x86_64:  [[T8:%.*]] = bitcast i8** [[T_INHERITED]] to i32*
 // CHECK:  [[T9:%.*]] = getelementptr inbounds i32, i32* [[T8]], i32 1
 // CHECK:  [[T10:%.*]] = load i32, i32* [[T9]]
 // CHECK:  [[T11:%.*]] = sext i32 [[T10]] to i64
@@ -251,6 +262,9 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:  [[T13:%.*]] = add i64 [[T12]], [[T11]]
 // CHECK:  [[T14:%.*]] = inttoptr i64 [[T13]] to i8*
 // CHECK:  [[T15:%.*]] = bitcast i8* [[T14]] to i8**
+// CHECK-arm64e:  [[T16:%.*]] = ptrtoint i8** [[T15]] to i64
+// CHECK-arm64e:  [[T17:%.*]] = call i64 @llvm.ptrauth.sign(i64 [[T16]], i32 2, i64 47152)
+// CHECK-arm64e:  [[T15:%.*]] = inttoptr i64 [[T17]] to i8**
 // CHECK:  br label %[[L3:.*]]
 
 // CHECK:[[L3]]:
@@ -259,7 +273,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // Passing the witness table.
 
 // CHECK: define{{.*}} swiftcc void @"$s1A6useIt2yyF"()
-// CHECK:   call swiftcc void @"$s1A15requireWitness2yyxAA9InheritedRzlF"(%swift.opaque* {{.*}}, %swift.type* {{.*}} @"$s1A7BStructVMf"{{.*}}, i8** {{.*}} @"$s1A7BStructVAA9InheritedAAWP"
+// CHECK:   call swiftcc void @"$s1A15requireWitness2yyxAA9InheritedRzlF"(%swift.opaque* {{.*}}, %swift.type* {{.*}} @"$s1A7BStructVMf"{{.*}}, i8** {{.*}} @"$s1A7BStructVAA9InheritedAAWP{{(.ptrauth)?}}"
 // CHECK:   ret void
 
 // Accessing an associated witness
@@ -323,7 +337,12 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:   br label %[[T23:.*]]
 
 // CHECK: [[T14]]:
-// CHECK:   [[T15:%.*]] = bitcast i8** [[T4]] to i32*
+// CHECK-arm64e:  [[P0:%.*]] = ptrtoint i8** [[T4]] to i64
+// CHECK-arm64e:  [[P1:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[P0]], i32 2, i64 47152)
+// CHECK-arm64e:  [[P2:%.*]] = inttoptr i64 [[P1]] to i8**
+// CHECK-arm64e:  [[T15:%.*]] = bitcast i8** [[P2]] to i32*
+// CHECK-x86_64:   [[T15:%.*]] = bitcast i8** [[T4]] to i32*
+// CHECK-arm64:   [[T15:%.*]] = bitcast i8** [[T4]] to i32*
 // CHECK:   [[T16:%.*]] = getelementptr inbounds i32, i32* [[T15]], i32 1
 // CHECK:   [[T17:%.*]] = load i32, i32* [[T16]]
 // CHECK:   [[T18:%.*]] = sext i32 [[T17]] to i64
@@ -331,6 +350,9 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:   [[T20:%.*]] = add i64 [[T19]], [[T18]]
 // CHECK:   [[T21:%.*]] = inttoptr i64 [[T20]] to i8*
 // CHECK:   [[T22:%.*]] = bitcast i8* [[T21]] to i8**
+// CHECK-arm64e:  [[P0:%.*]] = ptrtoint i8** [[T22]] to i64
+// CHECK-arm64e:  [[P1:%.*]] = call i64 @llvm.ptrauth.sign(i64 [[P0]], i32 2, i64 47152)
+// CHECK-arm64e:  [[T22:%.*]] = inttoptr i64 [[P1]] to i8**
 // CHECK:   br label %[[T23]]
 
 // CHECK: [[T23]]:

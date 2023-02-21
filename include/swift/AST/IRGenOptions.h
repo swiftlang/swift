@@ -204,6 +204,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// C type StoreExtraInhabitantTag function descriminator.
   PointerAuthSchema StoreExtraInhabitantTagFunction;
+
+  /// Relative protocol witness table descriminator.
+  PointerAuthSchema RelativeProtocolWitnessTable;
 };
 
 enum class JITDebugArtifact : unsigned {
