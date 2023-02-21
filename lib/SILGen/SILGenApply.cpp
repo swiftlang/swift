@@ -2933,7 +2933,37 @@ done:
   }
 }
 
-static Expr *findStorageReferenceExprForBorrow(Expr *e) {
+/// Container to hold the result of a search for the storage reference
+/// when determining to emit a borrow.
+struct StorageRefResult {
+  // The direct storage reference.
+  Expr* storageRef;
+  // The root of the expression that accesses the storage in \c storageRef.
+  Expr* transitiveRoot;
+
+  // Represents an empty result
+  StorageRefResult() : storageRef(nullptr), transitiveRoot(nullptr) {}
+  bool isEmpty() const { return transitiveRoot == nullptr; }
+  operator bool() const { return !isEmpty(); }
+
+  StorageRefResult(Expr* storageRef, Expr* transitiveRoot)
+      : storageRef(storageRef), transitiveRoot(transitiveRoot) {
+    assert(storageRef && transitiveRoot);
+  }
+
+  // Initializes a storage reference where the base matches the ref.
+  StorageRefResult(Expr* storageRef)
+      : StorageRefResult(storageRef, storageRef) {}
+
+  StorageRefResult withTransitiveRoot(Expr *newRoot) {
+    return StorageRefResult(storageRef, newRoot);
+  }
+
+  // By default, this result is the transitive root.
+  operator Expr*() const { return transitiveRoot; }
+};
+
+static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
   e = e->getSemanticsProvidingExpr();
 
   // These are basically defined as the cases implemented by SILGenLValue.
@@ -2956,29 +2986,35 @@ static Expr *findStorageReferenceExprForBorrow(Expr *e) {
   // sub-expression is a storage reference, but don't return the
   // sub-expression.
   } else if (auto tue = dyn_cast<TupleElementExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(tue->getBase()))
-      return tue;
+    if (auto result = findStorageReferenceExprForBorrow(tue->getBase()))
+      return result.withTransitiveRoot(tue);
+
   } else if (auto fve = dyn_cast<ForceValueExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(fve->getSubExpr()))
-      return fve;
+    if (auto result = findStorageReferenceExprForBorrow(fve->getSubExpr()))
+      return result.withTransitiveRoot(fve);
+
   } else if (auto boe = dyn_cast<BindOptionalExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(boe->getSubExpr()))
-      return boe;
+    if (auto result = findStorageReferenceExprForBorrow(boe->getSubExpr()))
+      return result.withTransitiveRoot(boe);
+
   } else if (auto oe = dyn_cast<OpenExistentialExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(oe->getExistentialValue()) &&
-        findStorageReferenceExprForBorrow(oe->getSubExpr()))
-      return oe;
+    if (findStorageReferenceExprForBorrow(oe->getExistentialValue()))
+      if (auto result = findStorageReferenceExprForBorrow(oe->getSubExpr()))
+        return result.withTransitiveRoot(oe);
+
   } else if (auto bie = dyn_cast<DotSyntaxBaseIgnoredExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(bie->getRHS()))
-      return bie;
+    if (auto result = findStorageReferenceExprForBorrow(bie->getRHS()))
+      return result.withTransitiveRoot(bie);
+
   } else if (auto te = dyn_cast<AnyTryExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(te->getSubExpr()))
-      return te;
+    if (auto result = findStorageReferenceExprForBorrow(te->getSubExpr()))
+      return result.withTransitiveRoot(te);
+
   } else if (auto ioe = dyn_cast<InOutExpr>(e)) {
     return ioe;
   }
 
-  return nullptr;
+  return StorageRefResult();
 }
 
 Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow(
@@ -2990,7 +3026,7 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow(
   if (auto *li = dyn_cast<LoadExpr>(argExpr))
     argExpr = li->getSubExpr();
 
-  auto *lvExpr = ::findStorageReferenceExprForBorrow(argExpr);
+  auto lvExpr = ::findStorageReferenceExprForBorrow(argExpr);
 
   // Claim the value of this argument if we found a storage reference that has a
   // move only base.
@@ -3001,20 +3037,43 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow(
     //
     // NOTE: We purposely do not look through load implying that if we have
     // copyable types extracted from a move only class, we will not borrow.
-    auto *iterExpr = lvExpr;
-    while (true) {
-      SILType ty = SGF.getLoweredType(
-          iterExpr->getType()->getWithoutSpecifierType()->getCanonicalType());
-      if (ty.isPureMoveOnly())
-        break;
+//    auto *iterExpr = lvExpr;
+//    while (true) {
+//      SILType ty = SGF.getLoweredType(
+//          iterExpr->getType()->getWithoutSpecifierType()->getCanonicalType());
+//      if (ty.isPureMoveOnly())
+//        break;
+//
+//      if (auto *mre = dyn_cast<MemberRefExpr>(iterExpr)) {
+//        iterExpr = mre->getBase();
+//        continue;
+//      }
+//
+//      return nullptr;
+//    }
 
-      if (auto *mre = dyn_cast<MemberRefExpr>(iterExpr)) {
-        iterExpr = mre->getBase();
-        continue;
-      }
-
-      return nullptr;
+    VarDecl *storage = nullptr;
+    if (auto dre = dyn_cast<DeclRefExpr>(lvExpr.storageRef)) {
+      storage = dyn_cast<VarDecl>(dre->getDecl());
+    } else if (auto mre = dyn_cast<MemberRefExpr>(lvExpr.storageRef)) {
+      storage = dyn_cast<VarDecl>(mre->getDecl().getDecl());
     }
+
+    // if it's not the kind of storage we're expecting, reject the borrow.
+    if (!storage)
+      return nullptr;
+
+    // reject if the read-ownership is not a borrow.
+//    switch (storage->getOpaqueReadOwnership()) { // FIXME: this isn't any better than checking if it's move-only type.
+//    case OpaqueReadOwnership::Owned:
+//      return nullptr;
+//    case OpaqueReadOwnership::Borrowed:
+//    case OpaqueReadOwnership::OwnedOrBorrowed:
+//      break;
+//    }
+
+    if (!storage->getInterfaceType()->isPureMoveOnly())
+      return nullptr;
 
     (void)std::move(*this).asKnownExpr();
   }
@@ -3047,7 +3106,7 @@ ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
   if (!borrowExpr)
     return nullptr;
 
-  auto *lvExpr = ::findStorageReferenceExprForBorrow(borrowExpr->getSubExpr());
+  Expr *lvExpr = ::findStorageReferenceExprForBorrow(borrowExpr->getSubExpr());
 
   // Claim the value of this argument.
   if (lvExpr) {
