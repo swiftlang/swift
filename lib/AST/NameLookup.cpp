@@ -1522,9 +1522,10 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
     auto *med = dyn_cast<MacroExpansionDecl>(member);
     if (!med)
       continue;
-    auto macro = evaluateOrDefault(
+    auto declRef = evaluateOrDefault(
         ctx.evaluator, ResolveMacroRequest{med, dc},
         nullptr);
+    auto *macro = dyn_cast_or_null<MacroDecl>(declRef.getDecl());
     if (!macro)
       continue;
     auto *attr = macro->getMacroRoleAttr(MacroRole::Declaration);
