@@ -1658,7 +1658,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     if (!skipCustomName) {
       result.info.hasCustomName = true;
-      result.declName = parsedName.formDeclName(swiftCtx);
+      result.declName = parsedName.formDeclName(
+          swiftCtx, /*isSubscript=*/false,
+          isa<clang::ClassTemplateSpecializationDecl>(D));
 
       // Handle globals treated as members.
       if (parsedName.isMember()) {
@@ -1713,7 +1715,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
             // Update the name to reflect the new parameter labels.
             result.declName = formDeclName(
                 swiftCtx, parsedName.BaseName, parsedName.ArgumentLabels,
-                /*isFunction=*/true, isInitializer);
+                /*isFunction=*/true, isInitializer, /*isSubscript=*/false,
+                isa<clang::ClassTemplateSpecializationDecl>(D));
           } else if (nameAttr->isAsync) {
             // The custom name was for an async import, but we didn't in fact
             // import as async for some reason. Ignore this import.
@@ -2356,7 +2359,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   baseName = renameUnsafeMethod(swiftCtx, D, baseName);
 
   result.declName = formDeclName(swiftCtx, baseName, argumentNames, isFunction,
-                                 isInitializer);
+                                 isInitializer, /*isSubscript=*/false,
+                                 isa<clang::ClassTemplateSpecializationDecl>(D));
   return result;
 }
 

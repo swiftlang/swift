@@ -1331,14 +1331,17 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
   return result;
 }
 
-DeclName ParsedDeclName::formDeclName(ASTContext &ctx, bool isSubscript) const {
-  return formDeclNameRef(ctx, isSubscript).getFullName();
+DeclName ParsedDeclName::formDeclName(ASTContext &ctx, bool isSubscript,
+                                      bool isCxxClassTemplateSpec) const {
+  return formDeclNameRef(ctx, isSubscript, isCxxClassTemplateSpec).getFullName();
 }
 
 DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx,
-                                            bool isSubscript) const {
+                                            bool isSubscript,
+                                            bool isCxxClassTemplateSpec) const {
   return swift::formDeclNameRef(ctx, BaseName, ArgumentLabels, IsFunctionName,
-                                /*IsInitializer=*/true, isSubscript);
+                                /*IsInitializer=*/true, isSubscript,
+                                isCxxClassTemplateSpec);
 }
 
 DeclName swift::formDeclName(ASTContext &ctx,
@@ -1346,9 +1349,11 @@ DeclName swift::formDeclName(ASTContext &ctx,
                              ArrayRef<StringRef> argumentLabels,
                              bool isFunctionName,
                              bool isInitializer,
-                             bool isSubscript) {
+                             bool isSubscript,
+                             bool isCxxClassTemplateSpec) {
   return formDeclNameRef(ctx, baseName, argumentLabels, isFunctionName,
-                         isInitializer, isSubscript).getFullName();
+                         isInitializer, isSubscript,
+                         isCxxClassTemplateSpec).getFullName();
 }
 
 DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
@@ -1356,9 +1361,14 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
                                    ArrayRef<StringRef> argumentLabels,
                                    bool isFunctionName,
                                    bool isInitializer,
-                                   bool isSubscript) {
+                                   bool isSubscript,
+                                   bool isCxxClassTemplateSpec) {
   // We cannot import when the base name is not an identifier.
   if (baseName.empty())
+    return DeclNameRef();
+
+  if (!Lexer::isIdentifier(baseName) && !Lexer::isOperator(baseName) &&
+      !isCxxClassTemplateSpec)
     return DeclNameRef();
 
   // Get the identifier for the base name. Special-case `init`.
