@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %S/trap-on-exception-irgen-itanium.swift %t
 
-// RUN: %target-build-swift %s -I %t -o %t/trap-exceptions -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -g
+// RUN: %target-build-swift %s -I %t/Inputs -o %t/trap-exceptions -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -g
 // RUN: %target-codesign %t/trap-exceptions
 // RUN: %target-run %t/trap-exceptions
 
-// RUN: %target-build-swift %s -I %t -o %t/trap-exceptions-no-debug -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none
+// RUN: %target-build-swift %s -I %t/Inputs -o %t/trap-exceptions-no-debug -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none
 // RUN: %target-codesign %t/trap-exceptions-no-debug
 // RUN: %target-run %t/trap-exceptions-no-debug
 
-// RUN: %target-build-swift %s -I %t -o %t/trap-exceptions-opt -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -O
+// RUN: %target-build-swift %s -I %t/Inputs -o %t/trap-exceptions-opt -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -O
 // RUN: %target-codesign %t/trap-exceptions-opt
 // RUN: %target-run %t/trap-exceptions-opt
 

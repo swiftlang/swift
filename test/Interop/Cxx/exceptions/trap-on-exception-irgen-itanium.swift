@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-emit-ir %t/test.swift -I %t -enable-experimental-cxx-interop | %FileCheck %s
-// RUN: %target-swift-emit-ir %t/test.swift -I %t -enable-experimental-cxx-interop -g | %FileCheck --check-prefix=DEBUG %s
+// RUN: %target-swift-emit-ir %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-ir %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop -g | %FileCheck --check-prefix=DEBUG %s
 
 // UNSUPPORTED: OS=windows-msvc
 
