@@ -1360,8 +1360,6 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
   // We cannot import when the base name is not an identifier.
   if (baseName.empty())
     return DeclNameRef();
-//  if (!Lexer::isIdentifier(baseName) && !Lexer::isOperator(baseName))
-//    return DeclNameRef();
 
   // Get the identifier for the base name. Special-case `init`.
   DeclBaseName baseNameId;
