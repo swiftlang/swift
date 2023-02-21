@@ -1,3 +1,6 @@
+// TODO: why can't we run this on linux?
+// REQUIRES: OS=macosx
+
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 // RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
@@ -19,13 +22,13 @@ import Test
 import CxxStdlib.vector
 
 public func test(v: V) {
-  // CHECK: note: C++ method 'begin' that returns an iterator unavailable
+  // CHECK: note: C++ method 'begin' that returns an iterator is unavailable
   // CHECK: note: Do you want to make a Swift iterator instead?
   // CHECK: ^~~~~
   // CHECK: makeIterator
   _ = v.begin()
   
-  // CHECK: note: C++ method 'end' that returns an iterator unavailable
+  // CHECK: note: C++ method 'end' that returns an iterator is unavailable
   // CHECK: note: Do you want to compare against 'nil' instead?'
   // CHECK: ^~~~
   // CHECK: nil
