@@ -354,17 +354,26 @@ void ImportResolver::addImport(const UnboundImport &I, ModuleDecl *M) {
 // MARK: Import module loading
 //===----------------------------------------------------------------------===//
 
-static ModuleDecl *
-getModuleImpl(ImportPath::Module modulePath, ModuleDecl *loadingModule,
-              bool canImportBuiltin) {
+ModuleDecl *
+ImportResolver::getModule(ImportPath::Module modulePath) {
+  auto loadingModule = SF.getParentModule();
+
   ASTContext &ctx = loadingModule->getASTContext();
 
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
 
-  // The Builtin module cannot be explicitly imported unless we're a .sil file.
-  if (canImportBuiltin && moduleID.Item == ctx.TheBuiltinModule->getName())
-    return ctx.TheBuiltinModule;
+  // The Builtin module cannot be explicitly imported unless:
+  // 1. We're in a .sil file
+  // 2. '-enable-builtin-module' was passed.
+  //
+  // FIXME: Eventually, it would be nice to separate '-parse-stdlib' from
+  // implicitly importing Builtin, but we're not there yet.
+  if (SF.Kind == SourceFileKind::SIL || ctx.LangOpts.EnableBuiltinModule) {
+    if (moduleID.Item == ctx.TheBuiltinModule->getName()) {
+      return ctx.TheBuiltinModule;
+    }
+  }
 
   // If the imported module name is the same as the current module,
   // skip the Swift module loader and use the Clang module loader instead.
@@ -380,12 +389,6 @@ getModuleImpl(ImportPath::Module modulePath, ModuleDecl *loadingModule,
   }
 
   return ctx.getModule(modulePath);
-}
-
-ModuleDecl *
-ImportResolver::getModule(ImportPath::Module modulePath) {
-  return getModuleImpl(modulePath, SF.getParentModule(),
-                       /*canImportBuiltin=*/SF.Kind == SourceFileKind::SIL);
 }
 
 NullablePtr<ModuleDecl>
@@ -737,11 +740,21 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   if (!topLevelModule || topLevelModule.get()->isNonSwiftModule())
     return;
 
+  ASTContext &ctx = SF.getASTContext();
+
+  // If the module we're validating is the builtin one, then just return because
+  // this module is essentially a header only import and does not concern
+  // itself with resiliency. This can occur when one has passed
+  // '-enable-builtin-module' and is explicitly importing the Builtin module in
+  // their sources.
+  if (topLevelModule.get() == ctx.TheBuiltinModule) {
+    return;
+  }
+
   if (!SF.getParentModule()->isResilient() ||
       topLevelModule.get()->isResilient())
     return;
 
-  ASTContext &ctx = SF.getASTContext();
   ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
                      diag::module_not_compiled_with_library_evolution,
                      topLevelModule.get()->getName(),
