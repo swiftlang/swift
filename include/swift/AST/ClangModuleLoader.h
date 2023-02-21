@@ -27,6 +27,7 @@ class Preprocessor;
 class Sema;
 class TargetInfo;
 class Type;
+class SourceLocation;
 } // namespace clang
 
 namespace swift {
@@ -286,6 +287,8 @@ public:
   /// Determine the effective Clang context for the given Swift nominal type.
   virtual EffectiveClangContext getEffectiveClangContext(
       const NominalTypeDecl *nominal) = 0;
+
+  virtual SourceLoc importSourceLocation(clang::SourceLocation loc) = 0;
 };
 
 /// Describes a C++ template instantiation error.

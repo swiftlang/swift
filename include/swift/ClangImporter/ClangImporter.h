@@ -559,6 +559,8 @@ public:
 
   /// Enable the symbolic import experimental feature for the given callback.
   void withSymbolicFeatureEnabled(llvm::function_ref<void(void)> callback);
+
+  SourceLoc importSourceLocation(clang::SourceLocation loc) override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
