@@ -1442,6 +1442,9 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// C type StoreExtraInhabitantTag function descriminator
   const uint16_t StoreExtraInhabitantTagFunction = 0x9bf6; // = 39926
+
+  // Relative protocol witness table descriminator
+  const uint16_t RelativeProtocolWitnessTable = 0xb830; // = 47152
 }
 
 /// The number of arguments that will be passed directly to a generic
