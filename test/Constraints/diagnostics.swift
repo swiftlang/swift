@@ -1535,13 +1535,13 @@ func testUnwrapFixIts(x: Int?) throws {
 func issue63746() {
   let fn1 = {
     switch 0 {
-      case 1 where 0: // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+      case 1 where 0: // expected-error {{integer literal value '0' cannot be used as a boolean; did you mean 'false'?}}
         ()
     }
   }
   let fn2 = {
     switch 0 {
-      case 1 where 0: // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+      case 1 where 0: // expected-error {{integer literal value '0' cannot be used as a boolean; did you mean 'false'?}}
         break
     }
   }

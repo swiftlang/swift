@@ -2930,6 +2930,21 @@ bool ContextualFailure::diagnoseConversionToBool() const {
   // comparison against nil was probably expected.
   auto fromType = getFromType();
   if (fromType->getOptionalObjectType()) {
+    if (auto *OE = getAsExpr<OptionalEvaluationExpr>(
+            anchor->getValueProvidingExpr())) {
+      auto *subExpr = OE->getSubExpr();
+      while (auto *BOE = getAsExpr<BindOptionalExpr>(subExpr)) {
+        subExpr = BOE->getSubExpr();
+      }
+      // The contextual mismatch is anchored in an optional evaluation
+      // expression wrapping a literal expression e.g. `0?` suggesting to use
+      // `!= nil` will not be accurate in this case, so let's fallback to
+      // default mismatch diagnostic.
+      if (isa<LiteralExpr>(subExpr)) {
+        return false;
+      }
+    }
+
     StringRef prefix = "((";
     StringRef suffix;
     if (notOperatorLoc.isValid())
@@ -2960,6 +2975,22 @@ bool ContextualFailure::diagnoseConversionToBool() const {
   if (conformsToKnownProtocol(fromType, KnownProtocolKind::BinaryInteger) &&
       conformsToKnownProtocol(fromType,
                               KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+    if (auto *IL =
+            getAsExpr<IntegerLiteralExpr>(anchor->getValueProvidingExpr())) {
+      // If integer literal value is either zero or one, let's suggest replacing
+      // with boolean literal `true` or `false`. Otherwise fallback to generic
+      // type mismatch diagnostic.
+      const auto value = IL->getRawValue();
+      if (value.isOne() || value.isZero()) {
+        StringRef boolLiteral = value.isZero() ? "false" : "true";
+        emitDiagnostic(diag::integer_used_as_boolean_literal,
+                       IL->getDigitsText(), value.isOne())
+            .fixItReplace(IL->getSourceRange(), boolLiteral);
+        return true;
+      }
+      return false;
+    }
+
     StringRef prefix = "((";
     StringRef suffix;
     if (notOperatorLoc.isValid())

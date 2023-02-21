@@ -11,8 +11,12 @@ Enumerators:
 Tags:
 - Name: UIPrinterJobTypes
   SwiftName: UIPrinter.JobTypes
+- Name: Baz
+  SwiftName: CurrentBazVersion
 SwiftVersions:
 - Version: 4
   Tags:
   - Name: UIPrinterJobTypes
     SwiftName: UIPrinterJobTypes
+  - Name: Baz
+    SwiftName: BazVersion4
