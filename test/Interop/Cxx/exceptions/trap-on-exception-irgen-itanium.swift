@@ -129,12 +129,26 @@ func testCFuncPtrCall() {
   funcPtr()
 }
 
+protocol TestMethodProtocol {
+  func method(_ x: CInt) -> CInt
+}
+
+extension TestClass: TestMethodProtocol {
+}
+
+func testProtocolConformanceThunkInvoke() {
+  let v = TestClass()
+  let p: TestMethodProtocol = v
+  let _ = p.method(2)
+}
+
 let _ = testFreeFunctionNoThrowOnly()
 let _ = testFreeFunctionCalls()
 let _ = testMethodCalls()
 testTemplateCalls()
 testFuncPtrCall()
 testCFuncPtrCall()
+testProtocolConformanceThunkInvoke()
 
 // CHECK: define {{.*}} @"$s4test0A23FreeFunctionNoThrowOnlys5Int32VyF"() #[[#SWIFTMETA:]] {
 // CHECK-NEXT: :
@@ -221,6 +235,23 @@ testCFuncPtrCall()
 // CHECK-NEXT: to label %[[CONT21:.*]] unwind label %{{.*}}
 // CHECK: [[CONT21]]:
 // CHECK-NEXT: ret void
+
+// CHECK: define {{.*}} @"$sSo9TestClassV4test0A14MethodProtocolA2cDP6methodys5Int32VAHFTW"({{.*}}) #[[#SWIFTUWMETA]] personality
+// CHECK: invoke i32 @_ZNK9TestClass6methodEi({{.*}})
+// CHECK-NEXT:  to label %[[CONT30:.*]] unwind label %[[UNWIND30:.*]]
+// CHECK: [[CONT30]]:
+// CHECK-NEXT: ret i32
+// CHECK-EMPTY:
+// CHECK-NEXT: [[UNWIND30]]:
+// CHECK-NEXT: %4 = landingpad { i8*, i32 }
+// CHECK-NEXT:    catch i8* null
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+// CHECK-NEXT: }
+
+// CHECK: define {{.*}} @"$s4test0A30ProtocolConformanceThunkInvokeyyF"() #[[#SWIFTMETA]]
+// CHECK-NOT: invoke
+// CHECK: }
 
 // CHECK: i32 @__gxx_personality_v0(...)
 
