@@ -6316,6 +6316,12 @@ void ClangImporter::diagnoseMemberValue(const DeclName &name,
   }
 }
 
+SourceLoc ClangImporter::importSourceLocation(clang::SourceLocation loc) {
+  auto &bufferImporter = Impl.getBufferImporterForDiagnostics();
+  return bufferImporter.resolveSourceLocation(
+      getClangASTContext().getSourceManager(), loc);
+}
+
 static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
