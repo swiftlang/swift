@@ -210,6 +210,10 @@ static void findRelatedIdents(StringRef Filename, int64_t Offset,
                               SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Rec);
 
+static void findActiveRegions(StringRef Filename, ArrayRef<const char *> Args,
+                              SourceKitCancellationToken CancellationToken,
+                              ResponseReceiver Rec);
+
 static sourcekitd_response_t
 codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
              Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
@@ -1683,6 +1687,25 @@ handleRequestRelatedIdents(const RequestDict &Req,
 }
 
 static void
+handleRequestActiveRegions(const RequestDict &Req,
+                           SourceKitCancellationToken CancellationToken,
+                           ResponseReceiver Rec) {
+  if (checkVFSNotSupported(Req, Rec))
+    return;
+
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    auto SourceFile = getSourceFileNameForRequestOrEmitError(Req, Rec);
+    if (!SourceFile)
+      return;
+    SmallVector<const char *> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+
+    return findActiveRegions(*SourceFile, Args, CancellationToken, Rec);
+  });
+}
+
+static void
 handleRequestDiagnostics(const RequestDict &Req,
                          SourceKitCancellationToken CancellationToken,
                          ResponseReceiver Rec) {
@@ -1805,6 +1828,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
                  handleRequestFindLocalRenameRanges)
   HANDLE_REQUEST(RequestNameTranslation, handleRequestNameTranslation)
   HANDLE_REQUEST(RequestRelatedIdents, handleRequestRelatedIdents)
+  HANDLE_REQUEST(RequestActiveRegions, handleRequestActiveRegions)
   HANDLE_REQUEST(RequestDiagnostics, handleRequestDiagnostics)
 
   {
@@ -2570,6 +2594,38 @@ static void findRelatedIdents(StringRef Filename, int64_t Offset,
           auto Elem = Arr.appendDictionary();
           Elem.set(KeyOffset, R.first);
           Elem.set(KeyLength, R.second);
+        }
+
+        Rec(RespBuilder.createResponse());
+      });
+}
+
+//===----------------------------------------------------------------------===//
+// FindActiveRegions
+//===----------------------------------------------------------------------===//
+
+static void findActiveRegions(StringRef Filename, ArrayRef<const char *> Args,
+                              SourceKitCancellationToken CancellationToken,
+                              ResponseReceiver Rec) {
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+
+  Lang.findActiveRegionsInFile(
+      Filename, Args, CancellationToken,
+      [Rec](const RequestResult<ActiveRegionsInfo> &Result) {
+        if (Result.isCancelled())
+          return Rec(createErrorRequestCancelled());
+        if (Result.isError())
+          return Rec(createErrorRequestFailed(Result.getError()));
+
+        const ActiveRegionsInfo &Info = Result.value();
+
+        ResponseBuilder RespBuilder;
+        auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
+        for (auto Config : Info.Configs) {
+          auto Elem = Arr.appendDictionary();
+          Elem.set(KeyOffset, Config.Offset);
+          if (Config.IsActive)
+            Elem.setBool(KeyIsActive, true);
         }
 
         Rec(RespBuilder.createResponse());
