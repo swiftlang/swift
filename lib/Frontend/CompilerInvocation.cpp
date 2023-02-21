@@ -1105,6 +1105,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             .Default(ConcurrencyModel::Standard);
   }
 
+  Opts.EnableBuiltinModule = Args.hasArg(OPT_enable_builtin_module);
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
