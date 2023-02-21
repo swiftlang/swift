@@ -824,7 +824,7 @@ public struct UnsafeCurrentTask {
   /// The current task's base priority.
   ///
   /// - SeeAlso: `TaskPriority`
-  /// - SeeAlso: `Task.currentBasePriority`
+  /// - SeeAlso: `Task.basePriority`
   @available(SwiftStdlib 5.9, *)
   public var basePriority: TaskPriority {
     TaskPriority(rawValue: _taskBasePriority(_task))
