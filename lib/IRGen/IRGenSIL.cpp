@@ -2731,7 +2731,15 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   }
   FunctionPointer fp =
       FunctionPointer::forDirect(fpKind, value, secondaryValue, sig);
-
+  // Update the foreign no-throw information if needed.
+  if (const auto *cd = fn->getClangDecl()) {
+    if (auto *cfd = dyn_cast<clang::FunctionDecl>(cd)) {
+      if (auto *cft = cfd->getType()->getAs<clang::FunctionProtoType>()) {
+        if (cft->isNothrow())
+          fp.setForeignNoThrow();
+      }
+    }
+  }
   // Store the function as a FunctionPointer so we can avoid bitcasting
   // or thunking if we don't need to.
   setLoweredFunctionPointer(i, fp);

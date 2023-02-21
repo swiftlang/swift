@@ -53,6 +53,8 @@ class TypeInfo;
 class ForeignFunctionInfo {
 public:
   const clang::CodeGen::CGFunctionInfo *ClangInfo = nullptr;
+  /// True if the foreign function can throw an Objective-C / C++ exception.
+  bool canThrow = false;
 };
 
 /// An encapsulation of the extra lowering information we might want to

@@ -337,6 +337,11 @@ public:
     return Call;
   }
 
+  llvm::CallBase *CreateCallOrInvoke(const FunctionPointer &fn,
+                                     ArrayRef<llvm::Value *> args,
+                                     llvm::BasicBlock *invokeNormalDest,
+                                     llvm::BasicBlock *invokeUnwindDest);
+
   llvm::CallInst *CreateCall(const FunctionPointer &fn,
                              ArrayRef<llvm::Value *> args);
 

@@ -331,6 +331,10 @@ namespace irgen {
     llvm::Type *awaitSignature = nullptr;
     bool useSignature = false;
 
+    // True when this function pointer points to a non-throwing foreign
+    // function.
+    bool isForeignNoThrow = false;
+
     explicit FunctionPointer(Kind kind, llvm::Value *value,
                              const Signature &signature)
         : FunctionPointer(kind, value, PointerAuthInfo(), signature) {}
@@ -490,6 +494,12 @@ namespace irgen {
     }
     bool shouldSuppressPolymorphicArguments() const {
       return kind.shouldSuppressPolymorphicArguments();
+    }
+
+    void setForeignNoThrow() { isForeignNoThrow = true; }
+
+    bool canThrowForeignException() const {
+      return getForeignInfo().canThrow && !isForeignNoThrow;
     }
   };
 

@@ -1982,6 +1982,17 @@ Signature SignatureExpansion::getSignature() {
   result.Attributes = Attrs;
   using ExtraData = Signature::ExtraData;
   if (FnType->getLanguage() == SILFunctionLanguage::C) {
+    const auto &clangLangOpts =
+        IGM.Context.getClangModuleLoader()->getClangASTContext().getLangOpts();
+    bool exceptionHandlingEnabled = IGM.Context.LangOpts.EnableCXXInterop &&
+                                    clangLangOpts.Exceptions &&
+                                    !clangLangOpts.IgnoreExceptions;
+    // FIXME: Support exceptions on windows MSVC.
+    if (IGM.Triple.isWindowsMSVCEnvironment())
+      exceptionHandlingEnabled = false;
+    // This is a potentially throwing function. The use of 'noexcept' /
+    // 'nothrow' is applied at the call site in the \c FunctionPointer class.
+    ForeignInfo.canThrow = exceptionHandlingEnabled;
     result.ExtraDataKind = ExtraData::kindForMember<ForeignFunctionInfo>();
     result.ExtraDataStorage.emplace<ForeignFunctionInfo>(result.ExtraDataKind,
                                                          ForeignInfo);
@@ -2227,9 +2238,10 @@ public:
         index, IGF.IGM.getMaximalTypeExpansionContext());
   }
 
-  llvm::CallInst *createCall(const FunctionPointer &fn,
+  llvm::CallBase *createCall(const FunctionPointer &fn,
                              ArrayRef<llvm::Value *> args) override {
-    return IGF.Builder.CreateCall(fn, Args);
+    return IGF.Builder.CreateCallOrInvoke(fn, Args, invokeNormalDest,
+                                          invokeUnwindDest);
   }
 
   void begin() override { super::begin(); }
@@ -2375,7 +2387,8 @@ public:
     }
     super::setArgs(adjusted, isOutlined, witnessMetadata);
   }
-  void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
+  void emitCallToUnmappedExplosion(llvm::CallBase *call,
+                                   Explosion &out) override {
     // Bail out immediately on a void result.
     llvm::Value *result = call;
     if (result->getType()->isVoidTy())
@@ -2678,7 +2691,8 @@ public:
       saveValue(resumeParentField, fnVal, isOutlined);
     }
   }
-  void emitCallToUnmappedExplosion(llvm::CallInst *call, Explosion &out) override {
+  void emitCallToUnmappedExplosion(llvm::CallBase *call,
+                                   Explosion &out) override {
     // Bail out on a void result type.
     auto &IGM = IGF.IGM;
     llvm::Value *result = call;
@@ -2770,7 +2784,7 @@ public:
     return IGF.getCalleeErrorResultSlot(errorType);
   }
 
-  llvm::CallInst *createCall(const FunctionPointer &fn,
+  llvm::CallBase *createCall(const FunctionPointer &fn,
                              ArrayRef<llvm::Value *> args) override {
     auto &IGM = IGF.IGM;
     auto &Builder = IGF.Builder;
@@ -2900,7 +2914,7 @@ void CallEmission::emitToUnmappedMemory(Address result) {
 }
 
 /// The private routine to ultimately emit a call or invoke instruction.
-llvm::CallInst *CallEmission::emitCallSite() {
+llvm::CallBase *CallEmission::emitCallSite() {
   assert(state == State::Emitting);
   assert(LastArgWritten == 0);
   assert(!EmittedCall);
@@ -2921,8 +2935,13 @@ llvm::CallInst *CallEmission::emitCallSite() {
       Args[i] = IGF.coerceValue(Args[i], paramTy, IGF.IGM.DataLayout);
   }
 
-  // TODO: exceptions!
+  if (fn.canThrowForeignException()) {
+    invokeNormalDest = IGF.createBasicBlock("invoke.cont");
+    invokeUnwindDest = IGF.createExceptionUnwindBlock();
+  }
   auto call = createCall(fn, Args);
+  if (invokeNormalDest)
+    IGF.Builder.emitBlock(invokeNormalDest);
 
   // Make coroutines calls opaque to LLVM analysis.
   if (IsCoroutine) {
@@ -2984,8 +3003,9 @@ assertTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
   return attrList;
 }
 
-llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
-                                      ArrayRef<llvm::Value*> args) {
+llvm::CallBase *IRBuilder::CreateCallOrInvoke(
+    const FunctionPointer &fn, ArrayRef<llvm::Value *> args,
+    llvm::BasicBlock *invokeNormalDest, llvm::BasicBlock *invokeUnwindDest) {
   assert(fn.getKind() == FunctionPointer::Kind::Function);
   SmallVector<llvm::OperandBundleDef, 1> bundles;
 
@@ -2999,8 +3019,13 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
 
   assert(!isTrapIntrinsic(fn.getRawPointer()) && "Use CreateNonMergeableTrap");
   auto fnTy = cast<llvm::FunctionType>(fn.getFunctionType());
-  llvm::CallInst *call =
-      IRBuilderBase::CreateCall(fnTy, fn.getRawPointer(), args, bundles);
+  llvm::CallBase *call;
+  if (!fn.canThrowForeignException())
+    call = IRBuilderBase::CreateCall(fnTy, fn.getRawPointer(), args, bundles);
+  else
+    call =
+        IRBuilderBase::CreateInvoke(fnTy, fn.getRawPointer(), invokeNormalDest,
+                                    invokeUnwindDest, args, bundles);
 
   llvm::AttributeList attrs = fn.getAttributes();
   // If a parameter of a function is SRet, the corresponding argument should be
@@ -3022,6 +3047,13 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
   call->setAttributes(assertTypesInByValAndStructRetAttributes(fnTy, attrs));
   call->setCallingConv(fn.getCallingConv());
   return call;
+}
+
+llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
+                                      ArrayRef<llvm::Value *> args) {
+  assert(!fn.canThrowForeignException());
+  return cast<llvm::CallInst>(CreateCallOrInvoke(
+      fn, args, /*invokeNormalDest=*/nullptr, /*invokeUnwindDest=*/nullptr));
 }
 
 /// Emit the result of this call to memory.
@@ -4416,6 +4448,31 @@ void IRGenFunction::emitBBForReturn() {
   CurFn->getBasicBlockList().push_back(ReturnBB);
 }
 
+llvm::BasicBlock *IRGenFunction::createExceptionUnwindBlock() {
+  auto *result = createBasicBlock("exception.unwind");
+  IRBuilder::SavedInsertionPointRAII insertRAII(Builder, result);
+
+  // Create a catch-all landing pad.
+  // FIXME: Refactor Clang/lib/CodeGen to call into Clang here.
+  // FIXME: MSVC support.
+  llvm::LandingPadInst *lpad = Builder.CreateLandingPad(
+      llvm::StructType::get(IGM.Int8PtrTy, IGM.Int32Ty), 0);
+  lpad->addClause(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+
+  // The trap with a message informs the user that the exception hasn't
+  // been caught. The trap creates a new debug inline frame for the message,
+  // so ensure that the current debug location is preserved.
+  auto oldDebugLoc = Builder.getCurrentDebugLocation();
+  emitTrap(IGM.Context.LangOpts.EnableObjCInterop
+               ? "unhandled C++ / Objective-C exception"
+               : "unhandled C++ exception",
+           /*Unreachable=*/true);
+  Builder.SetCurrentDebugLocation(oldDebugLoc);
+
+  ExceptionUnwindBlocks.push_back(result);
+  return result;
+}
+
 /// Emit the prologue for the function.
 void IRGenFunction::emitPrologue() {
   // Set up the IRBuilder.
@@ -4466,12 +4523,31 @@ bool IRGenFunction::emitBranchToReturnBB() {
   return true;
 }
 
+llvm::Function *IRGenModule::getForeignExceptionHandlingPersonalityFunc() {
+  if (foreignExceptionHandlingPersonalityFunc)
+    return foreignExceptionHandlingPersonalityFunc;
+  foreignExceptionHandlingPersonalityFunc = llvm::Function::Create(
+      llvm::FunctionType::get(Int32Ty, true), llvm::Function::ExternalLinkage,
+      "__gxx_personality_v0", getModule());
+  return foreignExceptionHandlingPersonalityFunc;
+}
+
 /// Emit the epilogue for the function.
 void IRGenFunction::emitEpilogue() {
   if (EarliestIP != AllocaIP)
     EarliestIP->eraseFromParent();
   // Destroy the alloca insertion point.
   AllocaIP->eraseFromParent();
+  // Add exception unwind blocks and additional exception handling info
+  // if needed.
+  if (!ExceptionUnwindBlocks.empty()) {
+    // The function should have an unwind table when catching exceptions.
+    CurFn->addFnAttr(llvm::Attribute::getWithUWTableKind(
+        *IGM.LLVMContext, llvm::UWTableKind::Default));
+    CurFn->setPersonalityFn(IGM.getForeignExceptionHandlingPersonalityFunc());
+    for (auto *bb : ExceptionUnwindBlocks)
+      CurFn->getBasicBlockList().push_back(bb);
+  }
 }
 
 std::pair<Address, Size>
