@@ -3181,8 +3181,8 @@ void simple_display(llvm::raw_ostream &out,
 /// Resolve a given custom attribute to an attached macro declaration.
 class ResolveMacroRequest
     : public SimpleRequest<ResolveMacroRequest,
-                           MacroDecl *(UnresolvedMacroReference,
-                                       DeclContext *),
+                           ConcreteDeclRef(UnresolvedMacroReference,
+                                           DeclContext *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3190,7 +3190,7 @@ public:
 private:
   friend SimpleRequest;
 
-  MacroDecl *
+  ConcreteDeclRef
   evaluate(Evaluator &evaluator, UnresolvedMacroReference macroRef,
            DeclContext *dc) const;
 

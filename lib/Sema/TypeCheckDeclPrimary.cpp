@@ -3779,22 +3779,9 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
     return {};
   }
   // Resolve macro candidates.
-  MacroDecl *macro;
-  if (auto *args = MED->getArgs()) {
-    macro = evaluateOrDefault(
-        ctx.evaluator, ResolveMacroRequest{MED, dc},
-        nullptr);
-  }
-  else {
-    if (foundMacros.size() > 1) {
-      MED->diagnose(diag::ambiguous_decl_ref, MED->getMacroName())
-          .highlight(MED->getMacroNameLoc().getSourceRange());
-      for (auto *candidate : foundMacros)
-        candidate->diagnose(diag::found_candidate);
-      return {};
-    }
-    macro = foundMacros.front();
-  }
+  auto macro = evaluateOrDefault(
+      ctx.evaluator, ResolveMacroRequest{MED, dc},
+      ConcreteDeclRef());
   if (!macro)
     return {};
   MED->setMacroRef(macro);
