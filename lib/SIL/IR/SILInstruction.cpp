@@ -1681,11 +1681,11 @@ static bool visitRecursivelyLifetimeEndingUses(
     
     // There shouldn't be any dead-end consumptions of a nonescaping
     // partial_apply that don't forward it along, aside from destroy_value.
-    assert(use->getUser()->hasResults());
-    for (auto result : use->getUser()->getResults()) {
-      if (!visitRecursivelyLifetimeEndingUses(result, noUsers, func)) {
-        return false;
-      }
+    assert(use->getUser()->hasResults()
+           && use->getUser()->getNumResults() == 1);
+    if (!visitRecursivelyLifetimeEndingUses(use->getUser()->getResult(0),
+                                            noUsers, func)) {
+      return false;
     }
   }
   return true;
@@ -1721,7 +1721,8 @@ DestroyValueInst::getNonescapingClosureAllocation() const {
     if (auto mdi = dyn_cast<MarkDependenceInst>(operand)) {
       operand = mdi->getValue();
       continue;
-    } else if (isa<ConvertEscapeToNoEscapeInst>(operand)) {
+    } else if (isa<ConvertEscapeToNoEscapeInst>(operand)
+               || isa<ThinToThickFunctionInst>(operand)) {
       // Stop at a conversion from escaping closure, since there's no stack
       // allocation in that case.
       return nullptr;
@@ -1739,8 +1740,13 @@ DestroyValueInst::getNonescapingClosureAllocation() const {
       // The original partial_apply instruction should only be forwarded
       // through one of the above instructions. Anything else should lead us
       // to a copy or borrow of the closure from somewhere else.
-      // TODO: Assert that this is one of those cases, such as a SILArgument,
-      // copy_value, etc.
+      assert((isa<CopyValueInst>(operand)
+              || isa<SILArgument>(operand)
+              || isa<DifferentiableFunctionInst>(operand)
+              || isa<DifferentiableFunctionExtractInst>(operand)
+              || isa<LoadInst>(operand)
+              || (operand->dump(), false))
+             && "unexpected forwarding instruction for noescape closure");
       return nullptr;
     }
   }
