@@ -3239,6 +3239,15 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                         std::move(subscriptIndices),
                         /*index for diags*/ nullptr);
 
+  // If the assigned value will need to be reabstracted, add a reabstraction
+  // component.
+  const auto loweredSubstType = subSGF.getLoweredType(lv.getSubstFormalType());
+  if (lv.getTypeOfRValue() != loweredSubstType.getObjectType()) {
+    // Logical components always re-abstract back to the substituted type.
+    assert(lv.isLastComponentPhysical());
+    lv.addOrigToSubstComponent(loweredSubstType);
+  }
+
   subSGF.emitAssignToLValue(loc,
     RValue(subSGF, loc, propertyType, valueSubst),
     std::move(lv));
