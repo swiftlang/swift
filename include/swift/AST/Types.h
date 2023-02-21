@@ -122,6 +122,8 @@ public:
   /// Note that the property polarities should be chosen so that 0 is
   /// the correct default value and bitwise-or correctly merges things.
   enum Property : unsigned {
+    // clang-format off
+
     /// This type expression contains a TypeVariableType.
     HasTypeVariable      = 0x01,
 
@@ -139,9 +141,10 @@ public:
     /// Whether this type expression contains an unbound generic type.
     HasUnboundGeneric    = 0x10,
 
-    /// This type expression contains an LValueType other than as a
-    /// function input, and can be loaded to convert to an rvalue.
-    IsLValue             = 0x20,
+    /// This type expression contains a mutable LValueType other than as a
+    /// function input, and can be loaded to convert to an rvalue. It can also
+    /// be written to.
+    IsMutableLValue      = 0x20,
 
     /// This type expression contains an opened existential ArchetypeType.
     HasOpenedExistential = 0x40,
@@ -171,7 +174,17 @@ public:
     /// This type contains an ElementArchetype.
     HasElementArchetype = 0x4000,
 
-    Last_Property = HasElementArchetype
+    /// This type contains an ImmutableLValue type. Mutually exclusive with
+    /// IsMutableLValueType.
+    IsImmutableLValue = 0x8000,
+
+    Last_Property = IsImmutableLValue,
+
+    /// A combination of IsMutableLValue and IsImmutableLValue meant for masking
+    /// purposes.
+    IsLValueMask = IsMutableLValue | IsImmutableLValue,
+
+    // clang-format on
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -180,8 +193,8 @@ private:
 
 public:
   RecursiveTypeProperties() : Bits(0) {}
-  RecursiveTypeProperties(Property prop) : Bits(prop) {}
-  explicit RecursiveTypeProperties(unsigned bits) : Bits(bits) {}
+  RecursiveTypeProperties(Property prop) : Bits(prop) { verify(); }
+  explicit RecursiveTypeProperties(unsigned bits) : Bits(bits) { verify(); }
 
   /// Return these properties as a bitfield.
   unsigned getBits() const { return Bits; }
@@ -204,8 +217,14 @@ public:
   /// Does a type with these properties have an unresolved type somewhere in it?
   bool hasUnresolvedType() const { return Bits & HasUnresolvedType; }
 
-  /// Is a type with these properties an lvalue?
-  bool isLValue() const { return Bits & IsLValue; }
+  /// Is a type with these properties a mutable lvalue?
+  bool isMutableLValue() const { return Bits & IsMutableLValue; }
+
+  /// Is a type with these properties an immutable lvalue?
+  bool isImmutableLValue() const { return Bits & IsImmutableLValue; }
+
+  /// Is a type with these properties an lvalue ignoring mutability.
+  bool isLValue() const { return Bits & IsLValueMask; }
 
   /// Does this type contain an error?
   bool hasError() const { return Bits & HasError; }
@@ -259,6 +278,7 @@ public:
   /// Add any properties in the right-hand set to this set.
   RecursiveTypeProperties &operator|=(RecursiveTypeProperties other) {
     Bits |= other.Bits;
+    verify();
     return *this;
   }
   /// Restrict this to only the properties in the right-hand set.
@@ -280,6 +300,13 @@ public:
   /// Test for a particular property in this set.
   bool operator&(Property prop) const {
     return Bits & prop;
+  }
+
+  void verify() const {
+    // Make sure that we do not have both mutable lvalue and immutable lvalue
+    // bit set.
+    assert((!isMutableLValue() || !isImmutableLValue()) &&
+           "Cannot be both an immutable lvalue and a mutable rvalue");
   }
 };
 
@@ -752,8 +779,21 @@ public:
   /// Return the root generic parameter of this type parameter type.
   GenericTypeParamType *getRootGenericParam();
 
-  /// Determines whether this type is an lvalue. This includes both straight
-  /// lvalue types as well as tuples or optionals of lvalues.
+  /// Determines whether this type is a mutable lvalue. This includes both
+  /// straight lvalue types as well as tuples or optionals of lvalues.
+  bool hasMutableLValueType() {
+    return getRecursiveProperties().isMutableLValue();
+  }
+
+  /// Determines whether this type is an immutable lvalue. This includes both
+  /// straight lvalue types as well as tuples or optionals of lvalues.
+  bool hasImmutableLValueType() {
+    return getRecursiveProperties().isImmutableLValue();
+  }
+
+  /// Determines whether this type is an lvalue ignoring mutability. This
+  /// includes both straight lvalue types as well as tuples or optionals of
+  /// lvalues.
   bool hasLValueType() {
     return getRecursiveProperties().isLValue();
   }
@@ -5768,7 +5808,7 @@ class LValueType : public TypeBase {
       ObjectTy(objectTy) {}
 
 public:
-  static LValueType *get(Type type);
+  static LValueType *get(Type type, bool isMutable = true);
 
   Type getObjectType() const { return ObjectTy; }
 
