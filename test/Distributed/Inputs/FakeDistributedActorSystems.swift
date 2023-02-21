@@ -34,6 +34,36 @@ public struct ActorAddress: Hashable, Sendable, Codable {
   }
 }
 
+/// This type is same as ActorAddress however for purposes of SIL tests we make it not-loadable.
+///
+/// By adding the `Any` we don't know the full size of the struct making the type in SIL `$*ActorAddress`
+/// when we try to store or pass it around, which triggers `isAddressOnly` guarded paths which we need to test.
+public struct NotLoadableActorAddress: Hashable, Sendable, Codable {
+  public let address: String
+  public let any: Sendable = "" // DO NOT REMOVE, this makes this struct address-only which is crucial for testing.
+
+  public init(parse address: String) {
+    self.address = address
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    self.address = try container.decode(String.self)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(self.address)
+  }
+
+  public func hash(into hasher: inout Swift.Hasher) {
+  }
+
+  public static func ==(lhs: NotLoadableActorAddress, rhs: NotLoadableActorAddress) -> Bool {
+    lhs.address == rhs.address
+  }
+}
+
 // ==== Noop Transport ---------------------------------------------------------
 
 @available(SwiftStdlib 5.7, *)
@@ -109,9 +139,81 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
   }
 }
 
+@available(SwiftStdlib 5.7, *)
+public struct FakeNotLoadableAddressActorSystem: DistributedActorSystem, CustomStringConvertible {
+  public typealias ActorID = NotLoadableActorAddress
+  public typealias InvocationDecoder = FakeInvocationDecoder
+  public typealias InvocationEncoder = FakeInvocationEncoder
+  public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeRoundtripResultHandler
+
+  // just so that the struct does not become "trivial"
+  let someValue: String = ""
+  let someValue2: String = ""
+  let someValue3: String = ""
+  let someValue4: String = ""
+
+  public init() {
+    print("Initialized new FakeActorSystem")
+  }
+
+  public func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+      Act.ID == ActorID  {
+    nil
+  }
+
+  public func assignID<Act>(_ actorType: Act.Type) -> ActorID
+      where Act: DistributedActor,
+      Act.ID == ActorID {
+    NotLoadableActorAddress(parse: "xxx")
+  }
+
+  public func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+            Act.ID == ActorID {
+  }
+
+  public func resignID(_ id: ActorID) {
+  }
+
+  public func makeInvocationEncoder() -> InvocationEncoder {
+    .init()
+  }
+
+  public func remoteCall<Act, Err, Res>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation invocationEncoder: inout InvocationEncoder,
+      throwing: Err.Type,
+      returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
+  }
+
+  public func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
+  }
+
+  public nonisolated var description: Swift.String {
+    "\(Self.self)()"
+  }
+}
+
 // ==== Fake Roundtrip Transport -----------------------------------------------
 
-// TODO(distributed): not thread safe...
 @available(SwiftStdlib 5.7, *)
 public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = ActorAddress

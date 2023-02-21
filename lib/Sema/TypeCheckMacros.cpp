@@ -1200,7 +1200,7 @@ swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
   return macroSourceFile->getBufferID();
 }
 
-MacroDecl *
+ConcreteDeclRef
 ResolveMacroRequest::evaluate(Evaluator &evaluator,
                               UnresolvedMacroReference macroRef,
                               DeclContext *dc) const {
@@ -1209,7 +1209,7 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
   auto foundMacros = TypeChecker::lookupMacros(
       dc, macroRef.getMacroName(), SourceLoc(), roles);
   if (foundMacros.empty())
-    return nullptr;
+    return ConcreteDeclRef();
 
   // If we already have a MacroExpansionExpr, use that. Otherwise,
   // create one.
@@ -1228,13 +1228,9 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
   Expr *result = macroExpansion;
   TypeChecker::typeCheckExpression(result, dc);
 
-  auto macroDeclRef = macroExpansion->getMacroRef();
-  if (auto *macroDecl = dyn_cast_or_null<MacroDecl>(macroDeclRef.getDecl()))
-    return macroDecl;
-
   // If we couldn't resolve a macro decl, the attribute is invalid.
-  if (auto *attr = macroRef.getAttr())
-    attr->setInvalid();
+  if (!macroExpansion->getMacroRef() && macroRef.getAttr())
+    macroRef.getAttr()->setInvalid();
 
-  return nullptr;
+  return macroExpansion->getMacroRef();
 }
