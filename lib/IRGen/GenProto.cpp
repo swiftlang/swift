@@ -1192,6 +1192,17 @@ WitnessIndex ProtocolInfo::getAssociatedTypeIndex(
   llvm_unreachable("didn't find entry for associated type");
 }
 
+static llvm::Constant *
+getConstantSignedRelativeProtocolWitnessTable(IRGenModule &IGM,
+                                              llvm::Value *table) {
+  auto constantTable = cast<llvm::Constant>(table);
+  auto &schema = IGM.getOptions().PointerAuth.RelativeProtocolWitnessTable;
+  constantTable =
+      IGM.getConstantSignedPointer(constantTable, schema, PointerAuthEntity(),
+                                   /*storageAddress*/ nullptr);
+  return constantTable;
+}
+
 namespace {
 
 /// Conformance info for a witness table that can be directly generated.
@@ -1694,6 +1705,8 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
     // If we can emit a constant table, do so.
     if (auto constantTable =
           conformanceI->tryGetConstantTable(IGM, associatedType)) {
+      constantTable =
+          getConstantSignedRelativeProtocolWitnessTable(IGM, constantTable);
       IGF.Builder.CreateRet(constantTable);
       return;
     }
@@ -1890,6 +1903,7 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
     // Ask the ConformanceInfo to emit the wtable.
     llvm::Value *baseWTable =
       base.second->getTable(IGF, &metadata);
+
     baseWTable = IGF.Builder.CreateBitCast(baseWTable, IGM.Int8PtrTy);
 
     // Store that to the appropriate slot in the new witness table.
@@ -2626,6 +2640,11 @@ llvm::Value *IRGenFunction::optionallyLoadFromConditionalProtocolWitnessTable(
   auto *phi = Builder.CreatePHI(wtable->getType(), 2);
   phi->addIncoming(wtable, origBB);
   phi->addIncoming(wtableDeref, isCondBB);
+  if (auto &schema = getOptions().PointerAuth.RelativeProtocolWitnessTable) {
+    auto info = PointerAuthInfo::emit(*this, schema, nullptr,
+                                      PointerAuthEntity());
+    return emitPointerAuthAuth(*this, phi, info);
+  }
   return phi;
 }
 
@@ -2660,11 +2679,25 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
   Builder.CreateBr(endBB);
 
   Builder.emitBlock(isNotCondBB);
+  if (auto &schema = IGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
+    auto info = PointerAuthInfo::emit(IGF, schema, nullptr,
+                                      PointerAuthEntity());
+    wtable = emitPointerAuthAuth(IGF, wtable, info);
+  }
   auto baseWTable2 =
       emitInvariantLoadOfOpaqueWitness(IGF,/*isProtocolWitness*/true, wtable,
                                        index);
   baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
                                           IGF.IGM.WitnessTablePtrTy);
+  if (auto &schema = IGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
+    auto info = PointerAuthInfo::emit(IGF, schema, nullptr,
+                                      PointerAuthEntity());
+    baseWTable2 = emitPointerAuthSign(IGF, baseWTable2, info);
+
+    baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
+                                            IGF.IGM.WitnessTablePtrTy);
+  }
+
   Builder.CreateBr(endBB);
 
   Builder.emitBlock(endBB);
@@ -3268,6 +3301,8 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
 
   auto &conformanceI = IGF.IGM.getConformanceInfo(proto, concreteConformance);
   wtable = conformanceI.getTable(IGF, srcMetadataCache);
+  if (isa<llvm::Constant>(wtable))
+    wtable = getConstantSignedRelativeProtocolWitnessTable(IGF.IGM, wtable);
 
   IGF.setScopedLocalTypeData(srcType, cacheKind, wtable);
   return wtable;

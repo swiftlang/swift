@@ -5527,14 +5527,30 @@ instantiateRelativeWitnessTable(const Metadata *Type,
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
   auto table = fullTable + privateSizeInWords;
-
+#if SWIFT_PTRAUTH
+  table[0] = ptrauth_sign_unauthenticated(
+        (void*)pattern,
+        ptrauth_key_process_independent_data,
+        SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
+#else
   table[0] = (void*)pattern;
+#endif
+
   assert(1 == WitnessTableFirstRequirementOffset);
 
   // Fill in the base protocols of the requirements from the pattern.
   for (size_t i = 0, e = numBaseProtocols; i < e; ++i) {
     size_t index = i + WitnessTableFirstRequirementOffset;
+#if SWIFT_PTRAUTH
+    auto rawValue = ((RelativeBaseWitness const *)pattern)[index].get();
+    table[index] = (rawValue == nullptr) ? rawValue :
+      ptrauth_sign_unauthenticated(
+        rawValue,
+        ptrauth_key_process_independent_data,
+        SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
+#else
     table[index] = ((RelativeBaseWitness const *)pattern)[index].get();
+#endif
   }
 
   // Copy any instantiation arguments that correspond to conditional
@@ -5627,6 +5643,13 @@ swift::swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *confor
     assert(!conformance->isSynthesizedNonUnique());
     auto pattern = conformance->getWitnessTablePattern();
     auto table = uniqueForeignWitnessTableRef(pattern);
+
+  #if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES && SWIFT_PTRAUTH
+    table = ptrauth_sign_unauthenticated(table,
+          ptrauth_key_process_independent_data,
+          SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
+  #endif
+
     return reinterpret_cast<const RelativeWitnessTable*>(table);
   }
 
@@ -5855,8 +5878,14 @@ RelativeWitnessTable *swift::lookThroughOptionalConditionalWitnessTable(
   if (conditional_wtable & 0x1) {
     conditional_wtable = conditional_wtable & ~(uintptr_t)(0x1);
     conditional_wtable = (uintptr_t)*(void**)conditional_wtable;
+
   }
   auto table = (RelativeWitnessTable*)conditional_wtable;
+#if SWIFT_PTRAUTH
+  table = swift_auth_data_non_address(
+        table,
+        SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
+#endif
   return table;
 }
 
@@ -6169,7 +6198,7 @@ static const RelativeWitnessTable *swift_getAssociatedConformanceWitnessRelative
 
     auto assocWitnessTable = witnessFn(assocType, conformingType, origWTable);
 
-    // The access function returns an unsigned pointer for now.
+    // The access function returns an signed pointer.
     return assocWitnessTable;
   }
 
