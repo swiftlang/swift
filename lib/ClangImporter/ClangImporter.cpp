@@ -6278,6 +6278,9 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
             hasUnsafeAPIAttr(cxxRecord))
           return false;
 
+        if (hasIteratorAPIAttr(cxxRecord) || isIterator(cxxRecord))
+          return true;
+
         if (hasPointerInSubobjects(cxxRecord))
           return true;
       }

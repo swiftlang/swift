@@ -18,3 +18,17 @@
 // CHECK-NOT: StructWithDeletedDestructor
 // CHECK-NOT: StructWithInheritedDeletedDestructor
 // CHECK-NOT: StructWithSubobjectDeletedDestructor
+
+// CHECK: struct Iterator {
+// CHECK: }
+
+// CHECK: struct HasMethodThatReturnsIterator {
+// CHECK:   func __getIteratorUnsafe() -> Iterator
+// CHECK: }
+
+// CHECK: struct IteratorBox {
+// CHECK: }
+
+// CHECK: struct HasMethodThatReturnsIteratorBox {
+// CHECK:   func __getIteratorBoxUnsafe() -> IteratorBox
+// CHECK: }
