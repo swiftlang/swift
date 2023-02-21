@@ -36,6 +36,24 @@ public func overflowWithUnsafeBytes() {
   }
 }
 
+// CHECK-LABEL: sil [stack_protection] @$s4test31owerflowWithUnsafeBorrowedBytes5valueySi_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test31owerflowWithUnsafeBorrowedBytes5valueySi_tF'
+public func owerflowWithUnsafeBorrowedBytes(value: Int) {
+  withUnsafeBytes(of: value) {
+    potentiallyBadCFunction($0.bindMemory(to: Int.self).baseAddress!)
+  }
+}
+
+// CHECK-LABEL: sil @$s4test9onlyLoads5valueS2i_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test9onlyLoads5valueS2i_tF'
+public func onlyLoads(value: Int) -> Int {
+  withUnsafeBytes(of: value) {
+    $0.load(as: Int.self)
+  }
+}
+
 // CHECK-LABEL: sil @$s4test22unprotectedUnsafeBytesyyF
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function '$s4test22unprotectedUnsafeBytesyyF'
@@ -91,5 +109,12 @@ public func testWithUnsafeTemporaryAllocation() {
   withUnsafeTemporaryAllocation(of: Int.self, capacity: 10) {
     potentiallyBadCFunction($0.baseAddress!)
   }
+}
+
+// CHECK-LABEL: sil @$s4test13loadUnalignedySiSVF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test13loadUnalignedySiSVF'
+public func loadUnaligned(_ urp: UnsafeRawPointer) -> Int {
+  return urp.loadUnaligned(as: Int.self)
 }
 

@@ -653,12 +653,16 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       for (auto param : *params) {
         auto *typeRepr = param->getTypeRepr();
         if (typeRepr == nullptr)
-          continue;
+            continue;
 
         auto paramOptions = baseOptions;
 
-        if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
+        if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr)) {
+          if (isa<OwnershipTypeRepr>(specifier))
+            paramOptions |= TypeResolutionFlags::HasOwnership;
+
           typeRepr = specifier->getBase();
+        }
 
         if (auto *packExpansion = dyn_cast<VarargTypeRepr>(typeRepr)) {
           paramOptions.setContext(TypeResolverContext::VariadicFunctionInput);

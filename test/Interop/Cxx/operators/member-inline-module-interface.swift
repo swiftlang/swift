@@ -221,3 +221,23 @@
 // CHECK:   @available(*, unavailable, message: "use .pointee property")
 // CHECK:   func __operatorStar() -> Int32
 // CHECK: }
+
+// CHECK: struct AmbiguousOperatorStar {
+// CHECK-NEXT:   var pointee: Int32 { get }
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT: }
+
+// CHECK: struct AmbiguousOperatorStar2 {
+// CHECK-NEXT:   var pointee: Int32 { get }
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT: }

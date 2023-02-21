@@ -3019,6 +3019,9 @@ public:
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
   }
+  
+  /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
+  bool visitOnStackLifetimeEnds(llvm::function_ref<bool (Operand*)> func) const;
 };
 
 class EndApplyInst;
@@ -3867,7 +3870,8 @@ class KeyPathInst final
   friend TrailingObjects;
   
   KeyPathPattern *Pattern;
-  unsigned NumOperands;
+  unsigned numPatternOperands;
+  unsigned numTypeDependentOperands;
   SubstitutionMap Substitutions;
   
   static KeyPathInst *create(SILDebugLocation Loc,
@@ -3880,11 +3884,12 @@ class KeyPathInst final
   KeyPathInst(SILDebugLocation Loc,
               KeyPathPattern *Pattern,
               SubstitutionMap Subs,
-              ArrayRef<SILValue> Args,
+              ArrayRef<SILValue> allOperands,
+              unsigned numPatternOperands,
               SILType Ty);
   
   size_t numTrailingObjects(OverloadToken<Operand>) const {
-    return NumOperands;
+    return numPatternOperands + numTypeDependentOperands;
   }
   
 public:
@@ -3895,6 +3900,23 @@ public:
     return const_cast<KeyPathInst*>(this)->getAllOperands();
   }
   MutableArrayRef<Operand> getAllOperands();
+
+  ArrayRef<Operand> getPatternOperands() const {
+    return getAllOperands().slice(0, numPatternOperands);
+  }
+
+  MutableArrayRef<Operand> getPatternOperands() {
+    return getAllOperands().slice(0, numPatternOperands);
+  }
+
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().slice(numPatternOperands);
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().slice(numPatternOperands);
+  }
 
   SubstitutionMap getSubstitutions() const { return Substitutions; }
 

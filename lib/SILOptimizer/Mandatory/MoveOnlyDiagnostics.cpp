@@ -168,6 +168,11 @@ void DiagnosticEmitter::emitCheckerDoesntUnderstandDiagnostic(
   emittedCheckerDoesntUnderstandDiagnostic = true;
 }
 
+void DiagnosticEmitter::emitCheckedMissedCopyError(SILInstruction *copyInst) {
+  diagnose(copyInst->getFunction()->getASTContext(), copyInst,
+           diag::sil_moveonlychecker_missed_copy);
+}
+
 //===----------------------------------------------------------------------===//
 //                          MARK: Object Diagnostics
 //===----------------------------------------------------------------------===//
@@ -191,6 +196,8 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
   if (!getCanonicalizer().hasNonPartialApplyConsumingUse())
     return;
 
+  registerDiagnosticEmitted(markedValue);
+
   // Check if this value is closure captured. In such a case, emit a special
   // error.
   if (auto *fArg = dyn_cast<SILFunctionArgument>(
@@ -210,11 +217,12 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
            diag::sil_moveonlychecker_guaranteed_value_consumed, varName);
 
   emitObjectDiagnosticsForGuaranteedUses(true /*ignore partial apply uses*/);
-  registerDiagnosticEmitted(markedValue);
 }
 
 void DiagnosticEmitter::emitObjectOwnedDiagnostic(
     MarkMustCheckInst *markedValue) {
+  registerDiagnosticEmitted(markedValue);
+
   auto &astContext = fn->getASTContext();
   SmallString<64> varName;
   getVariableNameForValue(markedValue, varName);
@@ -334,8 +342,6 @@ void DiagnosticEmitter::emitObjectOwnedDiagnostic(
       }
     }
   }
-
-  registerDiagnosticEmitted(markedValue);
 }
 
 void DiagnosticEmitter::emitObjectDiagnosticsForGuaranteedUses(

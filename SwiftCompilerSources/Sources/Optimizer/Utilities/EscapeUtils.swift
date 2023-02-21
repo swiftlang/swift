@@ -594,7 +594,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     var matched = false
     for effect in effects.escapeEffects.arguments {
       switch effect.kind {
-      case .escapingToArgument(let toArgIdx, let toPath, _):
+      case .escapingToArgument(let toArgIdx, let toPath):
         // Note: exclusive argument -> argument effects cannot appear, so we don't need to handle them here.
         if effect.matches(calleeArgIdx, argPath.projectionPath) {
           guard let callerToIdx = apply.callerArgIndex(calleeArgIndex: toArgIdx) else {

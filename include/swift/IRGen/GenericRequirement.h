@@ -58,16 +58,6 @@ private:
   GenericRequirement(Kind kind, CanType type, ProtocolDecl *proto)
     : kind(kind), type(type), proto(proto) {}
 
-  static bool isPack(CanType ty) {
-    if (auto gp = dyn_cast<GenericTypeParamType>(ty))
-      return gp->isParameterPack();
-    if (auto dm = dyn_cast<DependentMemberType>(ty))
-      if (auto gp =
-              dyn_cast<GenericTypeParamType>(dm->getBase()->getCanonicalType()))
-        return gp->isParameterPack();
-    return false;
-  }
-
 public:
   Kind getKind() const {
     return kind;
@@ -91,7 +81,7 @@ public:
   }
 
   bool isMetadata() const {
-    return kind == Kind::Metadata;
+    return kind == Kind::Metadata || kind == Kind::MetadataPack;
   }
 
   static GenericRequirement forMetadata(CanType type, bool isPack) {
@@ -100,11 +90,11 @@ public:
   }
 
   static GenericRequirement forMetadata(CanType type) {
-    return forMetadata(type, isPack(type));
+    return forMetadata(type, type->hasParameterPack());
   }
 
   bool isWitnessTable() const {
-    return kind == Kind::WitnessTable;
+    return kind == Kind::WitnessTable || kind == Kind::WitnessTablePack;
   }
 
   static GenericRequirement forWitnessTable(CanType type, ProtocolDecl *proto,
@@ -114,7 +104,7 @@ public:
   }
 
   static GenericRequirement forWitnessTable(CanType type, ProtocolDecl *proto) {
-    return forWitnessTable(type, proto, isPack(type));
+    return forWitnessTable(type, proto, type->hasParameterPack());
   }
 
   static llvm::Type *typeForKind(irgen::IRGenModule &IGM,

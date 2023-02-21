@@ -3801,12 +3801,7 @@ void ASTMangler::appendMacroExpansionContext(
     outerExpansionDC = decl->getDeclContext();
     discriminator = decl->getAttachedMacroDiscriminator(role, attr);
 
-    auto *macroDecl = evaluateOrDefault(
-        ctx.evaluator,
-        ResolveMacroRequest{const_cast<CustomAttr *>(attr),
-                            getAttachedMacroRoles(), outerExpansionDC},
-        nullptr);
-    if (macroDecl)
+    if (auto *macroDecl = decl->getResolvedMacro(attr))
       baseName = macroDecl->getBaseName();
     else
       baseName = ctx.getIdentifier("__unknown_macro__");
@@ -3885,10 +3880,10 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     const Decl *decl, CustomAttr *attr, MacroRole role) {
   beginMangling();
 
-  DeclContext *macroDeclContext = decl->getDeclContext();
+  const Decl *attachedTo = decl;
   if (role == MacroRole::MemberAttribute) {
     appendContextOf(cast<ValueDecl>(decl));
-    macroDeclContext = decl->getDeclContext()->getParent();
+    attachedTo = decl->getDeclContext()->getAsDecl();
   } else if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
     appendAnyDecl(valueDecl);
   } else {
@@ -3896,11 +3891,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   }
 
   StringRef macroName;
-  auto *macroDecl = evaluateOrDefault(
-      decl->getASTContext().evaluator,
-      ResolveMacroRequest{attr, role, macroDeclContext},
-      nullptr);
-  if (macroDecl)
+  if (auto *macroDecl = attachedTo->getResolvedMacro(attr))
     macroName = macroDecl->getName().getBaseName().userFacingName();
   else
     macroName = "__unknown_macro__";

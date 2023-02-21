@@ -369,7 +369,7 @@ reflect(enumValue: OneIndirectPayload.child(.leafF))
 // CHECK: Reflecting an enum value.
 // CHECK-NEXT: Type reference:
 // CHECK-NEXT: (enum reflect_Enum_value.OneIndirectPayload)
-// CHECK-NEXT: Value: .child(_)
+// CHECK-NEXT: Value: .child(.leafF)
 
 reflect(enumValue: OneIndirectPayload.leafF)
 

@@ -2393,6 +2393,12 @@ namespace {
       // function, to set the type of the pattern.
       auto setType = [&](Type type) {
         CS.setType(pattern, type);
+        if (auto PE = dyn_cast<ExprPattern>(pattern)) {
+          // Set the type of the pattern's sub-expression as well, so code
+          // completion can retrieve the expression's type in case it is a code
+          // completion token.
+          CS.setType(PE->getSubExpr(), type);
+        }
         return type;
       };
 
@@ -3056,7 +3062,7 @@ namespace {
         Type packType;
         if (auto *elementExpr = getAsExpr<PackElementExpr>(pack)) {
           packType = CS.getType(elementExpr->getPackRefExpr());
-        } else if (auto *elementType = getAsTypeRepr<PackReferenceTypeRepr>(pack)) {
+        } else if (auto *elementType = getAsTypeRepr<PackElementTypeRepr>(pack)) {
           packType = CS.getType(elementType->getPackType());
         } else {
           llvm_unreachable("unsupported pack reference ASTNode");
@@ -4068,7 +4074,7 @@ namespace {
         auto &CS = CG.getConstraintSystem();
         for (const auto &capture : captureList->getCaptureList()) {
           SolutionApplicationTarget target(capture.PBD);
-          if (CS.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+          if (CS.generateConstraints(target))
             return Action::Stop();
         }
       }
@@ -4321,8 +4327,7 @@ generateForEachStmtConstraints(
         TypeLoc::withoutLoc(sequenceProto->getDeclaredInterfaceType()),
         CTP_ForEachSequence);
 
-    if (cs.generateConstraints(makeIteratorTarget,
-                               FreeTypeVariableBinding::Disallow))
+    if (cs.generateConstraints(makeIteratorTarget))
       return None;
 
     forEachStmtInfo.makeIteratorVar = PB;
@@ -4607,7 +4612,7 @@ bool ConstraintSystem::generateConstraints(
                          : SolutionApplicationTarget::forUninitializedVar(
                                patternBinding, index, patternType);
 
-      if (generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      if (generateConstraints(target)) {
         hadError = true;
         continue;
       }
@@ -4692,7 +4697,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
       auto target = SolutionApplicationTarget(symbolExpr, dc, CTP_Unused,
                                               Type(), /*isDiscarded=*/false);
 
-      if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+      if (generateConstraints(target))
         return true;
 
       setSolutionApplicationTarget(&condElement, target);
@@ -4763,9 +4768,15 @@ bool ConstraintSystem::generateConstraints(
     // Generate constraints for the guard expression, if there is one.
     Expr *guardExpr = caseLabelItem.getGuardExpr();
     if (guardExpr) {
-      guardExpr = generateConstraints(guardExpr, dc);
-      if (!guardExpr)
+      auto &ctx = dc->getASTContext();
+      SolutionApplicationTarget guardTarget(
+          guardExpr, dc, CTP_Condition, ctx.getBoolType(), /*discarded*/ false);
+
+      if (generateConstraints(guardTarget))
         return true;
+
+      guardExpr = guardTarget.getAsExpr();
+      setSolutionApplicationTarget(guardExpr, guardTarget);
     }
 
     // Save this info.

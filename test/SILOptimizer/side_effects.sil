@@ -1079,14 +1079,15 @@ bb0(%0 : @guaranteed $S):
 
 // CHECK-LABEL: sil [ossa] @has_partial_apply
 // CHECK-NEXT:  [%0: write c0.v**]
-// CHECK-NEXT:  [global: ]
+// TODO: Teach analysis that destroying noescape closures has no side effects.
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @has_partial_apply : $@convention(thin) (@guaranteed List) -> () {
 bb0(%0 : @guaranteed $List):
   %f = function_ref @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> ()
   %clo = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@convention(thin) (@guaranteed List, @guaranteed List) -> ()
   %res = apply %clo(%0) : $@noescape @callee_guaranteed (@guaranteed List) -> ()
-  dealloc_stack %clo : $@noescape @callee_guaranteed (@guaranteed List) -> ()
+  destroy_value %clo : $@noescape @callee_guaranteed (@guaranteed List) -> ()
   %r = tuple()
   return %r : $()
 }

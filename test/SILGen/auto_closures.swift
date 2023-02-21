@@ -4,10 +4,12 @@
 struct Bool {}
 var false_ = Bool()
 
-// CHECK-LABEL: sil hidden [ossa] @$s13auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> Bool
+// CHECK-LABEL: sil hidden [ossa] @$s13auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> Bool
 func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
-  // CHECK: bb0([[CLOSURE:%.*]] : $@noescape @callee_guaranteed () -> Bool):
-  // CHECK: [[RET:%.*]] = apply [[CLOSURE]]()
+  // CHECK: bb0([[CLOSURE:%.*]] : @guaranteed $@noescape @callee_guaranteed () -> Bool):
+  // CHECK: [[CLOSUREC:%.*]] = copy_value [[CLOSURE]]
+  // CHECK: [[CLOSUREB:%.*]] = begin_borrow [[CLOSUREC]]
+  // CHECK: [[RET:%.*]] = apply [[CLOSUREB]]()
   // CHECK: return [[RET]]
   return x()
 }

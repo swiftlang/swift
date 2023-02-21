@@ -85,6 +85,7 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Once.h"
+#include "swift/Runtime/CMakeConfig.h"
 #include <type_traits>
 
 namespace swift {
@@ -153,8 +154,17 @@ namespace swift {
 // Override section name computation. `COMPATIBILITY_OVERRIDE_SECTION_NAME` will
 // resolve to string literal containing the appropriate section name for the
 // current library.
-#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime "__swift58_hooks"
-#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swift_Concurrency "__s58async_hook"
+// Turns into '__swift<major><minor>_hooks'
+#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime "__swift" \
+  SWIFT_VERSION_MAJOR \
+  SWIFT_VERSION_MINOR \
+  "_hooks"
+
+// Turns into '__s<major><minor>async_hook'
+#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swift_Concurrency "__s" \
+  SWIFT_VERSION_MAJOR \
+  SWIFT_VERSION_MINOR \
+  "async_hook"
 
 #define COMPATIBILITY_OVERRIDE_SECTION_NAME                                    \
   COMPATIBILITY_CONCAT(COMPATIBILITY_OVERRIDE_SECTION_NAME_,                   \

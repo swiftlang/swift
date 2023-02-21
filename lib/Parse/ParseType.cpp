@@ -903,12 +903,12 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     // Treat 'each' as a keyword.
     TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
     SourceLoc eachLoc = consumeToken();
-    ParserResult<TypeRepr> packRef = parseTypeSimple(MessageID, reason);
-    if (packRef.isNull())
-      return packRef;
+    ParserResult<TypeRepr> packElt = parseTypeSimple(MessageID, reason);
+    if (packElt.isNull())
+      return packElt;
 
-    auto *typeRepr = new (Context) PackReferenceTypeRepr(eachLoc, packRef.get());
-    return makeParserResult(ParserStatus(packRef), typeRepr);
+    auto *typeRepr = new (Context) PackElementTypeRepr(eachLoc, packElt.get());
+    return makeParserResult(ParserStatus(packElt), typeRepr);
   }
 
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {

@@ -24,12 +24,16 @@ target_sources(swiftSILOptimizer PRIVATE
   LowerHopToActor.cpp
   MandatoryInlining.cpp
   MovedAsyncVarDebugInfoPropagator.cpp
-  MoveOnlyAddressChecker.cpp
-  MoveOnlyBorrowToDestructureTransform.cpp
-  MoveOnlyBorrowToDestructureTransformTester.cpp
+  MoveOnlyAddressCheckerUtils.cpp
+  MoveOnlyAddressCheckerTester.cpp
+  MoveOnlyBorrowToDestructureUtils.cpp
+  MoveOnlyBorrowToDestructureTester.cpp
   MoveOnlyDeinitInsertion.cpp
   MoveOnlyDiagnostics.cpp
-  MoveOnlyObjectChecker.cpp
+  MoveOnlyObjectCheckerUtils.cpp
+  MoveOnlyObjectCheckerTester.cpp
+  MoveOnlyChecker.cpp
+  MoveOnlyUtils.cpp
   NestedSemanticFunctionCheck.cpp
   OptimizeHopToExecutor.cpp
   PerformanceDiagnostics.cpp

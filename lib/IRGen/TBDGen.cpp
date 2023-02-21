@@ -277,6 +277,18 @@ getInnermostIntroVersion(ArrayRef<Decl*> DeclStack, PlatformKind Platform) {
   return None;
 }
 
+/// Using the introducing version of a symbol as the start version to redirect
+/// linkage path isn't sufficient. This is because the executable can be deployed
+/// to OS versions that were before the symbol was introduced. When that happens,
+/// strictly using the introductory version can lead to NOT redirecting.
+static llvm::VersionTuple calculateLdPreviousVersionStart(ASTContext &ctx,
+                                                llvm::VersionTuple introVer) {
+  auto minDep = ctx.LangOpts.getMinPlatformVersion();
+  if (minDep < introVer)
+    return llvm::VersionTuple(1, 0);
+  return introVer;
+}
+
 void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
                                                 llvm::MachO::SymbolKind kind) {
   if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
@@ -323,7 +335,8 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
     static auto getMinor = [](Optional<unsigned> Minor) {
       return Minor.has_value() ? *Minor : 0;
     };
-    OS << IntroVer->getMajor() << "." << getMinor(IntroVer->getMinor()) << "$";
+    auto verStart = calculateLdPreviousVersionStart(Ctx, *IntroVer);
+    OS << verStart.getMajor() << "." << getMinor(verStart.getMinor()) << "$";
     OS << Ver.Version.getMajor() << "." << getMinor(Ver.Version.getMinor()) << "$";
     OS << name << "$";
     addSymbolInternal(OS.str(), SymbolKind::GlobalSymbol,

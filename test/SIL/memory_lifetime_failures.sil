@@ -260,7 +260,7 @@ sil [ossa] @test_non_escaping_closure : $@convention(thin) (@in T) -> () {
 bb0(%0 :  $*T):
   %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
   %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
-  dealloc_stack %pa : $@noescape @callee_guaranteed () -> () 
+  destroy_value %pa : $@noescape @callee_guaranteed () -> () 
   %res = tuple ()
   return %res : $()
 }

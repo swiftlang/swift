@@ -1589,7 +1589,7 @@ reevaluate_if_taskgroup_has_results:;
     auto newStatus = TaskGroupStatus{assumedStatus};
     if (status.compare_exchange_strong(
         assumedStatus, newStatus.completingPendingReadyWaiting(this).status,
-        /*success*/ std::memory_order_relaxed,
+        /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
 
       // We're going back to running the task, so if we suspended before,

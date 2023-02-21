@@ -12,7 +12,7 @@
 ///
 /// \file
 ///
-/// This pass runs after move only checking has occured and transforms last
+/// This pass runs after move only checking has occurred and transforms last
 /// destroy_value of move only types into a call to the move only types deinit.
 ///
 //===----------------------------------------------------------------------===//
@@ -62,7 +62,7 @@ static bool performTransform(SILFunction &fn) {
 
       if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
         auto destroyType = dvi->getOperand()->getType();
-        if (destroyType.isMoveOnlyType()) {
+        if (destroyType.isMoveOnlyNominalType()) {
           LLVM_DEBUG(llvm::dbgs() << "Handling: " << *dvi);
           auto *nom = destroyType.getNominalOrBoundGenericNominal();
           assert(nom);
@@ -88,7 +88,7 @@ static bool performTransform(SILFunction &fn) {
 
       if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {
         auto destroyType = dai->getOperand()->getType();
-        if (destroyType.isLoadable(fn) && destroyType.isMoveOnlyType()) {
+        if (destroyType.isLoadable(fn) && destroyType.isMoveOnlyNominalType()) {
           LLVM_DEBUG(llvm::dbgs() << "Handling: " << *dai);
           auto *nom = destroyType.getNominalOrBoundGenericNominal();
           assert(nom);

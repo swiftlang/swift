@@ -85,61 +85,7 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
   // containing one or more references.
   let argPath = arg.type.isClass ? ap : ap.push(.anyValueFields)
   
-  struct ArgEffectsVisitor : EscapeVisitorWithResult {
-    enum EscapeDestination {
-      case notSet
-      case toReturn(SmallProjectionPath)
-      case toArgument(Int, SmallProjectionPath) // argument index, path
-    }
-    var result = EscapeDestination.notSet
-    
-    mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
-      if operand.instruction is ReturnInst {
-        // The argument escapes to the function return
-        if path.followStores {
-          // The escaping path must not introduce a followStores.
-          return .abort
-        }
-        switch result {
-          case .notSet:
-            result = .toReturn(path.projectionPath)
-          case .toReturn(let oldPath):
-            result = .toReturn(oldPath.merge(with: path.projectionPath))
-          case .toArgument:
-            return .abort
-        }
-        return .ignore
-      }
-      if isOperandOfRecursiveCall(operand) {
-        return .ignore
-      }
-      return .continueWalk
-    }
-    
-    mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
-      guard let destArg = def as? FunctionArgument else {
-        return .continueWalkUp
-      }
-      // The argument escapes to another argument (e.g. an out or inout argument)
-      if path.followStores {
-        // The escaping path must not introduce a followStores.
-        return .abort
-      }
-      let argIdx = destArg.index
-      switch result {
-        case .notSet:
-          result = .toArgument(argIdx, path.projectionPath)
-        case .toArgument(let oldArgIdx, let oldPath) where oldArgIdx == argIdx:
-          result = .toArgument(argIdx, oldPath.merge(with: path.projectionPath))
-        default:
-          return .abort
-      }
-      return .walkDown
-    }
-  }
-  
-  guard let result = arg.at(argPath).visitByWalkingDown(using: ArgEffectsVisitor(),
-                                                        context) else {
+  guard let result = arg.at(argPath).visitByWalkingDown(using: ArgEffectsVisitor(), context) else {
     return false
   }
   
@@ -152,15 +98,17 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
   switch result {
   case .notSet:
     effect = EscapeEffects.ArgumentEffect(.notEscaping, argumentIndex: arg.index, pathPattern: argPath)
+
   case .toReturn(let toPath):
-    let exclusive = isExclusiveEscapeToReturn(fromArgument: arg, fromPath: argPath,
-                                              toPath: toPath, returnInst: returnInst, context)
-    effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath, exclusive),
+    let visitor = IsExclusiveReturnEscapeVisitor(argument: arg, argumentPath: argPath, returnPath: toPath)
+    let exclusive = visitor.isExclusiveEscape(returnInst: returnInst, context)
+    effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath: toPath, isExclusive: exclusive),
                                           argumentIndex: arg.index, pathPattern: argPath)
+
   case .toArgument(let toArgIdx, let toPath):
     // Exclusive argument -> argument effects cannot appear because such an effect would
     // involve a store which is not permitted for exclusive escapes.
-    effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgIdx, toPath, /*exclusive*/ false),
+    effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
                                           argumentIndex: arg.index, pathPattern: argPath)
   }
   newEffects.append(effect)
@@ -176,8 +124,10 @@ private func getArgIndicesWithDefinedEscapingEffects(of function: Function) -> S
 
     argsWithDefinedEffects.insert(effect.argumentIndex)
     switch effect.kind {
-      case .notEscaping, .escapingToReturn:         break
-      case .escapingToArgument(let toArgIdx, _, _): argsWithDefinedEffects.insert(toArgIdx)
+    case .notEscaping, .escapingToReturn:
+      break
+    case .escapingToArgument(let toArgIdx, _):
+      argsWithDefinedEffects.insert(toArgIdx)
     }
   }
   return argsWithDefinedEffects
@@ -197,55 +147,105 @@ private func isOperandOfRecursiveCall(_ op: Operand) -> Bool {
   return false
 }
 
-/// Returns true if when walking up from the `returnInst`, the `fromArgument` is the one
-/// and only argument which is reached - with a matching `fromPath`.
-private
-func isExclusiveEscapeToReturn(fromArgument: Argument, fromPath: SmallProjectionPath,
-                               toPath: SmallProjectionPath,
-                               returnInst: ReturnInst, _ context: FunctionPassContext) -> Bool {
-  struct IsExclusiveReturnEscapeVisitor : EscapeVisitorWithResult {
-    let fromArgument: Argument
-    let fromPath: SmallProjectionPath
-    let toPath: SmallProjectionPath
-    var result = false
-    
-    mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
-      switch operand.instruction {
-      case is ReturnInst:
-        if path.followStores { return .abort }
-        if path.projectionPath.matches(pattern: toPath) {
-          return .ignore
-        }
+private struct ArgEffectsVisitor : EscapeVisitorWithResult {
+  enum EscapeDestination {
+    case notSet
+    case toReturn(SmallProjectionPath)
+    case toArgument(Int, SmallProjectionPath) // argument index, path
+  }
+  var result = EscapeDestination.notSet
+
+  mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+    if operand.instruction is ReturnInst {
+      // The argument escapes to the function return
+      if path.followStores {
+        // The escaping path must not introduce a followStores.
         return .abort
-      case let si as StoringInstruction:
-        // Don't allow store instructions because this allows the EscapeUtils to walk up
-        // an apply result with `followStores`.
-        if operand == si.destinationOperand {
-          return .abort
-        }
-      case let ca as CopyAddrInst:
-        // `copy_addr` is like a store.
-        if operand == ca.destinationOperand {
-          return .abort
-        }
-      default:
-        break
       }
-      return .continueWalk
+      switch result {
+        case .notSet:
+          result = .toReturn(path.projectionPath)
+        case .toReturn(let oldPath):
+          result = .toReturn(oldPath.merge(with: path.projectionPath))
+        case .toArgument:
+          return .abort
+      }
+      return .ignore
     }
-    
-    mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
-      guard let arg = def as? FunctionArgument else {
-        return .continueWalkUp
-      }
-      if path.followStores { return .abort }
-      if arg == fromArgument && path.projectionPath.matches(pattern: fromPath) {
-        result = true
-        return .walkDown
-      }
+    if isOperandOfRecursiveCall(operand) {
+      return .ignore
+    }
+    return .continueWalk
+  }
+
+  mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
+    guard let destArg = def as? FunctionArgument else {
+      return .continueWalkUp
+    }
+    // The argument escapes to another argument (e.g. an out or inout argument)
+    if path.followStores {
+      // The escaping path must not introduce a followStores.
       return .abort
     }
+    let argIdx = destArg.index
+    switch result {
+      case .notSet:
+        result = .toArgument(argIdx, path.projectionPath)
+      case .toArgument(let oldArgIdx, let oldPath) where oldArgIdx == argIdx:
+        result = .toArgument(argIdx, oldPath.merge(with: path.projectionPath))
+      default:
+        return .abort
+    }
+    return .walkDown
   }
-  let visitor = IsExclusiveReturnEscapeVisitor(fromArgument: fromArgument, fromPath: fromPath, toPath: toPath)
-  return returnInst.operand.at(toPath).visit(using: visitor, context) ?? false
+}
+
+/// Returns true if when walking up from the return instruction, the `fromArgument`
+/// is the one and only argument which is reached - with a matching `fromPath`.
+private struct IsExclusiveReturnEscapeVisitor : EscapeVisitorWithResult {
+  let argument: Argument
+  let argumentPath: SmallProjectionPath
+  let returnPath: SmallProjectionPath
+  var result = false
+
+  func isExclusiveEscape(returnInst: ReturnInst, _ context: FunctionPassContext) -> Bool {
+    return returnInst.operand.at(returnPath).visit(using: self, context) ?? false
+  }
+
+  mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+    switch operand.instruction {
+    case is ReturnInst:
+      if path.followStores { return .abort }
+      if path.projectionPath.matches(pattern: returnPath) {
+        return .ignore
+      }
+      return .abort
+    case let si as StoringInstruction:
+      // Don't allow store instructions because this allows the EscapeUtils to walk up
+      // an apply result with `followStores`.
+      if operand == si.destinationOperand {
+        return .abort
+      }
+    case let ca as CopyAddrInst:
+      // `copy_addr` is like a store.
+      if operand == ca.destinationOperand {
+        return .abort
+      }
+    default:
+      break
+    }
+    return .continueWalk
+  }
+
+  mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
+    guard let arg = def as? FunctionArgument else {
+      return .continueWalkUp
+    }
+    if path.followStores { return .abort }
+    if arg == argument && path.projectionPath.matches(pattern: argumentPath) {
+      result = true
+      return .walkDown
+    }
+    return .abort
+  }
 }

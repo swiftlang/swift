@@ -23,6 +23,7 @@ func test0() {
 // CHECK: destroy_value [[T5]]
 // CHECK:      [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: apply [[T0]]<Int>([[CVT]])
+// CHECK-NEXT: destroy_value [[CVT]]
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK-NEXT: } // end sil function '$s10reabstract5test0yyF'
@@ -38,17 +39,18 @@ func test0() {
 // MANDATORY-NEXT: //{{.*}}reabstraction thunk
 // MANDATORY-NEXT: [[T3:%.*]] = function_ref [[THUNK:@.*]] :
 // MANDATORY-NEXT: [[T4:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[T3]]([[CVT]])
-// MANDATORY-NEXT: [[T5:%.*]] = convert_function [[T4]]
+// MANDATORY-NEXT: [[T4_1:%.*]] = mark_dependence [[T4]]
+// MANDATORY-NEXT: [[T5:%.*]] = convert_function [[T4_1]]
 // MANDATORY-NEXT: // function_ref
 // MANDATORY-NEXT: [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // MANDATORY-NEXT: apply [[T0]]<Int>([[T5]])
-// MANDATORY-NEXT: dealloc_stack [[T4]] : $@noescape @callee_guaranteed (@in_guaranteed Int) -> @out Optional<Int>
 // MANDATORY-NEXT: strong_release [[T2]]
+// MANDATORY-NEXT: dealloc_stack [[T4]] : $@noescape @callee_guaranteed (@in_guaranteed Int) -> @out Optional<Int>
 // MANDATORY-NEXT: tuple ()
 // MANDATORY-NEXT: return
 // MANDATORY-NEXT: } // end sil function '$s10reabstract5test0yyF'
 
-// CHECK:    sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] [[THUNK]] : $@convention(thin) (@in_guaranteed Int, @noescape @callee_guaranteed (Int) -> Optional<Int>) -> @out Optional<Int> {
+// CHECK:    sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] [[THUNK]] :
 // CHECK:      [[T0:%.*]] = load [trivial] %1 : $*Int
 // CHECK-NEXT: [[T1:%.*]] = apply %2([[T0]])
 // CHECK-NEXT: store [[T1]] to [trivial] %0
@@ -96,7 +98,7 @@ func testInoutOpaque(_ c: C, i: Int) {
 func closureTakingOptional(_ fn: (Int?) -> ()) {}
 closureTakingOptional({ (_: Any) -> () in })
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sypIgn_SiSgIegy_TR : $@convention(thin) (Optional<Int>, @noescape @callee_guaranteed (@in_guaranteed Any) -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sypIgn_SiSgIegy_TR :
 // CHECK:   [[ANYADDR:%.*]] = alloc_stack $Any
 // CHECK:   [[OPTADDR:%.*]] = init_existential_addr [[ANYADDR]] : $*Any, $Optional<Int>
 // CHECK:   store %0 to [trivial] [[OPTADDR]] : $*Optional<Int>

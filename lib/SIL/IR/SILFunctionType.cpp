@@ -1212,10 +1212,20 @@ public:
                                 unsigned index, const AbstractionPattern &type,
                                 const TypeLowering &substTL) const {
     switch (ownership) {
-    case ValueOwnership::Default:
+    case ValueOwnership::Default: {
       if (forSelf)
         return getDirectSelfParameter(type);
-      return getDirectParameter(index, type, substTL);
+      auto convention = getDirectParameter(index, type, substTL);
+      // Nonescaping closures can only be borrowed across calls currently.
+      if (convention == ParameterConvention::Direct_Owned) {
+        if (auto fnTy = substTL.getLoweredType().getAs<SILFunctionType>()) {
+          if (fnTy->isTrivialNoEscape()) {
+            return ParameterConvention::Direct_Guaranteed;
+          }
+        }
+      }
+      return convention;
+    }
     case ValueOwnership::InOut:
       return ParameterConvention::Indirect_Inout;
     case ValueOwnership::Shared:
@@ -1838,6 +1848,21 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto boxTy = TC.getInterfaceBoxTypeForCapture(
           VD, minimalLoweredTy.getASTType(),
           /*mutable*/ true);
+      auto convention = ParameterConvention::Direct_Guaranteed;
+      auto param = SILParameterInfo(boxTy, convention);
+      inputs.push_back(param);
+      break;
+    }
+    case CaptureKind::ImmutableBox: {
+      // The type in the box is lowered in the minimal context.
+      auto minimalLoweredTy =
+          TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
+                             TypeExpansionContext::minimal())
+              .getLoweredType();
+      // Lvalues are captured as a box that owns the captured value.
+      auto boxTy =
+          TC.getInterfaceBoxTypeForCapture(VD, minimalLoweredTy.getASTType(),
+                                           /*mutable*/ false);
       auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention);
       inputs.push_back(param);

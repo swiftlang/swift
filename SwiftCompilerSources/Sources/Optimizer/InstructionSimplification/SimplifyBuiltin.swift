@@ -56,7 +56,7 @@ private extension BuiltinInst {
     let lhs = operands[0].value
     let rhs = operands[1].value
 
-    guard let equal = typesOfValuesAreEqual(lhs, rhs) else {
+    guard let equal = typesOfValuesAreEqual(lhs, rhs, in: parentFunction) else {
       return
     }
     let builder = Builder(before: self, context)
@@ -66,7 +66,7 @@ private extension BuiltinInst {
   }
 }
 
-private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value) -> Bool? {
+private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Function) -> Bool? {
   if lhs == rhs {
     return true
   }
@@ -76,8 +76,8 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value) -> Bool? {
     return nil
   }
 
-  let lhsTy = lhsExistential.operand.type.instanceTypeOfMetatype
-  let rhsTy = rhsExistential.operand.type.instanceTypeOfMetatype
+  let lhsTy = lhsExistential.operand.type.instanceTypeOfMetatype(in: function)
+  let rhsTy = rhsExistential.operand.type.instanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.

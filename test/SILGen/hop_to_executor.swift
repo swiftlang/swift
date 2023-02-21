@@ -313,6 +313,7 @@ func anotherUnspecifiedAsyncFunc(_ red : RedActorImpl) async {
 // CHECK: hop_to_executor [[GENERIC_EXEC]] :
 // CHECK: function_ref @$s4test8RedActorV6sharedAA0bC4ImplCvgZ
 // CHECK: hop_to_executor [[RED:%[0-9]+]] : $RedActorImpl
+// CHECK-NEXT: begin_borrow
 // CHECK-NEXT: apply
 // CHECK-NEXT: hop_to_executor [[GENERIC_EXEC:%[0-9]+]] : $Optional<Builtin.Executor>
 func testGlobalActorFuncValue(_ fn: @RedActor () -> Void) async {

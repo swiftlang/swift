@@ -463,7 +463,7 @@ public struct UnsafeRawPointer: _Pointer {
     as type: T.Type
   ) -> T {
     _debugPrecondition(_isPOD(T.self))
-    return withUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
+    return _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
       let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         temporary._rawValue,
@@ -1245,7 +1245,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
     as type: T.Type
   ) -> T {
     _debugPrecondition(_isPOD(T.self))
-    return withUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
+    return _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
       let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         temporary._rawValue,

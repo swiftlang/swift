@@ -59,6 +59,13 @@ withUnsafeTemporaryAllocation(of: Int32.self, capacity: 4) { buffer in
 // CHECK: [[INT_PTR:%[0-9]+]] = ptrtoint [16 x i8]* [[INT_PTR_RAW]] to [[WORD]]
 // CHECK: call swiftcc void @blackHole([[WORD]] [[INT_PTR]])
 
+_withUnprotectedUnsafeTemporaryAllocation(of: Int32.self, capacity: 4) { buffer in
+  blackHole(buffer.baseAddress)
+}
+// CHECK: [[INT_PTR_RAW:%temp_alloc[0-9]*]] = alloca [16 x i8], align 4
+// CHECK: [[INT_PTR:%[0-9]+]] = ptrtoint [16 x i8]* [[INT_PTR_RAW]] to [[WORD]]
+// CHECK: call swiftcc void @blackHole([[WORD]] [[INT_PTR]])
+
 withUnsafeTemporaryAllocation(of: Void.self, capacity: 2) { buffer in
   blackHole(buffer.baseAddress)
 }

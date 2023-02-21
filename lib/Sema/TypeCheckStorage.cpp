@@ -121,7 +121,7 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
     (void)evaluateOrDefault(
         ctx.evaluator,
         ExpandPeerMacroRequest{member},
-        false);
+        {});
 
     auto *var = dyn_cast<VarDecl>(member);
     if (!var || var->isStatic())

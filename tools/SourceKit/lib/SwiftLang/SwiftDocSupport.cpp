@@ -969,6 +969,10 @@ public:
              llvm::MutableArrayRef<TextEntity*> FuncEnts)
     : SM(SM), BufferID(BufferID), FuncEnts(FuncEnts) {}
 
+  bool shouldWalkMacroExpansions() override {
+    return false;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
       return Action::SkipChildren(); // Skip body.

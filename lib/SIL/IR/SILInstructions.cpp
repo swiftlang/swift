@@ -2899,24 +2899,30 @@ KeyPathInst::create(SILDebugLocation Loc,
   assert(Args.size() == Pattern->getNumOperands()
          && "number of key path args doesn't match pattern");
 
-  auto totalSize = totalSizeToAlloc<Operand>(Args.size());
+  SmallVector<SILValue, 8> allOperands(Args.begin(), Args.end());
+  collectTypeDependentOperands(allOperands, F, Ty);
+
+  auto totalSize = totalSizeToAlloc<Operand>(allOperands.size());
   void *mem = F.getModule().allocateInst(totalSize, alignof(KeyPathInst));
-  return ::new (mem) KeyPathInst(Loc, Pattern, Subs, Args, Ty);
+  return ::new (mem) KeyPathInst(Loc, Pattern, Subs, allOperands, Args.size(), Ty);
 }
 
 KeyPathInst::KeyPathInst(SILDebugLocation Loc,
                          KeyPathPattern *Pattern,
                          SubstitutionMap Subs,
-                         ArrayRef<SILValue> Args,
+                         ArrayRef<SILValue> allOperands,
+                         unsigned numPatternOperands,
                          SILType Ty)
   : InstructionBase(Loc, Ty),
     Pattern(Pattern),
-    NumOperands(Pattern->getNumOperands()),
+    numPatternOperands(numPatternOperands),
+    numTypeDependentOperands(allOperands.size() - numPatternOperands),
     Substitutions(Subs)
 {
+  assert(allOperands.size() >= numPatternOperands);
   auto *operandsBuf = getTrailingObjects<Operand>();
-  for (unsigned i = 0; i < Args.size(); ++i) {
-    ::new ((void*)&operandsBuf[i]) Operand(this, Args[i]);
+  for (unsigned i = 0; i < allOperands.size(); ++i) {
+    ::new ((void*)&operandsBuf[i]) Operand(this, allOperands[i]);
   }
   
   // Increment the use of any functions referenced from the keypath pattern.
@@ -2927,7 +2933,7 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
 
 MutableArrayRef<Operand>
 KeyPathInst::getAllOperands() {
-  return {getTrailingObjects<Operand>(), NumOperands};
+  return {getTrailingObjects<Operand>(), numPatternOperands + numTypeDependentOperands};
 }
 
 KeyPathInst::~KeyPathInst() {

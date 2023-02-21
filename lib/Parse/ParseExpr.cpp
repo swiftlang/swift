@@ -1175,6 +1175,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       //   [.foo(), <HERE> .bar()]
       // '.bar()' is probably not a part of the inserting element. Moreover,
       // having suffixes doesn't help type inference in any way.
+
       return Result;
     }
 

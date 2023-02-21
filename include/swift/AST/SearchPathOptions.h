@@ -234,6 +234,10 @@ private:
   /// Compiler plugin library search paths.
   std::vector<std::string> CompilerPluginLibraryPaths;
 
+  /// Compiler plugin executable paths and providing module names.
+  /// Format: '<path>#<module names>'
+  std::vector<std::string> CompilerPluginExecutablePaths;
+
   /// Add a single import search path. Must only be called from
   /// \c ASTContext::addSearchPath.
   void addImportSearchPath(StringRef Path, llvm::vfs::FileSystem *FS) {
@@ -322,6 +326,16 @@ public:
 
   ArrayRef<std::string> getCompilerPluginLibraryPaths() const {
     return CompilerPluginLibraryPaths;
+  }
+
+  void setCompilerPluginExecutablePaths(
+      std::vector<std::string> NewCompilerPluginExecutablePaths) {
+    CompilerPluginExecutablePaths = NewCompilerPluginExecutablePaths;
+    Lookup.searchPathsDidChange();
+  }
+
+  ArrayRef<std::string> getCompilerPluginExecutablePaths() const {
+    return CompilerPluginExecutablePaths;
   }
 
   /// Path(s) to virtual filesystem overlay YAML files.

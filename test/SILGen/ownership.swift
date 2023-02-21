@@ -7,6 +7,8 @@ case case1
 }
 
 // CHECK: bb{{[0-9]+}}([[ERROR:%.*]] : @owned $any Error):
+// CHECK-NEXT:   end_borrow {{.*}} : ${{.*}}() ->
+// CHECK-NEXT:   destroy_value {{.*}} : ${{.*}}() ->
 // CHECK-NEXT:   [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
 // CHECK-NEXT:   [[ERROR_SLOT:%.*]] = alloc_stack $any Error
 // CHECK-NEXT:   [[COPIED_BORROWED_ERROR:%.*]] = copy_value [[BORROWED_ERROR]]

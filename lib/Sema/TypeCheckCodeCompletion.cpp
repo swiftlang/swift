@@ -307,7 +307,9 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
-  options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
+  if (!Context.CompletionCallback) {
+    options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
+  }
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(dc, options);
@@ -400,7 +402,6 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
-  options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   // Construct a constraint system from this expression.
   ConstraintSystem CS(DC, options);
@@ -612,8 +613,9 @@ bool TypeChecker::typeCheckForCodeCompletion(
     options |= ConstraintSystemFlags::AllowFixes;
     options |= ConstraintSystemFlags::SuppressDiagnostics;
     options |= ConstraintSystemFlags::ForCodeCompletion;
-    options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
-
+    if (!Context.CompletionCallback) {
+      options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
+    }
 
     ConstraintSystem cs(DC, options);
 

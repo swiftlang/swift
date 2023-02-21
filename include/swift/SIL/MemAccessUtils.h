@@ -1254,6 +1254,8 @@ struct AccessPathWithBase {
     return AccessBase(base, accessPath.getStorage().getKind());
   }
 
+  bool isValid() const { return base && accessPath.isValid(); }
+
   bool operator==(AccessPathWithBase other) const {
     return accessPath == other.accessPath && base == other.base;
   }

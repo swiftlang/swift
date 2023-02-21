@@ -1011,11 +1011,11 @@ sil @closure3 : $@convention(thin) (@guaranteed Z) -> () {
 [%0: noescape **]
 }
 sil [ossa] @closure4 : $@convention(thin) (@guaranteed X, @guaranteed Y) -> () {
-[%0: escape => %1]
+[%0: escape -> %1]
 [%1: noescape]
 }
 sil [ossa] @closure5 : $@convention(thin) (@guaranteed Y, @guaranteed X) -> () {
-[%1: escape => %0, noescape]
+[%1: escape -> %0, noescape]
 }
 
 sil [ossa] @closure6 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> @owned Y {

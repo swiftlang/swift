@@ -1523,7 +1523,7 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
     if (!med)
       continue;
     auto macro = evaluateOrDefault(
-        ctx.evaluator, ResolveMacroRequest{med, MacroRole::Declaration, dc},
+        ctx.evaluator, ResolveMacroRequest{med, dc},
         nullptr);
     if (!macro)
       continue;
@@ -2618,8 +2618,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
                                        allowUsableFromInline);
   }
 
-  case TypeReprKind::PackReference: {
-    auto packReferenceRepr = cast<PackReferenceTypeRepr>(typeRepr);
+  case TypeReprKind::PackElement: {
+    auto packReferenceRepr = cast<PackElementTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
                                        packReferenceRepr->getPackType(), dc,
                                        allowUsableFromInline);

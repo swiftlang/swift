@@ -143,13 +143,15 @@ computeMallocTypeSummary(const HeapMetadata *heapMetadata) {
   summary.type_kind = MALLOC_TYPE_KIND_SWIFT;
 
   bool isGenericData = true;
-  for (auto &field : *typeDesc->Fields.get()) {
-    if (field.isIndirectCase()) {
-      isGenericData = false;
-      if (field.isVar())
-        summary.layout_semantics.data_pointer = true;
-      else
-        summary.layout_semantics.immutable_pointer = true;
+  if (auto *fieldDesc = typeDesc->Fields.get()) {
+    for (auto &field : *fieldDesc) {
+      if (field.isIndirectCase()) {
+        isGenericData = false;
+        if (field.isVar())
+          summary.layout_semantics.data_pointer = true;
+        else
+          summary.layout_semantics.immutable_pointer = true;
+      }
     }
   }
 

@@ -297,5 +297,13 @@ StringRef getCurrentCompilerTag() {
 #endif
 }
 
+StringRef getCurrentCompilerSerializationTag() {
+#ifdef SWIFT_COMPILER_VERSION
+  return SWIFT_COMPILER_VERSION;
+#else
+  return StringRef();
+#endif
+}
+
 } // end namespace version
 } // end namespace swift

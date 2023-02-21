@@ -127,7 +127,7 @@ git -C "%source_root%\swift" checkout-index --force --all
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository tensorflow-swift-apis"
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository yams"
 
-call "%source_root%\swift\utils\update-checkout.cmd" %scheme_arg% %skip_repositories_arg% --clone --skip-history --skip-tags --github-comment "%ghprbCommentBody%" >NUL 2>NUL
+call "%source_root%\swift\utils\update-checkout.cmd" %scheme_arg% %skip_repositories_arg% --clone --skip-history --skip-tags --github-comment "%ghprbCommentBody%" >NUL
 
 goto :eof
 endlocal

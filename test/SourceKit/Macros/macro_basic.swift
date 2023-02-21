@@ -57,30 +57,44 @@ struct S3 {
 //##-- Prepare the macro plugin.
 // RUN: %target-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: COMPILER_ARGS=( \
+// RUN: COMPILER_ARGS_WITHOUT_SOURCE=( \
 // RUN:   -swift-version 5 \
 // RUN:   -enable-experimental-feature Macros \
 // RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
 // RUN:   -I %swift-host-lib-dir \
 // RUN:   -module-name MacroUser \
+// RUN: )
+
+// RUN: COMPILER_ARGS=( \
+// RUN:   ${COMPILER_ARGS_WITHOUT_SOURCE[@]} \
 // RUN:   %s \
 // RUN: )
 
-//##-- cursor-info at '#' position.
+//##-- cursor-info at '#' position. Cursor doesn't resolve but we will still
+// get refactorings. Should fix that in the new cursor info.
 // RUN: %sourcekitd-test -req=cursor -pos=4:7 -cursor-action %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_POUND %s
-
+// CURSOR_POUND-NOT: source.lang.swift.ref.macro
 // CURSOR_POUND-LABEL: ACTIONS BEGIN
 // CURSOR_POUND: source.refactoring.kind.expand.macro
 // CURSOR_POUND-NEXT: Expand Macro
 // CURSOR_POUND: ACTIONS END
 
 //##-- cursor-info at 'stringify' position.
-// RUN: %sourcekitd-test -req=cursor -pos=4:8 -cursor-action %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_MACRONAME %s
-
+// RUN: %sourcekitd-test -req=cursor -pos=4:8 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_MACRONAME %s
 // CURSOR_MACRONAME: source.lang.swift.ref.macro (1:33-1:42)
 // CURSOR_MACRONAME: (T) -> (T, String)
 // CURSOR_MACRONAME: <Declaration>@freestanding(expression) macro stringify&lt;T&gt;(_ value: <Type usr="s:9MacroUser1TL_xmfp">T</Type>) -&gt; (<Type usr="s:9MacroUser1TL_xmfp">T</Type>, <Type usr="s:SS">String</Type>) = #externalMacro(module: &quot;MacroDefinition&quot;, type: &quot;StringifyMacro&quot;)</Declaration>
 // CURSOR_MACRONAME: <decl.macro><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@freestanding</syntaxtype.attribute.name>(expression)</syntaxtype.attribute.builtin> <syntaxtype.keyword>macro</syntaxtype.keyword> <decl.name>stringify</decl.name>&lt;<decl.generic_type_param usr="s:9MacroUser1TL_xmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>value</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr="s:9MacroUser1TL_xmfp">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="s:9MacroUser1TL_xmfp">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:SS">String</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype> = #externalMacro(module: &quot;MacroDefinition&quot;, type: &quot;StringifyMacro&quot;)</decl.macro>
+// CURSOR_MACRONAME-LABEL: SYMBOL GRAPH BEGIN
+// CURSOR_MACRONAME: "identifier": {
+// CURSOR_MACRONAME-NEXT:   "interfaceLanguage": "swift",
+// CURSOR_MACRONAME-NEXT:   "precise": "s:9MacroUser9stringifyyx_SStxcfm"
+// CURSOR_MACRONAME-NEXT: },
+// CURSOR_MACRONAME-NEXT: "kind": {
+// CURSOR_MACRONAME-NEXT:   "displayName": "Macro",
+// CURSOR_MACRONAME-NEXT:   "identifier": "swift.macro"
+// CURSOR_MACRONAME-NEXT: },
+// CURSOR_MACRONAME: SYMBOL GRAPH END
 // CURSOR_MACRONAME-LABEL: ACTIONS BEGIN
 // CURSOR_MACRONAME: source.refactoring.kind.rename.global
 // CURSOR_MACRONAME-NEXT: Global Rename
@@ -95,9 +109,19 @@ struct S3 {
 // EXPAND: source.edit.kind.active:
 // EXPAND-NEXT: 4:7-4:24 "(a + b, "a + b")"
 
-//##-- cursor-info at 'macro name' position following @.
-// RUN: %sourcekitd-test -req=cursor -pos=21:2 -cursor-action %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_ATTACHED_MACRO %s
-
+//##-- cursor-info at 'myTypeWrapper' position following @. We don't support
+// on the @ currently.
+// RUN: %sourcekitd-test -req=cursor -pos=21:2 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_ATTACHED_MACRO %s
+// CURSOR_ATTACHED_MACRO-LABEL: SYMBOL GRAPH BEGIN
+// CURSOR_ATTACHED_MACRO: "identifier": {
+// CURSOR_ATTACHED_MACRO-NEXT:   "interfaceLanguage": "swift",
+// CURSOR_ATTACHED_MACRO-NEXT:   "precise": "s:9MacroUser13myTypeWrapperyycfm"
+// CURSOR_ATTACHED_MACRO-NEXT: },
+// CURSOR_ATTACHED_MACRO-NEXT: "kind": {
+// CURSOR_ATTACHED_MACRO-NEXT:   "displayName": "Macro",
+// CURSOR_ATTACHED_MACRO-NEXT:   "identifier": "swift.macro"
+// CURSOR_ATTACHED_MACRO-NEXT: },
+// CURSOR_ATTACHED_MACRO: SYMBOL GRAPH END
 // CURSOR_ATTACHED_MACRO-LABEL: ACTIONS BEGIN
 // CURSOR_ATTACHED_MACRO: source.refactoring.kind.expand.macro
 // CURSOR_ATTACHED_MACRO-NEXT: Expand Macro
@@ -139,10 +163,24 @@ struct S3 {
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=42:5 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=PEER_EXPAND %s
 // PEER_EXPAND: source.edit.kind.active:
 // PEER_EXPAND:   45:4-45:4 "
-// PEER_EXPAND: func f(a: Int, for b: String, _ value: Double, completionHandler: (String) -> Void) {
+// PEER_EXPAND: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
 // PEER_EXPAND:  Task {
 // PEER_EXPAND:    completionHandler(await f(a: a, for: b, value))
 // PEER_EXPAND:  }
 // PEER_EXPAND: }
 // PEER_EXPAND: source.edit.kind.active:
 // PEER_EXPAND:   42:3-42:24 ""
+
+//##-- Doc info, mostly just checking we don't crash because of the separate buffers
+// RUN: %sourcekitd-test -req=doc-info %s -- ${COMPILER_ARGS_WITHOUT_SOURCE[@]} | %FileCheck -check-prefix=DOCINFO %s
+// DOCINFO: key.name: "myTypeWrapper()"
+// DOCINFO-NEXT: key.usr: "s:9MacroUser13myTypeWrapperyycfm"
+// DOCINFO-NEXT: key.offset: 621
+// DOCINFO: key.name: "myTypeWrapper()"
+// DOCINFO-NEXT: key.usr: "s:9MacroUser13myTypeWrapperyycfm"
+// DOCINFO-NEXT: key.offset: 250
+
+//##-- Formatting shouldn't include the added attribute (or crash)
+// RUN: %sourcekitd-test -req=format -line=23 -length=1 %s | %FileCheck -check-prefix=FORMATTED %s
+// FORMATTED: "  var x: Int"
+
