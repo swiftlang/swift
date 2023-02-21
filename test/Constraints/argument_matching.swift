@@ -531,13 +531,13 @@ struct PositionsAroundDefaultsAndVariadics {
     // expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
     
     f1(b: "2", 1) // expected-error {{incorrect argument labels in call (have 'b:_:', expected '_:_:c:_:')}}
-    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-1 {{integer literal value '1' cannot be used as a boolean; did you mean 'true'?}}
 
     f1(b: "2", [3], 1) // expected-error {{incorrect argument labels in call (have 'b:_:_:', expected '_:_:c:_:')}}
     // expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
 
     f1(b: "2", 1, [3]) // expected-error {{incorrect argument labels in call (have 'b:_:_:', expected '_:_:c:_:')}}
-    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-1 {{integer literal value '1' cannot be used as a boolean; did you mean 'true'?}}
     // expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'Int'}}
   }
 
@@ -574,11 +574,11 @@ struct PositionsAroundDefaultsAndVariadics {
     f2(true, 21, 22, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
     // expected-note@-1 {{remove brackets to pass array elements directly}}
 
-    f2(21, 22, 23, c: "3", [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f2(21, 22, 23, c: "3", [4]) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
 
-    f2(21, 22, c: "3", [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f2(21, 22, c: "3", [4]) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
 
-    f2(21, c: "3", [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f2(21, c: "3", [4]) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
 
     f2(c: "3", [4])
     f2(c: "3")
@@ -591,15 +591,15 @@ struct PositionsAroundDefaultsAndVariadics {
     // expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
 
     f2(c: "3", [4], 21) // expected-error {{incorrect argument labels in call (have 'c:_:_:', expected '_:_:c:_:')}}
-    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
 
     f2([4]) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
 
-    f2(21, [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f2(21, [4]) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
     // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
     // expected-note@-2 {{remove brackets to pass array elements directly}}
 
-    f2(21, 22, [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f2(21, 22, [4]) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
     // expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
     // expected-note@-2 {{remove brackets to pass array elements directly}}
   }
@@ -690,7 +690,7 @@ struct PositionsAroundDefaultsAndVariadics {
     f4(b: "2", 31, d: [4])
     f4(b: "2", d: [4])
 
-    f4(31, b: "2", d: [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f4(31, b: "2", d: [4]) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
 
     f4(b: "2", d: [4], 31) // expected-error {{unnamed argument #3 must precede argument 'b'}}
 
@@ -700,13 +700,13 @@ struct PositionsAroundDefaultsAndVariadics {
 
     f4()
     
-    f4(31) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f4(31) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
 
-    f4(31, d: [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f4(31, d: [4]) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
 
-    f4(31, 32) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f4(31, 32) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
 
-    f4(31, 32, d: [4]) // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    f4(31, 32, d: [4]) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
   }
 
   // labeled variadics after labeled parameter
