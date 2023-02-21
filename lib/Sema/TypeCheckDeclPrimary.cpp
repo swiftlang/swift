@@ -2967,15 +2967,6 @@ public:
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(CD);
 
-    // Ban non-final classes from having move only fields.
-    if (!CD->isFinal()) {
-      for (auto *field : CD->getStoredProperties()) {
-        if (field->getType()->isPureMoveOnly()) {
-          field->diagnose(
-              diag::moveonly_non_final_class_cannot_contain_moveonly_field);
-        }
-      }
-    }
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {

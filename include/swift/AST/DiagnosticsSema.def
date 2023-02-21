@@ -6862,8 +6862,6 @@ NOTE(moveonly_copyable_type_that_contains_moveonly_type_location, none,
 ERROR(moveonly_cannot_conform_to_type, none,
      "move-only %0 %1 cannot conform to %2",
      (DescriptiveDeclKind, DeclName, Type))
-ERROR(moveonly_non_final_class_cannot_contain_moveonly_field, none,
-     "non-final classes containing move only fields is not yet supported", ())
 ERROR(moveonly_parameter_missing_ownership, none,
       "noncopyable parameter must specify its ownership", ())
 NOTE(moveonly_parameter_ownership_suggestion, none,
