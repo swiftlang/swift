@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -closure-lifetime-fixup %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -closure-lifetime-fixup %s | %FileCheck %s
 
 sil_stage raw
 
@@ -270,16 +270,16 @@ bb3:
 // CHECK:         [[STACK:%[^,]+]] = alloc_stack $Self
 // CHECK:         try_apply undef() {{.*}}, normal [[SUCCESS_1:bb[0-9]+]], error [[FAILURE_1:bb[0-9]+]]
 // CHECK:       [[SUCCESS_1]]
-// CHECK:         copy_addr [[INSTANCE]] to [init] [[STACK]] : $*Self
+// CHECK:         copy_addr [[INSTANCE]] to [init] [[STACK]] : $*Self, {{.*}} scope [[STACK_SCOPE:[0-9]+]]
 // CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] undef<Self>([[STACK]])
 // CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [[CLOSURE]] {{.*}} on [[STACK]]
 // CHECK:         try_apply undef([[DEPENDENCY]]) {{.*}}, normal [[SUCCESS_2:bb[0-9]+]], error [[FAILURE_2:bb[0-9]+]]
 // CHECK:       [[SUCCESS_2]]
 // CHECK:         destroy_value [[DEPENDENCY]]
 // CHECK:         destroy_addr [[STACK]]
-// CHECK:         dealloc_stack [[STACK]] : $*Self
+// CHECK:         dealloc_stack [[STACK]] : $*Self, {{.*}} scope [[STACK_SCOPE]]
 // CHECK:       [[FAILURE_1]]
-// CHECK:         dealloc_stack [[STACK]]
+// CHECK:         dealloc_stack [[STACK]] : $*Self, {{.*}} scope [[STACK_SCOPE]]
 // CHECK:         throw
 // CHECK:       [[FAILURE_2]]
 // CHECK-NOT:     dealloc_stack
