@@ -760,12 +760,11 @@ ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed_global_var, 
 ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed_global_let, none,
       "'%0' was consumed but it is illegal to consume a noncopyable global let. One can only read from it",
       (StringRef))
-ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed_escaping_let, none,
-      "'%0' was consumed but it is illegal to consume a noncopyable escaping immutable capture. One can only read from it",
-      (StringRef))
 ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed_escaping_var, none,
-      "'%0' was consumed but it is illegal to consume a noncopyable escaping mutable capture. One can only read from it or assign over it",
+      "'%0' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it",
       (StringRef))
+ERROR(sil_moveonlychecker_let_capture_consumed, none,
+      "'%0' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it", (StringRef))
 
 NOTE(sil_moveonlychecker_moveonly_field_consumed_here, none,
      "move only field consumed here", ())

@@ -15,6 +15,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -81,7 +82,8 @@ struct MoveOnlyChecker {
 
   MoveOnlyChecker(SILFunction *fn, DominanceInfo *domTree,
                   PostOrderAnalysis *poa)
-      : fn(fn), domTree(domTree), poa(poa) {}
+      : diagnosticEmitter(fn), fn(fn), domTree(domTree), poa(poa) {
+  }
 
   void checkObjects();
   void checkAddresses();
@@ -154,6 +156,14 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
 
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
+
+    // If allocbox to stack told use to not emit diagnostics for this function,
+    // clean up any copies, invalidate the analysis, and return early.
+    if (getFunction()->hasSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS)) {
+      if (cleanupNonCopyableCopiesAfterEmittingDiagnostic(getFunction()))
+        invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      return;
+    }
 
     LLVM_DEBUG(llvm::dbgs()
                << "===> MoveOnly Checker. Visiting: " << fn->getName() << '\n');

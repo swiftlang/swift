@@ -25,6 +25,7 @@
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILType.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
@@ -394,11 +395,12 @@ public:
   FormalEvaluationContext FormalEvalContext;
 
   /// VarLoc - representation of an emitted local variable or constant.  There
-  /// are three scenarios here:
+  /// are four scenarios here:
   ///
-  ///  1) This could be a simple "var" or "let" emitted into an alloc_box.  In
-  ///     this case, 'value' contains a pointer (it is always an address) to the
-  ///     value, and 'box' contains a pointer to the retain count for the box.
+  ///  1) This could be a simple copyable "var" or "let" emitted into an
+  ///     alloc_box.  In this case, 'value' contains a pointer (it is always an
+  ///     address) to the value, and 'box' contains a pointer to the retain
+  ///     count for the box.
   ///  2) This could be a simple non-address-only "let" represented directly. In
   ///     this case, 'value' is the value of the let and is never of address
   ///     type.  'box' is always nil.
@@ -407,13 +409,20 @@ public:
   ///     incoming argument of 'in_guaranteed' convention).  In this case,
   ///     'value' is a pointer to the memory (and thus, its type is always an
   ///     address) and the 'box' is nil.
+  ///  4) This could be a noncopyable "var" or "let" emitted into an
+  ///     alloc_box. In this case, 'value' is nil and the 'box' contains the box
+  ///     itself. The user must always reproject from the box and insert an
+  ///     access marker/must_must_check as appropriate.
   ///
-  /// Generally, code shouldn't be written to enumerate these three cases, it
+  /// Generally, code shouldn't be written to enumerate these four cases, it
   /// should just handle the case of "box or not" or "address or not", depending
   /// on what the code cares about.
   struct VarLoc {
     /// value - the value of the variable, or the address the variable is
     /// stored at (if "value.getType().isAddress()" is true).
+    ///
+    /// It may be invalid if we are supposed to lazily project out an address
+    /// from a box.
     SILValue value;
 
     /// box - This is the retainable box for something emitted to an alloc_box.
@@ -426,6 +435,25 @@ public:
       Result.value = value;
       Result.box = box;
       return Result;
+    }
+
+    static VarLoc getForBox(SILValue box) {
+      VarLoc Result;
+      Result.value = SILValue();
+      Result.box = box;
+      return Result;
+    }
+
+    /// Return either the value if we have one or if we only have a box, project
+    /// our a new box address and return that.
+    SILValue getValueOrBoxedValue(SILGenFunction &SGF,
+                                  SILLocation loc = SILLocation::invalid()) {
+      if (value)
+        return value;
+      assert(box);
+      if (loc.isNull())
+        loc = SGF.CurrentSILLoc;
+      return SGF.B.createProjectBox(loc, box, 0);
     }
   };
   
@@ -1466,6 +1494,9 @@ public:
   // FIXME: demote this to private state.
   ManagedValue maybeEmitValueOfLocalVarDecl(
       VarDecl *var, AccessKind accessKind);
+
+  ManagedValue maybeEmitAddressForBoxOfLocalVarDecl(SILLocation loc,
+                                                    VarDecl *var);
 
   /// Produce an RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified expression.  Try to
