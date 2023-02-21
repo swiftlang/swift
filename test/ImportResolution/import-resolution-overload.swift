@@ -32,7 +32,7 @@ ambiguousWithVar(true)   // no-warning
 
 var localVar : Bool
 localVar = false
-localVar = 42 // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+localVar = 42 // expected-error {{cannot assign value of type 'Int' to type 'Bool'}}
 localVar(42)  // expected-error {{cannot call value of non-function type 'Bool'}}
 var _ : localVar // should still work
 
