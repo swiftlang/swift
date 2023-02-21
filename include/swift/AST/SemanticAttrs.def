@@ -120,5 +120,9 @@ SEMANTICS_ATTR(LIFETIMEMANAGEMENT_COPY, "lifetimemanagement.copy")
 
 SEMANTICS_ATTR(NO_PERFORMANCE_ANALYSIS, "no_performance_analysis")
 
+// A flag used to turn off moveonly diagnostics on functions that allocbox to
+// stack specialized.
+SEMANTICS_ATTR(NO_MOVEONLY_DIAGNOSTICS, "sil.optimizer.moveonly.diagnostic.ignore")
+
 #undef SEMANTICS_ATTR
 

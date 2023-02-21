@@ -1075,7 +1075,8 @@ namespace {
       Value(value),
       Enforcement(enforcement),
       IsRValue(isRValue) {
-        assert(IsRValue || value.getType().isAddress());
+      assert(IsRValue || value.getType().isAddress() ||
+             value.getType().isBoxedNonCopyableType(value.getFunction()));
     }
 
     virtual bool isLoadingPure() const override { return true; }
@@ -1084,8 +1085,26 @@ namespace {
                          ManagedValue base) && override {
       assert(!base && "value component must be root of lvalue path");
 
+      // See if we have a noncopyable address from a project_box or global, we
+      // always eagerly reproject out.
+      if (Value.getType().isAddress() && Value.getType().isMoveOnly()) {
+        SILValue addr = Value.getValue();
+        if (isa<ProjectBoxInst>(addr) || isa<GlobalAddrInst>(addr)) {
+          if (Enforcement)
+            addr = enterAccessScope(SGF, loc, base, addr, getTypeData(),
+                                    getAccessKind(), *Enforcement,
+                                    takeActorIsolation());
+          addr = SGF.B.createMarkMustCheckInst(
+              loc, addr,
+              MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
+          return ManagedValue::forLValue(addr);
+        }
+      }
+
       if (!Enforcement)
         return Value;
+
+      assert(Value.getType().isAddress() && "Must have an address here?!");
 
       SILValue addr = Value.getLValueAddress();
       addr =
@@ -2985,23 +3004,20 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       auto astAccessKind = mapAccessKind(this->AccessKind);
       auto address = SGF.maybeEmitValueOfLocalVarDecl(Storage, astAccessKind);
 
-      // The only other case that should get here is a global variable.
+      // The only other case that should get here is a global variable or a
+      // noncopyable value in a box.
       if (!address) {
-        address = SGF.emitGlobalVariableRef(Loc, Storage, ActorIso);
-        if (address.getType().isMoveOnly()) {
-            auto checkKind =
-                MarkMustCheckInst::CheckKind::AssignableButNotConsumable;
-            if (isReadAccess(AccessKind)) {
-              checkKind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
-            }
-            address = SGF.B.createMarkMustCheckInst(Loc, address, checkKind);
-        }
+        address = SGF.maybeEmitAddressForBoxOfLocalVarDecl(Loc, Storage);
+        if (!address)
+          address = SGF.emitGlobalVariableRef(Loc, Storage, ActorIso);
       } else {
         assert((!ActorIso || Storage->isTopLevelGlobal()) &&
                "local var should not be actor isolated!");
       }
+
       assert(address.isLValue() &&
-             "physical lvalue decl ref must evaluate to an address");
+             "Must have a physical copyable lvalue decl ref that "
+             "evaluates to an address");
 
       Optional<SILAccessEnforcement> enforcement;
       if (!Storage->isLet()) {
@@ -3036,13 +3052,40 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
 }
 
 ManagedValue
+SILGenFunction::maybeEmitAddressForBoxOfLocalVarDecl(SILLocation loc,
+                                                     VarDecl *var) {
+  auto It = VarLocs.find(var);
+
+  // Wasn't a box.
+  if (It == VarLocs.end())
+    return ManagedValue();
+
+  SILValue value = It->second.value;
+  SILValue box = It->second.box;
+
+  // We only want to do this if we only have a box without a value.
+  if (!box || value)
+    return ManagedValue();
+
+  SILValue addr = B.createProjectBox(loc, box, 0);
+  return ManagedValue::forLValue(addr);
+}
+
+ManagedValue
 SILGenFunction::maybeEmitValueOfLocalVarDecl(
     VarDecl *var, AccessKind accessKind) {
   // For local decls, use the address we allocated or the value if we have it.
   auto It = VarLocs.find(var);
   if (It != VarLocs.end()) {
-    // If this has an address, return it.  By-value let's have no address.
     SILValue ptr = It->second.value;
+
+    // If we do not have an actual value stored, then we must have a box.
+    if (!ptr) {
+      assert(It->second.box);
+      return ManagedValue();
+    }
+
+    // If this has an address, return it.  By-value let's have no address.
     if (ptr->getType().isAddress())
       return ManagedValue::forLValue(ptr);
 
@@ -3053,7 +3096,7 @@ SILGenFunction::maybeEmitValueOfLocalVarDecl(
     return ManagedValue::forUnmanaged(ptr);
   }
 
-  // Otherwise, it's non-local or not stored.
+  // Otherwise, it's non-local, not stored, or a box.
   return ManagedValue();
 }
 
@@ -3068,6 +3111,8 @@ SILGenFunction::emitAddressOfLocalVarDecl(SILLocation loc, VarDecl *var,
   assert(!var->isAsyncLet() && "async let does not have an address");
   
   auto address = maybeEmitValueOfLocalVarDecl(var, astAccessKind);
+  if (!address)
+    address = maybeEmitAddressForBoxOfLocalVarDecl(loc, var);
   assert(address);
   assert(address.isLValue());
   return address;
@@ -3088,7 +3133,15 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
     return RValue(*this, loc, formalRValueType,
                   emitReadAsyncLetBinding(loc, var));
   }
-  auto localValue = maybeEmitValueOfLocalVarDecl(var, AccessKind::Read);
+
+  // If our localValue is a closure captured box of a noncopyable type, project
+  // it out eagerly and insert a no_consume_or_assign constraint.
+  ManagedValue localValue;
+  if (auto localAddr = maybeEmitAddressForBoxOfLocalVarDecl(loc, var)) {
+    localValue = localAddr;
+  } else {
+    localValue = maybeEmitValueOfLocalVarDecl(var, AccessKind::Read);
+  }
 
   // If this VarDecl is represented as an address, emit it as an lvalue, then
   // perform a load to get the rvalue.
@@ -3109,6 +3162,13 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
     SILValue destAddr = localValue.getLValueAddress();
     SILValue accessAddr = UnenforcedFormalAccess::enter(*this, loc, destAddr,
                                                         SILAccessKind::Read);
+
+    if (accessAddr->getType().isMoveOnly()) {
+      accessAddr = B.createMarkMustCheckInst(
+          loc, accessAddr,
+          MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
+    }
+
     auto propagateRValuePastAccess = [&](RValue &&rvalue) {
       // Check if a new begin_access was emitted and returned as the
       // RValue. This means that the load did not actually load. If so, then
@@ -4388,6 +4448,28 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
   // also handle address only lets.
   if (rvalue->getType().isMoveOnlyWrapped() && rvalue->getType().isObject()) {
     rvalue = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, rvalue);
+  }
+
+  // See if our rvalue is a box whose boxed type matches the destTL type. In
+  // that case, emit a project_box eagerly. This can happen for escaping
+  // captured move only arguments.
+  if (auto boxType = rvalue->getType().getAs<SILBoxType>()) {
+    auto fieldType = rvalue->getType().getSILBoxFieldType(&F, 0);
+    assert(fieldType.isMoveOnly());
+    if (fieldType.getObjectType() == destTL.getLoweredType()) {
+      SILValue box = rvalue;
+      rvalue = B.createProjectBox(loc, rvalue, 0);
+      // If we have a let, we rely on the typechecker to error if we attempt to
+      // assign to it.
+      bool isMutable = boxType->getLayout()->getFields()[0].isMutable();
+      if (isMutable)
+        rvalue = B.createMarkMustCheckInst(
+            loc, rvalue,
+            MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
+      B.emitCopyAddrOperation(loc, rvalue, dest, IsNotTake, isInit);
+      B.emitDestroyValueOperation(loc, box);
+      return;
+    }
   }
 
   // Easy case: the types match.

@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "allocbox-to-stack"
 
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/ApplySite.h"
@@ -524,20 +525,22 @@ static void replaceProjectBoxUsers(SILValue heapBox, SILValue stackBox) {
   }
 }
 
-static void hoistMarkMustCheckInsts(SingleValueInstruction *stackBox) {
+static void hoistMarkMustCheckInsts(SILValue stackBox,
+                                    MarkMustCheckInst::CheckKind checkKind) {
   StackList<Operand *> worklist(stackBox->getFunction());
 
   for (auto *use : stackBox->getUses()) {
     worklist.push_back(use);
   }
 
-  bool foundTarget = false;
+  StackList<MarkMustCheckInst *> targets(stackBox->getFunction());
   while (!worklist.empty()) {
     auto *nextUse = worklist.pop_back_val();
     auto *nextUser = nextUse->getUser();
 
     if (isa<BeginBorrowInst>(nextUser) || isa<BeginAccessInst>(nextUser) ||
-        isa<CopyValueInst>(nextUser) || isa<MarkUninitializedInst>(nextUser)) {
+        isa<CopyValueInst>(nextUser) || isa<MarkUninitializedInst>(nextUser) ||
+        isa<MarkMustCheckInst>(nextUser)) {
       for (auto result : nextUser->getResults()) {
         for (auto *use : result->getUses())
           worklist.push_back(use);
@@ -545,24 +548,30 @@ static void hoistMarkMustCheckInsts(SingleValueInstruction *stackBox) {
     }
 
     if (auto *mmci = dyn_cast<MarkMustCheckInst>(nextUser)) {
-      foundTarget = true;
-      mmci->replaceAllUsesWith(mmci->getOperand());
-      mmci->eraseFromParent();
+      targets.push_back(mmci);
     }
   }
 
-  if (!foundTarget)
+  if (targets.empty())
     return;
 
-  SILBuilderWithScope builder(stackBox);
-  builder.insertAfter(stackBox, [&](SILBuilder &b) {
-    auto *undef = SILUndef::get(stackBox->getType(), stackBox->getModule());
-    auto *mmci = b.createMarkMustCheckInst(
-        stackBox->getLoc(), undef,
-        MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
-    stackBox->replaceAllUsesWith(mmci);
-    mmci->setOperand(stackBox);
-  });
+  while (!targets.empty()) {
+    auto *mmci = targets.pop_back_val();
+    mmci->replaceAllUsesWith(mmci->getOperand());
+    mmci->eraseFromParent();
+  }
+
+  auto *next = stackBox->getNextInstruction();
+  auto loc = next->getLoc();
+  if (isa<TermInst>(next))
+    loc = RegularLocation::getDiagnosticsOnlyLocation(loc, next->getModule());
+  SILBuilderWithScope builder(next);
+
+  auto *undef = SILUndef::get(stackBox->getType(), *stackBox->getModule());
+
+  auto *mmci = builder.createMarkMustCheckInst(loc, undef, checkKind);
+  stackBox->replaceAllUsesWith(mmci);
+  mmci->setOperand(stackBox);
 }
 
 /// rewriteAllocBoxAsAllocStack - Replace uses of the alloc_box with a
@@ -634,7 +643,8 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   // alloc_stack and convert them to [consumable_but_not_assignable]. This is
   // because we are semantically converting from escaping semantics to
   // non-escaping semantics.
-  hoistMarkMustCheckInsts(StackBox);
+  hoistMarkMustCheckInsts(
+      StackBox, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
 
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "promoting multi-field box not implemented");
@@ -1011,6 +1021,24 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     Cloner.populateCloned();
     ClonedFn = Cloner.getCloned();
     pass.T->addFunctionToPassManagerWorklist(ClonedFn, F);
+
+    // Set the moveonly ignore flag so we do not emit an error on the original
+    // function even though it is still around.
+    F->addSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS);
+
+    // If any of our promoted callee arg indices were originally noncopyable let
+    // boxes, convert them from having escaping to having non-escaping
+    // semantics.
+    for (unsigned index : PromotedCalleeArgIndices) {
+      if (F->getArgument(index)->getType().isBoxedNonCopyableType(*F)) {
+        auto boxType = F->getArgument(index)->getType().castTo<SILBoxType>();
+        bool isMutable = boxType->getLayout()->getFields()[0].isMutable();
+        auto checkKind =
+            isMutable ? MarkMustCheckInst::CheckKind::AssignableButNotConsumable
+                      : MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
+        hoistMarkMustCheckInsts(ClonedFn->getArgument(index), checkKind);
+      }
+    }
   }
 
   // Now create the new ApplySite using the cloned function.
