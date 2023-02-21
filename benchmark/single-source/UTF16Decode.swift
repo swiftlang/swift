@@ -17,43 +17,53 @@ public let benchmarks = [
     BenchmarkInfo(
       name: "UTF16Decode",
       runFunction: run_UTF16Decode,
-      tags: [.validation, .api, .String]),
+      tags: [.validation, .api, .String],
+      setUpFunction: setUp),
     BenchmarkInfo(
       name: "UTF16Decode.initFromCustom.cont",
       runFunction: run_UTF16Decode_InitFromCustom_contiguous,
-      tags: [.validation, .api, .String]),
+      tags: [.validation, .api, .String],
+      setUpFunction: setUp),
     BenchmarkInfo(
       name: "UTF16Decode.initFromCustom.cont.ascii",
       runFunction: run_UTF16Decode_InitFromCustom_contiguous_ascii,
-      tags: [.validation, .api, .String, .skip]),
+      tags: [.validation, .api, .String, .skip],
+      setUpFunction: setUp),
     BenchmarkInfo(
       name: "UTF16Decode.initFromCustom.noncont",
       runFunction: run_UTF16Decode_InitFromCustom_noncontiguous,
-      tags: [.validation, .api, .String]),
+      tags: [.validation, .api, .String],
+      setUpFunction: setUp),
     BenchmarkInfo(
       name: "UTF16Decode.initFromCustom.noncont.ascii",
       runFunction: run_UTF16Decode_InitFromCustom_noncontiguous_ascii,
-      tags: [.validation, .api, .String, .skip]),
+      tags: [.validation, .api, .String, .skip],
+      setUpFunction: setUp),
     BenchmarkInfo(
       name: "UTF16Decode.initFromData",
       runFunction: run_UTF16Decode_InitFromData,
-      tags: [.validation, .api, .String]),
+      tags: [.validation, .api, .String],
+      setUpFunction: setUp),
     BenchmarkInfo(
       name: "UTF16Decode.initDecoding",
       runFunction: run_UTF16Decode_InitDecoding,
-      tags: [.validation, .api, .String]),
+      tags: [.validation, .api, .String],
+      setUpFunction: setUp),
     BenchmarkInfo(
       name: "UTF16Decode.initFromData.ascii",
       runFunction: run_UTF16Decode_InitFromData_ascii,
-      tags: [.validation, .api, .String, .skip]),
+      tags: [.validation, .api, .String, .skip],
+      setUpFunction: setUp),
     BenchmarkInfo(
       name: "UTF16Decode.initDecoding.ascii",
       runFunction: run_UTF16Decode_InitDecoding_ascii,
-      tags: [.validation, .api, .String, .skip]),
+      tags: [.validation, .api, .String, .skip],
+      setUpFunction: setUp),
     BenchmarkInfo(
       name: "UTF16Decode.initFromData.asciiAsAscii",
       runFunction: run_UTF16Decode_InitFromData_ascii_as_ascii,
-      tags: [.validation, .api, .String, .skip]),
+      tags: [.validation, .api, .String, .skip],
+      setUpFunction: setUp),
 ]
 
 typealias CodeUnit = UInt16
@@ -76,6 +86,17 @@ let allStrings: [[CodeUnit]] = [ascii, russian, japanese, emoji].map { Array($0.
 let allStringsCodeUnits: [CodeUnit] = Array(allStrings.joined())
 let allStringsData: Data = allStringsCodeUnits.withUnsafeBytes { Data($0) }
 
+func setUp() {
+    blackHole(asciiCodeUnits)
+    blackHole(asciiData)
+    blackHole(allStrings)
+    blackHole(allStringsCodeUnits)
+    blackHole(allStringsData)
+    blackHole(allStringsCustomContiguous)
+    blackHole(asciiCustomContiguous)
+    blackHole(allStringsCustomNoncontiguous)
+    blackHole(asciiCustomNoncontiguous)
+}
 
 @inline(never)
 public func run_UTF16Decode(_ N: Int) {
