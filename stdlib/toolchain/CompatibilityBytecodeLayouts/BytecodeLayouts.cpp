@@ -191,8 +191,7 @@ typedef void* (*CopyInitFn)(void*, void*);
 void* skipRetain(void* ignore) { return nullptr; }
 void* existential_initializeWithCopy(OpaqueValue* dest, OpaqueValue* src) {
   auto* metadata = getExistentialTypeMetadata(src);
-  metadata->vw_initializeBufferWithCopyOfBuffer((ValueBuffer *)dest,
-                                                (ValueBuffer *)src);
+  return metadata->vw_initializeBufferWithCopyOfBuffer((ValueBuffer*)dest, (ValueBuffer*)src);
 }
 
 const RetainFuncAndMask retainTable[] = {
@@ -367,8 +366,7 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
         genericType = getResilientTypeMetadata(type, layoutStr, offset);
       }
 
-      if (false) { // genericType->getTypeContextDescriptor()->hasLayoutString())
-                   // {
+      if ((false)) {//genericType->getTypeContextDescriptor()->hasLayoutString()) {
         const uint8_t *genericLayoutStr = genericType->getLayoutString();
         size_t countOffset = 0;
         genericRefCountSize += readBytes<size_t>(genericLayoutStr, countOffset);
@@ -427,8 +425,7 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
         genericType = getResilientTypeMetadata(type, layoutStr, offset);
       }
 
-      if (false) { // genericType->getTypeContextDescriptor()->hasLayoutString())
-                   // {
+      if ((false)) {//genericType->getTypeContextDescriptor()->hasLayoutString()) {
         const uint8_t *genericLayoutStr = genericType->getLayoutString();
         size_t countOffset = 0;
         auto genericRefCountSize = readBytes<size_t>(genericLayoutStr, countOffset);
@@ -485,7 +482,7 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
   }
 
   size_t trailingBytesOffset = layoutStringHeaderSize + refCountSize;
-  skipBytes += readBytes<size_t>(layoutStr, trailingBytesOffset);
+  skipBytes += readBytes<uint64_t>(layoutStr, trailingBytesOffset);
 
   if (skipBytes > 0) {
     writeBytes<size_t>(instancedLayoutStr, layoutStringHeaderSize + refCountSize + genericRefCountSize, skipBytes);

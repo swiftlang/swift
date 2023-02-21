@@ -1,11 +1,11 @@
 
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-type-layout -enable-autolinking-runtime-compatibility-bytecode-layouts -force-struct-type-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-build-swift -Xfrontend -enable-type-layout -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -Xfrontend -force-struct-type-layouts -c -parse-as-library -o %t/layout_string_witnesses_types.o %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-swift-frontend -enable-library-evolution -enable-autolinking-runtime-compatibility-bytecode-layouts -force-struct-type-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -Xfrontend -enable-type-layout -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -Xfrontend -force-struct-type-layouts -module-name layout_string_witnesses_dynamic %t/layout_string_witnesses_types.o %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s
+// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-type-layout -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-build-swift -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -c -parse-as-library -o %t/layout_string_witnesses_types.o %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-library-evolution -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -module-name layout_string_witnesses_dynamic %t/layout_string_witnesses_types.o %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 

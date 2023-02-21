@@ -189,7 +189,8 @@ public:
   const TypeInfo *getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
 
-  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
+  const TypeLayoutEntry
+  &getTypeLayoutEntry(SILType T, bool useStructLayouts);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();

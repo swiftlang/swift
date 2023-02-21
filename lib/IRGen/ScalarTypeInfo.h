@@ -251,9 +251,11 @@ protected:
 public:
   friend class SingleScalarTypeInfo<Derived, Base>;
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts) {
+  TypeLayoutEntry *
+  buildTypeLayoutEntry(IRGenModule &IGM,
+                       SILType T,
+                       bool useStructLayouts = false) const override {
+    if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T, kind);
@@ -294,14 +296,17 @@ private:
   void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts) {
+  TypeLayoutEntry *
+  buildTypeLayoutEntry(IRGenModule &IGM,
+                       SILType T,
+                       bool useStructLayouts = false) const override {
+    if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(asDerived(), T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T,
                                                       ScalarKind::POD);
   }
+
 };
 
 }

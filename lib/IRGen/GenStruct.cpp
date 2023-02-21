@@ -360,9 +360,11 @@ namespace {
                              std::move(spareBits), align, IsPOD, IsFixedSize),
           ClangDecl(clangDecl) {}
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (!areFieldsABIAccessible()) {
@@ -376,7 +378,7 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be LoadableClangRecordTypeInfo");
@@ -459,9 +461,11 @@ namespace {
       (void)clangDecl;
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       assert(false && "Implement proper type layout info in the future");
@@ -649,9 +653,11 @@ namespace {
                              destructorFnAddr, args);
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts || getCXXDestructor(T) ||
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts || getCXXDestructor(T) ||
           !areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
@@ -660,7 +666,7 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be AddressOnlyRecordTypeInfo");
@@ -773,9 +779,11 @@ namespace {
       }
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
@@ -791,7 +799,7 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
 
       if (fields.size() == 1 && isFixedSize() &&
@@ -836,9 +844,11 @@ namespace {
                            isPOD, isBT, alwaysFixedSize)
     {}
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
@@ -850,7 +860,7 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be FixedStructTypeInfo");
@@ -926,8 +936,10 @@ namespace {
                            T, align, isPOD, isBT, structAccessible) {
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
       if (!areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
@@ -936,7 +948,7 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be NonFixedStructTypeInfo");
@@ -1454,8 +1466,10 @@ namespace {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
     }
   };

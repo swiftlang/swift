@@ -990,8 +990,10 @@ namespace {
                                Explosion &dest,
                                unsigned offset) const override {}
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType) const override {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType,
+                          bool useStructLayouts) const override {
       return IGM.typeLayoutCache.getEmptyEntry();
     }
   };
@@ -1134,9 +1136,11 @@ namespace {
       return cast<llvm::ArrayType>(ScalarTypeInfo::getStorageType());
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
@@ -1262,9 +1266,11 @@ namespace {
     ImmovableTypeInfoBase(Args &&...args)
       : IndirectTypeInfo<Impl, Base>(std::forward<Args>(args)...) {}
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
@@ -1984,7 +1990,8 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
     return CanType(exemplified);
   }
 }
-const TypeLayoutEntry &TypeConverter::getTypeLayoutEntry(SILType T) {
+const TypeLayoutEntry
+&TypeConverter::getTypeLayoutEntry(SILType T, bool useStructLayouts) {
   auto astTy = T.getASTType();
   auto cache =
       Types.getTypeLayoutCacheFor(astTy->hasTypeParameter(), LoweringMode);
@@ -1993,7 +2000,7 @@ const TypeLayoutEntry &TypeConverter::getTypeLayoutEntry(SILType T) {
     return *it->second;
   }
   auto *ti = getTypeEntry(T.getASTType());
-  auto *entry = ti->buildTypeLayoutEntry(IGM, T);
+  auto *entry = ti->buildTypeLayoutEntry(IGM, T, useStructLayouts);
   cache[astTy.getPointer()] = entry;
   return *entry;
 }
@@ -2480,8 +2487,10 @@ public:
                     IsFixedSize /* irrelevant */),
       NumExtraInhabitants(node.NumExtraInhabitants) {}
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
     llvm_unreachable("Cannot construct type layout for legacy types");
   }
 

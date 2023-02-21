@@ -1979,9 +1979,11 @@ TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
                                        getSILModule().isWholeModule());
 }
 
-const TypeLayoutEntry &IRGenModule::getTypeLayoutEntry(SILType T) {
-  return Types.getTypeLayoutEntry(T);
+const TypeLayoutEntry
+&IRGenModule::getTypeLayoutEntry(SILType T, bool useStructLayouts) {
+  return Types.getTypeLayoutEntry(T, useStructLayouts);
 }
+
 
 void IRGenModule::emitSwiftAsyncExtendedFrameInfoWeakRef() {
   if (!hasSwiftAsyncFunctionDef || extendedFramePointerFlagsWeakRef)

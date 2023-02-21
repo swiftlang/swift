@@ -454,8 +454,10 @@ public:
   virtual void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                            SILType T) const = 0;
 
-  virtual TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                                SILType T) const = 0;
+  virtual TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts = false) const = 0;
 
   virtual bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                          ReferenceCounting *rc) const {

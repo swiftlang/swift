@@ -440,10 +440,11 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
 
 static const TypeLayoutEntry *
 conditionallyGetTypeLayoutEntry(IRGenModule &IGM, SILType concreteType) {
-  // if (!IGM.getOptions().UseTypeLayoutValueHandling)
-  return nullptr;
+  if (!IGM.getOptions().UseTypeLayoutValueHandling)
+    return nullptr;
 
-  auto &typeLayoutEntry = IGM.getTypeLayoutEntry(concreteType);
+  auto &typeLayoutEntry = IGM.getTypeLayoutEntry(
+    concreteType, IGM.getOptions().ForceStructTypeLayouts);
 
   // Don't use type layout based generation for layouts that contain a resilient
   // field but no archetype. We don't expect a speedup by using type layout
@@ -907,9 +908,10 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getNoOpVoidFunction(IGM));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getDestroyStrongFunction(IGM));
-    } else if (IGM.getOptions().ForceStructTypeLayouts) {
+    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
       if (auto *typeLayoutEntry =
-              concreteTI.buildTypeLayoutEntry(IGM, concreteType)) {
+            concreteTI.buildTypeLayoutEntry(IGM, concreteType,
+                                            /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig)) {
@@ -932,9 +934,10 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::InitializeWithTake:
     if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (IGM.getOptions().ForceStructTypeLayouts) {
+    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
       if (auto *typeLayoutEntry =
-              concreteTI.buildTypeLayoutEntry(IGM, concreteType)) {
+            concreteTI.buildTypeLayoutEntry(IGM, concreteType,
+                                            /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig)) {
@@ -949,9 +952,10 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getAssignWithCopyStrongFunction(IGM));
-    } else if (IGM.getOptions().ForceStructTypeLayouts) {
+    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
       if (auto *typeLayoutEntry =
-              concreteTI.buildTypeLayoutEntry(IGM, concreteType)) {
+            concreteTI.buildTypeLayoutEntry(IGM, concreteType,
+                                            /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig)) {
@@ -966,9 +970,10 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getAssignWithTakeStrongFunction(IGM));
-    } else if (IGM.getOptions().ForceStructTypeLayouts) {
+    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
       if (auto *typeLayoutEntry =
-              concreteTI.buildTypeLayoutEntry(IGM, concreteType)) {
+            concreteTI.buildTypeLayoutEntry(IGM, concreteType,
+                                            /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig)) {
@@ -983,9 +988,10 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getInitWithCopyStrongFunction(IGM));
-    } else if (IGM.getOptions().ForceStructTypeLayouts) {
+    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
       if (auto *typeLayoutEntry =
-              concreteTI.buildTypeLayoutEntry(IGM, concreteType)) {
+            concreteTI.buildTypeLayoutEntry(IGM, concreteType,
+                                            /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig)) {

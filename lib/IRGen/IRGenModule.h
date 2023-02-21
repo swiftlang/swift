@@ -1006,7 +1006,8 @@ public:
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param,
                                            CanSILFunctionType funcTy);
 
-  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
+  const TypeLayoutEntry
+  &getTypeLayoutEntry(SILType T, bool useStructLayouts = false);
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&

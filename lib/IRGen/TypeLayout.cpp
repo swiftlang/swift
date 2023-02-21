@@ -222,7 +222,7 @@ private:
     // size of ref counting ops in bytes
     B.fillPlaceholderWithInt(sizePlaceholder, IGM.SizeTy, refCountBytes);
 
-    B.addSize(Size(skip));
+    B.addInt64(skip);
   }
 
   void generateDynamic(IRGenModule &IGM, ConstantStructBuilder &B) const {
@@ -302,7 +302,7 @@ private:
     // size of ref counting ops in bytes
     B.fillPlaceholderWithInt(sizePlaceholder, IGM.SizeTy, refCountBytes);
 
-    B.addSize(Size(skip));
+    B.addInt64(skip);
 
     if (!genericInstOps.empty()) {
       if (instCopyBytes > 0) {
@@ -1484,8 +1484,6 @@ llvm::Value *AlignedGroupEntry::alignmentMask(IRGenFunction &IGF) const {
   if (isFixedSize(IGF.IGM))
     return minimumAlignmentMask;
 
-  // Non fixed layouts should have a minimumAlignment of 1.
-  assert(minimumAlignment == 1);
   auto &Builder = IGF.Builder;
   llvm::Value *currentMaxAlignment = minimumAlignmentMask;
   for(auto *entry : entries) {
@@ -1582,7 +1580,8 @@ AlignedGroupEntry::fixedAlignment(IRGenModule &IGM) const {
   if (_fixedAlignment.has_value())
     return *_fixedAlignment;
 
-  Alignment currentAlignment = Alignment(std::max(1llu, minimumAlignment));
+  Alignment currentAlignment =
+      Alignment(1); // std::max(1llu, minimumAlignment));
   for (auto *entry : entries) {
     if (!entry->fixedAlignment(IGM)) {
       return *(_fixedAlignment =
@@ -1687,16 +1686,16 @@ bool AlignedGroupEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
     }
   } else {
     return false;
-    B.startDynamicAlignment();
-    for (auto *entry : entries) {
-      if (entry->isFixedSize(IGM)) {
-        B.addAlignment(entry->fixedAlignment(IGM)->getValue());
-      }
-      if (!entry->refCountString(IGM, B, genericSig)) {
-        return false;
-      }
-    }
-    B.endDynamicAlignment();
+    // B.startDynamicAlignment();
+    // for (auto *entry : entries) {
+    //   if (entry->isFixedSize(IGM)) {
+    //     B.addAlignment(entry->fixedAlignment(IGM)->getValue());
+    //   }
+    //   if (!entry->refCountString(IGM, B, genericSig)) {
+    //     return false;
+    //   }
+    // }
+    // B.endDynamicAlignment();
   }
 
   return true;
@@ -2145,8 +2144,6 @@ llvm::Value *EnumTypeLayoutEntry::alignmentMask(IRGenFunction &IGF) const {
   auto &IGM = IGF.IGM;
   auto minimumAlignmentMask = IGM.getSize(Size(minimumAlignment - 1));
 
-  // Non fixed layouts should have a minimumAlignment of 1.
-  assert(minimumAlignment == 1);
   auto &Builder = IGF.Builder;
   llvm::Value *currentMaxAlignment = minimumAlignmentMask;
   for(auto *entry : cases) {

@@ -2970,10 +2970,10 @@ namespace {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.getOptions().ForceStructTypeLayouts)
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
         return nullptr;
       auto lowered = getLoweredType();
-      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
+      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered, /*useStructLayouts*/true);
       auto genericSig =
           lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
       return typeLayoutEntry.layoutString(IGM, genericSig);
@@ -3048,7 +3048,8 @@ namespace {
         if (HasDependentMetadata)
           asImpl().emitInitializeMetadata(IGF, metadata, false, collector);
 
-        if (IGM.getOptions().ForceStructTypeLayouts) {
+
+        if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
           if (auto *layoutString = getLayoutString()) {
             auto layoutStringCast = IGF.Builder.CreateBitCast(layoutString,
                                                               IGM.Int8PtrTy);
@@ -3623,10 +3624,10 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.getOptions().ForceStructTypeLayouts)
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
         return nullptr;
       auto lowered = getLoweredType();
-      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
+      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered, /*useStructLayouts*/true);
       auto genericSig =
           lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
       return typeLayoutEntry.layoutString(IGM, genericSig);
@@ -4844,10 +4845,10 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.getOptions().ForceStructTypeLayouts)
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
         return nullptr;
       auto lowered = getLoweredType();
-      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
+      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered, /*useStructLayouts*/true);
       auto genericSig =
           lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
       return typeLayoutEntry.layoutString(IGM, genericSig);
@@ -5084,9 +5085,10 @@ namespace {
     }
 
     bool hasCompletionFunction() {
-      // TODO: ONLY FOR TESTING!!!! WE NEED TO EMIT THE LAYOUT STRING INTO THE
-      // METADATA PATTERN!!!
-      return true; //! isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
+      // TODO: Once we store layout string pointers on the metadata pattern, we
+      //       don't have to emit completion functions for all generic types anymore.
+      return IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
+             !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
     }
   };
 
@@ -5236,10 +5238,10 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.getOptions().ForceStructTypeLayouts)
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
         return nullptr;
       auto lowered = getLoweredType();
-      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered);
+      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered, /*useStructLayouts*/true);
       auto genericSig =
           lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
       return typeLayoutEntry.layoutString(IGM, genericSig);

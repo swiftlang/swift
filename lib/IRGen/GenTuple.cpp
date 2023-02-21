@@ -245,9 +245,11 @@ namespace {
       }
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (getFields().empty()) {
@@ -258,7 +260,7 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       // if (fields.size() == 1) {
       //   return fields[0];
@@ -290,9 +292,11 @@ namespace {
                           isPOD, isBT, alwaysFixedSize)
     {}
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (getFields().empty()) {
@@ -303,7 +307,7 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       // if (fields.size() == 1) {
       //   return fields[0];
@@ -357,8 +361,10 @@ namespace {
       return TupleNonFixedOffsets(T);
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
       if (!areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
@@ -367,7 +373,7 @@ namespace {
       for (auto &field : asImpl().getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
 
       if (fields.empty()) {
