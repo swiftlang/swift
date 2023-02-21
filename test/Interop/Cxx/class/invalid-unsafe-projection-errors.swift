@@ -37,7 +37,7 @@ public func test(x: M) {
   // CHECK: note: Mark method 'test3' as 'safe_to_import' in C++ to make it available in Swift.
   // CHECK: note: Mark type 'Ptr' as 'self_contained' in C++ to make methods that use it available in Swift.
   x.test3()
-  // CHECK: note: C++ method 'begin' that returns an iterator unavailable
+  // CHECK: note: C++ method 'begin' that returns an iterator is unavailable
   // CHECK: note: C++ methods that return iterators are potentially unsafe. Try re-writing to use Swift iterator APIs.
   x.begin()
 }

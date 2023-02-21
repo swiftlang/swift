@@ -203,7 +203,7 @@ NOTE(get_last_element, none, "Do you want to get the last element instead?",
      ())
 
 NOTE(iterator_method_unavailable, none, "C++ method '%0' that returns an "
-                                  "iterator unavailable",
+                                  "iterator is unavailable",
      (StringRef))
 NOTE(iterator_potentially_unsafe, none, "C++ methods that return iterators "
                                         "are potentially unsafe. Try re-writing "
