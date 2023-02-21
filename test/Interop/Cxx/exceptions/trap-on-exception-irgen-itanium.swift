@@ -67,6 +67,20 @@ public:
 using TestTemplateInt = TestTemplate<int>;
 using TestTemplateBool = TestTemplate<bool>;
 
+using TestFunctionTy = int (* _Nonnull)(int);
+
+inline TestFunctionTy getFreeFunctionThrowsPtr() noexcept {
+  return &freeFunctionThrows;
+}
+
+extern "C" {
+
+typedef void ( * _Nonnull CFreeFunctionTy)(void);
+
+CFreeFunctionTy getCFreeFunctionPointer() noexcept;
+
+}
+
 //--- test.swift
 
 import CxxModule
@@ -105,10 +119,22 @@ func testTemplateCalls() {
   v2.dependentNoExceptMethod()
 }
 
+func testFuncPtrCall() {
+  let funcPtr = getFreeFunctionThrowsPtr()
+  let _ = funcPtr(2)
+}
+
+func testCFuncPtrCall() {
+  let funcPtr = getCFreeFunctionPointer()
+  funcPtr()
+}
+
 let _ = testFreeFunctionNoThrowOnly()
 let _ = testFreeFunctionCalls()
 let _ = testMethodCalls()
 testTemplateCalls()
+testFuncPtrCall()
+testCFuncPtrCall()
 
 // CHECK: define {{.*}} @"$s4test0A23FreeFunctionNoThrowOnlys5Int32VyF"() #[[#SWIFTMETA:]] {
 // CHECK-NEXT: :
@@ -181,6 +207,20 @@ testTemplateCalls()
 // CHECK-NEXT:  to label %[[CONT12:.*]] unwind label
 // CHECK: [[CONT12]]:
 // CHECK: ret
+
+// CHECK: define {{.*}} @"$s4test0A11FuncPtrCallyyF"() #[[#SWIFTUWMETA]] personality
+// CHECK: call i32 (i32)* @_Z24getFreeFunctionThrowsPtrv()
+// CHECK: invoke i32 %{{.*}}(i32 2)
+// CHECK-NEXT: to label %[[CONT20:.*]] unwind label %{{.*}}
+// CHECK: [[CONT20]]:
+// CHECK-NEXT: ret void
+
+// CHECK: define {{.*}} @"$s4test0A12CFuncPtrCallyyF"() #[[#SWIFTUWMETA]] personality
+// CHECK: call void ()* @getCFreeFunctionPointer()
+// CHECK: invoke void %{{.*}}()
+// CHECK-NEXT: to label %[[CONT21:.*]] unwind label %{{.*}}
+// CHECK: [[CONT21]]:
+// CHECK-NEXT: ret void
 
 // CHECK: i32 @__gxx_personality_v0(...)
 
