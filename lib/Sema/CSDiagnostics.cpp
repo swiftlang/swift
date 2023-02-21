@@ -3767,6 +3767,10 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
     auto conformsToRACollection = [&](auto baseType) {
       auto raCollectionProto =
           ctx.getProtocol(KnownProtocolKind::CxxRandomAccessCollection);
+      // We didn't load the overlay.
+      if (raCollectionProto == nullptr)
+        return false;
+
       SmallVector<ProtocolConformance *, 2> scratch;
       return baseType->getAnyNominal()->lookupConformance(raCollectionProto,
                                                           scratch);

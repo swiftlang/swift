@@ -1,9 +1,8 @@
-// TODO: why can't we run this on linux?
-// REQUIRES: OS=macosx
-
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 // RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
+
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 //--- Inputs/module.modulemap
 module Test {
@@ -19,7 +18,7 @@ using V = std::vector<int>;
 //--- test.swift
 
 import Test
-import CxxStdlib.vector
+import CxxStdlib
 
 public func test(v: V) {
   // CHECK: note: C++ method 'begin' that returns an iterator is unavailable
