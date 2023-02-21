@@ -103,8 +103,6 @@ tuplify(true) { cond in
         globalFuncAvailableOn10_52()
       } else if false {
         globalFuncAvailableOn10_52()
-      } else {
-        globalFuncAvailableOn10_52()
       }
     }
   }
@@ -165,6 +163,11 @@ tuplifyWithAvailabilityErasure(true) { cond in
     cond
   } else {
     globalFuncAvailableOn10_52()
+  }
+
+  // https://github.com/apple/swift/issues/63764
+  if #unavailable(OSX 10.52) {
+    cond // Ok
   }
 }
 
