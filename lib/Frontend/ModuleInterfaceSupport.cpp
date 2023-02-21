@@ -293,8 +293,14 @@ static void printImports(raw_ostream &out,
 
   for (auto import : allImports) {
     auto importedModule = import.importedModule;
-    if (importedModule->isOnoneSupportModule() ||
-        importedModule->isBuiltinModule()) {
+    if (importedModule->isOnoneSupportModule()) {
+      continue;
+    }
+
+    // Unless '-enable-builtin-module' was passed, do not print 'import Builtin'
+    // in the interface. '-parse-stdlib' still implicitly imports it however...
+    if (importedModule->isBuiltinModule() &&
+        !M->getASTContext().LangOpts.EnableBuiltinModule) {
       continue;
     }
 
