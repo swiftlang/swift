@@ -520,7 +520,7 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
   InstructionDeleter deleter(std::move(callbacks));
   OSSACanonicalizer canonicalizer;
   canonicalizer.init(fn, domTree, deleter);
-  diagnosticEmitter.init(fn, &canonicalizer);
+  diagnosticEmitter.initCanonicalizer(&canonicalizer);
 
   unsigned initialDiagCount = diagnosticEmitter.getDiagnosticCount();
 

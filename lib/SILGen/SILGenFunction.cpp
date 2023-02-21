@@ -357,7 +357,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
-    auto getAddressValue = [&](SILValue entryValue) -> SILValue {
+    auto getAddressValue = [&](VarLoc entryVarLoc) -> SILValue {
+      SILValue entryValue = entryVarLoc.getValueOrBoxedValue(*this, vd);
       if (SGM.M.useLoweredAddresses()
           && SGM.Types
                  .getTypeLowering(
@@ -382,7 +383,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::Constant: {
       // let declarations.
       auto &tl = getTypeLowering(valueType);
-      SILValue Val = Entry.value;
+      SILValue Val = Entry.getValueOrBoxedValue(*this);
       bool eliminateMoveOnlyWrapper =
           Val->getType().isMoveOnlyWrapped() &&
           !vd->getInterfaceType()->is<SILMoveOnlyWrappedType>();
@@ -409,6 +410,11 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       } else {
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.
+        if (Val->getType().isMoveOnly()) {
+          Val = B.createMarkMustCheckInst(
+              loc, Val,
+              MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
+        }
         Val = emitLoad(loc, Val, tl, SGFContext(), IsNotTake).forward(*this);
       }
 
@@ -425,14 +431,14 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (canGuarantee) {
         // No-escaping stored declarations are captured as the
         // address of the value.
-        auto entryValue = getAddressValue(Entry.value);
+        auto entryValue = getAddressValue(Entry);
         capturedArgs.push_back(ManagedValue::forBorrowedRValue(entryValue));
       }
       else if (!silConv.useLoweredAddresses()) {
         capturedArgs.push_back(
           B.createCopyValue(loc, ManagedValue::forUnmanaged(Entry.value)));
       } else {
-        auto entryValue = getAddressValue(Entry.value);
+        auto entryValue = getAddressValue(Entry);
         // We cannot pass a valid SILDebugVariable while creating the temp here
         // See rdar://60425582
         auto addr = B.createAllocStack(loc, entryValue->getType().getObjectType());
@@ -443,7 +449,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       break;
     }
     case CaptureKind::StorageAddress: {
-      auto entryValue = getAddressValue(Entry.value);
+      auto entryValue = getAddressValue(Entry);
       // No-escaping stored declarations are captured as the
       // address of the value.
       assert(entryValue->getType().isAddress() && "no address for captured var!");
@@ -452,7 +458,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     }
 
     case CaptureKind::Box: {
-      auto entryValue = getAddressValue(Entry.value);
+      auto entryValue = getAddressValue(Entry);
       // LValues are captured as both the box owning the value and the
       // address of the value.
       assert(entryValue->getType().isAddress() && "no address for captured var!");
@@ -501,7 +507,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       break;
     }
     case CaptureKind::ImmutableBox: {
-      auto entryValue = getAddressValue(Entry.value);
+      auto entryValue = getAddressValue(Entry);
       // LValues are captured as both the box owning the value and the
       // address of the value.
       assert(entryValue->getType().isAddress() &&

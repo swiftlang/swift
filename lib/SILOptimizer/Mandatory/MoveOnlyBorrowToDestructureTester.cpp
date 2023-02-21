@@ -89,7 +89,7 @@ class MoveOnlyBorrowToDestructureTransformPass : public SILFunctionTransform {
     auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
 
     SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
-    DiagnosticEmitter diagnosticEmitter;
+    DiagnosticEmitter diagnosticEmitter(getFunction());
 
     unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
     bool madeChange = searchForCandidateObjectMarkMustChecks(

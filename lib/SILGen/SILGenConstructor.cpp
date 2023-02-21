@@ -399,7 +399,11 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Allocate the local variable for 'self'.
   emitLocalVariableWithCleanup(selfDecl, MUIKind)->finishInitialization(*this);
 
-  SILValue selfLV = VarLocs[selfDecl].value;
+  ManagedValue selfLV =
+      maybeEmitValueOfLocalVarDecl(selfDecl, AccessKind::ReadWrite);
+  if (!selfLV)
+    selfLV = maybeEmitAddressForBoxOfLocalVarDecl(selfDecl, selfDecl);
+  assert(selfLV);
 
   // Emit the prolog.
   emitBasicProlog(ctor->getParameters(),
@@ -491,7 +495,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
     if (!F.getConventions().hasIndirectSILResults()) {
       // Otherwise, load and return the final 'self' value.
-      selfValue = lowering.emitLoad(B, cleanupLoc, selfLV,
+      if (selfLV.getType().isMoveOnly()) {
+        selfLV = B.createMarkMustCheckInst(
+            cleanupLoc, selfLV,
+            MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
+      }
+
+      selfValue = lowering.emitLoad(B, cleanupLoc, selfLV.getValue(),
                                     LoadOwnershipQualifier::Copy);
 
       // Inject the self value into an optional if the constructor is failable.
@@ -513,17 +523,16 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
         returnAddress = completeReturnAddress;
       } else {
         // If this is a failable initializer, project out the payload.
-        returnAddress = B.createInitEnumDataAddr(cleanupLoc,
-                                                 completeReturnAddress,
-                                         getASTContext().getOptionalSomeDecl(),
-                                                 selfLV->getType());
+        returnAddress = B.createInitEnumDataAddr(
+            cleanupLoc, completeReturnAddress,
+            getASTContext().getOptionalSomeDecl(), selfLV.getType());
       }
       
       // We have to do a non-take copy because someone else may be using the
       // box (e.g. someone could have closed over it).
-      B.createCopyAddr(cleanupLoc, selfLV, returnAddress,
+      B.createCopyAddr(cleanupLoc, selfLV.getLValueAddress(), returnAddress,
                        IsNotTake, IsInitialization);
-      
+
       // Inject the enum tag if the result is optional because of failability.
       if (ctor->isFailable()) {
         // Inject the 'Some' tag.
@@ -1022,14 +1031,19 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
                                           VarDecl *selfDecl) {
   CanType selfFormalType = selfDecl->getType()->getCanonicalType();
-  if (selfFormalType->hasReferenceSemantics())
+  if (selfFormalType->hasReferenceSemantics()) {
     return SGF.emitRValueForDecl(loc, selfDecl, selfFormalType,
                                  AccessSemantics::DirectToStorage,
                                  SGFContext::AllowImmediatePlusZero)
       .getAsSingleValue(SGF, loc);
-  else
+  } else {
+    // First see if we have a variable that is boxed without a value.
+    if (auto value = SGF.maybeEmitAddressForBoxOfLocalVarDecl(loc, selfDecl))
+      return value;
+    // Otherwise, emit the address directly.
     return SGF.emitAddressOfLocalVarDecl(loc, selfDecl, selfFormalType,
                                          SGFAccessKind::Write);
+  }
 }
 
 // FIXME: Can emitMemberInit() share code with InitializationForPattern in

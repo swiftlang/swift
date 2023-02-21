@@ -46,8 +46,10 @@ func a(x: __shared M) {
     borrow(x)
 }
 
-func b(x: __owned M) { // expected-error{{}}
-    clodger({ borrow(x) }, consume: x) // expected-note{{}} expected-note{{}}
+func b(x: __owned M) { // expected-error {{'x' used after consume}}
+    clodger({ borrow(x) }, consume: x)
+    // expected-note @-1:25 {{non-consuming use here}}
+    // expected-note @-2:37 {{consuming use here}}
 }
 
 func c(x: __owned M) {
@@ -56,8 +58,9 @@ func c(x: __owned M) {
     consume(x)
 }
 
-func d(x: __owned M) { // expected-error{{}}
-    clodger({ consume(x) }) // expected-note{{}}
+func d(x: __owned M) { // expected-error {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    clodger({ consume(x) })
+    // expected-note @-1 {{consuming use here}}
 }
 
 func e(x: inout M) {

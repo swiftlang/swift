@@ -14,10 +14,13 @@ func consumeMoveIntPair(_ x: __owned MoveOnlyIntPair) {}
 var value: Bool { false }
 
 // CHECK-LABEL: sil hidden [ossa] @$s21moveonly_enum_literal4testyyF : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = alloc_box
 // CHECK: [[VALUE:%.*]] = enum $MoveOnlyIntPair, #MoveOnlyIntPair.lhs!enumelt,
-// CHECK: [[MV:%.*]] = move_value [lexical] [[VALUE]]
-// CHECK: [[MARKED_VALUE:%.*]] = mark_must_check [consumable_and_assignable] [[MV]]
-// CHECK: debug_value [[MARKED_VALUE]]
+// CHECK: [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK: store [[VALUE]] to [init] [[PROJECT]]
+//
+// CHECK: [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK: [[MARKED_VALUE:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
 // CHECK: } // end sil function '$s21moveonly_enum_literal4testyyF'
 func test() {
     let x = MoveOnlyIntPair.lhs(5)

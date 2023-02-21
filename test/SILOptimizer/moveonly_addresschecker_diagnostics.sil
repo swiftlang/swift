@@ -61,6 +61,7 @@ public struct AggStruct {
 
 sil @get_aggstruct : $@convention(thin) () -> @owned AggStruct
 sil @nonConsumingUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
+sil @nonConsumingUseNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
 sil @classConsume : $@convention(thin) (@owned Klass) -> () // user: %18
 sil @copyableClassConsume : $@convention(thin) (@owned CopyableKlass) -> () // user: %24
 sil @copyableClassUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed CopyableKlass) -> () // user: %16
@@ -125,7 +126,7 @@ bb2(%55 : $Int):
   %58 = struct_element_addr %57 : $*KlassPair, #KlassPair.lhs
   %59 = load [copy] %58 : $*Klass
   // expected-note @-1 {{consuming use here}}
-  // expected-note @-2 {{consuming use here}}  
+  // expected-note @-2 {{consuming use here}}
   end_access %56 : $*AggStruct
   %61 = function_ref @classConsume : $@convention(thin) (@owned Klass) -> ()
   %62 = apply %61(%59) : $@convention(thin) (@owned Klass) -> ()
@@ -227,3 +228,36 @@ bb0(%arg0 : @guaranteed $NonTrivialStruct, %arg1 : $*NonTrivialStruct):
   return %9999 : $()
 }
 
+// Make sure that we do not emit a "Compiler doesn't understand error on this
+// piece of code".
+sil [ossa] @closureCaptureClassUseAfterConsumeError : $@convention(thin) (@owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = move_value [lexical] %0 : $NonTrivialStruct
+  debug_value %1 : $NonTrivialStruct, let, name "x", argno 1
+  %3 = alloc_stack $NonTrivialStruct, let, name "x2"
+  %4 = mark_must_check [consumable_and_assignable] %3 : $*NonTrivialStruct // expected-error {{'x2' consumed more than once}}
+  store %1 to [init] %4 : $*NonTrivialStruct
+  %6 = function_ref @nonConsumingUseNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  %7 = load [copy] %4 : $*NonTrivialStruct // expected-note {{consuming use here}}
+  %8 = partial_apply [callee_guaranteed] %6(%7) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  %9 = begin_borrow [lexical] %8 : $@callee_guaranteed () -> ()
+  debug_value %9 : $@callee_guaranteed () -> (), let, name "f"
+  %11 = copy_value %9 : $@callee_guaranteed () -> ()
+  %12 = apply %11() : $@callee_guaranteed () -> ()
+  destroy_value %11 : $@callee_guaranteed () -> ()
+  %14 = alloc_stack $NonTrivialStruct, let, name "x3"
+  %15 = mark_must_check [consumable_and_assignable] %14 : $*NonTrivialStruct
+  %16 = load [copy] %4 : $*NonTrivialStruct // expected-note {{consuming use here}}
+  store %16 to [init] %15 : $*NonTrivialStruct
+  %18 = load [copy] %15 : $*NonTrivialStruct
+  %19 = move_value %18 : $NonTrivialStruct
+  destroy_value %19 : $NonTrivialStruct
+  destroy_addr %15 : $*NonTrivialStruct
+  dealloc_stack %14 : $*NonTrivialStruct
+  end_borrow %9 : $@callee_guaranteed () -> ()
+  destroy_value %8 : $@callee_guaranteed () -> ()
+  destroy_addr %4 : $*NonTrivialStruct
+  dealloc_stack %3 : $*NonTrivialStruct
+  %27 = tuple ()
+  return %27 : $()
+}
