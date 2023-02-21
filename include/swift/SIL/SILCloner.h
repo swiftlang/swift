@@ -1962,23 +1962,10 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
       if (fnTy->isTrivialNoEscape()) {
         // Destroying the partial_apply [stack] becomes the stack deallocation
         // of the context.
-        // Look through mark_dependence and other wrapper instructions.
-        SILValue deallocOperand = Inst->getOperand();
-        while (true) {
-          if (auto mdi = dyn_cast<MarkDependenceInst>(deallocOperand)) {
-            deallocOperand = mdi->getValue();
-          } else if (isa<ConvertEscapeToNoEscapeInst>(deallocOperand)) {
-            break;
-          } else if (auto conv = dyn_cast<ConversionInst>(deallocOperand)) {
-            deallocOperand = conv->getConverted();
-          } else {
-            break;
-          }
-        }
-        if (isa<PartialApplyInst>(deallocOperand)) {
+        if (auto origPA = Inst->getNonescapingClosureAllocation()) {
           recordClonedInstruction(Inst,
             getBuilder().createDeallocStack(getOpLocation(Inst->getLoc()),
-                                            getOpValue(deallocOperand)));
+                                            getOpValue(origPA)));
         }
         
         return;

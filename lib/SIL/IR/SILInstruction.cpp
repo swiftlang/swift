@@ -1705,6 +1705,47 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   return !noUsers;
 }
 
+PartialApplyInst *
+DestroyValueInst::getNonescapingClosureAllocation() const {
+  SILValue operand = getOperand();
+  auto operandFnTy = operand->getType().getAs<SILFunctionType>();
+  // The query doesn't make sense if we aren't operating on a noescape closure
+  // to begin with.
+  if (!operandFnTy || !operandFnTy->isTrivialNoEscape()) {
+    return nullptr;
+  }
+
+  // Look through marker and conversion instructions that would forward
+  // ownership of the original partial application.
+  while (true) {
+    if (auto mdi = dyn_cast<MarkDependenceInst>(operand)) {
+      operand = mdi->getValue();
+      continue;
+    } else if (isa<ConvertEscapeToNoEscapeInst>(operand)) {
+      // Stop at a conversion from escaping closure, since there's no stack
+      // allocation in that case.
+      return nullptr;
+    } else if (auto conv = dyn_cast<ConversionInst>(operand)) {
+      operand = conv->getConverted();
+      continue;
+    } else if (auto pa = dyn_cast<PartialApplyInst>(operand)) {
+      // If we found the `[on_stack]` partial apply, we're done.
+      if (pa->isOnStack()) {
+        return pa;
+      }
+      // Any other kind of partial apply fails to pass muster.
+      return nullptr;
+    } else {
+      // The original partial_apply instruction should only be forwarded
+      // through one of the above instructions. Anything else should lead us
+      // to a copy or borrow of the closure from somewhere else.
+      // TODO: Assert that this is one of those cases, such as a SILArgument,
+      // copy_value, etc.
+      return nullptr;
+    }
+  }
+}
+
 #ifndef NDEBUG
 
 //---
