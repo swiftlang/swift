@@ -1580,8 +1580,7 @@ AlignedGroupEntry::fixedAlignment(IRGenModule &IGM) const {
   if (_fixedAlignment.has_value())
     return *_fixedAlignment;
 
-  Alignment currentAlignment =
-      Alignment(1); // std::max(1llu, minimumAlignment));
+  Alignment currentAlignment = Alignment(std::max(1llu, minimumAlignment));
   for (auto *entry : entries) {
     if (!entry->fixedAlignment(IGM)) {
       return *(_fixedAlignment =

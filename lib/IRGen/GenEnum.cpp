@@ -1666,11 +1666,6 @@ namespace {
       //   return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(),
       //                                                            T);
 
-      if (CopyDestroyKind == NullableRefcounted) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(
-            getTypeInfo(), T, refcountingToScalarKind(Refcounting));
-      }
-
       unsigned emptyCases = ElementsWithNoPayload.size();
       std::vector<TypeLayoutEntry *> nonEmptyCases;
       nonEmptyCases.push_back(getPayloadTypeInfo().buildTypeLayoutEntry(

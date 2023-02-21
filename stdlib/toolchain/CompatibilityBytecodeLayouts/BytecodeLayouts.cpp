@@ -282,10 +282,6 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
     addrOffset += skip;
 
     switch (tag) {
-    case RefCountingKind::NativeWeak:
-      swift_weakTakeInit((WeakReference *)((uintptr_t)dest + addrOffset),
-                         (WeakReference *)((uintptr_t)src + addrOffset));
-      break;
     case RefCountingKind::UnknownWeak:
       swift_unknownObjectWeakTakeInit((WeakReference*)((uintptr_t)dest + addrOffset),
                                       (WeakReference*)((uintptr_t)src + addrOffset));
@@ -297,7 +293,6 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
         type->vw_initializeWithTake((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                     (OpaqueValue*)((uintptr_t)src + addrOffset));
       }
-      // addrOffset += type->vw_size();
       break;
     }
     case RefCountingKind::Existential: {
@@ -314,7 +309,6 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
         type->vw_initializeWithTake((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                     (OpaqueValue*)((uintptr_t)src + addrOffset));
       }
-      // addrOffset += type->vw_size();
       break;
     }
     case RefCountingKind::End:
