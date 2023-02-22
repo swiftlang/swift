@@ -294,6 +294,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
           placeholderExpr->getOriginalWrappedValue());
     }
 
+    case ExprKind::Coerce: {
+      auto coerceExpr = cast<CoerceExpr>(expr);
+      return extractCompileTimeValue(coerceExpr->getSubExpr());
+    }
+
     default: {
       break;
     }
