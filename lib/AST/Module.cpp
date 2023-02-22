@@ -1902,8 +1902,10 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
     if (desc.options.contains(ImportFlags::Exported))
       requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
     else if (desc.options.contains(ImportFlags::ImplementationOnly) ||
-             (desc.accessLevel <= AccessLevel::Package && moduleIsResilient))
+             (desc.accessLevel <= AccessLevel::Internal && moduleIsResilient))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    else if (desc.accessLevel <= AccessLevel::Package && moduleIsResilient)
+      requiredFilter |= ModuleDecl::ImportFilterKind::PackageOnly;
     else if (desc.options.contains(ImportFlags::SPIOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
     else
@@ -2275,6 +2277,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
   ModuleDecl::ImportFilter topLevelFilter = filter;
   topLevelFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  topLevelFilter |= ModuleDecl::ImportFilterKind::PackageOnly,
   topLevelFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
   topLevel->getImportedModules(stack, topLevelFilter);
 
@@ -2982,6 +2985,8 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
   ModuleDecl::ImportFilter filter = {
     ModuleDecl::ImportFilterKind::Exported,
     ModuleDecl::ImportFilterKind::Default,
+    ModuleDecl::ImportFilterKind::PackageOnly,
+    ModuleDecl::ImportFilterKind::SPIOnly,
     ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
   SmallVector<ImportedModule, 4> results;
   getImportedModules(results, filter);
@@ -3004,9 +3009,10 @@ canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
     return true;
 
   // See if context is imported in a "regular" way, i.e. not with
-  // @_implementationOnly or @_spi.
+  // @_implementationOnly, `package import` or @_spiOnly.
   ModuleDecl::ImportFilter filter = {
     ModuleDecl::ImportFilterKind::ImplementationOnly,
+    ModuleDecl::ImportFilterKind::PackageOnly,
     ModuleDecl::ImportFilterKind::SPIOnly
   };
   SmallVector<ImportedModule, 4> results;

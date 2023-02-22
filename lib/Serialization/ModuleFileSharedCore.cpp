@@ -1021,6 +1021,8 @@ getActualImportControl(unsigned rawValue) {
     return ModuleDecl::ImportFilterKind::Exported;
   case static_cast<unsigned>(serialization::ImportControl::ImplementationOnly):
     return ModuleDecl::ImportFilterKind::ImplementationOnly;
+  case static_cast<unsigned>(serialization::ImportControl::PackageOnly):
+    return ModuleDecl::ImportFilterKind::PackageOnly;
   default:
     return None;
   }

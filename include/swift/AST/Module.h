@@ -789,16 +789,18 @@ public:
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
     Exported = 1 << 0,
-    /// Include "regular" imports with no special annotation.
+    /// Include "regular" imports with an access-level of `public`.
     Default = 1 << 1,
     /// Include imports declared with `@_implementationOnly` or with an
     /// access-level of `package` or less.
     ImplementationOnly = 1 << 2,
+    /// Include imports declared with `package import`.
+    PackageOnly = 1 << 3,
     /// Include imports declared with `@_spiOnly`.
-    SPIOnly = 1 << 3,
+    SPIOnly = 1 << 4,
     /// Include imports shadowed by a cross-import overlay. Unshadowed imports
     /// are included whether or not this flag is specified.
-    ShadowedByCrossImportOverlay = 1 << 4
+    ShadowedByCrossImportOverlay = 1 << 5
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;

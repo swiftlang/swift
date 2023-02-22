@@ -1388,6 +1388,8 @@ void swift::ide::deliverCompletionResults(
                        ModuleDecl::ImportFilterKind::Exported,
                        ModuleDecl::ImportFilterKind::Default,
                        ModuleDecl::ImportFilterKind::ImplementationOnly,
+                       ModuleDecl::ImportFilterKind::PackageOnly,
+                       ModuleDecl::ImportFilterKind::SPIOnly,
                    });
 
       for (auto Imported : Imports) {
