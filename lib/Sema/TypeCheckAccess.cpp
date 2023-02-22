@@ -1174,7 +1174,6 @@ public:
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType) // Handled by the Var or Subscript.
-  UNINTERESTING(Macro)
 
   /// If \p VD's layout is exposed by a @frozen struct or class, return said
   /// struct or class.
@@ -1567,6 +1566,10 @@ public:
         highlightOffendingType(diag, complainRepr);
       });
     }
+  }
+
+  void visitMacroDecl(MacroDecl *MD) {
+    // FIXME: Check access of macro generic parameters, parameters and result
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
