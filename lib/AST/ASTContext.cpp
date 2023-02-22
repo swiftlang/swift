@@ -55,6 +55,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
@@ -5306,8 +5307,6 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     }
 
     // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
-    // FIXME: Layering violation to use the ClangImporter's define.
-    const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
     if (auto simd = getLoadedModule(Id_simd)) {
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                  \
       {                                                                 \
@@ -5354,7 +5353,6 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   conditionallyAddTrivial(nominal, getSwiftId(KnownFoundationEntity::NSZone), Id_ObjectiveC, true);
   conditionallyAddTrivial(nominal, Id_CGFloat, getIdentifier("CoreGraphics"));
   conditionallyAddTrivial(nominal, Id_CGFloat, getIdentifier("CoreFoundation"));
-  const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
   {                                                                            \
     char name[] = #BASENAME "0";                                               \
@@ -6252,3 +6250,39 @@ void *ASTContext::getAddressOfSymbol(const char *name,
 #endif
   return address;
 }
+
+Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
+  if (!module)
+    return Type();
+
+  // Look for the type.
+  Identifier identifier = getIdentifier(name);
+  SmallVector<ValueDecl *, 2> results;
+
+  // Check if the lookup we're about to perform a lookup within is
+  // a Clang module.
+  for (auto *file : module->getFiles()) {
+    if (auto clangUnit = dyn_cast<ClangModuleUnit>(file)) {
+      // If we have an overlay, look in the overlay. Otherwise, skip
+      // the lookup to avoid infinite recursion.
+      if (auto module = clangUnit->getOverlayModule())
+        module->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
+    } else {
+      file->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
+    }
+  }
+
+  if (results.size() != 1)
+    return Type();
+
+  auto decl = dyn_cast<TypeDecl>(results.front());
+  if (!decl)
+    return Type();
+
+  assert(!decl->hasClangNode() && "picked up the original type?");
+
+  if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
+    return nominalDecl->getDeclaredType();
+  return decl->getDeclaredInterfaceType();
+}
+

@@ -40,8 +40,8 @@ func basicTest() {
 
 // CHECK-LABEL: sil hidden @$s4main12testSetValueyyF : $@convention(thin) () -> ()
 
-// CHECK: [[SET_VALUE:%.*]] = function_ref @_ZN32TemplateClassWithMemberTemplatesIiE8setValueIlEEvT_ : $@convention(cxx_method) (Int, @inout __CxxTemplateInst32TemplateClassWithMemberTemplatesIiE) -> ()
-// CHECK: apply [[SET_VALUE]]({{.*}}) : $@convention(cxx_method) (Int, @inout __CxxTemplateInst32TemplateClassWithMemberTemplatesIiE) -> ()
+// CHECK: [[SET_VALUE:%.*]] = function_ref @_ZN32TemplateClassWithMemberTemplatesIiE8setValueIlEEvT_ : $@convention(cxx_method) (Int, @inout TemplateClassWithMemberTemplates<Int32>) -> ()
+// CHECK: apply [[SET_VALUE]]({{.*}}) : $@convention(cxx_method) (Int, @inout TemplateClassWithMemberTemplates<Int32>) -> ()
 
 // CHECK-LABEL: end sil function '$s4main12testSetValueyyF'
 func testSetValue() {
