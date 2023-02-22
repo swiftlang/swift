@@ -31,6 +31,12 @@ public:
   inline ClassWithThrowingCopyConstructor(const ClassWithThrowingCopyConstructor &) { (void)freeFunctionThrows(0); }
 };
 
+class ClassWithThrowingConstructor {
+public:
+  int m = 0;
+  inline ClassWithThrowingConstructor() { }
+};
+
 //--- test.swift
 
 import CxxModule
@@ -56,9 +62,15 @@ func testClassWithThrowingCopyConstructor() -> CInt {
   return p2.m
 }
 
+func testClassWithThrowingConstructor() -> CInt {
+  let obj = ClassWithThrowingConstructor()
+  return obj.m
+}
+
 let _ = testFreeFunctionNoThrowOnly()
 let _ = testFreeFunctionCalls()
 let _ = testClassWithThrowingCopyConstructor()
+let _ = testClassWithThrowingConstructor()
 
 // CHECK: define {{.*}} @"$s4test0A23FreeFunctionNoThrowOnlys5Int32VyF"() #[[#SWIFTMETA:]] {
 // CHECK-NEXT: :
@@ -76,5 +88,9 @@ let _ = testClassWithThrowingCopyConstructor()
 // CHECK-NEXT: }
 
 // CHECK: define {{.*}} @"$s4test0A32ClassWithThrowingCopyConstructors5Int32VyF"() #[[#SWIFTMETA]] {
+// CHECK-NOT: invoke
+// CHECK: }
+
+// CHECK: define {{.*}} @"$s4test0A28ClassWithThrowingConstructors5Int32VyF"() #[[#SWIFTMETA]] {
 // CHECK-NOT: invoke
 // CHECK: }

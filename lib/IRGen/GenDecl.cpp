@@ -3257,13 +3257,14 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     if (fpt->isNothrow())
       canThrow = false;
   }
-  if (canThrow)
+  if (canThrow) {
+    IGM.emittedForeignFunctionThunksWithExceptionTraps.insert(thunk);
     subIGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
                                         llvm::BasicBlock *invokeUnwindDest) {
       subIGF.Builder.createInvoke(ctorFnType, ctorAddress, Args,
                                   invokeNormalDest, invokeUnwindDest);
     });
-  else
+  } else
     subIGF.Builder.CreateCall(ctorFnType, ctorAddress, Args);
 
   subIGF.Builder.CreateRetVoid();

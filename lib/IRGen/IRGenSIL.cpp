@@ -2739,6 +2739,8 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
           fp.setForeignNoThrow();
       }
     }
+    if (IGM.emittedForeignFunctionThunksWithExceptionTraps.count(fnPtr))
+      fp.setForeignCallCatchesExceptionInThunk();
   }
   // Store the function as a FunctionPointer so we can avoid bitcasting
   // or thunking if we don't need to.

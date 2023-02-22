@@ -103,4 +103,14 @@ TrapOnExecutionTestSuite.test("TestClassWithThrowingCopyConstructor") {
 }
 #endif
 
+TrapOnExecutionTestSuite.test("ClassWithThrowingConstructor") {
+  expectCrashLater()
+  let _ = ClassWithThrowingConstructor()
+}
+
+TrapOnExecutionTestSuite.test("ClassWithNoThrowingConstructor") {
+  let obj = ClassWithNoThrowingConstructor()
+  expectEqual(obj.m, 0)
+}
+
 runAllTests()

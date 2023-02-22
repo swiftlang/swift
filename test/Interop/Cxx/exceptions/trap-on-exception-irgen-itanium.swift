@@ -119,6 +119,18 @@ public:
   inline ClassWithThrowingCopyConstructor(const ClassWithThrowingCopyConstructor &) { throw 2; }
 };
 
+class ClassWithThrowingConstructor {
+public:
+  int m = 0;
+  inline ClassWithThrowingConstructor() { throw 2; }
+};
+
+class ClassWithNoThrowingConstructor {
+public:
+  int m = 0;
+  inline ClassWithNoThrowingConstructor() noexcept {}
+};
+
 //--- test.swift
 
 import CxxModule
@@ -205,6 +217,16 @@ func testClassWithThrowingCopyConstructor() -> CInt {
   return p2.m
 }
 
+func testClassWithThrowingConstructor() -> CInt {
+  let obj = ClassWithThrowingConstructor()
+  return obj.m
+}
+
+func testClassWithNoThrowingConstructor() -> CInt {
+  let obj = ClassWithNoThrowingConstructor()
+  return obj.m
+}
+
 let _ = testFreeFunctionNoThrowOnly()
 let _ = testFreeFunctionCalls()
 let _ = testMethodCalls()
@@ -217,6 +239,8 @@ testClassWithDestructor()
 testClassWithThrowingDestructor()
 let _ = testClassWithCopyConstructor()
 let _ = testClassWithThrowingCopyConstructor()
+let _ = testClassWithThrowingConstructor()
+let _ = testClassWithNoThrowingConstructor()
 
 // CHECK: define {{.*}} @"$s4test0A23FreeFunctionNoThrowOnlys5Int32VyF"() #[[#SWIFTMETA:]] {
 // CHECK-NEXT: :
@@ -358,6 +382,24 @@ let _ = testClassWithThrowingCopyConstructor()
 // CHECK: [[CONT41]]:
 // CHECK: ret i32
 // CHECK-NEXT: }
+
+// CHECK: define {{.*}} @"$s4test0A28ClassWithThrowingConstructors5Int32VyF"() #[[#SWIFTUWMETA]] personality
+// CHECK: invoke {{.*}} @_ZN28ClassWithThrowingConstructorC{{.*}}(
+// CHECK-NEXT:  to label %[[CONT42:.*]] unwind label %[[UNWIND42:.*]]
+// CHECK-EMPTY:
+// CHECK-NEXT: [[UNWIND42]]:
+// CHECK-NEXT: landingpad { i8*, i32 }
+// CHECK-NEXT:    catch i8* null
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+// CHECK-EMPTY:
+// CHECK-NEXT: [[CONT42]]:
+// CHECK: ret i32
+// CHECK-NEXT: }
+
+// CHECK: define {{.*}} @"$s4test0A30ClassWithNoThrowingConstructors5Int32VyF"() #[[#SWIFTMETA]]
+// CHECK-NOT: invoke
+// CHECK: }
 
 // CHECK: i32 @__gxx_personality_v0(...)
 

@@ -335,6 +335,10 @@ namespace irgen {
     // function.
     bool isForeignNoThrow = false;
 
+    // True when this function pointer points to a foreign function that traps
+    // on exception in the always_inline thunk.
+    bool foreignCallCatchesExceptionInThunk = false;
+
     explicit FunctionPointer(Kind kind, llvm::Value *value,
                              const Signature &signature)
         : FunctionPointer(kind, value, PointerAuthInfo(), signature) {}
@@ -500,6 +504,18 @@ namespace irgen {
 
     bool canThrowForeignException() const {
       return getForeignInfo().canThrow && !isForeignNoThrow;
+    }
+
+    void setForeignCallCatchesExceptionInThunk() {
+      foreignCallCatchesExceptionInThunk = true;
+    }
+
+    bool doesForeignCallCatchExceptionInThunk() {
+      return foreignCallCatchesExceptionInThunk;
+    }
+
+    bool shouldUseInvoke() const {
+      return canThrowForeignException() && !foreignCallCatchesExceptionInThunk;
     }
   };
 

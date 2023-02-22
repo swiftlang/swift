@@ -2928,8 +2928,11 @@ llvm::CallBase *CallEmission::emitCallSite() {
   }
 
   if (fn.canThrowForeignException()) {
-    invokeNormalDest = IGF.createBasicBlock("invoke.cont");
-    invokeUnwindDest = IGF.createExceptionUnwindBlock();
+    if (!fn.doesForeignCallCatchExceptionInThunk()) {
+      invokeNormalDest = IGF.createBasicBlock("invoke.cont");
+      invokeUnwindDest = IGF.createExceptionUnwindBlock();
+    } else
+      IGF.setCallsThunksWithForeignExceptionTraps();
   }
   auto call = createCall(fn, Args);
   if (invokeNormalDest)
@@ -3012,7 +3015,7 @@ llvm::CallBase *IRBuilder::CreateCallOrInvoke(
   assert(!isTrapIntrinsic(fn.getRawPointer()) && "Use CreateNonMergeableTrap");
   auto fnTy = cast<llvm::FunctionType>(fn.getFunctionType());
   llvm::CallBase *call;
-  if (!fn.canThrowForeignException())
+  if (!fn.shouldUseInvoke())
     call = IRBuilderBase::CreateCall(fnTy, fn.getRawPointer(), args, bundles);
   else
     call =
@@ -3043,7 +3046,7 @@ llvm::CallBase *IRBuilder::CreateCallOrInvoke(
 
 llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
                                       ArrayRef<llvm::Value *> args) {
-  assert(!fn.canThrowForeignException());
+  assert(!fn.shouldUseInvoke());
   return cast<llvm::CallInst>(CreateCallOrInvoke(
       fn, args, /*invokeNormalDest=*/nullptr, /*invokeUnwindDest=*/nullptr));
 }
@@ -4551,14 +4554,15 @@ void IRGenFunction::emitEpilogue() {
   AllocaIP->eraseFromParent();
   // Add exception unwind blocks and additional exception handling info
   // if needed.
-  if (!ExceptionUnwindBlocks.empty()) {
+  if (!ExceptionUnwindBlocks.empty() ||
+      callsAnyAlwaysInlineThunksWithForeignExceptionTraps) {
     // The function should have an unwind table when catching exceptions.
     CurFn->addFnAttr(llvm::Attribute::getWithUWTableKind(
         *IGM.LLVMContext, llvm::UWTableKind::Default));
     CurFn->setPersonalityFn(IGM.getForeignExceptionHandlingPersonalityFunc());
-    for (auto *bb : ExceptionUnwindBlocks)
-      CurFn->getBasicBlockList().push_back(bb);
   }
+  for (auto *bb : ExceptionUnwindBlocks)
+    CurFn->getBasicBlockList().push_back(bb);
 }
 
 std::pair<Address, Size>
