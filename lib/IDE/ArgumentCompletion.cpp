@@ -24,7 +24,7 @@ using namespace swift::constraints;
 bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
     const ArgumentTypeCheckCompletionCallback::Result &Res,
     SmallVectorImpl<PossibleParamInfo> &Params, SmallVectorImpl<Type> &Types) {
-  if (!Res.ParamIdx) {
+  if (!Res.ParamIdx || !Res.FuncTy) {
     // We don't really know much here. Suggest global results without a specific
     // expected type.
     return true;
@@ -117,6 +117,13 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   auto Info = getSelectedOverloadInfo(S, CalleeLocator);
   if (Info.Value && Info.Value->shouldHideFromEditor()) {
     return;
+  }
+  // Disallow invalid initializer references
+  for (auto Fix : S.Fixes) {
+    if (Fix->getLocator() == CalleeLocator &&
+        Fix->getKind() == FixKind::AllowInvalidInitRef) {
+      return;
+    }
   }
 
   // Find the parameter the completion was bound to (if any), as well as which
