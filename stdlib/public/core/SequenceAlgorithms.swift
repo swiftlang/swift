@@ -710,28 +710,32 @@ extension Sequence {
   @inlinable
   public __consuming func reversed() -> [Element] {
     let underestimatedCount = self.underestimatedCount
-    if underestimatedCount == 0 {
+    guard underestimatedCount > 0 else {
       var result = Array(self)
       result.reverse()
       return result
-    } else {
-      var iterator = makeIterator()
-      var result: [Element] =
-        .init(unsafeUninitializedCapacity: underestimatedCount)
-      { buf, initializedCount in
-        for i in 0..<underestimatedCount {
-          guard let next = iterator.next() else {
-            _internalInvariantFailure("underestimatedCount greater than count")
-          }
-          buf[underestimatedCount - i - 1] = next
-        }
-        initializedCount = underestimatedCount
-      }
-      while let next = iterator.next() {
-        result.insert(next, at: 0)
-      }
-      return result
     }
+    var iterator = makeIterator()
+    var result: [Element] =
+      .init(unsafeUninitializedCapacity: underestimatedCount)
+    { buf, initializedCount in
+      for i in 0..<underestimatedCount {
+        guard let next = iterator.next() else {
+          _internalInvariantFailure("underestimatedCount greater than count")
+        }
+        buf[underestimatedCount - i - 1] = next
+      }
+      initializedCount = underestimatedCount
+    }
+    var undercountedElements: [Element] = []
+    while let next = iterator.next() {
+      undercountedElements.append(next)
+    }
+    guard undercountedElements.isEmpty else {
+      undercountedElements.reverse()
+      return undercountedElements + result
+    }
+    return result
   }
 }
 
