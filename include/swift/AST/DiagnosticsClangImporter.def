@@ -147,12 +147,12 @@ NOTE(macro_not_imported_invalid_numeric_literal, none, "invalid numeric literal"
 NOTE(macro_not_imported_unsupported_literal, none, "only numeric and string macro literals supported", ())
 NOTE(macro_not_imported_nested_cast, none, "non-null nested casts not supported", ())
 
-NOTE(macro_not_imported_function_like, none, "macro '%0' not imported: function like macros not supported", (StringRef))
-NOTE(macro_not_imported_unsupported_structure, none, "macro '%0' not imported: structure not supported", (StringRef))
-NOTE(macro_not_imported, none, "macro '%0' not imported", (StringRef))
+NOTE(macro_not_imported_function_like, none, "macro '%0' unavailable: function like macros not supported", (StringRef))
+NOTE(macro_not_imported_unsupported_structure, none, "macro '%0' unavailable: structure not supported", (StringRef))
+NOTE(macro_not_imported, none, "macro '%0' unavailable (cannot import)", (StringRef))
 
-NOTE(return_type_not_imported, none, "return type not imported", ())
-NOTE(parameter_type_not_imported, none, "parameter %0 not imported", (const clang::NamedDecl*))
+NOTE(return_type_not_imported, none, "return type unavailable (cannot import)", ())
+NOTE(parameter_type_not_imported, none, "parameter %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(incomplete_interface, none, "interface %0 is incomplete", (const clang::NamedDecl*))
 NOTE(incomplete_protocol, none, "protocol %0 is incomplete", (const clang::NamedDecl*))
 NOTE(incomplete_record, none, "record '%0' is not defined (incomplete)", (StringRef))
@@ -170,13 +170,44 @@ NOTE(record_not_automatically_importable, none, "record '%0' is not "
                                                 "Refer to the C++ Interop User "
                                                 "Manual to classify this type.",
      (StringRef, StringRef))
-NOTE(projection_not_imported, none, "C++ method '%0' that returns unsafe "
-                                    "projection of type '%1' not imported",
+
+NOTE(projection_value_not_imported, none, "C++ method '%0' that returns a value "
+                                          "of type '%1' is unavailable. ",
      (StringRef, StringRef))
-NOTE(dont_use_iterator_api, none, "C++ method '%0' that returns an unsafe "
-                                  "iterator not imported: use Swift Sequence "
-                                  "APIs instead",
+NOTE(projection_ptr_not_imported, none, "C++ method '%0' that returns a pointer "
+                                          "of type '%1' is unavailable. ",
+     (StringRef, StringRef))
+NOTE(projection_reference_not_imported, none, "C++ method '%0' that returns a reference "
+                                          "of type '%1' is unavailable. ",
+     (StringRef, StringRef))
+NOTE(projection_may_return_interior_ptr, none, "C++ method '%0' may return an "
+                                    "interior pointer. ",
      (StringRef))
+NOTE(mark_self_contained, none, "Mark type '%0' as 'self_contained' in C++ to "
+                                 "make methods that use it available in Swift. ",
+     (StringRef))
+NOTE(mark_safe_to_import, none, "Mark method '%0' as 'safe_to_import' in C++ to "
+                                "make it available in Swift. ",
+     (StringRef))
+
+NOTE(at_to_subscript, none, "Do you want to replace it with a call "
+                            "to the subscript operator?",
+     ())
+NOTE(get_swift_iterator, none, "Do you want to make a Swift iterator instead?",
+     ())
+NOTE(replace_with_nil, none, "Do you want to compare against 'nil' instead?'",
+     ())
+NOTE(get_first_element, none, "Do you want to get the first element instead?",
+     ())
+NOTE(get_last_element, none, "Do you want to get the last element instead?",
+     ())
+
+NOTE(iterator_method_unavailable, none, "C++ method '%0' that returns an "
+                                  "iterator is unavailable",
+     (StringRef))
+NOTE(iterator_potentially_unsafe, none, "C++ methods that return iterators "
+                                        "are potentially unsafe. Try re-writing "
+                                        "to use Swift iterator APIs.", ())
 
 ERROR(reference_type_must_have_retain_attr,none,
       "reference type '%0' must have 'retain:' swift attribute.", (StringRef))
@@ -210,10 +241,10 @@ ERROR(conforms_to_not_protocol,none,
       "specified protocol conformance '%0' is not a protocol.", (StringRef))
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
-NOTE(record_field_not_imported, none, "field %0 not imported", (const clang::NamedDecl*))
-NOTE(invoked_func_not_imported, none, "function %0 not imported", (const clang::NamedDecl*))
-NOTE(record_method_not_imported, none, "method %0 not imported", (const clang::NamedDecl*))
-NOTE(objc_property_not_imported, none, "property %0 not imported", (const clang::NamedDecl*))
+NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (const clang::NamedDecl*))
+NOTE(invoked_func_not_imported, none, "function %0 unavailable (cannot import)", (const clang::NamedDecl*))
+NOTE(record_method_not_imported, none, "method %0 unavailable (cannot import)", (const clang::NamedDecl*))
+NOTE(objc_property_not_imported, none, "property %0 unavailable (cannot import)", (const clang::NamedDecl*))
 
 NOTE(forward_declared_interface_label, none, "interface %0 forward declared here", (const clang::NamedDecl*))
 NOTE(forward_declared_protocol_label, none, "protocol %0 forward declared here", (const clang::NamedDecl*))
