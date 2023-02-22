@@ -3638,6 +3638,9 @@ namespace {
     }
 
     void addLayoutStringPointer() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       if (auto *layoutString = getLayoutString()) {
         B.add(layoutString);
       } else {
