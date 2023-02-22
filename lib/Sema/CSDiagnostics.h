@@ -1255,7 +1255,18 @@ private:
   /// overload to be present, but a class marked as `@dynamicCallable`
   /// defines only `dynamicallyCall(withArguments:)` variant.
   bool diagnoseForDynamicCallable() const;
-  
+
+  /// Diagnose methods that return unsafe projections and suggest fixits.
+  /// For example, if Swift cannot find "vector::data" because it is unsafe, try
+  /// to diagnose this and tell the user why we did not import "vector::data".
+  ///
+  /// Provides fixits for:
+  /// at -> subscript
+  /// begin, end -> makeIterator
+  /// front, back -> first, last
+  void diagnoseUnsafeCxxMethod(SourceLoc loc, ASTNode anchor, Type baseType,
+                               DeclName name) const;
+
   /// Tailored diagnostics for collection literal with unresolved member expression
   /// that defaults the element type. e.g. _ = [.e]
   bool diagnoseInLiteralCollectionContext() const;
