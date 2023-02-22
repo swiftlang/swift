@@ -67,4 +67,25 @@ TrapOnExecutionTestSuite.test("TestTemplateBoolDependentNoExceptMethod") {
   v.dependentNoExceptMethod()
 }
 
+protocol MethodProtocol {
+  func method(_ x: CInt) -> CInt
+}
+
+extension TestClass: MethodProtocol {
+}
+
+TrapOnExecutionTestSuite.test("TestProtocolConformanceThunkInvoke") {
+  let v = TestClass()
+  let p: MethodProtocol = v
+  expectCrashLater()
+  let _ = p.method(2)
+}
+
+TrapOnExecutionTestSuite.test("TestClassWithSubscript") {
+  let v = ClassWithSubscript()
+  expectEqual(v[0], 0)
+  expectCrashLater()
+  let _ = v[1]
+}
+
 runAllTests()
