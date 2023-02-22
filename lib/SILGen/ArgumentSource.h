@@ -222,8 +222,15 @@ public:
     return Storage.get<LValueStorage>(StoredKind).Loc;
   }
 
+  /// The kind of operation under which we are querying a storage reference.
+  enum class StorageReferenceOperationKind {
+    Borrow,
+    Consume
+  };
+
   Expr *findStorageReferenceExprForBorrow() &&;
-  Expr *findStorageReferenceExprForMoveOnlyBorrow(SILGenFunction &SGF) &&;
+  Expr *findStorageReferenceExprForMoveOnly(SILGenFunction &SGF,
+                                      StorageReferenceOperationKind refKind) &&;
   Expr *findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) &&;
 
   /// Given that this source is an expression, extract and clear
