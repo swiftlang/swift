@@ -1519,7 +1519,7 @@ void swift::insertDeallocOfCapturedArguments(PartialApplyInst *pai,
       } else {
         insertionPoint = terminator;
       }
-      auto builder = SILBuilder(insertionPoint);
+      SILBuilderWithScope builder(insertionPoint);
       builder.createDeallocStack(CleanupLocation(insertionPoint->getLoc()),
                                  argValue);
     }
