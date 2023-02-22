@@ -3346,6 +3346,10 @@ static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::Expression);
 }
 
+static bool usesFeatureDisableActorInferenceFromPropertyWrapperUsage(Decl *decl) {
+  return false;
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
