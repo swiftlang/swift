@@ -462,9 +462,9 @@ private extension AccessBase {
       case .box, .global:
         return .no
       case .class(let rea):
-        return .objectIfStackPromoted(rea.operand)
+        return .objectIfStackPromoted(rea.instance)
       case .tail(let rta):
-        return .objectIfStackPromoted(rta.operand)
+        return .objectIfStackPromoted(rta.instance)
       case .argument(let arg):
         return .decidedInCaller(arg)
       case .yield, .pointer:
@@ -493,7 +493,7 @@ private extension Instruction {
 
         // The result of an `address_to_pointer` may be used in any unsafe way, e.g.
         // passed to a C function.
-        baseAddr = atp.operand
+        baseAddr = atp.address
       case let ia as IndexAddrInst:
         if !ia.needsStackProtection {
           return nil

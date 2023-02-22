@@ -80,7 +80,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
   for inst in function.instructions {
     switch inst {
       case let fli as FixLifetimeInst:
-        valuesToCheck.append(fli.operand)
+        valuesToCheck.append(fli.operand.value)
       case is FullApplySite:
         applies.append(inst)
       default:
