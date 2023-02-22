@@ -907,11 +907,13 @@ private:
         !Ty->getASTContext().LangOpts.EnableCXXInterop) {
       // Make sure we can reconstruct mangled types for the debugger.
       auto &Ctx = Ty->getASTContext();
-      Type Reconstructed = Demangle::getTypeForMangling(Ctx, Result);
+      Type Reconstructed = Demangle::getTypeForMangling(Ctx, Result, Sig);
       if (!Reconstructed) {
         llvm::errs() << "Failed to reconstruct type for " << Result << "\n";
         llvm::errs() << "Original type:\n";
         Ty->dump(llvm::errs());
+        if (Sig)
+          llvm::errs() << "Generic signature: " << Sig << "\n";
         abort();
       } else if (!Reconstructed->isEqual(Ty) &&
                  // FIXME: Some existential types are reconstructed without
@@ -924,6 +926,8 @@ private:
         Ty->dump(llvm::errs());
         llvm::errs() << "Reconstructed type:\n";
         Reconstructed->dump(llvm::errs());
+        if (Sig)
+          llvm::errs() << "Generic signature: " << Sig << "\n";
         abort();
       }
     }
