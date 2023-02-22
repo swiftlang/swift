@@ -716,7 +716,7 @@ extension Sequence {
       return result
     }
     var iterator = makeIterator()
-    var result: [Element] =
+    let result: [Element] =
       .init(unsafeUninitializedCapacity: underestimatedCount)
     { buf, initializedCount in
       for i in 0..<underestimatedCount {
