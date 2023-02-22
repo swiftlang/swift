@@ -486,30 +486,14 @@ bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
   // we dealloc_stack the context.
   auto operand = dvi->getOperand();
   auto operandTy = operand->getType();
-  if (auto operandFnTy = operandTy.getAs<SILFunctionType>()) {
+  if (auto operandFnTy = operandTy.getAs<SILFunctionType>()){
     if (operandFnTy->isTrivialNoEscape()) {
-      // Look through mark_dependence and other wrapper instructions.
-      SILValue deallocOperand = operand;
-      while (true) {
-        if (auto mdi = dyn_cast<MarkDependenceInst>(deallocOperand)) {
-          deallocOperand = mdi->getValue();
-        } else if (isa<ConvertEscapeToNoEscapeInst>(deallocOperand)) {
-          // If there's a surviving convert_escape_to_noescape that wasn't
-          // turned into a stack closure, then stop here and just delete the
-          // destroy_value, since the original escaping closure's lifetime
-          // will persist.
-          break;
-        } else if (auto conv = dyn_cast<ConversionInst>(deallocOperand)) {
-          deallocOperand = conv->getConverted();
-        } else {
-          break;
-        }
-      }
-      if (isa<PartialApplyInst>(deallocOperand)) {
+      if (auto origPA = dvi->getNonescapingClosureAllocation()) {
         withBuilder<void>(dvi, [&](SILBuilder &b, SILLocation loc) {
-          b.createDeallocStack(loc, deallocOperand);
+          b.createDeallocStack(loc, origPA);
         });
       }
+      
       eraseInstruction(dvi);
       return true;
     }
