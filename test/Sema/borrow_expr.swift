@@ -40,6 +40,7 @@ func useApply() {
   var s = S()
   s = S()
   (_borrow s).test()
+  (((_borrow s))).test()
 }
 
 func testExprFailureLet() {
@@ -72,9 +73,23 @@ struct StructWithField {
   }
 
   var computedK2 : Klass {
+    get {
+      return k
+    }
+    set {}
+  }
+
+  var computedK3 : Klass {
     _read {
       yield k
     }
+  }
+
+  var computedK4 : Klass {
+    _read {
+      yield k
+    }
+    set {}
   }
 }
 
@@ -95,10 +110,21 @@ func testVarStructAccessField() {
   var t = StructWithField()
   t = StructWithField()
   let _ = _borrow t.k
-  let _ = _borrow t.computedK // expected-error {{'borrow' can only be applied to var bindings}}
-  let _ = _borrow t.computedK2 // expected-error {{'borrow' can only be applied to var bindings}}
-  let _ = _borrow (_borrow t).computedK // expected-error {{'borrow' can only be applied to var bindings}}
-  let _ = _borrow (_borrow t).computedK2 // expected-error {{'borrow' can only be applied to var bindings}}
+
+  let _ = (_borrow t).computedK
+  let _ = (_borrow t).computedK2
+  let _ = (_borrow t).computedK3
+  let _ = (_borrow t).computedK4
+
+  let _ = _borrow t.computedK
+  let _ = _borrow t.computedK2
+  let _ = _borrow t.computedK3
+  let _ = _borrow t.computedK4
+
+  let _ = _borrow (_borrow t).computedK
+  let _ = _borrow (_borrow t).computedK2
+  let _ = _borrow (_borrow t).computedK3
+  let _ = _borrow (_borrow t).computedK4
 
 }
 
@@ -110,5 +136,5 @@ func testLetClassAccessField() {
 func testVarClassAccessField() {
   var t = Klass()
   t = Klass()
-  let _ = _borrow t.k // expected-error {{'borrow' can only be applied to var bindings}}
+  let _ = _borrow t.k
 }
