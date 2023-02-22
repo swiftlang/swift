@@ -534,6 +534,17 @@ recursive function, the attribute is ignored.
 
 This attribute has no effect in debug builds.
 
+## `@_lexicalLifetimes`
+
+Applies lexical lifetime rules within a module built with lexical lifetimes
+disabled.  Facilitates gradual migration.
+
+In modules built with lexical lifetimes disabled but lexical borrow scopes
+enabled--the behavior of `-enable-lexical-lifetimes=false`--all lexical markers
+are stripped by the LexicalLifetimeEliminator pass.  Functions annotated with
+this attribute keep their lexical markers, affecting the optimizations that run
+on the function subsequently.
+
 ## `@_noEagerMove`
 
 When applied to a value, indicates that the value's lifetime is lexical, that

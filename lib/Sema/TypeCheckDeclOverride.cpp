@@ -1625,6 +1625,7 @@ namespace  {
     UNINTERESTING_ATTR(RuntimeMetadata)
 
     UNINTERESTING_ATTR(MacroRole)
+    UNINTERESTING_ATTR(LexicalLifetimes)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
