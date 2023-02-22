@@ -250,6 +250,18 @@ namespace {
       return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
     }
 
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
+      // If the struct has a deinit declared, then call it to destroy the
+      // value.
+      if (tryEmitDestroyUsingDeinit(IGF, address, T)) {
+        return;
+      }
+      
+      // Otherwise, perform elementwise destruction of the value.
+      return super::destroy(IGF, address, T, isOutlined);
+    }
+
     void verify(IRGenTypeVerifierFunction &IGF,
                 llvm::Value *metadata,
                 SILType structType) const override {
@@ -748,6 +760,7 @@ namespace {
   /// A type implementation for loadable struct types.
   class LoadableStructTypeInfo final
       : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
+    using super = StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo>;
   public:
     LoadableStructTypeInfo(ArrayRef<StructFieldInfo> fields,
                            unsigned explosionSize,
@@ -813,6 +826,18 @@ namespace {
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
                                    const StructFieldInfo &field) const {
       llvm_unreachable("non-fixed field in loadable type?");
+    }
+    
+    void consume(IRGenFunction &IGF, Explosion &explosion,
+                 Atomicity atomicity, SILType T) const override {
+      // If the struct has a deinit declared, then call it to consume the
+      // value.
+      if (tryEmitConsumeUsingDeinit(IGF, explosion, T)) {
+        return;
+      }
+      
+      // Otherwise, do elementwise destruction of the value.
+      return super::consume(IGF, explosion, atomicity, T);
     }
   };
 

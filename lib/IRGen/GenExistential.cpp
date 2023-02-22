@@ -450,7 +450,7 @@ namespace {
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address address,
-                bool isOutlined) const override {
+                bool isOutlined, SILType T) const override {
       // Assign the value.
       Address instanceAddr = asDerived().projectValue(IGF, address);
       llvm::Value *old = IGF.Builder.CreateLoad(instanceAddr);
@@ -483,7 +483,8 @@ namespace {
       src.transferInto(dest, getNumStoredProtocols());
     }
 
-    void consume(IRGenFunction &IGF, Explosion &src, Atomicity atomicity)
+    void consume(IRGenFunction &IGF, Explosion &src, Atomicity atomicity,
+                 SILType T)
     const override {
       // Copy the instance pointer.
       llvm::Value *value = src.claimNext();
