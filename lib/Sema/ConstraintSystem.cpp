@@ -1071,15 +1071,6 @@ FunctionType *ConstraintSystem::openFunctionType(
   return funcType->castTo<FunctionType>();
 }
 
-Optional<Type> ConstraintSystem::isArrayType(Type type) {
-  if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
-    if (boundStruct->getDecl() == type->getASTContext().getArrayDecl())
-      return boundStruct->getGenericArgs()[0];
-  }
-
-  return None;
-}
-
 Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
   if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
     if (boundStruct->getDecl() == type->getASTContext().getDictionaryDecl()) {

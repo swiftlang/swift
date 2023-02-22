@@ -193,7 +193,7 @@ TreatArrayLiteralAsDictionary *
 TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
                                        Type arrayTy,
                                        ConstraintLocator *locator) {
-  if (!cs.isArrayType(arrayTy))
+  if (!arrayTy->isArrayType())
     return nullptr;
 
   // Determine the ArrayExpr from the locator.
@@ -1676,7 +1676,7 @@ ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
   if (!(argLoc && argLoc->getParameterFlags().isVariadic()))
     return nullptr;
 
-  auto elementType = cs.isArrayType(argType);
+  auto elementType = argType->isArrayType();
   if (!elementType)
     return nullptr;
 
@@ -1684,7 +1684,7 @@ ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
   options |= ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix;
   options |= ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints;
 
-  auto result = cs.matchTypes(*elementType, paramType, ConstraintKind::Subtype,
+  auto result = cs.matchTypes(elementType, paramType, ConstraintKind::Subtype,
                               options, builder);
 
   if (result.isFailure())

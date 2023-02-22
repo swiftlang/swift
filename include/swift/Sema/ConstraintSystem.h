@@ -4731,10 +4731,6 @@ public:
                        bool updateState = true,
                        bool notifyBindingInference = true);
 
-  /// Determine if the type in question is an Array<T> and, if so, provide the
-  /// element type of the array.
-  static Optional<Type> isArrayType(Type type);
-
   /// Determine whether the given type is a dictionary and, if so, provide the
   /// key and value types for the dictionary.
   static Optional<std::pair<Type, Type>> isDictionaryType(Type type);

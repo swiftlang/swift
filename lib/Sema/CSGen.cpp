@@ -981,8 +981,8 @@ namespace {
           isLValueBase = true;
           baseObjTy = baseObjTy->getWithoutSpecifierType();
         }
-        
-        if (CS.isArrayType(baseObjTy.getPointer())) {
+
+        if (baseObjTy->isArrayType()) {
 
           if (auto arraySliceTy = 
                 dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
@@ -1981,14 +1981,13 @@ namespace {
       };
 
       // If a contextual type exists for this expression, apply it directly.
-      if (contextualType && ConstraintSystem::isArrayType(contextualType)) {
+      if (contextualType && contextualType->isArrayType()) {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
         contextualType = CS.openOpaqueType(
             contextualType, contextualPurpose, locator);
-        Optional<Type> arrayElementType =
-            ConstraintSystem::isArrayType(contextualType);
+        Type arrayElementType = contextualType->isArrayType();
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
                          locator);
