@@ -205,18 +205,14 @@ func expandFreestandingMacro(
       diagEnginePtr: diagEnginePtr,
       macroSyntax: macroSyntax,
       sourceFilePtr: sourceFilePtr,
-      discriminator: discriminator,
-      expandedSourcePointer: expandedSourcePointer,
-      expandedSourceLength: expandedSourceLength)
+      discriminator: discriminator)
   case .Executable:
     expandedSource = expandFreestandingMacroIPC(
       macroPtr: macroPtr,
       diagEnginePtr: diagEnginePtr,
       macroSyntax: macroSyntax,
       sourceFilePtr: sourceFilePtr,
-      discriminator: discriminator,
-      expandedSourcePointer: expandedSourcePointer,
-      expandedSourceLength: expandedSourceLength)
+      discriminator: discriminator)
   }
 
   guard var expandedSource = expandedSource else {
@@ -243,9 +239,7 @@ func expandFreestandingMacroIPC(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
   macroSyntax: Syntax,
   sourceFilePtr: UnsafePointer<ExportedSourceFile>,
-  discriminator: String,
-  expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  expandedSourceLength: UnsafeMutablePointer<Int>
+  discriminator: String
 ) -> String? {
 
   let macroName: String
@@ -291,9 +285,7 @@ func expandFreestandingMacroInProcess(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
   macroSyntax: Syntax,
   sourceFilePtr: UnsafePointer<ExportedSourceFile>,
-  discriminator: String,
-  expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  expandedSourceLength: UnsafeMutablePointer<Int>
+  discriminator: String
 ) -> String? {
 
   // Create a source manager. This should probably persist and be given to us.
@@ -492,9 +484,7 @@ func expandAttachedMacro(
       declarationSourceFilePtr: declarationSourceFilePtr,
       attachedTo: declarationNode,
       parentDeclSourceFilePtr: parentDeclSourceFilePtr,
-      parentDeclNode: parentDeclNode,
-      expandedSourcePointer: expandedSourcePointer,
-      expandedSourceLength: expandedSourceLength)
+      parentDeclNode: parentDeclNode)
   case .InProcess:
     expandedSources = expandAttachedMacroInProcess(
       diagEnginePtr: diagEnginePtr,
@@ -506,9 +496,7 @@ func expandAttachedMacro(
       declarationSourceFilePtr: declarationSourceFilePtr,
       attachedTo: declarationNode,
       parentDeclSourceFilePtr: parentDeclSourceFilePtr,
-      parentDeclNode: parentDeclNode,
-      expandedSourcePointer: expandedSourcePointer,
-      expandedSourceLength: expandedSourceLength)
+      parentDeclNode: parentDeclNode)
   }
 
   guard let expandedSources = expandedSources else {
@@ -556,9 +544,7 @@ func expandAttachedMacroIPC(
   declarationSourceFilePtr: UnsafePointer<ExportedSourceFile>,
   attachedTo declarationNode: DeclSyntax,
   parentDeclSourceFilePtr: UnsafePointer<ExportedSourceFile>?,
-  parentDeclNode: DeclSyntax?,
-  expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  expandedSourceLength: UnsafeMutablePointer<Int>
+  parentDeclNode: DeclSyntax?
 ) -> [String]? {
   let macroName: String = customAttrNode.attributeName.description
   let macro = macroPtr.assumingMemoryBound(to: ExportedExecutableMacro.self).pointee
@@ -634,9 +620,7 @@ func expandAttachedMacroInProcess(
   declarationSourceFilePtr: UnsafePointer<ExportedSourceFile>,
   attachedTo declarationNode: DeclSyntax,
   parentDeclSourceFilePtr: UnsafePointer<ExportedSourceFile>?,
-  parentDeclNode: DeclSyntax?,
-  expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  expandedSourceLength: UnsafeMutablePointer<Int>
+  parentDeclNode: DeclSyntax?
 ) -> [String]? {
   // Get the macro.
   let macroPtr = macroPtr.bindMemory(to: ExportedMacro.self, capacity: 1)
