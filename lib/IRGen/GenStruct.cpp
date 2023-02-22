@@ -567,6 +567,7 @@ namespace {
       auto callee = cast<llvm::Function>(clangFnAddr->stripPointerCasts());
       Signature signature = IGF.IGM.getSignature(fnType);
       std::string name = "__swift_cxx_copy_ctor" + callee->getName().str();
+      auto *origClangFnAddr = clangFnAddr;
       clangFnAddr = emitCXXConstructorThunkIfNeeded(
           IGF.IGM, signature, copyConstructor, name, clangFnAddr);
       callee = cast<llvm::Function>(clangFnAddr);
@@ -576,7 +577,19 @@ namespace {
         src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
                               IGF.IGM.DataLayout);
       }
-      IGF.Builder.CreateCall(callee->getFunctionType(), callee, {dest, src});
+      llvm::Value *args[] = {dest, src};
+      if (clangFnAddr == origClangFnAddr) {
+        // Ensure we can use 'invoke' to trap on uncaught exceptions when
+        // calling original copy constructor without going through the thunk.
+        emitCXXConstructorCall(IGF, copyConstructor, callee->getFunctionType(),
+                               callee, args);
+        return;
+      }
+      // Check if we're calling a thunk that traps on exception thrown from copy
+      // constructor.
+      if (IGF.IGM.emittedForeignFunctionThunksWithExceptionTraps.count(callee))
+        IGF.setCallsThunksWithForeignExceptionTraps();
+      IGF.Builder.CreateCall(callee->getFunctionType(), callee, args);
     }
 
   public:

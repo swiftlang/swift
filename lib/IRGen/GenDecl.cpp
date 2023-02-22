@@ -3252,24 +3252,33 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     Args.push_back(arg);
   }
 
-  bool canThrow = IGM.isForeignExceptionHandlingEnabled();
+  auto *call =
+      emitCXXConstructorCall(subIGF, ctor, ctorFnType, ctorAddress, Args);
+  if (isa<llvm::InvokeInst>(call))
+    IGM.emittedForeignFunctionThunksWithExceptionTraps.insert(thunk);
+  subIGF.Builder.CreateRetVoid();
+
+  return thunk;
+}
+
+llvm::CallBase *swift::irgen::emitCXXConstructorCall(
+    IRGenFunction &IGF, const clang::CXXConstructorDecl *ctor,
+    llvm::FunctionType *ctorFnType, llvm::Constant *ctorAddress,
+    llvm::ArrayRef<llvm::Value *> args) {
+  bool canThrow = IGF.IGM.isForeignExceptionHandlingEnabled();
   if (auto *fpt = ctor->getType()->getAs<clang::FunctionProtoType>()) {
     if (fpt->isNothrow())
       canThrow = false;
   }
-  if (canThrow) {
-    IGM.emittedForeignFunctionThunksWithExceptionTraps.insert(thunk);
-    subIGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
-                                        llvm::BasicBlock *invokeUnwindDest) {
-      subIGF.Builder.createInvoke(ctorFnType, ctorAddress, Args,
-                                  invokeNormalDest, invokeUnwindDest);
-    });
-  } else
-    subIGF.Builder.CreateCall(ctorFnType, ctorAddress, Args);
-
-  subIGF.Builder.CreateRetVoid();
-
-  return thunk;
+  if (!canThrow)
+    return IGF.Builder.CreateCall(ctorFnType, ctorAddress, args);
+  llvm::CallBase *result;
+  IGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
+                                   llvm::BasicBlock *invokeUnwindDest) {
+    result = IGF.Builder.createInvoke(ctorFnType, ctorAddress, args,
+                                      invokeNormalDest, invokeUnwindDest);
+  });
+  return result;
 }
 
 StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {

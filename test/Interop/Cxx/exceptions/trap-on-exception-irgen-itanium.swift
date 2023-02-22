@@ -369,19 +369,15 @@ let _ = testClassWithNoThrowingConstructor()
 // CHECK-NOT: invoke
 // CHECK: }
 
-// CHECK: define {{.*}} @"$s4test0A32ClassWithThrowingCopyConstructors5Int32VyF"() #[[#SWIFTMETA]] personality
+// CHECK: define {{.*}} @"$s4test0A32ClassWithThrowingCopyConstructors5Int32VyF"() #[[#SWIFTUWMETA]] personality
 // CHECK: invoke {{.*}} @_ZN32ClassWithThrowingCopyConstructorC1ERKS_(
 // CHECK-NEXT:  to label %[[CONT41:.*]] unwind label %[[UNWIND41:.*]]
-// CHECK-EMPTY:
-// CHECK-NEXT: [[UNWIND41]]:
+
+// CHECK: [[UNWIND41]]:
 // CHECK-NEXT: landingpad { i8*, i32 }
 // CHECK-NEXT:    catch i8* null
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: unreachable
-// CHECK-EMPTY:
-// CHECK: [[CONT41]]:
-// CHECK: ret i32
-// CHECK-NEXT: }
 
 // CHECK: define {{.*}} @"$s4test0A28ClassWithThrowingConstructors5Int32VyF"() #[[#SWIFTUWMETA]] personality
 // CHECK: invoke {{.*}} @_ZN28ClassWithThrowingConstructorC{{.*}}(
