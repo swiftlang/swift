@@ -76,13 +76,13 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     return nil
   }
 
-  let lhsTy = lhsExistential.operand.type.instanceTypeOfMetatype(in: function)
-  let rhsTy = rhsExistential.operand.type.instanceTypeOfMetatype(in: function)
+  let lhsTy = lhsExistential.metatype.type.instanceTypeOfMetatype(in: function)
+  let rhsTy = rhsExistential.metatype.type.instanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.
-  let typesAreExact = lhsExistential.operand is MetatypeInst &&
-                      rhsExistential.operand is MetatypeInst
+  let typesAreExact = lhsExistential.metatype is MetatypeInst &&
+                      rhsExistential.metatype is MetatypeInst
 
   switch (lhsTy.typeKind, rhsTy.typeKind) {
   case (_, .unknown), (.unknown, _):

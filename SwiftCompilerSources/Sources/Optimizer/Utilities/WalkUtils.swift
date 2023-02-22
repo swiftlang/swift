@@ -385,7 +385,7 @@ extension ValueDefUseWalker {
         return unmatchedPath(value: operand, path: path)
       }
     case let bcm as BeginCOWMutationInst:
-      return walkDownUses(ofValue: bcm.bufferResult, path: path)
+      return walkDownUses(ofValue: bcm.instanceResult, path: path)
     default:
       return leafUse(value: operand, path: path)
     }
@@ -595,25 +595,25 @@ extension ValueUseDefWalker {
       }
     case let e as EnumInst:
       if let path = path.popIfMatches(.enumCase, index: e.caseIndex),
-         let operand = e.operand {
-        return walkUp(value: operand, path: path)
+         let payload = e.payload {
+        return walkUp(value: payload, path: path)
       } else {
         return unmatchedPath(value: e, path: path)
       }
     case let se as StructExtractInst:
-      return walkUp(value: se.operand, path: path.push(.structField, index: se.fieldIndex))
+      return walkUp(value: se.struct, path: path.push(.structField, index: se.fieldIndex))
     case let te as TupleExtractInst:
-      return walkUp(value: te.operand, path: path.push(.tupleField, index: te.fieldIndex))
+      return walkUp(value: te.tuple, path: path.push(.tupleField, index: te.fieldIndex))
     case let ued as UncheckedEnumDataInst:
-      return walkUp(value: ued.operand, path: path.push(.enumCase, index: ued.caseIndex))
+      return walkUp(value: ued.enum, path: path.push(.enumCase, index: ued.caseIndex))
     case let mvr as MultipleValueInstructionResult:
       let instruction = mvr.parentInstruction
       if let ds = instruction as? DestructureStructInst {
-        return walkUp(value: ds.operand, path: path.push(.structField, index: mvr.index))
+        return walkUp(value: ds.struct, path: path.push(.structField, index: mvr.index))
       } else if let dt = instruction as? DestructureTupleInst {
-        return walkUp(value: dt.operand, path: path.push(.tupleField, index: mvr.index))
+        return walkUp(value: dt.tuple, path: path.push(.tupleField, index: mvr.index))
       } else if let bcm = instruction as? BeginCOWMutationInst {
-        return walkUp(value: bcm.operand, path: path)
+        return walkUp(value: bcm.instance, path: path)
       } else {
         return rootDef(value: mvr, path: path)
       }
@@ -699,11 +699,11 @@ extension AddressUseDefWalker {
   mutating func walkUpDefault(address def: Value, path: Path) -> WalkResult {
     switch def {
     case let sea as StructElementAddrInst:
-      return walkUp(address: sea.operand, path: path.push(.structField, index: sea.fieldIndex))
+      return walkUp(address: sea.struct, path: path.push(.structField, index: sea.fieldIndex))
     case let tea as TupleElementAddrInst:
-      return walkUp(address: tea.operand, path: path.push(.tupleField, index: tea.fieldIndex))
+      return walkUp(address: tea.tuple, path: path.push(.tupleField, index: tea.fieldIndex))
     case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst:
-      return walkUp(address: (def as! UnaryInstruction).operand,
+      return walkUp(address: (def as! UnaryInstruction).operand.value,
                     path: path.push(.enumCase, index: (def as! EnumInstruction).caseIndex))
     case is InitExistentialAddrInst, is OpenExistentialAddrInst, is BeginAccessInst, is IndexAddrInst,
          is MarkMustCheckInst:

@@ -14,7 +14,7 @@ import SIL
 
 extension StrongRetainInst : Simplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
-    if isNotReferenceCounted(value: operand) {
+    if isNotReferenceCounted(value: instance) {
       context.erase(instruction: self)
       return
     }
@@ -34,7 +34,7 @@ extension StrongRetainInst : Simplifyable, SILCombineSimplifyable {
     // peephole.
     if let prev = previous {
       if let release = prev as? StrongReleaseInst {
-        if release.operand == operand {
+        if release.instance == self.instance {
           context.erase(instruction: self)
           context.erase(instruction: release)
           return
@@ -46,7 +46,7 @@ extension StrongRetainInst : Simplifyable, SILCombineSimplifyable {
 
 extension StrongReleaseInst : Simplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
-    let op = operand
+    let op = instance
     if isNotReferenceCounted(value: op) {
       context.erase(instruction: self)
       return
@@ -56,7 +56,7 @@ extension StrongReleaseInst : Simplifyable, SILCombineSimplifyable {
     // release of the class, squish the conversion.
     if let ier = op as? InitExistentialRefInst {
       if ier.uses.isSingleUse {
-        setOperand(at: 0, to: ier.operand, context)
+        setOperand(at: 0, to: ier.instance, context)
         context.erase(instruction: ier)
         return
       }
@@ -69,11 +69,11 @@ extension StrongReleaseInst : Simplifyable, SILCombineSimplifyable {
 private func isNotReferenceCounted(value: Value) -> Bool {
   switch value {
     case let cfi as ConvertFunctionInst:
-      return isNotReferenceCounted(value: cfi.operand)
+      return isNotReferenceCounted(value: cfi.fromFunction)
     case let uci as UpcastInst:
-      return isNotReferenceCounted(value: uci.operand)
+      return isNotReferenceCounted(value: uci.fromInstance)
     case let urc as UncheckedRefCastInst:
-      return isNotReferenceCounted(value: urc.operand)
+      return isNotReferenceCounted(value: urc.fromInstance)
     case let gvi as GlobalValueInst:
       // Since Swift 5.1, statically allocated objects have "immortal" reference
       // counts. Therefore we can safely eliminate unbalanced retains and
@@ -90,8 +90,8 @@ private func isNotReferenceCounted(value: Value) -> Bool {
         //     %0 = global_addr @_swiftEmptyArrayStorage
         //     %1 = address_to_pointer %0
         //     %2 = raw_pointer_to_ref %1
-        if let atp = rptr.operand as? AddressToPointerInst {
-          return atp.operand is GlobalAddrInst
+        if let atp = rptr.pointer as? AddressToPointerInst {
+          return atp.address is GlobalAddrInst
         }
       }
       return false
