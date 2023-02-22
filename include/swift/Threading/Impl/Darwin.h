@@ -186,7 +186,7 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 // On Darwin, we want to use the reserved keys
 #define SWIFT_THREADING_USE_RESERVED_TLS_KEYS 1
 
-#if !(SWIFT_THREADING_IS_COMPATIBILITY_LIBRARY && __ARM_ARCH_7K__) && __has_include(<pthread/tsd_private.h>)
+#if !(SWIFT_THREADING_IS_COMPATIBILITY_LIBRARY && (__ARM_ARCH_7K__ || __ARM64_ARCH_8_32__)) && __has_include(<pthread/tsd_private.h>)
 } // namespace threading_impl
 } // namespace swift
 
