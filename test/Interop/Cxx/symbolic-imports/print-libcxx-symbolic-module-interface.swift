@@ -1,4 +1,8 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -enable-objc-interop -module-print-submodules -enable-experimental-feature ImportSymbolicCXXDecls | %FileCheck %s
+// RUN: rm -rf %t
+// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -enable-objc-interop -module-print-submodules -enable-experimental-feature ImportSymbolicCXXDecls > %t
+// RUN: %FileCheck %s --check-prefixes=CHECK,VECTOR --input-file=%t
+// RUN: %FileCheck %s --check-prefixes=CHECK,STRING --input-file=%t
+// RUN: %FileCheck %s --check-prefixes=CHECK,MAP --input-file=%t
 
 // REQUIRES: asserts
 // REQUIRES: OS=macosx
@@ -6,14 +10,14 @@
 // CHECK: enum std {
 // CHECK-NEXT: enum __1 {
 
-// CHECK: struct basic_string {
+// STRING: struct basic_string {
 
-// CHECK: typealias string = std.__1.basic_string
+// STRING: typealias string = std.__1.basic_string
 
-// CHECK: struct vector {
-// CHECK: mutating func push_back()
-// CHECK: }
+// VECTOR: struct vector {
+// VECTOR: mutating func push_back()
+// VECTOR: }
 
-// CHECK: struct map {
+// MAP: struct map {
 
 // CHECK-NOT: enum std
