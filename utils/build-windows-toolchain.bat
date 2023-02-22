@@ -508,6 +508,7 @@ cmake --build %BuildRoot%\11 --target install || (exit /b)
 cmake ^
   -B %BuildRoot%\12 ^
 
+  -D BUILD_SHARED_LIBS=NO ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=cl ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
