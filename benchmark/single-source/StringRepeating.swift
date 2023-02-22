@@ -54,30 +54,30 @@ public func run_33CyrillicCharactersCount2(N: Int) {
   }
 }
 
-func getLongString() -> String {
-  let long = """
-    Swift is a multi-paradigm, compiled programming language created for
-     iOS, OS X, watchOS, tvOS and Linux development by Apple Inc. Swift is
-     designed to work with Apple's Cocoa and Cocoa Touch frameworks and the
-     large body of existing Objective-C code written for Apple products. Swift
-     is intended to be more resilient to erroneous code (\"safer\") than
-     Objective-C and also more concise. It is built with the LLVM compiler
-     framework included in Xcode 6 and later and uses the Objective-C runtime,
-     which allows C, Objective-C, C++ and Swift code to run within a single
-     program.
-     Існує багато варіацій уривків з Lorem Ipsum, але більшість з них зазнала
-     певних змін на кшталт жартівливих вставок або змішування слів, які навіть
-     не виглядають правдоподібно.
-     日本語の場合はランダムに生成された文章以外に、
-     著作権が切れた小説などが利用されることもある。
-     🦩
-    """
-  return getString(long)
-}
-
 @inline(never)
 public func run_longMixedStringCount100(N: Int) {
   for _ in 1...5000*N {
-    blackHole(repeating(getLongString(), count: 100))
+    blackHole(
+      repeating(
+        """
+          Swift is a multi-paradigm, compiled programming language created for
+           iOS, OS X, watchOS, tvOS and Linux development by Apple Inc. Swift is
+           designed to work with Apple's Cocoa and Cocoa Touch frameworks and the
+           large body of existing Objective-C code written for Apple products. Swift
+           is intended to be more resilient to erroneous code (\"safer\") than
+           Objective-C and also more concise. It is built with the LLVM compiler
+           framework included in Xcode 6 and later and uses the Objective-C runtime,
+           which allows C, Objective-C, C++ and Swift code to run within a single
+           program.
+           Існує багато варіацій уривків з Lorem Ipsum, але більшість з них зазнала
+           певних змін на кшталт жартівливих вставок або змішування слів, які навіть
+           не виглядають правдоподібно.
+           日本語の場合はランダムに生成された文章以外に、
+           著作権が切れた小説などが利用されることもある。
+           🦩
+        """,
+        count: 100
+      )
+    )
   }
 }
