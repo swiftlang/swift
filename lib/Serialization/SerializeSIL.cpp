@@ -511,16 +511,15 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
-      (unsigned)F.getClassSubclassScope(),
-      (unsigned)F.hasCReferences(), (unsigned)F.getEffectsKind(),
-      (unsigned)numAttrs, (unsigned)F.hasOwnership(),
-      F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
-      (unsigned)F.isDynamicallyReplaceable(),
-      (unsigned)F.isExactSelfClass(),
-      (unsigned)F.isDistributed(),
+      (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
+      (unsigned)F.getEffectsKind(), (unsigned)numAttrs,
+      (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
+      LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
+      (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
-      FnID, replacedFunctionID, usedAdHocWitnessFunctionID,
-      genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
+      (unsigned)F.forceEnableLexicalLifetimes(), FnID, replacedFunctionID,
+      usedAdHocWitnessFunctionID, genericSigID, clangNodeOwnerID,
+      parentModuleID, SemanticsIDs);
 
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
