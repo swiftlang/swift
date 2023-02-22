@@ -3779,7 +3779,7 @@ static void diagnoseUnsafeCxxMethod(SourceLoc loc, Type baseType,
   auto &ctx = baseType->getASTContext();
 
   if (baseType->getAnyNominal() == nullptr ||
-      // Don't waist time on non-cxx-methods.
+      // The following diagnostics only apply to C++ methods.
       !isa_and_nonnull<clang::CXXRecordDecl>(
           baseType->getAnyNominal()->getClangDecl()))
     return;
@@ -3797,21 +3797,20 @@ static void diagnoseUnsafeCxxMethod(SourceLoc loc, Type baseType,
         name.getBaseIdentifier().str() == "end") {
       ctx.Diags.diagnose(loc, diag::dont_use_iterator_api,
                          name.getBaseIdentifier().str());
-    } else if (cxxMethod->getReturnType()->isPointerType())
+    } else if (cxxMethod->getReturnType()->isPointerType()) {
       ctx.Diags.diagnose(loc, diag::projection_not_imported,
-                         name.getBaseIdentifier().str(), "pointer");
-    else if (cxxMethod->getReturnType()->isReferenceType())
-      ctx.Diags.diagnose(loc, diag::projection_not_imported,
-                         name.getBaseIdentifier().str(), "reference");
-    else if (cxxMethod->getReturnType()->isRecordType()) {
+                         name.getBaseIdentifier().str());
+    } else if (cxxMethod->getReturnType()->isReferenceType()) {
+      ctx.Diags.diagnose(loc, diag::projection_not_imported_because,
+                         name.getBaseIdentifier().str());
+    } else if (cxxMethod->getReturnType()->isRecordType()) {
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(
               cxxMethod->getReturnType()->getAsRecordDecl())) {
         assert(evaluateOrDefault(ctx.evaluator,
                                  CxxRecordSemantics({cxxRecord, ctx}), {}) ==
                CxxRecordSemanticsKind::UnsafePointerMember);
         ctx.Diags.diagnose(loc, diag::projection_not_imported,
-                           name.getBaseIdentifier().str(),
-                           cxxRecord->getNameAsString());
+                           name.getBaseIdentifier().str());
       }
     }
   }
