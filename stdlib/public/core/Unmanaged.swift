@@ -221,11 +221,6 @@ public struct Unmanaged<Instance: AnyObject> {
   }
 
   /// Performs an unbalanced retain of the object.
-  ///
-  /// Note: Use Umanaged.passRetained(object) instead to ensure that
-  /// the reference to object is retained before it becomes
-  /// unmanaged. Once a reference is unmanaged, its underlying object
-  /// may be freed by the system.
   @_transparent
   public func retain() -> Unmanaged {
     Builtin.retain(_value)

@@ -103,7 +103,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
       case .stack(let asi):    return "stack - \(asi)"
       case .global(let gl):    return "global - @\(gl.name)"
       case .class(let rea):    return "class  - \(rea)"
-      case .tail(let rta):     return "tail - \(rta.operand)"
+      case .tail(let rta):     return "tail - \(rta.instance)"
       case .argument(let arg): return "argument - \(arg)"
       case .yield(let ba):     return "yield - \(ba)"
       case .pointer(let p):    return "pointer - \(p)"
@@ -123,9 +123,9 @@ enum AccessBase : CustomStringConvertible, Hashable {
   /// The reference value if this is an access to a referenced objecct (class, box, tail).
   var reference: Value? {
     switch self {
-      case .box(let pbi):      return pbi.operand
-      case .class(let rea):    return rea.operand
-      case .tail(let rta):     return rta.operand
+      case .box(let pbi):      return pbi.box
+      case .class(let rea):    return rea.instance
+      case .tail(let rta):     return rta.instance
       case .stack, .global, .argument, .yield, .pointer, .unidentified:
         return nil
     }
@@ -143,9 +143,9 @@ enum AccessBase : CustomStringConvertible, Hashable {
   /// True, if the address is immediately produced by an allocation in its function.
   var isLocal: Bool {
     switch self {
-      case .box(let pbi):      return pbi.operand is AllocBoxInst
-      case .class(let rea):    return rea.operand is AllocRefInstBase
-      case .tail(let rta):     return rta.operand is AllocRefInstBase
+      case .box(let pbi):      return pbi.box is AllocBoxInst
+      case .class(let rea):    return rea.instance is AllocRefInstBase
+      case .tail(let rta):     return rta.instance is AllocRefInstBase
       case .stack:             return true
       case .global, .argument, .yield, .pointer, .unidentified:
         return false
@@ -193,16 +193,16 @@ enum AccessBase : CustomStringConvertible, Hashable {
     // First handle all pairs of the same kind (except `yield` and `pointer`).
     case (.box(let pb), .box(let otherPb)):
       return pb.fieldIndex != otherPb.fieldIndex ||
-             isDifferentAllocation(pb.operand, otherPb.operand)
+             isDifferentAllocation(pb.box, otherPb.box)
     case (.stack(let asi), .stack(let otherAsi)):
       return asi != otherAsi
     case (.global(let global), .global(let otherGlobal)):
       return global != otherGlobal
     case (.class(let rea), .class(let otherRea)):
       return rea.fieldIndex != otherRea.fieldIndex ||
-             isDifferentAllocation(rea.operand, otherRea.operand)
+             isDifferentAllocation(rea.instance, otherRea.instance)
     case (.tail(let rta), .tail(let otherRta)):
-      return isDifferentAllocation(rta.operand, otherRta.operand)
+      return isDifferentAllocation(rta.instance, otherRta.instance)
     case (.argument(let arg), .argument(let otherArg)):
       return (arg.convention.isExclusiveIndirect || otherArg.convention.isExclusiveIndirect) && arg != otherArg
       
@@ -279,14 +279,14 @@ extension PointerToAddressInst {
 
       mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
         if let atp = value as? AddressToPointerInst {
-          if let res = result, atp.operand != res {
+          if let res = result, atp.address != res {
             return .abortWalk
           }
 
-          if addrType != atp.operand.type { return .abortWalk }
+          if addrType != atp.address.type { return .abortWalk }
           if !path.isEmpty { return .abortWalk }
 
-          self.result = atp.operand
+          self.result = atp.address
           return .continueWalk
         }
         return .abortWalk
@@ -305,7 +305,7 @@ extension PointerToAddressInst {
     }
 
     var walker = Walker(addrType: type)
-    if walker.walkUp(value: operand, path: SmallProjectionPath()) == .abortWalk {
+    if walker.walkUp(value: pointer, path: SmallProjectionPath()) == .abortWalk {
       return nil
     }
     return walker.result
@@ -473,11 +473,11 @@ extension ValueUseDefWalker where Path == SmallProjectionPath {
     let path = accessPath.projectionPath
     switch accessPath.base {
       case .box(let pbi):
-        return walkUp(value: pbi.operand, path: path.push(.classField, index: pbi.fieldIndex)) != .abortWalk
+        return walkUp(value: pbi.box, path: path.push(.classField, index: pbi.fieldIndex)) != .abortWalk
       case .class(let rea):
-        return walkUp(value: rea.operand, path: path.push(.classField, index: rea.fieldIndex)) != .abortWalk
+        return walkUp(value: rea.instance, path: path.push(.classField, index: rea.fieldIndex)) != .abortWalk
       case .tail(let rta):
-        return walkUp(value: rta.operand, path: path.push(.tailElements, index: 0)) != .abortWalk
+        return walkUp(value: rta.instance, path: path.push(.tailElements, index: 0)) != .abortWalk
       case .stack, .global, .argument, .yield, .pointer, .unidentified:
         return false
     }

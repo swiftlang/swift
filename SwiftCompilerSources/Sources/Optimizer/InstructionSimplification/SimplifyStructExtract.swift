@@ -14,7 +14,7 @@ import SIL
 
 extension StructExtractInst : OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
-    guard let structInst = operand as? StructInst else {
+    guard let structInst = self.struct as? StructInst else {
       return
     }
     context.tryReplaceRedundantInstructionPair(first: structInst, second: self,
