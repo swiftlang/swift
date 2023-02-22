@@ -453,9 +453,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       auto *subExpr = borrowExpr->getSubExpr();
       while (auto *memberRef = dyn_cast<MemberRefExpr>(subExpr))
         subExpr = memberRef->getBase();
-      if (!isa<DeclRefExpr>(subExpr)) {
+      auto *declRefExpr = dyn_cast<DeclRefExpr>(subExpr);
+      if (!declRefExpr || !declRefExpr->getType()->hasLValueType()) {
         Ctx.Diags.diagnose(borrowExpr->getLoc(),
-                           diag::borrow_expression_not_passed_lvalue);
+                           diag::borrow_expression_not_passed_var);
       }
     }
 
