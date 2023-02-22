@@ -2638,7 +2638,7 @@ namespace {
           return Type();
 
         CS.addConstraint(
-            ConstraintKind::Conversion, subPatternType, openedType,
+            ConstraintKind::Equal, subPatternType, openedType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
         // FIXME [OPAQUE SUPPORT]: the distinction between where we want opaque
@@ -2729,21 +2729,6 @@ namespace {
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
         if (!castType) return Type();
 
-        auto *subPattern = isPattern->getSubPattern();
-        Type subPatternType = getTypeForPattern(
-            subPattern,
-            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-            castType, bindPatternVarsOneWay);
-
-        if (!subPatternType)
-          return Type();
-
-        // Make sure we can cast from the subpattern type to the type we're
-        // checking; if it's impossible, fail.
-        CS.addConstraint(
-            ConstraintKind::CheckedCast, subPatternType, castType,
-            locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
-
         // Allow `is` pattern to infer type from context which is then going
         // to be propaged down to its sub-pattern via conversion. This enables
         // correct handling of patterns like `_ as Foo` where `_` would
@@ -2751,9 +2736,23 @@ namespace {
         // inferred from enclosing context.
         auto isType = CS.createTypeVariable(CS.getConstraintLocator(pattern),
                                             TVO_CanBindToNoEscape);
+
+        // Make sure we can cast from the subpattern type to the type we're
+        // checking; if it's impossible, fail.
         CS.addConstraint(
-            ConstraintKind::Conversion, subPatternType, isType,
+            ConstraintKind::CheckedCast, isType, castType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+
+        if (auto *subPattern = isPattern->getSubPattern()) {
+          auto subPatternType = getTypeForPattern(
+              subPattern,
+              locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+              castType, bindPatternVarsOneWay);
+
+          CS.addConstraint(
+              ConstraintKind::Equal, subPatternType, castType,
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+        }
         return setType(isType);
       }
 

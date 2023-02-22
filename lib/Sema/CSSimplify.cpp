@@ -14194,7 +14194,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       return SolutionKind::Error;
 
     (void)matchTypes(type1, OptionalType::get(type2),
-                     ConstraintKind::Conversion,
+                     ConstraintKind::Equal,
                      TypeMatchFlags::TMF_ApplyingFix, locator);
 
     return SolutionKind::Solved;
