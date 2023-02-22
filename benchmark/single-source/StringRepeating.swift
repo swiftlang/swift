@@ -35,23 +35,23 @@ func repeating(_ i: String, count: Int) -> String {
 
 @inline(never)
 public func run_singleAsciiCharacterCount100(N: Int) {
-    for _ in 1...5000*N {
-        blackHole(repeating("x", count: 100))
-    }
+  for _ in 1...5000*N {
+    blackHole(repeating("x", count: 100))
+  }
 }
 
 @inline(never)
 public func run_26AsciiCharactersCount2(N: Int) {
-    for _ in 1...5000*N {
-        blackHole(repeating("abcdefghijklmnopqrstuvwxyz", count: 2))
-    }
+  for _ in 1...5000*N {
+    blackHole(repeating("abcdefghijklmnopqrstuvwxyz", count: 2))
+  }
 }
 
 @inline(never)
 public func run_33CyrillicCharactersCount2(N: Int) {
-    for _ in 1...5000*N {
-        blackHole(repeating("абвгґдеєжзиіїйклмнопрстуфхцчшщьюя", count: 2))
-    }
+  for _ in 1...5000*N {
+    blackHole(repeating("абвгґдеєжзиіїйклмнопрстуфхцчшщьюя", count: 2))
+  }
 }
 
 func getLongString() -> String {
@@ -77,7 +77,7 @@ func getLongString() -> String {
 
 @inline(never)
 public func run_longMixedStringCount100(N: Int) {
-    for _ in 1...5000*N {
-        blackHole(repeating(getLongString(), count: 100))
-    }
+  for _ in 1...5000*N {
+    blackHole(repeating(getLongString(), count: 100))
+  }
 }
