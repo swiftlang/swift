@@ -180,10 +180,12 @@ struct RetainFuncAndMask {
   bool isSingle;
 };
 
+#if SWIFT_OBJC_INTEROP
 void* Block_copyForwarder(void** dest, const void** src) {
   *dest = _Block_copy(*src);
   return *dest;
 }
+#endif
 
 typedef void* (*RetainFn)(void*);
 typedef void* (*CopyInitFn)(void*, void*);
