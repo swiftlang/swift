@@ -2377,13 +2377,6 @@ namespace {
        bool bindPatternVarsOneWay,
        PatternBindingDecl *patternBinding = nullptr,
        unsigned patternBindingIndex = 0) {
-      // If there's no pattern, then we have an unknown subpattern. Create a
-      // type variable.
-      if (!pattern) {
-        return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                     TVO_CanBindToNoEscape);
-      }
-
       // Local function that must be called for each "return" throughout this
       // function, to set the type of the pattern.
       auto setType = [&](Type type) {
@@ -4180,16 +4173,18 @@ bool ConstraintSystem::generateWrappedPropertyTypeConstraints(
 /// Generate additional constraints for the pattern of an initialization.
 static bool generateInitPatternConstraints(
     ConstraintSystem &cs, SolutionApplicationTarget target, Expr *initializer) {
-  auto pattern = target.getInitializationPattern();
   auto locator = cs.getConstraintLocator(
       initializer, LocatorPathElt::ContextualType(CTP_Initialization));
-  Type patternType = cs.generateConstraints(
-      pattern, locator, target.shouldBindPatternVarsOneWay(),
-      target.getInitializationPatternBindingDecl(),
-      target.getInitializationPatternBindingIndex());
 
-  if (!patternType)
-    return true;
+  Type patternType;
+  if (auto pattern = target.getInitializationPattern()) {
+    patternType = cs.generateConstraints(
+        pattern, locator, target.shouldBindPatternVarsOneWay(),
+        target.getInitializationPatternBindingDecl(),
+        target.getInitializationPatternBindingIndex());
+  } else {
+    patternType = cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
+  }
 
   if (auto wrappedVar = target.getInitializationWrappedVar())
     return cs.generateWrappedPropertyTypeConstraints(
@@ -4604,6 +4599,7 @@ Type ConstraintSystem::generateConstraints(
     Pattern *pattern, ConstraintLocatorBuilder locator,
     bool bindPatternVarsOneWay, PatternBindingDecl *patternBinding,
     unsigned patternIndex) {
+  assert(pattern);
   ConstraintGenerator cg(*this, nullptr);
   return cg.getTypeForPattern(pattern, locator, bindPatternVarsOneWay,
                               patternBinding, patternIndex);
