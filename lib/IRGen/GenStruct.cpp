@@ -648,12 +648,12 @@ namespace {
           canThrow = true;
       }
       if (canThrow) {
-        auto *invokeNormalDest = IGF.createBasicBlock("invoke.cont");
-        auto *invokeUnwindDest = IGF.createExceptionUnwindBlock();
-        IGF.Builder.createInvoke(destructorFnAddr->getFunctionType(),
-                                 destructorFnAddr, args, invokeNormalDest,
-                                 invokeUnwindDest);
-        IGF.Builder.emitBlock(invokeNormalDest);
+        IGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
+                                         llvm::BasicBlock *invokeUnwindDest) {
+          IGF.Builder.createInvoke(destructorFnAddr->getFunctionType(),
+                                   destructorFnAddr, args, invokeNormalDest,
+                                   invokeUnwindDest);
+        });
         return;
       }
 

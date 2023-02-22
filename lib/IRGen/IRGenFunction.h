@@ -105,6 +105,10 @@ public:
 
   llvm::BasicBlock *createExceptionUnwindBlock();
 
+  void createExceptionTrapScope(
+      llvm::function_ref<void(llvm::BasicBlock *, llvm::BasicBlock *)>
+          invokeEmitter);
+
   void emitAllExtractValues(llvm::Value *aggValue, llvm::StructType *type,
                             Explosion &out);
 

@@ -3252,7 +3252,20 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     Args.push_back(arg);
   }
 
-  subIGF.Builder.CreateCall(ctorFnType, ctorAddress, Args);
+  bool canThrow = IGM.isForeignExceptionHandlingEnabled();
+  if (auto *fpt = ctor->getType()->getAs<clang::FunctionProtoType>()) {
+    if (fpt->isNothrow())
+      canThrow = false;
+  }
+  if (canThrow)
+    subIGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
+                                        llvm::BasicBlock *invokeUnwindDest) {
+      subIGF.Builder.createInvoke(ctorFnType, ctorAddress, Args,
+                                  invokeNormalDest, invokeUnwindDest);
+    });
+  else
+    subIGF.Builder.CreateCall(ctorFnType, ctorAddress, Args);
+
   subIGF.Builder.CreateRetVoid();
 
   return thunk;

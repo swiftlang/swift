@@ -1982,17 +1982,9 @@ Signature SignatureExpansion::getSignature() {
   result.Attributes = Attrs;
   using ExtraData = Signature::ExtraData;
   if (FnType->getLanguage() == SILFunctionLanguage::C) {
-    const auto &clangLangOpts =
-        IGM.Context.getClangModuleLoader()->getClangASTContext().getLangOpts();
-    bool exceptionHandlingEnabled = IGM.Context.LangOpts.EnableCXXInterop &&
-                                    clangLangOpts.Exceptions &&
-                                    !clangLangOpts.IgnoreExceptions;
-    // FIXME: Support exceptions on windows MSVC.
-    if (IGM.Triple.isWindowsMSVCEnvironment())
-      exceptionHandlingEnabled = false;
     // This is a potentially throwing function. The use of 'noexcept' /
     // 'nothrow' is applied at the call site in the \c FunctionPointer class.
-    ForeignInfo.canThrow = exceptionHandlingEnabled;
+    ForeignInfo.canThrow = IGM.isForeignExceptionHandlingEnabled();
     result.ExtraDataKind = ExtraData::kindForMember<ForeignFunctionInfo>();
     result.ExtraDataStorage.emplace<ForeignFunctionInfo>(result.ExtraDataKind,
                                                          ForeignInfo);
@@ -4473,6 +4465,15 @@ llvm::BasicBlock *IRGenFunction::createExceptionUnwindBlock() {
   return result;
 }
 
+void IRGenFunction::createExceptionTrapScope(
+    llvm::function_ref<void(llvm::BasicBlock *, llvm::BasicBlock *)>
+        invokeEmitter) {
+  auto *invokeNormalDest = createBasicBlock("invoke.cont");
+  auto *invokeUnwindDest = createExceptionUnwindBlock();
+  invokeEmitter(invokeNormalDest, invokeUnwindDest);
+  Builder.emitBlock(invokeNormalDest);
+}
+
 /// Emit the prologue for the function.
 void IRGenFunction::emitPrologue() {
   // Set up the IRBuilder.
@@ -4530,6 +4531,16 @@ llvm::Function *IRGenModule::getForeignExceptionHandlingPersonalityFunc() {
       llvm::FunctionType::get(Int32Ty, true), llvm::Function::ExternalLinkage,
       "__gxx_personality_v0", getModule());
   return foreignExceptionHandlingPersonalityFunc;
+}
+
+bool IRGenModule::isForeignExceptionHandlingEnabled() const {
+  // FIXME: Support exceptions on windows MSVC.
+  if (Triple.isWindowsMSVCEnvironment())
+    return false;
+  const auto &clangLangOpts =
+      Context.getClangModuleLoader()->getClangASTContext().getLangOpts();
+  return Context.LangOpts.EnableCXXInterop && clangLangOpts.Exceptions &&
+         !clangLangOpts.IgnoreExceptions;
 }
 
 /// Emit the epilogue for the function.

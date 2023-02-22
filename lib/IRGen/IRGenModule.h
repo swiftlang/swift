@@ -1807,6 +1807,8 @@ public:
 
   llvm::Function *getForeignExceptionHandlingPersonalityFunc();
 
+  bool isForeignExceptionHandlingEnabled() const;
+
 private:
   llvm::Constant *
   getAddrOfSharedContextDescriptor(LinkEntity entity,
