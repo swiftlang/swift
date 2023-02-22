@@ -7497,11 +7497,17 @@ static bool isPotentialPropertyWrapperInit(Expr *baseExpr,
   return true;
 }
 
+/// Detect whether the given baseExpr is a borrow.
+static bool isBorrowExprOfLValueType(Expr *baseExpr) {
+  while (auto *pd = dyn_cast<ParenExpr>(baseExpr))
+    baseExpr = pd->getSubExpr();
+  return isa<BorrowExpr>(baseExpr);
+}
+
 /// Adjust the given type to become the self type when referring to
 /// the given member.
-static Type adjustSelfTypeForMember(Expr *baseExpr,
-                                    Type baseTy, ValueDecl *member,
-                                    DeclContext *UseDC) {
+static Type adjustSelfTypeForMember(Expr *baseExpr, Type baseTy,
+                                    ValueDecl *member, DeclContext *UseDC) {
   assert(!baseTy->is<LValueType>());
 
   auto inOutTy = baseTy->getAs<InOutType>();
@@ -7512,6 +7518,10 @@ static Type adjustSelfTypeForMember(Expr *baseExpr,
 
   if (isa<ConstructorDecl>(member))
     return baseObjectTy;
+
+  // If we have a borrow expr, adjust self to be an immutable lvalue.
+  if (isBorrowExprOfLValueType(baseExpr))
+    return LValueType::get(baseObjectTy, false /*ismutable*/);
 
   if (auto func = dyn_cast<FuncDecl>(member)) {
     // If 'self' is an inout type, turn the base type into an lvalue
