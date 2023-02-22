@@ -48,16 +48,16 @@ private:
     HasResult = 1 << 0,
     DidAllocateFromParentTask = 1 << 1,
   };
-  
+
   /// The task that was kicked off to initialize this `async let`,
   /// and flags.
   llvm::PointerIntPair<AsyncTask *, 2, unsigned> taskAndFlags;
-  
+
   /// Reserved space for a future_wait context frame, used during suspensions
   /// on the child task future.
   std::aligned_storage<sizeof(TaskFutureWaitAsyncContext),
                        alignof(TaskFutureWaitAsyncContext)>::type futureWaitContextStorage;
-  
+
   friend class ::swift::AsyncTask;
 
 public:
@@ -77,43 +77,43 @@ public:
   AsyncTask *getTask() const {
     return taskAndFlags.getPointer();
   }
-  
+
   bool hasResultInBuffer() const {
     return taskAndFlags.getInt() & HasResult;
   }
-  
+
   void setHasResultInBuffer(bool value = true) {
     if (value)
       taskAndFlags.setInt(taskAndFlags.getInt() | HasResult);
     else
       taskAndFlags.setInt(taskAndFlags.getInt() & ~HasResult);
   }
-  
+
   bool didAllocateFromParentTask() const {
     return taskAndFlags.getInt() & DidAllocateFromParentTask;
   }
-  
+
   void setDidAllocateFromParentTask(bool value = true) {
     if (value)
       taskAndFlags.setInt(taskAndFlags.getInt() | DidAllocateFromParentTask);
     else
       taskAndFlags.setInt(taskAndFlags.getInt() & ~DidAllocateFromParentTask);
   }
-  
+
   // The compiler preallocates a large fixed space for the `async let`, with the
   // intent that most of it be used for the child task context. The next two
   // methods return the address and size of that space.
-  
+
   /// Return a pointer to the unused space within the async let block.
   void *getPreallocatedSpace() {
     return (void*)(this + 1);
   }
-  
+
   /// Return the size of the unused space within the async let block.
   static constexpr size_t getSizeOfPreallocatedSpace() {
     return sizeof(AsyncLet) - sizeof(AsyncLetImpl);
   }
-  
+
   TaskFutureWaitAsyncContext *getFutureContext() {
     return reinterpret_cast<TaskFutureWaitAsyncContext*>(&futureWaitContextStorage);
   }
@@ -149,11 +149,11 @@ void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 
   // ok, now that the async let task actually is initialized: attach it to the
   // current task
-  bool addedRecord =
-      addStatusRecord(record, [&](ActiveTaskStatus parentStatus, ActiveTaskStatus& newStatus) {
-        updateNewChildWithParentAndGroupState(task, parentStatus, NULL);
-        return true;
-      });
+  bool addedRecord = addStatusRecordToSelf(record,
+      [&](ActiveTaskStatus parentStatus, ActiveTaskStatus& newStatus) {
+    updateNewChildWithParentAndGroupState(task, parentStatus, NULL);
+    return true;
+  });
   (void)addedRecord;
   assert(addedRecord);
 }
@@ -279,13 +279,13 @@ static void _asyncLet_get_throwing_continuation(
         SWIFT_CONTEXT void *error) {
   auto continuationContext = static_cast<AsyncLetContinuationContext*>(callContext);
   auto alet = continuationContext->alet;
-  
+
   // If the future completed successfully, its result is now in the async let
   // buffer.
   if (!error) {
     asImpl(alet)->setHasResultInBuffer();
   }
-  
+
   // Continue the caller's execution.
   auto throwingResume
     = reinterpret_cast<ThrowingTaskFutureWaitContinuationFunction*>(callContext->ResumeParent);
@@ -303,14 +303,14 @@ static void swift_asyncLet_get_throwingImpl(
   if (asImpl(alet)->hasResultInBuffer()) {
     return resumeFunction(callerContext, nullptr);
   }
-  
+
   auto aletContext = static_cast<AsyncLetContinuationContext*>(callContext);
   aletContext->ResumeParent
     = reinterpret_cast<TaskContinuationFunction*>(resumeFunction);
   aletContext->Parent = callerContext;
   aletContext->alet = alet;
   auto futureContext = asImpl(alet)->getFutureContext();
-  
+
   // Unlike the non-throwing variant, whether we end up with a result depends
   // on the success of the task. If we raise an error, then the result buffer
   // will not be populated. Save the async let binding so we can fetch it
@@ -375,7 +375,7 @@ static void asyncLet_finish_after_task_completion(SWIFT_ASYNC_CONTEXT AsyncConte
   if (alet->didAllocateFromParentTask()) {
     swift_task_dealloc(task);
   }
-  
+
   return reinterpret_cast<ThrowingTaskFutureWaitContinuationFunction*>(resumeFunction)
     (callerContext, error);
 }
@@ -390,7 +390,7 @@ static void _asyncLet_finish_continuation(
     = reinterpret_cast<AsyncLetContinuationContext*>(callContext);
   auto alet = continuationContext->alet;
   auto resultBuffer = continuationContext->resultBuffer;
-  
+
   // Destroy the error, or the result that was stored to the buffer.
   if (error) {
     swift_errorRelease((SwiftError*)error);
@@ -436,7 +436,7 @@ static void swift_asyncLet_finishImpl(SWIFT_ASYNC_CONTEXT AsyncContext *callerCo
   aletContext->alet = alet;
   aletContext->resultBuffer = reinterpret_cast<OpaqueValue*>(resultBuffer);
   auto futureContext = asImpl(alet)->getFutureContext();
-  
+
   // TODO: It would be nice if we could await the future without having to
   // provide a buffer to store the value to, since we're going to dispose of
   // it anyway.
@@ -504,7 +504,7 @@ static void _asyncLet_consume_throwing_continuation(
   // Get the async let pointer so we can destroy the task.
   auto continuationContext = static_cast<AsyncLetContinuationContext*>(callContext);
   auto alet = continuationContext->alet;
-  
+
   return asyncLet_finish_after_task_completion(callContext->Parent,
                                                alet,
                                                callContext->ResumeParent,
@@ -528,14 +528,14 @@ static void swift_asyncLet_consume_throwingImpl(
                    callContext,
                    nullptr);
   }
-  
+
   auto aletContext = static_cast<AsyncLetContinuationContext*>(callContext);
   aletContext->ResumeParent
     = reinterpret_cast<TaskContinuationFunction*>(resumeFunction);
   aletContext->Parent = callerContext;
   aletContext->alet = alet;
   auto futureContext = asImpl(alet)->getFutureContext();
-  
+
   // Unlike the non-throwing variant, whether we end up with a result depends
   // on the success of the task. If we raise an error, then the result buffer
   // will not be populated. Save the async let binding so we can fetch it
