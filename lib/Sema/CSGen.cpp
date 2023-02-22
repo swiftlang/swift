@@ -2368,17 +2368,12 @@ namespace {
     /// \param locator The locator to use for generated constraints and
     /// type variables.
     ///
-    /// \param externalPatternType The type imposed by the enclosing pattern,
-    /// if any. This will be non-null in cases where there is, e.g., a
-    /// pattern such as "is SubClass".
-    ///
     /// \param bindPatternVarsOneWay When true, generate fresh type variables
     /// for the types of each variable declared within the pattern, along
     /// with a one-way constraint binding that to the type to which the
     /// variable will be ascribed or inferred.
     Type getTypeForPattern(
        Pattern *pattern, ConstraintLocatorBuilder locator,
-       Type externalPatternType,
        bool bindPatternVarsOneWay,
        PatternBindingDecl *patternBinding = nullptr,
        unsigned patternBindingIndex = 0) {
@@ -2406,19 +2401,11 @@ namespace {
       case PatternKind::Paren: {
         auto *paren = cast<ParenPattern>(pattern);
 
-        // Parentheses don't affect the canonical type, but record them as
-        // type sugar.
-        if (externalPatternType &&
-            isa<ParenType>(externalPatternType.getPointer())) {
-          externalPatternType = cast<ParenType>(externalPatternType.getPointer())
-              ->getUnderlyingType();
-        }
-
         auto *subPattern = paren->getSubPattern();
         auto underlyingType = getTypeForPattern(
             subPattern,
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-            externalPatternType, bindPatternVarsOneWay);
+            bindPatternVarsOneWay);
 
         if (!underlyingType)
           return Type();
@@ -2427,7 +2414,7 @@ namespace {
       }
       case PatternKind::Binding: {
         auto *subPattern = cast<BindingPattern>(pattern)->getSubPattern();
-        auto type = getTypeForPattern(subPattern, locator, externalPatternType,
+        auto type = getTypeForPattern(subPattern, locator,
                                       bindPatternVarsOneWay);
 
         if (!type)
@@ -2453,9 +2440,7 @@ namespace {
         };
 
         // Always prefer a contextual type when it's available.
-        if (externalPatternType) {
-          type = externalPatternType;
-        } else if (auto *initializer = getInitializerExpr()) {
+        if (auto *initializer = getInitializerExpr()) {
           // For initialization always assume a type of initializer.
           type = CS.getType(initializer)->getRValueType();
         } else {
@@ -2532,18 +2517,13 @@ namespace {
           // diagnostic in the middle of the solver path.
 
           CS.addConstraint(ConstraintKind::OneWayEqual, oneWayVarType,
-                           externalPatternType ? externalPatternType : varType,
-                           locator);
+                           varType, locator);
         }
 
         // Ascribe a type to the declaration so it's always available to
         // constraint system.
         if (oneWayVarType) {
           CS.setType(var, oneWayVarType);
-        } else if (externalPatternType) {
-          // If there is an externally imposed type, that's what the
-          // declaration is going to be bound to.
-          CS.setType(var, externalPatternType);
         } else {
           // Otherwise, let's use the type of the pattern. The type
           // of the declaration has to be r-value, so let's add an
@@ -2632,7 +2612,7 @@ namespace {
         Type subPatternType = getTypeForPattern(
             subPattern,
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-            openedType, bindPatternVarsOneWay);
+            bindPatternVarsOneWay);
 
         if (!subPatternType)
           return Type();
@@ -2652,38 +2632,16 @@ namespace {
       case PatternKind::Tuple: {
         auto tuplePat = cast<TuplePattern>(pattern);
 
-        // If there's an externally-imposed type, decompose it into element
-        // types so long as we have the right number of such types.
-        SmallVector<AnyFunctionType::Param, 4> externalEltTypes;
-        if (externalPatternType) {
-          decomposeTuple(externalPatternType, externalEltTypes);
-
-          // If we have the wrong number of elements, we may not be able to
-          // provide more specific types.
-          if (tuplePat->getNumElements() != externalEltTypes.size()) {
-            externalEltTypes.clear();
-
-            // Implicit tupling.
-            if (tuplePat->getNumElements() == 1) {
-              externalEltTypes.push_back(
-                  AnyFunctionType::Param(externalPatternType));
-            }
-          }
-        }
-
         SmallVector<TupleTypeElt, 4> tupleTypeElts;
         tupleTypeElts.reserve(tuplePat->getNumElements());
         for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
           auto &tupleElt = tuplePat->getElement(i);
-          Type externalEltType;
-          if (!externalEltTypes.empty())
-            externalEltType = externalEltTypes[i].getPlainType();
 
           auto *eltPattern = tupleElt.getPattern();
           Type eltTy = getTypeForPattern(
               eltPattern,
               locator.withPathElement(LocatorPathElt::PatternMatch(eltPattern)),
-              externalEltType, bindPatternVarsOneWay);
+              bindPatternVarsOneWay);
 
           if (!eltTy)
             return Type();
@@ -2695,25 +2653,12 @@ namespace {
       }
 
       case PatternKind::OptionalSome: {
-        // Remove an optional from the object type.
-        if (externalPatternType) {
-          Type objVar = CS.createTypeVariable(
-              CS.getConstraintLocator(
-                  locator.withPathElement(ConstraintLocator::OptionalPayload)),
-              TVO_CanBindToNoEscape);
-          CS.addConstraint(
-              ConstraintKind::OptionalObject, externalPatternType, objVar,
-              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
-
-          externalPatternType = objVar;
-        }
-
         auto *subPattern = cast<OptionalSomePattern>(pattern)->getSubPattern();
         // The subpattern must have optional type.
         Type subPatternType = getTypeForPattern(
             subPattern,
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-            externalPatternType, bindPatternVarsOneWay);
+            bindPatternVarsOneWay);
 
         if (!subPatternType)
           return Type();
@@ -2747,7 +2692,7 @@ namespace {
           auto subPatternType = getTypeForPattern(
               subPattern,
               locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-              castType, bindPatternVarsOneWay);
+              bindPatternVarsOneWay);
 
           CS.addConstraint(
               ConstraintKind::Equal, subPatternType, castType,
@@ -2829,18 +2774,6 @@ namespace {
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
           baseType = parentType;
-          // Perform member lookup into the external pattern metatype. e.g.
-          // `case let .test(tuple) as Test`.
-        } else if (externalPatternType) {
-          Type externalMetaType = MetatypeType::get(externalPatternType);
-
-          CS.addValueMemberConstraint(
-              externalMetaType, enumPattern->getName(), memberType, CurDC,
-              functionRefKind, {},
-              CS.getConstraintLocator(locator,
-                                      LocatorPathElt::PatternMatch(pattern)));
-
-          baseType = externalPatternType;
         } else {
           // Use the pattern type for member lookup.
           CS.addUnresolvedValueMemberConstraint(
@@ -2858,7 +2791,7 @@ namespace {
           Type subPatternType = getTypeForPattern(
               subPattern,
               locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-              Type(), bindPatternVarsOneWay);
+              bindPatternVarsOneWay);
 
           if (!subPatternType)
             return Type();
@@ -4672,7 +4605,7 @@ Type ConstraintSystem::generateConstraints(
     bool bindPatternVarsOneWay, PatternBindingDecl *patternBinding,
     unsigned patternIndex) {
   ConstraintGenerator cg(*this, nullptr);
-  return cg.getTypeForPattern(pattern, locator, Type(), bindPatternVarsOneWay,
+  return cg.getTypeForPattern(pattern, locator, bindPatternVarsOneWay,
                               patternBinding, patternIndex);
 }
 
