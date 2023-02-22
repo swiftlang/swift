@@ -1761,6 +1761,24 @@ public:
         .Value;
   }
 
+  TypeLookupErrorOr<BuiltType>
+  createPackType(llvm::ArrayRef<BuiltType> elements) const {
+    // FIXME: Runtime support for variadic generics.
+    return BuiltType();
+  }
+
+  TypeLookupErrorOr<BuiltType>
+  createSILPackType(llvm::ArrayRef<BuiltType> elements, bool isElementAddress) const {
+    // FIXME: Runtime support for variadic generics.
+    return BuiltType();
+  }
+
+  TypeLookupErrorOr<BuiltType>
+  createPackExpansionType(BuiltType patternType, BuiltType countType) const {
+    // FIXME: Runtime support for variadic generics.
+    return BuiltType();
+  }
+
   TypeLookupErrorOr<BuiltType> createDependentMemberType(StringRef name,
                                                          BuiltType base) const {
     // Should not have unresolved dependent member types here.
