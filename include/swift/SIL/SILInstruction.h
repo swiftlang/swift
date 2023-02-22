@@ -8193,6 +8193,10 @@ public:
   void setPoisonRefs(bool poisonRefs = true) {
     sharedUInt8().DestroyValueInst.poisonRefs = poisonRefs;
   }
+  
+  /// If the value being destroyed is a stack allocation of a nonescaping
+  /// closure, then return the PartialApplyInst that allocated the closure.
+  PartialApplyInst *getNonescapingClosureAllocation() const;
 };
 
 class MoveValueInst
