@@ -1455,6 +1455,8 @@ public:
   /// Finds the address of the given symbol. If `libraryHandleHint` is non-null,
   /// search within the library.
   void *getAddressOfSymbol(const char *name, void *libraryHandleHint = nullptr);
+  
+  Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 
 private:
   friend Decl;

@@ -150,18 +150,18 @@ int main() {
 // CHECK-NEXT: move NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: __CxxTemplateInst18NonTrivialTemplateI7TrivialE(x: __C.Trivial(x: 42, y: -942))
+// CHECK-NEXT: NonTrivialTemplate<Trivial>(x: __C.Trivial(x: 42, y: -942))
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: done non trivial
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: GENERIC __CxxTemplateInst18NonTrivialTemplateI7TrivialE(x: __C.Trivial(x: 42, y: -1884))
+// CHECK-NEXT: GENERIC NonTrivialTemplate<Trivial>(x: __C.Trivial(x: 42, y: -1884))
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: copy NonTrivialTemplate
 // CHECK-NEXT: move NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: __CxxTemplateInst18NonTrivialTemplateI7TrivialE(x: __C.Trivial(x: 42, y: -1884))
+// CHECK-NEXT: NonTrivialTemplate<Trivial>(x: __C.Trivial(x: 42, y: -1884))
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: secondon non trivial
