@@ -641,6 +641,21 @@ namespace {
                                         IGF.IGM.DataLayout);
         args.push_back(implicitParam);
       }
+      bool canThrow = false;
+      if (auto *fpt =
+              destructor->getType()->getAs<clang::FunctionProtoType>()) {
+        if (!fpt->isNothrow())
+          canThrow = true;
+      }
+      if (canThrow) {
+        auto *invokeNormalDest = IGF.createBasicBlock("invoke.cont");
+        auto *invokeUnwindDest = IGF.createExceptionUnwindBlock();
+        IGF.Builder.createInvoke(destructorFnAddr->getFunctionType(),
+                                 destructorFnAddr, args, invokeNormalDest,
+                                 invokeUnwindDest);
+        IGF.Builder.emitBlock(invokeNormalDest);
+        return;
+      }
 
       IGF.Builder.CreateCall(destructorFnAddr->getFunctionType(),
                              destructorFnAddr, args);

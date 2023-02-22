@@ -89,6 +89,22 @@ public:
   }
 };
 
+class ClassWithDestructor {
+  int m = 0;
+public:
+  inline ~ClassWithDestructor() {
+    (void)freeFunctionNoThrow(0);
+  }
+};
+
+class ClassWithThrowingDestructor {
+  int m = 0;
+public:
+  inline ~ClassWithThrowingDestructor() noexcept(false) {
+    throw 2;
+  }
+};
+
 //--- test.swift
 
 import CxxModule
@@ -155,6 +171,14 @@ func testSubscriptThunkInvoke() -> CInt {
   return v[0]
 }
 
+func testClassWithDestructor() {
+  let _ = ClassWithDestructor()
+}
+
+func testClassWithThrowingDestructor() {
+  let _ = ClassWithThrowingDestructor()
+}
+
 let _ = testFreeFunctionNoThrowOnly()
 let _ = testFreeFunctionCalls()
 let _ = testMethodCalls()
@@ -163,6 +187,8 @@ testFuncPtrCall()
 testCFuncPtrCall()
 testProtocolConformanceThunkInvoke()
 let _ = testSubscriptThunkInvoke()
+testClassWithDestructor()
+testClassWithThrowingDestructor()
 
 // CHECK: define {{.*}} @"$s4test0A23FreeFunctionNoThrowOnlys5Int32VyF"() #[[#SWIFTMETA:]] {
 // CHECK-NEXT: :
@@ -257,7 +283,7 @@ let _ = testSubscriptThunkInvoke()
 // CHECK-NEXT: ret i32
 // CHECK-EMPTY:
 // CHECK-NEXT: [[UNWIND30]]:
-// CHECK-NEXT: %4 = landingpad { i8*, i32 }
+// CHECK-NEXT: landingpad { i8*, i32 }
 // CHECK-NEXT:    catch i8* null
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: unreachable
@@ -269,6 +295,23 @@ let _ = testSubscriptThunkInvoke()
 
 // CHECK: define {{.*}} @"$s4test0A20SubscriptThunkInvokes5Int32VyF"() #[[#SWIFTUWMETA]]
 // CHECK: invoke i32 @_ZNK18ClassWithSubscriptixEi
+
+// CHECK: define {{.*}} @"$s4test0A19ClassWithDestructoryyF"() #[[#SWIFTMETA]]
+// CHECK-NOT: invoke
+// CHECK: }
+
+// CHECK: define {{.*}} @"$s4test0A27ClassWithThrowingDestructoryyF"() #[[#SWIFTUWMETA]]
+// CHECK: invoke {{.*}} @_ZN27ClassWithThrowingDestructorD{{.*}}(
+// CHECK-NEXT:  to label %[[CONT40:.*]] unwind label %[[UNWIND40:.*]]
+// CHECK: [[CONT40]]:
+// CHECK: ret void
+// CHECK-EMPTY:
+// CHECK-NEXT: [[UNWIND40]]:
+// CHECK-NEXT: landingpad { i8*, i32 }
+// CHECK-NEXT:    catch i8* null
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+// CHECK-NEXT: }
 
 // CHECK: i32 @__gxx_personality_v0(...)
 

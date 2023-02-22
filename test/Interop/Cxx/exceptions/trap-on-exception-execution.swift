@@ -88,4 +88,9 @@ TrapOnExecutionTestSuite.test("TestClassWithSubscript") {
   let _ = v[1]
 }
 
+TrapOnExecutionTestSuite.test("TestClassWithThrowingDestructor") {
+  expectCrashLater()
+  let _ = ClassWithThrowingDestructor()
+}
+
 runAllTests()

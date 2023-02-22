@@ -52,7 +52,7 @@ private:
   // Set calling convention of the call instruction using
   // the same calling convention as the callee function.
   // This ensures that they are always compatible.
-  void setCallingConvUsingCallee(llvm::CallInst *Call) {
+  void setCallingConvUsingCallee(llvm::CallBase *Call) {
     auto CalleeFn = Call->getCalledFunction();
     if (CalleeFn) {
       auto CC = CalleeFn->getCallingConv();
@@ -335,6 +335,17 @@ public:
     auto Call = IRBuilderBase::CreateCall(FTy, Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;
+  }
+
+  llvm::InvokeInst *
+  createInvoke(llvm::FunctionType *fTy, llvm::Constant *callee,
+               ArrayRef<llvm::Value *> args, llvm::BasicBlock *invokeNormalDest,
+               llvm::BasicBlock *invokeUnwindDest, const Twine &name = "") {
+    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
+    auto call = IRBuilderBase::CreateInvoke(fTy, callee, invokeNormalDest,
+                                            invokeUnwindDest, args, name);
+    setCallingConvUsingCallee(call);
+    return call;
   }
 
   llvm::CallBase *CreateCallOrInvoke(const FunctionPointer &fn,
