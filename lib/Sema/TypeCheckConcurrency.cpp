@@ -3451,7 +3451,7 @@ static Optional<ActorIsolation> getIsolationFromWrappers(
     return None;
 
   ASTContext &ctx = nominal->getASTContext();
-  if (ctx.isSwiftVersionAtLeast(6)) {
+  if (ctx.LangOpts.hasFeature(Feature::DisableActorInferenceFromPropertyWrapperUsage)) {
     // In Swift 6, we no longer infer isolation of a nominal type
     // based on the property wrappers used in its stored properties
     return None;
