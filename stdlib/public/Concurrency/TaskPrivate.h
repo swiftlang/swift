@@ -147,8 +147,13 @@ void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
 SWIFT_CC(swift)
 void removeStatusRecord(TaskStatusRecord *record);
 
-/// Add a status record to the current task. This must be called synchronously
-/// with the task.
+/// Add a status record to the input task.
+///
+/// Clients can optionally pass in the status of the task if they have already
+/// done the load on it already or if they require the oldStatus on the task
+/// prior to the atomic ActiveTaskStatus update that addStatusRecord will
+/// perform. This status will be updated with the last status on the task prior
+/// to updating it with the new status if the input function_ref allows so.
 ///
 /// This function also takes in a function_ref which is given the old
 /// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
@@ -162,9 +167,27 @@ void removeStatusRecord(TaskStatusRecord *record);
 /// If the function_ref returns false, the status record is not added to the
 /// task. This function_ref may be called multiple times and must be idempotent.
 /// The new status passed to `fn` is freshly derived from the current status and
-/// does not include modifications made by previous runs through the loop
+/// does not include modifications made by previous runs through the loop.
+///
+/// A convenience overload is also provided for clients who have not done the
+/// load on the task status prior to adding the record
 SWIFT_CC(swift)
-bool addStatusRecord(TaskStatusRecord *record,
+bool addStatusRecord(AsyncTask *task, TaskStatusRecord *record,
+     llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord);
+
+SWIFT_CC(swift)
+bool addStatusRecord(AsyncTask *task, TaskStatusRecord *record,
+     ActiveTaskStatus& taskStatus,
+     llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord);
+
+/// Convenience functions for clients who want to just add a record to the task
+/// on the current thread
+SWIFT_CC(swift)
+bool addStatusRecordToSelf(TaskStatusRecord *record,
+     llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord);
+
+SWIFT_CC(swift)
+bool addStatusRecordToSelf(TaskStatusRecord *record,  ActiveTaskStatus& taskStatus,
      llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord);
 
 /// A helper function for updating a new child task that is created with
@@ -958,17 +981,13 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
                   dependencyStatusRecord);
   assert(dependencyStatusRecord != NULL);
 
-  bool taskWasEscalated = false;
-  JobPriority taskStoredPriority = JobPriority::Unspecified;
+  auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+  // We can only be suspended if we were previously running. See state
+  // transitions listed out in Task.h
+  assert(oldStatus.isRunning() && !oldStatus.isEnqueued());
 
-  addStatusRecord(dependencyStatusRecord, [&](ActiveTaskStatus oldStatus,
+  addStatusRecord(this, dependencyStatusRecord, oldStatus, [&](ActiveTaskStatus unused,
                   ActiveTaskStatus &newStatus) {
-    // We can only be suspended if we were previously running. See state
-    // transitions listed out in Task.h
-    assert(oldStatus.isRunning() && !oldStatus.isEnqueued());
-    taskWasEscalated = oldStatus.isStoredPriorityEscalated();
-    taskStoredPriority = oldStatus.getStoredPriority();
-
     newStatus = newStatus.withRunning(false);
     newStatus = newStatus.withoutStoredPriorityEscalation();
     newStatus = newStatus.withTaskDependency();
@@ -985,7 +1004,7 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
     // published it in the ActiveTaskStatus.
     SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate the dependency %p of task %p",
                   dependencyStatusRecord, this);
-    dependencyStatusRecord->performEscalationAction(taskStoredPriority);
+    dependencyStatusRecord->performEscalationAction(newStatus.getStoredPriority());
 
     // Always add the dependency status record
     return true;
@@ -994,10 +1013,10 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   // Successfully dropped task drain lock, make sure to remove override on
   // thread due to task
-  if (taskWasEscalated) {
+  if (oldStatus.isStoredPriorityEscalated()) {
      SWIFT_TASK_DEBUG_LOG("[Override] Reset override %#x on thread from task %p",
-       taskStoredPriority, this);
-     swift_dispatch_lock_override_end((qos_class_t) taskStoredPriority);
+       oldStatus.getStoredPriority(), this);
+     swift_dispatch_lock_override_end((qos_class_t) oldStatus.getStoredPriority());
   }
 #endif
 
