@@ -20,7 +20,6 @@ distributed actor MyDistActor {
 // CHECK:  bb0([[ACTOR_ID_ARG:%[0-9]+]] : $ActorAddress, [[SYSTEM_ARG:%[0-9]+]] : $FakeRoundtripActorSystem, [[TYPE_ARG:%[0-9]+]] : $@thick MyDistActor.Type):
 // CHECK: [[SYS_RESOLVE_RESULT:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0a9RoundtripC6SystemC7resolve2id2asxSgAA0C7AddressV_xmtK0B00bC0RzlF
 
-// CHECK: // makeProxyBB
 // CHECK: [[ACTOR_INSTANCE:%[0-9]+]] = builtin "initializeDistributedRemoteActor"(%7 : $@thick MyDistActor.Type) : $MyDistActor
 // CHECK: [[ID_PROPERTY:%[0-9]+]] = ref_element_addr [[ACTOR_INSTANCE]] : $MyDistActor, #MyDistActor.id
 // CHECK: retain_value [[ACTOR_ID_ARG]] : $ActorAddress

@@ -143,12 +143,19 @@ private:
   /// The scope map that describes this source file.
   NullablePtr<ASTScope> Scope = nullptr;
 
+   /// The set of parsed decls with opaque return types that have not yet
+   /// been validated.
+   llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
+  
   /// The set of validated opaque return type decls in the source file.
   llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
   llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
-  /// The set of parsed decls with opaque return types that have not yet
-  /// been validated.
-  llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
+  /// The set of opaque type decls that have not yet been validated.
+  ///
+  /// \note This is populated as opaque type decls are created. Validation
+  /// requires mangling the naming decl, which would lead to circularity
+  /// if it were done from OpaqueResultTypeRequest.
+  llvm::SetVector<OpaqueTypeDecl *> UnvalidatedOpaqueReturnTypes;
 
   /// The set of declarations with valid runtime discoverable attributes
   /// located in the source file.
@@ -666,6 +673,10 @@ public:
   /// to something that won't be in the ASTScope tree.
   void addUnvalidatedDeclWithOpaqueResultType(ValueDecl *vd) {
     UnvalidatedDeclsWithOpaqueReturnTypes.insert(vd);
+  }
+
+  void addOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
+    UnvalidatedOpaqueReturnTypes.insert(decl);
   }
 
   ArrayRef<OpaqueTypeDecl *> getOpaqueReturnTypeDecls();
