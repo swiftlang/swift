@@ -712,10 +712,7 @@ extension Sequence {
     let underestimatedCount = self.underestimatedCount
     if underestimatedCount == 0 {
       var result = Array(self)
-      let count = result.count
-      for i in 0..<count/2 {
-        result.swapAt(i, count - ((i + 1) as Int))
-      }
+      result.reverse()
       return result
     } else {
       var iterator = makeIterator()
