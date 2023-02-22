@@ -32,16 +32,14 @@ namespace swift {
 /// context), partially initialized, and then atomically added to the task with
 /// `addStatusRecord`.
 ///
-/// Status records currently are only added to a task by itself but they may be
-/// removed from the task by other threads, or accessed by other threads
-/// asynchronous to the task for other purposes.
-///
-/// As a result, while registered with the task, a status record should only be
-/// modified in ways that respect the possibility of asynchronous access by a
-/// different thread.  In particular, the chain of status records must not be
-/// disturbed. When the task leaves the scope that requires the status record,
-/// the record can be unregistered from the task with `removeStatusRecord`, at
-/// which point the memory can be returned to the system.
+/// Status records can be added to or removed from  a task by itself or by other
+/// threads. As a result, while registered with the task, a status record
+/// should only be modified in ways that respect the possibility of asynchronous
+/// access by a different thread.  In particular, the chain of status records
+/// must not be disturbed. When the task leaves the scope that requires the
+/// status record, the record can be unregistered from the task with
+/// `removeStatusRecord`, at which point the memory can be returned to the
+/// system.
 class TaskStatusRecord {
 public:
   TaskStatusRecordFlags Flags;
