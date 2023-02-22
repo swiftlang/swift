@@ -306,6 +306,24 @@ bool Pattern::hasAnyMutableBindings() const {
   return HasMutable;
 }
 
+OptionalSomePattern *OptionalSomePattern::create(ASTContext &ctx,
+                                                 Pattern *subPattern,
+                                                 SourceLoc questionLoc) {
+  return new (ctx) OptionalSomePattern(ctx, subPattern, questionLoc);
+}
+
+OptionalSomePattern *
+OptionalSomePattern::createImplicit(ASTContext &ctx, Pattern *subPattern,
+                                    SourceLoc questionLoc) {
+  auto *P = OptionalSomePattern::create(ctx, subPattern, questionLoc);
+  P->setImplicit();
+  return P;
+}
+
+EnumElementDecl *OptionalSomePattern::getElementDecl() const {
+  return Ctx.getOptionalSomeDecl();
+}
+
 /// Return true if this is a non-resolved ExprPattern which is syntactically
 /// irrefutable.
 static bool isIrrefutableExprPattern(const ExprPattern *EP) {

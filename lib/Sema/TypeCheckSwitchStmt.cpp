@@ -1480,8 +1480,7 @@ namespace {
       }
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
-        auto &Ctx = OSP->getElementDecl()->getASTContext();
-        const Identifier name = Ctx.getOptionalSomeDecl()->getBaseIdentifier();
+        const Identifier name = OSP->getElementDecl()->getBaseIdentifier();
 
         auto subSpace = projectPattern(OSP->getSubPattern());
         // To match patterns like (_, _, ...)?, we must rewrite the underlying
