@@ -25,6 +25,8 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
   struct Result {
     /// The type associated with the code completion expression itself.
     Type ExpectedType;
+    /// The expected return type of the function call.
+    Type ExpectedCallType;
     /// True if this is a subscript rather than a function call.
     bool IsSubscript;
     /// The FuncDecl or SubscriptDecl associated with the call.

@@ -623,6 +623,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
 
     // If solve failed to generate constraints or with some other
     // issue, we need to fallback to type-checking a sub-expression.
+    cs.setSolutionApplicationTarget(target.getAsExpr(), target);
     if (!cs.solveForCodeCompletion(target, solutions))
       return CompletionResult::Fallback;
 

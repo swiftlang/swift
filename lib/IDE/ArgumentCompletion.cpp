@@ -78,6 +78,44 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
   return ShowGlobalCompletions;
 }
 
+/// Applies heuristic to determine whether the result type of \p E is
+/// unconstrained, that is if the constraint system is satisfiable for any
+/// result type of \p E.
+static bool isExpressionResultTypeUnconstrained(const Solution &S, Expr *E) {
+  ConstraintSystem &CS = S.getConstraintSystem();
+  if (auto ParentExpr = CS.getParentExpr(E)) {
+    if (auto Assign = dyn_cast<AssignExpr>(ParentExpr)) {
+      if (isa<DiscardAssignmentExpr>(Assign->getDest())) {
+        // _ = <expr> is unconstrained
+        return true;
+      }
+    } else if (isa<RebindSelfInConstructorExpr>(ParentExpr)) {
+      // super.init() is unconstrained (it always produces the correct result
+      // by definition)
+      return true;
+    }
+  }
+  auto targetIt = S.solutionApplicationTargets.find(E);
+  if (targetIt == S.solutionApplicationTargets.end()) {
+    return false;
+  }
+  auto target = targetIt->second;
+  assert(target.kind == SolutionApplicationTarget::Kind::expression);
+  switch (target.getExprContextualTypePurpose()) {
+  case CTP_Unused:
+    // If we aren't using the contextual type, its unconstrained by definition.
+    return true;
+  case CTP_Initialization: {
+    // let x = <expr> is unconstrained
+    auto contextualType = target.getExprContextualType();
+    return !contextualType || contextualType->is<UnresolvedType>();
+  }
+  default:
+    // Assume that it's constrained by default.
+    return false;
+  }
+}
+
 void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
@@ -110,6 +148,11 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     return;
   }
   auto ArgIdx = ArgInfo->completionIdx;
+
+  Type ExpectedCallType;
+  if (!isExpressionResultTypeUnconstrained(S, ParentCall)) {
+    ExpectedCallType = getTypeForCompletion(S, ParentCall);
+  }
 
   auto *CallLocator = CS.getConstraintLocator(ParentCall);
   auto *CalleeLocator = S.getCalleeLocator(CallLocator);
@@ -189,10 +232,10 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   if (Info.ValueTy) {
     FuncTy = Info.ValueTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
   }
-  Results.push_back({ExpectedTy, isa<SubscriptExpr>(ParentCall), Info.Value,
-                     FuncTy, ArgIdx, ParamIdx, std::move(ClaimedParams),
-                     IsNoninitialVariadic, Info.BaseTy, HasLabel, IsAsync,
-                     SolutionSpecificVarTypes});
+  Results.push_back({ExpectedTy, ExpectedCallType,
+                     isa<SubscriptExpr>(ParentCall), Info.Value, FuncTy, ArgIdx,
+                     ParamIdx, std::move(ClaimedParams), IsNoninitialVariadic,
+                     Info.BaseTy, HasLabel, IsAsync, SolutionSpecificVarTypes});
 }
 
 void ArgumentTypeCheckCompletionCallback::deliverResults(
@@ -205,10 +248,18 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
 
   // Perform global completion as a fallback if we don't have any results.
   bool shouldPerformGlobalCompletion = Results.empty();
+  SmallVector<Type, 4> ExpectedCallTypes;
+  for (auto &Result : Results) {
+    ExpectedCallTypes.push_back(Result.ExpectedCallType);
+  }
+
   SmallVector<Type, 8> ExpectedTypes;
 
   if (IncludeSignature && !Results.empty()) {
     Lookup.setHaveLParen(true);
+    Lookup.setExpectedTypes(ExpectedCallTypes,
+                            /*isImplicitSingleExpressionReturn=*/false);
+
     for (auto &Result : Results) {
       auto SemanticContext = SemanticContextKind::None;
       NominalTypeDecl *BaseNominal = nullptr;
