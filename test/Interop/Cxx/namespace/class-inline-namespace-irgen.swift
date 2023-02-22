@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-emit-ir -I %t/Inputs -enable-experimental-cxx-interop %t/test.swift | %FileCheck %t/test.swift
+// RUN: %target-swift-emit-ir -I %t/Inputs -enable-experimental-cxx-interop %t/test.swift -Xcc -fignore-exceptions | %FileCheck %t/test.swift
 
 
 //--- Inputs/module.modulemap

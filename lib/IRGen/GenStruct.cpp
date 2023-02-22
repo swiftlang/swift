@@ -642,10 +642,12 @@ namespace {
         args.push_back(implicitParam);
       }
       bool canThrow = false;
-      if (auto *fpt =
-              destructor->getType()->getAs<clang::FunctionProtoType>()) {
-        if (!fpt->isNothrow())
-          canThrow = true;
+      if (IGF.IGM.isForeignExceptionHandlingEnabled()) {
+        if (auto *fpt =
+                destructor->getType()->getAs<clang::FunctionProtoType>()) {
+          if (!fpt->isNothrow())
+            canThrow = true;
+        }
       }
       if (canThrow) {
         IGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
