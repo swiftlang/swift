@@ -81,6 +81,14 @@ CFreeFunctionTy getCFreeFunctionPointer() noexcept;
 
 }
 
+class ClassWithSubscript {
+  int m = 0;
+public:
+  int operator[](int x) const {
+    return freeFunctionThrows(x);
+  }
+};
+
 //--- test.swift
 
 import CxxModule
@@ -142,6 +150,11 @@ func testProtocolConformanceThunkInvoke() {
   let _ = p.method(2)
 }
 
+func testSubscriptThunkInvoke() -> CInt {
+  let v = ClassWithSubscript()
+  return v[0]
+}
+
 let _ = testFreeFunctionNoThrowOnly()
 let _ = testFreeFunctionCalls()
 let _ = testMethodCalls()
@@ -149,6 +162,7 @@ testTemplateCalls()
 testFuncPtrCall()
 testCFuncPtrCall()
 testProtocolConformanceThunkInvoke()
+let _ = testSubscriptThunkInvoke()
 
 // CHECK: define {{.*}} @"$s4test0A23FreeFunctionNoThrowOnlys5Int32VyF"() #[[#SWIFTMETA:]] {
 // CHECK-NEXT: :
@@ -252,6 +266,9 @@ testProtocolConformanceThunkInvoke()
 // CHECK: define {{.*}} @"$s4test0A30ProtocolConformanceThunkInvokeyyF"() #[[#SWIFTMETA]]
 // CHECK-NOT: invoke
 // CHECK: }
+
+// CHECK: define {{.*}} @"$s4test0A20SubscriptThunkInvokes5Int32VyF"() #[[#SWIFTUWMETA]]
+// CHECK: invoke i32 @_ZNK18ClassWithSubscriptixEi
 
 // CHECK: i32 @__gxx_personality_v0(...)
 
