@@ -1077,7 +1077,7 @@ public:
   }
 
   void processClassMethod(DeclRefExpr *e, AbstractFunctionDecl *afd) {
-    assert(!afd->isBackDeployed() &&
+    assert(!afd->hasBackDeployedAttr() &&
            "cannot back deploy dynamically dispatched methods");
 
     ArgumentSource selfArgSource(selfApply->getBase());
