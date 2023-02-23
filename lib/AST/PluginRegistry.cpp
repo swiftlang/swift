@@ -50,14 +50,13 @@ llvm::Error PluginRegistry::loadLibraryPlugin(StringRef path) {
 #if defined(_WIN32)
   lib = LoadLibraryA(path.str().c_str());
   if (!lib) {
-    return llvm::createStringError(std::errc::not_supported, "failed");
-    return true;
+    std::error_code ec(GetLastError(), std::system_category());
+    return llvm::errorCodeToError(ec);
   }
 #else
   lib = dlopen(path.str().c_str(), RTLD_LAZY | RTLD_LOCAL);
   if (!lib) {
-    return llvm::createStringError(std::errc::not_supported,
-                                   "unsupported platform");
+    return llvm::createStringError(std::error_code(), dlerror());
   }
 #endif
   LoadedPluginLibraries.insert({path, lib});
