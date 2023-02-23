@@ -15,17 +15,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
-#include "swift/Basic/StringExtras.h"
-#include "swift/AST/ASTWalker.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/SourceFile.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/StringExtras.h"
+#include "swift/Subsystems.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <utility>
 using namespace swift;
@@ -146,85 +147,6 @@ lookupEnumMemberElement(DeclContext *DC, Type ty,
   return filterForEnumElement(DC, UseLoc,
                               /*unqualifiedLookup=*/false, foundElements);
 }
-
-namespace {
-/// Build up an \c DeclRefTypeRepr and see what it resolves to.
-/// FIXME: Support DeclRefTypeRepr nodes with non-identifier base components.
-struct ExprToDeclRefTypeRepr : public ASTVisitor<ExprToDeclRefTypeRepr, bool> {
-  SmallVectorImpl<IdentTypeRepr *> &components;
-  ASTContext &C;
-
-  ExprToDeclRefTypeRepr(decltype(components) &components, ASTContext &C)
-      : components(components), C(C) {}
-
-  bool visitExpr(Expr *e) {
-    return false;
-  }
-  
-  bool visitTypeExpr(TypeExpr *te) {
-    if (auto *TR = te->getTypeRepr())
-      if (auto *ITR = dyn_cast<IdentTypeRepr>(TR)) {
-        components.push_back(ITR);
-        return true;
-      }
-    return false;
-  }
-
-  bool visitDeclRefExpr(DeclRefExpr *dre) {
-    assert(components.empty() && "decl ref should be root element of expr");
-    
-    // Get the declared type.
-    if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
-      components.push_back(
-        new (C) SimpleIdentTypeRepr(dre->getNameLoc(), td->createNameRef()));
-      components.back()->setValue(td, nullptr);
-      return true;
-    }
-    return false;
-  }
-  
-  bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
-    assert(components.empty() && "decl ref should be root element of expr");
-    // Track the AST location of the component.
-    components.push_back(
-      new (C) SimpleIdentTypeRepr(udre->getNameLoc(),
-                                  udre->getName()));
-    return true;
-  }
-  
-  bool visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    if (!visit(ude->getBase()))
-      return false;
-    
-    assert(!components.empty() && "no components before dot expr?!");
-
-    // Track the AST location of the new component.
-    components.push_back(
-      new (C) SimpleIdentTypeRepr(ude->getNameLoc(),
-                                  ude->getName()));
-    return true;
-  }
-  
-  bool visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *use) {
-    if (!visit(use->getSubExpr()))
-      return false;
-    
-    assert(!components.empty() && "no components before generic args?!");
-    
-    // Track the AST location of the generic arguments.
-    auto origComponent = components.back();
-    components.back() =
-      GenericIdentTypeRepr::create(C, origComponent->getNameLoc(),
-                                   origComponent->getNameRef(),
-                                   use->getUnresolvedParams(),
-                                   SourceRange(use->getLAngleLoc(),
-                                               use->getRAngleLoc()));
-
-    return true;
-  }
-};
-} // end anonymous namespace
-
 
 namespace {
   class UnresolvedPatternFinder : public ASTWalker {
@@ -448,16 +370,19 @@ public:
                                        bindExpr->getQuestionLoc());
   }
 
-  // Convert a x? to OptionalSome pattern.  In the AST form, this will look like
-  // an OptionalEvaluationExpr with an immediate BindOptionalExpr inside of it.
+  // - 'x?' forms an OptionalSome pattern.  In the AST form, this will look like
+  //   an OptionalEvaluationExpr with an immediate BindOptionalExpr inside
+  //   of it.
+  // - Expressions like 'x?.y' might form an EnumElementPattern pattern.
   Pattern *visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
     auto *subExpr = E->getSubExpr();
-    // We only handle the case where one or more bind expressions are subexprs
-    // of the optional evaluation.  Other cases are not simple postfix ?'s.
-    if (!isa<BindOptionalExpr>(subExpr->getSemanticsProvidingExpr()))
-      return nullptr;
 
-    return convertBindingsToOptionalSome(subExpr);
+    // Handle the case where one or more bind expressions are subexprs of the
+    // optional evaluation.  Other cases are not simple postfix '?'s.
+    if (isa<BindOptionalExpr>(subExpr->getSemanticsProvidingExpr()))
+      return convertBindingsToOptionalSome(subExpr);
+
+    return visit(subExpr);
   }
 
 
@@ -475,14 +400,17 @@ public:
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    SmallVector<IdentTypeRepr *, 2> components;
-    if (!ExprToDeclRefTypeRepr(components, Context).visit(ude->getBase()))
+    // In synthesized code this will have been a pattern from the get-go.
+    if (ude->isImplicit())
+      return nullptr;
+
+    auto *repr = swift::parseSimpleTypeInRange(
+        DC->getParentSourceFile(), ude->getBase()->getSourceRange());
+    if (!repr)
       return nullptr;
 
     const auto options =
         TypeResolutionOptions(None) | TypeResolutionFlags::SilenceErrors;
-
-    DeclRefTypeRepr *repr = MemberTypeRepr::create(Context, components);
 
     // See if the repr resolves to a type.
     const auto ty = TypeResolution::resolveContextualType(
@@ -576,19 +504,25 @@ public:
       return P;
     }
 
-    SmallVector<IdentTypeRepr *, 2> components;
-    if (!ExprToDeclRefTypeRepr(components, Context).visit(ce->getFn()))
-      return nullptr;
-    
-    if (components.empty())
+    // In synthesized code this will have been a pattern from the get-go.
+    if (ce->isImplicit())
       return nullptr;
 
-    auto tailComponent = components.pop_back_val();
+    auto *repr =
+        dyn_cast_or_null<DeclRefTypeRepr>(swift::parseSimpleTypeInRange(
+            DC->getParentSourceFile(), ce->getFn()->getSourceRange()));
+    if (!repr)
+      return nullptr;
+
+    auto *const tailComponent = repr->getLastComponent();
+    assert(!isa<GenericIdentTypeRepr>(tailComponent) &&
+           "should be handled above");
+
     EnumElementDecl *referencedElement = nullptr;
     TypeExpr *baseTE = nullptr;
 
-    if (components.empty()) {
-      // Only one component. Try looking up an enum element in context.
+    if (isa<SimpleIdentTypeRepr>(repr)) {
+      // A simple identifier. Try looking up an enum element in context.
       referencedElement
         = lookupUnqualifiedEnumMemberElement(DC, tailComponent->getNameRef(),
                                              tailComponent->getLoc());
@@ -604,7 +538,13 @@ public:
 
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
-      DeclRefTypeRepr *prefixRepr = MemberTypeRepr::create(Context, components);
+      TypeRepr *prefixRepr = nullptr;
+      {
+        auto *memberRepr = cast<MemberTypeRepr>(repr);
+        prefixRepr = MemberTypeRepr::create(
+            Context, memberRepr->getBaseComponent(),
+            memberRepr->getMemberComponents().drop_back());
+      }
 
       // See first if the entire repr resolves to a type.
       const Type enumTy = TypeResolution::resolveContextualType(
@@ -636,8 +576,6 @@ public:
     }
 
     assert(baseTE && baseTE->getType() && "Didn't initialize base expression?");
-    assert(!isa<GenericIdentTypeRepr>(tailComponent) &&
-           "should be handled above");
 
     auto *subPattern = composeTupleOrParenPattern(ce->getArgs());
     return new (Context) EnumElementPattern(

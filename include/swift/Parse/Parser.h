@@ -119,6 +119,7 @@ class Parser {
   std::vector<Token> SplitTokens;
 
 public:
+  ASTContext &Context;
   SourceManager &SourceMgr;
   DiagnosticEngine &Diags;
   SourceFile &SF;
@@ -127,7 +128,6 @@ public:
   PersistentParserState *State;
   std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
-  ASTContext &Context;
   IDEInspectionCallbacks *IDECallbacks = nullptr;
   std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
@@ -362,13 +362,13 @@ public:
   bool AvailabilityMacrosComputed = false;
 
 public:
-  Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
-         SILParserStateBase *SIL, PersistentParserState *PersistentState);
-  Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
-         PersistentParserState *PersistentState = nullptr);
-  Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
-         SILParserStateBase *SIL = nullptr,
-         PersistentParserState *PersistentState = nullptr);
+  Parser(unsigned BufferID, SourceFile &SF, bool EnableLexerDiags,
+         Optional<SourceRange> LexerRange = None,
+         PersistentParserState *PersistentState = nullptr,
+         SILParserStateBase *SIL = nullptr);
+  Parser(unsigned BufferID, SourceFile &SF,
+         PersistentParserState *PersistentState = nullptr,
+         SILParserStateBase *SIL = nullptr);
   ~Parser();
 
   /// Returns true if the buffer being parsed is allowed to contain SIL.

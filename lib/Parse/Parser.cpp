@@ -15,8 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParseRequests.h"
@@ -25,16 +25,17 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 
 static void getStringPartTokens(const swift::Token &Tok,
                                 const swift::LangOptions &LangOpts,
@@ -124,7 +125,7 @@ bool IDEInspectionSecondPassRequest::evaluate(
   auto &Ctx = SF->getASTContext();
 
   auto BufferID = Ctx.SourceMgr.getIDEInspectionTargetBufferID();
-  Parser TheParser(BufferID, *SF, nullptr, parserState);
+  Parser TheParser(BufferID, *SF, parserState);
 
   std::unique_ptr<IDEInspectionCallbacks> IDECallbacks(
       Factory->createIDEInspectionCallbacks(TheParser));
@@ -329,25 +330,10 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
   llvm_unreachable("covered switch");
 }
 
-Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
-               PersistentParserState *PersistentState)
-    : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState) {}
-
-Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
-               SILParserStateBase *SIL,
-               PersistentParserState *PersistentState)
-    : Parser(
-          std::unique_ptr<Lexer>(new Lexer(
-              SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
-              BufferID, LexerDiags,
-              sourceFileKindToLexerMode(SF.Kind),
-              SF.Kind == SourceFileKind::Main
-                  ? HashbangMode::Allowed
-                  : HashbangMode::Disallowed,
-              SF.getASTContext().LangOpts.AttachCommentsToDecls
-                  ? CommentRetentionMode::AttachToNextToken
-                  : CommentRetentionMode::None)),
-          SF, SIL, PersistentState) {}
+Parser::Parser(unsigned BufferID, SourceFile &SF,
+               PersistentParserState *PersistentState, SILParserStateBase *SIL)
+    : Parser(BufferID, SF, /*EnableLexerDiags=*/true, /*LexerRange=*/None,
+             PersistentState, SIL) {}
 
 namespace {
 
@@ -473,15 +459,25 @@ public:
 };
 } // End of an anonymous namespace.
 
-Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
-               SILParserStateBase *SIL, PersistentParserState *PersistentState)
-    : SourceMgr(SF.getASTContext().SourceMgr), Diags(SF.getASTContext().Diags),
-      SF(SF), L(Lex.release()), SIL(SIL), CurDeclContext(&SF),
-      Context(SF.getASTContext()),
-      TokReceiver(SF.shouldCollectTokens()
-                      ? new TokenRecorder(SF.getASTContext(), *L)
-                      : new ConsumeTokenReceiver()) {
-  State = PersistentState;
+Parser::Parser(unsigned BufferID, SourceFile &SF, bool EnableLexerDiags,
+               Optional<SourceRange> LexerSourceRange,
+               PersistentParserState *PersistentState, SILParserStateBase *SIL)
+    : Context(SF.getASTContext()), SourceMgr(Context.SourceMgr),
+      Diags(Context.Diags), SF(SF),
+      L(new Lexer(Context.LangOpts, SourceMgr, BufferID,
+                  EnableLexerDiags ? &Diags : nullptr,
+                  sourceFileKindToLexerMode(SF.Kind),
+                  SF.Kind == SourceFileKind::Main ? HashbangMode::Allowed
+                                                  : HashbangMode::Disallowed,
+                  Context.LangOpts.AttachCommentsToDecls
+                      ? CommentRetentionMode::AttachToNextToken
+                      : CommentRetentionMode::None,
+                  LexerSourceRange ? Lexer::getCharSourceRangeFromSourceRange(
+                                         SourceMgr, LexerSourceRange.getValue())
+                                   : Optional<CharSourceRange>())),
+      SIL(SIL), State(PersistentState), CurDeclContext(&SF),
+      TokReceiver(SF.shouldCollectTokens() ? new TokenRecorder(Context, *L)
+                                           : new ConsumeTokenReceiver()) {
   if (!State) {
     OwnedState.reset(new PersistentParserState());
     State = OwnedState.get();
@@ -1164,24 +1160,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
                        const SILOptions &SILOpts, StringRef ModuleName)
     : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, TypeCheckOpts,
                                SILOpts, ModuleName)) {
-  Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
-                                  /*PersistentState=*/nullptr));
-}
-
-ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
-                       unsigned BufferID, unsigned Offset, unsigned EndOffset)
-    : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
-                               TypeCheckerOptions(), SILOptions(), "input")) {
-
-  std::unique_ptr<Lexer> Lex;
-  Lex.reset(new Lexer(Impl.LangOpts, SM,
-                      BufferID, &Impl.Diags,
-                      LexerMode::Swift,
-                      HashbangMode::Allowed,
-                      CommentRetentionMode::None,
-                      Offset, EndOffset));
-  Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,
-                                  /*PersistentState=*/nullptr));
+  Impl.TheParser.reset(new Parser(BufferID, *Impl.SF));
 }
 
 ParserUnit::~ParserUnit() {
@@ -1218,6 +1197,23 @@ const LangOptions &ParserUnit::getLangOptions() const {
 
 SourceFile &ParserUnit::getSourceFile() {
   return *Impl.SF;
+}
+
+TypeRepr *swift::parseSimpleTypeInRange(SourceFile *SF, SourceRange Range) {
+  Parser parser(*SF->getBufferID(), *SF, /*EnableLexerDiags=*/false, Range);
+
+  // Prime the lexer.
+  parser.consumeTokenWithoutFeedingReceiver();
+
+  Optional<DiagnosticSuppression> suppression;
+  suppression.emplace(SF->getASTContext().Diags);
+
+  auto result = parser.parseTypeSimple(diag::expected_type,
+                                       Parser::ParseTypeReason::Unspecified);
+  if (result.isParseError())
+    return nullptr;
+
+  return result.getPtrOrNull();
 }
 
 ParsedDeclName swift::parseDeclName(StringRef name) {

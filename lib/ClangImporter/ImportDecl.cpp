@@ -7408,8 +7408,8 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
           *MappedDecl->getDeclContext()->getParentModule());
 
       // Spin up a parser.
-      swift::Parser parser(
-          bufferID, sourceFile, &SwiftContext.Diags, nullptr, nullptr);
+      swift::Parser parser(bufferID, sourceFile);
+
       // Prime the lexer.
       parser.consumeTokenWithoutFeedingReceiver();
 

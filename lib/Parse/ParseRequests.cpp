@@ -73,7 +73,7 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
 
   // Lexer diagnostics have been emitted during skipping, so we disable lexer's
   // diagnostic engine here.
-  Parser parser(bufferID, *sf, /*No Lexer Diags*/nullptr, nullptr, nullptr);
+  Parser parser(bufferID, *sf, /*EnableLexerDiags=*/false);
   auto declsAndHash = parser.parseDeclListDelayed(idc);
   FingerprintAndMembers fingerprintAndMembers = {declsAndHash.second,
                                                  declsAndHash.first};
@@ -115,7 +115,7 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
     SourceManager &sourceMgr = sf.getASTContext().SourceMgr;
     unsigned bufferID =
         sourceMgr.findBufferContainingLoc(afd->getBodySourceRange().Start);
-    Parser parser(bufferID, sf, /*SIL*/ nullptr);
+    Parser parser(bufferID, sf);
     auto result = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
     return result;
@@ -161,7 +161,7 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
     SF->setDelayedParserState({state, &deletePersistentParserState});
   }
 
-  Parser parser(*bufferID, *SF, /*SIL*/ nullptr, state);
+  Parser parser(*bufferID, *SF, state);
   PrettyStackTraceParser StackTrace(parser);
 
   // If the buffer is generated source information, we might have more

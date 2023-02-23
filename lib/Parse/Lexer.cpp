@@ -228,14 +228,33 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
          "or we should be lexing from the middle of the buffer");
 }
 
+void Lexer::initialize(Optional<CharSourceRange> OptRange) {
+  if (!OptRange) {
+    unsigned EndOffset = SourceMgr.getRangeForBuffer(BufferID).getByteLength();
+    initialize(/*Offset=*/0, EndOffset);
+    return;
+  }
+
+  auto Range = OptRange.getValue();
+  assert(BufferID == SourceMgr.findBufferContainingLoc(Range.getStart()) &&
+         "location for the wrong buffer");
+  assert(BufferID == SourceMgr.findBufferContainingLoc(Range.getEnd()) &&
+         "location for the wrong buffer");
+
+  unsigned Offset = SourceMgr.getLocOffsetInBuffer(Range.getStart(), BufferID);
+  unsigned EndOffset = Offset + Range.getByteLength();
+
+  initialize(Offset, EndOffset);
+}
+
 Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
              unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
              HashbangMode HashbangAllowed,
-             CommentRetentionMode RetainComments)
+             CommentRetentionMode RetainComments,
+             Optional<CharSourceRange> Range)
     : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, LexMode,
             HashbangAllowed, RetainComments) {
-  unsigned EndOffset = SourceMgr.getRangeForBuffer(BufferID).getByteLength();
-  initialize(/*Offset=*/0, EndOffset);
+  initialize(Range);
 }
 
 Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
@@ -256,14 +275,7 @@ Lexer::Lexer(const Lexer &Parent, State BeginState, State EndState,
                 ? HashbangMode::Allowed
                 : HashbangMode::Disallowed,
             Parent.RetainComments) {
-  assert(BufferID == SourceMgr.findBufferContainingLoc(BeginState.Loc) &&
-         "state for the wrong buffer");
-  assert(BufferID == SourceMgr.findBufferContainingLoc(EndState.Loc) &&
-         "state for the wrong buffer");
-
-  unsigned Offset = SourceMgr.getLocOffsetInBuffer(BeginState.Loc, BufferID);
-  unsigned EndOffset = SourceMgr.getLocOffsetInBuffer(EndState.Loc, BufferID);
-  initialize(Offset, EndOffset);
+  initialize(CharSourceRange(SourceMgr, BeginState.Loc, EndState.Loc));
 }
 
 InFlightDiagnostic Lexer::diagnose(const char *Loc, Diagnostic Diag) {
