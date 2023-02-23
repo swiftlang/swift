@@ -107,7 +107,7 @@ struct S3 {
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=4:8 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=EXPAND %s
 
 // EXPAND: source.edit.kind.active:
-// EXPAND-NEXT: 4:7-4:24 "(a + b, "a + b")"
+// EXPAND-NEXT: 4:7-4:24 (@__swiftmacro_9MacroUser13testStringify1a1bySi_SitF9stringifyfMf_.swift) "(a + b, "a + b")"
 
 //##-- cursor-info at 'myTypeWrapper' position following @. We don't support
 // on the @ currently.
@@ -130,46 +130,51 @@ struct S3 {
 //##-- Refactoring expanding the attached macro
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=21:2 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ATTACHED_EXPAND %s
 // ATTACHED_EXPAND: source.edit.kind.active:
-// ATTACHED_EXPAND:   23:3-23:3 "@accessViaStorage "
-// ATTACHED_EXPAND: source.edit.kind.active:
-// ATTACHED_EXPAND:   24:3-24:3 "@accessViaStorage "
-// ATTACHED_EXPAND: source.edit.kind.active:
-// ATTACHED_EXPAND:   22:11-22:11 "
-// ATTACHED_EXPAND: private var _storage = _Storage()
-// ATTACHED_EXPAND: source.edit.kind.active:
-// ATTACHED_EXPAND:   21:1-21:15 ""
+// ATTACHED_EXPAND-NEXT: 23:3-23:3 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMA_.swift) "@accessViaStorage "
+// ATTACHED_EXPAND-NEXT: source.edit.kind.active:
+// ATTACHED_EXPAND-NEXT: 24:3-24:3 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMA_.swift) "@accessViaStorage "
+// ATTACHED_EXPAND-NEXT: source.edit.kind.active:
+// ATTACHED_EXPAND-NEXT: 22:11-22:11 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMm_.swift) "
+// ATTACHED_EXPAND-NEXT: private var _storage = _Storage()
+// ATTACHED_EXPAND-NEXT: "
+// ATTACHED_EXPAND-NEXT: source.edit.kind.active:
+// ATTACHED_EXPAND-NEXT: 21:1-21:15 ""
 
 //##-- Refactoring expanding the first accessor macro
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=30:4 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ACCESSOR1_EXPAND %s
 // ACCESSOR1_EXPAND: source.edit.kind.active:
-// ACCESSOR1_EXPAND:   31:13-31:13 "{
-// ACCESSOR1_EXPAND:  get { _storage.x }
-// ACCESSOR1_EXPAND:  set { _storage.x = newValue }
-// ACCESSOR1_EXPAND: }"
-// ACCESSOR1_EXPAND: source.edit.kind.active:
-// ACCESSOR1_EXPAND:   30:3-30:20 ""
+// ACCESSOR1_EXPAND-NEXT: 31:13-31:13 (@__swiftmacro_9MacroUser2S2V1xSivp16accessViaStoragefMa_.swift) "{
+// ACCESSOR1_EXPAND-NEXT:  get { _storage.x }
+// ACCESSOR1_EXPAND-EMPTY:
+// ACCESSOR1_EXPAND-NEXT:  set { _storage.x = newValue }
+// ACCESSOR1_EXPAND-NEXT: }"
+// ACCESSOR1_EXPAND-NEXT: source.edit.kind.active:
+// ACCESSOR1_EXPAND-NEXT: 30:3-30:20 ""
 
 //##-- Refactoring expanding the second accessor macro
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=33:13 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ACCESSOR2_EXPAND %s
 // ACCESSOR2_EXPAND: source.edit.kind.active:
-// ACCESSOR2_EXPAND:   34:14-34:18 "{
-// ACCESSOR2_EXPAND:  get { _storage.y }
-// ACCESSOR2_EXPAND:  set { _storage.y = newValue }
-// ACCESSOR2_EXPAND: }"
-// ACCESSOR2_EXPAND: source.edit.kind.active:
-// ACCESSOR2_EXPAND:   33:3-33:20 ""
+// ACCESSOR2_EXPAND-NEXT: 34:14-34:18 (@__swiftmacro_9MacroUser2S2V1ySivp16accessViaStoragefMa_.swift) "{
+// ACCESSOR2_EXPAND-NEXT:  get { _storage.y }
+// ACCESSOR2_EXPAND-EMPTY:
+// ACCESSOR2_EXPAND-NEXT:  set { _storage.y = newValue }
+// ACCESSOR2_EXPAND-NEXT: }"
+// ACCESSOR2_EXPAND-NEXT: source.edit.kind.active:
+// ACCESSOR2_EXPAND-NEXT: 33:3-33:20 ""
 
 //##-- Refactoring expanding the second accessor macro
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=42:5 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=PEER_EXPAND %s
 // PEER_EXPAND: source.edit.kind.active:
-// PEER_EXPAND:   45:4-45:4 "
-// PEER_EXPAND: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
-// PEER_EXPAND:  Task {
-// PEER_EXPAND:    completionHandler(await f(a: a, for: b, value))
-// PEER_EXPAND:  }
-// PEER_EXPAND: }
-// PEER_EXPAND: source.edit.kind.active:
-// PEER_EXPAND:   42:3-42:24 ""
+// PEER_EXPAND-NEXT: 45:4-45:4 (@__swiftmacro_9MacroUser2S3V1f1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_.swift) "
+// PEER_EXPAND-EMPTY:
+// PEER_EXPAND-NEXT: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
+// PEER_EXPAND-NEXT:  Task {
+// PEER_EXPAND-NEXT:    completionHandler(await f(a: a, for: b, value))
+// PEER_EXPAND-NEXT:  }
+// PEER_EXPAND-NEXT: }
+// PEER_EXPAND-NEXT: "
+// PEER_EXPAND-NEXT: source.edit.kind.active:
+// PEER_EXPAND-NEXT: 42:3-42:24 ""
 
 //##-- Doc info, mostly just checking we don't crash because of the separate buffers
 // RUN: %sourcekitd-test -req=doc-info %s -- ${COMPILER_ARGS_WITHOUT_SOURCE[@]} | %FileCheck -check-prefix=DOCINFO %s
