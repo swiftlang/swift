@@ -651,7 +651,10 @@ void Plugin_unlock(PluginHandle handle) {
 bool Plugin_sendMessage(PluginHandle handle, const BridgedData data) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   StringRef message(data.baseAddress, data.size);
-  return bool(plugin->sendMessage(message));
+  auto error = plugin->sendMessage(message);
+  bool hadError = bool(error);
+  llvm::consumeError(std::move(error));
+  return hadError;
 }
 
 bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {

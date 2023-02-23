@@ -56,7 +56,7 @@ llvm::Error PluginRegistry::loadLibraryPlugin(StringRef path) {
 #else
   lib = dlopen(path.str().c_str(), RTLD_LAZY | RTLD_LOCAL);
   if (!lib) {
-    return llvm::createStringError(std::error_code(), dlerror());
+    return llvm::createStringError(llvm::inconvertibleErrorCode(), dlerror());
   }
 #endif
   LoadedPluginLibraries.insert({path, lib});
