@@ -53,8 +53,9 @@ class DiagnosticEmitter {
   bool emittedCheckerDoesntUnderstandDiagnostic = false;
 
 public:
-  void init(SILFunction *inputFn, OSSACanonicalizer *inputCanonicalizer) {
-    fn = inputFn;
+  DiagnosticEmitter(SILFunction *inputFn) : fn(inputFn) {}
+
+  void initCanonicalizer(OSSACanonicalizer *inputCanonicalizer) {
     canonicalizer = inputCanonicalizer;
   }
 
@@ -105,7 +106,10 @@ public:
                                           Operand *consumingUse,
                                           Operand *nonConsumingUse);
 
-  void emitAddressInstLoadedAndConsumed(MarkMustCheckInst *markedValue);
+  void emitAddressEscapingClosureCaptureLoadedAndConsumed(
+      MarkMustCheckInst *markedValue);
+  void emitPromotedBoxArgumentError(MarkMustCheckInst *markedValue,
+                                    SILFunctionArgument *arg);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing

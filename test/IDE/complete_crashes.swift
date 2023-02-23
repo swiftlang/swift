@@ -15,8 +15,8 @@ func badMembers1(_ a: BadMembers1) {
   a#^BAD_MEMBERS_1^#
 }
 // BAD_MEMBERS_1: Begin completions
-// BAD_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
-// BAD_MEMBERS_1-NEXT: Decl[Subscript]/CurrNominal:   [{#(i): Int#}][#Double#]{{; name=.+$}}
+// BAD_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
+// BAD_MEMBERS_1-DAG: Decl[Subscript]/CurrNominal:   [{#(i): Int#}][#Double#]{{; name=.+$}}
 // BAD_MEMBERS_1: End completions
 
 protocol BadMembers2 {
@@ -31,10 +31,10 @@ func badMembers2(_ a: BadMembers2) {
   a#^BAD_MEMBERS_2^#
 }
 // BAD_MEMBERS_2: Begin completions, 3 items
-// BAD_MEMBERS_2-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
-// BAD_MEMBERS_2-NEXT: Decl[Subscript]/CurrNominal:   [{#(i): Int#}][#Double#]{{; name=.+$}}
-// BAD_MEMBERS_2-NEXT: Keyword[self]/CurrNominal:     .self[#BadMembers2#]; name=self
-// BAD_MEMBERS_2-NEXT: End completions
+// BAD_MEMBERS_2-DAG: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
+// BAD_MEMBERS_2-DAG: Decl[Subscript]/CurrNominal:   [{#(i): Int#}][#Double#]{{; name=.+$}}
+// BAD_MEMBERS_2-DAG: Keyword[self]/CurrNominal:     .self[#BadMembers2#]; name=self
+// BAD_MEMBERS_2: End completions
 
 func globalFunc() {}
 

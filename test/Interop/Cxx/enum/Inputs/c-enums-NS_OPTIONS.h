@@ -78,3 +78,13 @@ typedef NS_OPTIONS(NSUInteger, Bar) {
   API_NOTES_NAMED_OptionFour = API_NOTES_NAMED_OptionOne |
                                API_NOTES_NAMED_OptionTwo
 };
+
+typedef NS_OPTIONS(NSUInteger, Baz) { Baz1, Baz2 };
+
+Baz CFunctionReturningNSOption();
+void CFunctionTakingNSOption(Baz);
+
+@interface NSOptionTypeCheckTest
++ (Baz)methodReturningNSOption;
++ (void)methodTakingNSOption:(Baz)baz;
+@end

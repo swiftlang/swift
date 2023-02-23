@@ -331,7 +331,7 @@ namespace swift {
     bool UseMalloc = false;
 
     /// Specifies how strict concurrency checking will be.
-    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Targeted;
+    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Minimal;
 
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
@@ -531,6 +531,9 @@ namespace swift {
 
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
+
+    /// Allows the explicit 'import Builtin' within Swift modules.
+    bool EnableBuiltinModule = false;
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;

@@ -14,14 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
-#include "TypeChecker.h"
-#include "TypeCheckObjC.h"
-#include "TypeCheckType.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
-#include "swift/AST/ASTWalker.h"
+#include "TypeCheckObjC.h"
+#include "TypeCheckType.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -37,13 +36,15 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Sema/IDETypeChecking.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CompletionContextFinder.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallSet.h"
@@ -565,7 +566,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
   {
     auto range = target.getSourceRange();
     if (range.isInvalid() ||
-        !Context.SourceMgr.rangeContainsIDEInspectionTarget(range))
+        !containsIDEInspectionTarget(range, Context.SourceMgr))
       return false;
   }
 

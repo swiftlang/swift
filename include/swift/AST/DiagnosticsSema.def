@@ -3893,6 +3893,9 @@ ERROR(optional_used_as_boolean,none,
 ERROR(integer_used_as_boolean,none,
      "type %0 cannot be used as a boolean; "
      "test for '%select{!|=}1= 0' instead", (Type, bool))
+ERROR(integer_used_as_boolean_literal,none,
+     "integer literal value '%0' cannot be used as a boolean; "
+     "did you mean '%select{false|true}1'?", (StringRef, bool))
 
 ERROR(interpolation_missing_proto,none,
       "string interpolation requires the protocol 'ExpressibleByStringInterpolation' to be defined",

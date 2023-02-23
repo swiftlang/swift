@@ -28,6 +28,19 @@ enum : UIControlState { UIControlState1, UIControlState2 };
 typedef int __attribute__((availability(swift, unavailable))) UITableViewCellStateMask;
 enum : UITableViewCellStateMask { UITableViewCellStateMask1, UITableViewCellStateMask2 };
 
+typedef int __attribute__((availability(swift, unavailable))) UIControlEvents;
+enum : UIControlEvents { UIControlEvents1, UIControlEvents2 };
+
+typedef int __attribute__((availability(swift, unavailable)))
+UITableViewScrollPosition;
+enum : UITableViewScrollPosition {
+  UITableViewScrollPosition1,
+  UITableViewScrollPosition2
+};
+
+@interface NSIndexPath
+@end
+
 @interface TestsForEnhancedOmitNeedlessWords
 - (void)differenceFromArray:(int)other withOptions:(NSOrderedCollectionDifferenceCalculationOptions)options ;
 - (unsigned)minimumRangeOfUnit:(NSCalendarUnit)unit;
@@ -35,4 +48,9 @@ enum : UITableViewCellStateMask { UITableViewCellStateMask1, UITableViewCellStat
 - (unsigned)layoutManager:(unsigned)layoutManager shouldUseAction:(NSControlCharacterAction)action ;
 - (void)setBackButtonBackgroundImage:(unsigned)backgroundImage forState:(UIControlState)state ;
 - (void)willTransitionToState:(UITableViewCellStateMask)state ;
+- (void)addTarget:(nullable id)target
+              action:(SEL)action
+    forControlEvents:(UIControlEvents)controlEvents;
+- (void)scrollToRowAtIndexPath:(NSIndexPath *)indexPath
+              atScrollPosition:(UITableViewScrollPosition)scrollPosition;
 @end
