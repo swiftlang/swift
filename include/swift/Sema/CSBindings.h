@@ -195,8 +195,7 @@ struct LiteralRequirement {
   /// \param canBeNil The flag that determines whether given type
   /// variable requires all of its bindings to be optional.
   ///
-  /// \param useDC The declaration context in which this literal
-  /// requirement is used.
+  /// \param CS The constraint system this literal requirement belongs to.
   ///
   /// \returns a pair of bool and a type:
   ///    - bool, true if binding covers given literal protocol;
@@ -204,14 +203,14 @@ struct LiteralRequirement {
   ///      to cover given literal protocol;
   std::pair<bool, Type> isCoveredBy(const PotentialBinding &binding,
                                     bool canBeNil,
-                                    DeclContext *useDC) const;
+                                    ConstraintSystem &CS) const;
 
   /// Determines whether literal protocol associated with this
   /// meta-information is viable for inclusion as a defaultable binding.
   bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
 
 private:
-  bool isCoveredBy(Type type, DeclContext *useDC) const;
+  bool isCoveredBy(Type type, ConstraintSystem &CS) const;
 };
 
 struct PotentialBindings {

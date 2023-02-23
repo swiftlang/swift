@@ -2250,6 +2250,10 @@ private:
   llvm::SmallMapVector<ConstraintLocator *, ArrayRef<OpenedType>, 4>
       OpenedTypes;
 
+  /// A dictionary of all conformances that have been looked up by the solver.
+  llvm::DenseMap<std::pair<TypeBase *, ProtocolDecl *>, ProtocolConformanceRef>
+      Conformances;
+
   /// The list of all generic requirements fixed along the current
   /// solver path.
   using FixedRequirement =
@@ -3946,7 +3950,7 @@ public:
   ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
-  Type getFixedTypeRecursive(Type type, bool wantRValue) const {
+  Type getFixedTypeRecursive(Type type, bool wantRValue) {
     TypeMatchOptions flags = llvm::None;
     return getFixedTypeRecursive(type, flags, wantRValue);
   }
@@ -3964,7 +3968,7 @@ public:
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
   Type getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
-                             bool wantRValue) const;
+                             bool wantRValue);
 
   /// Determine whether the given type variable occurs within the given type.
   ///
@@ -4197,6 +4201,10 @@ public:
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
          const OpenedTypeMap &replacements);
+
+  /// Check whether the given type conforms to the given protocol and if
+  /// so return a valid conformance reference.
+  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *P);
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.
@@ -4711,7 +4719,7 @@ public:
   ///
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type) const;
+  Type simplifyType(Type type);
 
   /// Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
@@ -4791,8 +4799,9 @@ private:
 
   /// Simplifies a type by replacing type variables with the result of
   /// \c getFixedTypeFn and performing lookup on dependent member types.
-  Type simplifyTypeImpl(Type type,
-      llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) const;
+  Type
+  simplifyTypeImpl(Type type,
+                   llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn);
 
   /// Attempt to simplify the given construction constraint.
   ///

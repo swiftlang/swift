@@ -1196,9 +1196,8 @@ llvm::Optional<Type> ConstraintSystem::isSetType(Type type) {
   return llvm::None;
 }
 
-Type ConstraintSystem::getFixedTypeRecursive(Type type,
-                                             TypeMatchOptions &flags,
-                                             bool wantRValue) const {
+Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
+                                             bool wantRValue) {
 
   if (wantRValue)
     type = type->getRValueType();
@@ -3822,7 +3821,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 namespace {
 
 struct TypeSimplifier {
-  const ConstraintSystem &CS;
+  ConstraintSystem &CS;
   llvm::function_ref<Type(TypeVariableType *)> GetFixedTypeFn;
 
   struct ActivePackExpansion {
@@ -3831,7 +3830,7 @@ struct TypeSimplifier {
   };
   SmallVector<ActivePackExpansion, 4> ActivePackExpansions;
 
-  TypeSimplifier(const ConstraintSystem &CS,
+  TypeSimplifier(ConstraintSystem &CS,
                  llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn)
     : CS(CS), GetFixedTypeFn(getFixedTypeFn) {}
 
@@ -3979,8 +3978,7 @@ struct TypeSimplifier {
       if (lookupBaseType->mayHaveMembers() ||
           lookupBaseType->is<PackType>()) {
         auto *proto = assocType->getProtocol();
-        auto conformance = CS.DC->getParentModule()->lookupConformance(
-          lookupBaseType, proto);
+        auto conformance = CS.lookupConformance(lookupBaseType, proto);
         if (!conformance) {
           // If the base type doesn't conform to the associatedtype's protocol,
           // there will be a missing conformance fix applied in diagnostic mode,
@@ -4011,11 +4009,11 @@ struct TypeSimplifier {
 } // end anonymous namespace
 
 Type ConstraintSystem::simplifyTypeImpl(Type type,
-    llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) const {
+    llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) {
   return type.transform(TypeSimplifier(*this, getFixedTypeFn));
 }
 
-Type ConstraintSystem::simplifyType(Type type) const {
+Type ConstraintSystem::simplifyType(Type type) {
   if (!type->hasTypeVariable())
     return type;
 
@@ -6098,15 +6096,12 @@ bool constraints::hasAppliedSelf(const OverloadChoice &choice,
 /// Check whether given type conforms to `RawRepresentable` protocol
 /// and return the witness type.
 Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
-  auto *DC = cs.DC;
-
   auto rawReprType = TypeChecker::getProtocol(
       cs.getASTContext(), SourceLoc(), KnownProtocolKind::RawRepresentable);
   if (!rawReprType)
     return Type();
 
-  auto conformance = TypeChecker::conformsToProtocol(type, rawReprType,
-                                                     DC->getParentModule());
+  auto conformance = cs.lookupConformance(type, rawReprType);
   if (conformance.isInvalid())
     return Type();
 
@@ -7342,6 +7337,21 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
   return true;
 }
 
+ProtocolConformanceRef
+ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
+  auto cacheKey = std::make_pair(type.getPointer(), protocol);
+
+  auto cachedConformance = Conformances.find(cacheKey);
+  if (cachedConformance != Conformances.end())
+    return cachedConformance->second;
+
+  auto conformance =
+      DC->getParentModule()->lookupConformance(type, protocol,
+                                               /*allowMissing=*/true);
+  Conformances[cacheKey] = conformance;
+  return conformance;
+}
+
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
     : BindingProducer(bindings.getConstraintSystem(),
                       bindings.getTypeVariable()->getImpl().getLocator()),
@@ -7474,7 +7484,7 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
     auto *proto = CS.getASTContext().getProtocol(
          KnownProtocolKind::ExpressibleByNilLiteral);
 
-    return !proto->getParentModule()->lookupConformance(type, proto);
+    return !CS.lookupConformance(type, proto);
   } else if (binding.isDefaultableBinding() && binding.BindingType->isAny()) {
     return true;
   }
