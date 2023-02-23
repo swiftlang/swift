@@ -199,6 +199,7 @@ import SuperChars
 import TwoSum
 import TypeFlood
 import UTF8Decode
+import UTF16Decode
 import Walsh
 import WordCount
 import XorLoop
@@ -393,6 +394,7 @@ register(SuperChars.benchmarks)
 register(TwoSum.benchmarks)
 register(TypeFlood.benchmarks)
 register(UTF8Decode.benchmarks)
+register(UTF16Decode.benchmarks)
 register(Walsh.benchmarks)
 register(WordCount.benchmarks)
 register(XorLoop.benchmarks)
