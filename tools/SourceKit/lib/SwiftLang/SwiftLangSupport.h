@@ -22,6 +22,7 @@
 #include "SourceKit/Support/Tracing.h"
 #include "SwiftInterfaceGenContext.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/Indenting.h"

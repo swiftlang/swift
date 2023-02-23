@@ -47,6 +47,7 @@ add_swift_host_library(swiftBasic STATIC
   Cache.cpp
   CBasicBridging.cpp
   ClusteredBitVector.cpp
+  CBasicBridging.cpp
   DiverseStack.cpp
   Edit.cpp
   EditorPlaceholder.cpp
@@ -66,6 +67,7 @@ add_swift_host_library(swiftBasic STATIC
   PrimitiveParsing.cpp
   Program.cpp
   QuotedString.cpp
+  Sandbox.cpp
   SourceLoc.cpp
   StableHasher.cpp
   Statistic.cpp
