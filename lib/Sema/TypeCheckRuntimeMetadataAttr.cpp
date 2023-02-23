@@ -78,12 +78,7 @@ static TypeRepr *buildTypeRepr(DeclContext *typeContext,
   // Reverse the components to form a valid outer-to-inner name sequence.
   std::reverse(components.begin(), components.end());
 
-  TypeRepr *typeRepr = nullptr;
-  if (components.size() == 1) {
-    typeRepr = components.front();
-  } else {
-    typeRepr = MemberTypeRepr::create(ctx, components);
-  }
+  TypeRepr *typeRepr = MemberTypeRepr::create(ctx, components);
 
   if (forMetatype)
     return new (ctx) MetatypeTypeRepr(typeRepr, /*MetaLoc=*/SourceLoc());
