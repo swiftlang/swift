@@ -551,7 +551,15 @@ struct NoteRegion {
 };
 
 struct Replacement {
+  /// If the edit is outside of the originally request source file, the path
+  /// to the file it is editing.
+  StringRef Path;
+  /// Range to apply the replacement to, zero-width if making an addition.
   CharSourceRange Range;
+  /// If the edit is actually a file (which could be generated/from an
+  /// expansion), the name (or path) of that buffer.
+  StringRef BufferName;
+  /// The text to replace \c Range with.
   StringRef Text;
   ArrayRef<NoteRegion> RegionsWorthNote;
 };
