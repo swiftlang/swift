@@ -4,5 +4,5 @@
 
 
 // CHECK: import ClassTemplateForSwiftModule
-// CHECK: func makeWrappedMagicNumber() -> __CxxTemplateInst12MagicWrapperI10IntWrapperE
-// CHECK: func readWrappedMagicNumber(_ i: inout __CxxTemplateInst12MagicWrapperI10IntWrapperE) -> CInt
+// CHECK: func makeWrappedMagicNumber() -> MagicWrapper<IntWrapper>
+// CHECK: func readWrappedMagicNumber(_ i: inout MagicWrapper<IntWrapper>) -> CInt

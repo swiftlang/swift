@@ -5,15 +5,20 @@
 // Test that makes sure that throughout the pipeline we properly handle
 // conditional releases for trivial and non-trivial move only types.
 
-//////////////////////
-// Misc Declaration //
-//////////////////////
+////////////////////////////
+// MARK: Misc Declaration //
+////////////////////////////
 
 class Klass {}
 
-/////////////////////////
-// Struct Declarations //
-/////////////////////////
+///////////////////////////////
+// MARK: Struct Declarations //
+///////////////////////////////
+
+@inline(never)
+func doSomething() {
+    print("123")
+}
 
 @_moveOnly
 struct KlassPairWithoutDeinit {
@@ -27,7 +32,7 @@ struct KlassPairWithDeinit {
     var rhs = Klass()
 
     deinit {
-        print("123")
+        doSomething()
     }
 }
 
@@ -43,7 +48,7 @@ struct IntPairWithDeinit {
     var k2: Int = 6
 
     deinit {
-        print("123")
+        doSomething()
     }
 }
 
@@ -54,9 +59,27 @@ func consumeKlassPairWithDeinit(_ x: __owned KlassPairWithDeinit) { }
 
 var value: Bool { false }
 
-//////////////////
-// Struct Tests //
-//////////////////
+//////////////////////////////////////
+// MARK: Struct Deinit Output Tests //
+//////////////////////////////////////
+
+// SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits19KlassPairWithDeinitVfD : $@convention(method) (@owned KlassPairWithDeinit) -> () {
+// SILGEN: bb0([[ARG:%.*]] :
+// SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
+// SILGEN:   ([[LHS:%.*]], [[RHS:%.*]]) = destructure_struct [[MARK]]
+// SILGEN:   destroy_value [[LHS]]
+// SILGEN:   destroy_value [[RHS]]
+// SILGEN: } // end sil function '$s16moveonly_deinits19KlassPairWithDeinitVfD'
+
+// SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits17IntPairWithDeinitVfD : $@convention(method) (@owned IntPairWithDeinit) -> () {
+// SILGEN: bb0([[ARG:%.*]] :
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
+// SILGEN:   end_lifetime [[MARKED]]
+// SILGEN: } // end sil function '$s16moveonly_deinits17IntPairWithDeinitVfD'
+
+////////////////////////
+// MARK: Struct Tests //
+////////////////////////
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits24testIntPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
@@ -259,9 +282,9 @@ public func testKlassPairWithDeinit() {
     }
 }
 
-///////////////////////
-// Enum Declarations //
-///////////////////////
+/////////////////////////////
+// MARK: Enum Declarations //
+/////////////////////////////
 
 @_moveOnly
 enum KlassEnumPairWithoutDeinit {
@@ -275,7 +298,7 @@ enum KlassEnumPairWithDeinit {
     case rhs(Klass)
 
     deinit {
-        print("123")
+        doSomething()
     }
 }
 
@@ -291,7 +314,7 @@ enum IntEnumPairWithDeinit {
     case rhs(Int)
 
     deinit {
-        print("123")
+        doSomething()
     }
 }
 
@@ -300,9 +323,47 @@ func consumeIntEnumPairWithDeinit(_ x: __owned IntEnumPairWithDeinit) { }
 func consumeKlassEnumPairWithoutDeinit(_ x: __owned KlassEnumPairWithoutDeinit) { }
 func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 
-////////////////
-// Enum Tests //
-////////////////
+////////////////////////////////////
+// MARK: Enum Deinit Output Tests //
+////////////////////////////////////
+
+// SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits23KlassEnumPairWithDeinitOfD : $@convention(method) (@owned KlassEnumPairWithDeinit) -> () {
+// SILGEN: bb0([[ARG:%.*]] :
+// SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
+// SILGEN:   switch_enum [[MARK]] : $KlassEnumPairWithDeinit, case #KlassEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #KlassEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
+//
+// SILGEN: [[BB_LHS]]([[ARG:%.*]] :
+// SILGEN-NEXT: destroy_value [[ARG]]
+// SILGEN-NEXT: br [[BB_CONT:bb[0-9]+]]
+//
+// SILGEN: [[BB_RHS]]([[ARG:%.*]] :
+// SILGEN-NEXT: destroy_value [[ARG]]
+// SILGEN-NEXT: br [[BB_CONT]]
+//
+// SILGEN: [[BB_CONT]]:
+// SILGEN-NEXT: tuple ()
+// SILGEN-NEXT: return
+// SILGEN: } // end sil function '$s16moveonly_deinits23KlassEnumPairWithDeinitOfD'
+
+// SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits21IntEnumPairWithDeinitOfD : $@convention(method) (@owned IntEnumPairWithDeinit) -> () {
+// SILGEN: bb0([[ARG:%.*]] :
+// SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
+// SILGEN:   switch_enum [[MARK]] : $IntEnumPairWithDeinit, case #IntEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #IntEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
+//
+// SILGEN: [[BB_LHS]]([[ARG:%.*]] :
+// SILGEN-NEXT: br [[BB_CONT:bb[0-9]+]]
+//
+// SILGEN: [[BB_RHS]]([[ARG:%.*]] :
+// SILGEN-NEXT: br [[BB_CONT]]
+//
+// SILGEN: [[BB_CONT]]:
+// SILGEN-NEXT: tuple ()
+// SILGEN-NEXT: return
+// SILGEN: } // end sil function '$s16moveonly_deinits21IntEnumPairWithDeinitOfD'
+
+//////////////////////
+// MARK: Enum Tests //
+//////////////////////
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box

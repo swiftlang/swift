@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
 // REQUIRES: tools-release,no_asan
+// REQUIRES: OS=macosx
 
 struct T {
   enum B {

@@ -167,6 +167,10 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setPerfConstraints(PerformanceConstraints::NoAllocation);
   }
 
+  if (Attrs.hasAttribute<LexicalLifetimesAttr>()) {
+    F->setForceEnableLexicalLifetimes(DoForceEnableLexicalLifetimes);
+  }
+
   // Validate `@differentiable` attributes by calling `getParameterIndices`.
   // This is important for:
   // - Skipping invalid `@differentiable` attributes in non-primary files.

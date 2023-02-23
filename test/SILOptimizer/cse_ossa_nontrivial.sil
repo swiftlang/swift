@@ -92,7 +92,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Klass>):
 
 // CHECK-LABEL: sil [ossa] @project_box_test2 :
 // CHECK: project_box %0 : $<τ_0_0> { var τ_0_0 } <Klass>
-// CHECK-NOT: project_box
+// CHECK: project_box
 // CHECK-LABEL: } // end sil function 'project_box_test2'
 sil [ossa] @project_box_test2 : $(@owned <τ_0_0> { var τ_0_0 } <Klass>) -> Klass {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Klass>):
@@ -108,7 +108,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Klass>):
 
 // CHECK-LABEL: sil [ossa] @project_box_test3 :
 // CHECK: project_box
-// CHECK-NOT: project_box
+// CHECK: project_box
 // CHECK-LABEL: } // end sil function 'project_box_test3'
 sil [ossa] @project_box_test3 : $(@owned <τ_0_0> { var τ_0_0 } <Klass>) -> Klass {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Klass>):
@@ -234,7 +234,7 @@ bb0(%0 : @owned $Klass):
 
 // CHECK-LABEL: sil [ossa] @test2cse2 :
 // CHECK: ref_to_raw_pointer
-// CHECK-NOT: ref_to_raw_pointer
+// CHECK: ref_to_raw_pointer
 // CHECK: function_ref
 // CHECK: apply
 // CHECK-LABEL: } // end sil function 'test2cse2'
@@ -300,8 +300,7 @@ bb0(%0 : @owned $Builtin.BridgeObject):
 
 // CHECK-LABEL:   sil [ossa] @cse_bridge_object_to_word2 :
 // CHECK:           [[REF:%[0-9]+]] = bridge_object_to_word
-// CHECK-NOT:       bridge_object_to_word
-// CHECK:           tuple ([[REF]] : $Builtin.Word, [[REF]] : $Builtin.Word)
+// CHECK:           bridge_object_to_word
 // CHECK-LABEL: } // end sil function 'cse_bridge_object_to_word2'
 sil [ossa] @cse_bridge_object_to_word2 : $@convention(thin) (@owned Builtin.BridgeObject) -> (Builtin.Word, Builtin.Word) {
 bb0(%0 : @owned $Builtin.BridgeObject):
@@ -316,8 +315,7 @@ bb0(%0 : @owned $Builtin.BridgeObject):
 
 // CHECK-LABEL:   sil [ossa] @cse_bridge_object_to_word3 :
 // CHECK:           [[REF:%[0-9]+]] = bridge_object_to_word
-// CHECK-NOT:       bridge_object_to_word
-// CHECK:           tuple ([[REF]] : $Builtin.Word, [[REF]] : $Builtin.Word)
+// CHECK:           bridge_object_to_word
 // CHECK-LABEL: } // end sil function 'cse_bridge_object_to_word3'
 sil [ossa] @cse_bridge_object_to_word3 : $@convention(thin) (@owned Builtin.BridgeObject) -> (Builtin.Word, Builtin.Word) {
 bb0(%0 : @owned $Builtin.BridgeObject):
@@ -762,7 +760,7 @@ sil [ossa] @use_bridgeobject : $@convention(thin) (Builtin.BridgeObject) -> ()
 // CHECK-LABEL: sil [ossa] @test_valuetobridgeobject :
 // CHECK: bb0
 // CHECK: value_to_bridge_object
-// CHECK-NOT: value_to_bridge_object
+// CHECK: value_to_bridge_object
 // CHECK-LABEL: } // end sil function 'test_valuetobridgeobject'
 sil [ossa] @test_valuetobridgeobject : $@convention(thin) (@guaranteed WrapperKlass) -> () {
 bb0(%0 : @guaranteed $WrapperKlass):
@@ -964,4 +962,28 @@ bb3:
 return %res : $()
 }
 
+sil [ossa] @use : $@convention(thin) (@sil_unmanaged Klass) -> ()
+sil [ossa] @getKlass : $@convention(thin) () -> (@owned Klass)
+
+// Tests to make sure cse does not eliminate non-owned, non-guaranteed redundant values
+// by looking through ownership instructions.
+// CHECK-LABEL: sil [ossa] @test_ref_to_unmanaged :
+// CHECK: ref_to_unmanaged
+// CHECK: ref_to_unmanaged
+// CHECK-LABEL: } // end sil function 'test_ref_to_unmanaged'
+sil [ossa] @test_ref_to_unmanaged : $@convention(thin) () -> () {
+bb0:
+ %f1 = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+ %f2 = function_ref @use : $@convention(thin) (@sil_unmanaged Klass) -> ()
+ %0 = apply %f1() : $@convention(thin) () -> (@owned Klass)
+ %raw1 = ref_to_unmanaged %0 : $Klass to $@sil_unmanaged Klass
+ apply %f2(%raw1) : $@convention(thin) (@sil_unmanaged Klass) -> ()
+ %copy = copy_value %0 : $Klass
+ destroy_value %0 : $Klass
+ %raw2 = ref_to_unmanaged %copy : $Klass to $@sil_unmanaged Klass
+ apply %f2(%raw2) : $@convention(thin) (@sil_unmanaged Klass) -> ()
+ destroy_value %copy : $Klass
+ %t = tuple ()
+ return %t : $()
+}
 

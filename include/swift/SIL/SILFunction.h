@@ -70,6 +70,11 @@ enum IsRuntimeAccessible_t {
   IsRuntimeAccessible
 };
 
+enum ForceEnableLexicalLifetimes_t {
+  DoNotForceEnableLexicalLifetimes,
+  DoForceEnableLexicalLifetimes
+};
+
 enum class PerformanceConstraints : uint8_t {
   None = 0,
   NoAllocation = 1,
@@ -403,6 +408,9 @@ private:
   /// The function is in a statically linked module.
   unsigned IsStaticallyLinked : 1;
 
+  /// If true, the function has lexical lifetimes even if the module does not.
+  unsigned ForceEnableLexicalLifetimes : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -668,6 +676,14 @@ public:
 
   void setIsStaticallyLinked(bool value) {
     IsStaticallyLinked = value;
+  }
+
+  ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
+    return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);
+  }
+
+  void setForceEnableLexicalLifetimes(ForceEnableLexicalLifetimes_t value) {
+    ForceEnableLexicalLifetimes = value;
   }
 
   /// Returns true if this is a reabstraction thunk of escaping function type

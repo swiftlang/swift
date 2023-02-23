@@ -14,12 +14,12 @@ import SIL
 
 extension UncheckedEnumDataInst : OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
-    guard let enumInst = operand as? EnumInst else {
+    guard let enumInst = self.enum as? EnumInst else {
       return
     }
     if caseIndex != enumInst.caseIndex {
       return
     }
-    context.tryReplaceRedundantInstructionPair(first: enumInst, second: self, with: enumInst.operand)
+    context.tryReplaceRedundantInstructionPair(first: enumInst, second: self, with: enumInst.payload!)
   }
 }

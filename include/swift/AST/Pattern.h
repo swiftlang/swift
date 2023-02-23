@@ -603,17 +603,24 @@ public:
   }
 };
 
-/// A pattern "x?" which matches ".Some(x)".
+/// A pattern "x?" which matches ".some(x)".
 class OptionalSomePattern : public Pattern {
+  const ASTContext &Ctx;
   Pattern *SubPattern;
   SourceLoc QuestionLoc;
-  EnumElementDecl *ElementDecl = nullptr;
+
+  OptionalSomePattern(const ASTContext &ctx, Pattern *subPattern,
+                      SourceLoc questionLoc)
+      : Pattern(PatternKind::OptionalSome), Ctx(ctx), SubPattern(subPattern),
+        QuestionLoc(questionLoc) {}
 
 public:
-  explicit OptionalSomePattern(Pattern *SubPattern,
-                               SourceLoc QuestionLoc)
-  : Pattern(PatternKind::OptionalSome), SubPattern(SubPattern),
-    QuestionLoc(QuestionLoc) { }
+  static OptionalSomePattern *create(ASTContext &ctx, Pattern *subPattern,
+                                     SourceLoc questionLoc);
+
+  static OptionalSomePattern *
+  createImplicit(ASTContext &ctx, Pattern *subPattern,
+                 SourceLoc questionLoc = SourceLoc());
 
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
   SourceRange getSourceRange() const {
@@ -624,8 +631,8 @@ public:
   Pattern *getSubPattern() { return SubPattern; }
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
-  EnumElementDecl *getElementDecl() const { return ElementDecl; }
-  void setElementDecl(EnumElementDecl *d) { ElementDecl = d; }
+  /// Retrieve the Optional.some enum element decl.
+  EnumElementDecl *getElementDecl() const;
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::OptionalSome;

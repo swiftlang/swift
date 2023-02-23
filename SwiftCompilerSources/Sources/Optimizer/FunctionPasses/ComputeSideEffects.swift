@@ -98,7 +98,7 @@ private struct CollectedEffects {
       addDestroyEffects(ofValue: inst.operands[0].value)
 
     case let da as DestroyAddrInst:
-      addDestroyEffects(ofAddress: da.operand)
+      addDestroyEffects(ofAddress: da.destroyedAddress)
 
     case let copy as CopyAddrInst:
       addEffects(.read, to: copy.source)
@@ -146,7 +146,7 @@ private struct CollectedEffects {
     case let fl as FixLifetimeInst:
       // A fix_lifetime instruction acts like a read on the operand to prevent
       // releases moving above the fix_lifetime.
-      addEffects(.read, to: fl.operand)
+      addEffects(.read, to: fl.operand.value)
 
       // Instructions which have effects defined in SILNodes.def, but those effects are
       // not relevant for our purpose.

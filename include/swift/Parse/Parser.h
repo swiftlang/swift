@@ -172,9 +172,7 @@ public:
 
   bool InPoundLineEnvironment = false;
   bool InPoundIfEnvironment = false;
-  /// Do not call \c addUnvalidatedDeclWithOpaqueResultType when in an inactive
-  /// clause because ASTScopes are not created in those contexts and lookups to
-  /// those decls will fail.
+  /// ASTScopes are not created in inactive clauses and lookups to decls will fail.
   bool InInactiveClauseEnvironment = false;
   bool InSwiftKeyPath = false;
 
@@ -2001,10 +1999,12 @@ struct ParsedDeclName {
   }
 
   /// Form a declaration name from this parsed declaration name.
-  DeclName formDeclName(ASTContext &ctx, bool isSubscript = false) const;
+  DeclName formDeclName(ASTContext &ctx, bool isSubscript = false,
+                        bool isCxxClassTemplateSpec = false) const;
 
   /// Form a declaration name from this parsed declaration name.
-  DeclNameRef formDeclNameRef(ASTContext &ctx, bool isSubscript = false) const;
+  DeclNameRef formDeclNameRef(ASTContext &ctx, bool isSubscript = false,
+                              bool isCxxClassTemplateSpec = false) const;
 };
 
 /// To assist debugging parser crashes, tell us the location of the
@@ -2026,7 +2026,8 @@ DeclName formDeclName(ASTContext &ctx,
                       ArrayRef<StringRef> argumentLabels,
                       bool isFunctionName,
                       bool isInitializer,
-                      bool isSubscript = false);
+                      bool isSubscript = false,
+                      bool isCxxClassTemplateSpec = false);
 
 /// Form a Swift declaration name reference from its constituent parts.
 DeclNameRef formDeclNameRef(ASTContext &ctx,
@@ -2034,7 +2035,8 @@ DeclNameRef formDeclNameRef(ASTContext &ctx,
                             ArrayRef<StringRef> argumentLabels,
                             bool isFunctionName,
                             bool isInitializer,
-                            bool isSubscript = false);
+                            bool isSubscript = false,
+                            bool isCxxClassTemplateSpec = false);
 
 /// Whether a given token can be the start of a decl.
 bool isKeywordPossibleDeclStart(const Token &Tok);

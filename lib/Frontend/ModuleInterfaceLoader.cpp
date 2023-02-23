@@ -1214,12 +1214,22 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
 }
 
 std::vector<std::string>
-ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(
-    StringRef moduleName, StringRef interfacePath) {
+ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(StringRef moduleName, StringRef interfacePath) {
   // Derive .swiftmodule path from the .swiftinterface path.
+  auto interfaceExt = file_types::getExtension(file_types::TY_SwiftModuleInterfaceFile);
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
-  llvm::SmallString<32> modulePath = interfacePath;
-  llvm::sys::path::replace_extension(modulePath, newExt);
+  llvm::SmallString<32> modulePath;
+
+  // When looking up the module for a private interface, strip the '.private.' section of the base name
+  if (interfacePath.endswith(".private." + interfaceExt.str())) {
+    auto newBaseName = llvm::sys::path::stem(llvm::sys::path::stem(interfacePath));
+    modulePath = llvm::sys::path::parent_path(interfacePath);
+    llvm::sys::path::append(modulePath, newBaseName + "." + newExt.str());
+  } else {
+    modulePath = interfacePath;
+    llvm::sys::path::replace_extension(modulePath, newExt);
+  }
+
   ModuleInterfaceLoaderImpl Impl(Ctx, modulePath, interfacePath, moduleName,
                                  CacheDir, PrebuiltCacheDir, BackupInterfaceDir,
                                  SourceLoc(), Opts,

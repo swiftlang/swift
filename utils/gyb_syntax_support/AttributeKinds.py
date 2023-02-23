@@ -616,6 +616,12 @@ DECL_ATTR_KINDS = [
                         OnFunc, OnParam, OnVar, OnNominalType,
                         code=117),
 
+    SimpleDeclAttribute('_lexicalLifetimes', 'LexicalLifetimes',
+                        UserInaccessible,
+                        ABIStableToAdd, ABIStableToRemove,
+                        APIStableToAdd, APIStableToRemove,
+                        OnFunc, code=36),
+
     SimpleDeclAttribute('_noEagerMove', 'NoEagerMove',
                         UserInaccessible,
                         ABIStableToAdd, ABIStableToRemove,

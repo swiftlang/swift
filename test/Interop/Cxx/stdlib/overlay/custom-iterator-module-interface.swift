@@ -86,22 +86,22 @@
 // CHECK-NOT: struct HasNoPreIncrementOperator : UnsafeCxxInputIterator
 // CHECK-NOT: struct HasNoDereferenceOperator : UnsafeCxxInputIterator
 
-// CHECK: struct __CxxTemplateInst17TemplatedIteratorIiE : UnsafeCxxInputIterator {
+// CHECK: struct TemplatedIterator<Int32> : UnsafeCxxInputIterator {
 // CHECK:   var pointee: Int32 { get }
-// CHECK:   func successor() -> __CxxTemplateInst17TemplatedIteratorIiE
+// CHECK:   func successor() -> TemplatedIterator<Int32>
 // CHECK:   typealias Pointee = Int32
-// CHECK:   static func == (lhs: __CxxTemplateInst17TemplatedIteratorIiE, other: __CxxTemplateInst17TemplatedIteratorIiE) -> Bool
+// CHECK:   static func == (lhs: TemplatedIterator<Int32>, other: TemplatedIterator<Int32>) -> Bool
 // CHECK: }
 
-// CHECK: struct __CxxTemplateInst28TemplatedIteratorOutOfLineEqIiE : UnsafeCxxInputIterator {
+// CHECK: struct TemplatedIteratorOutOfLineEq<Int32> : UnsafeCxxInputIterator {
 // CHECK:   var pointee: Int32 { get }
-// CHECK:   func successor() -> __CxxTemplateInst28TemplatedIteratorOutOfLineEqIiE
+// CHECK:   func successor() -> TemplatedIteratorOutOfLineEq<Int32>
 // CHECK:   typealias Pointee = Int32
 // CHECK: }
 
-// CHECK: struct __CxxTemplateInst31TemplatedRACIteratorOutOfLineEqIiE : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK: struct TemplatedRACIteratorOutOfLineEq<Int32> : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
 // CHECK:   var pointee: Int32 { get }
-// CHECK:   func successor() -> __CxxTemplateInst31TemplatedRACIteratorOutOfLineEqIiE
+// CHECK:   func successor() -> TemplatedRACIteratorOutOfLineEq<Int32>
 // CHECK:   typealias Pointee = Int32
-// CHECK:   typealias Distance = __CxxTemplateInst31TemplatedRACIteratorOutOfLineEqIiE.difference_type
+// CHECK:   typealias Distance = TemplatedRACIteratorOutOfLineEq<Int32>.difference_type
 // CHECK: }

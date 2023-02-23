@@ -38,7 +38,6 @@ distributed actor Greeter {
 // CHECK: bb0([[ADDRESS_ARG:%[0-9]+]] : $*NotLoadableActorAddress, [[SYSTEM_ARG:%[0-9]+]] : $FakeNotLoadableAddressActorSystem, [[TYPE_ARG:%[0-9]+]] : $@thick Greeter.Type):
 // CHECK: [[TYPE:%[0-9]+]] = metatype $@thick Greeter.Type
 
-// CHECK: // makeProxyBB
 // CHECK: [[INSTANCE:%[0-9]+]] = builtin "initializeDistributedRemoteActor"([[TYPE]] : $@thick Greeter.Type) : $Greeter
 // CHECK: [[ID_PROPERTY:%[0-9]+]] = ref_element_addr [[INSTANCE]] : $Greeter, #Greeter.id
 // Note specifically that we don't [take] in the below copy_addr:
