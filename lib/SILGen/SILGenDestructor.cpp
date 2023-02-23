@@ -538,11 +538,21 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
       B.setInsertionPoint(contBlock);
     }
   } else {
-    if (isa<StructDecl>(nom)) {
-      auto *d = B.createDestructureStruct(cleanupLoc, selfValue,
-                                          OwnershipKind::Owned);
-      for (auto result : d->getResults()) {
-        B.emitDestroyValueOperation(cleanupLoc, result);
+    if (auto *sd = dyn_cast<StructDecl>(nom)) {
+      if (llvm::any_of(sd->getStoredProperties(),
+                       [&](VarDecl *vd) {
+                         auto &lowering = getTypeLowering(vd->getType());
+                         return !lowering.isTrivial();
+                       })) {
+        auto *d = B.createDestructureStruct(cleanupLoc, selfValue,
+                                            OwnershipKind::Owned);
+        for (auto result : d->getResults()) {
+          B.emitDestroyValueOperation(cleanupLoc, result);
+        }
+      } else {
+        // If we only contain trivial uses, we don't have anything to cleanup,
+        // so just insert an end_lifetime.
+        B.createEndLifetime(cleanupLoc, selfValue);
       }
     } else {
       auto *origBlock = B.getInsertionBB();
