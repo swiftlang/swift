@@ -344,18 +344,10 @@ func compositionType() {
 
   CheckType<P1 & P2>.matches(((P1) & (P2)).self)
   CheckType<P1 & P2>.matches((Foo.P1 & Foo.P2).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{binary operator '&' cannot be applied to operands of type '(any (Foo).P1).Type' (aka '(any P1).Type') and '(any (Foo).P2).Type' (aka '(any P2).Type')}}
   CheckType<P1 & P2>.matches(((Foo).P1 & (Foo).P2).self)
   CheckType<P1 & P2>.matches((Gen<Foo>.P1 & Gen<Foo>.P2).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{binary operator '&' cannot be applied to operands of type '(any Optional<Foo>.P1).Type' (aka '(any P1).Type') and '(any Optional<Foo>.P2).Type' (aka '(any P2).Type')}}
   CheckType<P1 & P2>.matches((Foo?.P1 & Foo?.P2).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{binary operator '&' cannot be applied to operands of type '(any Array<Foo>.P1).Type' (aka '(any P1).Type') and '(any Array<Foo>.P2).Type' (aka '(any P2).Type')}}
   CheckType<P1 & P2>.matches(([Foo].P1 & [Foo].P2).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{binary operator '&' cannot be applied to operands of type '(any Dictionary<Int, Foo>.P1).Type' (aka '(any P1).Type') and '(any Dictionary<Int, Foo>.P2).Type' (aka '(any P2).Type')}}
   CheckType<P1 & P2>.matches(([Int : Foo].P1 & [Int : Foo].P2).self)
 }
 
@@ -375,8 +367,6 @@ func tupleType() {
   CheckType<(Foo, Foo)>.matches(((Foo), (Foo)).self)
 
   CheckType<(Foo.Bar, Foo.Bar)>.matches((Foo.Bar, Foo.Bar).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{cannot convert value of type '((Foo).Bar.Type, (Foo).Bar.Type)' to expected argument type '(Foo.Bar, Foo.Bar).Type'}}
   CheckType<(Foo.Bar, Foo.Bar)>.matches(((Foo).Bar, (Foo).Bar).self)
 
   CheckType<(Gen<Foo>, Gen<Foo>)>.matches((Gen<Foo>, Gen<Foo>).self)
@@ -385,14 +375,8 @@ func tupleType() {
   CheckType<([Int : Foo], [Int : Foo])>.matches(([Int : Foo], [Int : Foo]).self)
 
   CheckType<(Gen<Foo>.Bar, Gen<Foo>.Bar)>.matches((Gen<Foo>.Bar, Gen<Foo>.Bar).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{cannot convert value of type '(Optional<Foo>.Wrapped.Type, Optional<Foo>.Wrapped.Type)' (aka '(Foo.Type, Foo.Type)') to expected argument type '(Foo, Foo).Type'}}
   CheckType<(Foo, Foo)>.matches((Foo?.Wrapped, Foo?.Wrapped).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{cannot convert value of type '(Array<Foo>.Element.Type, Array<Foo>.Element.Type)' (aka '(Foo.Type, Foo.Type)') to expected argument type '(Foo, Foo).Type'}}
   CheckType<(Foo, Foo)>.matches(([Foo].Element, [Foo].Element).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{cannot convert value of type '(Dictionary<Int, Foo>.Value.Type, Dictionary<Int, Foo>.Value.Type)' (aka '(Foo.Type, Foo.Type)') to expected argument type '(Foo, Foo).Type'}}
   CheckType<(Foo, Foo)>.matches(([Int : Foo].Value, [Int : Foo].Value).self)
 
   CheckType<(Foo.Type, Foo.Type)>.matches((Foo.Type, Foo.Type).self)
@@ -401,7 +385,6 @@ func tupleType() {
   CheckType<(P1 & P2, P1 & P2)>.matches((P1 & P2, P1 & P2).self)
 
   // Trade exhaustivity for one complex test case.
-  // FIXME: Replace this with the next test once we make it succeed.
   CheckType<
     (
       (Gen<Foo>.Bar) -> P1 & P2,
@@ -411,24 +394,7 @@ func tupleType() {
     )
   >.matches(
     (
-      (Gen<Foo>.Bar) -> (P1) & Optional<Foo>.P2,
-      (Foo.Bar, [Int : Foo?].Type),
-      [Gen<Foo>.Bar],
-      Array<Foo.Bar.Baz>.Element
-    ).self
-  )
-
-  // FIXME: Teach Sema to recognize this type expression.
-  CheckType<
-    (
-      (Gen<Foo>.Bar) -> P1 & P2,
-      (Foo.Bar, [Int : Foo?].Type),
-      [Gen<Foo>.Bar],
-      Foo.Bar.Baz
-    )
-  >.matches(
-    ( // expected-error {{cannot convert value of type '(_.Type, (Foo.Bar, Dictionary<Int, Optional<Foo>>.Type).Type, Array<(Gen<Foo>).Bar.Type>, Array<Foo.Bar.Baz>.Element.Type)' (aka '(_.Type, (Foo.Bar, Dictionary<Int, Optional<Foo>>.Type).Type, Array<(Gen<Foo>).Bar.Type>, Foo.Bar.Baz.Type)') to expected argument type '((Gen<Foo>.Bar) -> any P1 & P2, (Foo.Bar, [Int : Foo?].Type), [Gen<Foo>.Bar], Foo.Bar.Baz).Type'}}
-      (Gen<Foo>.Bar) -> (P1) & Foo?.P2, // expected-error {{expected type after '->'}}
+      (Gen<Foo>.Bar) -> (P1) & Foo?.P2,
       (Foo.Bar, [Int : Foo?].Type),
       [(Gen<Foo>).Bar],
       [Foo.Bar.Baz].Element
@@ -466,8 +432,6 @@ func functionType() {
   CheckType<(Foo) -> Foo>.matches((((Foo)) -> (Foo)).self)
 
   CheckType<(Foo.Bar) -> Foo.Bar>.matches(((Foo.Bar) -> Foo.Bar).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{expected type before '->'}} expected-error@+1 {{expected type after '->'}}
   CheckType<(Foo.Bar) -> Foo.Bar>.matches((((Foo).Bar) -> (Foo).Bar).self)
 
   CheckType<(Gen<Foo>) -> Gen<Foo>>.matches(((Gen<Foo>) -> Gen<Foo>).self)
@@ -476,14 +440,8 @@ func functionType() {
   CheckType<([Int : Foo]) -> [Int : Foo]>.matches((([Int : Foo]) -> [Int : Foo]).self)
 
   CheckType<(Gen<Foo>.Bar) -> Gen<Foo>.Bar>.matches(((Gen<Foo>.Bar) -> Gen<Foo>.Bar).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{expected type before '->'}} expected-error@+1 {{expected type after '->'}}
   CheckType<(Foo) -> Foo>.matches(((Foo?.Wrapped) -> Foo?.Wrapped).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{expected type before '->'}} expected-error@+1 {{expected type after '->'}}
   CheckType<(Foo) -> Foo>.matches((([Foo].Element) -> [Foo].Element).self)
-  // FIXME: Teach Sema to recognize this type expression.
-  // expected-error@+1 {{expected type before '->'}} expected-error@+1 {{expected type after '->'}}
   CheckType<(Foo) -> Foo>.matches((([Int : Foo].Value) -> [Int : Foo].Value).self)
 
   CheckType<(Foo.Type) -> Foo.Type>.matches(((Foo.Type) -> Foo.Type).self)
@@ -495,7 +453,6 @@ func functionType() {
       .matches(((P1 & P2) -> (P3 & P2) -> P1 & Any).self)
 
   // Trade exhaustivity for one complex test case.
-  // FIXME: Replace this with the next test once we make it succeed.
   CheckType<
     (
       P1 & P2,
@@ -507,33 +464,12 @@ func functionType() {
   >.matches(
     (
       (
-        (P1) & Optional<Foo>.P2,
-        Gen<Foo>.Bar,
-        (Foo, [Int : Foo?].Type)
-      ) -> (
-        [Foo.Bar]
-      ) -> Array<Foo>.Element
-    ).self
-  )
-
-  // FIXME: Teach Sema to recognize this type expression.
-  CheckType<
-    (
-      P1 & P2,
-      Gen<Foo>.Bar,
-      (Foo, [Int : Foo?].Type)
-    ) -> (
-      [Foo.Bar]
-    ) -> Foo
-  >.matches(
-    (
-      ( // expected-error {{expected type before '->'}}
         (P1) & Foo?.P2,
         Gen<Foo>.Bar,
         (Foo, [Int : Foo?].Type)
       ) -> (
-        [(Foo).Bar] // expected-error {{expected type before '->'}}
-      ) -> [Foo].Element // expected-error {{expected type after '->'}}
+        [(Foo).Bar]
+      ) -> [Foo].Element
     ).self
   )
 }

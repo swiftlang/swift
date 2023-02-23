@@ -446,11 +446,11 @@ enum E {
   // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments1EO4testyyFZ : $@convention(method) (@thin E.Type) -> ()
   static func test() {
     // CHECK: function_ref @$s17default_arguments1EO6ResultV4name9platformsAESS_SaySiGtcfcfA0_ : $@convention(thin) () -> @owned Array<Int>
-    // CHECK: function_ref @$s17default_arguments1EO4testyyFZAC6ResultVSS_SaySiGtcfu_ : $@convention(thin) (@guaranteed String, @guaranteed Array<Int>) -> @owned E.Result
+    // CHECK: function_ref @$s17default_arguments1EO6ResultV4name9platformsAESS_SaySiGtcfC : $@convention(method) (@owned String, @owned Array<Int>, @thin E.Result.Type) -> @owned E.Result
 
-    // CHECK-LABEL: sil private [ossa] @$s17default_arguments1EO4testyyFZAC6ResultVSS_SaySiGtcfu_ : $@convention(thin) (@guaranteed String, @guaranteed Array<Int>) -> @owned E.Result
     var result = Self.Result(name: "")
   }
+  // CHECK: end sil function '$s17default_arguments1EO4testyyFZ'
 }
 
 // FIXME: Arguably we shouldn't allow calling a constructor like this, as
