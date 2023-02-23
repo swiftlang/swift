@@ -9,7 +9,7 @@
 // RUN: %target-codesign %t/trap-exceptions-no-debug
 // RUN: %target-run %t/trap-exceptions-no-debug
 
-// RUN: %target-build-swift %s -I %t/Inputs -o %t/trap-exceptions-opt -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -O -DOPTIMIZE
+// RUN: %target-build-swift %s -I %t/Inputs -o %t/trap-exceptions-opt -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -O
 // RUN: %target-codesign %t/trap-exceptions-opt
 // RUN: %target-run %t/trap-exceptions-opt
 
@@ -93,15 +93,15 @@ TrapOnExecutionTestSuite.test("TestClassWithThrowingDestructor") {
   let _ = ClassWithThrowingDestructor()
 }
 
-#if OPTIMIZE
-#else
 TrapOnExecutionTestSuite.test("TestClassWithThrowingCopyConstructor") {
   expectCrashLater()
   let p1 = ClassWithThrowingCopyConstructor()
-  let p2 = p1
+  var p2 = p1
   expectEqual(p2.m, 0)
+  p2.m = 1
+  expectEqual(p2.m, 1)
+  expectEqual(p1.m, 0)
 }
-#endif
 
 TrapOnExecutionTestSuite.test("ClassWithThrowingConstructor") {
   expectCrashLater()
