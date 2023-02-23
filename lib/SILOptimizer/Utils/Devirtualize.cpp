@@ -559,7 +559,7 @@ replaceBeginApplyInst(SILBuilder &builder, SILLocation loc,
     auto newYield = newYields[i];
     // Insert any end_borrow if the yielded value before the token's uses.
     SmallVector<SILInstruction *, 4> users(
-      makeUserIteratorRange(oldBAI->getTokenResult()->getUses()));
+      makeUserIteratorRange(oldYield->getUses()));
     auto yieldCastRes = castValueToABICompatibleType(
       &builder, loc, newYield, newYield->getType(), oldYield->getType(),
       users);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-verify-all %s -module-name test -emit-sil -o - -verify | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all %s -module-name test -emit-sil -o - -verify | %FileCheck %s --enable-var-scope
 
 
 // Constructor calls are dispatched dynamically for open classes, even if
@@ -48,4 +48,20 @@ public func caller(_ c: Concrete) throws {
   // CHECK: [[FN:%.*]] = function_ref @$s4test8ConcreteV4failyyKF : $@convention(method) (Concrete) -> @error any Error
   // CHECK: try_apply [[FN]]([[ARG]]) : $@convention(method) (Concrete) -> @error any Error
   try callee(c)
+}
+
+
+public struct File {
+  var alias: FileHandle = FileHandle()
+}
+
+public class FileHandle {
+  @_borrowed var file: File = File()
+}
+
+// CHECK-LABEL: sil @$s4test20access_borrowed_readyAA10FileHandleCADF : $@convention(thin) (@guaranteed FileHandle) -> @owned FileHandle {
+public func access_borrowed_read(_ l: FileHandle) -> FileHandle {
+  // CHECK-NOT: begin_apply
+  // CHECK:     return
+  return l.file.alias
 }
