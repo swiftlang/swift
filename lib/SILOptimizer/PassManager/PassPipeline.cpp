@@ -402,6 +402,9 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Promote stack allocations to values.
   P.addMem2Reg();
 
+  // Add a round of DCE to remove dead ownership phis created in mem2reg.
+  P.addDCE();
+
   // Run the existential specializer Pass.
   P.addExistentialSpecializer();
 
@@ -411,7 +414,11 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
       return;
-
+    // Run ownership opts one last time before lowering to non-ossa.
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
+      P.addCopyPropagation();
+    }
+    P.addSemanticARCOpts();
     if (SILPrintFinalOSSAModule) {
       addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
     }
