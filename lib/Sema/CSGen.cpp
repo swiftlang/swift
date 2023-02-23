@@ -848,6 +848,19 @@ namespace {
     /// A stack of pack expansions that can open pack elements.
     llvm::SmallVector<PackExpansionExpr *, 2> PackElementEnvironments;
 
+    /// A stack of expressions being walked, used to determine if a expression
+    /// being type checked is nested within another type.
+    llvm::SmallVector<Expr *, 8> ExprStack;
+
+  public:
+    void walkToExprPre(Expr *expr) { ExprStack.push_back(expr); }
+
+    Expr *walkToExprPost(Expr *expr) {
+      ExprStack.pop_back();
+      return expr;
+    }
+
+  private:
     /// Returns false and emits the specified diagnostic if the member reference
     /// base is a nil literal. Returns true otherwise.
     bool isValidBaseOfMemberRef(Expr *base, Diag<> diagnostic) {
@@ -4120,6 +4133,7 @@ namespace {
         CG.addPackElementEnvironment(expansion);
       }
 
+      CG.walkToExprPre(expr);
       return Action::Continue(expr);
     }
 
@@ -4157,14 +4171,14 @@ namespace {
             DSE->setImplicit();
             CS.cacheType(DSE);
 
-            return Action::Continue(DSE);
+            return Action::Continue(CG.walkToExprPost(DSE));
           }
         }
       }
       if (auto type = CG.visit(expr)) {
         auto simplifiedType = CS.simplifyType(type);
         CS.setType(expr, simplifiedType);
-        return Action::Continue(expr);
+        return Action::Continue(CG.walkToExprPost(expr));
       }
       return Action::Stop();
     }
