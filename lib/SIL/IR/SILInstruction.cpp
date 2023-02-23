@@ -1736,6 +1736,9 @@ DestroyValueInst::getNonescapingClosureAllocation() const {
       }
       // Any other kind of partial apply fails to pass muster.
       return nullptr;
+    } else if (auto *mvi = dyn_cast<MoveValueInst>(operand)) {
+      operand = mvi->getOperand();
+      continue;
     } else {
       // The original partial_apply instruction should only be forwarded
       // through one of the above instructions. Anything else should lead us

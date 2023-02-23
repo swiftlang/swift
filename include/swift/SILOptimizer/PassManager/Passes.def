@@ -302,6 +302,8 @@ PASS(Mem2Reg, "mem2reg",
      "Memory to SSA Value Conversion to Remove Stack Allocation")
 PASS(MemBehaviorDumper, "mem-behavior-dump",
      "Print SIL Instruction MemBehavior from Alias Analysis over all Pairs")
+PASS(MoveValueInserter, "move-value-inserter",
+     "Insert lots of move_values to stress other passes")
 PASS(LSLocationPrinter, "lslocation-dump",
      "Print Load-Store Location Results Covering all Accesses")
 SWIFT_FUNCTION_PASS(MergeCondFails, "merge-cond_fails",

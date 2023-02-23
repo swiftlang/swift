@@ -153,6 +153,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // These happen after ClosureLifetimeFixup because they depend on the
   // resolution of nonescaping closure lifetimes to correctly check the use
   // of move-only values as captures in nonescaping closures as borrows.
+  P.addMoveValueInserter();
 
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();

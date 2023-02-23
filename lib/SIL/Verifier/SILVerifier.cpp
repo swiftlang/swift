@@ -2281,6 +2281,9 @@ public:
       // SILGen introduces copy_value instructions.
       else if (auto cvi = dyn_cast<CopyValueInst>(value))
         value = cvi->getOperand();
+      // MoveValueInserter introduces move_value instructions.
+      else if (auto mvi = dyn_cast<MoveValueInst>(value))
+        value = mvi->getOperand();
       // SILGen inserts mark_uninitialized instructions of alloc_boxes.
       else if (auto *mui = dyn_cast<MarkUninitializedInst>(value))
         value = mui->getOperand();
