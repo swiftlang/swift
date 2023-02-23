@@ -41,35 +41,34 @@ extern "C" void swift_ASTGen_destroyCompilerPluginCapability(void *value);
 
 using namespace swift;
 
-bool PluginRegistry::loadLibraryPlugin(StringRef path, const char *&errorMsg) {
+llvm::Error PluginRegistry::loadLibraryPlugin(StringRef path) {
   if (LoadedPluginLibraries.find(path) != LoadedPluginLibraries.end()) {
     // Already loaded.
-    return false;
+    return llvm::Error::success();
   }
-  errorMsg = nullptr;
   void *lib = nullptr;
 #if defined(_WIN32)
   lib = LoadLibraryA(path.str().c_str());
   if (!lib) {
-    errorMsg = "faild";
+    return llvm::createStringError(std::errc::not_supported, "failed");
     return true;
   }
 #else
   lib = dlopen(path.str().c_str(), RTLD_LAZY | RTLD_LOCAL);
   if (!lib) {
-    errorMsg = "Unsupported platform";
-    return true;
+    return llvm::createStringError(std::errc::not_supported,
+                                   "unsupported platform");
   }
 #endif
   LoadedPluginLibraries.insert({path, lib});
-  return false;
+  return llvm::Error::success();
 }
 
-LoadedExecutablePlugin *
-PluginRegistry::loadExecutablePlugin(StringRef path, const char *&errorMsg) {
+llvm::Expected<LoadedExecutablePlugin *>
+PluginRegistry::loadExecutablePlugin(StringRef path) {
   llvm::sys::fs::file_status stat;
   if (auto err = llvm::sys::fs::status(path, stat)) {
-    errorMsg = err.message().c_str();
+    return llvm::errorCodeToError(err);
   }
 
   // See if the plugin is already loaded.
@@ -84,13 +83,13 @@ PluginRegistry::loadExecutablePlugin(StringRef path, const char *&errorMsg) {
   }
 
   if (!llvm::sys::fs::exists(stat)) {
-    errorMsg = "not found";
-    return nullptr;
+    return llvm::createStringError(std::errc::no_such_file_or_directory,
+                                   "not found");
   }
 
   if (!llvm::sys::fs::can_execute(path)) {
-    errorMsg = "not executable";
-    return nullptr;
+    return llvm::createStringError(std::errc::permission_denied,
+                                   "not executable");
   }
 
   // Create command line arguments.
@@ -103,8 +102,7 @@ PluginRegistry::loadExecutablePlugin(StringRef path, const char *&errorMsg) {
   // Launch.
   auto childInfo = ExecuteWithPipe(command[0], command);
   if (!childInfo) {
-    errorMsg = "Failed to execute";
-    return nullptr;
+    return llvm::errorCodeToError(childInfo.getError());
   }
 
   plugin = std::unique_ptr<LoadedExecutablePlugin>(new LoadedExecutablePlugin(
@@ -163,7 +161,7 @@ ssize_t LoadedExecutablePlugin::write(const void *buf, size_t nbyte) const {
   return nbyte - bytesToWrite;
 }
 
-bool LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
+llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
   ssize_t writtenSize = 0;
 
   const char *data = message.data();
@@ -180,10 +178,10 @@ bool LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
   writtenSize = write(data, size);
   assert(writtenSize == ssize_t(size) && "failed to write plugin message data");
 
-  return false;
+  return llvm::Error::success();
 }
 
-std::string LoadedExecutablePlugin::waitForNextMessage() const {
+llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
   ssize_t readSize = 0;
 
   // Read header (message size).

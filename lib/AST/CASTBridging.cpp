@@ -651,14 +651,19 @@ void Plugin_unlock(PluginHandle handle) {
 bool Plugin_sendMessage(PluginHandle handle, const BridgedData data) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   StringRef message(data.baseAddress, data.size);
-  return plugin->sendMessage(message);
+  return bool(plugin->sendMessage(message));
 }
 
 bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   auto result = plugin->waitForNextMessage();
-  auto outPtr = malloc(result.size());
-  memcpy(outPtr, result.data(), result.size());
-  *out = BridgedData{(const char *)outPtr, result.size()};
+  if (!result) {
+    return true;
+  }
+  auto &message = result.get();
+  auto size = message.size();
+  auto outPtr = malloc(size);
+  memcpy(outPtr, message.data(), size);
+  *out = BridgedData{(const char *)outPtr, size};
   return false;
 }

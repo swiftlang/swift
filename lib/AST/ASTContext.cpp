@@ -6227,7 +6227,6 @@ PluginRegistry *ASTContext::getPluginRegistry() const {
 }
 
 void ASTContext::loadCompilerPlugins() {
-  const char *errorMsg = nullptr;
   auto fs = this->SourceMgr.getFileSystem();
   for (auto &path : SearchPathOpts.getCompilerPluginLibraryPaths()) {
     SmallString<128> resolvedPath;
@@ -6236,9 +6235,9 @@ void ASTContext::loadCompilerPlugins() {
                      err.message());
       continue;
     }
-    if (getPluginRegistry()->loadLibraryPlugin(resolvedPath, errorMsg)) {
+    if (auto error = getPluginRegistry()->loadLibraryPlugin(resolvedPath)) {
       Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                     errorMsg);
+                     llvm::toString(std::move(error)));
     }
   }
 
@@ -6339,12 +6338,11 @@ ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
   }
 
   // Load the plugin.
-  const char *errorMsg;
-  auto plugin = getPluginRegistry()->loadExecutablePlugin(resolvedPath, errorMsg);
+  auto plugin = getPluginRegistry()->loadExecutablePlugin(resolvedPath);
   if (!plugin) {
     Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                   errorMsg);
+                   llvm::toString(plugin.takeError()));
   }
 
-  return plugin;
+  return plugin.get();
 }

@@ -14,6 +14,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/Program.h"
 
 #include <mutex>
@@ -52,10 +53,10 @@ public:
   void unlock() { mtx.unlock(); }
 
   /// Send a message to the plugin.
-  bool sendMessage(llvm::StringRef message) const;
+  llvm::Error sendMessage(llvm::StringRef message) const;
 
   /// Wait for a message from plugin and returns it.
-  std::string waitForNextMessage() const;
+  llvm::Expected<std::string> waitForNextMessage() const;
 
   bool isInitialized() const { return bool(cleanup); }
   void setCleanup(std::function<void(void)> cleanup) {
@@ -77,9 +78,9 @@ class PluginRegistry {
       LoadedPluginExecutables;
 
 public:
-  bool loadLibraryPlugin(llvm::StringRef path, const char *&errorMsg);
-  LoadedExecutablePlugin *loadExecutablePlugin(llvm::StringRef path,
-                                               const char *&errorMsg);
+  llvm::Error loadLibraryPlugin(llvm::StringRef path);
+  llvm::Expected<LoadedExecutablePlugin *>
+  loadExecutablePlugin(llvm::StringRef path);
 
   const llvm::StringMap<void *> &getLoadedLibraryPlugins() const {
     return LoadedPluginLibraries;
