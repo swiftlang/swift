@@ -1012,3 +1012,14 @@ public struct EmptyMacro: MemberMacro {
     return []
   }
 }
+
+public struct EquatableMacro: ConformanceMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingConformancesOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [(TypeSyntax, WhereClauseSyntax?)] {
+    let protocolName: TypeSyntax = "Equatable"
+    return [(protocolName, nil)]
+  }
+}

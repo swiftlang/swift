@@ -8625,7 +8625,8 @@ static StringRef adjustMacroExpansionWhitespace(
     return scratch;
 
   case GeneratedSourceInfo::PeerMacroExpansion:
-      // For peers, add a newline to create some separation.
+  case GeneratedSourceInfo::ConformanceMacroExpansion:
+      // For peers and conformances, add a newline to create some separation.
     scratch += "\n";
     LLVM_FALLTHROUGH;
 

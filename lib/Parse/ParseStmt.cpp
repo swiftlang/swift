@@ -17,6 +17,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
@@ -299,7 +300,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind ConditionalBlockKind,
                                      bool &IsFollowingGuard) {
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
-                    (Kind == BraceItemListKind::TopLevelLibrary);
+                    (Kind == BraceItemListKind::TopLevelLibrary ||
+                    (Kind == BraceItemListKind::MacroExpansion &&
+                     isa<FileUnit>(CurDeclContext)));
   bool isActiveConditionalBlock =
     ConditionalBlockKind == BraceItemListKind::ActiveConditionalBlock;
   bool isConditionalBlock = isActiveConditionalBlock ||

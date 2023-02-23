@@ -931,6 +931,9 @@ Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::PeerMacroExpansion:
     return MacroRole::Peer;
 
+  case GeneratedSourceInfo::ConformanceMacroExpansion:
+    return MacroRole::Conformance;
+
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
     return None;
