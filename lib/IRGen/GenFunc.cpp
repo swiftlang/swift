@@ -177,7 +177,7 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                        ScalarKind::POD);
+                                          ScalarKind::TriviallyDestroyable);
     }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -217,7 +217,7 @@ namespace {
   protected:
     FuncTypeInfo(CanSILFunctionType formalType, llvm::StructType *storageType,
                  Size size, Alignment align, SpareBitVector &&spareBits,
-                 IsPOD_t pod)
+                 IsTriviallyDestroyable_t pod)
       : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align, pod),
         FuncSignatureInfo(formalType)
     {
@@ -228,7 +228,7 @@ namespace {
                                       llvm::StructType *storageType,
                                       Size size, Alignment align,
                                       SpareBitVector &&spareBits,
-                                      IsPOD_t pod) {
+                                      IsTriviallyDestroyable_t pod) {
       return new FuncTypeInfo(formalType, storageType, size, align,
                               std::move(spareBits), pod);
     }
@@ -248,9 +248,9 @@ namespace {
                           bool useStructLayouts) const override {
       if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
-      } else if (isPOD(ResilienceExpansion::Maximal)) {
+      } else if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                           ScalarKind::POD);
+                                                           ScalarKind::TriviallyDestroyable);
       } else {
         return IGM.typeLayoutCache.getOrCreateScalarEntry(
             *this, T, ScalarKind::ThickFunc);
@@ -285,25 +285,25 @@ namespace {
       return ".data";
     }
     bool isSecondElementTrivial() const {
-      return isPOD(ResilienceExpansion::Maximal);
+      return isTriviallyDestroyable(ResilienceExpansion::Maximal);
     }
     void emitRetainSecondElement(IRGenFunction &IGF, llvm::Value *data,
                                  Optional<Atomicity> atomicity = None) const {
-      if (!isPOD(ResilienceExpansion::Maximal)) {
+      if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRetain(data, *atomicity);
       }
     }
     void emitReleaseSecondElement(IRGenFunction &IGF, llvm::Value *data,
                                   Optional<Atomicity> atomicity = None) const {
-      if (!isPOD(ResilienceExpansion::Maximal)) {
+      if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRelease(data, *atomicity);
       }
     }
     void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
                                  Address dataAddr) const {
-      if (isPOD(ResilienceExpansion::Maximal))
+      if (isTriviallyDestroyable(ResilienceExpansion::Maximal))
         IGF.Builder.CreateStore(context, dataAddr);
       else
         IGF.emitNativeStrongAssign(context, dataAddr);
@@ -448,7 +448,7 @@ namespace {
   public:
     BlockStorageTypeInfo(llvm::Type *type, Size size, Alignment align,
                          SpareBitVector &&spareBits,
-                         IsPOD_t pod, IsBitwiseTakable_t bt, Size captureOffset)
+                         IsTriviallyDestroyable_t pod, IsBitwiseTakable_t bt, Size captureOffset)
       : IndirectTypeInfo(type, size, std::move(spareBits), align, pod, bt,
                          IsFixedSize),
         CaptureOffset(captureOffset)
@@ -511,7 +511,7 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
   spareBits.appendClearBits(captureOffset.getValueInBits());
 
   Size size = captureOffset;
-  IsPOD_t pod = IsNotPOD;
+  IsTriviallyDestroyable_t pod = IsNotTriviallyDestroyable;
   IsBitwiseTakable_t bt = IsNotBitwiseTakable;
   if (!fixedCapture) {
     IGM.unimplemented(SourceLoc(), "dynamic @block_storage capture");
@@ -524,7 +524,7 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
     spareBits.append(fixedCapture->getSpareBits());
 
     size = captureOffset + fixedCapture->getFixedSize();
-    pod = fixedCapture->isPOD(ResilienceExpansion::Maximal);
+    pod = fixedCapture->isTriviallyDestroyable(ResilienceExpansion::Maximal);
     bt = fixedCapture->isBitwiseTakable(ResilienceExpansion::Maximal);
   }
 
@@ -595,11 +595,11 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
       return FuncTypeInfo::create(
           CanSILFunctionType(T), IGM.NoEscapeFunctionPairTy,
           IGM.getPointerSize() * 2, IGM.getPointerAlignment(),
-          std::move(spareBits), IsPOD);
+          std::move(spareBits), IsTriviallyDestroyable);
     }
     return FuncTypeInfo::create(
         CanSILFunctionType(T), IGM.FunctionPairTy, IGM.getPointerSize() * 2,
-        IGM.getPointerAlignment(), std::move(spareBits), IsNotPOD);
+        IGM.getPointerAlignment(), std::move(spareBits), IsNotTriviallyDestroyable);
   }
   }
   llvm_unreachable("bad function type representation");
@@ -1632,7 +1632,7 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
       case ParameterConvention::Direct_Unowned:
         // If the type is nontrivial, keep the context alive since the field
         // depends on the context to not be deallocated.
-        if (!fieldTI.isPOD(ResilienceExpansion::Maximal))
+        if (!fieldTI.isTriviallyDestroyable(ResilienceExpansion::Maximal))
           dependsOnContextLifetime = true;
 
         // Load these parameters directly. We can "take" since the parameter is
@@ -2278,8 +2278,8 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   uint32_t flags = 0;
   auto &captureTL
     = IGF.getTypeInfoForLowered(blockTy->getCaptureType());
-  bool isPOD = captureTL.isPOD(ResilienceExpansion::Maximal);
-  if (!isPOD)
+  bool isTriviallyDestroyable = captureTL.isTriviallyDestroyable(ResilienceExpansion::Maximal);
+  if (!isTriviallyDestroyable)
     flags |= 1 << 25;
   
   // - HAS_STRET, if the invoke function is sret
@@ -2309,7 +2309,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   descriptorFields.addInt(UnsignedLongTy,
                           storageTL.getFixedSize().getValue());
   
-  if (!isPOD) {
+  if (!isTriviallyDestroyable) {
     // Define the copy and dispose helpers.
     descriptorFields.addSignedPointer(
                        emitBlockCopyHelper(IGF.IGM, blockTy, storageTL),

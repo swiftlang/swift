@@ -369,7 +369,7 @@ namespace {
                                 const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
                              fields, explosionSize, storageType, size,
-                             std::move(spareBits), align, IsPOD, IsFixedSize),
+                             std::move(spareBits), align, IsTriviallyDestroyable, IsFixedSize),
           ClangDecl(clangDecl) {}
 
     TypeLayoutEntry
@@ -468,7 +468,7 @@ namespace {
                              // with user-defined special member functions.
                              SpareBitVector(llvm::Optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
-                             align, IsNotPOD, IsNotBitwiseTakable, IsFixedSize),
+                             align, IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsFixedSize),
           clangDecl(clangDecl) {
       (void)clangDecl;
     }
@@ -622,7 +622,7 @@ namespace {
                              // with user-defined special member functions.
                              SpareBitVector(llvm::Optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
-                             align, IsNotPOD, IsNotBitwiseTakable, IsFixedSize),
+                             align, IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsFixedSize),
           ClangDecl(clangDecl) {
       (void)ClangDecl;
     }
@@ -805,12 +805,12 @@ namespace {
                            unsigned explosionSize,
                            llvm::Type *storageType, Size size,
                            SpareBitVector &&spareBits,
-                           Alignment align, IsPOD_t isPOD,
+                           Alignment align, IsTriviallyDestroyable_t isTriviallyDestroyable,
                            IsFixedSize_t alwaysFixedSize)
       : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo,
                            fields, explosionSize,
                            storageType, size, std::move(spareBits),
-                           align, isPOD, alwaysFixedSize)
+                           align, isTriviallyDestroyable, alwaysFixedSize)
     {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -892,11 +892,11 @@ namespace {
     // FIXME: Spare bits between struct members.
     FixedStructTypeInfo(ArrayRef<StructFieldInfo> fields, llvm::Type *T,
                         Size size, SpareBitVector &&spareBits,
-                        Alignment align, IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                        Alignment align, IsTriviallyDestroyable_t isTriviallyDestroyable, IsBitwiseTakable_t isBT,
                         IsFixedSize_t alwaysFixedSize)
       : StructTypeInfoBase(StructTypeInfoKind::FixedStructTypeInfo,
                            fields, T, size, std::move(spareBits), align,
-                           isPOD, isBT, alwaysFixedSize)
+                           isTriviallyDestroyable, isBT, alwaysFixedSize)
     {}
 
     TypeLayoutEntry
@@ -984,11 +984,11 @@ namespace {
                            FieldsAreABIAccessible_t fieldsAccessible,
                            llvm::Type *T,
                            Alignment align,
-                           IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                           IsTriviallyDestroyable_t isTriviallyDestroyable, IsBitwiseTakable_t isBT,
                            IsABIAccessible_t structAccessible)
       : StructTypeInfoBase(StructTypeInfoKind::NonFixedStructTypeInfo,
                            fields, fieldsAccessible,
-                           T, align, isPOD, isBT, structAccessible) {
+                           T, align, isTriviallyDestroyable, isBT, structAccessible) {
     }
 
     TypeLayoutEntry
@@ -1115,7 +1115,7 @@ namespace {
                                             layout.getSize(),
                                             std::move(layout.getSpareBits()),
                                             layout.getAlignment(),
-                                            layout.isPOD(),
+                                            layout.isTriviallyDestroyable(),
                                             layout.isAlwaysFixedSize());
     }
 
@@ -1125,7 +1125,7 @@ namespace {
                                          layout.getSize(),
                                          std::move(layout.getSpareBits()),
                                          layout.getAlignment(),
-                                         layout.isPOD(),
+                                         layout.isTriviallyDestroyable(),
                                          layout.isBitwiseTakable(),
                                          layout.isAlwaysFixedSize());
     }
@@ -1138,7 +1138,7 @@ namespace {
       return NonFixedStructTypeInfo::create(fields, fieldsAccessible,
                                             layout.getType(),
                                             layout.getAlignment(),
-                                            layout.isPOD(),
+                                            layout.isTriviallyDestroyable(),
                                             layout.isBitwiseTakable(),
                                             structAccessible);
     }
@@ -1388,9 +1388,9 @@ private:
     auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
     if (isEmpty)
       layout.completeEmptyTailAllocatedCType(
-          fieldType.isPOD(ResilienceExpansion::Maximal), NextOffset);
+          fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
     else
-      layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
+      layout.completeFixed(fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());
 
     if (isLoadableField)

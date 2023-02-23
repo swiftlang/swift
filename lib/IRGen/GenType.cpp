@@ -174,7 +174,7 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                                           Address srcAddr, SILType T,
                                           bool isOutlined) const {
   // Use memcpy if that's legal.
-  if (isPOD(ResilienceExpansion::Maximal)) {
+  if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
     return initializeWithTake(IGF, destAddr, srcAddr, T, isOutlined);
   }
 
@@ -226,9 +226,9 @@ llvm::Constant *FixedTypeInfo::getStaticAlignmentMask(IRGenModule &IGM) const {
 llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, SILType T) const {
   return FixedTypeInfo::getStaticStride(IGF.IGM);
 }
-llvm::Value *FixedTypeInfo::getIsPOD(IRGenFunction &IGF, SILType T) const {
+llvm::Value *FixedTypeInfo::getIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
-                                isPOD(ResilienceExpansion::Maximal) == IsPOD);
+                                isTriviallyDestroyable(ResilienceExpansion::Maximal) == IsTriviallyDestroyable);
 }
 llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
@@ -963,7 +963,7 @@ namespace {
   /// A TypeInfo implementation for empty types.
   struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
-      : ScalarTypeInfo(ty, Size(0), SpareBitVector{}, Alignment(1), IsPOD,
+      : ScalarTypeInfo(ty, Size(0), SpareBitVector{}, Alignment(1), IsTriviallyDestroyable,
                        IsFixedSize) {}
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
@@ -1128,7 +1128,7 @@ namespace {
                           Size size,
                           SpareBitVector &&spareBits,
                           Alignment align)
-      : ScalarTypeInfo(storage, size, std::move(spareBits), align, IsPOD,
+      : ScalarTypeInfo(storage, size, std::move(spareBits), align, IsTriviallyDestroyable,
                        IsFixedSize),
         ScalarTypes(std::move(scalarTypes))
     {}
@@ -1145,7 +1145,7 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                        ScalarKind::POD);
+                                            ScalarKind::TriviallyDestroyable);
     }
 
     unsigned getExplosionSize() const override {
@@ -1315,7 +1315,7 @@ namespace {
                       SpareBitVector &&spareBits,
                       Alignment align)
       : ImmovableTypeInfoBase(storage, size, std::move(spareBits), align,
-                              IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
+                              IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsFixedSize) {}
   };
 
   /// A TypeInfo implementation for address-only types which can never
@@ -1324,7 +1324,7 @@ namespace {
     public ImmovableTypeInfoBase<OpaqueImmovableTypeInfo, TypeInfo> {
   public:
     OpaqueImmovableTypeInfo(llvm::Type *storage, Alignment minAlign)
-      : ImmovableTypeInfoBase(storage, minAlign, IsNotPOD,
+      : ImmovableTypeInfoBase(storage, minAlign, IsNotTriviallyDestroyable,
                               IsNotBitwiseTakable, IsNotFixedSize,
                               IsNotABIAccessible,
                               SpecialTypeInfoKind::None) {}
@@ -1338,7 +1338,7 @@ namespace {
     llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
-    llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const override {
+    llvm::Value *getIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
     llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
@@ -2483,7 +2483,7 @@ public:
                     Size(node.Size),
                     spareBits,
                     Alignment(node.Alignment),
-                    IsNotPOD, /* irrelevant */
+                    IsNotTriviallyDestroyable, /* irrelevant */
                     IsNotBitwiseTakable, /* irrelevant */
                     IsFixedSize /* irrelevant */),
       NumExtraInhabitants(node.NumExtraInhabitants) {}

@@ -67,8 +67,8 @@ public:
     return Layout.isEmpty();
   }
 
-  IsPOD_t isPOD() const {
-    return Layout.isPOD();
+  IsTriviallyDestroyable_t isTriviallyDestroyable() const {
+    return Layout.isTriviallyDestroyable();
   }
 
   IsABIAccessible_t isABIAccessible() const {
@@ -212,7 +212,7 @@ public:
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                           SILType T, bool isOutlined) const override {
     // If we're POD, use the generic routine.
-    if (this->isPOD(ResilienceExpansion::Maximal) &&
+    if (this->isTriviallyDestroyable(ResilienceExpansion::Maximal) &&
         isa<LoadableTypeInfo>(this)) {
       return cast<LoadableTypeInfo>(this)->LoadableTypeInfo::initializeWithCopy(
           IGF, dest, src, T, isOutlined);
@@ -281,7 +281,7 @@ public:
     if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
-        if (field.isPOD())
+        if (field.isTriviallyDestroyable())
           continue;
 
         field.getTypeInfo().destroy(IGF,
@@ -605,7 +605,7 @@ public:
         if (field == &otherField)
           continue;
         auto &ti = otherField.getTypeInfo();
-        if (!ti.isPOD(ResilienceExpansion::Maximal)) {
+        if (!ti.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
           return false;
         }
       }

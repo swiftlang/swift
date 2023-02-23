@@ -126,9 +126,9 @@ private:
   /// or in the non-fixed elements array (if non-fixed).
   unsigned Index : 28;
 
-  /// Whether this element is known to be POD in the local resilience
-  /// domain.
-  unsigned IsPOD : 1;
+  /// Whether this element is known to be trivially destructible in the local
+  /// resilience domain.
+  unsigned IsTriviallyDestroyable : 1;
 
   /// The kind of layout performed for this element.
   unsigned TheKind : 3;
@@ -148,31 +148,31 @@ public:
   void completeFrom(const ElementLayout &other) {
     assert(!isCompleted());
     TheKind = other.TheKind;
-    IsPOD = other.IsPOD;
+    IsTriviallyDestroyable = other.IsTriviallyDestroyable;
     ByteOffset = other.ByteOffset;
     ByteOffsetForLayout = other.ByteOffsetForLayout;
     Index = other.Index;
   }
 
-  void completeEmpty(IsPOD_t isPOD, Size byteOffset) {
+  void completeEmpty(IsTriviallyDestroyable_t isTriviallyDestroyable, Size byteOffset) {
     TheKind = unsigned(Kind::Empty);
-    IsPOD = unsigned(isPOD);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
     ByteOffset = 0;
     ByteOffsetForLayout = byteOffset.getValue();
     Index = 0; // make a complete write of the bitfield
   }
 
-  void completeInitialNonFixedSize(IsPOD_t isPOD) {
+  void completeInitialNonFixedSize(IsTriviallyDestroyable_t isTriviallyDestroyable) {
     TheKind = unsigned(Kind::InitialNonFixedSize);
-    IsPOD = unsigned(isPOD);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
     ByteOffset = 0;
     ByteOffsetForLayout = ByteOffset;
     Index = 0; // make a complete write of the bitfield
   }
 
-  void completeFixed(IsPOD_t isPOD, Size byteOffset, unsigned structIndex) {
+  void completeFixed(IsTriviallyDestroyable_t isTriviallyDestroyable, Size byteOffset, unsigned structIndex) {
     TheKind = unsigned(Kind::Fixed);
-    IsPOD = unsigned(isPOD);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
     ByteOffset = byteOffset.getValue();
     ByteOffsetForLayout = ByteOffset;
     Index = structIndex;
@@ -180,9 +180,9 @@ public:
     assert(getByteOffset() == byteOffset);
   }
 
-  void completeEmptyTailAllocatedCType(IsPOD_t isPOD, Size byteOffset) {
+  void completeEmptyTailAllocatedCType(IsTriviallyDestroyable_t isTriviallyDestroyable, Size byteOffset) {
     TheKind = unsigned(Kind::EmptyTailAllocatedCType);
-    IsPOD = unsigned(isPOD);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
     ByteOffset = byteOffset.getValue();
     ByteOffsetForLayout = ByteOffset;
     Index = 0;
@@ -193,9 +193,9 @@ public:
   /// Complete this element layout with a non-fixed offset.
   ///
   /// \param nonFixedElementIndex - the index into the elements array
-  void completeNonFixed(IsPOD_t isPOD, unsigned nonFixedElementIndex) {
+  void completeNonFixed(IsTriviallyDestroyable_t isTriviallyDestroyable, unsigned nonFixedElementIndex) {
     TheKind = unsigned(Kind::NonFixed);
-    IsPOD = unsigned(isPOD);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
     Index = nonFixedElementIndex;
   }
 
@@ -213,9 +213,9 @@ public:
   }
 
   /// Is this element known to be POD?
-  IsPOD_t isPOD() const {
+  IsTriviallyDestroyable_t isTriviallyDestroyable() const {
     assert(isCompleted());
-    return IsPOD_t(IsPOD);
+    return IsTriviallyDestroyable_t(IsTriviallyDestroyable);
   }
 
   /// Can we access this element at a static offset?
@@ -283,7 +283,7 @@ private:
   SmallVector<SpareBitVector, 8> CurSpareBits;
   unsigned NextNonFixedOffsetIndex = 0;
   bool IsFixedLayout = true;
-  IsPOD_t IsKnownPOD = IsPOD;
+  IsTriviallyDestroyable_t IsKnownTriviallyDestroyable = IsTriviallyDestroyable;
   IsBitwiseTakable_t IsKnownBitwiseTakable = IsBitwiseTakable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
 public:
@@ -325,7 +325,7 @@ public:
 
   /// Return whether the structure is known to be POD in the local
   /// resilience scope.
-  IsPOD_t isPOD() const { return IsKnownPOD; }
+  IsTriviallyDestroyable_t isTriviallyDestroyable() const { return IsKnownTriviallyDestroyable; }
 
   /// Return whether the structure is known to be bitwise-takable in the local
   /// resilience scope.
@@ -392,7 +392,7 @@ class StructLayout {
   /// alignment are exact.
   bool IsFixedLayout;
 
-  IsPOD_t IsKnownPOD;
+  IsTriviallyDestroyable_t IsKnownTriviallyDestroyable;
   IsBitwiseTakable_t IsKnownBitwiseTakable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
   
@@ -423,7 +423,7 @@ public:
       headerSize(builder.getHeaderSize()),
       SpareBits(builder.getSpareBits()),
       IsFixedLayout(builder.isFixedLayout()),
-      IsKnownPOD(builder.isPOD()),
+      IsKnownTriviallyDestroyable(builder.isTriviallyDestroyable()),
       IsKnownBitwiseTakable(builder.isBitwiseTakable()),
       IsKnownAlwaysFixedSize(builder.isAlwaysFixedSize()),
       Ty(type),
@@ -441,7 +441,7 @@ public:
   const SpareBitVector &getSpareBits() const { return SpareBits; }
   SpareBitVector &getSpareBits() { return SpareBits; }
   bool isKnownEmpty() const { return isFixedLayout() && MinimumSize.isZero(); }
-  IsPOD_t isPOD() const { return IsKnownPOD; }
+  IsTriviallyDestroyable_t isTriviallyDestroyable() const { return IsKnownTriviallyDestroyable; }
   IsBitwiseTakable_t isBitwiseTakable() const {
     return IsKnownBitwiseTakable;
   }

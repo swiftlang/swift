@@ -640,7 +640,7 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
       if (getSingleton() &&
-          !getSingleton()->isPOD(ResilienceExpansion::Maximal)) {
+          !getSingleton()->isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!ElementsAreABIAccessible) {
           emitDestroyCall(IGF, T, addr);
         } else if (isOutlined || T.hasOpenedExistential()) {
@@ -1033,7 +1033,8 @@ namespace {
     void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                      SILType T) const override {}
 
-    static constexpr IsPOD_t IsScalarPOD = IsPOD;
+    static constexpr IsTriviallyDestroyable_t IsScalarTriviallyDestroyable
+      = IsTriviallyDestroyable;
 
     ClusteredBitVector getTagBitsForPayloads() const override {
       // No tag bits; no-payload enums always use fixed representations.
@@ -1097,7 +1098,7 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(), T);
       }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T,
-                                                        ScalarKind::POD);
+                                            ScalarKind::TriviallyDestroyable);
     }
 
 
@@ -1255,7 +1256,7 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(), T);
       }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T,
-                                                        ScalarKind::POD);
+                                            ScalarKind::TriviallyDestroyable);
     }
 
     /// \group Extra inhabitants for C-compatible enums.
@@ -1507,10 +1508,10 @@ namespace {
                 bool isOutlined, SILType T) const override {
       assert(TIK >= Loadable);
       Explosion old;
-      if (!isPOD(ResilienceExpansion::Maximal))
+      if (!isTriviallyDestroyable(ResilienceExpansion::Maximal))
         loadAsTake(IGF, addr, old);
       initialize(IGF, e, addr, isOutlined);
-      if (!isPOD(ResilienceExpansion::Maximal))
+      if (!isTriviallyDestroyable(ResilienceExpansion::Maximal))
         consume(IGF, old, IGF.getDefaultAtomicity(), T);
     }
 
@@ -1705,8 +1706,9 @@ namespace {
     enum CopyDestroyStrategy {
       /// No special behavior.
       Normal,
-      /// The payload is POD, so copying is bitwise, and destruction is a noop.
-      POD,
+      /// The payload is trivially destructible, so copying is bitwise (if
+      /// allowed), and destruction is a noop.
+      TriviallyDestroyable,
       /// The payload type is ABI-inaccessible, so we can't recurse.
       ABIInaccessible,
       /// The payload is a single reference-counted value, and we have
@@ -1832,12 +1834,12 @@ namespace {
     {
       assert(ElementsWithPayload.size() == 1);
 
-      // If the payload is POD, then we can use POD value semantics.
+      // If the payload is TriviallyDestroyable, then we can use TriviallyDestroyable value semantics.
       auto &payloadTI = *ElementsWithPayload[0].ti;
       if (!payloadTI.isABIAccessible()) {
         CopyDestroyKind = ABIInaccessible;
-      } else if (payloadTI.isPOD(ResilienceExpansion::Maximal)) {
-        CopyDestroyKind = POD;
+      } else if (payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
+        CopyDestroyKind = TriviallyDestroyable;
       // If the payload is a single refcounted pointer and we have a single
       // empty case, then the layout will be a nullable pointer, and we can
       // pass enum values directly into swift_retain/swift_release as-is.
@@ -2487,7 +2489,7 @@ namespace {
       case NullableRefcounted:
         return IGM.getReferenceType(Refcounting);
       case ForwardToPayload:
-      case POD:
+      case TriviallyDestroyable:
       case Normal:
       case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
@@ -2511,7 +2513,7 @@ namespace {
         return;
       }
       case ForwardToPayload:
-      case POD:
+      case TriviallyDestroyable:
       case Normal:
       case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
@@ -2525,7 +2527,7 @@ namespace {
         IGF.emitFixLifetime(ptr);
         return;
       case ForwardToPayload:
-      case POD:
+      case TriviallyDestroyable:
       case Normal:
       case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
@@ -2547,7 +2549,7 @@ namespace {
         return;
       }
       case ForwardToPayload:
-      case POD:
+      case TriviallyDestroyable:
       case Normal:
       case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
@@ -2591,7 +2593,7 @@ namespace {
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
-      case POD:
+      case TriviallyDestroyable:
         reexplode(IGF, src, dest);
         return;
 
@@ -2661,7 +2663,7 @@ namespace {
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
-      case POD:
+      case TriviallyDestroyable:
         (void)src.claim(getExplosionSize());
         return;
 
@@ -2728,7 +2730,7 @@ namespace {
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
-      case POD:
+      case TriviallyDestroyable:
         (void)src.claim(getExplosionSize());
         return;
 
@@ -2782,14 +2784,14 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
-      if (CopyDestroyKind == POD) {
+      if (CopyDestroyKind == TriviallyDestroyable) {
         return;
       }
       if (!ElementsAreABIAccessible) {
         return emitDestroyCall(IGF, T, addr);
       } else if (isOutlined || T.hasOpenedExistential()) {
         switch (CopyDestroyKind) {
-        case POD:
+        case TriviallyDestroyable:
           return;
 
         case ABIInaccessible:
@@ -2899,7 +2901,7 @@ namespace {
       auto PayloadT = getPayloadType(IGM, T);
 
       switch (CopyDestroyKind) {
-      case POD:
+      case TriviallyDestroyable:
         return emitPrimitiveCopy(IGF, dest, src, T);
 
       case ABIInaccessible:
@@ -3018,7 +3020,7 @@ namespace {
       auto &C = IGM.getLLVMContext();
 
       switch (CopyDestroyKind) {
-      case POD:
+      case TriviallyDestroyable:
         return emitPrimitiveCopy(IGF, dest, src, T);
 
       case ABIInaccessible:
@@ -3525,9 +3527,9 @@ namespace {
     enum CopyDestroyStrategy {
       /// No special behavior.
       Normal,
-      /// The payloads are all POD, so copying is bitwise, and destruction is a
-      /// noop.
-      POD,
+      /// The payloads are all trivially destructible, so copying is bitwise
+      /// (if allowed), and destruction is a noop.
+      TriviallyDestroyable,
       /// One or more of the payloads is ABI-inaccessible, so we cannot recurse.
       ABIInaccessible,
       /// The payloads are all bitwise-takable, but have no other special
@@ -3672,13 +3674,13 @@ namespace {
 
       // Check the payloads to see if we can take advantage of common layout to
       // optimize our value semantics.
-      bool allPOD = true;
+      bool allTriviallyDestroyable = true;
       bool allBitwiseTakable = true;
       bool allSingleRefcount = true;
       bool haveRefcounting = false;
       for (auto &elt : ElementsWithPayload) {
-        if (!elt.ti->isPOD(ResilienceExpansion::Maximal))
-          allPOD = false;
+        if (!elt.ti->isTriviallyDestroyable(ResilienceExpansion::Maximal))
+          allTriviallyDestroyable = false;
         if (!elt.ti->isBitwiseTakable(ResilienceExpansion::Maximal))
           allBitwiseTakable = false;
 
@@ -3702,9 +3704,9 @@ namespace {
 
       if (!ElementsAreABIAccessible) {
         CopyDestroyKind = ABIInaccessible;
-      } else if (allPOD) {
-        assert(!allSingleRefcount && "pod *and* refcounted?!");
-        CopyDestroyKind = POD;
+      } else if (allTriviallyDestroyable) {
+        assert(!allSingleRefcount && "TriviallyDestroyable *and* refcounted?!");
+        CopyDestroyKind = TriviallyDestroyable;
       // FIXME: Memory corruption issues arise when enabling this for mixed
       // Swift/ObjC enums.
       } else if (allSingleRefcount
@@ -3794,7 +3796,7 @@ namespace {
       switch (CopyDestroyKind) {
       case TaggedRefcounted:
         return IGM.getReferenceType(Refcounting);
-      case POD:
+      case TriviallyDestroyable:
       case BitwiseTakable:
       case Normal:
       case ABIInaccessible:
@@ -3810,7 +3812,7 @@ namespace {
       case TaggedRefcounted:
         IGF.emitStrongRetain(ptr, Refcounting, IGF.getDefaultAtomicity());
         return;
-      case POD:
+      case TriviallyDestroyable:
       case BitwiseTakable:
       case Normal:
       case ABIInaccessible:
@@ -3824,7 +3826,7 @@ namespace {
       case TaggedRefcounted:
         IGF.emitFixLifetime(ptr);
         return;
-      case POD:
+      case TriviallyDestroyable:
       case BitwiseTakable:
       case Normal:
       case ABIInaccessible:
@@ -3838,7 +3840,7 @@ namespace {
       case TaggedRefcounted:
         IGF.emitStrongRelease(ptr, Refcounting, IGF.getDefaultAtomicity());
         return;
-      case POD:
+      case TriviallyDestroyable:
       case BitwiseTakable:
       case Normal:
       case ABIInaccessible:
@@ -4519,7 +4521,7 @@ namespace {
       unsigned numNontrivialPayloads
         = std::count_if(ElementsWithPayload.begin(), ElementsWithPayload.end(),
                      [](Element e) -> bool {
-                       return !e.ti->isPOD(ResilienceExpansion::Maximal);
+                       return !e.ti->isTriviallyDestroyable(ResilienceExpansion::Maximal);
                      });
 
       bool anyTrivial = !ElementsWithNoPayload.empty()
@@ -4536,7 +4538,7 @@ namespace {
         auto &payloadTI = *payloadCasePair.ti;
 
         // Trivial payloads don't need any work.
-        if (payloadTI.isPOD(ResilienceExpansion::Maximal)) {
+        if (payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
           ++tagIndex;
           continue;
         }
@@ -4601,7 +4603,7 @@ namespace {
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
-      case POD:
+      case TriviallyDestroyable:
         reexplode(IGF, src, dest);
         return;
 
@@ -4663,7 +4665,7 @@ namespace {
                  Atomicity atomicity, SILType T) const override {
       assert(TIK >= Loadable);
       switch (CopyDestroyKind) {
-      case POD:
+      case TriviallyDestroyable:
         (void)src.claim(getExplosionSize());
         return;
 
@@ -4717,7 +4719,7 @@ namespace {
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
-      case POD:
+      case TriviallyDestroyable:
         (void)src.claim(getExplosionSize());
         return;
 
@@ -4760,7 +4762,7 @@ namespace {
       auto &C = IGM.getLLVMContext();
 
       switch (CopyDestroyKind) {
-      case POD:
+      case TriviallyDestroyable:
         return emitPrimitiveCopy(IGF, dest, src, T);
 
       case ABIInaccessible:
@@ -4813,7 +4815,7 @@ namespace {
       auto &C = IGM.getLLVMContext();
 
       switch (CopyDestroyKind) {
-      case POD:
+      case TriviallyDestroyable:
         return emitPrimitiveCopy(IGF, dest, src, T);
 
       case ABIInaccessible:
@@ -4847,7 +4849,7 @@ namespace {
 
         /// True if the type is trivially copyable or takable by this operation.
         auto isTrivial = [&](const TypeInfo &ti) -> bool {
-          return ti.isPOD(ResilienceExpansion::Maximal)
+          return ti.isTriviallyDestroyable(ResilienceExpansion::Maximal)
               || (isTake && ti.isBitwiseTakable(ResilienceExpansion::Maximal));
         };
         
@@ -5004,14 +5006,14 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
-      if (CopyDestroyKind == POD) {
+      if (CopyDestroyKind == TriviallyDestroyable) {
         return;
       }
       if (!ElementsAreABIAccessible) {
         emitDestroyCall(IGF, T, addr);
       } else if (isOutlined || T.hasOpenedExistential()) {
         switch (CopyDestroyKind) {
-        case POD:
+        case TriviallyDestroyable:
           return;
 
         case ABIInaccessible:
@@ -6335,9 +6337,9 @@ namespace {
   public:
     FixedEnumTypeInfo(EnumImplStrategy &strategy,
                       llvm::StructType *T, Size S, SpareBitVector SB,
-                      Alignment A, IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                      Alignment A, IsTriviallyDestroyable_t isTriviallyDestroyable, IsBitwiseTakable_t isBT,
                       IsFixedSize_t alwaysFixedSize)
-      : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD, isBT,
+      : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A, isTriviallyDestroyable, isBT,
                               alwaysFixedSize) {}
   };
 
@@ -6347,9 +6349,9 @@ namespace {
     // FIXME: Derive spare bits from element layout.
     LoadableEnumTypeInfo(EnumImplStrategy &strategy,
                          llvm::StructType *T, Size S, SpareBitVector SB,
-                         Alignment A, IsPOD_t isPOD,
+                         Alignment A, IsTriviallyDestroyable_t isTriviallyDestroyable,
                          IsFixedSize_t alwaysFixedSize)
-      : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD,
+      : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A, isTriviallyDestroyable,
                               alwaysFixedSize) {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -6417,7 +6419,7 @@ namespace {
     NonFixedEnumTypeInfo(EnumImplStrategy &strategy,
                          llvm::Type *irTy,
                          Alignment align,
-                         IsPOD_t pod,
+                         IsTriviallyDestroyable_t pod,
                          IsBitwiseTakable_t bt,
                          IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, align, pod, bt, abiAccessible) {}
@@ -6453,19 +6455,19 @@ irgen::getEnumImplStrategy(IRGenModule &IGM, CanType ty) {
 TypeInfo *
 EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
                                        SpareBitVector SB,
-                                       Alignment A, IsPOD_t isPOD,
+                                       Alignment A, IsTriviallyDestroyable_t isTriviallyDestroyable,
                                        IsBitwiseTakable_t isBT) {
   TypeInfo *mutableTI;
   switch (TIK) {
   case Opaque:
     llvm_unreachable("not valid");
   case Fixed:
-    mutableTI = new FixedEnumTypeInfo(*this, T, S, std::move(SB), A, isPOD, isBT,
+    mutableTI = new FixedEnumTypeInfo(*this, T, S, std::move(SB), A, isTriviallyDestroyable, isBT,
                                       AlwaysFixedSize);
     break;
   case Loadable:
     assert(isBT && "loadable enum not bitwise takable?!");
-    mutableTI = new LoadableEnumTypeInfo(*this, T, S, std::move(SB), A, isPOD,
+    mutableTI = new LoadableEnumTypeInfo(*this, T, S, std::move(SB), A, isTriviallyDestroyable,
                                          AlwaysFixedSize);
     break;
   }
@@ -6485,7 +6487,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
                                                          Size(0), {},
                                                          alignment,
-                                                         IsPOD,
+                                                         IsTriviallyDestroyable,
                                                          AlwaysFixedSize));
   } else {
     const TypeInfo &eltTI = *getSingleton();
@@ -6504,7 +6506,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
       auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                              alignment,
-                             eltTI.isPOD(ResilienceExpansion::Maximal),
+                             eltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
                              eltTI.isBitwiseTakable(ResilienceExpansion::Maximal),
                              enumAccessible));
     } else {
@@ -6516,7 +6518,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                         fixedEltTI.getFixedSize(),
                         fixedEltTI.getSpareBits(),
                         alignment,
-                        fixedEltTI.isPOD(ResilienceExpansion::Maximal),
+                        fixedEltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
                         fixedEltTI.isBitwiseTakable(ResilienceExpansion::Maximal));
     }
   }
@@ -6549,7 +6551,7 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
 
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                               enumTy, tagSize, std::move(spareBits),
-                              alignment, IsPOD, AlwaysFixedSize));
+                              alignment, IsTriviallyDestroyable, AlwaysFixedSize));
 }
 
 TypeInfo *
@@ -6572,7 +6574,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   auto &rawTI = TC.getCompleteTypeInfo(
                                    theEnum->getRawType()->getCanonicalType());
   auto &rawFixedTI = cast<FixedTypeInfo>(rawTI);
-  assert(rawFixedTI.isPOD(ResilienceExpansion::Maximal)
+  assert(rawFixedTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)
          && "c-compatible raw type isn't POD?!");
   ExplosionSchema rawSchema = rawTI.getSchema();
   assert(rawSchema.size() == 1
@@ -6594,7 +6596,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                rawFixedTI.getFixedSize(),
                                                rawFixedTI.getSpareBits(),
                                                alignment,
-                                               IsPOD,
+                                               IsTriviallyDestroyable,
                                                IsFixedSize));
 }
 
@@ -6661,7 +6663,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
 
   getFixedEnumTypeInfo(
       enumTy, Size(sizeWithTag), spareBits.build(), alignment,
-      payloadTI.isPOD(ResilienceExpansion::Maximal),
+      payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
       payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal));
   if (TIK >= Loadable && CopyDestroyKind == Normal) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
@@ -6691,7 +6693,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
 
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
-         payloadTI.isPOD(ResilienceExpansion::Maximal),
+         payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
          payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal),
          enumAccessible));
 }
@@ -6722,15 +6724,15 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   // of the largest payload.
   CommonSpareBits = {};
   Alignment worstAlignment(1);
-  IsPOD_t isPOD = IsPOD;
+  IsTriviallyDestroyable_t isTriviallyDestroyable = IsTriviallyDestroyable;
   IsBitwiseTakable_t isBT = IsBitwiseTakable;
   PayloadSize = 0;
   for (auto &elt : ElementsWithPayload) {
     auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti);
     if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
       worstAlignment = fixedPayloadTI.getFixedAlignment();
-    if (!fixedPayloadTI.isPOD(ResilienceExpansion::Maximal))
-      isPOD = IsNotPOD;
+    if (!fixedPayloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal))
+      isTriviallyDestroyable = IsNotTriviallyDestroyable;
     if (!fixedPayloadTI.isBitwiseTakable(ResilienceExpansion::Maximal))
       isBT = IsNotBitwiseTakable;
 
@@ -6862,7 +6864,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/ true, worstAlignment);
 
   getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
-                       worstAlignment, isPOD, isBT);
+                       worstAlignment, isTriviallyDestroyable, isBT);
   if (TIK >= Loadable &&
       (CopyDestroyKind == Normal || CopyDestroyKind == BitwiseTakable)) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
@@ -6886,12 +6888,12 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   // during initializeMetadata. We can at least glean the best available
   // static information from the payloads.
   Alignment alignment(1);
-  IsPOD_t pod = IsPOD;
+  IsTriviallyDestroyable_t pod = IsTriviallyDestroyable;
   IsBitwiseTakable_t bt = IsBitwiseTakable;
   for (auto &element : ElementsWithPayload) {
     auto &payloadTI = *element.ti;
     alignment = std::max(alignment, payloadTI.getBestKnownAlignment());
-    pod &= payloadTI.isPOD(ResilienceExpansion::Maximal);
+    pod &= payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
     bt &= payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   }
   

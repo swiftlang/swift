@@ -106,8 +106,8 @@ protected:
       /// The storage alignment of this type in log2 bytes.
       AlignmentShift : 6,
 
-      /// Whether this type is known to be POD.
-      POD : 1,
+      /// Whether this type is known to be trivially destructible.
+      TriviallyDestroyable : 1,
 
       /// Whether this type is known to be bitwise-takable.
       BitwiseTakable : 1,
@@ -142,7 +142,7 @@ protected:
   } Bits;
   enum { InvalidSubclassKind = 0x7 };
 
-  TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,
+  TypeInfo(llvm::Type *Type, Alignment A, IsTriviallyDestroyable_t pod,
            IsBitwiseTakable_t bitwiseTakable,
            IsFixedSize_t alwaysFixedSize,
            IsABIAccessible_t abiAccessible,
@@ -151,7 +151,7 @@ protected:
     Bits.OpaqueBits = 0;
     Bits.TypeInfo.Kind = unsigned(stik);
     Bits.TypeInfo.AlignmentShift = llvm::Log2_32(A.getValue());
-    Bits.TypeInfo.POD = pod;
+    Bits.TypeInfo.TriviallyDestroyable = pod;
     Bits.TypeInfo.BitwiseTakable = bitwiseTakable;
     Bits.TypeInfo.SubclassKind = InvalidSubclassKind;
     Bits.TypeInfo.AlwaysFixedSize = alwaysFixedSize;
@@ -208,8 +208,8 @@ public:
 
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.
-  IsPOD_t isPOD(ResilienceExpansion expansion) const {
-    return IsPOD_t(Bits.TypeInfo.POD);
+  IsTriviallyDestroyable_t isTriviallyDestroyable(ResilienceExpansion expansion) const {
+    return IsTriviallyDestroyable_t(Bits.TypeInfo.TriviallyDestroyable);
   }
   
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
@@ -286,7 +286,7 @@ public:
   virtual llvm::Value *getSize(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getStride(IRGenFunction &IGF, SILType T) const = 0;
-  virtual llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const = 0;
+  virtual llvm::Value *getIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                                  SILType T) const = 0;

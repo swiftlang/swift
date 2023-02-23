@@ -75,7 +75,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
     headerSize = builder.getHeaderSize();
     SpareBits.clear();
     IsFixedLayout = true;
-    IsKnownPOD = IsPOD;
+    IsKnownTriviallyDestroyable = IsTriviallyDestroyable;
     IsKnownBitwiseTakable = IsBitwiseTakable;
     IsKnownAlwaysFixedSize = IsFixedSize;
     Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
@@ -85,7 +85,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
     headerSize = builder.getHeaderSize();
     SpareBits = builder.getSpareBits();
     IsFixedLayout = builder.isFixedLayout();
-    IsKnownPOD = builder.isPOD();
+    IsKnownTriviallyDestroyable = builder.isTriviallyDestroyable();
     IsKnownBitwiseTakable = builder.isBitwiseTakable();
     IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
     if (typeToFill) {
@@ -217,7 +217,7 @@ void StructLayoutBuilder::addDefaultActorHeader(ElementLayout &elt) {
   assert(CurSize.isMultipleOf(IGM.getPointerSize()));
   assert(align >= CurAlignment);
   assert(CurSize == getDefaultActorStorageFieldOffset(IGM));
-  elt.completeFixed(IsNotPOD, CurSize, /*struct index*/ 1);
+  elt.completeFixed(IsNotTriviallyDestroyable, CurSize, /*struct index*/ 1);
   CurSize += size;
   CurAlignment = align;
   StructFields.push_back(ty);
@@ -245,7 +245,7 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
 bool StructLayoutBuilder::addField(ElementLayout &elt,
                                   LayoutStrategy strategy) {
   auto &eltTI = elt.getType();
-  IsKnownPOD &= eltTI.isPOD(ResilienceExpansion::Maximal);
+  IsKnownTriviallyDestroyable &= eltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
   IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
 
@@ -342,7 +342,7 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 /// Add an empty element to the aggregate.
 void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
   auto byteOffset = isFixedLayout() ? CurSize : Size(0);
-  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal), byteOffset);
+  elt.completeEmpty(elt.getType().isTriviallyDestroyable(ResilienceExpansion::Maximal), byteOffset);
 }
 
 /// Add an element at the fixed offset of the current end of the
@@ -351,7 +351,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   assert(isFixedLayout());
   auto &eltTI = cast<FixedTypeInfo>(elt.getType());
 
-  elt.completeFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
+  elt.completeFixed(elt.getType().isTriviallyDestroyable(ResilienceExpansion::Maximal),
                     CurSize, StructFields.size());
   StructFields.push_back(elt.getType().getStorageType());
   
@@ -362,7 +362,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
 /// Add an element at a non-fixed offset to the aggregate.
 void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
   assert(!isFixedLayout());
-  elt.completeNonFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
+  elt.completeNonFixed(elt.getType().isTriviallyDestroyable(ResilienceExpansion::Maximal),
                        NextNonFixedOffsetIndex);
   CurSpareBits = SmallVector<SpareBitVector, 8>(); // clear spare bits
 }
@@ -372,7 +372,7 @@ void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt)
   assert(isFixedLayout());
   assert(!isa<FixedTypeInfo>(elt.getType()));
   assert(CurSize.isZero());
-  elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceExpansion::Maximal));
+  elt.completeInitialNonFixedSize(elt.getType().isTriviallyDestroyable(ResilienceExpansion::Maximal));
   CurSpareBits = SmallVector<SpareBitVector, 8>(); // clear spare bits
 }
 

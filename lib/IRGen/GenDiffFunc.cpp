@@ -94,9 +94,9 @@ public:
   DifferentiableFuncTypeInfo(ArrayRef<DifferentiableFuncFieldInfo> fields,
                              unsigned explosionSize, llvm::Type *ty, Size size,
                              SpareBitVector &&spareBits, Alignment align,
-                             IsPOD_t isPOD, IsFixedSize_t alwaysFixedSize)
+                             IsTriviallyDestroyable_t isTriviallyDestroyable, IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, ty, size, std::move(spareBits), align,
-              isPOD, alwaysFixedSize) {}
+              isTriviallyDestroyable, alwaysFixedSize) {}
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const DifferentiableFuncFieldInfo &field) const {
@@ -179,7 +179,7 @@ public:
                  StructLayout &&layout, unsigned explosionSize) {
     return DifferentiableFuncTypeInfo::create(
         fields, explosionSize, layout.getType(), layout.getSize(),
-        std::move(layout.getSpareBits()), layout.getAlignment(), layout.isPOD(),
+        std::move(layout.getSpareBits()), layout.getAlignment(), layout.isTriviallyDestroyable(),
         layout.isAlwaysFixedSize());
   }
 
@@ -267,10 +267,10 @@ class LinearFuncTypeInfo final
 public:
   LinearFuncTypeInfo(ArrayRef<LinearFuncFieldInfo> fields,
                      unsigned explosionSize, llvm::Type *ty, Size size,
-                     SpareBitVector &&spareBits, Alignment align, IsPOD_t isPOD,
+                     SpareBitVector &&spareBits, Alignment align, IsTriviallyDestroyable_t isTriviallyDestroyable,
                      IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, ty, size, std::move(spareBits), align,
-              isPOD, alwaysFixedSize) {}
+              isTriviallyDestroyable, alwaysFixedSize) {}
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const LinearFuncFieldInfo &field) const {
@@ -347,7 +347,7 @@ public:
                                      unsigned explosionSize) {
     return LinearFuncTypeInfo::create(
         fields, explosionSize, layout.getType(), layout.getSize(),
-        std::move(layout.getSpareBits()), layout.getAlignment(), layout.isPOD(),
+        std::move(layout.getSpareBits()), layout.getAlignment(), layout.isTriviallyDestroyable(),
         layout.isAlwaysFixedSize());
   }
 

@@ -44,7 +44,7 @@ class ResilientTypeInfo : public WitnessSizedTypeInfo<Impl> {
 protected:
   ResilientTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
     : WitnessSizedTypeInfo<Impl>(type, Alignment(1),
-                                 IsNotPOD, IsNotBitwiseTakable,
+                                 IsNotTriviallyDestroyable, IsNotBitwiseTakable,
                                  abiAccessible) {}
 
 public:
