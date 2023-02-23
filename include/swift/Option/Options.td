@@ -805,11 +805,14 @@ def L_EQ : Joined<["-"], "L=">, Group<linker_option_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   Alias<L>;
 
+// Accept but ignore these flags.  They were once used to control
+// linking of arclite, which is no longer used on Darwin.
 def link_objc_runtime : Flag<["-"], "link-objc-runtime">,
-  Flags<[DoesNotAffectIncrementalBuild]>;
+  Flags<[DoesNotAffectIncrementalBuild]>,
+  HelpText<"Deprecated">;
 def no_link_objc_runtime : Flag<["-"], "no-link-objc-runtime">,
   Flags<[HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Don't link in additions to the Objective-C runtime">;
+  HelpText<"Deprecated">;
 
 def static_stdlib: Flag<["-"], "static-stdlib">,
   Flags<[DoesNotAffectIncrementalBuild]>,
