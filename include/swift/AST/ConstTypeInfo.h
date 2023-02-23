@@ -36,6 +36,7 @@ public:
     Array,
     Tuple,
     Enum,
+    Type,
     Runtime
   };
 
@@ -181,6 +182,21 @@ public:
 private:
   std::string Identifier;
   llvm::Optional<std::vector<FunctionParameter>> Parameters;
+};
+
+/// An type value representation
+class TypeValue : public CompileTimeValue {
+public:
+  TypeValue(swift::Type Type) : CompileTimeValue(ValueKind::Type), Type(Type) {}
+
+  swift::Type getType() const { return Type; }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::Type;
+  }
+
+private:
+  swift::Type Type;
 };
 
 /// A representation of an arbitrary value that does not fall under
