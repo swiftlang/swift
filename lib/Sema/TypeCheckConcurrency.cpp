@@ -793,6 +793,19 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
   return defaultBehavior;
 }
 
+static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
+  switch (sf.Kind) {
+  case SourceFileKind::Interface:
+  case SourceFileKind::SIL:
+      return false;
+
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+  case SourceFileKind::MacroExpansion:
+      return true;
+  }
+}
+
 bool swift::diagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
     llvm::function_ref<bool(DiagnosticBehavior)> diagnose) {
@@ -806,47 +819,68 @@ bool swift::diagnoseSendabilityErrorBasedOn(
 
   bool wasSuppressed = diagnose(behavior);
 
-  bool emittedDiagnostics =
-      behavior != DiagnosticBehavior::Ignore && !wasSuppressed;
+  SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
+  if (sourceFile && shouldDiagnosePreconcurrencyImports(*sourceFile)) {
+    bool emittedDiagnostics =
+        behavior != DiagnosticBehavior::Ignore && !wasSuppressed;
 
-  // When the type is explicitly Sendable *or* explicitly non-Sendable, we
-  // assume it has been audited and `@preconcurrency` is not recommended even
-  // though it would actually affect the diagnostic.
-  bool nominalIsImportedAndHasImplicitSendability =
-      nominal &&
-      nominal->getParentModule() != fromContext.fromDC->getParentModule() &&
-      !hasExplicitSendableConformance(nominal);
+    // When the type is explicitly Sendable *or* explicitly non-Sendable, we
+    // assume it has been audited and `@preconcurrency` is not recommended even
+    // though it would actually affect the diagnostic.
+    bool nominalIsImportedAndHasImplicitSendability =
+        nominal &&
+        nominal->getParentModule() != fromContext.fromDC->getParentModule() &&
+        !hasExplicitSendableConformance(nominal);
 
-  if (emittedDiagnostics && nominalIsImportedAndHasImplicitSendability) {
-    // This type was imported from another module; try to find the
-    // corresponding import.
-    Optional<AttributedImport<swift::ImportedModule>> import;
-    SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
-    if (sourceFile) {
-      import = findImportFor(nominal, fromContext.fromDC);
-    }
+    if (emittedDiagnostics && nominalIsImportedAndHasImplicitSendability) {
+      // This type was imported from another module; try to find the
+      // corresponding import.
+      Optional<AttributedImport<swift::ImportedModule>> import =
+          findImportFor(nominal, fromContext.fromDC);
 
-    // If we found the import that makes this nominal type visible, remark
-    // that it can be @preconcurrency import.
-    // Only emit this remark once per source file, because it can happen a
-    // lot.
-    if (import && !import->options.contains(ImportFlags::Preconcurrency) &&
-        import->importLoc.isValid() && sourceFile &&
-        !sourceFile->hasImportUsedPreconcurrency(*import)) {
-      SourceLoc importLoc = import->importLoc;
-      ASTContext &ctx = nominal->getASTContext();
+      // If we found the import that makes this nominal type visible, remark
+      // that it can be @preconcurrency import.
+      // Only emit this remark once per source file, because it can happen a
+      // lot.
+      if (import && !import->options.contains(ImportFlags::Preconcurrency) &&
+          import->importLoc.isValid() && sourceFile &&
+          !sourceFile->hasImportUsedPreconcurrency(*import)) {
+        SourceLoc importLoc = import->importLoc;
+        ASTContext &ctx = nominal->getASTContext();
 
-      ctx.Diags.diagnose(
-          importLoc, diag::add_predates_concurrency_import,
-          ctx.LangOpts.isSwiftVersionAtLeast(6),
-          nominal->getParentModule()->getName())
-        .fixItInsert(importLoc, "@preconcurrency ");
+        ctx.Diags
+            .diagnose(importLoc, diag::add_predates_concurrency_import,
+                      ctx.LangOpts.isSwiftVersionAtLeast(6),
+                      nominal->getParentModule()->getName())
+            .fixItInsert(importLoc, "@preconcurrency ");
 
-      sourceFile->setImportUsedPreconcurrency(*import);
+        sourceFile->setImportUsedPreconcurrency(*import);
+      }
     }
   }
 
   return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
+}
+
+void swift::diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
+  if (!shouldDiagnosePreconcurrencyImports(sf))
+    return;
+
+  ASTContext &ctx = sf.getASTContext();
+
+  if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
+    return;
+
+  for (const auto &import : sf.getImports()) {
+    if (import.options.contains(ImportFlags::Preconcurrency) &&
+        import.importLoc.isValid() &&
+        !sf.hasImportUsedPreconcurrency(import)) {
+      ctx.Diags.diagnose(
+          import.importLoc, diag::remove_predates_concurrency_import,
+          import.module.importedModule->getName())
+        .fixItRemove(import.preconcurrencyRange);
+    }
+  }
 }
 
 /// Produce a diagnostic for a single instance of a non-Sendable type where
