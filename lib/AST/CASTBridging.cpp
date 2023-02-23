@@ -628,33 +628,33 @@ void Type_dump(void *expr) { ((TypeRepr *)expr)->dump(); }
 // Plugins
 //===----------------------------------------------------------------------===//
 
-const void *Plugin_getCapability(void *handle) {
+PluginCapabilityPtr Plugin_getCapability(PluginHandle handle) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   return plugin->getCapability();
 }
 
-void Plugin_setCapability(void *handle, const void *data) {
+void Plugin_setCapability(PluginHandle handle, PluginCapabilityPtr data) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   plugin->setCapability(data);
 }
 
-void Plugin_lock(void *handle) {
+void Plugin_lock(PluginHandle handle) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   plugin->lock();
 }
 
-void Plugin_unlock(void *handle) {
+void Plugin_unlock(PluginHandle handle) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   plugin->unlock();
 }
 
-bool Plugin_sendMessage(void *handle, const BridgedData data) {
+bool Plugin_sendMessage(PluginHandle handle, const BridgedData data) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   StringRef message(data.baseAddress, data.size);
   return plugin->sendMessage(message);
 }
 
-bool Plugin_waitForNextMessage(void *handle, BridgedData *out) {
+bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   auto result = plugin->waitForNextMessage();
   auto outPtr = malloc(result.size());
