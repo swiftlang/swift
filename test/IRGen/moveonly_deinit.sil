@@ -1,0 +1,179 @@
+// RUN: %target-swift-frontend -enable-experimental-move-only -emit-ir %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+// Check that box destructor invokes deinit for a captured move-only value.
+// CHECK: @[[BOX_STRUCT_METADATA:[A-Za-z0-9_.]+]] = {{.*}} constant %swift.full_boxmetadata { void (%swift.refcounted*)* @[[BOX_STRUCT_DESTRUCTOR:[A-Za-z0-9_.]+]]
+
+sil_stage canonical
+
+class C {}
+
+@_moveOnly
+struct MOStruct {
+  var x: Int
+  var y: C
+
+  deinit
+}
+
+@_moveOnly
+enum MOEnum {
+  case x(Int)
+  case y(C)
+
+  deinit
+}
+
+@_moveOnly
+struct MOComboStruct {
+  var a: MOStruct
+  var b: MOEnum
+  var c: C
+}
+
+@_moveOnly
+enum MOComboEnum {
+  case a(MOStruct)
+  case b(MOEnum)
+  case c(C)
+}
+
+// Move-only types should not share value witnesses or box metadata with
+// common layout types.
+@_moveOnly
+struct MOIntLikeStruct {
+  var x: Int
+
+  deinit
+}
+
+@_moveOnly
+struct MOSingleRefcountLikeStruct {
+  var x: C
+
+  deinit
+}
+
+
+// CHECK-LABEL: define{{.*}}@destroy_struct_value(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    call{{.*}}@destroy_struct(
+// CHECK-NEXT:    ret void
+sil @destroy_struct_value : $@convention(thin) (@owned MOStruct) -> () {
+entry(%b : $MOStruct):
+  release_value %b : $MOStruct
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}}@destroy_struct_value_indirect(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    getelementptr
+// CHECK-NEXT:    getelementptr
+// CHECK-NEXT:    load
+// CHECK-NEXT:    getelementptr
+// CHECK-NEXT:    load
+// CHECK-NEXT:    call{{.*}}@destroy_struct(
+// CHECK-NEXT:    ret void
+sil @destroy_struct_value_indirect : $@convention(thin) (@in MOStruct) -> () {
+entry(%b : $*MOStruct):
+  destroy_addr %b : $*MOStruct
+  return undef : $()
+}
+
+sil @destroy_enum_value : $@convention(thin) (@owned MOEnum) -> () {
+entry(%b : $MOEnum):
+  release_value %b : $MOEnum
+  return undef : $()
+}
+
+sil @destroy_enum_value_indirect : $@convention(thin) (@in MOEnum) -> () {
+entry(%b : $*MOEnum):
+  destroy_addr %b : $*MOEnum
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}}@destroy_combo_struct_value(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:   call {{.*}} @[[COMBO_STRUCT_OUTLINED_DESTROY:"\$.*13MOComboStructVWOs"]](
+// CHECK-NEXT:   ret void
+sil @destroy_combo_struct_value : $@convention(thin) (@owned MOComboStruct) -> () {
+entry(%b : $MOComboStruct):
+  release_value %b : $MOComboStruct
+  return undef : $()
+}
+
+// CHECK: define{{.*}}@[[COMBO_STRUCT_OUTLINED_DESTROY]](
+// CHECK:   call {{.*}} @destroy_struct
+// CH/ECK:   call {{.*}} @destroy_enum
+// CHECK:   call {{.*}} @swift_release
+// CHECK:   ret {{.*}} %0
+
+
+// CHECK-LABEL: define{{.*}}@destroy_combo_enum_value(
+// CHECK-NEXT:  entry:
+// CHECK:         call {{.*}} @[[COMBO_ENUM_OUTLINED_DESTROY:"\$.*11MOComboEnumOWOe"]](
+// CHECK-NEXT:    ret void
+sil @destroy_combo_enum_value : $@convention(thin) (@owned MOComboEnum) -> () {
+entry(%b : $MOComboEnum):
+  release_value %b : $MOComboEnum
+  return undef : $()
+}
+
+// CHECK:      define{{.*}}@[[COMBO_ENUM_OUTLINED_DESTROY]](
+// CHECK:        switch
+// CHECK-NEXT:     i8 0, label %[[STRUCT:[0-9]+]]
+// CHECK-NEXT:     i8 1, label %[[ENUM:[0-9]+]]
+// CHECK-NEXT:     i8 2, label %[[CLASS:[0-9]+]]
+// CHECK:      [[STRUCT]]:
+// CHECK:        call {{.*}} @destroy_struct
+// CHECK:      [[ENUM]]:
+// C/HECK:        call {{.*}} @destroy_enum
+// CHECK:      [[CLASS]]:
+// CHECK:        call {{.*}} @swift_release
+
+// CHECK-LABEL: define{{.*}}@box_struct(
+// CHECK:         call {{.*}} @swift_allocObject({{.*}} %swift.full_boxmetadata* @[[BOX_STRUCT_METADATA]],
+
+// CHECK:       define{{.*}}@[[BOX_STRUCT_DESTRUCTOR]](
+// CHECK:        call {{.*}} @destroy_struct
+// C/HECK:        call {{.*}} @destroy_enum
+// CHECK:        call {{.*}} @swift_release
+sil @box_struct : $@convention(thin) (@owned MOComboStruct) -> Builtin.NativeObject {
+entry(%0 : $MOComboStruct):
+  %b = alloc_box ${ var MOComboStruct }
+  %p = project_box %b : ${ var MOComboStruct }, 0
+  store %0 to %p : $*MOComboStruct
+  %r = unchecked_ref_cast %b : ${ var MOComboStruct } to $Builtin.NativeObject
+  return %r : $Builtin.NativeObject
+}
+
+sil @destroy_struct : $@convention(method) (@owned MOStruct) -> ()
+sil @destroy_enum : $@convention(method) (@owned MOEnum) -> ()
+sil @destroy_intlike_struct : $@convention(method) (@owned MOIntLikeStruct) -> ()
+sil @destroy_single_refcount_like_struct : $@convention(method) (@owned MOSingleRefcountLikeStruct) -> ()
+
+sil_vtable C {}
+
+sil_moveonlydeinit MOStruct { @destroy_struct }
+sil_moveonlydeinit MOEnum { @destroy_enum }
+sil_moveonlydeinit MOIntLikeStruct { @destroy_intlike_struct }
+sil_moveonlydeinit MOSingleRefcountLikeStruct { @destroy_single_refcount_like_struct }
+
+// Check that destroy value witnesses invoke the deinit function, either
+// indirectly or directly.
+
+// CHECK-LABEL: define {{.*}} @"{{.*}}8MOStructVwxx"
+// CHECK:         call {{.*}} @destroy_struct(
+// CHECK-LABEL: define {{.*}} @"{{.*}}6MOEnumOwxx"
+// C/HECK:         call {{.*}} @destroy_enum(
+// CHECK-LABEL: define {{.*}} @"{{.*}}13MOComboStructVwxx"
+// CHECK:         call {{.*}} @destroy_struct(
+// C/HECK:         call {{.*}} @destroy_enum(
+// CHECK:         call {{.*}} @swift_retain(
+// CHECK-LABEL: define {{.*}} @"{{.*}}11MOComboEnumOwxx"
+// CHECK:         call {{.*}} @[[COMBO_ENUM_OUTLINED_DESTROY]]
+
+// C/HECK-LABEL: define {{.*}} @"{{.*}}15MOIntLikeStructVwxx"
+// C/HECK-LABEL: define {{.*}} @"{{.*}}26MOSingleRefcountLikeStructVwxx"

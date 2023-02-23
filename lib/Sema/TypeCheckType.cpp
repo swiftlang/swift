@@ -758,14 +758,32 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     }
 
     // Build ParameterizedProtocolType if the protocol has a primary associated
-    // type and we're in a supported context (for now just generic requirements,
-    // inheritance clause, extension binding).
+    // type and we're in a supported context.
     if (resolution.getOptions().isConstraintImplicitExistential() &&
         !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-      diags.diagnose(loc, diag::existential_requires_any,
-                     protoDecl->getDeclaredInterfaceType(),
-                     protoDecl->getDeclaredExistentialType(),
-                     /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
+
+      if (!genericArgs.empty()) {
+
+        SmallVector<Type, 2> argTys;
+        for (auto *genericArg : genericArgs) {
+          Type argTy = resolution.resolveType(genericArg);
+          if (!argTy || argTy->hasError())
+            return ErrorType::get(ctx);
+
+          argTys.push_back(argTy);
+        }
+
+        auto parameterized =
+            ParameterizedProtocolType::get(ctx, protoType, argTys);
+        diags.diagnose(loc, diag::existential_requires_any, parameterized,
+                       ExistentialType::get(parameterized),
+                       /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
+      } else {
+        diags.diagnose(loc, diag::existential_requires_any,
+                       protoDecl->getDeclaredInterfaceType(),
+                       protoDecl->getDeclaredExistentialType(),
+                       /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
+      }
 
       return ErrorType::get(ctx);
     }
