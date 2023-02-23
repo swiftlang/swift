@@ -875,6 +875,8 @@ function(add_swift_target_library_single target name)
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
         -Xcc;-Xclang;-Xcc;-ivfsoverlay;-Xcc;-Xclang;-Xcc;${SWIFTLIB_SINGLE_VFS_OVERLAY})
     endif()
+    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}")
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
     foreach(directory ${SWIFTLIB_INCLUDE})
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-isystem;-Xcc;${directory})
