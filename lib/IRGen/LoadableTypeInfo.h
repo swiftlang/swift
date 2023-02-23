@@ -97,7 +97,7 @@ public:
   /// Assign a set of exploded values into an address.  The values are
   /// consumed out of the explosion.
   virtual void assign(IRGenFunction &IGF, Explosion &explosion, Address addr,
-                      bool isOutlined) const = 0;
+                      bool isOutlined, SILType T) const = 0;
 
   /// Initialize an address by consuming values out of an explosion.
   virtual void initialize(IRGenFunction &IGF, Explosion &explosion,
@@ -121,7 +121,8 @@ public:
   
   /// Release reference counts or other resources owned by the explosion.
   virtual void consume(IRGenFunction &IGF, Explosion &explosion,
-                       Atomicity atomicity) const = 0;
+                       Atomicity atomicity,
+                       SILType T) const = 0;
 
   /// Fix the lifetime of the source explosion by creating opaque calls to
   /// swift_fixLifetime for all reference types in the explosion.

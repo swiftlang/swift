@@ -535,10 +535,10 @@ namespace {
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr,
-                bool isOutlined) const override {
+                bool isOutlined, SILType T) const override {
       if (!getLoadableSingleton()) return;
       getLoadableSingleton()->assign(IGF, e, getSingletonAddress(IGF, addr),
-                                     isOutlined);
+                                     isOutlined, getSingletonType(IGF.IGM, T));
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
@@ -629,9 +629,11 @@ namespace {
     }
 
     void consume(IRGenFunction &IGF, Explosion &src,
-                 Atomicity atomicity) const override {
+                 Atomicity atomicity,
+                 SILType T) const override {
       if (getLoadableSingleton())
-        getLoadableSingleton()->consume(IGF, src, atomicity);
+        getLoadableSingleton()->consume(IGF, src, atomicity,
+                                        getSingletonType(IGF.IGM, T));
     }
 
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
@@ -1501,14 +1503,14 @@ namespace {
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr,
-                bool isOutlined) const override {
+                bool isOutlined, SILType T) const override {
       assert(TIK >= Loadable);
       Explosion old;
       if (!isPOD(ResilienceExpansion::Maximal))
         loadAsTake(IGF, addr, old);
       initialize(IGF, e, addr, isOutlined);
       if (!isPOD(ResilienceExpansion::Maximal))
-        consume(IGF, old, IGF.getDefaultAtomicity());
+        consume(IGF, old, IGF.getDefaultAtomicity(), T);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
@@ -1786,7 +1788,8 @@ namespace {
         Explosion payloadValue;
         auto &loadableTI = getLoadablePayloadTypeInfo();
         loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
-        loadableTI.consume(IGF, payloadValue, IGF.getDefaultAtomicity());
+        loadableTI.consume(IGF, payloadValue, IGF.getDefaultAtomicity(),
+                           getPayloadType(IGF.IGM, theEnumType));
       }
 
       IGF.Builder.CreateBr(endBB);
@@ -2646,7 +2649,7 @@ namespace {
     }
 
     void consume(IRGenFunction &IGF, Explosion &src,
-                 Atomicity atomicity) const override {
+                 Atomicity atomicity, SILType T) const override {
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
@@ -2672,7 +2675,8 @@ namespace {
             Explosion payloadValue;
             auto &loadableTI = getLoadablePayloadTypeInfo();
             loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
-            loadableTI.consume(IGF, payloadValue, IGF.getDefaultAtomicity());
+            loadableTI.consume(IGF, payloadValue, IGF.getDefaultAtomicity(),
+                               getPayloadType(IGF.IGM, T));
           }
 
           IGF.Builder.CreateBr(endBB);
@@ -2705,7 +2709,8 @@ namespace {
         // operation.
         Explosion srcAsPayload;
         unpackIntoPayloadExplosion(IGF, src, srcAsPayload);
-        payloadTI.consume(IGF, srcAsPayload, atomicity);
+        payloadTI.consume(IGF, srcAsPayload, atomicity,
+                          getPayloadType(IGF.IGM, T));
         return;
       }
       }
@@ -3613,7 +3618,10 @@ namespace {
         Explosion value;
         projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
-        lti.consume(IGF, value, IGF.getDefaultAtomicity());
+        lti.consume(IGF, value, IGF.getDefaultAtomicity(),
+                    type.getEnumElementType(elt.decl,
+                                          IGM.getSILTypes(),
+                                          IGM.getMaximalTypeExpansionContext()));
       });
 
       IGF.Builder.CreateRetVoid();
@@ -4642,7 +4650,7 @@ namespace {
     }
 
     void consume(IRGenFunction &IGF, Explosion &src,
-                 Atomicity atomicity) const override {
+                 Atomicity atomicity, SILType T) const override {
       assert(TIK >= Loadable);
       switch (CopyDestroyKind) {
       case POD:
@@ -4664,7 +4672,10 @@ namespace {
                 Explosion value;
                 projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
-                lti.consume(IGF, value, IGF.getDefaultAtomicity());
+                lti.consume(IGF, value, IGF.getDefaultAtomicity(),
+                            T.getEnumElementType(elt.decl,
+                                    IGF.IGM.getSILTypes(),
+                                    IGF.IGM.getMaximalTypeExpansionContext()));
               });
           return;
         }
@@ -4759,7 +4770,7 @@ namespace {
 
           loadAsTake(IGF, dest, tmpOld);
           initialize(IGF, tmpSrc, dest, isOutlined);
-          consume(IGF, tmpOld, IGF.getDefaultAtomicity());
+          consume(IGF, tmpOld, IGF.getDefaultAtomicity(), T);
           return;
         }
 
@@ -5004,7 +5015,7 @@ namespace {
           if (TI->isLoadable()) {
             Explosion tmp;
             loadAsTake(IGF, addr, tmp);
-            consume(IGF, tmp, IGF.getDefaultAtomicity());
+            consume(IGF, tmp, IGF.getDefaultAtomicity(), T);
             return;
           }
 
@@ -5898,7 +5909,7 @@ namespace {
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr,
-                bool isOutlined) const override {
+                bool isOutlined, SILType T) const override {
       llvm_unreachable("resilient enums are always indirect");
     }
 
@@ -5918,7 +5929,7 @@ namespace {
     }
 
     void consume(IRGenFunction &IGF, Explosion &src,
-                 Atomicity atomicity) const override {
+                 Atomicity atomicity, SILType T) const override {
       llvm_unreachable("resilient enums are always indirect");
     }
 
@@ -6343,8 +6354,8 @@ namespace {
       return Strategy.loadAsTake(IGF, addr, e);
     }
     void assign(IRGenFunction &IGF, Explosion &e, Address addr,
-                bool isOutlined) const override {
-      return Strategy.assign(IGF, e, addr, isOutlined);
+                bool isOutlined, SILType T) const override {
+      return Strategy.assign(IGF, e, addr, isOutlined, T);
     }
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
                     bool isOutlined) const override {
@@ -6359,8 +6370,8 @@ namespace {
       return Strategy.copy(IGF, src, dest, atomicity);
     }
     void consume(IRGenFunction &IGF, Explosion &src,
-                 Atomicity atomicity) const override {
-      return Strategy.consume(IGF, src, atomicity);
+                 Atomicity atomicity, SILType T) const override {
+      return Strategy.consume(IGF, src, atomicity, T);
     }
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
       return Strategy.fixLifetime(IGF, src);

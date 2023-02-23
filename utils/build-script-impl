@@ -2909,9 +2909,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 call mkdir -p "${results_dir}"
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --xunit-xml-output=${results_dir}/results.xml"
 
-                if [[ "${ENABLE_ASAN}" ]] ; then
+                if test "${ENABLE_ASAN}" -o "$(echo ${LLDB_EXTRA_CMAKE_ARGS}|grep Address)"; then
                     # Limit the number of parallel tests
-                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ print (N < int($2/2)) ? N : int($2/2) }')"
+                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ print (N < int($2/1.5)) ? N : int($2/1.5) }')"
                 fi
 
                 FILTER_SWIFT_OPTION="--filter=[sS]wift"

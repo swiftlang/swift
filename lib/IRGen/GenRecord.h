@@ -741,6 +741,22 @@ private:
     }
   }
 
+  template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF, Explosion &in,
+                                         Address addr, bool isOutlined,
+                                         SILType T) const>
+  void forAllFields(IRGenFunction &IGF, Explosion &in, Address addr,
+                    bool isOutlined, SILType T) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
+    for (auto &field : getFields()) {
+      if (field.isEmpty()) continue;
+
+      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
+      (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, in, fieldAddr,
+                                                    isOutlined,
+                                                    field.getType(IGF.IGM, T));
+    }
+  }
+
 public:
   using super::getFields;
 
@@ -755,8 +771,8 @@ public:
   }
 
   void assign(IRGenFunction &IGF, Explosion &e, Address addr,
-              bool isOutlined) const override {
-    forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr, isOutlined);
+              bool isOutlined, SILType T) const override {
+    forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr, isOutlined, T);
   }
 
   void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
@@ -782,10 +798,11 @@ public:
   }
 
   void consume(IRGenFunction &IGF, Explosion &src,
-               Atomicity atomicity) const override {
-    for (auto &field : getFields())
+               Atomicity atomicity, SILType T) const override {
+    for (auto &field : getFields()) {
       cast<LoadableTypeInfo>(field.getTypeInfo())
-          .consume(IGF, src, atomicity);
+          .consume(IGF, src, atomicity, field.getType(IGF.IGM, T));
+    }
   }
 
   void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
