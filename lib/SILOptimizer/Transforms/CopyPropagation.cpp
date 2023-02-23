@@ -432,6 +432,7 @@ void CopyPropagation::run() {
   auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
   auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
   auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+  auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
   DominanceInfo *domTree = dominanceAnalysis->get(f);
 
   // Label for unit testing with debug output.
@@ -475,9 +476,7 @@ void CopyPropagation::run() {
   // don't need to explicitly check for changes.
   CanonicalizeOSSALifetime canonicalizer(
       pruneDebug, /*maximizeLifetime=*/!getFunction()->shouldOptimize(),
-      getFunction(), accessBlockAnalysis, domTree, deleter);
-  auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
-
+      getFunction(), accessBlockAnalysis, domTree, calleeAnalysis, deleter);
   // NOTE: We assume that the function is in reverse post order so visiting the
   //       blocks and pushing begin_borrows as we see them and then popping them
   //       off the end will result in shrinking inner borrow scopes first.

@@ -495,13 +495,15 @@ struct CanonicalizeOSSALifetimeTest : UnitTest {
     auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
+    auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
     auto pruneDebug = arguments.takeBool();
     auto maximizeLifetimes = arguments.takeBool();
     auto respectAccessScopes = arguments.takeBool();
     InstructionDeleter deleter;
     CanonicalizeOSSALifetime canonicalizer(
         pruneDebug, maximizeLifetimes, getFunction(),
-        respectAccessScopes ? accessBlockAnalysis : nullptr, domTree, deleter);
+        respectAccessScopes ? accessBlockAnalysis : nullptr, domTree,
+        calleeAnalysis, deleter);
     auto value = arguments.takeValue();
     canonicalizer.canonicalizeValueLifetime(value);
     getFunction()->dump();
@@ -900,6 +902,7 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("interior-liveness", InteriorLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
     ADD_UNIT_TEST_SUBCLASS("is-lexical", IsLexicalTest)
+    ADD_UNIT_TEST_SUBCLASS("lexical-destroy-folding", LexicalDestroyFoldingTest)
     ADD_UNIT_TEST_SUBCLASS("linear-liveness", LinearLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("multidef-liveness", MultiDefLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("multidefuse-liveness", MultiDefUseLivenessTest)

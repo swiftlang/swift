@@ -26,18 +26,16 @@ class CompileError : Error {}
 // This test case used to have an invalid boundary extension.
 // CHECK-LABEL: sil [ossa] @canonicalize_borrow_of_copy_with_interesting_boundary : $@convention(thin) (@owned C) -> (@owned NonTrivialStruct, @error any Error) {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         cond_br undef, [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
 // CHECK:       [[SUCCESS]]:
-// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[COPY]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[STRUCT:%[^,]+]] = struct $NonTrivialStruct ([[BORROW]] : $C)
 // CHECK:         [[STRUCT_OUT:%[^,]+]] = copy_value [[STRUCT]]
 // CHECK:         end_borrow [[BORROW]]
-// CHECK:         destroy_value [[COPY]]
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         return [[STRUCT_OUT]]
 // CHECK:       [[FAILURE]]:
-// CHECK:         destroy_value [[COPY]]
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         [[BOX:%[^,]+]] = alloc_existential_box
 // CHECK:         throw [[BOX]]
 // CHECK-LABEL: } // end sil function 'canonicalize_borrow_of_copy_with_interesting_boundary'

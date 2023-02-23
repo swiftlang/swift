@@ -917,10 +917,10 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @dont_extend_beyond_nonoverlapping_end_access_after_store_in_consuming_block : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK-NOT:     copy_value
 // CHECK:         begin_access
 // CHECK-NOT:     copy_value
-// CHECK:         store [[COPY]] to [init] {{%[^,]+}}
+// CHECK:         store [[INSTANCE]] to [init] {{%[^,]+}}
 // CHECK-LABEL: } // end sil function 'dont_extend_beyond_nonoverlapping_end_access_after_store_in_consuming_block'
 sil [ossa] @dont_extend_beyond_nonoverlapping_end_access_after_store_in_consuming_block : $@convention(thin) (@owned C) -> () {
 bb0(%instance : @owned $C):
