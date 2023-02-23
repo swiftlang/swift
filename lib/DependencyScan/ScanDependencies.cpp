@@ -365,6 +365,7 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
 
         assert(bridgingModuleDependencies);
         for (const auto &clangDep : *bridgingModuleDependencies) {
+          result.insert({clangDep, ModuleDependencyKind::Clang});
           findAllImportedClangModules(ctx, clangDep, cache, allClangModules,
                                       knownModules);
         }
