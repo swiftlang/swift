@@ -110,10 +110,12 @@ static std::string displayName(StringRef MainExecutablePath) {
 
 static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                          DependencyTracker *depTracker,
-                                         const FrontendOptions &opts) {
+                                         const FrontendOptions &opts,
+                                         llvm::vfs::OutputBackend &backend) {
   opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &f) -> bool {
-        return swift::emitMakeDependenciesIfNeeded(diags, depTracker, opts, f);
+        return swift::emitMakeDependenciesIfNeeded(diags, depTracker, opts, f,
+                                                   backend);
       });
 }
 
@@ -1164,7 +1166,8 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 
   // Emit Make-style dependencies.
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
-                               Instance.getDependencyTracker(), opts);
+                               Instance.getDependencyTracker(), opts,
+                               Instance.getOutputBackend());
 
   // Emit extracted constant values for every file in the batch
   emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
@@ -1358,7 +1361,8 @@ static bool performAction(CompilerInstance &Instance,
     getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
     return Instance.getASTContext().hadError();
   case FrontendOptions::ActionType::EmitImportedModules:
-    return emitImportedModules(Instance.getMainModule(), opts);
+    return emitImportedModules(Instance.getMainModule(), opts,
+                               Instance.getOutputBackend());
 
   // MARK: Dependency Scanning Actions
   case FrontendOptions::ActionType::ScanDependencies:

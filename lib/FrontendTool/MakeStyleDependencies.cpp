@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 
 using namespace swift;
 
@@ -91,18 +92,16 @@ reversePathSortedFilenames(const Container &elts) {
 bool swift::emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                          DependencyTracker *depTracker,
                                          const FrontendOptions &opts,
-                                         const InputFile &input) {
+                                         const InputFile &input,
+                                         llvm::vfs::OutputBackend &backend) {
   auto dependenciesFilePath = input.getDependenciesFilePath();
   if (dependenciesFilePath.empty())
     return false;
 
-  std::error_code EC;
-  llvm::raw_fd_ostream out(dependenciesFilePath, EC, llvm::sys::fs::OF_None);
-
-  if (out.has_error() || EC) {
+  auto out = backend.createFile(dependenciesFilePath);
+  if (!out) {
     diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   dependenciesFilePath, EC.message());
-    out.clear_error();
+                   dependenciesFilePath, toString(out.takeError()));
     return true;
   }
 
@@ -138,8 +137,14 @@ bool swift::emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
   // dependency line.
   opts.forAllOutputPaths(input, [&](const StringRef targetName) {
     auto targetNameEscaped = frontend::utils::escapeForMake(targetName, buffer);
-    out << targetNameEscaped << " :" << dependencyString << '\n';
+    *out << targetNameEscaped << " :" << dependencyString << '\n';
   });
+
+  if (auto error = out->keep()) {
+    diags.diagnose(SourceLoc(), diag::error_opening_output,
+                   dependenciesFilePath, toString(std::move(error)));
+    return true;
+  }
 
   return false;
 }

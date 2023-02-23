@@ -24,6 +24,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 
 using namespace swift;
 
@@ -43,16 +44,15 @@ static void findAllClangImports(const clang::Module *module,
 }
 
 bool swift::emitImportedModules(ModuleDecl *mainModule,
-                                const FrontendOptions &opts) {
+                                const FrontendOptions &opts,
+                                llvm::vfs::OutputBackend &backend) {
   auto &Context = mainModule->getASTContext();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
-  std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::OF_None);
-
-  if (out.has_error() || EC) {
-    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
-                           EC.message());
-    out.clear_error();
+  auto &diags = Context.Diags;
+  auto out = backend.createFile(path);
+  if (!out) {
+    diags.diagnose(SourceLoc(), diag::error_opening_output,
+                   path, toString(out.takeError()));
     return true;
   }
 
@@ -110,7 +110,13 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
   }
 
   for (auto name : Modules) {
-    out << name << "\n";
+    *out << name << "\n";
+  }
+
+  if (auto error = out->keep()) {
+    diags.diagnose(SourceLoc(), diag::error_opening_output,
+                   path, toString(std::move(error)));
+    return true;
   }
 
   return false;
