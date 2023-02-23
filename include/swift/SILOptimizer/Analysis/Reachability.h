@@ -903,6 +903,41 @@ void IterativeBackwardReachability<Effects>::Result::setEffectForBlock(
   }
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: findBarriersBackward
+//===----------------------------------------------------------------------===//
+
+using llvm::ArrayRef;
+using llvm::function_ref;
+
+struct ReachableBarriers final {
+  /// Instructions which are barriers.
+  llvm::SmallVector<SILInstruction *, 4> instructions;
+
+  /// Blocks one of whose phis is a barrier.
+  llvm::SmallVector<SILBasicBlock *, 4> phis;
+
+  /// Boundary edges; edges such that
+  /// (1) the target block is reachable-at-begin
+  /// (2) at least one adjacent edge's target is not reachable-at-begin.
+  llvm::SmallVector<SILBasicBlock *, 4> edges;
+
+  ReachableBarriers() {}
+  ReachableBarriers(ReachableBarriers const &) = delete;
+  ReachableBarriers &operator=(ReachableBarriers const &) = delete;
+};
+
+/// Walk backwards from the specified \p roots through at the earliest \p
+/// initialBlocks to populate \p barriers by querying \p isBarrier along the
+/// way.
+///
+/// If \p initialBlocks is empty, dataflow continues to the begin of the
+/// function.
+void findBarriersBackward(ArrayRef<SILInstruction *> roots,
+                          ArrayRef<SILBasicBlock *> initialBlocks,
+                          SILFunction &function, ReachableBarriers &barriers,
+                          function_ref<bool(SILInstruction *)> isBarrier);
+
 } // end namespace swift
 
 #endif
