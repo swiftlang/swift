@@ -2326,7 +2326,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     }
     // Reflect in the score that this type variable couldn't be
     // resolved and had to be bound to a placeholder "hole" type.
-    cs.increaseScore(SK_Hole);
+    cs.increaseScore(SK_Hole, srcLocator);
 
     if (auto fix = fixForHole(cs)) {
       if (cs.recordFix(/*fix=*/fix->first, /*impact=*/fix->second))

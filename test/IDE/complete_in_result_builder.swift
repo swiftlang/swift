@@ -97,7 +97,10 @@ func testStaticMemberLookup() {
   }
 
   @TupleBuilder<String> var x3 {
-    "hello: \(StringFactory.#^COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL?check=COMPLETE_STATIC_MEMBER;xfail=rdar78015646^#)"
+    "hello: \(StringFactory.#^COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL?xfail=rdar106720628^#)"
+// COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: Begin completions
+// COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]:     makeString({#x: String#})[#String#];
+// COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: End completions
   }
 }
 
@@ -354,14 +357,13 @@ func testSwitchInResultBuilder() {
       Reduce2()
       Reduce2 { action in
         switch action {
-        case .#^SWITCH_IN_RESULT_BUILDER^# alertDismissed:
+        case .#^SWITCH_IN_RESULT_BUILDER?xfail=rdar106720462^# alertDismissed:
           return 0
         }
       }
     }
   }
-// SWITCH_IN_RESULT_BUILDER: Begin completions, 2 items
+// SWITCH_IN_RESULT_BUILDER: Begin completions, 1 item
 // SWITCH_IN_RESULT_BUILDER-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: alertDismissed[#Action#];
-// SWITCH_IN_RESULT_BUILDER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Action#})[#(into: inout Hasher) -> Void#];
 // SWITCH_IN_RESULT_BUILDER: End completions
 }

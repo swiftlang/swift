@@ -32,31 +32,97 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 STATISTIC(NumDiscardedSolutions, "Number of solutions discarded");
 
-void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
-  if (isForCodeCompletion()) {
-    switch (kind) {
-    case SK_NonDefaultLiteral:
-      // Don't increase score for non-default literals in expressions involving
-      // a code completion. In the below example, members of EnumA and EnumB
-      // should be ranked equally:
-      //   func overloaded(_ x: Float, _ y: EnumA) {}
-      //   func overloaded(_ x: Int, _ y: EnumB) {}
-      //   func overloaded(_ x: Float) -> EnumA {}
-      //   func overloaded(_ x: Int) -> EnumB {}
-      //
-      //   overloaded(1, .<complete>) {}
-      //   overloaded(1).<complete>
-      return;
-    default:
-      break;
+/// Returns \c true if \p expr takes a code completion expression as an
+/// argument.
+static bool exprHasCodeCompletionAsArgument(Expr *expr, ConstraintSystem &cs) {
+  if (auto args = expr->getArgs()) {
+    for (auto arg : *args) {
+      if (isa<CodeCompletionExpr>(arg.getExpr())) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+static bool shouldIgnoreScoreIncreaseForCodeCompletion(
+    ScoreKind kind, ConstraintLocatorBuilder Locator, ConstraintSystem &cs) {
+  if (kind < SK_SyncInAsync) {
+    // We don't want to ignore score kinds that make the code invalid.
+    return false;
+  }
+  auto expr = Locator.trySimplifyToExpr();
+  if (!expr) {
+    return false;
+  }
+
+  // These are a few hand-picked examples in which we don't want to increase the
+  // score in code completion mode. Technically, to get all valid results, we
+  // would like to not increase the score if the expression contains the code
+  // completion token anywhere but that's not possible for performance reasons.
+  // Thus, just special case the most common cases.
+
+  // The code completion token itself.
+  if (isa<CodeCompletionExpr>(expr)) {
+    return true;
+  }
+
+  // An assignment where the LHS or RHS contains the code completion token (e.g.
+  // an optional conversion).
+  // E.g.
+  // x[#^COMPLETE^#] = foo
+  // let a = foo(#^COMPLETE^#)
+  if (auto assign = dyn_cast<AssignExpr>(expr)) {
+    if (exprHasCodeCompletionAsArgument(assign->getSrc(), cs)) {
+      return true;
+    } else if (exprHasCodeCompletionAsArgument(assign->getDest(), cs)) {
+      return true;
     }
   }
 
+  // If the function call takes the code completion token as an argument, the
+  // call also shouldn't increase the score.
+  // E.g. `foo` in
+  // foo(#^COMPLETE^#)
+  if (exprHasCodeCompletionAsArgument(expr, cs)) {
+    return true;
+  }
+
+  // The sibling argument is the code completion expression, this allows e.g.
+  // non-default literal values in sibling arguments.
+  // E.g. we allow a 1 to be a double in
+  // foo(1, #^COMPLETE^#)
+  if (auto parent = cs.getParentExpr(expr)) {
+    if (exprHasCodeCompletionAsArgument(parent, cs)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void ConstraintSystem::increaseScore(ScoreKind kind,
+                                     ConstraintLocatorBuilder Locator,
+                                     unsigned value) {
+  if (isForCodeCompletion() &&
+      shouldIgnoreScoreIncreaseForCodeCompletion(kind, Locator, *this)) {
+    if (isDebugMode() && value > 0) {
+      if (solverState)
+        llvm::errs().indent(solverState->getCurrentIndent());
+      llvm::errs() << "(not increasing '" << Score::getNameFor(kind)
+      << "' score by " << value
+      << " because of proximity to code completion token";
+      Locator.dump(&getASTContext().SourceMgr, llvm::errs());
+      llvm::errs() << ")\n";
+    }
+    return;
+  }
   if (isDebugMode() && value > 0) {
     if (solverState)
       llvm::errs().indent(solverState->getCurrentIndent());
     llvm::errs() << "(increasing '" << Score::getNameFor(kind) << "' score by "
-                 << value << ")\n";
+    << value << " @ ";
+    Locator.dump(&getASTContext().SourceMgr, llvm::errs());
+    llvm::errs() << ")\n";
   }
 
   unsigned index = static_cast<unsigned>(kind);

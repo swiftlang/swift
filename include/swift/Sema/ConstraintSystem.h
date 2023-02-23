@@ -928,6 +928,9 @@ enum ScoreKind: unsigned int {
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
   /// A reference to an async function in a synchronous context.
+  ///
+  /// \note Any score kind after this is considered a conversion that doesn't
+  /// require fixing the source and will be ignored during code completion.
   SK_AsyncInSyncMismatch,
   /// Synchronous function in an asynchronous context or a conversion of
   /// a synchronous function to an asynchronous one.
@@ -5130,7 +5133,8 @@ private:
 public:
   /// Increase the score of the given kind for the current (partial) solution
   /// along the.
-  void increaseScore(ScoreKind kind, unsigned value = 1);
+  void increaseScore(ScoreKind kind, ConstraintLocatorBuilder Locator,
+                     unsigned value = 1);
 
   /// Determine whether this solution is guaranteed to be worse than the best
   /// solution found so far.

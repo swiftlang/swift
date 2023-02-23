@@ -1419,3 +1419,65 @@ func testRdar89773376(arry: [Int]) {
 // RDAR89773376-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#intVal: Int#}[')'][#Rdar89773376#];
 // RDAR89773376: End completions
 }
+
+func testOverloadedWithDefaultedArgument() {
+  struct Image {
+    init(_ name: Int) {}
+    func grame(maxWidth: Double? = nil) {}
+    func grame() {}
+  }
+
+  func test() {
+    Image(0)
+      .grame(maxWidth: .#^OVERLOADED_WITH_DEFAULT_ARG^#infinity)
+// OVERLOADED_WITH_DEFAULT_ARG: Begin completions
+// OVERLOADED_WITH_DEFAULT_ARG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/IsSystem/TypeRelation[Convertible]: infinity[#Double#];
+// OVERLOADED_WITH_DEFAULT_ARG: End completions
+  }
+}
+
+func testSubscriptWithExistingRhs(someString: String) {
+  var userInfo: [String: Any] = [:]
+  userInfo[#^SUBSCRIPT_WITH_EXISTING_RHS^#] = message
+
+// SUBSCRIPT_WITH_EXISTING_RHS: Begin completions
+// SUBSCRIPT_WITH_EXISTING_RHS-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<[String : Any], Value>#}[']'][#Value#];
+// SUBSCRIPT_WITH_EXISTING_RHS-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem/TypeRelation[Convertible]: ['[']{#(key): String#}[']'][#@lvalue Any?#];
+// SUBSCRIPT_WITH_EXISTING_RHS-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem/TypeRelation[Convertible]: ['[']{#(key): String#}, {#default: Any#}[']'][#@lvalue Any#];
+// SUBSCRIPT_WITH_EXISTING_RHS-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: someString[#String#];
+// SUBSCRIPT_WITH_EXISTING_RHS: End completions
+}
+
+func testOptionalConversionFromSubscriptToCallArg() {
+  func takeOptionalInt(_ x: Int?) {}
+
+  func test(savedFilters: [Int], index: Int) {
+    takeOptionalInt(savedFilters[#^OPTIONAL_CONVERSION_FROM_SUBSCRIPT_TO_CALL_ARG^#index])
+// OPTIONAL_CONVERSION_FROM_SUBSCRIPT_TO_CALL_ARG: Begin completions
+// OPTIONAL_CONVERSION_FROM_SUBSCRIPT_TO_CALL_ARG-DAG: Pattern/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['[']{#keyPath: KeyPath<[Int], Value>#}[']'][#Value#];
+// OPTIONAL_CONVERSION_FROM_SUBSCRIPT_TO_CALL_ARG-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem/TypeRelation[Convertible]: ['[']{#(index): Int#}[']'][#Int#];
+// OPTIONAL_CONVERSION_FROM_SUBSCRIPT_TO_CALL_ARG-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: index[#Int#];
+// OPTIONAL_CONVERSION_FROM_SUBSCRIPT_TO_CALL_ARG: End completions
+  }
+}
+
+func testOptionalConversionInSrcOfAssignment(myArray: [Int]) {
+  var optInt: Int?
+  optInt = myArray[#^OPTIONAL_CONVERSION_IN_ASSIGNMENT^#]
+// OPTIONAL_CONVERSION_IN_ASSIGNMENT: Begin completions
+// OPTIONAL_CONVERSION_IN_ASSIGNMENT-DAG: Pattern/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['[']{#keyPath: KeyPath<[Int], Value>#}[']'][#Value#]; name=keyPath:
+// OPTIONAL_CONVERSION_IN_ASSIGNMENT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem/TypeRelation[Convertible]: ['[']{#(index): Int#}[']'][#Int#]; name=:
+// OPTIONAL_CONVERSION_IN_ASSIGNMENT-DAG: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#]; name=0
+// OPTIONAL_CONVERSION_IN_ASSIGNMENT: End completions
+}
+
+func testAnyConversionInDestOfAssignment(_ message: String) {
+  var userInfo: [String: Any] = [:]
+  userInfo[#^ANY_CONVERSION_IN_ASSIGNMENT^#] = message
+// ANY_CONVERSION_IN_ASSIGNMENT: Begin completions
+// ANY_CONVERSION_IN_ASSIGNMENT-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<[String : Any], Value>#}[']'][#Value#]; name=keyPath:
+// ANY_CONVERSION_IN_ASSIGNMENT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem/TypeRelation[Convertible]: ['[']{#(key): String#}, {#default: Any#}[']'][#@lvalue Any#]; name=:default:
+// ANY_CONVERSION_IN_ASSIGNMENT-DAG: Decl[LocalVar]/Local:               userInfo[#[String : Any]#]; name=userInfo
+// ANY_CONVERSION_IN_ASSIGNMENT-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: message[#String#]; name=message
+// ANY_CONVERSION_IN_ASSIGNMENT: End completions
+}
