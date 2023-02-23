@@ -5526,18 +5526,26 @@ void swift::diagnoseConformanceFailure(Type T,
         !enumDecl->getRawType()->is<ErrorType>()) {
 
       auto rawType = enumDecl->getRawType();
-
-      diags.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
-                     diag::enum_raw_type_nonconforming_and_nonsynthable,
-                     T, rawType);
+      SourceRange sourceRange =
+          enumDecl->getInherited().front().getSourceRange();
+      
+        diags.diagnose(sourceRange.Start,
+                       diag::enum_raw_type_nonconforming_and_nonsynthable, T,
+                       rawType);
 
       // If the reason is that the raw type does not conform to
       // Equatable, say so.
       if (!TypeChecker::conformsToKnownProtocol(
-              rawType, KnownProtocolKind::Equatable, DC->getParentModule())) {
-        SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
-        diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
+              rawType, KnownProtocolKind::Equatable, DC->getParentModule()) && !rawType->is<ExistentialType>()) {
+        diags.diagnose(sourceRange.Start, diag::enum_raw_type_not_equatable, rawType);
         return;
+      } else if (!TypeChecker::conformsToKnownProtocol(
+                                                       rawType, KnownProtocolKind::Equatable, DC->getParentModule()) && rawType->is<ExistentialType>()) {
+          // Suggest fixit for existential types
+          diags.diagnose(sourceRange.Start,
+                        diag::enum_raw_type_not_equatable,
+                        rawType)
+              .fixItRemoveChars(sourceRange.Start, sourceRange.End);
       }
 
       return;

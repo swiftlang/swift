@@ -357,11 +357,15 @@ static void checkInheritanceClause(
       }
     }
 
+    SourceRange removeRange = inherited.getSourceRange();
+
     // We can't inherit from a non-class, non-protocol type.
     decl->diagnose(canHaveSuperclass
-                   ? diag::inheritance_from_non_protocol_or_class
-                   : diag::inheritance_from_non_protocol,
-                   inheritedTy);
+                       ? diag::inheritance_from_non_protocol_or_class
+                       : diag::inheritance_from_non_protocol,
+                   inheritedTy)
+        .fixItRemoveChars(removeRange.Start, removeRange.End);
+
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
   }
 }
@@ -2562,18 +2566,20 @@ public:
 
     auto &DE = getASTContext().Diags;
     if (auto rawTy = ED->getRawType()) {
-      // The raw type must be one of the blessed literal convertible types.
-      if (!computeAutomaticEnumValueKind(ED)) {
-        if (!rawTy->is<ErrorType>()) {
-          DE.diagnose(ED->getInherited().front().getSourceRange().Start,
-                      diag::raw_type_not_literal_convertible, rawTy);
+      if (!rawTy->is<ExistentialType>()) {
+        // The raw type must be one of the blessed literal convertible types.
+        if (!computeAutomaticEnumValueKind(ED)) {
+          if (!rawTy->is<ErrorType>()) {
+            DE.diagnose(ED->getInherited().front().getSourceRange().Start,
+                        diag::raw_type_not_literal_convertible, rawTy);
+          }
         }
-      }
-      
-      // We need at least one case to have a raw value.
-      if (ED->getAllElements().empty()) {
-        DE.diagnose(ED->getInherited().front().getSourceRange().Start,
-                    diag::empty_enum_raw_type);
+
+        // We need at least one case to have a raw value.
+        if (ED->getAllElements().empty()) {
+          DE.diagnose(ED->getInherited().front().getSourceRange().Start,
+                      diag::empty_enum_raw_type);
+        }
       }
     }
 
