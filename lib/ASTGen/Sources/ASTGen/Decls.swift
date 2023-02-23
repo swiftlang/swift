@@ -74,13 +74,13 @@ extension ASTGenVisitor {
     let initializer = visit(node.bindings.first!.initializer!).rawValue
 
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
-    let isStateic = false  // TODO: compute this
-    let isLet = node.letOrVarKeyword.tokenKind == .keyword(.let)
+    let isStatic = false  // TODO: compute this
+    let isLet = node.bindingKeyword.tokenKind == .keyword(.let)
 
     // TODO: don't drop "initializer" on the floor.
     return .decl(
       SwiftVarDecl_create(
-        ctx, pattern, initializer, loc, isStateic,
+        ctx, pattern, initializer, loc, isStatic,
         isLet, declContext))
   }
 
