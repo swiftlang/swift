@@ -6,7 +6,7 @@
 // RUN: not %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE -previous-module-installname-map-file %t/nil.json >& %t/error.txt
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR < %t/error.txt
 
-// RUN: %target-swift-frontend -target x86_64-apple-macosx10.6 -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE -previous-module-installname-map-file %t/install-name.json | %FileCheck %s -check-prefix=CHECK-SYMBOLS-LOW-TARGET
+// RUN: %target-swift-frontend -target x86_64-apple-macosx10.6 -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -disable-legacy-type-info -module-name CurrentModule -D CURRENT_MODULE -previous-module-installname-map-file %t/install-name.json | %FileCheck %s -check-prefix=CHECK-SYMBOLS-LOW-TARGET
 
 @available(OSX 10.8, *)
 @_originallyDefinedIn(module: "OriginalModule", macOS 10.10)
