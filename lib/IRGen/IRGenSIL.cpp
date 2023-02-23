@@ -415,6 +415,7 @@ public:
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<llvm::Value *, Address, 8> TaskAllocStackSlots;
   llvm::SmallDenseMap<Decl *, Identifier, 8> AnonymousVariables;
+  llvm::SmallDenseSet<llvm::Value *, 4> PackShapeExpressions;
   /// To avoid inserting elements into ValueDomPoints twice.
   llvm::SmallDenseSet<llvm::Value *, 8> ValueVariables;
   /// Holds the DominancePoint of values that are storage for a source variable.
@@ -1097,6 +1098,22 @@ public:
       runtimeTy.visit([&](CanType t) {
         if (auto archetype = dyn_cast<ArchetypeType>(t))
           emitTypeMetadataRef(archetype);
+        else if (auto packArchetype = dyn_cast<PackArchetypeType>(t))
+          emitTypeMetadataRef(packArchetype);
+        else if (auto packtype = dyn_cast<SILPackType>(t)) {
+          llvm::Value *Shape = emitPackShapeExpression(t);
+          if (PackShapeExpressions.insert(Shape).second) {
+              llvm::SmallString<8> Buf;
+              llvm::raw_svector_ostream OS(Buf);
+              unsigned Position = PackShapeExpressions.size();
+              OS << "$pack_count_" << Position;
+              SILDebugVariable Var(OS.str(), true, 0);
+              Shape = emitShadowCopyIfNeeded(Shape, getDebugScope(), Var, false,
+                                             false /*was move*/);
+              if (IGM.DebugInfo)
+                IGM.DebugInfo->emitPackCountParameter(*this, Shape, Var);
+          }
+        }
       });
   }
   

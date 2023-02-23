@@ -188,6 +188,11 @@ public:
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                         unsigned Depth, unsigned Index, StringRef Name);
 
+  /// Emit debug info for the IR function parameter holding the size of one or
+  /// more parameter / type packs.
+  void emitPackCountParameter(IRGenFunction &IGF, llvm::Value *Metadata,
+                              SILDebugVariable VarInfo);
+
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder();
 

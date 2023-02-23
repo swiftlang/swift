@@ -243,6 +243,8 @@ public:
                                      Optional<SILLocation> Loc);
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                         unsigned Depth, unsigned Index, StringRef Name);
+  void emitPackCountParameter(IRGenFunction &IGF, llvm::Value *Metadata,
+                              SILDebugVariable VarInfo);
 
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder() { return DBuilder; }
@@ -1528,11 +1530,16 @@ private:
                                       File, FwdDeclLine, Flags, MangledName);
     }
 
-    case TypeKind::SILPack:
     case TypeKind::Pack:
-    case TypeKind::PackExpansion:
       llvm_unreachable("Unimplemented!");
 
+    case TypeKind::SILPack:
+    case TypeKind::PackExpansion:
+      //assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      return createPointerSizedStruct(Scope,
+                                      MangledName,
+                                      MainFile, 0, Flags, MangledName);
+      
     case TypeKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType should not show up here");
 
@@ -2977,6 +2984,25 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
                           ArtificialValue);
 }
 
+void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
+                                                llvm::Value *Metadata,
+                                                SILDebugVariable VarInfo) {
+  if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
+    return;
+
+  // Don't emit debug info in transparent functions.
+  auto *DS = IGF.getDebugScope();
+  if (!DS || DS->getInlinedFunction()->isTransparent())
+    return;
+
+  Type IntTy = IGM.Context.getIntType();
+  auto &TI = IGM.getTypeInfoForUnlowered(IntTy);
+  auto DbgTy = *CompletedDebugTypeInfo::getFromTypeInfo(IntTy, TI, IGM);
+  emitVariableDeclaration(
+      IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(), {}, VarInfo,
+      IGF.isAsync() ? CoroDirectValue : DirectValue, ArtificialValue);
+}
+
 SILLocation::FilenameAndLocation
 IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
   auto &Cached = FilenameAndLocationCache[SL.getOpaquePointerValue()];
@@ -3106,6 +3132,13 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                                       StringRef Name) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitTypeMetadata(IGF, Metadata,
                                                             Depth, Index, Name);
+}
+
+void IRGenDebugInfo::emitPackCountParameter(IRGenFunction &IGF,
+                                            llvm::Value *Metadata,
+                                            SILDebugVariable VarInfo) {
+  static_cast<IRGenDebugInfoImpl *>(this)->emitPackCountParameter(IGF, Metadata,
+                                                                  VarInfo);
 }
 
 llvm::DIBuilder &IRGenDebugInfo::getBuilder() {
