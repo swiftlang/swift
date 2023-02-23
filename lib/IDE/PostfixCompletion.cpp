@@ -21,6 +21,64 @@ using namespace swift;
 using namespace swift::constraints;
 using namespace swift::ide;
 
+bool PostfixCompletionCallback::Result::canBeMergedWith(const Result &Other,
+                                                        DeclContext &DC) const {
+  if (BaseDecl != Other.BaseDecl) {
+    return false;
+  }
+  if (!BaseTy->isEqual(Other.BaseTy) &&
+      !isConvertibleTo(BaseTy, Other.BaseTy, /*openArchetypes=*/true, DC) &&
+      !isConvertibleTo(Other.BaseTy, BaseTy, /*openArchetypes=*/true, DC)) {
+    return false;
+  }
+  return true;
+}
+
+void PostfixCompletionCallback::Result::merge(const Result &Other,
+                                              DeclContext &DC) {
+  assert(canBeMergedWith(Other, DC));
+  // These properties should match if we are talking about the same BaseDecl.
+  assert(BaseIsStaticMetaType == Other.BaseIsStaticMetaType);
+
+  if (!BaseTy->isEqual(Other.BaseTy) &&
+      isConvertibleTo(Other.BaseTy, BaseTy, /*openArchetypes=*/true, DC)) {
+    // Pick the more specific base type as it will produce more solutions.
+    BaseTy = Other.BaseTy;
+  }
+
+  // There could be multiple results that have different actor isolations if the
+  // closure is an argument to a function that has multiple overloads with
+  // different isolations for the closure. Producing multiple results for these
+  // is usually not very enlightning. For now, we just pick the first actor
+  // isolation that we find. This is good enough in practice.
+  // What we should really do is probably merge these two actor isolations and
+  // pick the weakest isolation for each closure.
+
+  for (auto &OtherExpectedTy : Other.ExpectedTypes) {
+    auto IsEqual = [&](Type Ty) { return Ty->isEqual(OtherExpectedTy); };
+    if (llvm::any_of(ExpectedTypes, IsEqual)) {
+      // We already know if this expected type
+      continue;
+    }
+    ExpectedTypes.push_back(OtherExpectedTy);
+  }
+  ExpectsNonVoid &= Other.ExpectsNonVoid;
+  IsImplicitSingleExpressionReturn |= Other.IsImplicitSingleExpressionReturn;
+  IsInAsyncContext |= Other.IsInAsyncContext;
+}
+
+void PostfixCompletionCallback::addResult(const Result &Res) {
+  auto ExistingRes =
+      llvm::find_if(Results, [&Res, DC = DC](const Result &ExistingResult) {
+        return ExistingResult.canBeMergedWith(Res, *DC);
+      });
+  if (ExistingRes != Results.end()) {
+    ExistingRes->merge(Res, *DC);
+  } else {
+    Results.push_back(Res);
+  }
+}
+
 void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   assert(!gotCallback());
 
@@ -101,39 +159,43 @@ void PostfixCompletionCallback::sawSolutionImpl(
     }
   }
 
-  auto Key = std::make_pair(BaseTy, ReferencedDecl);
-  auto Ret = BaseToSolutionIdx.insert({Key, Results.size()});
-  if (Ret.second) {
-    bool ISDMT = S.isStaticallyDerivedMetatype(ParsedExpr);
-    bool ImplicitReturn = isImplicitSingleExpressionReturn(CS, CompletionExpr);
-    bool DisallowVoid = false;
-    DisallowVoid |= ExpectedTy && !ExpectedTy->isVoid();
-    DisallowVoid |= !ParentExpr &&
-                    CS.getContextualTypePurpose(CompletionExpr) != CTP_Unused;
-    for (auto SAT : S.targets) {
-      if (DisallowVoid) {
-        // DisallowVoid is already set. No need to iterate further.
-        break;
-      }
-      if (SAT.second.getAsExpr() == CompletionExpr) {
-        DisallowVoid |= SAT.second.getExprContextualTypePurpose() != CTP_Unused;
-      }
-    }
+  bool BaseIsStaticMetaType = S.isStaticallyDerivedMetatype(ParsedExpr);
 
-    Results.push_back({BaseTy, ReferencedDecl,
-                       /*ExpectedTypes=*/{}, DisallowVoid, ISDMT,
-                       ImplicitReturn, IsAsync, ClosureActorIsolations});
-    if (ExpectedTy) {
-      Results.back().ExpectedTypes.push_back(ExpectedTy);
+  SmallVector<Type, 4> ExpectedTypes;
+  if (ExpectedTy) {
+    ExpectedTypes.push_back(ExpectedTy);
+  }
+
+  bool ExpectsNonVoid = false;
+  ExpectsNonVoid |= ExpectedTy && !ExpectedTy->isVoid();
+  ExpectsNonVoid |=
+      !ParentExpr && CS.getContextualTypePurpose(CompletionExpr) != CTP_Unused;
+
+  for (auto SAT : S.targets) {
+    if (ExpectsNonVoid) {
+      // ExpectsNonVoid is already set. No need to iterate further.
+      break;
     }
-  } else if (ExpectedTy) {
-    auto &ExistingResult = Results[Ret.first->getSecond()];
-    ExistingResult.IsInAsyncContext |= IsAsync;
-    auto IsEqual = [&](Type Ty) { return ExpectedTy->isEqual(Ty); };
-    if (!llvm::any_of(ExistingResult.ExpectedTypes, IsEqual)) {
-      ExistingResult.ExpectedTypes.push_back(ExpectedTy);
+    if (SAT.second.getAsExpr() == CompletionExpr) {
+      ExpectsNonVoid |= SAT.second.getExprContextualTypePurpose() != CTP_Unused;
     }
   }
+
+  bool IsImplicitSingleExpressionReturn =
+      isImplicitSingleExpressionReturn(CS, CompletionExpr);
+
+  Result Res = {
+      BaseTy,
+      ReferencedDecl,
+      BaseIsStaticMetaType,
+      ExpectedTypes,
+      ExpectsNonVoid,
+      IsImplicitSingleExpressionReturn,
+      IsAsync,
+      ClosureActorIsolations
+  };
+
+  addResult(Res);
 }
 
 void PostfixCompletionCallback::deliverResults(
