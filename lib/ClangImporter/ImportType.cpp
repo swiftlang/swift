@@ -920,8 +920,6 @@ namespace {
     ImportResult Visit##KIND##Type(const clang::KIND##Type *type) {            \
       if (type->isSugared())                                                   \
         return Visit(type->desugar());                                         \
-      if (type->isDependentType())                                             \
-        return Impl.SwiftContext.getAnyExistentialType();                      \
       return Type();                                                           \
     }
     MAYBE_SUGAR_TYPE(TypeOfExpr)

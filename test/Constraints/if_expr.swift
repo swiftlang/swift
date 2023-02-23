@@ -567,3 +567,9 @@ func builderInClosure() {
     }
   }
 }
+
+// https://github.com/apple/swift/issues/63796
+func testInvalidOptionalChainingInIfContext() {
+  let v63796 = 1
+  if v63796? {} // expected-error{{cannot use optional chaining on non-optional value of type 'Int'}}
+}
