@@ -299,6 +299,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       return extractCompileTimeValue(coerceExpr->getSubExpr());
     }
 
+    case ExprKind::DotSelf: {
+      auto dotSelfExpr = cast<DotSelfExpr>(expr);
+      return std::make_shared<TypeValue>(dotSelfExpr->getType());
+    }
+
     default: {
       break;
     }
@@ -582,6 +587,16 @@ void writeValue(llvm::json::OStream &JSON,
           }
         });
       }
+    });
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::Type: {
+    auto typeValue = cast<TypeValue>(value);
+    JSON.attribute("valueKind", "Type");
+    JSON.attributeObject("value", [&]() {
+      JSON.attribute("type",
+                     toFullyQualifiedTypeNameString(typeValue->getType()));
     });
     break;
   }
