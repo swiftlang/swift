@@ -1522,7 +1522,7 @@ static void resolveCursor(
       if (Actionables && Length) {
         SmallVector<RefactoringKind, 8> Kinds;
         RangeConfig Range;
-        Range.BufferId = BufferID;
+        Range.BufferID = BufferID;
         auto Pair = SM.getLineAndColumnInBuffer(Loc);
         Range.Line = Pair.first;
         Range.Column = Pair.second;
@@ -2675,12 +2675,12 @@ static RefactoringKind getIDERefactoringKind(SemanticRefactoringInfo Info) {
 }
 
 void SwiftLangSupport::semanticRefactoring(
-    StringRef Filename, SemanticRefactoringInfo Info,
+    StringRef PrimaryFile, SemanticRefactoringInfo Info,
     ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
     CategorizedEditsReceiver Receiver) {
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, Filename, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFile, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(Error));
@@ -2698,18 +2698,30 @@ void SwiftLangSupport::semanticRefactoring(
                                                 Receiver(std::move(Receiver)) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      RequestRefactoringEditConsumer EditConsumer(Receiver);
+
       auto &CompIns = AstUnit->getCompilerInstance();
-      ModuleDecl *MainModule = CompIns.getMainModule();
+      auto &SM = CompIns.getSourceMgr();
+
       RefactoringOptions Opts(getIDERefactoringKind(Info));
-      Opts.Range.BufferId =  AstUnit->getPrimarySourceFile().getBufferID().
-        value();
+
+      Optional<unsigned> BufferID;
+      if (Info.SourceFile.empty()) {
+        BufferID = AstUnit->getPrimarySourceFile().getBufferID();
+      } else {
+        BufferID = SM.getIDForBufferIdentifier(Info.SourceFile);
+      }
+      if (!BufferID)
+        return;
+
+      Opts.Range.BufferID = *BufferID;
       Opts.Range.Line = Info.Line;
       Opts.Range.Column = Info.Column;
       Opts.Range.Length = Info.Length;
       Opts.PreferredName = Info.PreferredName.str();
 
-      RequestRefactoringEditConsumer EditConsumer(Receiver);
-      refactorSwiftModule(MainModule, Opts, EditConsumer, EditConsumer);
+      refactorSwiftModule(CompIns.getMainModule(), Opts, EditConsumer,
+                          EditConsumer);
     }
 
     void cancelled() override {

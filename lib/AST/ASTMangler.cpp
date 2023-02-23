@@ -3810,12 +3810,13 @@ void ASTMangler::appendMacroExpansionContext(
 
     outerExpansionLoc = decl->getLoc();
     outerExpansionDC = decl->getDeclContext();
-    discriminator = decl->getAttachedMacroDiscriminator(role, attr);
 
     if (auto *macroDecl = decl->getResolvedMacro(attr))
       baseName = macroDecl->getBaseName();
     else
       baseName = ctx.getIdentifier("__unknown_macro__");
+
+    discriminator = decl->getAttachedMacroDiscriminator(baseName, role, attr);
 
     break;
   }
@@ -3896,24 +3897,30 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   beginMangling();
 
   const Decl *attachedTo = decl;
-  if (role == MacroRole::MemberAttribute) {
-    appendContextOf(cast<ValueDecl>(decl));
-    attachedTo = decl->getDeclContext()->getAsDecl();
-  } else if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
-    appendAnyDecl(valueDecl);
+  if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
+    if (role != MacroRole::MemberAttribute) {
+      appendAnyDecl(valueDecl);
+    } else {
+      // Appending the member would result in a cycle since `VarDecl` appends
+      // its type, which would then loop back around to getting the attributes
+      // again. We'll instead add a discriminator for each member.
+      appendContextOf(valueDecl);
+      attachedTo = decl->getDeclContext()->getAsDecl();
+    }
   } else {
     appendContext(decl->getDeclContext(), "");
   }
 
-  StringRef macroName;
-  if (auto *macroDecl = attachedTo->getResolvedMacro(attr))
-    macroName = macroDecl->getName().getBaseName().userFacingName();
-  else
-    macroName = "__unknown_macro__";
+  DeclBaseName macroName;
+  if (auto *macroDecl = attachedTo->getResolvedMacro(attr)) {
+    macroName = macroDecl->getName().getBaseName();
+  } else {
+    macroName = decl->getASTContext().getIdentifier("__unknown_macro__");
+  }
 
   appendMacroExpansionOperator(
-      macroName, role,
-      decl->getAttachedMacroDiscriminator(role, attr));
+      macroName.userFacingName(), role,
+      decl->getAttachedMacroDiscriminator(macroName, role, attr));
   return finalize();
 }
 

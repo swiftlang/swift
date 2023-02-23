@@ -684,11 +684,13 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
     }
   }
 
-  // FIXME: This should be getSemanticAttrs if we want to walk macro
-  // expansions. We've just already typechecked and this list is mutable so...
-  for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
-    if (!shouldWalkMacroArgumentsAndExpansion().second &&
-        D->getModuleContext()->isInGeneratedBuffer(customAttr->getLocation()))
+  ModuleDecl *MD = D->getModuleContext();
+  for (auto *customAttr :
+       D->getSemanticAttrs().getAttributes<CustomAttr, true>()) {
+    SourceFile *SF =
+        MD->getSourceFileContainingLocation(customAttr->getLocation());
+    ASTNode expansion = SF ? SF->getMacroExpansion() : nullptr;
+    if (!shouldWalkMacroArgumentsAndExpansion().second && expansion)
       continue;
 
     if (auto *Repr = customAttr->getTypeRepr()) {
@@ -700,10 +702,12 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
       if (auto macroDecl = D->getResolvedMacro(mutableAttr)) {
         Type macroRefType = macroDecl->getDeclaredInterfaceType();
         if (!passReference(
-              macroDecl, macroRefType, DeclNameLoc(Repr->getStartLoc()),
-              ReferenceMetaData(SemaReferenceKind::DeclRef, None,
-                                /*isImplicit=*/false,
-                                std::make_pair(customAttr, D))))
+                macroDecl, macroRefType, DeclNameLoc(Repr->getStartLoc()),
+                ReferenceMetaData(
+                    SemaReferenceKind::DeclRef, None,
+                    /*isImplicit=*/false,
+                    std::make_pair(customAttr,
+                                   expansion ? expansion.get<Decl *>() : D))))
           return false;
       } else if (!Repr->walk(*this)) {
         return false;
@@ -865,9 +869,23 @@ bool SemaAnnotator::passCallArgNames(Expr *Fn, ArgumentList *ArgList) {
 }
 
 bool SemaAnnotator::shouldIgnore(Decl *D) {
+  if (!D->isImplicit())
+    return false;
+
   // TODO: There should really be a separate field controlling whether
   //       constructors are visited or not
-  return D->isImplicit() && !isa<ConstructorDecl>(D);
+  if (isa<ConstructorDecl>(D))
+    return false;
+
+  // Walk into missing decls to visit their attributes if they were generated
+  // by a member attribute expansion. Note that we would have already skipped
+  // this decl if we were ignoring expansions, so no need to check that.
+  if (auto *missing = dyn_cast<MissingDecl>(D)) {
+    if (D->isInGeneratedBuffer())
+      return false;
+  }
+
+  return true;
 }
 
 bool SourceEntityWalker::walk(SourceFile &SrcFile) {

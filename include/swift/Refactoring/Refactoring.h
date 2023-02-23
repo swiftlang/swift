@@ -33,7 +33,7 @@ enum class RefactoringKind : int8_t {
 };
 
 struct RangeConfig {
-  unsigned BufferId;
+  unsigned BufferID;
   unsigned Line;
   unsigned Column;
   unsigned Length;

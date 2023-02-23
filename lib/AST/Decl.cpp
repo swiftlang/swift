@@ -441,39 +441,34 @@ MacroDecl *Decl::getResolvedMacro(CustomAttr *customAttr) const {
   return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
 }
 
-unsigned Decl::getAttachedMacroDiscriminator(
-    MacroRole role, const CustomAttr *attr
-) const {
+unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
+                                             MacroRole role,
+                                             const CustomAttr *attr) const {
   assert(isAttachedMacro(role) && "Not an attached macro role");
 
-  // Member-attribute macros are written on the enclosing declaration,
-  // but apply to the member itself. Adjust the owning declaration accordingly.
-  const Decl *owningDecl = this;
-  if (role == MacroRole::MemberAttribute) {
-    owningDecl = getDeclContext()->getAsDecl();
+  if (role != MacroRole::MemberAttribute) {
+    llvm::SmallDenseMap<Identifier, unsigned> nextDiscriminator;
+    Optional<unsigned> foundDiscriminator;
+
+    forEachAttachedMacro(
+        role, [&](CustomAttr *foundAttr, MacroDecl *foundMacro) {
+          unsigned discriminator =
+              nextDiscriminator[foundMacro->getBaseIdentifier()]++;
+          if (attr == foundAttr)
+            foundDiscriminator = discriminator;
+        });
+
+    if (foundDiscriminator)
+      return *foundDiscriminator;
   }
 
-  llvm::SmallDenseMap<Identifier, unsigned> nextDiscriminator;
-  Optional<unsigned> foundDiscriminator;
-
-  owningDecl->forEachAttachedMacro(
-    role,
-    [&](CustomAttr *foundAttr, MacroDecl *foundMacro) {
-      unsigned discriminator =
-        nextDiscriminator[foundMacro->getBaseIdentifier()]++;
-      if (attr == foundAttr)
-        foundDiscriminator = discriminator;
-    });
-
-  if (foundDiscriminator)
-    return *foundDiscriminator;
-
   // If that failed, conjure up a discriminator.
+  // FIXME: Better discriminator for member attributes - add the member name?
   ASTContext &ctx = getASTContext();
-  assert(ctx.Diags.hadAnyError());
+  assert(role == MacroRole::MemberAttribute || ctx.Diags.hadAnyError());
   return ctx.getNextMacroDiscriminator(
       MacroDiscriminatorContext::getParentOf(getLoc(), getDeclContext()),
-      DeclBaseName());
+      macroName);
 }
 
 const Decl *Decl::getInnermostDeclWithAvailability() const {
