@@ -419,7 +419,7 @@ public:
   virtual void loadAsTake(IRGenFunction &IGF, Address addr,
                           Explosion &e) const = 0;
   virtual void assign(IRGenFunction &IGF, Explosion &e, Address addr,
-                      bool isOutlined) const = 0;
+                      bool isOutlined, SILType T) const = 0;
   virtual void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
                           bool isOutlined) const = 0;
   virtual void reexplode(IRGenFunction &IGF, Explosion &src,
@@ -427,7 +427,7 @@ public:
   virtual void copy(IRGenFunction &IGF, Explosion &src,
                     Explosion &dest, Atomicity atomicity) const = 0;
   virtual void consume(IRGenFunction &IGF, Explosion &src,
-                       Atomicity atomicity) const = 0;
+                       Atomicity atomicity, SILType T) const = 0;
   virtual void fixLifetime(IRGenFunction &IGF, Explosion &src) const = 0;
   virtual void packIntoEnumPayload(IRGenFunction &IGF,
                                    EnumPayload &payload,

@@ -449,7 +449,7 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &ti,
                      loadableTI->getFixedAlignment());
         Explosion loaded;
         loadableTI->loadAsTake(IGF, addr, loaded);
-        loadableTI->consume(IGF, loaded, atomicity);
+        loadableTI->consume(IGF, loaded, atomicity, t);
         IGF.Builder.CreateRet(addr.getAddress());
       },
       true /*setIsNoInline*/);
