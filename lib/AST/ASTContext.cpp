@@ -531,7 +531,7 @@ struct ASTContext::Implementation {
   llvm::StringMap<void *> LoadedSymbols;
 
   /// Map a module name to an executable plugin path that provides the module.
-  llvm::DenseMap<Identifier, std::string> ExecutablePluginPaths;
+  llvm::DenseMap<Identifier, StringRef> ExecutablePluginPaths;
 
   /// The permanent arena.
   Arena Permanent;
@@ -6256,9 +6256,9 @@ void ASTContext::loadCompilerPlugins() {
       // TODO: Error messsage.
       Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, arg, "");
     }
-    auto pathstr = std::string(path);
+    auto pathStr = AllocateCopy(path);
     for (auto moduleName : modules) {
-      getImpl().ExecutablePluginPaths[getIdentifier(moduleName)] = pathstr;
+      getImpl().ExecutablePluginPaths[getIdentifier(moduleName)] = pathStr;
     }
   }
 }
@@ -6327,7 +6327,7 @@ ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
   if (found == execPluginPaths.end())
     return nullptr;
 
-  // Resolve the realpath.
+  // Let the VFS to map the path.
   auto &path = found->second;
   SmallString<128> resolvedPath;
   auto fs = this->SourceMgr.getFileSystem();

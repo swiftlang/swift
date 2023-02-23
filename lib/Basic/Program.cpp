@@ -59,7 +59,6 @@ toNullTerminatedCStringArray(ArrayRef<StringRef> array,
                              llvm::BumpPtrAllocator &Alloc) {
   size_t size = array.size();
   const char **result = Alloc.Allocate<const char *>(size + 1);
-  const char **ptr = result;
   for (size_t i = 0; i < size; ++i) {
     result[i] = NullTerminatedStringRef(array[i], Alloc).data();
   }
@@ -155,8 +154,7 @@ swift::ExecuteWithPipe(llvm::StringRef program,
     dup2(p2.write, STDOUT_FILENO);
 
     // Execute the program.
-    if (env.has_value()) {
-      const char **envp = toNullTerminatedCStringArray(*env, Alloc);
+    if (envp) {
       execve(progCStr, const_cast<char **>(argv), const_cast<char **>(envp));
     } else {
       execv(progCStr, const_cast<char **>(argv));

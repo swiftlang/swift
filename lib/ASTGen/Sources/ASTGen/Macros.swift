@@ -109,13 +109,13 @@ public func resolveExecutableMacro(
   moduleNameLength: Int,
   typeName: UnsafePointer<UInt8>,
   typeNameLength: Int,
-  pluginOpaqueHanle: UnsafeMutableRawPointer
+  pluginOpaqueHandle: UnsafeMutableRawPointer
 ) -> UnsafeRawPointer {
   let exportedPtr = UnsafeMutablePointer<ExportedExecutableMacro>.allocate(capacity: 1)
   exportedPtr.initialize(to: .init(
     moduleName: String(bufferStart: moduleName, count: moduleNameLength),
     typeName: String(bufferStart: typeName, count: typeNameLength),
-    plugin: CompilerPlugin(opaqueHandle: pluginOpaqueHanle)))
+    plugin: CompilerPlugin(opaqueHandle: pluginOpaqueHandle)))
   return UnsafeRawPointer(exportedPtr)
 }
 

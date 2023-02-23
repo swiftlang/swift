@@ -23,9 +23,9 @@
 #
 # where 'TEST_SPEC' is a list of pairs of an expected request and the result to
 # respond. For example:
-#   {'expected': {'testRequest': {'params': []}},
+#   {'expect': {'testRequest': {'params': []}},
 #    'response': {'testRequestResult': [1,2,"foo"]}}
-# this spec matches a request that is an object with 'testRequst' key with an
+# this spec matches a request that is an object with 'testRequest' key with an
 # object with 'params' key with an empty array. When the host system sends a
 # request matching, this mock plugin replies to it with the 'response' object.
 # ===-----------------------------------------------------------------------===#

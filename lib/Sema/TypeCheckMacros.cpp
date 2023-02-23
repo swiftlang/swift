@@ -356,7 +356,7 @@ resolveInProcessMacro(
 }
 
 static Optional<ExternalMacroDefinition>
-resolvExecutableMacro(ASTContext &ctx, Identifier moduleName,
+resolveExecutableMacro(ASTContext &ctx, Identifier moduleName,
                       Identifier typeName) {
 #if SWIFT_SWIFT_PARSER
   // Find macros in exectuable plugins.
@@ -374,7 +374,7 @@ resolvExecutableMacro(ASTContext &ctx, Identifier moduleName,
     });
   }
 
-  if (auto execMacro = swift_ASTGen_resolveExecutableMacro(
+  if (auto *execMacro = swift_ASTGen_resolveExecutableMacro(
           moduleName.str().data(), moduleName.str().size(),
           typeName.str().data(), typeName.str().size(), executablePlugin)) {
     // Make sure we clean up after the macro.
@@ -408,7 +408,7 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
 
   // Try executable plugins.
   if (auto executableMacro =
-          resolvExecutableMacro(*ctx, moduleName, typeName)) {
+          resolveExecutableMacro(*ctx, moduleName, typeName)) {
     return executableMacro;
   }
 
