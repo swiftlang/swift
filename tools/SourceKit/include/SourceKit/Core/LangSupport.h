@@ -708,10 +708,16 @@ struct NoteRegion {
 };
 
 struct Edit {
+  /// If the edit is outside of the originally request source file, the path
+  /// to the file it is editing.
+  std::string Path;
   unsigned StartLine;
   unsigned StartColumn;
   unsigned EndLine;
   unsigned EndColumn;
+  /// If the edit is actually a file (which could be generated/from an
+  /// expansion), the name (or path) of that buffer.
+  std::string BufferName;
   std::string NewText;
   SmallVector<NoteRegion, 2> RegionsWithNote;
 };
