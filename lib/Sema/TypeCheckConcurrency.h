@@ -399,6 +399,11 @@ bool diagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
     llvm::function_ref<bool(DiagnosticBehavior)> diagnose);
 
+/// If any of the imports in this source file was @preconcurrency but
+/// there were no diagnostics downgraded or suppressed due to that
+/// @preconcurrency, suggest that the attribute be removed.
+void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf);
+
 /// Given a set of custom attributes, pick out the global actor attributes
 /// and perform any necessary resolution and diagnostics, returning the
 /// global actor attribute and type it refers to (or \c None).
