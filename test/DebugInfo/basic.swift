@@ -1,5 +1,3 @@
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows
-// Remove the line above when rdar://105651154 is addressed.
 // A (no longer) basic test for debug info.
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info by default.
