@@ -2319,7 +2319,9 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
     auto &fnProtoInfo =
         IGM.getProtocolInfo(conf->getProtocol(), ProtocolInfoKind::Full);
     auto index = fnProtoInfo.getFunctionIndex(member).forProtocolWitnessTable();
-    auto offset = index.getValue() * IGM.getPointerSize().getValue();
+    auto entrySize = IGM.IRGen.Opts.UseRelativeProtocolWitnessTables ?
+      4 : IGM.getPointerSize().getValue();
+    auto offset = index.getValue() * entrySize;
     global->addTypeMetadata(offset, typeIdForMethod(IGM, member));
 
     minOffset = std::min(minOffset, offset);
@@ -3810,9 +3812,11 @@ static llvm::Value *emitWTableSlotLoad(IRGenFunction &IGF, llvm::Value *wtable,
 
     // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
     // which could mean redundant loads don't get removed.
-    llvm::Value *checkedLoad = IGF.Builder.CreateIntrinsicCall(
-        llvm::Intrinsic::type_checked_load, args);
-    assert(!isRelativeTable && "Not yet implemented");
+    llvm::Value *checkedLoad =
+        isRelativeTable ? IGF.Builder.CreateIntrinsicCall(
+                              llvm::Intrinsic::type_checked_load_relative, args)
+                        : IGF.Builder.CreateIntrinsicCall(
+                              llvm::Intrinsic::type_checked_load, args);
     return IGF.Builder.CreateExtractValue(checkedLoad, 0);
   }
 
