@@ -18,6 +18,7 @@
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/ToolChain.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "llvm/WindowsDriver/MSVCPaths.h"
 
 using namespace swift;
 
@@ -296,14 +297,119 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
   };
 }
 
+namespace {
+std::string
+GetWindowsAuxiliaryFile(StringRef modulemap, const SearchPathOptions &Options) {
+  StringRef SDKPath = Options.getSDKPath();
+  if (!SDKPath.empty()) {
+    llvm::SmallString<261> path{SDKPath};
+    llvm::sys::path::append(path, "usr", "share", modulemap);
+    if (llvm::sys::fs::exists(path))
+      return path.str().str();
+  }
+
+  if (!Options.RuntimeResourcePath.empty()) {
+    llvm::SmallString<261> path{Options.RuntimeResourcePath};
+    llvm::sys::path::append(path, "windows", modulemap);
+    if (llvm::sys::fs::exists(path))
+      return path.str().str();
+  }
+
+  return "";
+}
+
+SmallVector<std::pair<std::string, std::string>, 2>
+GetWindowsFileMappings(ASTContext &Context) {
+  const llvm::Triple &Triple = Context.LangOpts.Target;
+  const SearchPathOptions &SearchPathOpts = Context.SearchPathOpts;
+  SmallVector<std::pair<std::string, std::string>, 2> Mappings;
+  std::string AuxiliaryFile;
+
+  if (!Triple.isWindowsMSVCEnvironment())
+    return Mappings;
+
+  clang::driver::Driver Driver = createClangDriver(Context);
+  const llvm::opt::InputArgList Args = createClangArgs(Context, Driver);
+  const clang::driver::ToolChain &ToolChain = Driver.getToolChain(Args, Triple);
+  llvm::vfs::FileSystem &VFS = ToolChain.getVFS();
+
+  struct {
+    std::string Path;
+    std::string IncludeVersion;
+    std::string LibraryVersion;
+    int MajorVersion;
+  } WindowsSDK;
+  if (llvm::getWindowsSDKDir(VFS, {}, {}, {},
+                             WindowsSDK.Path, WindowsSDK.MajorVersion,
+                             WindowsSDK.IncludeVersion,
+                             WindowsSDK.LibraryVersion)) {
+    llvm::SmallString<261> WinSDKInjection{WindowsSDK.Path};
+    llvm::sys::path::append(WinSDKInjection, "Include");
+    if (WindowsSDK.MajorVersion > 8)
+      llvm::sys::path::append(WinSDKInjection, WindowsSDK.IncludeVersion, "um");
+    llvm::sys::path::append(WinSDKInjection, "module.modulemap");
+
+    AuxiliaryFile = GetWindowsAuxiliaryFile("winsdk.modulemap", SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      Mappings.emplace_back(std::string(WinSDKInjection), AuxiliaryFile);
+  }
+
+  struct {
+    std::string Path;
+    std::string Version;
+  } UCRTSDK;
+  if (llvm::getUniversalCRTSdkDir(VFS, {}, {}, {},
+                                  UCRTSDK.Path, UCRTSDK.Version)) {
+    llvm::SmallString<261> UCRTInjection{UCRTSDK.Path};
+    llvm::sys::path::append(UCRTInjection, "Include", UCRTSDK.Version, "ucrt");
+    llvm::sys::path::append(UCRTInjection, "module.modulemap");
+
+    AuxiliaryFile = GetWindowsAuxiliaryFile("ucrt.modulemap", SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      Mappings.emplace_back(std::string(UCRTInjection), AuxiliaryFile);
+  }
+
+  struct {
+    std::string Path;
+    llvm::ToolsetLayout Layout;
+  } VCTools;
+  if (llvm::findVCToolChainViaCommandLine(VFS, {}, {}, {}, VCTools.Path, VCTools.Layout) ||
+      llvm::findVCToolChainViaEnvironment(VFS, VCTools.Path, VCTools.Layout) ||
+      llvm::findVCToolChainViaSetupConfig(VFS, VCTools.Path, VCTools.Layout)) {
+    assert(VCTools.Layout == llvm::ToolsetLayout::VS2017OrNewer &&
+           "unsupported toolset layout (VS2017+ required)");
+
+    llvm::SmallString<261> VCToolsInjection{VCTools.Path};
+    llvm::sys::path::append(VCToolsInjection, "include");
+
+    llvm::sys::path::append(VCToolsInjection, "module.modulemap");
+    AuxiliaryFile =
+        GetWindowsAuxiliaryFile("vcruntime.modulemap", SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      Mappings.emplace_back(std::string(VCToolsInjection), AuxiliaryFile);
+
+    llvm::sys::path::remove_filename(VCToolsInjection);
+    llvm::sys::path::append(VCToolsInjection, "vcruntime.apinotes");
+    AuxiliaryFile =
+        GetWindowsAuxiliaryFile("vcruntime.apinotes", SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      Mappings.emplace_back(std::string(VCToolsInjection), AuxiliaryFile);
+  }
+
+  return Mappings;
+}
+}
+
 SmallVector<std::pair<std::string, std::string>, 2>
 swift::getClangInvocationFileMapping(ASTContext &ctx) {
   SmallVector<std::pair<std::string, std::string>, 2> result;
 
+  // Android/BSD/Linux Mappings
   result.append(getGlibcFileMapping(ctx));
-
-  if (ctx.LangOpts.EnableCXXInterop) {
+  if (ctx.LangOpts.EnableCXXInterop)
     result.append(getLibStdCxxFileMapping(ctx));
-  }
+
+  result.append(GetWindowsFileMappings(ctx));
+
   return result;
 }
