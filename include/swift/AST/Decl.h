@@ -8418,6 +8418,9 @@ public:
   /// Retrieve the definition of this macro.
   MacroDefinition getDefinition() const;
 
+  /// Retrieve the parameter list of this macro.
+  ParameterList *getParameterList() const { return parameterList; }
+
   /// Retrieve the builtin macro kind for this macro, or \c None if it is a
   /// user-defined macro with no special semantics.
   Optional<BuiltinMacroKind> getBuiltinKind() const;

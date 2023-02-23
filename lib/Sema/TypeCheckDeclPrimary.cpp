@@ -2019,6 +2019,8 @@ public:
     if (!MD->getAttrs().hasAttribute<MacroRoleAttr>(/*AllowInvalid*/ true))
       MD->diagnose(diag::macro_without_role, MD->getName());
 
+    TypeChecker::checkParameterList(MD->getParameterList(), MD);
+
     // Check the macro definition.
     switch (auto macroDef = MD->getDefinition()) {
     case MacroDefinition::Kind::Undefined:
