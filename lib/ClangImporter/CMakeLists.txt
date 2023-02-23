@@ -57,7 +57,6 @@ add_custom_target("copy_cxxInterop_support_header"
     COMMENT "Copying C++ interop support header to ${SWIFTINC_DIR}")
 
 swift_install_in_component(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cxx-interop.h"
-                           TARGET ${SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET}
                            DESTINATION "include/swift"
                            COMPONENT compiler)
 
