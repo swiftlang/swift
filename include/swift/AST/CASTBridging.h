@@ -13,8 +13,13 @@
 #ifndef SWIFT_C_AST_ASTBRIDGING_H
 #define SWIFT_C_AST_ASTBRIDGING_H
 
+#include "swift/Basic/CBasicBridging.h"
 #include "swift/Basic/Compiler.h"
+
 #include <inttypes.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #if __clang__
 // Provide macros to temporarily suppress warning about the use of
@@ -279,6 +284,34 @@ void Expr_dump(void *);
 void Decl_dump(void *);
 void Stmt_dump(void *);
 void Type_dump(void *);
+
+//===----------------------------------------------------------------------===//
+// Plugins
+//===----------------------------------------------------------------------===//
+
+typedef void *PluginHandle;
+typedef const void *PluginCapabilityPtr;
+
+/// Set a capability data to the plugin object. Since the data is just a opaque
+/// pointer, it's not used in AST at all.
+void Plugin_setCapability(PluginHandle handle, PluginCapabilityPtr data);
+
+/// Get a capability data set by \c Plugin_setCapability .
+PluginCapabilityPtr _Nullable Plugin_getCapability(PluginHandle handle);
+
+/// Lock the plugin. Clients should lock it during sending and recving the
+/// response.
+void Plugin_lock(PluginHandle handle);
+
+/// Unlock the plugin.
+void Plugin_unlock(PluginHandle handle);
+
+/// Sends the message to the plugin, returns true if there was an error.
+/// Clients should receive the response  by \c Plugin_waitForNextMessage .
+_Bool Plugin_sendMessage(PluginHandle handle, const BridgedData data);
+
+/// Receive a message from the plugin.
+_Bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *data);
 
 #ifdef __cplusplus
 }

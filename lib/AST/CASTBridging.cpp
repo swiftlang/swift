@@ -9,6 +9,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 
@@ -622,3 +623,50 @@ void Stmt_dump(void *expr) { ((Stmt *)expr)->dump(llvm::errs()); }
 void Type_dump(void *expr) { ((TypeRepr *)expr)->dump(); }
 
 #pragma clang diagnostic pop
+
+//===----------------------------------------------------------------------===//
+// Plugins
+//===----------------------------------------------------------------------===//
+
+PluginCapabilityPtr Plugin_getCapability(PluginHandle handle) {
+  auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
+  return plugin->getCapability();
+}
+
+void Plugin_setCapability(PluginHandle handle, PluginCapabilityPtr data) {
+  auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
+  plugin->setCapability(data);
+}
+
+void Plugin_lock(PluginHandle handle) {
+  auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
+  plugin->lock();
+}
+
+void Plugin_unlock(PluginHandle handle) {
+  auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
+  plugin->unlock();
+}
+
+bool Plugin_sendMessage(PluginHandle handle, const BridgedData data) {
+  auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
+  StringRef message(data.baseAddress, data.size);
+  auto error = plugin->sendMessage(message);
+  bool hadError = bool(error);
+  llvm::consumeError(std::move(error));
+  return hadError;
+}
+
+bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {
+  auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
+  auto result = plugin->waitForNextMessage();
+  if (!result) {
+    return true;
+  }
+  auto &message = result.get();
+  auto size = message.size();
+  auto outPtr = malloc(size);
+  memcpy(outPtr, message.data(), size);
+  *out = BridgedData{(const char *)outPtr, size};
+  return false;
+}

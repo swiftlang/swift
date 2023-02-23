@@ -42,7 +42,7 @@ extension SourceManager {
 extension String {
   /// Retrieve the base name of a string that represents a path, removing the
   /// directory.
-  fileprivate var basename: String {
+  var basename: String {
     guard let lastSlash = lastIndex(of: "/") else {
       return self
     }
