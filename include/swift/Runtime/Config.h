@@ -323,6 +323,9 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
                           ptrauth_key_process_independent_code,                \
                           ptrauth_blend_discriminator(__buffer,                \
             SpecialPointerAuthDiscriminators::OpaqueModifyResumeFunction))
+#define __ptrauth_swift_type_layout_string                                     \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::TypeLayoutString)
 #else
 #define SWIFT_PTRAUTH 0
 #define __ptrauth_swift_function_pointer(__typekey)
@@ -350,6 +353,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_dynamic_replacement_key
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer) (__fn)
 #define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer) (__fn)
+#define __ptrauth_swift_type_layout_string
 #endif
 
 #ifdef __cplusplus

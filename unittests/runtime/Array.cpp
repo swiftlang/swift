@@ -47,7 +47,7 @@ extern "C" void swift_arrayInitWithCopy(OpaqueValue *dest,
   initialize_pod_witness_table_size_uint32_t_stride_uint64_t(pod_witnesses);   \
   uint64_t srcArray[3] = {0, 1, 2};                                            \
   uint64_t destArray[3] = {0x5A5A5A5AU, 0x5A5A5A5AU, 0x5A5A5A5AU};             \
-  FullOpaqueMetadata testMetadata = {{&pod_witnesses},            \
+  FullOpaqueMetadata testMetadata = {{&pod_witnesses},                         \
                                      {{MetadataKind::Opaque}}};                \
   Metadata *metadata = &testMetadata.base;                                     \
   swift_array##kind((OpaqueValue *)destArray, (OpaqueValue *)srcArray, 3,      \

@@ -91,7 +91,7 @@ import TestModule
 //         CHECK-SAME:  i16 {{(7|3)}},
 //         CHECK-SAME:  i16 0,
 //   CHECK-apple-SAME:  i32 {{(144|84)}},
-// CHECK-unknown-SAME:  i32 112,
+// CHECK-unknown-SAME:  i32 120,
 //         CHECK-SAME:  i32 {{(24|12)}},
 //         CHECK-SAME:  %swift.type_descriptor* bitcast (
 //                   :    <{

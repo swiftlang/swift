@@ -152,6 +152,10 @@ namespace irgen {
       // Struct and enum metadata have one word of head-allocated data:
       // the value witness table.
       ValueType = 2,
+
+      // Some builtin and well-known types don't have a layout string
+      // for binary compatibility reasons.
+      NoTypeLayoutString = 1,
       
       // Other metadata objects have no head allocation.
       None = 0,

@@ -1445,6 +1445,8 @@ namespace SpecialPointerAuthDiscriminators {
 
   // Relative protocol witness table descriminator
   const uint16_t RelativeProtocolWitnessTable = 0xb830; // = 47152
+
+  const uint16_t TypeLayoutString = 0x8b65; // = 35685
 }
 
 /// The number of arguments that will be passed directly to a generic

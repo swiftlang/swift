@@ -1,5 +1,3 @@
-import Foundation
-
 public class SimpleClass {
     public let x: Int
 
@@ -137,6 +135,8 @@ public struct ExistentialRefWrapper {
 }
 
 #if os(macOS)
+import Foundation
+
 @objc
 public class ObjcClass: NSObject {
     public let x: Int

@@ -118,8 +118,11 @@ struct MetadataDependency {
 
 /// Prefix of a metadata header, containing a pointer to the
 /// type layout string.
+template <typename Runtime>
 struct TargetTypeMetadataLayoutPrefix {
-  const uint8_t *layoutString;
+    TargetSignedPointer<Runtime, const uint8_t *
+                                      __ptrauth_swift_type_layout_string>
+        layoutString;
 };
 
 /// The header before a metadata object which appears on all type
@@ -138,14 +141,14 @@ struct TargetTypeMetadataHeaderBase {
 
 template <typename Runtime>
 struct TargetTypeMetadataHeader
-    : TargetTypeMetadataLayoutPrefix,
+    : TargetTypeMetadataLayoutPrefix<Runtime>,
       TargetTypeMetadataHeaderBase<Runtime> {
 
   TargetTypeMetadataHeader() = default;
   constexpr TargetTypeMetadataHeader(
-    const TargetTypeMetadataLayoutPrefix &layout,
+    const TargetTypeMetadataLayoutPrefix<Runtime> &layout,
     const TargetTypeMetadataHeaderBase<Runtime> &header)
-      : TargetTypeMetadataLayoutPrefix(layout),
+      : TargetTypeMetadataLayoutPrefix<Runtime>(layout),
         TargetTypeMetadataHeaderBase<Runtime>(header) {}
 };
 
@@ -305,6 +308,7 @@ public:
   }
 
   const uint8_t *getLayoutString() const {
+    assert(hasLayoutString());
     if (isAnyClass()) {
       return asFullMetadata(
                  reinterpret_cast<const TargetAnyClassMetadata<Runtime> *>(
@@ -333,6 +337,10 @@ public:
     } else {
       asFullMetadata(this)->layoutString = layoutString;
     }
+  }
+
+  bool hasLayoutString() const {
+    return getTypeContextDescriptor()->hasLayoutString();
   }
   
   // Define forwarders for value witnesses. These invoke this metadata's value
@@ -508,14 +516,14 @@ using HeapMetadataHeaderPrefix =
 /// The header present on all heap metadata.
 template <typename Runtime>
 struct TargetHeapMetadataHeader
-    : TargetTypeMetadataLayoutPrefix,
+    : TargetTypeMetadataLayoutPrefix<Runtime>,
       TargetHeapMetadataHeaderPrefix<Runtime>,
       TargetTypeMetadataHeaderBase<Runtime> {
   constexpr TargetHeapMetadataHeader(
-      const TargetTypeMetadataLayoutPrefix &typeLayoutPrefix,
+      const TargetTypeMetadataLayoutPrefix<Runtime> &typeLayoutPrefix,
       const TargetHeapMetadataHeaderPrefix<Runtime> &heapPrefix,
       const TargetTypeMetadataHeaderBase<Runtime> &typePrefix)
-    : TargetTypeMetadataLayoutPrefix(typeLayoutPrefix),
+    : TargetTypeMetadataLayoutPrefix<Runtime>(typeLayoutPrefix),
       TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
       TargetTypeMetadataHeaderBase<Runtime>(typePrefix) {}
 };

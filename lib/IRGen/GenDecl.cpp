@@ -4942,7 +4942,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     }
 
     if (concreteType->is<TupleType>()) {
-      adjustmentIndex = 1;
+      adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
     }
   }
 
@@ -4988,7 +4988,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   unsigned adjustmentIndex;
   if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
     defaultVarTy = FullExistentialTypeMetadataStructTy;
-    adjustmentIndex = 1;
+    adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
   } else if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
     if (concreteType->getClassOrBoundGenericClass() && !foreign) {

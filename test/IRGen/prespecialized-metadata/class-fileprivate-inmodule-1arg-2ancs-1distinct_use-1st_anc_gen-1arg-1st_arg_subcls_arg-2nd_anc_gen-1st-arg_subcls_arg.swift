@@ -124,7 +124,7 @@
 //         CHECK-SAME:  i16 {{(7|3)}},
 //         CHECK-SAME:  i16 0,
 //   CHECK-apple-SAME:  i32 {{(160|92)}},
-// CHECK-unknown-SAME:  i32 128,
+// CHECK-unknown-SAME:  i32 136,
 //         CHECK-SAME:  i32 {{(24|12)}},
 //                   :  %swift.type_descriptor* bitcast (
 //                   :    <{
