@@ -292,6 +292,23 @@ struct OwnershipUtilsHasPointerEscape : UnitTest {
 //===----------------------------------------------------------------------===//
 
 // Arguments:
+// - the lexical borrow to fold
+// Dumpts:
+// - the function
+struct LexicalDestroyFoldingTest : UnitTest {
+  LexicalDestroyFoldingTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+    DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
+    auto value = arguments.takeValue();
+    auto *bbi = cast<BeginBorrowInst>(value);
+    InstructionDeleter deleter;
+    foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
+    getFunction()->dump();
+  }
+};
+
+// Arguments:
 // - variadic list of - instruction: a last user
 // Dumps:
 // - the insertion points
