@@ -734,6 +734,11 @@ extension Sequence {
     guard undercountedElements.isEmpty else {
       undercountedElements.reverse()
       return undercountedElements + result
+      // is there more effective way to do this 👆🏻?
+      //underestimatedCount.append(result)
+      //return underestimatedCount
+      //result.insert(contentsOf: undercountedElements, at: 0)
+      //return result
     }
     return result
   }
