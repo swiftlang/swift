@@ -70,7 +70,8 @@ void ClangClassTypePrinter::printClassTypeDecl(
   os << "  using " << baseClassName << "::operator=;\n";
   bodyPrinter();
   os << "protected:\n";
-  os << "  inline ";
+  os << "  ";
+  printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
   os << "(void * _Nonnull ptr) noexcept : " << baseClassName << "(ptr) {}\n";
   os << "private:\n";
@@ -86,7 +87,8 @@ void ClangClassTypePrinter::printClassTypeDecl(
         printCxxImplClassName(os, typeDecl);
         os << " {\n";
         os << "public:\n";
-        os << "static inline ";
+        os << "static ";
+        printer.printInlineForThunk();
         printer.printBaseName(typeDecl);
         os << " makeRetained(void * _Nonnull ptr) noexcept { return ";
         printer.printBaseName(typeDecl);

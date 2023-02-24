@@ -13,6 +13,6 @@
 @_cdecl("cfuncPassTwo")
 public func differentCDeclName(x: CInt, y: CInt) -> CInt { return x + y }
 
-// CHECK: inline int differentCDeclName(int x, int y) noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK int differentCDeclName(int x, int y) noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: return _impl::cfuncPassTwo(x, y);
 // CHECK: }

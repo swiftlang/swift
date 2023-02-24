@@ -27,7 +27,7 @@ public func printBreak(_ x: Int) {
 
 // CHECK:      class SWIFT_SYMBOL({{.*}}) StructWithRefcountedMember final {
 // CHECK-NEXT: public:
-// CHECK-NEXT:   inline ~StructWithRefcountedMember() {
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~StructWithRefcountedMember() {
 // CHECK-NEXT:     auto metadata = _impl::$s7Structs26StructWithRefcountedMemberVMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -37,7 +37,7 @@ public func printBreak(_ x: Int) {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->destroy(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT:   }
-// CHECK-NEXT:   inline StructWithRefcountedMember(const StructWithRefcountedMember &other) {
+// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember(const StructWithRefcountedMember &other) {
 // CHECK-NEXT:     auto metadata = _impl::$s7Structs26StructWithRefcountedMemberVMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -47,5 +47,5 @@ public func printBreak(_ x: Int) {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT:   }
-// CHECK-NEXT:   inline StructWithRefcountedMember(StructWithRefcountedMember &&) { abort(); }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember(StructWithRefcountedMember &&) { abort(); }
 // CHECK-NEXT: private:

@@ -17,9 +17,9 @@ public enum E {
     public static func takeParamB(_ b: Int) {}
 }
 
-// CHECK: static inline E init(swift::Int b_)
-// CHECK: inline void takeParamA(swift::Int a_)
-// CHECK: static inline void takeParamB(swift::Int b_)
+// CHECK: static SWIFT_INLINE_THUNK E init(swift::Int b_)
+// CHECK: SWIFT_INLINE_THUNK void takeParamA(swift::Int a_)
+// CHECK: static SWIFT_INLINE_THUNK void takeParamB(swift::Int b_)
 
 // CHECK: E E::init(swift::Int b_) {
 // CHECK: _impl::$s5Enums1EOyACSicfC(b_)

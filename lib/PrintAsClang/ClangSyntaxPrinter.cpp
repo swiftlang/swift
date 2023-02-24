@@ -194,9 +194,7 @@ void ClangSyntaxPrinter::printSwiftImplQualifier() const {
 }
 
 void ClangSyntaxPrinter::printInlineForThunk() const {
-  // FIXME: make a macro and add 'nodebug', and
-  // migrate all other 'inline' uses.
-  os << "inline __attribute__((always_inline)) ";
+  os << "SWIFT_INLINE_THUNK ";
 }
 
 void ClangSyntaxPrinter::printNullability(
