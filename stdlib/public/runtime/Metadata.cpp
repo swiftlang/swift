@@ -4433,7 +4433,7 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
 const uint8_t *
 ExtendedExistentialTypeCacheEntry::getOrCreateTypeLayout(Key key) {
   // TODO: implement
-  return (uint8_t*)0xdeadbeef;
+  return nullptr;
 }
 
 /// The uniquing structure for extended existential type metadata.
