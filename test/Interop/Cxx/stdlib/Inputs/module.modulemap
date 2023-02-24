@@ -22,3 +22,8 @@ module StdSet {
   header "std-set.h"
   requires cplusplus
 }
+
+module StdFunction {
+  header "std-function.h"
+  requires cplusplus
+}
