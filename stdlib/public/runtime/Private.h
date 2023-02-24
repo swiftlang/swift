@@ -663,6 +663,9 @@ public:
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
 
+  RelativeWitnessTable *
+  lookThroughOptionalConditionalWitnessTable(const RelativeWitnessTable *wtable);
+
 #if SWIFT_OBJC_INTEROP
   /// Returns a retained Quick Look representation object an Obj-C object.
   SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL

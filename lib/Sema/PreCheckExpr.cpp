@@ -930,6 +930,9 @@ namespace {
     /// The current number of nested \c SequenceExprs that we're within.
     unsigned SequenceExprDepth = 0;
 
+    /// The current number of nested \c SingleValueStmtExprs that we're within.
+    unsigned SingleValueStmtExprDepth = 0;
+
     /// Simplify expressions which are type sugar productions that got parsed
     /// as expressions due to the parser not knowing which identifiers are
     /// type names.
@@ -1049,6 +1052,13 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr))
         return finish(walkToClosureExprPre(closure), expr);
 
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
+        // Record the scope of a single value stmt expr, as we want to skip
+        // pre-checking of any patterns, similar to closures.
+        SingleValueStmtExprDepth += 1;
+        return finish(true, expr);
+      }
+
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         TypeChecker::checkForForbiddenPrefix(
             getASTContext(), unresolved->getName().getBaseName());
@@ -1156,6 +1166,10 @@ namespace {
         assert(DC == ce && "DeclContext imbalance");
         DC = ce->getParent();
       }
+
+      // Restore the depth for the single value stmt counter.
+      if (isa<SingleValueStmtExpr>(expr))
+        SingleValueStmtExprDepth -= 1;
 
       // A 'self.init' or 'super.init' application inside a constructor will
       // evaluate to void, with the initializer's result implicitly rebound
@@ -1300,6 +1314,17 @@ namespace {
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      if (auto *RS = dyn_cast<ReturnStmt>(stmt)) {
+        // Pre-check a return statement, which includes potentially turning it
+        // into a FailStmt.
+        auto &eval = Ctx.evaluator;
+        auto *S = evaluateOrDefault(eval, PreCheckReturnStmtRequest{RS, DC},
+                                    nullptr);
+        if (!S)
+          return Action::Stop();
+
+        return Action::Continue(S);
+      }
       return Action::Continue(stmt);
     }
 
@@ -1309,9 +1334,10 @@ namespace {
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
       // Constraint generation is responsible for pattern verification and
-      // type-checking in the body of the closure, so there is no need to
-      // walk into patterns.
-      return Action::SkipChildrenIf(isa<ClosureExpr>(DC), pattern);
+      // type-checking in the body of the closure and single value stmt expr,
+      // so there is no need to walk into patterns.
+      return Action::SkipChildrenIf(
+          isa<ClosureExpr>(DC) || SingleValueStmtExprDepth > 0, pattern);
     }
   };
 } // end anonymous namespace
@@ -1319,6 +1345,23 @@ namespace {
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
+  // If we have a single statement that can become an expression, turn it
+  // into an expression now. This needs to happen before we check
+  // LeaveClosureBodiesUnchecked, as the closure may become a single expression
+  // closure.
+  auto *body = closure->getBody();
+  if (body->getNumElements() == 1) {
+    if (auto *S = body->getLastElement().dyn_cast<Stmt *>()) {
+      if (S->mayProduceSingleValue(Ctx)) {
+        auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
+            Ctx, S, /*DC*/ closure, /*mustBeExpr*/ false);
+        auto *RS = new (Ctx) ReturnStmt(SourceLoc(), SVE);
+        body->setLastElement(RS);
+        closure->setBody(body, /*isSingleExpression*/ true);
+      }
+    }
+  }
+
   // If we won't be checking the body of the closure, don't walk into it here.
   if (!closure->hasSingleExpressionBody()) {
     if (LeaveClosureBodiesUnchecked)
@@ -1386,33 +1429,31 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   }
 
   // Fold 'T.U' into a nested type.
-  if (auto *DeclRefTR = dyn_cast<DeclRefTypeRepr>(InnerTypeRepr)) {
-    // Resolve the TypeRepr to get the base type for the lookup.
-    const auto BaseTy = TypeResolution::resolveContextualType(
-        InnerTypeRepr, DC, TypeResolverContext::InExpression,
-        [](auto unboundTy) {
-          // FIXME: Don't let unbound generic types escape type resolution.
-          // For now, just return the unbound generic type.
-          return unboundTy;
-        },
-        // FIXME: Don't let placeholder types escape type resolution.
-        // For now, just return the placeholder type.
-        PlaceholderType::get,
-        // TypeExpr pack elements are opened in CSGen.
-        /*packElementOpener*/ nullptr);
 
-    if (BaseTy->mayHaveMembers()) {
-      // See if there is a member type with this name.
-      auto Result =
-          TypeChecker::lookupMemberType(DC, BaseTy, Name,
-                                        defaultMemberLookupOptions);
+  // Resolve the TypeRepr to get the base type for the lookup.
+  const auto BaseTy = TypeResolution::resolveContextualType(
+      InnerTypeRepr, DC, TypeResolverContext::InExpression,
+      [](auto unboundTy) {
+        // FIXME: Don't let unbound generic types escape type resolution.
+        // For now, just return the unbound generic type.
+        return unboundTy;
+      },
+      // FIXME: Don't let placeholder types escape type resolution.
+      // For now, just return the placeholder type.
+      PlaceholderType::get,
+      // TypeExpr pack elements are opened in CSGen.
+      /*packElementOpener*/ nullptr);
 
-      // If there is no nested type with this name, we have a lookup of
-      // a non-type member, so leave the expression as-is.
-      if (Result.size() == 1) {
-        return TypeExpr::createForMemberDecl(DeclRefTR, UDE->getNameLoc(),
-                                             Result.front().Member);
-      }
+  if (BaseTy->mayHaveMembers()) {
+    // See if there is a member type with this name.
+    auto Result = TypeChecker::lookupMemberType(DC, BaseTy, Name,
+                                                defaultMemberLookupOptions);
+
+    // If there is no nested type with this name, we have a lookup of
+    // a non-type member, so leave the expression as-is.
+    if (Result.size() == 1) {
+      return TypeExpr::createForMemberDecl(InnerTypeRepr, UDE->getNameLoc(),
+                                           Result.front().Member);
     }
   }
 
@@ -1444,6 +1485,7 @@ bool PreCheckExpression::exprLooksLikeAType(Expr *expr) {
       isa<ParenExpr>(expr) ||
       isa<ArrowExpr>(expr) ||
       isa<PackExpansionExpr>(expr) ||
+      isa<PackElementExpr>(expr) ||
       isa<TupleExpr>(expr) ||
       (isa<ArrayExpr>(expr) &&
        cast<ArrayExpr>(expr)->getElements().size() == 1) ||
@@ -1937,6 +1979,15 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (auto *pattern = dyn_cast<TypeExpr>(expansion->getPatternExpr())) {
       auto *repr = new (Ctx) PackExpansionTypeRepr(expansion->getStartLoc(),
                                                    pattern->getTypeRepr());
+      return new (Ctx) TypeExpr(repr);
+    }
+  }
+
+  // Fold a PackElementExpr into a TypeExpr when the element is a TypeExpr
+  if (auto *element = dyn_cast<PackElementExpr>(E)) {
+    if (auto *refExpr = dyn_cast<TypeExpr>(element->getPackRefExpr())) {
+      auto *repr = new (Ctx) PackElementTypeRepr(element->getStartLoc(),
+                                                 refExpr->getTypeRepr());
       return new (Ctx) TypeExpr(repr);
     }
   }

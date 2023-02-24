@@ -72,14 +72,23 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///   `unsafeBitCast(_:to:)` with class or pointer types; doing so may
 ///   introduce undefined behavior.
 ///
-/// - Warning: Calling this function breaks the guarantees of the Swift type
-///   system; use with extreme care.
+/// Warning: Calling this function breaks the guarantees of the Swift type
+/// system; use with extreme care.
 ///
-/// - Parameters:
+/// Warning: Casting from an integer or a pointer type to a reference type
+/// is undefined behavior. It may result in incorrect code in any future
+/// compiler release. To convert a bit pattern to a reference type:
+/// 1. convert the bit pattern to an UnsafeRawPointer.
+/// 2. create an unmanaged reference using Unmanaged.fromOpaque()
+/// 3. obtain a managed reference using Unmanaged.takeUnretainedValue()
+/// The programmer must ensure that the resulting reference has already been
+/// manually retained.
+///
+/// Parameters:
 ///   - x: The instance to cast to `type`.
 ///   - type: The type to cast `x` to. `type` and the type of `x` must have the
 ///     same size of memory representation and compatible memory layout.
-/// - Returns: A new instance of type `U`, cast from `x`.
+/// Returns: A new instance of type `U`, cast from `x`.
 @inlinable // unsafe-performance
 @_transparent
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
@@ -139,7 +148,7 @@ internal func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
 ///   - t1: Another type to compare.
 /// - Returns: `true` if both `t0` and `t1` are `nil` or if they represent the
 ///   same type; otherwise, `false`.
-@inlinable
+@inlinable @_transparent
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   switch (t0, t1) {
   case (.none, .none): return true
@@ -156,7 +165,7 @@ public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
 ///   - t1: Another type to compare.
 /// - Returns: `true` if one, but not both, of `t0` and `t1` are `nil`, or if
 ///   they represent different types; otherwise, `false`.
-@inlinable
+@inlinable @_transparent
 public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return !(t0 == t1)
 }

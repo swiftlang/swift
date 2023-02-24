@@ -49,6 +49,12 @@ struct SerializedModuleBaseName {
 
   /// Gets the filename with a particular extension appended to it.
   std::string getName(file_types::ID fileTy) const;
+
+  /// If the interface with \p baseName exists, returns its path (which may be
+  /// the private interface if there is one). Return an empty optional
+  /// otherwise.
+  llvm::Optional<std::string>
+  findInterfacePath(llvm::vfs::FileSystem &fs) const;
 };
 
 /// Common functionality shared between \c ImplicitSerializedModuleLoader,
@@ -72,12 +78,13 @@ protected:
   void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
                                              StringRef extension) const;
 
-  virtual bool findModule(ImportPath::Element moduleID,
-                          SmallVectorImpl<char> *moduleInterfacePath,
-                          std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
-                          std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
-                          std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                          bool skipBuildingInterface, bool &isFramework, bool &isSystemModule);
+  virtual bool findModule(
+      ImportPath::Element moduleID, SmallVectorImpl<char> *moduleInterfacePath,
+      SmallVectorImpl<char> *moduleInterfaceSourcePath,
+      std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
+      bool skipBuildingInterface, bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -92,9 +99,9 @@ protected:
   ///   modules and will defer to the remaining module loaders to look up this
   ///   module.
   virtual std::error_code findModuleFilesInDirectory(
-      ImportPath::Element ModuleID,
-      const SerializedModuleBaseName &BaseName,
+      ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
+      SmallVectorImpl<char> *ModuleInterfaceSourcePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
@@ -155,7 +162,7 @@ public:
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
   LoadedFile *
   loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
-          StringRef moduleInterfacePath,
+          StringRef moduleInterfacePath, StringRef moduleInterfaceSourcePath,
           std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
           std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
           std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
@@ -219,9 +226,9 @@ class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
   {}
 
   std::error_code findModuleFilesInDirectory(
-      ImportPath::Element ModuleID,
-      const SerializedModuleBaseName &BaseName,
+      ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
+      SmallVectorImpl<char> *ModuleInterfaceSourcePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
@@ -273,9 +280,9 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
         BypassResilience(BypassResilience) {}
 
   std::error_code findModuleFilesInDirectory(
-      ImportPath::Element ModuleID,
-      const SerializedModuleBaseName &BaseName,
+      ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
       SmallVectorImpl<char> *ModuleInterfacePath,
+      SmallVectorImpl<char> *ModuleInterfaceSourcePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
@@ -452,6 +459,8 @@ public:
   virtual StringRef getFilename() const override;
 
   virtual StringRef getLoadedFilename() const override;
+
+  virtual StringRef getSourceFilename() const override;
 
   virtual StringRef getModuleDefiningPath() const override;
 

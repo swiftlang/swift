@@ -2001,7 +2001,7 @@ bool Lexer::isPotentialUnskippableBareSlashRegexLiteral(const Token &Tok) const 
   // We either don't have a regex literal, or we failed a heuristic. We now need
   // to make sure we don't have an unbalanced `{` or `}`, as that would have the
   // potential to change the range of a skipped body if we try to more
-  // agressively lex a regex literal during normal parsing. If we have balanced
+  // aggressively lex a regex literal during normal parsing. If we have balanced
   // `{` + `}`, we can proceed with skipping. Worst case scenario is we emit a
   // worse diagnostic.
   // FIXME: We ought to silence lexer diagnostics when skipping, this would

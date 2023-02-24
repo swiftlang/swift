@@ -852,16 +852,20 @@ extension String.UTF16View {
       return _utf16Distance(from: startIndex, to: idx)
     }
 
-    // Simple and common: endIndex aka `length`.
-    let breadcrumbsPtr = _guts.getBreadcrumbsPtr()
-    if idx == endIndex { return breadcrumbsPtr.pointee.utf16Length }
+    let breadcrumbs = _guts.loadUnmanagedBreadcrumbs()
 
-    // Otherwise, find the nearest lower-bound breadcrumb and count from there
-    // FIXME: Starting from the upper-bound crumb when that is closer would cut
-    // the average cost of the subsequent iteration by 50%.
-    let (crumb, crumbOffset) = breadcrumbsPtr.pointee.getBreadcrumb(
-      forIndex: idx)
-    return crumbOffset + _utf16Distance(from: crumb, to: idx)
+    // Simple and common: endIndex aka `length`.
+    if idx == endIndex {
+      return breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
+    }
+
+    return breadcrumbs._withUnsafeGuaranteedRef { crumbs in
+      // Otherwise, find the nearest lower-bound breadcrumb and count from there
+      // FIXME: Starting from the upper-bound crumb when that is closer would
+      // cut the average cost of the subsequent iteration by 50%.
+      let (crumb, crumbOffset) = crumbs.getBreadcrumb(forIndex: idx)
+      return crumbOffset + _utf16Distance(from: crumb, to: idx)
+    }
   }
 
   /// Return the index at the given UTF-16 offset, measured from the
@@ -892,14 +896,17 @@ extension String.UTF16View {
     }
 
     // Simple and common: endIndex aka `length`.
-    let breadcrumbsPtr = _guts.getBreadcrumbsPtr()
-    if offset == breadcrumbsPtr.pointee.utf16Length { return endIndex }
+    let breadcrumbs = _guts.loadUnmanagedBreadcrumbs()
+    let utf16Count = breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
+    if offset == utf16Count { return endIndex }
 
     // Otherwise, find the nearest lower-bound breadcrumb and advance that
     // FIXME: Starting from the upper-bound crumb when that is closer would cut
     // the average cost of the subsequent iteration by 50%.
-    let (crumb, remaining) = breadcrumbsPtr.pointee.getBreadcrumb(
-      forOffset: offset)
+    let (crumb, remaining) = breadcrumbs._withUnsafeGuaranteedRef {
+      $0.getBreadcrumb(forOffset: offset)
+    }
+    _internalInvariant(crumb._canBeUTF8 && crumb._encodedOffset <= _guts.count)
     if remaining == 0 { return crumb }
 
     return _guts.withFastUTF8 { utf8 in
@@ -981,6 +988,8 @@ extension String.UTF16View {
       if _slowPath(range.lowerBound.transcodedOffset != 0) {
         _internalInvariant(range.lowerBound.transcodedOffset == 1)
         let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
+        // Note: this is intentionally not using the _unchecked subscript.
+        // (We rely on debug assertions to catch out of bounds access.)
         buffer[writeIdx] = scalar.utf16[1]
         readIdx &+= len
         writeIdx &+= 1
@@ -993,6 +1002,8 @@ extension String.UTF16View {
         readIdx &+= len
         writeIdx &+= 1
         if _slowPath(scalar.utf16.count == 2) {
+          // Note: this is intentionally not using the _unchecked subscript.
+          // (We rely on debug assertions to catch out of bounds access.)
           buffer[writeIdx] = scalar.utf16[1]
           writeIdx &+= 1
         }
@@ -1004,6 +1015,8 @@ extension String.UTF16View {
         let (scalar, _) = _decodeScalar(utf8, startingAt: readIdx)
         _internalInvariant(scalar.utf16.count == 2)
 
+        // Note: this is intentionally not using the _unchecked subscript.
+        // (We rely on debug assertions to catch out of bounds access.)
         buffer[writeIdx] = scalar.utf16[0]
         writeIdx &+= 1
       }

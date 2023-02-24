@@ -35,7 +35,9 @@ class ArchetypeType;
 class ASTContext;
 class GenericTypeParamType;
 class OpaqueTypeDecl;
+class ElementArchetypeType;
 class OpenedArchetypeType;
+class PackArchetypeType;
 class SILModule;
 class SILType;
 
@@ -197,6 +199,9 @@ public:
 
   void forEachPackElementArchetype(
           llvm::function_ref<void(ElementArchetypeType*)> function) const;
+
+  void forEachPackElementGenericTypeParam(
+      llvm::function_ref<void(GenericTypeParamType *)> function) const;
 
   using PackElementBindingCallback =
     llvm::function_ref<void(ElementArchetypeType *elementType,

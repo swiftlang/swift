@@ -69,6 +69,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -125,7 +126,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   // adjacent reborrows and phis are encapsulated within their lifetimes.
   SILPhiArgument *arg;
   if ((arg = dyn_cast<SILPhiArgument>(getCurrentDef())) && arg->isPhi()) {
-    visitAdjacentReborrowsOfPhi(arg, [&](SILPhiArgument *reborrow) {
+    visitInnerAdjacentPhis(arg, [&](SILArgument *reborrow) {
       defUseWorklist.insert(reborrow);
       return true;
     });
@@ -902,7 +903,7 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
       defUseWorklist.insert(copy);
       return true;
     }
-    if (auto *destroy = dyn_cast<DestroyValueInst>(user)) {
+    if (auto *destroy = dynCastToDestroyOf(user, getCurrentDef())) {
       // If this destroy was marked as a final destroy, ignore it; otherwise,
       // delete it.
       if (!consumes.claimConsume(destroy)) {
@@ -927,16 +928,8 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
     // If this use was not marked as a final destroy *or* this is not the first
     // consumed operand we visited, then it needs a copy.
     if (!consumes.claimConsume(user)) {
-      maybeNotifyMoveOnlyCopy(use);
       return false;
     }
-
-    // Ok, this is a final user that isn't a destroy_value. Notify our caller if
-    // we were asked to.
-    //
-    // If we need this for diagnostics, we will only use it if we found actual
-    // uses that required copies.
-    maybeNotifyFinalConsumingUse(use);
 
     return true;
   };
@@ -997,8 +990,7 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
 //                            MARK: Top-Level API
 //===----------------------------------------------------------------------===//
 
-/// Canonicalize a single extended owned lifetime.
-bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
+bool CanonicalizeOSSALifetime::computeLiveness(SILValue def) {
   if (def->getOwnershipKind() != OwnershipKind::Owned)
     return false;
 
@@ -1031,10 +1023,14 @@ bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
   if (accessBlockAnalysis) {
     extendLivenessThroughOverlappingAccess();
   }
+  return true;
+}
+
+void CanonicalizeOSSALifetime::rewriteLifetimes() {
   // Step 2: compute original boundary
   PrunedLivenessBoundary originalBoundary;
   findOriginalBoundary(originalBoundary);
-  PrunedLivenessBoundary boundary;
+  PrunedLivenessBoundary extendedBoundary;
   if (maximizeLifetime) {
     // Step 3. (optional) maximize lifetimes
     extendUnconsumedLiveness(originalBoundary);
@@ -1043,19 +1039,33 @@ bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
     //         liveness
     findOriginalBoundary(originalBoundary);
     // Step 4: extend boundary to destroys
-    findExtendedBoundary(originalBoundary, boundary);
+    findExtendedBoundary(originalBoundary, extendedBoundary);
   } else {
     // Step 3: (skipped)
     // Step 4: extend boundary to destroys
-    findExtendedBoundary(originalBoundary, boundary);
+    findExtendedBoundary(originalBoundary, extendedBoundary);
   }
+
   // Step 5: insert destroys and record consumes
-  insertDestroysOnBoundary(boundary);
+  insertDestroysOnBoundary(extendedBoundary);
   // Step 6: rewrite copies and delete extra destroys
   rewriteCopies();
 
   clearLiveness();
   consumes.clear();
+}
+
+/// Canonicalize a single extended owned lifetime.
+bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
+  // Step 1: Compute liveness.
+  if (!computeLiveness(def)) {
+    LLVM_DEBUG(llvm::dbgs() << "Failed to compute liveness boundary!\n");
+    return false;
+  }
+
+  // Steps 2-6. \see rewriteUses for explanation of steps 2-6.
+  rewriteLifetimes();
+
   return true;
 }
 

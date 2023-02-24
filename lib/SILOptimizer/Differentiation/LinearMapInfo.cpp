@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Linear map struct and branching trace enum information for differentiation.
+// Linear map tuple and branching trace enum information for differentiation.
 //
 //===----------------------------------------------------------------------===//
 
@@ -69,56 +69,11 @@ SILType LinearMapInfo::remapTypeInDerivative(SILType ty) {
   return derivative->mapTypeIntoContext(ty);
 }
 
-VarDecl *LinearMapInfo::addVarDecl(NominalTypeDecl *nominal, StringRef name,
-                                   Type type) {
-  auto &astCtx = nominal->getASTContext();
-  auto id = astCtx.getIdentifier(name);
-  auto *varDecl = new (astCtx) VarDecl(
-      /*IsStatic*/ false, VarDecl::Introducer::Var,
-      SourceLoc(), id, nominal);
-  varDecl->setAccess(AccessLevel::Private);
-  if (type->hasArchetype())
-    varDecl->setInterfaceType(type->mapTypeOutOfContext());
-  else
-    varDecl->setInterfaceType(type);
-  nominal->addMember(varDecl);
-  return varDecl;
-}
-
-void LinearMapInfo::computeAccessLevel(NominalTypeDecl *nominal,
-                                       SILLinkage originalLinkage) {
-  auto &astCtx = nominal->getASTContext();
-  switch (originalLinkage) {
-  case swift::SILLinkage::Public:
-  case swift::SILLinkage::PublicNonABI:
-    nominal->setAccess(AccessLevel::Internal);
-    nominal->getAttrs().add(new (astCtx)
-                                UsableFromInlineAttr(/*Implicit*/ true));
-    break;
-  case swift::SILLinkage::Hidden:
-  case swift::SILLinkage::Shared:
-    nominal->setAccess(AccessLevel::Internal);
-    break;
-  case swift::SILLinkage::Private:
-    nominal->setAccess(AccessLevel::FilePrivate);
-    break;
-  default:
-    // When the original function has external linkage, we create an internal
-    // struct for use by our own module. This is necessary for cross-cell
-    // differentiation in Jupyter.
-    // TODO: Add a test in the compiler that exercises a similar situation as
-    // cross-cell differentiation in Jupyter.
-    nominal->setAccess(AccessLevel::Internal);
-  }
-}
-
 EnumDecl *
 LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
-                                        CanGenericSignature genericSig,
-                                        SILLoopInfo *loopInfo) {
+                                        CanGenericSignature genericSig) {
   assert(originalBB->getParent() == original);
   auto &astCtx = original->getASTContext();
-  auto *moduleDecl = original->getModule().getSwiftModule();
   auto &file = getSynthesizedFile();
   // Create a branching trace enum.
   Mangle::ASTMangler mangler;
@@ -137,31 +92,58 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   // Note: must mark enum as implicit to satisfy assertion in
   // `Parser::parseDeclListDelayed`.
   branchingTraceDecl->setImplicit();
-  // Branching trace enums shall not be resilient.
-  branchingTraceDecl->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
   if (genericSig)
     branchingTraceDecl->setGenericSignature(genericSig);
-  computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
+  switch (original->getEffectiveSymbolLinkage()) {
+  case swift::SILLinkage::Public:
+  case swift::SILLinkage::PublicNonABI:
+    // Branching trace enums shall not be resilient.
+    branchingTraceDecl->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
+    branchingTraceDecl->getAttrs().add(new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
+    LLVM_FALLTHROUGH;
+  case swift::SILLinkage::Hidden:
+  case swift::SILLinkage::Shared:
+    branchingTraceDecl->setAccess(AccessLevel::Internal);
+    break;
+  case swift::SILLinkage::Private:
+    branchingTraceDecl->setAccess(AccessLevel::FilePrivate);
+    break;
+  default:
+    // When the original function has external linkage, we create an internal
+    // struct for use by our own module. This is necessary for cross-cell
+    // differentiation in Jupyter.
+    // TODO: Add a test in the compiler that exercises a similar situation as
+    // cross-cell differentiation in Jupyter.
+    branchingTraceDecl->setAccess(AccessLevel::Internal);
+  }
   file.addTopLevelDecl(branchingTraceDecl);
+
+  return branchingTraceDecl;
+}
+
+void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
+                                               SILLoopInfo *loopInfo) {
+  auto &astCtx = original->getASTContext();
+  auto *moduleDecl = original->getModule().getSwiftModule();
+  auto loc = original->getLocation().getSourceLoc();
+  auto *branchingTraceDecl = getBranchingTraceDecl(originalBB);
+
   // Add basic block enum cases.
   for (auto *predBB : originalBB->getPredecessorBlocks()) {
     // Create dummy declaration representing enum case parameter.
     auto *decl = new (astCtx)
         ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
     decl->setSpecifier(ParamDecl::Specifier::Default);
-    // If predecessor block is in a loop, its linear map struct will be
+    // If predecessor block is in a loop, its linear map tuple will be
     // indirectly referenced in memory owned by the context object. The payload
     // is just a raw pointer.
     if (loopInfo->getLoopFor(predBB)) {
       blocksInLoop.insert(predBB);
       decl->setInterfaceType(astCtx.TheRawPointerType);
     }
-    // Otherwise the payload is the linear map struct.
+    // Otherwise the payload is the linear map tuple.
     else {
-      auto *linearMapStruct = getLinearMapStruct(predBB);
-      assert(linearMapStruct);
-      auto linearMapStructTy =
-          linearMapStruct->getDeclaredInterfaceType()->getCanonicalType();
+      auto linearMapStructTy = getLinearMapTupleType(predBB)->getCanonicalType();
       decl->setInterfaceType(
           linearMapStructTy->hasArchetype()
               ? linearMapStructTy->mapTypeOutOfContext() : linearMapStructTy);
@@ -181,85 +163,10 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
     // Record enum element declaration.
     branchingTraceEnumCases.insert({{predBB, originalBB}, enumEltDecl});
   }
-  return branchingTraceDecl;
 }
 
-StructDecl *
-LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
-                                     CanGenericSignature genericSig) {
-  assert(originalBB->getParent() == original);
-  auto *original = originalBB->getParent();
-  auto &astCtx = original->getASTContext();
-  auto &file = getSynthesizedFile();
-  // Create a linear map struct.
-  Mangle::ASTMangler mangler;
-  auto config = this->config.withGenericSignature(genericSig);
-  auto structName = mangler.mangleAutoDiffGeneratedDeclaration(
-      AutoDiffGeneratedDeclarationKind::LinearMapStruct,
-      original->getName().str(), originalBB->getDebugID(), kind, config);
-  auto structId = astCtx.getIdentifier(structName);
-  GenericParamList *genericParams = nullptr;
-  if (genericSig)
-    genericParams = cloneGenericParameters(astCtx, &file, genericSig);
-  auto *linearMapStruct = new (astCtx) StructDecl(
-      /*StructLoc*/ SourceLoc(), /*Name*/ structId, /*NameLoc*/ SourceLoc(),
-      /*Inherited*/ {}, /*GenericParams*/ genericParams, /*DC*/ &file);
-  // Note: must mark struct as implicit to satisfy assertion in
-  // `Parser::parseDeclListDelayed`.
-  linearMapStruct->setImplicit();
-  // Linear map structs shall not be resilient.
-  linearMapStruct->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
-  if (genericSig)
-    linearMapStruct->setGenericSignature(genericSig);
-  computeAccessLevel(linearMapStruct, original->getEffectiveSymbolLinkage());
-  file.addTopLevelDecl(linearMapStruct);
-  return linearMapStruct;
-}
 
-VarDecl *LinearMapInfo::addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
-  // IRGen requires decls to have AST types (not `SILFunctionType`), so we
-  // convert the `SILFunctionType` of the linear map to a `FunctionType` with
-  // the same parameters and results.
-  auto silFnTy = linearMapType.castTo<SILFunctionType>();
-  SmallVector<AnyFunctionType::Param, 8> params;
-  for (auto &param : silFnTy->getParameters()) {
-    ParameterTypeFlags flags;
-    if (param.isIndirectMutating())
-      flags = flags.withInOut(true);
-    params.push_back(
-        AnyFunctionType::Param(param.getInterfaceType(), Identifier(), flags));
-  }
-
-  AnyFunctionType *astFnTy;
-  if (auto genSig = silFnTy->getSubstGenericSignature()) {
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
-    GenericFunctionType::ExtInfo info;
-    astFnTy = GenericFunctionType::get(
-        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType(),
-        info);
-  } else {
-    FunctionType::ExtInfo info;
-    astFnTy = FunctionType::get(
-        params, silFnTy->getAllResultsInterfaceType().getASTType(), info);
-  }
-
-  auto *origBB = ai->getParent();
-  auto *linMapStruct = getLinearMapStruct(origBB);
-  std::string linearMapName;
-  switch (kind) {
-  case AutoDiffLinearMapKind::Differential:
-    linearMapName = "differential_" + llvm::itostr(linearMapFieldMap.size());
-    break;
-  case AutoDiffLinearMapKind::Pullback:
-    linearMapName = "pullback_" + llvm::itostr(linearMapFieldMap.size());
-    break;
-  }
-  auto *linearMapDecl = addVarDecl(linMapStruct, linearMapName, astFnTy);
-  linearMapFieldMap.insert({ai, linearMapDecl});
-  return linearMapDecl;
-}
-
-void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
+Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
   SmallVector<SILValue, 4> allResults;
   SmallVector<unsigned, 8> activeParamIndices;
   SmallVector<unsigned, 8> activeResultIndices;
@@ -285,9 +192,9 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
     }
   }
   if (!hasActiveArguments)
-    return;
+    return {};
   if (!hasActiveResults && !hasActiveInoutArgument)
-    return;
+    return {};
 
   // Compute differentiability parameters.
   // - If the callee has `@differentiable` function type, use differentiation
@@ -342,7 +249,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
     return false;
   };
   if (checkNondifferentiableOriginalFunctionType(remappedOrigFnSubstTy))
-    return;
+    return nullptr;
 
   AutoDiffDerivativeFunctionKind derivativeFnKind(kind);
   auto derivativeFnType =
@@ -363,7 +270,37 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
     linearMapSILType = SILType::getPrimitiveObjectType(
         fnTy->getUnsubstitutedType(original->getModule()));
   }
-  addLinearMapDecl(ai, linearMapSILType);
+
+  // IRGen requires decls to have AST types (not `SILFunctionType`), so we
+  // convert the `SILFunctionType` of the linear map to a `FunctionType` with
+  // the same parameters and results.
+  auto silFnTy = linearMapSILType.castTo<SILFunctionType>();
+  SmallVector<AnyFunctionType::Param, 8> params;
+  for (auto &param : silFnTy->getParameters()) {
+    ParameterTypeFlags flags;
+    if (param.isIndirectMutating())
+      flags = flags.withInOut(true);
+    params.push_back(
+        AnyFunctionType::Param(param.getInterfaceType(), Identifier(), flags));
+  }
+
+  AnyFunctionType *astFnTy;
+  if (auto genSig = silFnTy->getSubstGenericSignature()) {
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    GenericFunctionType::ExtInfo info;
+    astFnTy = GenericFunctionType::get(
+        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType(),
+        info);
+  } else {
+    FunctionType::ExtInfo info;
+    astFnTy = FunctionType::get(
+        params, silFnTy->getAllResultsInterfaceType().getASTType(), info);
+  }
+
+  if (astFnTy->hasArchetype())
+    return astFnTy->mapTypeOutOfContext();
+
+  return astFnTy;
 }
 
 void LinearMapInfo::generateDifferentiationDataStructures(
@@ -374,12 +311,6 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   if (auto *derivativeFnGenEnv = derivativeFn->getGenericEnvironment())
     derivativeFnGenSig =
         derivativeFnGenEnv->getGenericSignature().getCanonicalSignature();
-
-  // Create linear map struct for each original block.
-  for (auto &origBB : *original) {
-    auto *linearMapStruct = createLinearMapStruct(&origBB, derivativeFnGenSig);
-    linearMapStructs.insert({&origBB, linearMapStruct});
-  }
 
   // Create branching trace enum for each original block and add it as a field
   // in the corresponding struct.
@@ -392,43 +323,51 @@ void LinearMapInfo::generateDifferentiationDataStructures(
     traceEnumFieldName = "predecessor";
     break;
   }
+
   for (auto &origBB : *original) {
     auto *traceEnum =
-        createBranchingTraceDecl(&origBB, derivativeFnGenSig, loopInfo);
+        createBranchingTraceDecl(&origBB, derivativeFnGenSig);
     branchingTraceDecls.insert({&origBB, traceEnum});
-    if (origBB.isEntry())
-      continue;
-    // Add branching trace enum field to corresponding linear map struct.
-    auto *linearMapStruct = getLinearMapStruct(&origBB);
-    auto *traceEnumField = addVarDecl(
-        linearMapStruct, astCtx.getIdentifier(traceEnumFieldName).str(),
-        traceEnum->getDeclaredInterfaceType());
-    linearMapStructEnumFields.insert({linearMapStruct, traceEnumField});
   }
 
-  // Do not add linear map fields for semantic member accessors, which have
-  // special-case pullback generation. Linear map structs should be empty.
-  if (isSemanticMemberAccessor(original))
-    return;
-
-  // Add linear map fields to the linear map structs.
+  // Add linear map fields to the linear map tuples.
   for (auto &origBB : *original) {
-    for (auto &inst : origBB) {
-      if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
-        // Add linear map field to struct for active `apply` instructions.
-        // Skip array literal intrinsic applications since array literal
-        // initialization is linear and handled separately.
-        if (!shouldDifferentiateApplySite(ai) ||
-            ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC))
-          continue;
-        if (ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC))
-          continue;
-        LLVM_DEBUG(getADDebugStream()
-                   << "Adding linear map struct field for " << *ai);
-        addLinearMapToStruct(context, ai);
+    SmallVector<TupleTypeElt, 4> linearTupleTypes;
+    if (!origBB.isEntry()) {
+      CanType traceEnumType = getBranchingTraceEnumLoweredType(&origBB).getASTType();
+      linearTupleTypes.emplace_back(traceEnumType,
+                                    astCtx.getIdentifier(traceEnumFieldName));
+    }
+
+    if (isSemanticMemberAccessor(original)) {
+      // Do not add linear map fields for semantic member accessors, which have
+      // special-case pullback generation. Linear map tuples should be empty.
+    } else {
+      for (auto &inst : origBB) {
+        if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
+          // Add linear map field to struct for active `apply` instructions.
+          // Skip array literal intrinsic applications since array literal
+          // initialization is linear and handled separately.
+          if (!shouldDifferentiateApplySite(ai) ||
+              ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC))
+            continue;
+          if (ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC))
+            continue;
+          LLVM_DEBUG(getADDebugStream()
+                     << "Adding linear map tuple field for " << *ai);
+          if (Type linearMapType = getLinearMapType(context, ai)) {
+            linearMapIndexMap.insert({ai, linearTupleTypes.size()});
+            linearTupleTypes.emplace_back(linearMapType);
+          }
+        }
       }
     }
+
+    linearMapTuples.insert({&origBB, TupleType::get(linearTupleTypes, astCtx)});
   }
+
+  for (auto &origBB : *original)
+    populateBranchingTraceDecl(&origBB, loopInfo);
 
   // Print generated linear map structs and branching trace enums.
   // These declarations do not show up with `-emit-sil` because they are
@@ -440,13 +379,14 @@ void LinearMapInfo::generateDifferentiationDataStructures(
     printOptions.TypeDefinitions = true;
     printOptions.ExplodePatternBindingDecls = true;
     printOptions.SkipImplicit = false;
-    s << "Generated linear map structs and branching trace enums for @"
+    s << "Generated linear map tuples and branching trace enums for @"
       << original->getName() << ":\n";
     for (auto &origBB : *original) {
-      auto *linearMapStruct = getLinearMapStruct(&origBB);
-      linearMapStruct->print(s, printOptions);
+      auto *linearMapTuple = getLinearMapTupleType(&origBB);
+      linearMapTuple->print(s, printOptions);
       s << '\n';
     }
+
     for (auto &origBB : *original) {
       auto *traceEnum = getBranchingTraceDecl(&origBB);
       traceEnum->print(s, printOptions);

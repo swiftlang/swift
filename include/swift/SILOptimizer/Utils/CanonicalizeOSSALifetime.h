@@ -213,15 +213,6 @@ private:
   /// copies.
   bool maximizeLifetime;
 
-  /// If true and we are processing a value of move_only type, emit a diagnostic
-  /// when-ever we need to insert a copy_value.
-  std::function<void(Operand *)> moveOnlyCopyValueNotification;
-
-  /// If true and we are processing a value of move_only type, pass back to the
-  /// caller any consuming uses that are going to be used as part of the final
-  /// lifetime boundary in case we need to emit diagnostics.
-  std::function<void(Operand *)> moveOnlyFinalConsumingUse;
-
   // If present, will be used to ensure that the lifetime is not shortened to
   // end inside an access scope which it previously enclosed.  (Note that ending
   // before such an access scope is fine regardless.)
@@ -289,27 +280,10 @@ public:
     }
   }
 
-  void maybeNotifyMoveOnlyCopy(Operand *use) {
-    if (!moveOnlyCopyValueNotification)
-      return;
-    moveOnlyCopyValueNotification(use);
-  }
-
-  void maybeNotifyFinalConsumingUse(Operand *use) {
-    if (!moveOnlyFinalConsumingUse)
-      return;
-    moveOnlyFinalConsumingUse(use);
-  }
-
-  CanonicalizeOSSALifetime(
-      bool pruneDebugMode, bool maximizeLifetime,
-      NonLocalAccessBlockAnalysis *accessBlockAnalysis, DominanceInfo *domTree,
-      InstructionDeleter &deleter,
-      std::function<void(Operand *)> moveOnlyCopyValueNotification = nullptr,
-      std::function<void(Operand *)> moveOnlyFinalConsumingUse = nullptr)
+  CanonicalizeOSSALifetime(bool pruneDebugMode, bool maximizeLifetime,
+                           NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+                           DominanceInfo *domTree, InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
-        moveOnlyCopyValueNotification(moveOnlyCopyValueNotification),
-        moveOnlyFinalConsumingUse(moveOnlyFinalConsumingUse),
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
         deleter(deleter),
         liveness(maximizeLifetime ? &discoveredBlocks : nullptr) {}
@@ -348,7 +322,51 @@ public:
   /// operands.
   bool canonicalizeValueLifetime(SILValue def);
 
+  /// Compute the liveness information for \p def. But do not do any rewriting
+  /// or computation of boundaries.
+  ///
+  /// The intention is that this is used if one wants to emit diagnostics using
+  /// the liveness information before doing any rewriting.
+  bool computeLiveness(SILValue def);
+
+  /// Given the already computed liveness boundary for the given def, rewrite
+  /// copies of def as appropriate.
+  ///
+  /// NOTE: It is assumed that one passes the extended boundary from \see
+  /// computeLiveness.
+  ///
+  /// NOTE: It is assumed that one has emitted any diagnostics.
+  void rewriteLifetimes();
+
+  /// Return the pure original boundary just based off of liveness information
+  /// without maximizing or extending liveness.
+  void findOriginalBoundary(PrunedLivenessBoundary &resultingOriginalBoundary);
+
   InstModCallbacks &getCallbacks() { return deleter.getCallbacks(); }
+
+  using IsInterestingUser = PrunedLiveness::IsInterestingUser;
+
+  /// Helper method that returns the isInterestingUser status of \p user in the
+  /// passed in Liveness.
+  ///
+  /// NOTE: Only call this after calling computeLivenessBoundary or the results
+  /// will not be initialized.
+  IsInterestingUser isInterestingUser(SILInstruction *user) const {
+    return liveness.isInterestingUser(user);
+  }
+
+  using LifetimeEndingUserRange = PrunedLiveness::LifetimeEndingUserRange;
+  LifetimeEndingUserRange getLifetimeEndingUsers() const {
+    return liveness.getLifetimeEndingUsers();
+  }
+
+  using NonLifetimeEndingUserRange = PrunedLiveness::NonLifetimeEndingUserRange;
+  NonLifetimeEndingUserRange getNonLifetimeEndingUsers() const {
+    return liveness.getNonLifetimeEndingUsers();
+  }
+
+  using UserRange = PrunedLiveness::ConstUserRange;
+  UserRange getUsers() const { return liveness.getAllUsers(); }
 
 private:
   void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }
@@ -361,8 +379,6 @@ private:
   bool endsAccessOverlappingPrunedBoundary(SILInstruction *inst);
 
   void extendLivenessThroughOverlappingAccess();
-
-  void findOriginalBoundary(PrunedLivenessBoundary &boundary);
 
   void findExtendedBoundary(PrunedLivenessBoundary const &originalBoundary,
                             PrunedLivenessBoundary &boundary);

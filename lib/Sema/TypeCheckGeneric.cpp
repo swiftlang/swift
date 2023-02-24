@@ -79,6 +79,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         .diagnose(repr->getLoc(), diag::opaque_type_in_protocol_requirement)
         .fixItInsert(fixitLoc, result)
         .fixItReplace(repr->getSourceRange(), placeholder);
+    repr->setInvalid();
 
     return nullptr;
   }
@@ -136,6 +137,11 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     }
   } else {
     opaqueReprs = collectOpaqueReturnTypeReprs(repr, ctx, dc);
+    
+    if (opaqueReprs.empty()) {
+      return nullptr;
+    }
+
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> requirements;
     for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
@@ -157,6 +163,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
              .diagnose(currentRepr->getLoc(), diag::opaque_of_optional_rewrite)
              .fixItReplaceChars(currentRepr->getStartLoc(),
                                 currentRepr->getEndLoc(), stream.str());
+          repr->setInvalid();
           return nullptr;
         }
       }
@@ -194,6 +201,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         // Error out if the constraint type isn't a class or existential type.
         ctx.Diags.diagnose(currentRepr->getLoc(),
                            diag::opaque_type_invalid_constraint);
+        currentRepr->setInvalid();
         return nullptr;
       }
 
@@ -241,6 +249,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         ctx.Diags.diagnose(repr->getLoc(),
                            diag::opaque_type_in_parameter,
                            false, interfaceType);
+        repr->setInvalid();
         return true;
       }
     }
@@ -253,6 +262,13 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
 
   auto metatype = MetatypeType::get(interfaceType);
   opaqueDecl->setInterfaceType(metatype);
+
+  // Record the opaque return type decl in the parent source file,
+  // which will be used in IRGen to emit all opaque type decls
+  // in a Swift module for type reconstruction.
+  if (auto *sourceFile = dc->getParentSourceFile())
+    sourceFile->addOpaqueResultTypeDecl(opaqueDecl);
+
   return opaqueDecl;
 }
 
@@ -469,8 +485,15 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
           continue;
       }
       // Produce an error that this generic parameter cannot be bound.
-      paramDecl->diagnose(diag::unreferenced_generic_parameter,
-                          paramDecl->getNameStr());
+      if (paramDecl->isImplicit()) {
+        paramDecl->getASTContext().Diags
+          .diagnose(paramDecl->getOpaqueTypeRepr()->getLoc(),
+                    diag::unreferenced_generic_parameter,
+                    paramDecl->getNameStr());
+      } else {
+        paramDecl->diagnose(diag::unreferenced_generic_parameter,
+                            paramDecl->getNameStr());
+      }
     }
   }
 }
@@ -637,12 +660,16 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       for (auto param : *params) {
         auto *typeRepr = param->getTypeRepr();
         if (typeRepr == nullptr)
-          continue;
+            continue;
 
         auto paramOptions = baseOptions;
 
-        if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
+        if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr)) {
+          if (isa<OwnershipTypeRepr>(specifier))
+            paramOptions |= TypeResolutionFlags::HasOwnership;
+
           typeRepr = specifier->getBase();
+        }
 
         if (auto *packExpansion = dyn_cast<VarargTypeRepr>(typeRepr)) {
           paramOptions.setContext(TypeResolverContext::VariadicFunctionInput);

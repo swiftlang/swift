@@ -271,6 +271,10 @@ def I : JoinedOrSeparate<["-"], "I">,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
 
+def plugin_path : Separate<["-"], "plugin-path">,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"Add directory to the plugin search path">;
+
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
@@ -808,11 +812,14 @@ def L_EQ : Joined<["-"], "L=">, Group<linker_option_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   Alias<L>;
 
+// Accept but ignore these flags.  They were once used to control
+// linking of arclite, which is no longer used on Darwin.
 def link_objc_runtime : Flag<["-"], "link-objc-runtime">,
-  Flags<[DoesNotAffectIncrementalBuild]>;
+  Flags<[DoesNotAffectIncrementalBuild]>,
+  HelpText<"Deprecated">;
 def no_link_objc_runtime : Flag<["-"], "no-link-objc-runtime">,
   Flags<[HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Don't link in additions to the Objective-C runtime">;
+  HelpText<"Deprecated">;
 
 def static_stdlib: Flag<["-"], "static-stdlib">,
   Flags<[DoesNotAffectIncrementalBuild]>,
@@ -1039,6 +1046,10 @@ def parse_sil : Flag<["-"], "parse-sil">,
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
+
+def enable_builtin_module : Flag<["-"], "enable-builtin-module">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Enables the explicit import of the Builtin module">;
 
 def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
 
@@ -1537,6 +1548,10 @@ def disable_remove_deprecated_check: Flag<["-", "--"], "disable-remove-deprecate
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Skip diagnosing removal of deprecated symbols">;
 
+def enable_remove_deprecated_check: Flag<["-", "--"], "enable-remove-deprecated-check">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Diagnosing removal of deprecated symbols">;
+
 def print_module: Flag<["-", "--"], "print-module">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Print module names in diagnostics">;
@@ -1748,5 +1763,12 @@ def load_plugin_library:
   HelpText<"Path to a dynamic library containing compiler plugins such as "
            "macros">,
   MetaVarName<"<path>">;
+
+def load_plugin_executable:
+  Separate<["-"], "load-plugin-executable">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to an executable compiler plugins and providing module names "
+           "such as macros">,
+  MetaVarName<"<path>#<module-names>">;
 
 include "FrontendOptions.td"

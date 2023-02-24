@@ -1255,7 +1255,18 @@ private:
   /// overload to be present, but a class marked as `@dynamicCallable`
   /// defines only `dynamicallyCall(withArguments:)` variant.
   bool diagnoseForDynamicCallable() const;
-  
+
+  /// Diagnose methods that return unsafe projections and suggest fixits.
+  /// For example, if Swift cannot find "vector::data" because it is unsafe, try
+  /// to diagnose this and tell the user why we did not import "vector::data".
+  ///
+  /// Provides fixits for:
+  /// at -> subscript
+  /// begin, end -> makeIterator
+  /// front, back -> first, last
+  void diagnoseUnsafeCxxMethod(SourceLoc loc, ASTNode anchor, Type baseType,
+                               DeclName name) const;
+
   /// Tailored diagnostics for collection literal with unresolved member expression
   /// that defaults the element type. e.g. _ = [.e]
   bool diagnoseInLiteralCollectionContext() const;
@@ -1819,6 +1830,15 @@ class NotCompileTimeConstFailure final : public FailureDiagnostic {
 public:
   NotCompileTimeConstFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+class NotCopyableFailure final : public FailureDiagnostic {
+  Type noncopyableTy;
+public:
+  NotCopyableFailure(const Solution &solution, Type noncopyableTy, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), noncopyableTy(noncopyableTy) {}
 
   bool diagnoseAsError() override;
 };
@@ -2870,29 +2890,6 @@ class AddMissingMacroPound final : public FailureDiagnostic {
 
 public:
   AddMissingMacroPound(const Solution &solution, MacroDecl *macro,
-                       ConstraintLocator *locator)
-    : FailureDiagnostic(solution, locator),
-      macro(macro) { }
-
-  bool diagnoseAsError() override;
-};
-
-/// Diagnose situations where we end up type checking a reference to a macro
-/// that has parameters, but was not provided any arguments.
-///
-/// \code
-/// func print(_ value: Any)
-/// @expression macro print<Value...>(_ value: Value...)
-///
-/// func test(e: E) {
-///   #print
-/// }
-/// \endcode
-class AddMissingMacroArguments final : public FailureDiagnostic {
-  MacroDecl *macro;
-
-public:
-  AddMissingMacroArguments(const Solution &solution, MacroDecl *macro,
                        ConstraintLocator *locator)
     : FailureDiagnostic(solution, locator),
       macro(macro) { }

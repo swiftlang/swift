@@ -82,6 +82,7 @@ LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building built
 LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building builtin", true)
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
 LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
+LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc", true)
 LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline", true)
 LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
@@ -92,6 +93,9 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated 
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 LANGUAGE_FEATURE(BuiltinIntLiteralAccessors, 368, "Builtin.IntLiteral accessors", true)
+LANGUAGE_FEATURE(
+    FreestandingExpressionMacros, 0, "@freestanding(expression) macros",
+    langOpts.hasFeature(Feature::Macros))
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
@@ -112,7 +116,7 @@ EXPERIMENTAL_FEATURE(MoveOnlyClasses, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
-EXPERIMENTAL_FEATURE(LayoutPrespecialization, false)
+EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 EXPERIMENTAL_FEATURE(ModuleInterfaceExportAs, true)
 
 /// Whether to enable experimental differentiable programming features:
@@ -132,11 +136,6 @@ EXPERIMENTAL_FEATURE(SendableCompletionHandlers, false)
 
 /// Enables opaque type erasure without also enabling implict dynamic
 EXPERIMENTAL_FEATURE(OpaqueTypeErasure, false)
-
-/// Whether to enable experimental @typeWrapper feature which allows to
-/// declare a type that controls access to all stored properties of the
-/// wrapped type.
-EXPERIMENTAL_FEATURE(TypeWrappers, false)
 
 /// Whether to perform round-trip testing of the Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
@@ -167,6 +166,11 @@ EXPERIMENTAL_FEATURE(BuiltinMacros, false)
 /// Whether to enable experimental @runtimeMetadata feature which allows to
 /// declare an attribute which is discoverable and constructable at runtime.
 EXPERIMENTAL_FEATURE(RuntimeDiscoverableAttrs, false)
+
+/// Import C++ class templates as semantically-meaningless symbolic
+/// Swift types and C++ methods as symbolic functions with blank
+/// signatures.
+EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false)
 
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

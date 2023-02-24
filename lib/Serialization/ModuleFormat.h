@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 742; // Constructor affects ABI
+const uint16_t SWIFTMODULE_VERSION_MINOR = 745; // _lexicalLifetimes attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -618,6 +618,8 @@ enum class MacroRole : uint8_t {
   Accessor,
   MemberAttribute,
   Member,
+  Peer,
+  Conformance,
 };
 using MacroRoleField = BCFixed<3>;
 
@@ -2214,8 +2216,8 @@ namespace decls_block {
     BCBlob      // Message
   >;
 
-  using BackDeployDeclAttrLayout = BCRecordLayout<
-    BackDeploy_DECL_ATTR,
+  using BackDeployedDeclAttrLayout = BCRecordLayout<
+    BackDeployed_DECL_ATTR,
     BCFixed<1>,     // implicit flag
     BC_AVAIL_TUPLE, // OS version
     BCVBR<5>        // platform

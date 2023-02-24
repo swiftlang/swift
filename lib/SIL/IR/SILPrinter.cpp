@@ -1397,6 +1397,9 @@ public:
     printDebugVar(AVI->getVarInfo(),
                   &AVI->getModule().getASTContext().SourceMgr);
   }
+  void visitAllocPackInst(AllocPackInst *API) {
+    *this << API->getType().getObjectType();
+  }
 
   void printAllocRefInstBase(AllocRefInstBase *ARI) {
     if (ARI->isObjC())
@@ -1711,20 +1714,6 @@ public:
   }
 
   void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
-    {
-      *this << "origin ";
-
-      switch (AI->getOriginator()) {
-      case AssignByWrapperInst::Originator::TypeWrapper:
-        *this << "type_wrapper";
-        break;
-      case AssignByWrapperInst::Originator::PropertyWrapper:
-        *this << "property_wrapper";
-      }
-
-      *this << ", ";
-    }
-
     *this << getIDAndType(AI->getSrc()) << " to ";
     switch (AI->getMode()) {
     case AssignByWrapperInst::Unknown:
@@ -1739,13 +1728,9 @@ public:
       *this << "[assign_wrapped_value] ";
       break;
     }
-
-    *this << getIDAndType(AI->getDest());
-
-    if (AI->getOriginator() == AssignByWrapperInst::Originator::PropertyWrapper)
-      *this << ", init " << getIDAndType(AI->getInitializer());
-
-    *this << ", set " << getIDAndType(AI->getSetter());
+    *this << getIDAndType(AI->getDest())
+          << ", init " << getIDAndType(AI->getInitializer())
+          << ", set " << getIDAndType(AI->getSetter());
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
@@ -1784,6 +1769,10 @@ public:
     *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo(),
                   &DVI->getModule().getASTContext().SourceMgr);
+  }
+
+  void visitDebugStepInst(DebugStepInst *dsi) {
+    // nothing to print other than the instruction name
   }
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -2003,11 +1992,14 @@ public:
     switch (I->getCheckKind()) {
     case CheckKind::Invalid:
       llvm_unreachable("Invalid?!");
-    case CheckKind::NoImplicitCopy:
-      *this << "[no_implicit_copy] ";
+    case CheckKind::ConsumableAndAssignable:
+      *this << "[consumable_and_assignable] ";
       break;
-    case CheckKind::NoCopy:
-      *this << "[no_copy] ";
+    case CheckKind::NoConsumeOrAssign:
+      *this << "[no_consume_or_assign] ";
+      break;
+    case CheckKind::AssignableButNotConsumable:
+      *this << "[assignable_but_not_consumable] ";
       break;
     }
     *this << getIDAndType(I->getOperand());
@@ -2282,6 +2274,9 @@ public:
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEI) {
     *this << getIDAndType(DEI->getOperand()) << ", $" << DEI->getConcreteType();
   }
+  void visitPackLengthInst(PackLengthInst *PLI) {
+    *this << "$" << PLI->getPackType();
+  }
   void visitDynamicPackIndexInst(DynamicPackIndexInst *DPII) {
     *this << Ctx.getID(DPII->getOperand()) << " of $"
           << DPII->getIndexedPackType();
@@ -2304,6 +2299,21 @@ public:
     printSubstitutions(subs);
     *this << ", shape $" << env->getOpenedElementShapeClass()
           << ", uuid \"" << env->getOpenedElementUUID() << "\"";
+  }
+  void visitPackElementGetInst(PackElementGetInst *I) {
+    *this << Ctx.getID(I->getIndex()) << " of "
+          << getIDAndType(I->getPack()) << " as "
+          << I->getElementType();
+  }
+  void visitPackElementSetInst(PackElementSetInst *I) {
+    *this << getIDAndType(I->getValue()) << " into "
+          << Ctx.getID(I->getIndex()) << " of "
+          << getIDAndType(I->getPack());
+  }
+  void visitTuplePackElementAddrInst(TuplePackElementAddrInst *I) {
+    *this << Ctx.getID(I->getIndex()) << " of "
+          << getIDAndType(I->getTuple()) << " as "
+          << I->getElementType();
   }
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
     *this << getIDAndType(PBSI->getOperand());
@@ -2372,6 +2382,9 @@ public:
     *this << getIDAndType(CUI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {
+    *this << getIDAndType(DI->getOperand());
+  }
+  void visitDeallocPackInst(DeallocPackInst *DI) {
     *this << getIDAndType(DI->getOperand());
   }
   void visitDeallocStackRefInst(DeallocStackRefInst *ESRL) {
@@ -2660,10 +2673,10 @@ public:
       *this << ' ';
       printSubstitutions(KPI->getSubstitutions());
     }
-    if (!KPI->getAllOperands().empty()) {
+    if (!KPI->getPatternOperands().empty()) {
       *this << " (";
       
-      interleave(KPI->getAllOperands(),
+      interleave(KPI->getPatternOperands(),
         [&](const Operand &operand) {
           *this << Ctx.getID(operand.get());
         }, [&]{
@@ -3081,6 +3094,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isRuntimeAccessible()) {
     OS << "[runtime_accessible] ";
   }
+  if (forceEnableLexicalLifetimes()) {
+    OS << "[lexical_lifetimes] ";
+  }
 
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";
@@ -3433,6 +3449,36 @@ static void printSILDifferentiabilityWitnesses(
     dw->print(Ctx.OS(), Ctx.printVerbose());
 }
 
+static void printSILLinearMapTypes(SILPrintContext &Ctx,
+                                   const ModuleDecl *M) {
+  auto &OS = Ctx.OS();
+
+  PrintOptions Options = PrintOptions::printSIL();
+  Options.TypeDefinitions = true;
+  Options.VarInitializers = true;
+  Options.ExplodePatternBindingDecls = true;
+  Options.SkipImplicit = false;
+  Options.PrintGetSetOnRWProperties = true;
+  Options.PrintInSILBody = false;
+
+  SmallVector<Decl *, 32> topLevelDecls;
+  M->getTopLevelDecls(topLevelDecls);
+  for (const Decl *D : topLevelDecls) {
+    if (D->getDeclContext() == M)
+      continue;
+
+    if (!isa<StructDecl>(D) && !isa<EnumDecl>(D))
+      continue;
+
+    StringRef Name = cast<TypeDecl>(D)->getNameStr();
+    if (!Name.startswith("_AD__"))
+      continue;
+
+    D->print(OS, Options);
+    OS << "\n\n";
+  }
+}
+
 static void
 printSILCoverageMaps(SILPrintContext &Ctx,
                      const SILModule::CoverageMapCollectionType &CoverageMaps) {
@@ -3608,6 +3654,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILGlobals(PrintCtx, getSILGlobalList());
   printSILDifferentiabilityWitnesses(PrintCtx,
                                      getDifferentiabilityWitnessList());
+  printSILLinearMapTypes(PrintCtx, getSwiftModule());
   printSILFunctions(PrintCtx, getFunctionList());
   printSILVTables(PrintCtx, getVTables());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
@@ -4058,7 +4105,9 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
           } else {
             Requirement ReqWithDecls(req.getKind(), FirstTy,
                                      req.getLayoutConstraint());
-            ReqWithDecls.print(OS, SubPrinter);
+            auto SubPrinterCopy = SubPrinter;
+            SubPrinterCopy.PrintClassLayoutName = erased;
+            ReqWithDecls.print(OS, SubPrinterCopy);
           }
         },
         [&] { OS << ", "; });

@@ -187,7 +187,7 @@ toolchain as a one-off, there are a couple of differences:
 
 ### Spot check dependencies
 
-* Run `cmake --version`; this should be at least 3.19.6 (3.22.2 if you want to generate an Xcode project on macOS).
+* Run `cmake --version`; this should be at least 3.19.6 (3.24.2 if you want to use Xcode for editing on macOS).
 * Run `python3 --version`; check that this succeeds.
 * Run `ninja --version`; check that this succeeds.
 * If you installed and want to use Sccache: Run `sccache --version`; check
@@ -243,10 +243,6 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
        --sccache --release-debuginfo --swift-disable-dead-stripping
      ```
-     > **Warning**  
-     > On Macs with Apple silicon (arm64), pass `--bootstrapping=off`.
-     > (https://github.com/apple/swift/issues/62017)
-
    - Linux:
      ```sh
      utils/build-script --release-debuginfo --skip-early-swift-driver \
@@ -254,10 +250,16 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
      ```
      If you installed and want to use Sccache, include the `--sccache` option in
      the invocation as well.
+   <!-- FIXME: Without this "hard" line break, the note doesn’t get properly spaced from the bullet -->
+   <br />
 
    > **Note**  
-   > If you aren't planning to edit the parts of the compiler that are written
-   > in Swift, pass `--bootstrapping=off` to speed up local development.
+   > If you are planning to work on the compiler, but not the parts that are
+   > written in Swift, pass `--bootstrapping=hosttools` to speed up local
+   > development. Note that on Linux — unlike macOS, where the toolchain already
+   > comes with Xcode — this option additionally requires
+   > [a recent Swift toolchain](https://www.swift.org/download/) to be
+   > installed.
 
    This will create a directory `swift-project/build/Ninja-RelWithDebInfoAssert`
    containing the Swift compiler and standard library and clang/LLVM build artifacts.
@@ -274,9 +276,8 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    on Linux, add the `--xctest` flag to `build-script`.
 
 In the following sections, for simplicity, we will assume that you are using a
-`Ninja-RelWithDebInfoAssert` build on macOS running on an Intel-based Mac,
-unless explicitly mentioned otherwise. You will need to slightly tweak the paths
-for other build configurations.
+`Ninja-RelWithDebInfoAssert` build on macOS, unless explicitly mentioned otherwise.
+You will need to slightly tweak the paths for other build configurations.
 
 ### Troubleshooting build issues
 
@@ -363,13 +364,13 @@ several more steps are necessary to set up this environment:
 * Create a new Xcode workspace.
 * Add the generated Xcode projects or Swift packages that are relevant to your
   tasks to your workspace. All the Xcode projects can be found among the
-  build artifacts under `build/Xcode-ReleaseAssert`. For example:
-  * If you are aiming for the compiler, add `build/Xcode-ReleaseAssert/swift-macosx-*/Swift.xcodeproj`.
+  build artifacts under `build/Xcode-*/`. For example:
+  * If you are aiming for the compiler, add `build/Xcode-*/swift-macosx-*/Swift.xcodeproj`.
     This project also includes the standard library and runtime sources. If you
     need the parts of the compiler that are implemented in Swift itself, add the
     `swift/SwiftCompilerSources/Package.swift` package as well.
   * If you are aiming for just the standard library or runtime, add
-    `build/Xcode-ReleaseAssert/swift-macosx-*/stdlib/Swift-stdlib.xcodeproj`.
+    `build/Xcode-*/swift-macosx-*/stdlib/Swift-stdlib.xcodeproj`.
   <!-- FIXME: Without this "hard" line break, the note doesn’t get properly spaced from the bullet -->
   <br />
 
@@ -385,15 +386,16 @@ several more steps are necessary to set up this environment:
 
 * Create an empty Xcode project in the workspace, using the
   _External Build System_ template.
-* For a Ninja target that you want to build (e.g. `swift-frontend`), add a
-  target to the empty project, using the _External Build System_ template.
+* Add a target to the empty project, using the _External Build System_ template,
+  and name it after the Ninja target that you want to build (e.g. `swift-frontend`
+  is the compiler).
 * In the _Info_ pane of the target settings, set
   * _Build Tool_ to the absolute path of the `ninja` executable (the output of
     `which ninja` on the command line)
-  * _Arguments_ to the Ninja target name (e.g. `swift-frontend`)
-  * _Directory_ to the absolute path of the directory where the Ninja target
-    lives. For Swift targets (the compiler, standard library, runtime, and
-    related tooling), this is the `build/Ninja-*/swift-macosx-*` directory.
+  * _Arguments_ to the Ninja target (e.g. `bin/swift-frontend`)
+  * _Directory_ to the absolute path of the build directory where the Ninja
+    target lives. For Swift targets such as the compiler or standard library,
+    this is the `build/Ninja-*/swift-macosx-*` directory.
 * Add a scheme for the target. In the drop-down menu, be careful not to mistake
   your target for a similar one that belongs to a generated Xcode project.
 * > **Note**  
@@ -405,7 +407,7 @@ several more steps are necessary to set up this environment:
     the appropriate `bin` directory (e.g. `build/Ninja-*/swift-macosx-*/bin/swift-frontend`).
   * In the _Arguments_ pane, add the command line arguments that you want to
     pass to the executable on launch (e.g. `path/to/file.swift -typecheck` for
-    `swift-frontend`).
+    `bin/swift-frontend`).
   * You can optionally set the working directory for debugging in the
     _Options_ pane.
 * Configure as many more target-scheme pairs as you need.
@@ -463,7 +465,7 @@ Now that you have made some changes, you will need to rebuild...
 
 To rebuild the compiler:
 ```sh
-ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m) swift-frontend
+ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m) bin/swift-frontend
 ```
 
 To rebuild everything, including the standard library:

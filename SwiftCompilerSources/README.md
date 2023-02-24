@@ -24,7 +24,7 @@ The bootstrapping mode is cached in the `CMakeCache.txt` file in the Swift build
 
 ### Bootstrapping
 
-The bootstrapping process is completely implemented with CMake dependencies. The build-script is not required to build the whole bootstrapping chain. For example, a `ninja swift-frontend` invocation builds all the required bootstrapping steps required for the final `swift-frontend`.
+The bootstrapping process is completely implemented with CMake dependencies. The build-script is not required to build the whole bootstrapping chain. For example, a `ninja bin/swift-frontend` invocation builds all the required bootstrapping steps required for the final `swift-frontend`.
 
 Bootstrapping involves the following steps:
 

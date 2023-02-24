@@ -47,6 +47,12 @@ public:
     /// The expansion of an attached member macro.
     MemberMacroExpansion,
 
+    /// The expansion of an attached peer macro.
+    PeerMacroExpansion,
+
+    /// The expansion of an attached conformance macro.
+    ConformanceMacroExpansion,
+
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
 
@@ -60,12 +66,12 @@ public:
   /// which source code was generated. Conceptually, one can think of the
   /// buffer described by a \c GeneratedSource instance as replacing the
   /// code in the \c originalSourceRange.
-  SourceRange originalSourceRange;
+  CharSourceRange originalSourceRange;
 
   /// The source range in the generated-source buffer where the generated
   /// code exists. This might be a subrange of the buffer containing the
   /// generated source, but it will never be from a different buffer.
-  SourceRange generatedSourceRange;
+  CharSourceRange generatedSourceRange;
 
   /// The opaque pointer for an ASTNode for which this buffer was generated.
   void *astNode;
@@ -129,6 +135,7 @@ public:
   SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
                     llvm::vfs::getRealFileSystem())
     : FileSystem(FS) {}
+  ~SourceManager();
 
   llvm::SourceMgr &getLLVMSourceMgr() {
     return LLVMSourceMgr;
@@ -166,6 +173,17 @@ public:
 
   SourceLoc getIDEInspectionTargetLoc() const;
 
+  /// Returns whether `Range` contains `Loc`. This also respects the
+  /// `ReplacedRanges`, i.e. if `Loc` is in a range that replaces a range which
+  /// overlaps `Range`, this also returns `true`.
+  bool containsRespectingReplacedRanges(SourceRange Range, SourceLoc Loc) const;
+
+  /// Returns whether `Enclosing` contains `Inner`. This also respects the
+  /// `ReplacedRanges`, i.e. if `Inner` is contained in a range that replaces a
+  /// range which overlaps `Range`, this also returns `true`.
+  bool rangeContainsRespectingReplacedRanges(SourceRange Enclosing,
+                                             SourceRange Inner) const;
+
   const llvm::DenseMap<SourceRange, SourceRange> &getReplacedRanges() const {
     return ReplacedRanges;
   }
@@ -199,6 +217,13 @@ public:
            (isBeforeInBuffer(R.Start, Loc) && isBeforeInBuffer(Loc, R.End));
   }
 
+  /// Returns true if range \c R contains the location \c Loc.  The location
+  /// \c Loc should point at the beginning of the token.
+  bool rangeContainsTokenLoc(CharSourceRange R, SourceLoc Loc) const {
+    return Loc == R.getStart() || (isBeforeInBuffer(R.getStart(), Loc) &&
+                                   isBeforeInBuffer(Loc, R.getEnd()));
+  }
+
   /// Returns true if range \c Enclosing contains the range \c Inner.
   bool rangeContains(SourceRange Enclosing, SourceRange Inner) const {
     return rangeContainsTokenLoc(Enclosing, Inner.Start) &&
@@ -206,10 +231,11 @@ public:
   }
 
   /// Returns true if range \p R contains the code-completion location, if any.
-  bool rangeContainsIDEInspectionTarget(SourceRange R) const {
-    return IDEInspectionTargetBufferID
-               ? rangeContainsTokenLoc(R, getIDEInspectionTargetLoc())
-               : false;
+  bool rangeContainsIDEInspectionTarget(CharSourceRange R) const {
+    if (!IDEInspectionTargetBufferID) {
+      return false;
+    }
+    return rangeContainsTokenLoc(R, getIDEInspectionTargetLoc());
   }
 
   /// Returns the buffer ID for the specified *valid* location.

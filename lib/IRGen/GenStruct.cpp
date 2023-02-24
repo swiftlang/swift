@@ -83,7 +83,6 @@ static clang::CXXDestructorDecl *getCXXDestructor(SILType type) {
     return nullptr;
   return cxxRecordDecl->getDestructor();
 }
-
 namespace {
   class StructFieldInfo : public RecordField<StructFieldInfo> {
   public:
@@ -251,6 +250,18 @@ namespace {
       return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
     }
 
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
+      // If the struct has a deinit declared, then call it to destroy the
+      // value.
+      if (tryEmitDestroyUsingDeinit(IGF, address, T)) {
+        return;
+      }
+      
+      // Otherwise, perform elementwise destruction of the value.
+      return super::destroy(IGF, address, T, isOutlined);
+    }
+
     void verify(IRGenTypeVerifierFunction &IGF,
                 llvm::Value *metadata,
                 SILType structType) const override {
@@ -415,6 +426,97 @@ namespace {
     }
   };
 
+  class AddressOnlyPointerAuthRecordTypeInfo final
+      : public StructTypeInfoBase<AddressOnlyPointerAuthRecordTypeInfo,
+                                  FixedTypeInfo, ClangFieldInfo> {
+    const clang::RecordDecl *clangDecl;
+
+    void emitCopyWithCopyFunction(IRGenFunction &IGF, SILType T, Address src,
+                                  Address dst) const {
+      auto *copyFunction =
+          clang::CodeGen::getNonTrivialCStructCopyAssignmentOperator(
+              IGF.IGM.getClangCGM(), dst.getAlignment(), src.getAlignment(),
+              /*isVolatile*/ false,
+              clang::QualType(clangDecl->getTypeForDecl(), 0));
+      auto *dstValue = dst.getAddress();
+      auto *srcValue = src.getAddress();
+      if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
+        dstValue = IGF.coerceValue(
+            dst.getAddress(), copyFunction->getFunctionType()->getParamType(0),
+            IGF.IGM.DataLayout);
+        srcValue = IGF.coerceValue(
+            src.getAddress(), copyFunction->getFunctionType()->getParamType(1),
+            IGF.IGM.DataLayout);
+      }
+      IGF.Builder.CreateCall(copyFunction->getFunctionType(), copyFunction,
+                             {dstValue, srcValue});
+    }
+
+  public:
+    AddressOnlyPointerAuthRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                         llvm::Type *storageType, Size size,
+                                         Alignment align,
+                                         const clang::RecordDecl *clangDecl)
+        : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
+                             fields, storageType, size,
+                             // We can't assume any spare bits in a C++ type
+                             // with user-defined special member functions.
+                             SpareBitVector(llvm::Optional<APInt>{
+                                 llvm::APInt(size.getValueInBits(), 0)}),
+                             align, IsNotPOD, IsNotBitwiseTakable, IsFixedSize),
+          clangDecl(clangDecl) {
+      (void)clangDecl;
+    }
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
+      if (!IGM.getOptions().ForceStructTypeLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+      }
+      assert(false && "Implement proper type layout info in the future");
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address addr, SILType T,
+                              bool isOutlined) const override {
+      llvm_unreachable("Address-only C++ types must be created by C++ special "
+                       "member functions.");
+    }
+
+    void initializeWithCopy(IRGenFunction &IGF, Address dst, Address src,
+                            SILType T, bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address dst, Address src, SILType T,
+                        bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address dst, Address src,
+                            SILType T, bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+      destroy(IGF, src, T, isOutlined);
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dst, Address src, SILType T,
+                        bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+      destroy(IGF, src, T, isOutlined);
+    }
+
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
+    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return None;
+    }
+    MemberAccessStrategy
+    getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
+                                   const ClangFieldInfo &field) const {
+      llvm_unreachable("non-fixed field in Clang type?");
+    }
+  };
+
   class AddressOnlyCXXClangRecordTypeInfo final
       : public StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo,
                                   FixedTypeInfo, ClangFieldInfo> {
@@ -477,6 +579,7 @@ namespace {
       auto callee = cast<llvm::Function>(clangFnAddr->stripPointerCasts());
       Signature signature = IGF.IGM.getSignature(fnType);
       std::string name = "__swift_cxx_copy_ctor" + callee->getName().str();
+      auto *origClangFnAddr = clangFnAddr;
       clangFnAddr = emitCXXConstructorThunkIfNeeded(
           IGF.IGM, signature, copyConstructor, name, clangFnAddr);
       callee = cast<llvm::Function>(clangFnAddr);
@@ -486,7 +589,19 @@ namespace {
         src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
                               IGF.IGM.DataLayout);
       }
-      IGF.Builder.CreateCall(callee->getFunctionType(), callee, {dest, src});
+      llvm::Value *args[] = {dest, src};
+      if (clangFnAddr == origClangFnAddr) {
+        // Ensure we can use 'invoke' to trap on uncaught exceptions when
+        // calling original copy constructor without going through the thunk.
+        emitCXXConstructorCall(IGF, copyConstructor, callee->getFunctionType(),
+                               callee, args);
+        return;
+      }
+      // Check if we're calling a thunk that traps on exception thrown from copy
+      // constructor.
+      if (IGF.IGM.emittedForeignFunctionThunksWithExceptionTraps.count(callee))
+        IGF.setCallsThunksWithForeignExceptionTraps();
+      IGF.Builder.CreateCall(callee->getFunctionType(), callee, args);
     }
 
   public:
@@ -550,6 +665,23 @@ namespace {
                                         destructorFnAddr->getArg(1)->getType(),
                                         IGF.IGM.DataLayout);
         args.push_back(implicitParam);
+      }
+      bool canThrow = false;
+      if (IGF.IGM.isForeignExceptionHandlingEnabled()) {
+        if (auto *fpt =
+                destructor->getType()->getAs<clang::FunctionProtoType>()) {
+          if (!fpt->isNothrow())
+            canThrow = true;
+        }
+      }
+      if (canThrow) {
+        IGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
+                                         llvm::BasicBlock *invokeUnwindDest) {
+          IGF.Builder.createInvoke(destructorFnAddr->getFunctionType(),
+                                   destructorFnAddr, args, invokeNormalDest,
+                                   invokeUnwindDest);
+        });
+        return;
       }
 
       IGF.Builder.CreateCall(destructorFnAddr->getFunctionType(),
@@ -658,6 +790,7 @@ namespace {
   /// A type implementation for loadable struct types.
   class LoadableStructTypeInfo final
       : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
+    using super = StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo>;
   public:
     LoadableStructTypeInfo(ArrayRef<StructFieldInfo> fields,
                            unsigned explosionSize,
@@ -723,6 +856,18 @@ namespace {
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
                                    const StructFieldInfo &field) const {
       llvm_unreachable("non-fixed field in loadable type?");
+    }
+    
+    void consume(IRGenFunction &IGF, Explosion &explosion,
+                 Atomicity atomicity, SILType T) const override {
+      // If the struct has a deinit declared, then call it to consume the
+      // value.
+      if (tryEmitConsumeUsingDeinit(IGF, explosion, T)) {
+        return;
+      }
+      
+      // Otherwise, do elementwise destruction of the value.
+      return super::consume(IGF, explosion, atomicity, T);
     }
   };
 
@@ -1045,8 +1190,10 @@ public:
       return AddressOnlyCXXClangRecordTypeInfo::create(
           FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
     }
-    // TODO: New AddressOnlyPtrAuthTypeInfo to handle address diversified field
-    // function ptrs in C structs.
+    if (SwiftType.getStructOrBoundGenericStruct()->isNonTrivialPtrAuth()) {
+      return AddressOnlyPointerAuthRecordTypeInfo::create(
+          FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
+    }
     return LoadableClangRecordTypeInfo::create(
         FieldInfos, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment, ClangDecl);

@@ -462,9 +462,9 @@ private extension AccessBase {
       case .box, .global:
         return .no
       case .class(let rea):
-        return .objectIfStackPromoted(rea.operand)
+        return .objectIfStackPromoted(rea.instance)
       case .tail(let rta):
-        return .objectIfStackPromoted(rta.operand)
+        return .objectIfStackPromoted(rta.instance)
       case .argument(let arg):
         return .decidedInCaller(arg)
       case .yield, .pointer:
@@ -486,13 +486,23 @@ private extension Instruction {
         if !atp.needsStackProtection {
           return nil
         }
+        var hasNoStores = NoStores()
+        if hasNoStores.walkDownUses(ofValue: atp, path: SmallProjectionPath()) == .continueWalk {
+          return nil
+        }
+
         // The result of an `address_to_pointer` may be used in any unsafe way, e.g.
         // passed to a C function.
-        baseAddr = atp.operand
+        baseAddr = atp.address
       case let ia as IndexAddrInst:
         if !ia.needsStackProtection {
           return nil
         }
+        var hasNoStores = NoStores()
+        if hasNoStores.walkDownUses(ofAddress: ia, path: SmallProjectionPath()) == .continueWalk {
+          return nil
+        }
+
         // `index_addr` is unsafe if not used for tail-allocated elements (e.g. in Array).
         baseAddr = ia.base
       default:
@@ -506,6 +516,29 @@ private extension Instruction {
       return nil
     }
     return (accessPath.base, scope)
+  }
+}
+
+/// Checks if there are no stores to an address or raw pointer.
+private struct NoStores : ValueDefUseWalker, AddressDefUseWalker {
+  var walkDownCache = WalkerCache<SmallProjectionPath>()
+
+  mutating func leafUse(value: Operand, path: SmallProjectionPath) -> WalkResult {
+    if let ptai = value.instruction as? PointerToAddressInst {
+      return walkDownUses(ofAddress: ptai, path: path)
+    }
+    return .abortWalk
+  }
+
+  mutating func leafUse(address: Operand, path: SmallProjectionPath) -> WalkResult {
+    switch address.instruction {
+    case is LoadInst:
+      return .continueWalk
+    case let cai as CopyAddrInst:
+      return address == cai.sourceOperand ? .continueWalk : .abortWalk
+    default:
+      return .abortWalk
+    }
   }
 }
 

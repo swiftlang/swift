@@ -11,3 +11,23 @@
 public struct S {
   public var value: Int
 }
+
+public struct Base {
+  public static func member() -> Base { .init() }
+}
+
+@attached(memberAttribute) public macro wrapAllProperties(
+  _ : Base
+) = #externalMacro(module: "MacroDefinition", type: "WrapAllProperties")
+
+@wrapAllProperties(.member())
+public struct TestMacroArgTypechecking {
+  public var value: Int
+}
+
+@resultBuilder
+public struct Builder {
+  static func buildBlock(_: Int...) -> Void {}
+}
+@freestanding(expression)
+public macro macroWithBuilderArgs(@Builder _: () -> Void) = #externalMacro(module: "A", type: "B")

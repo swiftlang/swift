@@ -386,6 +386,11 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
     return;
 
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
+
+  // Collect compiler plugin dependencies.
+  auto &searchPathOpts = Invocation.getSearchPathOptions();
+  for (auto &path : searchPathOpts.getCompilerPluginLibraryPaths())
+    DepTracker->addDependency(path, /*isSystem=*/false);
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
@@ -561,10 +566,12 @@ bool CompilerInstance::setUpModuleLoaders() {
   bool ExplicitModuleBuild =
       Invocation.getFrontendOptions().DisableImplicitModules;
   if (ExplicitModuleBuild ||
-      !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty()) {
+      !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty() ||
+      !Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs.empty()) {
     ESML = ExplicitSwiftModuleLoader::create(
         *Context, getDependencyTracker(), MLM,
         Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+        Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
         IgnoreSourceInfoFile);
   }
 
@@ -1222,11 +1229,11 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports(
   bool hadLoadError = false;
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
-    auto *file =
-      DefaultSerializedLoader->loadAST(*mod, /*diagLoc*/ SourceLoc(), /*moduleInterfacePath*/ "",
-                     std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
-                     std::move(PM.ModuleSourceInfoBuffer),
-                     /*isFramework*/ false);
+    auto *file = DefaultSerializedLoader->loadAST(
+        *mod, /*diagLoc=*/SourceLoc(), /*moduleInterfacePath*/ "",
+        /*moduleInterfaceSourcePath=*/"", std::move(PM.ModuleBuffer),
+        std::move(PM.ModuleDocBuffer), std::move(PM.ModuleSourceInfoBuffer),
+        /*isFramework*/ false);
     if (file) {
       partialModules.push_back(file);
     } else {

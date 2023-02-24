@@ -568,6 +568,11 @@ function(_compile_swift_files
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
 
+  if (SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES)
+    list(APPEND swift_flags "-Xfrontend" "-enable-relative-protocol-witness-tables")
+    list(APPEND swift_flags "-Xfrontend" "-swift-async-frame-pointer=never")
+  endif()
+
   if(SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES)
     list(APPEND swift_flags "-Xfrontend" "-disable-preallocated-instantiation-caches")
   endif()

@@ -1609,10 +1609,13 @@ TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
   UnqualifiedLookupDescriptor descriptor(macroName, moduleScopeDC);
   auto lookup = evaluateOrDefault(
       ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
-  for (const auto &found : lookup.allResults())
-    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl()))
-      if (roles.contains(macro->getMacroRoles()))
+  for (const auto &found : lookup.allResults()) {
+    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+      auto foundRoles = macro->getMacroRoles();
+      if (foundRoles && roles.contains(foundRoles))
         choices.push_back(macro);
+    }
+  }
   return choices;
 }
 
@@ -2137,11 +2140,8 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return TupleType::getEmpty(ctx);
 
   // Handle opaque types.
-  if (decl->getOpaqueResultTypeRepr()) {
-    auto *opaqueDecl = decl->getOpaqueResultTypeDecl();
-    return (opaqueDecl
-            ? opaqueDecl->getDeclaredInterfaceType()
-            : ErrorType::get(ctx));
+  if (auto *opaqueDecl = decl->getOpaqueResultTypeDecl()) {
+      return opaqueDecl->getDeclaredInterfaceType();
   }
 
   auto options =
@@ -2737,7 +2737,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     return ctx.AllocateCopy(result);
   }
 
-  auto nominal = dyn_cast<NominalTypeDecl>(idc);
+  auto nominal = dyn_cast<NominalTypeDecl>(dc->getImplementedObjCContext());
 
   if (nominal) {
     // We need to add implicit initializers because they
@@ -2785,13 +2785,6 @@ static ArrayRef<Decl *> evaluateMembersRequest(
       ResolveImplicitMemberRequest{nominal,
                  ImplicitMemberAction::ResolveCodingKeys},
       {});
-
-    // Synthesize $Storage type and `var $storage` associated with
-    // type wrapped type.
-    if (nominal->hasTypeWrapper()) {
-      (void)nominal->getTypeWrapperStorageDecl();
-      (void)nominal->getTypeWrapperProperty();
-    }
   }
 
   // Expand synthesized member macros.
@@ -2809,6 +2802,12 @@ static ArrayRef<Decl *> evaluateMembersRequest(
       nullptr);
 
   for (auto *member : idc->getMembers()) {
+    // Expand peer macros.
+    (void)evaluateOrDefault(
+        ctx.evaluator,
+        ExpandPeerMacroRequest{member},
+        {});
+
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have
       // dynamically-dispatched accessors, so force them to be synthesized.

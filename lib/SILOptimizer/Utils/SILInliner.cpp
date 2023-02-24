@@ -851,6 +851,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::IntegerLiteralInst:
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugStepInst:
   case SILInstructionKind::StringLiteralInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndBorrowInst:
@@ -879,6 +880,16 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ProjectBlockStorageInst:
     return InlineCost::Free;
 
+  // tuple_pack_element_addr is just a GEP, but getting the offset
+  // can require accessing metadata, so conservatively treat it as
+  // expensive.
+  case SILInstructionKind::TuplePackElementAddrInst:
+    return InlineCost::Expensive;
+
+  // pack_length is just a few adds, which is close enough to free.
+  case SILInstructionKind::PackLengthInst:
+    return InlineCost::Free;
+
   // dynamic_pack_index is free.  The other pack-indexing instructions
   // are just adds of values that should be trivially dynamically
   // available; that's cheap enough to still consider free under the
@@ -887,6 +898,12 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::PackPackIndexInst:
   case SILInstructionKind::ScalarPackIndexInst:
     return InlineCost::Free;
+
+  // Pack element get/set are a GEP plus a load/store.
+  // Cheap, but not free.
+  case SILInstructionKind::PackElementGetInst:
+  case SILInstructionKind::PackElementSetInst:
+    return InlineCost::Expensive;
 
   // Aggregates are exploded at the IR level; these are effectively no-ops.
   case SILInstructionKind::TupleInst:
@@ -992,6 +1009,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
@@ -1019,6 +1037,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocPackInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
   case SILInstructionKind::DestroyAddrInst:

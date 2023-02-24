@@ -38,7 +38,7 @@ sil [ossa] @testMarkMustCheckInst : $@convention(thin) (@guaranteed List) -> () 
 bb0(%0 : @guaranteed $List):
   %1 = alloc_box ${ var MoveOnlyPair }
   %2 = project_box %1 : ${ var MoveOnlyPair }, 0
-  %3 = mark_must_check [no_implicit_copy] %2 : $*MoveOnlyPair
+  %3 = mark_must_check [consumable_and_assignable] %2 : $*MoveOnlyPair
   %3c = begin_access [modify] [static] %3 : $*MoveOnlyPair
   %3a = struct_element_addr %3c : $*MoveOnlyPair, #MoveOnlyPair.lhs
   %3b = struct_element_addr %3c : $*MoveOnlyPair, #MoveOnlyPair.rhs

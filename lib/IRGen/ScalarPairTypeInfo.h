@@ -98,7 +98,7 @@ public:
   }
 
   void assign(IRGenFunction &IGF, Explosion &e, Address address,
-              bool isOutlined) const override {
+              bool isOutlined, SILType T) const override {
     // Store the function pointer.
     Address firstAddr = projectFirstElement(IGF, address);
     asDerived().emitAssignFirstElement(IGF, e.claimNext(), firstAddr);
@@ -128,7 +128,7 @@ public:
   }
 
   void consume(IRGenFunction &IGF, Explosion &src,
-               Atomicity atomicity) const override {
+               Atomicity atomicity, SILType T) const override {
     auto first = src.claimNext();
     asDerived().emitReleaseFirstElement(IGF, first, atomicity);
 

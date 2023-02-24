@@ -535,11 +535,13 @@ bb0(%0 : @guaranteed $T):
   try_apply %8<T>(%7) : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <τ_0_0, τ_0_0>) -> (@owned AnyObject, @error Error), normal bb1, error bb2
 
 bb1(%10 : @owned $AnyObject):
+  destroy_value %7 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
   destroy_value %6 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
   destroy_value %5 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
   return %10 : $AnyObject
 
 bb2(%14 : @owned $Error):
+  destroy_value %7 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
   destroy_value %6 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
   unreachable
 }

@@ -78,7 +78,7 @@ private func tryDevirtualizeReleaseOfObject(
   // Check if the release instruction right before the `dealloc_stack_ref` really releases
   // the allocated object (and not something else).
   var finder = FindAllocationOfRelease(allocation: allocRefInstruction)
-  if !finder.allocationIsRoot(of: release.operand) {
+  if !finder.allocationIsRoot(of: release.operand.value) {
     return
   }
 

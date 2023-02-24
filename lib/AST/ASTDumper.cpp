@@ -1321,7 +1321,7 @@ namespace {
 
     void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
       printCommon(MED, "macro_expansion_decl ");
-      OS << MED->getMacro();
+      OS << MED->getMacroName();
       if (MED->getArgs()) {
         OS << '\n';
         OS.indent(Indent + 2);
@@ -2983,6 +2983,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+    printCommon(E, "single_value_stmt_expr");
+    OS << '\n';
+    printRec(E->getStmt(), E->getDeclContext()->getASTContext());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitOneWayExpr(OneWayExpr *E) {
     printCommon(E, "one_way_expr");
     OS << '\n';
@@ -3006,8 +3013,18 @@ public:
   void visitTypeJoinExpr(TypeJoinExpr *E) {
     printCommon(E, "type_join_expr");
 
-    PrintWithColorRAII(OS, DeclColor) << " var=";
-    printRec(E->getVar());
+    if (auto *var = E->getVar()) {
+      PrintWithColorRAII(OS, DeclColor) << " var=";
+      printRec(var);
+      OS << '\n';
+    }
+
+    if (auto *SVE = E->getSingleValueStmtExpr()) {
+      PrintWithColorRAII(OS, ExprColor) << "single_value_stmt_expr=";
+      printRec(SVE);
+      OS << '\n';
+    }
+
     OS << '\n';
 
     for (auto *member : E->getElements()) {
@@ -3194,8 +3211,8 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitPackReferenceTypeRepr(PackReferenceTypeRepr *T) {
-    printCommon("pack_reference");
+  void visitPackElementTypeRepr(PackElementTypeRepr *T) {
+    printCommon("pack_element");
     printRec(T->getPackType());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -3766,8 +3783,10 @@ namespace {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec("dependent_member_type", DMT);
-      } else {
+      } else if (originator.is<PlaceholderTypeRepr *>()) {
         printFlag("placeholder_type_repr");
+      } else {
+        assert(false && "unknown originator");
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

@@ -57,7 +57,7 @@ sil [ossa] @unknown_function : $@convention(thin) (@owned X) -> ()
 sil [ossa] @unknown_function_y : $@convention(thin) (@owned Y) -> ()
 
 // CHECK-LABEL: sil [ossa] @test_basic
-// CHECK-NEXT:  [%1: escape v** => %3.v**]
+// CHECK-NEXT:  [%1: escape v** -> %3.v**]
 // CHECK-NEXT:  [%2: noescape, escape c*.v** -> %r.v**]
 // CHECK-NEXT:  [%3: noescape]
 // CHECK-NEXT:  {{^[^[]}}
@@ -197,11 +197,11 @@ bb0(%0 : @guaranteed $Z, %1 : @owned $Y):
 }
 
 sil [ossa] @self_arg_callee : $@convention(thin) (@inout Str) -> () {
-[%0: escape v** => %0.v**] 
+[%0: escape v** -> %0.v**] 
 }
 
 // CHECK-LABEL: sil [ossa] @test_self_arg_escape
-// CHECK-NEXT:  [%0: escape v** => %0.v**]
+// CHECK-NEXT:  [%0: escape v** -> %0.v**]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_self_arg_escape : $@convention(thin) (@inout Str) -> () {
 bb0(%0 : $*Str):
@@ -212,7 +212,7 @@ bb0(%0 : $*Str):
 }
 
 // CHECK-LABEL: sil [ossa] @test_self_arg_escape_with_copy
-// CHECK-NEXT:  [%0: escape v** => %0.s1.0.v**]
+// CHECK-NEXT:  [%0: escape v** -> %0.s1.0.v**]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_self_arg_escape_with_copy : $@convention(thin) (@inout Str) -> () {
 bb0(%0 : $*Str):
@@ -225,7 +225,7 @@ bb0(%0 : $*Str):
 }
 
 // CHECK-LABEL: sil [ossa] @test_self_arg_escape_with_bidirectional_copy
-// CHECK-NEXT:  [%0: escape v** => %0.v**]
+// CHECK-NEXT:  [%0: escape v** -> %0.v**]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_self_arg_escape_with_bidirectional_copy : $@convention(thin) (@inout Str) -> () {
 bb0(%0 : $*Str):
@@ -240,7 +240,7 @@ bb0(%0 : $*Str):
 
 // CHECK-LABEL: sil [ossa] @test_content_to_arg_addr
 // CHECK-NEXT:  [%0: noescape **]
-// CHECK-NEXT:  [%1: noescape, escape c*.v** => %0.v**]
+// CHECK-NEXT:  [%1: noescape, escape c*.v** -> %0.v**]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_content_to_arg_addr : $@convention(thin) (@guaranteed Y) -> @out Str {
 bb0(%0 : $*Str, %1 : @guaranteed $Y):
@@ -331,7 +331,7 @@ bb0(%0 : $*Z, %1 : $Y):
 }
 
 // CHECK-LABEL: sil @store_to_content
-// CHECK-NEXT:  [%0: escape => %r, escape c*.v** => %r.c*.v**]
+// CHECK-NEXT:  [%0: escape => %r, escape c*.v** -> %r.c*.v**]
 // CHECK-NEXT:  {{^[^[]}}
 sil @store_to_content : $@convention(thin) (@owned Z, @guaranteed Y) -> @owned Z {
 bb0(%0 : $Z, %1 : $Y):
@@ -372,3 +372,15 @@ bb0(%0 : $*Z, %1 : $Y):
   %5 = tuple ()
   return %5 : $()
 }
+
+// CHECK-LABEL: sil @store_to_class_field
+// CHECK-NEXT:  [%0: escape v** -> %r.c0.v**, escape v**.c*.v** -> %r.c0.v**.c*.v**]
+// CHECK-NEXT:  {{^[^[]}}
+sil @store_to_class_field : $@convention(thin) (@in_guaranteed Str) -> @owned Y {
+bb0(%0 : $*Str):
+  %1 = alloc_ref $Y
+  %2 = ref_element_addr %1 : $Y, #Y.s
+  copy_addr %0 to [init] %2 : $*Str
+  return %1 : $Y
+}
+

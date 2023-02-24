@@ -343,6 +343,7 @@ public:
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
+  void appendAnyDecl(const ValueDecl *Decl);
   std::string mangleAnyDecl(const ValueDecl *Decl, bool prefix,
                             bool respectOriginallyDefinedIn = false);
   std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
@@ -368,9 +369,12 @@ public:
 
   std::string mangleMacroExpansion(const MacroExpansionExpr *expansion);
   std::string mangleMacroExpansion(const MacroExpansionDecl *expansion);
+  std::string mangleAttachedMacroExpansion(
+      const Decl *decl, CustomAttr *attr, MacroRole role);
+
   void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC);
   void appendMacroExpansionOperator(
-      StringRef macroName, unsigned discriminator);
+      StringRef macroName, MacroRole role, unsigned discriminator);
 
   enum SpecialContext {
     ObjCContext,

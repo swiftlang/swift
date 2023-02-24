@@ -3898,13 +3898,13 @@ namespace {
                                ClassDecl *forClass) {
       switch (requirement.getKind()) {
       case GenericRequirement::Kind::Shape:
-        B.addInt(IGM.SizeTy, 0);
+        B.addInt(cast<llvm::IntegerType>(requirement.getType(IGM)), 0);
         break;
       case GenericRequirement::Kind::Metadata:
-        B.addNullPointer(IGM.TypeMetadataPtrTy);
-        break;
       case GenericRequirement::Kind::WitnessTable:
-        B.addNullPointer(IGM.WitnessTablePtrTy);
+      case GenericRequirement::Kind::MetadataPack:
+      case GenericRequirement::Kind::WitnessTablePack:
+        B.addNullPointer(cast<llvm::PointerType>(requirement.getType(IGM)));
         break;
       }
     }
@@ -5875,7 +5875,10 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::DistributedTargetInvocationDecoder:
   case KnownProtocolKind::DistributedTargetInvocationResultHandler:
   case KnownProtocolKind::CxxConvertibleToCollection:
+  case KnownProtocolKind::CxxDictionary:
+  case KnownProtocolKind::CxxPair:
   case KnownProtocolKind::CxxRandomAccessCollection:
+  case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
@@ -5884,6 +5887,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:
   case KnownProtocolKind::GlobalActor:
+  case KnownProtocolKind::Copyable:
     return SpecialProtocol::None;
   }
 

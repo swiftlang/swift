@@ -1658,7 +1658,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     if (!skipCustomName) {
       result.info.hasCustomName = true;
-      result.declName = parsedName.formDeclName(swiftCtx);
+      result.declName = parsedName.formDeclName(
+          swiftCtx, /*isSubscript=*/false,
+          isa<clang::ClassTemplateSpecializationDecl>(D));
 
       // Handle globals treated as members.
       if (parsedName.isMember()) {
@@ -1713,7 +1715,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
             // Update the name to reflect the new parameter labels.
             result.declName = formDeclName(
                 swiftCtx, parsedName.BaseName, parsedName.ArgumentLabels,
-                /*isFunction=*/true, isInitializer);
+                /*isFunction=*/true, isInitializer, /*isSubscript=*/false,
+                isa<clang::ClassTemplateSpecializationDecl>(D));
           } else if (nameAttr->isAsync) {
             // The custom name was for an async import, but we didn't in fact
             // import as async for some reason. Ignore this import.
@@ -2173,30 +2176,64 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   if (auto classTemplateSpecDecl =
           dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
+    /// Symbolic specializations get imported as the symbolic class template
+    /// type.
+    if (importSymbolicCXXDecls)
+      return importNameImpl(classTemplateSpecDecl->getSpecializedTemplate(),
+                            version, givenName);
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
-
-      auto &astContext = classTemplateSpecDecl->getASTContext();
-      // Itanium mangler produces valid Swift identifiers, use it to generate a name for
-      // this instantiation.
-      std::unique_ptr<clang::MangleContext> mangler{
-          clang::ItaniumMangleContext::create(astContext,
-                                              astContext.getDiagnostics())};
+      // When constructing the name of a C++ template, don't expand all the
+      // template, only expand one layer. Here we want to prioritize
+      // readability over total completeness.
       llvm::SmallString<128> storage;
       llvm::raw_svector_ostream buffer(storage);
-      mangler->mangleTypeName(astContext.getRecordType(classTemplateSpecDecl),
-                              buffer);
+      D->printName(buffer);
+      buffer << "<";
+      llvm::interleaveComma(classTemplateSpecDecl->getTemplateArgs().asArray(),
+                            buffer,
+                            [&buffer, this, version](const clang::TemplateArgument& arg) {
+        // Use import name here so builtin types such as "int" map to their
+        // Swift equivalent ("Int32").
+        if (arg.getKind() == clang::TemplateArgument::Type) {
+          auto ty = arg.getAsType().getTypePtr();
+          if (auto builtin = dyn_cast<clang::BuiltinType>(ty)) {
+            auto &ctx = swiftCtx;
+            Type swiftType = nullptr;
+            switch (builtin->getKind()) {
+            case clang::BuiltinType::Void:
+              swiftType = ctx.getNamedSwiftType(ctx.getStdlibModule(), "Void");
+              break;
+      #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)            \
+            case clang::BuiltinType::CLANG_BUILTIN_KIND:                       \
+              swiftType = ctx.getNamedSwiftType(ctx.getStdlibModule(),         \
+                                                #SWIFT_TYPE_NAME);             \
+              break;
+      #define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)      \
+            case clang::BuiltinType::CLANG_BUILTIN_KIND:                       \
+              swiftType = ctx.getNamedSwiftType(ctx.getStdlibModule(),         \
+                                                #SWIFT_TYPE_NAME);             \
+              break;
+      #include "swift/ClangImporter/BuiltinMappedTypes.def"
+              default:
+                break;
+            }
+            
+            if (swiftType) {
+              if (auto nominal = dyn_cast<NominalType>(swiftType->getCanonicalType())) {
+                buffer << nominal->getDecl()->getNameStr();
+                return;
+              }
+            }
+          } else if (auto namedArg = dyn_cast_or_null<clang::NamedDecl>(ty->getAsTagDecl())) {
+            importNameImpl(namedArg, version, clang::DeclarationName()).getDeclName().print(buffer);
+            return;
+          }
+        }
+        buffer << "_";
+      });
+      buffer << ">";
 
-      // The Itanium mangler does not provide a way to get the mangled
-      // representation of a type. Instead, we call mangleTypeName() that
-      // returns the name of the RTTI typeinfo symbol, and remove the _ZTS
-      // prefix. Then we prepend __CxxTemplateInst to reduce chances of conflict
-      // with regular C and C++ structs.
-      llvm::SmallString<128> mangledNameStorage;
-      llvm::raw_svector_ostream mangledName(mangledNameStorage);
-      assert(buffer.str().take_front(4) == "_ZTS");
-      mangledName << CXX_TEMPLATE_INST_PREFIX << buffer.str().drop_front(4);
-
-      baseName = swiftCtx.getIdentifier(mangledName.str()).get();
+      baseName = swiftCtx.getIdentifier(buffer.str()).get();
     }
   }
 
@@ -2322,7 +2359,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   baseName = renameUnsafeMethod(swiftCtx, D, baseName);
 
   result.declName = formDeclName(swiftCtx, baseName, argumentNames, isFunction,
-                                 isInitializer);
+                                 isInitializer, /*isSubscript=*/false,
+                                 isa<clang::ClassTemplateSpecializationDecl>(D));
   return result;
 }
 

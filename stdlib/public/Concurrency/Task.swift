@@ -287,10 +287,10 @@ extension Task where Success == Never, Failure == Never {
   /// If the system can't provide a priority,
   /// this property's value is `Priority.default`.
   public static var currentPriority: TaskPriority {
-    withUnsafeCurrentTask { task in
+    withUnsafeCurrentTask { unsafeTask in
       // If we are running on behalf of a task, use that task's priority.
-      if let unsafeTask = task {
-         return TaskPriority(rawValue: _taskCurrentPriority(unsafeTask._task))
+      if let unsafeTask {
+         return unsafeTask.priority
       }
 
       // Otherwise, query the system.
@@ -311,6 +311,7 @@ extension Task where Success == Never, Failure == Never {
       return nil
     }
   }
+
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -820,6 +821,15 @@ public struct UnsafeCurrentTask {
     TaskPriority(rawValue: _taskCurrentPriority(_task))
   }
 
+  /// The current task's base priority.
+  ///
+  /// - SeeAlso: `TaskPriority`
+  /// - SeeAlso: `Task.basePriority`
+  @available(SwiftStdlib 5.9, *)
+  public var basePriority: TaskPriority {
+    TaskPriority(rawValue: _taskBasePriority(_task))
+  }
+
   /// Cancel the current task.
   public func cancel() {
     _taskCancel(_task)
@@ -1008,8 +1018,8 @@ extension Task where Failure == Error {
   public static func runInline(_ body: () async throws -> Success) rethrows -> Success {
     return try _runInlineHelper(
       body: {
-        do { 
-          let value = try await body() 
+        do {
+          let value = try await body()
           return Result.success(value)
         }
         catch let error {

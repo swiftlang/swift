@@ -318,6 +318,9 @@ struct PrintOptions {
   /// Suppress emitting @available(*, noasync)
   bool SuppressNoAsyncAvailabilityAttr = false;
 
+  /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
+  bool PrintFactoryInitializerComment = true;
+
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.

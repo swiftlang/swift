@@ -17,6 +17,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
@@ -76,6 +77,11 @@ bool Parser::isStartOfStmt() {
   case tok::kw_try: {
     // "try" cannot actually start any statements, but we parse it there for
     // better recovery in cases like 'try return'.
+
+    // For 'if' and 'switch' we can parse as an expression.
+    if (peekToken().isAny(tok::kw_if, tok::kw_switch)) {
+      return false;
+    }
     Parser::BacktrackingScope backtrack(*this);
     consumeToken(tok::kw_try);
     return isStartOfStmt();
@@ -141,8 +147,26 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
 
   if (isStartOfStmt()) {
     ParserResult<Stmt> Res = parseStmt();
-    if (Res.isNonNull())
-      Result = Res.get();
+    if (Res.isNonNull()) {
+      auto *S = Res.get();
+
+      // Special case: An 'if' or 'switch' statement followed by an 'as' must
+      // be an if/switch expression in a coercion.
+      // We could also achieve this by more eagerly attempting to parse an 'if'
+      // or 'switch' as an expression when in statement position, but that
+      // could result in less useful recovery behavior.
+      if ((isa<IfStmt>(S) || isa<SwitchStmt>(S)) && Tok.is(tok::kw_as)) {
+        auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
+            Context, S, CurDeclContext, /*mustBeExpr*/ true);
+        auto As = parseExprAs();
+        if (As.isParseErrorOrHasCompletion())
+          return As;
+
+        Result = SequenceExpr::create(Context, {SVE, As.get(), As.get()});
+      } else {
+        Result = S;
+      }
+    }
     return Res;
   }
 
@@ -276,7 +300,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind ConditionalBlockKind,
                                      bool &IsFollowingGuard) {
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
-                    (Kind == BraceItemListKind::TopLevelLibrary);
+                    (Kind == BraceItemListKind::TopLevelLibrary ||
+                    (Kind == BraceItemListKind::MacroExpansion &&
+                     isa<FileUnit>(CurDeclContext)));
   bool isActiveConditionalBlock =
     ConditionalBlockKind == BraceItemListKind::ActiveConditionalBlock;
   bool isConditionalBlock = isActiveConditionalBlock ||
@@ -304,7 +330,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // Eat invalid tokens instead of allowing them to produce downstream errors.
     if (Tok.is(tok::unknown)) {
-      if (Tok.getText().startswith("\"\"\"")) {
+      if (startsWithMultilineStringDelimiter(Tok)) {
         // This was due to unterminated multi-line string.
         IsInputIncomplete = true;
       }
@@ -730,13 +756,26 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
     return Result;
   }
 
+  auto isStartOfReturnExpr = [&]() {
+    if (Tok.isAny(tok::r_brace, tok::semi, tok::eof, tok::pound_if,
+                  tok::pound_error, tok::pound_warning, tok::pound_endif,
+                  tok::pound_else, tok::pound_elseif)) {
+      return false;
+    }
+    // Allowed for if/switch expressions.
+    if (Tok.isAny(tok::kw_if, tok::kw_switch)) {
+      return true;
+    }
+    if (isStartOfStmt() || isStartOfSwiftDecl())
+      return false;
+
+    return true;
+  };
+
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a '}', ';', statement or decl start keyword sequence.
-  if (Tok.isNot(tok::r_brace, tok::semi, tok::eof, tok::pound_if, 
-                tok::pound_error, tok::pound_warning, tok::pound_endif,
-                tok::pound_else, tok::pound_elseif) &&
-      !isStartOfStmt() && !isStartOfSwiftDecl()) {
+  if (isStartOfReturnExpr()) {
     SourceLoc ExprLoc = Tok.getLoc();
 
     // Issue a warning when the returned expression is on a different line than

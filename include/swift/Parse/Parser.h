@@ -50,6 +50,7 @@ namespace swift {
   class RequirementRepr;
   class SILParserStateBase;
   class ScopeInfo;
+  class SingleValueStmtExpr;
   class SourceManager;
   class TupleType;
   class TypeLoc;
@@ -171,9 +172,7 @@ public:
 
   bool InPoundLineEnvironment = false;
   bool InPoundIfEnvironment = false;
-  /// Do not call \c addUnvalidatedDeclWithOpaqueResultType when in an inactive
-  /// clause because ASTScopes are not created in those contexts and lookups to
-  /// those decls will fail.
+  /// ASTScopes are not created in inactive clauses and lookups to decls will fail.
   bool InInactiveClauseEnvironment = false;
   bool InSwiftKeyPath = false;
 
@@ -745,6 +744,11 @@ public:
   /// Check whether the current token starts with '...'.
   bool startsWithEllipsis(Token Tok);
 
+  /// Check whether the current token starts with a multi-line string delimiter.
+  bool startsWithMultilineStringDelimiter(Token Tok) {
+    return Tok.getText().ltrim('#').startswith("\"\"\"");
+  }
+
   /// Returns true if token is an identifier with the given value.
   bool isIdentifier(Token Tok, StringRef value) {
     return Tok.is(tok::identifier) && Tok.getText() == value;
@@ -1093,9 +1097,10 @@ public:
   ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
                                                       SourceLoc Loc);
 
-  /// Parse the @_backDeploy attribute.
-  bool parseBackDeployAttribute(DeclAttributes &Attributes, StringRef AttrName,
-                                SourceLoc AtLoc, SourceLoc Loc);
+  /// Parse the @backDeployed attribute.
+  bool parseBackDeployedAttribute(DeclAttributes &Attributes,
+                                  StringRef AttrName, SourceLoc AtLoc,
+                                  SourceLoc Loc);
 
   /// Parse the @_documentation attribute.
   ParserResult<DocumentationAttr> parseDocumentationAttribute(SourceLoc AtLoc,
@@ -1994,10 +1999,12 @@ struct ParsedDeclName {
   }
 
   /// Form a declaration name from this parsed declaration name.
-  DeclName formDeclName(ASTContext &ctx, bool isSubscript = false) const;
+  DeclName formDeclName(ASTContext &ctx, bool isSubscript = false,
+                        bool isCxxClassTemplateSpec = false) const;
 
   /// Form a declaration name from this parsed declaration name.
-  DeclNameRef formDeclNameRef(ASTContext &ctx, bool isSubscript = false) const;
+  DeclNameRef formDeclNameRef(ASTContext &ctx, bool isSubscript = false,
+                              bool isCxxClassTemplateSpec = false) const;
 };
 
 /// To assist debugging parser crashes, tell us the location of the
@@ -2019,7 +2026,8 @@ DeclName formDeclName(ASTContext &ctx,
                       ArrayRef<StringRef> argumentLabels,
                       bool isFunctionName,
                       bool isInitializer,
-                      bool isSubscript = false);
+                      bool isSubscript = false,
+                      bool isCxxClassTemplateSpec = false);
 
 /// Form a Swift declaration name reference from its constituent parts.
 DeclNameRef formDeclNameRef(ASTContext &ctx,
@@ -2027,7 +2035,8 @@ DeclNameRef formDeclNameRef(ASTContext &ctx,
                             ArrayRef<StringRef> argumentLabels,
                             bool isFunctionName,
                             bool isInitializer,
-                            bool isSubscript = false);
+                            bool isSubscript = false,
+                            bool isCxxClassTemplateSpec = false);
 
 /// Whether a given token can be the start of a decl.
 bool isKeywordPossibleDeclStart(const Token &Tok);

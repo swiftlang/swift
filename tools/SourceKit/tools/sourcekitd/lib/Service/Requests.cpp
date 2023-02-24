@@ -2406,6 +2406,8 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
     }
   }
 
+  Elem.setBool(KeyReusingASTContext, Info.DidReuseAST);
+
   return Rec(RespBuilder.createResponse());
 }
 
@@ -3673,10 +3675,16 @@ createCategorizedEditsResponse(const RequestResult<ArrayRef<CategorizedEdits>> &
     auto Edits = Entry.setArray(KeyEdits);
     for(auto E: TheEdit.Edits) {
       auto Edit = Edits.appendDictionary();
+      if (!E.Path.empty()) {
+        Edit.set(KeyFilePath, E.Path);
+      }
       Edit.set(KeyLine, E.StartLine);
       Edit.set(KeyColumn, E.StartColumn);
       Edit.set(KeyEndLine, E.EndLine);
       Edit.set(KeyEndColumn, E.EndColumn);
+      if (!E.BufferName.empty()) {
+        Edit.set(KeyBufferName, E.BufferName);
+      }
       Edit.set(KeyText, E.NewText);
       if (!E.RegionsWithNote.empty()) {
         auto Notes = Edit.setArray(KeyRangesWorthNote);

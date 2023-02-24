@@ -605,6 +605,20 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
                                            /*useResolver=*/true);
   }
 
+  // Expand synthesized member macros.
+  auto &ctx = NTD->getASTContext();
+  (void)evaluateOrDefault(ctx.evaluator,
+                          ExpandSynthesizedMemberMacroRequest{NTD},
+                          false);
+
+  // Expand peer macros.
+  for (auto *member : NTD->getMembers()) {
+    (void)evaluateOrDefault(
+        ctx.evaluator,
+        ExpandPeerMacroRequest{member},
+        {});
+  }
+
   synthesizePropertyWrapperVariables(NTD);
 }
 

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file implements diagnostics for fragile functions, like those with
-// @inlinable, @_alwaysEmitIntoClient, or @_backDeploy.
+// @inlinable, @_alwaysEmitIntoClient, or @backDeployed.
 //
 //===----------------------------------------------------------------------===//
 

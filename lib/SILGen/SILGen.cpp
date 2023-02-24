@@ -1405,7 +1405,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
                            getFunction(thunk, ForDefinition));
   }
 
-  if (AFD->isBackDeployed()) {
+  if (AFD->isBackDeployed(M.getASTContext())) {
     // Emit the fallback function that will be used when the original function
     // is unavailable at runtime.
     auto fallback = SILDeclRef(AFD).asBackDeploymentKind(
@@ -1447,24 +1447,6 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   SILDeclRef constant(decl);
   DeclContext *declCtx = decl->getDeclContext();
-
-  // Make sure that default & memberwise initializers of $Storage
-  // in a type wrapped type are always emitted because they would
-  // later be used to initialize its `$storage` property.
-  if (auto *SD = declCtx->getSelfStructDecl()) {
-    auto &ctx = SD->getASTContext();
-    if (SD->getName() == ctx.Id_TypeWrapperStorage &&
-        (decl->isMemberwiseInitializer() ||
-         decl == SD->getDefaultInitializer())) {
-#ifndef NDEBUG
-      auto *wrapped = SD->getDeclContext()->getSelfNominalTypeDecl();
-      assert(wrapped->hasTypeWrapper());
-#endif
-
-      emitFunctionDefinition(constant, getFunction(constant, ForDefinition));
-      return;
-    }
-  }
 
   if (declCtx->getSelfClassDecl()) {
     // Designated initializers for classes, as well as @objc convenience
@@ -2206,6 +2188,13 @@ public:
 
     SourceFileScope scope(SGM, sf);
     for (auto *D : sf->getTopLevelDecls()) {
+      // Emit auxiliary decls.
+      D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
+        FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
+                                        "SILgen-decl", auxiliaryDecl);
+        SGM.visit(auxiliaryDecl);
+      });
+
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                       "SILgen-decl", D);
       SGM.visit(D);

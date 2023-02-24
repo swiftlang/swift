@@ -1,4 +1,0 @@
-module _SwiftRuntimeShims {
-  umbrella "../../../SwiftShims/swift/shims/_SwiftRuntimeShims"
-  export *
-}

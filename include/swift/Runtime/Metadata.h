@@ -354,10 +354,13 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
                       const Metadata *type,
                       const void * const *instantiationArgs);
 
-const WitnessTable *
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+SWIFT_RUNTIME_EXPORT
+const RelativeWitnessTable *
 swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *conformance,
                       const Metadata *type,
                       const void * const *instantiationArgs);
+#endif
 
 /// Retrieve an associated type witness from the given witness table.
 ///
@@ -374,14 +377,15 @@ MetadataResponse swift_getAssociatedTypeWitness(
                                           const Metadata *conformingType,
                                           const ProtocolRequirement *reqBase,
                                           const ProtocolRequirement *assocType);
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_getAssociatedTypeWitnessRelative(
                                           MetadataRequest request,
-                                          WitnessTable *wtable,
+                                          RelativeWitnessTable *wtable,
                                           const Metadata *conformingType,
                                           const ProtocolRequirement *reqBase,
                                           const ProtocolRequirement *assocType);
-
+#endif
 /// Retrieve an associated conformance witness table from the given witness
 /// table.
 ///
@@ -400,13 +404,15 @@ const WitnessTable *swift_getAssociatedConformanceWitness(
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
 
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
-const WitnessTable *swift_getAssociatedConformanceWitnessRelative(
-                                  WitnessTable *wtable,
+const RelativeWitnessTable *swift_getAssociatedConformanceWitnessRelative(
+                                  RelativeWitnessTable *wtable,
                                   const Metadata *conformingType,
                                   const Metadata *assocType,
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
+#endif
 
 /// Determine whether two protocol conformance descriptors describe the same
 /// conformance of a type to a protocol.
@@ -872,6 +878,11 @@ const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_INTERNAL MetadataResponse
 getSuperclassMetadata(MetadataRequest request, const ClassMetadata *self);
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+bool _swift_class_isSubclass(const Metadata *subclass,
+                             const Metadata *superclass);
 
 #if !NDEBUG
 /// Verify that the given metadata pointer correctly roundtrips its

@@ -356,6 +356,11 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
            SILFunctionType::Representation::Thick))
     return SILValue();
 
+  // Look through copies.
+  if (auto copy = dyn_cast<CopyValueInst>(Arg)) {
+    Arg = copy->getOperand();
+  }
+
   return Arg;
 }
 
@@ -382,6 +387,18 @@ static RuntimeEffect metadataEffect(SILType ty) {
 }
 
 RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType) {
+  auto ifNonTrivial = [&](SILType type, RuntimeEffect effect) -> RuntimeEffect {
+    // Nonescaping closures are modeled with ownership to track borrows, but
+    // copying and destroying them has no actual runtime effect since they
+    // are trivial after lowering.
+    if (auto sft = type.getAs<SILFunctionType>()) {
+      if (sft->isTrivialNoEscape()) {
+        return RuntimeEffect::NoEffect;
+      }
+    }
+    return effect;
+  };
+
   switch (inst->getKind()) {
   case SILInstructionKind::TailAddrInst:
   case SILInstructionKind::IndexRawPointerInst:
@@ -464,6 +481,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocStackRefInst:
+  case SILInstructionKind::DeallocPackInst:
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:
@@ -489,6 +507,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::DynamicPackIndexInst:
   case SILInstructionKind::PackPackIndexInst:
   case SILInstructionKind::ScalarPackIndexInst:
+  case SILInstructionKind::PackElementGetInst:
+  case SILInstructionKind::PackElementSetInst:
+  case SILInstructionKind::PackLengthInst:
+  case SILInstructionKind::DebugStepInst:
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::DebugValueInst:
@@ -508,6 +530,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::KeyPathInst:
     return RuntimeEffect::Allocating | RuntimeEffect::Releasing |
            RuntimeEffect::MetaData;
+
+  case SILInstructionKind::TuplePackElementAddrInst:
+    return RuntimeEffect::MetaData;
 
   case SILInstructionKind::SwitchEnumAddrInst:
   case SILInstructionKind::InjectEnumAddrInst:
@@ -600,6 +625,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::Casting | metadataEffect(impactType) |
       metadataEffect(cast<CheckedCastBranchInst>(inst)->getTargetLoweredType());
+
+  case SILInstructionKind::AllocPackInst:
+    // Just conservatively assume this has metadata impact.
+    return RuntimeEffect::MetaData;
 
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::ProjectBoxInst:
@@ -731,7 +760,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
-    return RuntimeEffect::RefCounting;
+    return ifNonTrivial(inst->getOperand(0)->getType(),
+                        RuntimeEffect::RefCounting);
 
   case SILInstructionKind::InitBlockStorageHeaderInst:
     return RuntimeEffect::Releasing;
@@ -745,7 +775,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     if (impactType.isBlockPointerCompatible())
       return RuntimeEffect::ObjectiveC | RuntimeEffect::Releasing;
-    return RuntimeEffect::Releasing;
+    return ifNonTrivial(inst->getOperand(0)->getType(),
+                        RuntimeEffect::Releasing);
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   case SILInstructionKind::StrongRetain##Name##Inst:                           \

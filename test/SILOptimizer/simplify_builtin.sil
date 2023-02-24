@@ -1,0 +1,249 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=EARLY
+// RUN: %target-sil-opt -enable-sil-verify-all %s -late-onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=LATE
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+struct S1<T> {
+}
+
+struct S2<T> {
+}
+
+enum E1<T> {
+}
+
+enum E2<T> {
+}
+
+class C1<T> {
+}
+
+class C2<T> : C1<T> {
+}
+
+// CHECK-LABEL: sil @isConcrete_true
+// CHECK:       bb0(%0 : $@thin Int.Type):
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'isConcrete_true'
+sil @isConcrete_true : $@convention(thin) (@thin Int.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin Int.Type):
+  %1 = builtin "isConcrete"(%0 : $@thin Int.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @isConcrete_false
+// CHECK:       bb0(%0 : $@thin T.Type):
+// CHECK-EARLY:   [[R:%.*]] = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
+// CHECK-LATE:    [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'isConcrete_false'
+sil @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin T.Type):
+  %1 = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_same_operand
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_same_operand'
+sil @same_metatype_same_operand : $@convention(thin) <T> (@thick T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type):
+  %1 = init_existential_metatype %0 : $@thick T.Type, $@thick Any.Type
+  %3 = builtin "is_same_metatype"(%1 : $@thick Any.Type, %1 : $@thick Any.Type) : $Builtin.Int1
+  return %3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_int_and_T
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_int_and_T'
+sil @unknown_same_metatype_int_and_T : $@convention(thin) <T> (@thick T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type):
+  %1 = metatype $@thick T.Type
+  %2 = metatype $@thick Int.Type
+  %3 = init_existential_metatype %1 : $@thick T.Type, $@thick Any.Type
+  %4 = init_existential_metatype %2 : $@thick Int.Type, $@thick Any.Type
+  %5 = builtin "is_same_metatype"(%3 : $@thick Any.Type, %4 : $@thick Any.Type) : $Builtin.Int1
+  return %5 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_same_struct_different_T
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_same_struct_different_T'
+sil @unknown_same_metatype_same_struct_different_T : $@convention(thin) <T, U> (@thick T.Type, @thick U.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type, %1 : $@thick U.Type):
+  %2 = metatype $@thick S1<T>.Type
+  %3 = metatype $@thick S1<U>.Type
+  %4 = init_existential_metatype %2 : $@thick S1<T>.Type, $@thick Any.Type
+  %5 = init_existential_metatype %3 : $@thick S1<U>.Type, $@thick Any.Type
+  %6 = builtin "is_same_metatype"(%4 : $@thick Any.Type, %5 : $@thick Any.Type) : $Builtin.Int1
+  return %6 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_same_type
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'same_metatype_same_type'
+sil @same_metatype_same_type : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick S1<Int>.Type
+  %1 = metatype $@thick S1<Int>.Type
+  %2 = init_existential_metatype %0 : $@thick S1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick S1<Int>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_different_struct_arg
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'same_metatype_different_struct_arg'
+sil @same_metatype_different_struct_arg : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick S1<Int>.Type
+  %1 = metatype $@thick S1<Float>.Type
+  %2 = init_existential_metatype %0 : $@thick S1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick S1<Float>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_same_tuple
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'same_metatype_same_tuple'
+sil @same_metatype_same_tuple : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick (Int, Float).Type
+  %1 = metatype $@thick (Int, Float).Type
+  %2 = init_existential_metatype %0 : $@thick (Int, Float).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick (Int, Float).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_different_tuple
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'same_metatype_different_tuple'
+sil @same_metatype_different_tuple : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick (Int, Float).Type
+  %1 = metatype $@thick (Int, Int).Type
+  %2 = init_existential_metatype %0 : $@thick (Int, Float).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick (Int, Int).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_different_struct
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_different_struct'
+sil @same_metatype_different_struct : $@convention(thin) (@thick S1<Int>.Type, @thick S2<Int>.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick S1<Int>.Type, %1 : $@thick S2<Int>.Type):
+  %2 = init_existential_metatype %0 : $@thick S1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick S2<Int>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_same_enum_different_T
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_same_enum_different_T'
+sil @unknown_same_metatype_same_enum_different_T : $@convention(thin) <T, U> (@thick T.Type, @thick U.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type, %1 : $@thick U.Type):
+  %2 = metatype $@thick E1<T>.Type
+  %3 = metatype $@thick E1<U>.Type
+  %4 = init_existential_metatype %2 : $@thick E1<T>.Type, $@thick Any.Type
+  %5 = init_existential_metatype %3 : $@thick E1<U>.Type, $@thick Any.Type
+  %6 = builtin "is_same_metatype"(%4 : $@thick Any.Type, %5 : $@thick Any.Type) : $Builtin.Int1
+  return %6 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_different_enum
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_different_enum'
+sil @same_metatype_different_enum : $@convention(thin) (@thick E1<Int>.Type, @thick E2<Int>.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick E1<Int>.Type, %1 : $@thick E2<Int>.Type):
+  %2 = init_existential_metatype %0 : $@thick E1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick E2<Int>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_same_class_different_T
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_same_class_different_T'
+sil @unknown_same_metatype_same_class_different_T : $@convention(thin) <T, U> (@thick T.Type, @thick U.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type, %1 : $@thick U.Type):
+  %2 = metatype $@thick C1<T>.Type
+  %3 = metatype $@thick C1<U>.Type
+  %4 = init_existential_metatype %2 : $@thick C1<T>.Type, $@thick Any.Type
+  %5 = init_existential_metatype %3 : $@thick C1<U>.Type, $@thick Any.Type
+  %6 = builtin "is_same_metatype"(%4 : $@thick Any.Type, %5 : $@thick Any.Type) : $Builtin.Int1
+  return %6 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_different_class
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_different_class'
+sil @unknown_same_metatype_different_class : $@convention(thin) (@thick C1<Int>.Type, @thick C2<Int>.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick C1<Int>.Type, %1 : $@thick C2<Int>.Type):
+  %2 = init_existential_metatype %0 : $@thick C1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick C2<Int>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_different_concrete_class
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_different_concrete_class'
+sil @same_metatype_different_concrete_class : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick C1<Int>.Type
+  %1 = metatype $@thick C2<Int>.Type
+  %2 = init_existential_metatype %0 : $@thick C1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick C2<Int>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_function_metatype
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_function_metatype'
+sil @same_function_metatype : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int) -> Bool).Type
+  %1 = metatype $@thick ((Int) -> Bool).Type
+  %2 = init_existential_metatype %0 : $@thick ((Int) -> Bool).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick ((Int) -> Bool).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @different_function_metatype
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'different_function_metatype'
+sil @different_function_metatype : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int) -> Bool).Type
+  %1 = metatype $@thick ((Float) -> Bool).Type
+  %2 = init_existential_metatype %0 : $@thick ((Int) -> Bool).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick ((Float) -> Bool).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}

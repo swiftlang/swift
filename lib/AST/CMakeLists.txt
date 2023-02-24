@@ -72,6 +72,7 @@ add_swift_host_library(swiftAST STATIC
   Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
+  PluginRegistry.cpp
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   ProtocolConformanceRef.cpp
@@ -116,7 +117,6 @@ add_swift_host_library(swiftAST STATIC
   TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeWalker.cpp
-  TypeWrapper.cpp
   UnqualifiedLookup.cpp
   USRGeneration.cpp
 

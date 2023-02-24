@@ -68,6 +68,8 @@
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/TaggedUnion.h"
+#include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -467,15 +469,15 @@ struct ShrinkBorrowScopeTest : UnitTest {
 // Dumps:
 // - function
 // - the adjacent phis
-struct VisitAdjacentReborrowsOfPhiTest : UnitTest {
-  VisitAdjacentReborrowsOfPhiTest(UnitTestRunner *pass) : UnitTest(pass) {}
+struct VisitInnerAdjacentPhisTest : UnitTest {
+  VisitInnerAdjacentPhisTest(UnitTestRunner *pass) : UnitTest(pass) {}
   void invoke(Arguments &arguments) override {
     getFunction()->dump();
-    visitAdjacentReborrowsOfPhi(cast<SILPhiArgument>(arguments.takeValue()),
-                                [](auto *argument) -> bool {
-                                  argument->dump();
-                                  return true;
-                                });
+    visitInnerAdjacentPhis(cast<SILPhiArgument>(arguments.takeValue()),
+                           [](auto *argument) -> bool {
+                             argument->dump();
+                             return true;
+                           });
   }
 };
 
@@ -510,6 +512,77 @@ struct FindBorrowIntroducers : UnitTest {
       def->dump();
       return true;
     });
+  }
+};
+
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the computed pruned liveness
+// - the liveness boundary
+struct LinearLivenessTest : UnitTest {
+  LinearLivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    SILValue value = arguments.takeValue();
+    getFunction()->dump();
+    llvm::dbgs() << "Linear liveness: " << value;
+    LinearLiveness liveness(value);
+    liveness.compute();
+    liveness.print(llvm::outs());
+
+    PrunedLivenessBoundary boundary;
+    liveness.getLiveness().computeBoundary(boundary);
+    boundary.print(llvm::outs());
+  }
+};
+
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the computed pruned liveness
+// - the liveness boundary
+struct InteriorLivenessTest : UnitTest {
+  InteriorLivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    SILValue value = arguments.takeValue();
+    getFunction()->dump();
+    llvm::dbgs() << "Interior liveness: " << value;
+    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+    DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
+    InteriorLiveness liveness(value);
+    auto handleInnerScope = [](SILValue innerBorrow) {
+      llvm::outs() << "Inner scope: " << innerBorrow;
+    };
+    liveness.compute(domTree, handleInnerScope);
+    liveness.print(llvm::outs());
+
+    PrunedLivenessBoundary boundary;
+    liveness.getLiveness().computeBoundary(boundary);
+    boundary.print(llvm::outs());
+  }
+};
+
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+// - the computed pruned liveness
+// - the liveness boundary
+struct ExtendedLinearLivenessTest : UnitTest {
+  ExtendedLinearLivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    SILValue value = arguments.takeValue();
+    getFunction()->dump();
+    llvm::dbgs() << "Extended liveness: " << value;
+    ExtendedLinearLiveness liveness(value);
+    liveness.compute();
+    liveness.print(llvm::outs());
+
+    PrunedLivenessBoundary boundary;
+    liveness.getLiveness().computeBoundary(boundary);
+    boundary.print(llvm::outs());
   }
 };
 
@@ -621,6 +694,44 @@ struct SimplifyCFGTryJumpThreading : UnitTest {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// MARK: AccessPath Unit Tests
+//===----------------------------------------------------------------------===//
+
+struct AccessUseTestVisitor : public AccessUseVisitor {
+  AccessUseTestVisitor()
+    : AccessUseVisitor(AccessUseType::Overlapping,
+                       NestedAccessType::IgnoreAccessBegin) {}
+
+  bool visitUse(Operand *op, AccessUseType useTy) override {
+    switch (useTy) {
+    case AccessUseType::Exact:
+      llvm::errs() << "Exact Use: ";
+      break;
+    case AccessUseType::Inner:
+      llvm::errs() << "Inner Use: ";
+      break;
+    case AccessUseType::Overlapping:
+      llvm::errs() << "Overlapping Use ";
+      break;
+    }
+    llvm::errs() << *op->getUser();
+    return true;
+  }
+};
+
+struct AccessPathBaseTest : UnitTest {
+  AccessPathBaseTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto value = arguments.takeValue();
+    getFunction()->dump();
+    llvm::outs() << "Access path base: " << value;
+    auto accessPathWithBase = AccessPathWithBase::compute(value);
+    AccessUseTestVisitor visitor;
+    visitAccessPathBaseUses(visitor, accessPathWithBase, getFunction());
+  }
+};
+
 /// [new_tests] Add the new UnitTest subclass above this line. 
 
 //===----------------------------------------------------------------------===//
@@ -637,14 +748,18 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
   }
 
     // Alphabetical mapping from string to unit test subclass.
+    ADD_UNIT_TEST_SUBCLASS("accesspath-base", AccessPathBaseTest)
     ADD_UNIT_TEST_SUBCLASS("canonicalize-ossa-lifetime", CanonicalizeOSSALifetimeTest)
     ADD_UNIT_TEST_SUBCLASS("canonicalize-borrow-scope",
                            CanonicalizeBorrowScopeTest)
     ADD_UNIT_TEST_SUBCLASS("dump-function", DumpFunction)
+    ADD_UNIT_TEST_SUBCLASS("extended-liveness", ExtendedLinearLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("find-borrow-introducers", FindBorrowIntroducers)
     ADD_UNIT_TEST_SUBCLASS("find-enclosing-defs", FindEnclosingDefsTest)
     ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index", FunctionGetSelfArgumentIndex)
+    ADD_UNIT_TEST_SUBCLASS("interior-liveness", InteriorLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
+    ADD_UNIT_TEST_SUBCLASS("linear-liveness", LinearLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("multidef-liveness", MultiDefLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("pruned-liveness-boundary-with-list-of-last-users-insertion-points", PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
     ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
@@ -673,7 +788,8 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
 
     ADD_UNIT_TEST_SUBCLASS("ssa-liveness", SSALivenessTest)
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
-    ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi", VisitAdjacentReborrowsOfPhiTest)
+    ADD_UNIT_TEST_SUBCLASS("visit-inner-adjacent-phis",
+                           VisitInnerAdjacentPhisTest)
     /// [new_tests] Add the new mapping from string to subclass above this line.
     ///             Please sort alphabetically by name to help reduce merge
     ///             conflicts.

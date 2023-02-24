@@ -31,7 +31,13 @@ extension std.string: ExpressibleByStringLiteral {
 
 extension std.string: CustomDebugStringConvertible {
   public var debugDescription: String {
-    return "std.string(\(String(cxxString: self)))"
+    return "std.string(\(String(self)))"
+  }
+}
+
+extension std.string: CustomStringConvertible {
+  public var description: String {
+    return String(self)
   }
 }
 
@@ -43,7 +49,7 @@ extension String {
   /// (`"\u{FFFD}"`).
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ string.
-  public init(cxxString: std.string) {
+  public init(_ cxxString: std.string) {
     let buffer = UnsafeBufferPointer<CChar>(
       start: cxxString.__c_strUnsafe(),
       count: cxxString.size())

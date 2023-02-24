@@ -351,13 +351,13 @@ public:
            "can't emit a local var for a non-local var decl");
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
+
     // The box type's context is lowered in the minimal resilience domain.
+    auto instanceType = SGF.SGM.Types.getLoweredRValueType(
+        TypeExpansionContext::minimal(), decl->getType());
     auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
-        decl,
-        SGF.SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
-                                           decl->getType()),
-        SGF.F.getGenericEnvironment(),
-        /*mutable*/ true);
+        decl, instanceType, SGF.F.getGenericEnvironment(),
+        /*mutable*/ !instanceType->isPureMoveOnly() || !decl->isLet());
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
@@ -376,12 +376,8 @@ public:
       }
     }
 
-    Addr = SGF.B.createProjectBox(decl, Box, 0);
-    if (Addr->getType().isMoveOnly()) {
-      // TODO: Handle no implicit copy here.
-      Addr = SGF.B.createMarkMustCheckInst(
-          decl, Addr, MarkMustCheckInst::CheckKind::NoImplicitCopy);
-    }
+    if (!Box->getType().isBoxedNonCopyableType(Box->getFunction()))
+      Addr = SGF.B.createProjectBox(decl, Box, 0);
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
@@ -401,16 +397,24 @@ public:
   }
 
   SILValue getAddress() const {
+    assert(Addr);
     return Addr;
   }
 
+  /// If we have an address, returns the address. Otherwise, if we only have a
+  /// box, lazily projects it out and returns it.
   SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
                                               SILLocation loc) override {
+    if (!Addr && Box) {
+      auto pbi = SGF.B.createProjectBox(loc, Box, 0);
+      return pbi;
+    }
+
     return getAddress();
   }
 
   bool isInPlaceInitializationOfGlobal() const override {
-    return isa<GlobalAddrInst>(getAddress());
+    return dyn_cast_or_null<GlobalAddrInst>(Addr);
   }
 
   void finishUninitialized(SILGenFunction &SGF) override {
@@ -421,7 +425,11 @@ public:
     /// Remember that this is the memory location that we've emitted the
     /// decl to.
     assert(SGF.VarLocs.count(decl) == 0 && "Already emitted the local?");
-    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(Addr, Box);
+
+    if (Addr)
+      SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(Addr, Box);
+    else
+      SGF.VarLocs[decl] = SILGenFunction::VarLoc::getForBox(Box);
 
     SingleBufferInitialization::finishInitialization(SGF);
     assert(!DidFinish &&
@@ -485,9 +493,13 @@ public:
       isUninitialized = true;
     } else {
       // If this is a let with an initializer or bound value, we only need a
-      // buffer if the type is address only.
+      // buffer if the type is address only or is noncopyable.
+      //
+      // For noncopyable types, we always need to box them and eagerly
+      // reproject.
       needsTemporaryBuffer =
-          lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses();
+          (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
+        lowering->getLoweredType().isPureMoveOnly();
     }
 
     // Make sure that we have a non-address only type when binding a
@@ -580,7 +592,8 @@ public:
       if (value->getType().isPureMoveOnly()) {
         value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
         return SGF.B.createMarkMustCheckInst(
-            PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+            PrologueLoc, value,
+            MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
       }
 
       // Otherwise, if we don't have a no implicit copy trivial type, just
@@ -594,7 +607,8 @@ public:
           SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
       value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
       return SGF.B.createMarkMustCheckInst(
-          PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+          PrologueLoc, value,
+          MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
     }
 
     // Then if we don't have move only, just perform a lexical borrow if the
@@ -632,11 +646,11 @@ public:
     // We do this before the begin_borrow "normal" path below since move only
     // types do not have no implicit copy attr on them.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
-        value->getType().isMoveOnly() &&
-        !value->getType().isMoveOnlyWrapped()) {
+        value->getType().isPureMoveOnly()) {
       value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
       return SGF.B.createMarkMustCheckInst(
-          PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+          PrologueLoc, value,
+          MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
     }
 
     // Otherwise, if we do not have a no implicit copy variable, just follow
@@ -655,7 +669,8 @@ public:
     value = SGF.B.createCopyValue(PrologueLoc, value);
     value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
     return SGF.B.createMarkMustCheckInst(
-        PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+        PrologueLoc, value,
+        MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
   }
 
   void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne) {
@@ -1249,10 +1264,10 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
 
   assert(!isa<InOutType>(varType) && "local variables should never be inout");
 
-  // If this is a 'let' initialization for a non-global, set up a
-  // let binding, which stores the initialization value into VarLocs directly.
+  // If this is a 'let' initialization for a copyable non-global, set up a let
+  // binding, which stores the initialization value into VarLocs directly.
   if (forceImmutable && vd->getDeclContext()->isLocalContext() &&
-      !isa<ReferenceStorageType>(varType))
+      !isa<ReferenceStorageType>(varType) && !varType->isPureMoveOnly())
     return InitializationPtr(new LetValueInitialization(vd, *this));
 
   // If the variable has no initial value, emit a mark_uninitialized instruction
@@ -1385,69 +1400,6 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     bool isLocalVar =
         singleVar && singleVar->getDeclContext()->isLocalContext();
     emitInitializer(Init, singleVar, isLocalVar, initialization);
-  } else if (singleVar &&
-             singleVar->isTypeWrapperLocalStorageForInitializer()) {
-    // If any of the type wrapper managed properties had default initializers
-    // we need to emit them as assignments to `_storage` elements as part
-    // of its initialization.
-
-    auto storageVarType = singleVar->getType()->castTo<TupleType>();
-    auto *wrappedDecl = cast<NominalTypeDecl>(
-        singleVar->getDeclContext()->getInnermostTypeContext());
-
-    SmallVector<std::pair<VarDecl *, Expr *>, 2> fieldsToInitialize;
-    fieldsToInitialize.resize_for_overwrite(storageVarType->getNumElements());
-
-    unsigned numInitializable = 0;
-    for (auto member : wrappedDecl->getMembers()) {
-      auto *PBD = dyn_cast<PatternBindingDecl>(member);
-      // Check every member that is managed by the type wrapper.
-      if (!(PBD && PBD->getSingleVar() &&
-            PBD->getSingleVar()->isAccessedViaTypeWrapper()))
-        continue;
-
-      auto *field = PBD->getSingleVar();
-      auto fieldNo = storageVarType->getNamedElementId(field->getName());
-
-      if (auto *initExpr = PBD->getInit(/*index=*/0)) {
-        fieldsToInitialize[fieldNo] = {PBD->getSingleVar(), initExpr};
-        ++numInitializable;
-      }
-    }
-
-    if (numInitializable == 0) {
-      initialization->finishUninitialized(*this);
-      return;
-    }
-
-    // If there are any initializable fields, let's split _storage into
-    // element initializers and emit initializations for individual fields.
-
-    assert(initialization->canSplitIntoTupleElements());
-
-    SmallVector<InitializationPtr, 4> scratch;
-    auto fieldInits = initialization->splitIntoTupleElements(
-        *this, PBD, storageVarType->getCanonicalType(), scratch);
-
-    for (unsigned i : range(fieldInits.size())) {
-      VarDecl *field;
-      Expr *initExpr;
-
-      std::tie(field, initExpr) = fieldsToInitialize[i];
-
-      auto &fieldInit = fieldInits[i];
-      if (initExpr) {
-        // If there is wrapped value expression, we have to emit a
-        // backing property initializer call, otherwise let's use
-        // default expression (which is just `.init()` call).
-        emitInitializer(initExpr, field, bool(getWrappedValueExpr(field)),
-                        fieldInit);
-      } else {
-        fieldInit->finishUninitialized(*this);
-      }
-    }
-
-    initialization->finishInitialization(*this);
   } else {
     // Otherwise, mark it uninitialized for DI to resolve.
     initialization->finishUninitialized(*this);

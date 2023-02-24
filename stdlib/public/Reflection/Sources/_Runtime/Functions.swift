@@ -39,6 +39,10 @@ public struct BoxPair {
 public func swift_allocBox(_: Metadata) -> BoxPair
 
 @available(SwiftStdlib 5.9, *)
+@_silgen_name("_swift_class_isSubclass")
+internal func _isSubclass(_: Metadata, _: Metadata) -> Bool
+
+@available(SwiftStdlib 5.9, *)
 @inlinable
 public func swift_conformsToProtocol(
   _ type: Metadata,

@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-move-only -g -emit-module  -module-name OtherModule %S/Inputs/moveonly_deinit.swift -emit-module-path %t/OtherModule.swiftmodule
-// RUN: %target-swift-frontend -enable-experimental-move-only -g -I %t %s -emit-silgen
+// TODO: re-enable the simplification passes once rdar://104875010 is fixed
+// RUN: %target-swift-frontend -enable-experimental-move-only -Xllvm -sil-disable-pass=simplification -g -emit-module  -module-name OtherModule %S/Inputs/moveonly_deinit.swift -emit-module-path %t/OtherModule.swiftmodule
+// RUN: %target-swift-frontend -enable-experimental-move-only -Xllvm -sil-disable-pass=simplification -g -I %t %s -emit-silgen
 
 // Make sure we can deserialize deinits of both enums and structs.
 

@@ -141,13 +141,12 @@ void GenericEnvironment::forEachPackElementArchetype(
   }
 }
 
-void GenericEnvironment::forEachPackElementBinding(
-    PackElementBindingCallback function) const {
+void GenericEnvironment::forEachPackElementGenericTypeParam(
+    llvm::function_ref<void(GenericTypeParamType *)> function) const {
   auto sig = getGenericSignature();
   auto shapeClass = getOpenedElementShapeClass();
   auto packElements = sig.getInnermostGenericParams();
   auto packElementDepth = packElements.front()->getDepth();
-  auto elementIt = packElements.begin();
 
   // Each parameter pack in the outer generic parameters has
   // a corresponding pack element parameter at the innermost
@@ -164,13 +163,23 @@ void GenericEnvironment::forEachPackElementBinding(
     if (!sig->haveSameShape(genericParam, shapeClass->mapTypeOutOfContext()))
       continue;
 
+    function(genericParam);
+  }
+}
+
+void GenericEnvironment::forEachPackElementBinding(
+    PackElementBindingCallback function) const {
+  auto sig = getGenericSignature();
+  auto packElements = sig.getInnermostGenericParams();
+  auto elementIt = packElements.begin();
+  forEachPackElementGenericTypeParam([&](auto *genericParam) {
     assert(elementIt != packElements.end());
     auto *elementArchetype =
         mapTypeIntoContext(*elementIt++)->castTo<ElementArchetypeType>();
-    auto *packSubstitution =
-        maybeApplyOuterContextSubstitutions(genericParam)->castTo<PackType>();
+    auto *packSubstitution = maybeApplyOuterContextSubstitutions(genericParam)
+                                 ->template castTo<PackType>();
     function(elementArchetype, packSubstitution);
-  }
+  });
 
   assert(elementIt == packElements.end());
 }
@@ -547,7 +556,7 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
 Type GenericEnvironment::mapTypeIntoContext(
                                 Type type,
                                 LookupConformanceFn lookupConformance) const {
-  assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
+  assert((!type->hasArchetype() || type->hasLocalArchetype()) &&
          "already have a contextual type");
 
   type = maybeApplyOuterContextSubstitutions(type);

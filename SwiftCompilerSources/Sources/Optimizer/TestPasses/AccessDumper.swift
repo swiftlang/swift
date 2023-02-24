@@ -29,7 +29,7 @@ let accessDumper = FunctionPass(name: "dump-access", {
       case let st as StoreInst:
         printAccessInfo(address: st.destination)
       case let load as LoadInst:
-        printAccessInfo(address: load.operand)
+        printAccessInfo(address: load.address)
       case let apply as ApplyInst:
         guard let callee = apply.referencedFunction else {
           break

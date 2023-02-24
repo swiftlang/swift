@@ -394,4 +394,21 @@ public:
   int operator*() const { return value; }
 };
 
+struct AmbiguousOperatorStar {
+private:
+  int value = 567;
+public:
+  int &operator*() { return value; }
+  const int &operator*() const { return value; }
+};
+
+struct AmbiguousOperatorStar2 {
+private:
+  int value = 678;
+public:
+  int &operator*() & { return value; }
+  const int &operator*() const & { return value; }
+  const int &&operator*() const && { return static_cast<const int &&>(value); }
+};
+
 #endif

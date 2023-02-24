@@ -27,8 +27,10 @@ namespace swift {
 class ASTContext;
 class TypeRepr;
 class IdentTypeRepr;
+class PackElementTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
+class SILTypeResolutionContext;
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -79,6 +81,9 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether this is a resolution based on a pack reference.
   FromPackReference = 1 << 12,
+
+  /// Whether this resolution happens under an explicit ownership specifier.
+  HasOwnership = 1 << 13,
 };
 
 /// Type resolution contexts that require special handling.
@@ -490,10 +495,10 @@ using OpenUnboundGenericTypeFn = llvm::function_ref<Type(UnboundGenericType *)>;
 using HandlePlaceholderTypeReprFn =
     llvm::function_ref<Type(ASTContext &, PlaceholderTypeRepr *)>;
 
-/// A function reference used to replace pack references with opened
-/// element archetypes when resolving a \c PackReferenceTypeRepr.
+/// A function reference used to replace pack elements with opened
+/// element archetypes when resolving a \c PackElementTypeRepr.
 using OpenPackElementFn =
-    llvm::function_ref<Type(Type, PackReferenceTypeRepr *)>;
+    llvm::function_ref<Type(Type, PackElementTypeRepr *)>;
 
 /// Handles the resolution of types within a given declaration context,
 /// which might involve resolving generic parameters to a particular
@@ -555,14 +560,14 @@ public:
                         OpenUnboundGenericTypeFn unboundTyOpener,
                         HandlePlaceholderTypeReprFn placeholderHandler,
                         OpenPackElementFn packElementOpener,
-                        GenericParamList *silParams = nullptr);
+                        SILTypeResolutionContext *silContext = nullptr);
 
   static Type resolveContextualType(
       TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
       TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
       HandlePlaceholderTypeReprFn placeholderHandler,
       OpenPackElementFn packElementOpener,
-      GenericParamList *silParams = nullptr);
+      SILTypeResolutionContext *silContext = nullptr);
 
 public:
   TypeResolution withOptions(TypeResolutionOptions opts) const;
@@ -602,11 +607,11 @@ public:
   /// to create a well-formed type.
   ///
   /// \param TyR The type representation to check.
-  /// \param silParams Used to look up generic parameters in SIL mode.
+  /// \param silContext Used to look up generic parameters in SIL mode.
   ///
   /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR,
-                   GenericParamList *silParams=nullptr) const;
+                   SILTypeResolutionContext *silContext = nullptr) const;
 
   /// Resolve a reference to a member type of the given (dependent) base and
   /// name.

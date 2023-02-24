@@ -331,7 +331,7 @@ namespace swift {
     bool UseMalloc = false;
 
     /// Specifies how strict concurrency checking will be.
-    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Targeted;
+    StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Minimal;
 
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
@@ -366,7 +366,8 @@ namespace swift {
 
     /// Enable early skipping deserialization of decls that are marked as
     /// unsafe to read.
-    bool EnableDeserializationSafety = true;
+    bool EnableDeserializationSafety =
+      ::getenv("SWIFT_ENABLE_DESERIALIZATION_SAFETY");
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
@@ -530,6 +531,9 @@ namespace swift {
 
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
+
+    /// Allows the explicit 'import Builtin' within Swift modules.
+    bool EnableBuiltinModule = false;
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
@@ -830,7 +834,7 @@ namespace swift {
 
     /// When building a PCM, rely on the Swift frontend's command-line -Xcc flags
     /// to build the Clang module via Clang frontend directly,
-    /// and completly bypass the Clang driver.
+    /// and completely bypass the Clang driver.
     bool DirectClangCC1ModuleBuild = false;
 
     /// Return a hash code of any components from these options that should

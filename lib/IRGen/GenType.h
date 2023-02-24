@@ -379,6 +379,24 @@ TypeLayoutEntry *buildTypeLayoutEntryForFields(IRGenModule &IGM, SILType T,
       fields, minimumAlignment, true);
 }
 
+/// Emit a call to the deinit for T to destroy the value at the given address,
+/// if a deinit is available.
+///
+/// Returns true if the deinit call was emitted, or false if there is no deinit.
+/// No code emission occurs if the function returns false.
+bool tryEmitDestroyUsingDeinit(IRGenFunction &IGF,
+                               Address address,
+                               SILType T);
+                               
+/// Emit a call to the deinit for T to destroy the value in the given explosion,
+/// if a deinit is available.
+///
+/// Returns true if the deinit call was emitted, or false if there is no deinit.
+/// No code emission occurs if the function returns false.
+bool tryEmitConsumeUsingDeinit(IRGenFunction &IGF,
+                               Explosion &explosion,
+                               SILType T);
+
 } // end namespace irgen
 } // end namespace swift
 

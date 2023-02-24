@@ -492,7 +492,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
 
     // Only link with std on platforms where the overlay is available.
     // Do not try to link std with itself.
-    if ((target.isOSDarwin() || target.isOSLinux()) &&
+    if ((target.isOSDarwin() || (target.isOSLinux() && !target.isAndroid())) &&
         !getSwiftModule()->getName().is("Cxx") &&
         !getSwiftModule()->getName().is("CxxStdlib") &&
         !getSwiftModule()->getName().is("std")) {
@@ -3252,10 +3252,33 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     Args.push_back(arg);
   }
 
-  subIGF.Builder.CreateCall(ctorFnType, ctorAddress, Args);
+  auto *call =
+      emitCXXConstructorCall(subIGF, ctor, ctorFnType, ctorAddress, Args);
+  if (isa<llvm::InvokeInst>(call))
+    IGM.emittedForeignFunctionThunksWithExceptionTraps.insert(thunk);
   subIGF.Builder.CreateRetVoid();
 
   return thunk;
+}
+
+llvm::CallBase *swift::irgen::emitCXXConstructorCall(
+    IRGenFunction &IGF, const clang::CXXConstructorDecl *ctor,
+    llvm::FunctionType *ctorFnType, llvm::Constant *ctorAddress,
+    llvm::ArrayRef<llvm::Value *> args) {
+  bool canThrow = IGF.IGM.isForeignExceptionHandlingEnabled();
+  if (auto *fpt = ctor->getType()->getAs<clang::FunctionProtoType>()) {
+    if (fpt->isNothrow())
+      canThrow = false;
+  }
+  if (!canThrow)
+    return IGF.Builder.CreateCall(ctorFnType, ctorAddress, args);
+  llvm::CallBase *result;
+  IGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
+                                   llvm::BasicBlock *invokeUnwindDest) {
+    result = IGF.Builder.createInvoke(ctorFnType, ctorAddress, args,
+                                      invokeNormalDest, invokeUnwindDest);
+  });
+  return result;
 }
 
 StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {
@@ -5675,7 +5698,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
 
 /// Can not treat a treat the layout of a class as resilient if the current
 ///    class is defined in an external module and
-///    not publically accessible (e.g private or internal).
+///    not publicly accessible (e.g private or internal).
 /// This would normally not happen except if we compile theClass's module with
 /// enable-testing.
 /// Do we have to use resilient access patterns when working with this

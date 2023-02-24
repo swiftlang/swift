@@ -382,7 +382,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         
         // Class references, which are directly located in the array elements cannot escape,
         // because those are passed as `self` to their deinits - and `self` cannot escape in a deinit.
-        if path.projectionPath.hasNoClassProjection {
+        if !path.projectionPath.mayHaveClassProjection {
           return .continueWalk
         }
         return isEscaping
@@ -547,7 +547,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     }
 
     // Indirect arguments cannot escape the function, but loaded values from such can.
-    if !followLoads(at: path.projectionPath) {
+    if !followLoads(at: path.projectionPath) &&
+       // Except for begin_apply: it can yield an address value.
+       !apply.isBeginApplyWithIndirectResults {
       return .continueWalk
     }
 
@@ -592,7 +594,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     var matched = false
     for effect in effects.escapeEffects.arguments {
       switch effect.kind {
-      case .escapingToArgument(let toArgIdx, let toPath, let exclusive):
+      case .escapingToArgument(let toArgIdx, let toPath):
+        // Note: exclusive argument -> argument effects cannot appear, so we don't need to handle them here.
         if effect.matches(calleeArgIdx, argPath.projectionPath) {
           guard let callerToIdx = apply.callerArgIndex(calleeArgIndex: toArgIdx) else {
             return isEscaping
@@ -602,20 +605,6 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
           let arg = apply.arguments[callerToIdx]
           
           let p = Path(projectionPath: toPath, followStores: false, knownType: nil)
-          if walkUp(addressOrValue: arg, path: p) == .abortWalk {
-            return .abortWalk
-          }
-          matched = true
-        } else if toArgIdx == calleeArgIdx && argPath.projectionPath.matches(pattern: toPath) {
-          // Handle the reverse direction of an arg-to-arg escape.
-          guard let callerArgIdx = apply.callerArgIndex(calleeArgIndex: effect.argumentIndex) else {
-            return isEscaping
-          }
-          if !exclusive { return isEscaping }
-
-          let arg = apply.arguments[callerArgIdx]
-          let p = Path(projectionPath: effect.pathPattern, followStores: false, knownType: nil)
-
           if walkUp(addressOrValue: arg, path: p) == .abortWalk {
             return .abortWalk
           }
@@ -690,10 +679,18 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case let ap as ApplyInst:
       return walkUpApplyResult(apply: ap, path: path.with(knownType: nil))
     case is LoadInst, is LoadWeakInst, is LoadUnownedInst:
-      return walkUp(address: (def as! UnaryInstruction).operand,
+      if !followLoads(at: path.projectionPath) {
+        // When walking up we shouldn't end up at a load where followLoads is false,
+        // because going from a (non-followLoads) address to a load always involves a class indirection.
+        // There is one exception: loading a raw pointer, e.g.
+        //   %l = load %a : $Builtin.RawPointer
+        //   %a = pointer_to_address %l           // the up-walk starts at %a
+        return isEscaping
+      }
+      return walkUp(address: (def as! UnaryInstruction).operand.value,
                     path: path.with(followStores: true).with(knownType: nil))
     case let atp as AddressToPointerInst:
-      return walkUp(address: atp.operand, path: path.with(knownType: nil))
+      return walkUp(address: atp.address, path: path.with(knownType: nil))
     default:
       return isEscaping
     }
@@ -730,11 +727,11 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case is PointerToAddressInst, is IndexAddrInst:
       return walkUp(value: (def as! SingleValueInstruction).operands[0].value, path: path.with(knownType: nil))
     case let rta as RefTailAddrInst:
-      return walkUp(value: rta.operand, path: path.push(.tailElements, index: 0).with(knownType: nil))
+      return walkUp(value: rta.instance, path: path.push(.tailElements, index: 0).with(knownType: nil))
     case let rea as RefElementAddrInst:
-      return walkUp(value: rea.operand, path: path.push(.classField, index: rea.fieldIndex).with(knownType: nil))
+      return walkUp(value: rea.instance, path: path.push(.classField, index: rea.fieldIndex).with(knownType: nil))
     case let pb as ProjectBoxInst:
-      return walkUp(value: pb.operand, path: path.push(.classField, index: pb.fieldIndex).with(knownType: nil))
+      return walkUp(value: pb.box, path: path.push(.classField, index: pb.fieldIndex).with(knownType: nil))
     default:
       return isEscaping
     }
@@ -818,7 +815,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   private func followLoads(at path: SmallProjectionPath) -> Bool {
     return visitor.followLoads ||
            // When part of a class field we have to follow loads.
-           !path.hasNoClassProjection
+           path.mayHaveClassProjection
   }
 
   private func pathForArgumentEscapeChecking(_ path: SmallProjectionPath) -> SmallProjectionPath {
@@ -835,5 +832,15 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
 private extension SmallProjectionPath {
   var escapePath: EscapeUtilityTypes.EscapePath {
     EscapeUtilityTypes.EscapePath(projectionPath: self, followStores: false, knownType: nil)
+  }
+}
+
+private extension ApplySite {
+  var isBeginApplyWithIndirectResults: Bool {
+    guard let ba = self as? BeginApplyInst else {
+      return false
+    }
+    // Note that the token result is always a non-address type.
+    return ba.results.contains { $0.type.isAddress }
   }
 }

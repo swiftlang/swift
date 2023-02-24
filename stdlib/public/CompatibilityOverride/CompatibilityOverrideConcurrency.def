@@ -373,10 +373,6 @@ OVERRIDE_TASK_STATUS(task_escalate, JobPriority,
                      swift::, (AsyncTask *task, JobPriority newPriority),
                      (task, newPriority))
 
-OVERRIDE_TASK_STATUS(task_getNearestDeadline, NearestTaskDeadline,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (AsyncTask *task), (task))
-
 #undef OVERRIDE
 #undef OVERRIDE_ACTOR
 #undef OVERRIDE_TASK

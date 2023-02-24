@@ -24,11 +24,16 @@ target_sources(swiftSILOptimizer PRIVATE
   LowerHopToActor.cpp
   MandatoryInlining.cpp
   MovedAsyncVarDebugInfoPropagator.cpp
-  MoveOnlyAddressChecker.cpp
-  MoveOnlyBorrowToDestructureTransform.cpp
+  MoveOnlyAddressCheckerUtils.cpp
+  MoveOnlyAddressCheckerTester.cpp
+  MoveOnlyBorrowToDestructureUtils.cpp
+  MoveOnlyBorrowToDestructureTester.cpp
   MoveOnlyDeinitInsertion.cpp
   MoveOnlyDiagnostics.cpp
-  MoveOnlyObjectChecker.cpp
+  MoveOnlyObjectCheckerUtils.cpp
+  MoveOnlyObjectCheckerTester.cpp
+  MoveOnlyChecker.cpp
+  MoveOnlyUtils.cpp
   NestedSemanticFunctionCheck.cpp
   OptimizeHopToExecutor.cpp
   PerformanceDiagnostics.cpp
@@ -37,7 +42,6 @@ target_sources(swiftSILOptimizer PRIVATE
   RawSILInstLowering.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
-  MandatoryCombine.cpp
   OSLogOptimization.cpp
   MoveOnlyWrappedTypeEliminator.cpp
   OwnershipModelEliminator.cpp)

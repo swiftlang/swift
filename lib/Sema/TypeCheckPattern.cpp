@@ -444,8 +444,8 @@ public:
     }
 
     auto *subExpr = convertBindingsToOptionalSome(bindExpr->getSubExpr());
-    return new (Context)
-        OptionalSomePattern(subExpr, bindExpr->getQuestionLoc());
+    return OptionalSomePattern::create(Context, subExpr,
+                                       bindExpr->getQuestionLoc());
   }
 
   // Convert a x? to OptionalSome pattern.  In the AST form, this will look like
@@ -708,8 +708,7 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
 
     // "if let" implicitly looks inside of an optional, so wrap it in an
     // OptionalSome pattern.
-    P = new (Context) OptionalSomePattern(P, P->getEndLoc());
-    P->setImplicit();
+    P = OptionalSomePattern::createImplicit(Context, P, P->getEndLoc());
   }
 
   return P;
@@ -732,7 +731,7 @@ validateTypedPattern(TypedPattern *TP, DeclContext *dc,
   auto *Repr = TP->getTypeRepr();
   if (Repr && (Repr->hasOpaque() ||
                (Context.LangOpts.hasFeature(Feature::ImplicitSome) &&
-                Repr->isProtocol(dc)))) {
+                !collectOpaqueReturnTypeReprs(Repr, Context, dc).empty()))) {
     auto named = dyn_cast<NamedPattern>(
         TP->getSubPattern()->getSemanticsProvidingPattern());
     if (!named) {
@@ -1442,9 +1441,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
             if (lookupEnumMemberElement(dc,
                                         baseType->lookThroughAllOptionalTypes(),
                                         EEP->getName(), EEP->getLoc())) {
-              P = new (Context)
-                  OptionalSomePattern(EEP, EEP->getEndLoc());
-              P->setImplicit();
+              P = OptionalSomePattern::createImplicit(Context, EEP,
+                                                      EEP->getEndLoc());
               return coercePatternToType(
                   pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
                   options);
@@ -1657,12 +1655,6 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       diags.diagnose(loc, diagID, type);
       return nullptr;
     }
-
-    EnumElementDecl *elementDecl = Context.getOptionalSomeDecl();
-    if (!elementDecl)
-      return nullptr;
-
-    OP->setElementDecl(elementDecl);
 
     Pattern *sub = OP->getSubPattern();
     auto newSubOptions = subOptions;

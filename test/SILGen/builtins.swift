@@ -1,6 +1,8 @@
 // RUN: %target-swift-emit-silgen -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 // RUN: %target-swift-emit-sil -Onone -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
 
+// REQUIRES: swift_in_compiler
+
 import Swift
 
 protocol ClassProto : class { }
@@ -828,7 +830,6 @@ func retain(ptr: Builtin.NativeObject) {
 // CANONICAL: bb0([[P:%.*]] : $Builtin.NativeObject):
 // CANONICAL-NEXT:   debug_value
 // CANONICAL-NEXT:   strong_release [[P]]
-// CANONICAL-NEXT:   tuple
 // CANONICAL-NEXT:   tuple
 // CANONICAL-NEXT:   return
 // CANONICAL: } // end sil function '$s8builtins7release{{[_0-9a-zA-Z]*}}F'

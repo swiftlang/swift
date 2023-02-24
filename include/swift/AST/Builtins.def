@@ -629,6 +629,10 @@ BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 /// is not known at compile time, MaximumAlignment is assumed.
 BUILTIN_MISC_OPERATION(StackAlloc, "stackAlloc", "", Special)
 
+/// Like `stackAlloc`, but doesn't set the `[stack_protection]` flag on its
+/// containing function.
+BUILTIN_MISC_OPERATION(UnprotectedStackAlloc, "unprotectedStackAlloc", "", Special)
+
 /// StackDealloc has type (Builtin.RawPointer) -> ()
 ///
 /// Parameters: address.

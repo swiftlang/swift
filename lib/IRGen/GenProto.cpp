@@ -68,6 +68,7 @@
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
+#include "GenPack.h"
 #include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenType.h"
@@ -1191,6 +1192,17 @@ WitnessIndex ProtocolInfo::getAssociatedTypeIndex(
   llvm_unreachable("didn't find entry for associated type");
 }
 
+static llvm::Constant *
+getConstantSignedRelativeProtocolWitnessTable(IRGenModule &IGM,
+                                              llvm::Value *table) {
+  auto constantTable = cast<llvm::Constant>(table);
+  auto &schema = IGM.getOptions().PointerAuth.RelativeProtocolWitnessTable;
+  constantTable =
+      IGM.getConstantSignedPointer(constantTable, schema, PointerAuthEntity(),
+                                   /*storageAddress*/ nullptr);
+  return constantTable;
+}
+
 namespace {
 
 /// Conformance info for a witness table that can be directly generated.
@@ -1693,6 +1705,8 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
     // If we can emit a constant table, do so.
     if (auto constantTable =
           conformanceI->tryGetConstantTable(IGM, associatedType)) {
+      constantTable =
+          getConstantSignedRelativeProtocolWitnessTable(IGM, constantTable);
       IGF.Builder.CreateRet(constantTable);
       return;
     }
@@ -1889,6 +1903,7 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
     // Ask the ConformanceInfo to emit the wtable.
     llvm::Value *baseWTable =
       base.second->getTable(IGF, &metadata);
+
     baseWTable = IGF.Builder.CreateBitCast(baseWTable, IGM.Int8PtrTy);
 
     // Store that to the appropriate slot in the new witness table.
@@ -2304,7 +2319,9 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
     auto &fnProtoInfo =
         IGM.getProtocolInfo(conf->getProtocol(), ProtocolInfoKind::Full);
     auto index = fnProtoInfo.getFunctionIndex(member).forProtocolWitnessTable();
-    auto offset = index.getValue() * IGM.getPointerSize().getValue();
+    auto entrySize = IGM.IRGen.Opts.UseRelativeProtocolWitnessTables ?
+      4 : IGM.getPointerSize().getValue();
+    auto offset = index.getValue() * entrySize;
     global->addTypeMetadata(offset, typeIdForMethod(IGM, member));
 
     minOffset = std::min(minOffset, offset);
@@ -2625,6 +2642,11 @@ llvm::Value *IRGenFunction::optionallyLoadFromConditionalProtocolWitnessTable(
   auto *phi = Builder.CreatePHI(wtable->getType(), 2);
   phi->addIncoming(wtable, origBB);
   phi->addIncoming(wtableDeref, isCondBB);
+  if (auto &schema = getOptions().PointerAuth.RelativeProtocolWitnessTable) {
+    auto info = PointerAuthInfo::emit(*this, schema, nullptr,
+                                      PointerAuthEntity());
+    return emitPointerAuthAuth(*this, phi, info);
+  }
   return phi;
 }
 
@@ -2659,11 +2681,25 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
   Builder.CreateBr(endBB);
 
   Builder.emitBlock(isNotCondBB);
+  if (auto &schema = IGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
+    auto info = PointerAuthInfo::emit(IGF, schema, nullptr,
+                                      PointerAuthEntity());
+    wtable = emitPointerAuthAuth(IGF, wtable, info);
+  }
   auto baseWTable2 =
       emitInvariantLoadOfOpaqueWitness(IGF,/*isProtocolWitness*/true, wtable,
                                        index);
   baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
                                           IGF.IGM.WitnessTablePtrTy);
+  if (auto &schema = IGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
+    auto info = PointerAuthInfo::emit(IGF, schema, nullptr,
+                                      PointerAuthEntity());
+    baseWTable2 = emitPointerAuthSign(IGF, baseWTable2, info);
+
+    baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
+                                            IGF.IGM.WitnessTablePtrTy);
+  }
+
   Builder.CreateBr(endBB);
 
   Builder.emitBlock(endBB);
@@ -3250,6 +3286,9 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // conformance info for them.  However, that conformance info might be
   // more concrete than we're expecting.
   // TODO: make a best effort to devirtualize, maybe?
+  } else if (conformance.isPack()) {
+    auto pack = cast<PackType>(srcType);
+    return emitWitnessTablePackRef(IGF, pack, conformance.getPack());
   } else {
     concreteConformance = conformance.getConcrete();
   }
@@ -3264,6 +3303,8 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
 
   auto &conformanceI = IGF.IGM.getConformanceInfo(proto, concreteConformance);
   wtable = conformanceI.getTable(IGF, srcMetadataCache);
+  if (isa<llvm::Constant>(wtable))
+    wtable = getConstantSignedRelativeProtocolWitnessTable(IGF.IGM, wtable);
 
   IGF.setScopedLocalTypeData(srcType, cacheKind, wtable);
   return wtable;
@@ -3560,9 +3601,11 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
     return IGF.emitPackShapeExpression(argType);
 
   case GenericRequirement::Kind::Metadata:
+  case GenericRequirement::Kind::MetadataPack:
     return IGF.emitTypeMetadataRef(argType, request).getMetadata();
 
-  case GenericRequirement::Kind::WitnessTable: {
+  case GenericRequirement::Kind::WitnessTable:
+  case GenericRequirement::Kind::WitnessTablePack: {
     auto proto = requirement.getProtocol();
     auto conformance = subs.lookupConformance(depTy, proto);
     assert(conformance.getRequirement() == proto);
@@ -3600,21 +3643,28 @@ void irgen::bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
     }
 
     // Cast if necessary.
-    switch (requirements[index].getKind()) {
-    case GenericRequirement::Kind::Shape:
-      slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.SizeTy);
-      break;
-    case GenericRequirement::Kind::Metadata:
-      slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.TypeMetadataPtrTy);
-      break;
-    case GenericRequirement::Kind::WitnessTable:
-      slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.WitnessTablePtrTy);
-      break;
-    }
+    slot = IGF.Builder.CreateElementBitCast(
+        slot, requirements[index].getType(IGF.IGM));
 
     llvm::Value *value = IGF.Builder.CreateLoad(slot);
     bindGenericRequirement(IGF, requirements[index], value, metadataState,
                            getInContext);
+  }
+}
+
+llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
+                                            GenericRequirement::Kind kind) {
+  switch (kind) {
+  case GenericRequirement::Kind::Shape:
+    return IGM.SizeTy;
+  case GenericRequirement::Kind::Metadata:
+    return IGM.TypeMetadataPtrTy;
+  case GenericRequirement::Kind::WitnessTable:
+    return IGM.WitnessTablePtrTy;
+  case GenericRequirement::Kind::MetadataPack:
+    return IGM.TypeMetadataPtrPtrTy;
+  case GenericRequirement::Kind::WitnessTablePack:
+    return IGM.WitnessTablePtrPtrTy;
   }
 }
 
@@ -3626,26 +3676,26 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
   // Get the corresponding context type.
   auto type = getInContext(requirement.getTypeParameter());
 
+  assert(value->getType() == requirement.getType(IGF.IGM));
   switch (requirement.getKind()) {
   case GenericRequirement::Kind::Shape: {
     assert(isa<ArchetypeType>(type));
-    assert(value->getType() == IGF.IGM.SizeTy);
     auto kind = LocalTypeDataKind::forPackShapeExpression();
     IGF.setUnscopedLocalTypeData(type, kind, value);
     break;
   }
 
-  case GenericRequirement::Kind::Metadata: {
-    assert(value->getType() == IGF.IGM.TypeMetadataPtrTy);
+  case GenericRequirement::Kind::Metadata:
+  case GenericRequirement::Kind::MetadataPack: {
     setTypeMetadataName(IGF.IGM, value, type);
     IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, value, metadataState);
     break;
   }
 
-  case GenericRequirement::Kind::WitnessTable: {
+  case GenericRequirement::Kind::WitnessTable:
+  case GenericRequirement::Kind::WitnessTablePack: {
     auto proto = requirement.getProtocol();
     assert(isa<ArchetypeType>(type));
-    assert(value->getType() == IGF.IGM.WitnessTablePtrTy);
     setProtocolWitnessTableName(IGF.IGM, value, type, proto);
     auto kind = LocalTypeDataKind::forAbstractProtocolWitnessTable(proto);
     IGF.setUnscopedLocalTypeData(type, kind, value);
@@ -3676,17 +3726,17 @@ namespace {
       enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
         if (reqs)
           reqs->push_back(reqt);
+        out.push_back(reqt.getType(IGM));
         switch (reqt.getKind()) {
         case GenericRequirement::Kind::Shape:
-          out.push_back(IGM.SizeTy);
           ++numShapes;
           break;
         case GenericRequirement::Kind::Metadata:
-          out.push_back(IGM.TypeMetadataPtrTy);
+        case GenericRequirement::Kind::MetadataPack:
           ++numTypeMetadataPtrs;
           break;
         case GenericRequirement::Kind::WitnessTable:
-          out.push_back(IGM.WitnessTablePtrTy);
+        case GenericRequirement::Kind::WitnessTablePack:
           ++numWitnessTablePtrs;
           break;
         }
@@ -3762,9 +3812,11 @@ static llvm::Value *emitWTableSlotLoad(IRGenFunction &IGF, llvm::Value *wtable,
 
     // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
     // which could mean redundant loads don't get removed.
-    llvm::Value *checkedLoad = IGF.Builder.CreateIntrinsicCall(
-        llvm::Intrinsic::type_checked_load, args);
-    assert(!isRelativeTable && "Not yet implemented");
+    llvm::Value *checkedLoad =
+        isRelativeTable ? IGF.Builder.CreateIntrinsicCall(
+                              llvm::Intrinsic::type_checked_load_relative, args)
+                        : IGF.Builder.CreateIntrinsicCall(
+                              llvm::Intrinsic::type_checked_load, args);
     return IGF.Builder.CreateExtractValue(checkedLoad, 0);
   }
 

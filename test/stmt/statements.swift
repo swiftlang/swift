@@ -525,7 +525,7 @@ func fn(x: Int) {
 }
 
 func bad_if() {
-  if 1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  if 1 {} // expected-error {{integer literal value '1' cannot be used as a boolean; did you mean 'true'?}} {{6-7=true}}
   if (x: false) {} // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
   if (x: 1) {} // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
   if nil {} // expected-error {{'nil' is not compatible with expected condition type 'Bool'}}

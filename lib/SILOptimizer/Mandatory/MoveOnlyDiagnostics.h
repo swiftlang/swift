@@ -19,7 +19,7 @@
 #ifndef SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYDIAGNOSTICS_H
 #define SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYDIAGNOSTICS_H
 
-#include "MoveOnlyObjectChecker.h"
+#include "MoveOnlyObjectCheckerUtils.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
@@ -41,15 +41,21 @@ class DiagnosticEmitter {
   /// here.
   SmallPtrSet<MarkMustCheckInst *, 4> valuesWithDiagnostics;
 
-  // Track any violating uses we have emitted a diagnostic for so we don't emit
-  // multiple diagnostics for the same use.
+  /// Track any violating uses we have emitted a diagnostic for so we don't emit
+  /// multiple diagnostics for the same use.
   SmallPtrSet<SILInstruction *, 8> useWithDiagnostic;
 
+  /// A count of the total diagnostics emitted so that callers of routines that
+  /// take a diagnostic emitter can know if the emitter emitted additional
+  /// diagnosics while running a callee.
   unsigned diagnosticCount = 0;
 
+  bool emittedCheckerDoesntUnderstandDiagnostic = false;
+
 public:
-  void init(SILFunction *inputFn, OSSACanonicalizer *inputCanonicalizer) {
-    fn = inputFn;
+  DiagnosticEmitter(SILFunction *inputFn) : fn(inputFn) {}
+
+  void initCanonicalizer(OSSACanonicalizer *inputCanonicalizer) {
     canonicalizer = inputCanonicalizer;
   }
 
@@ -62,12 +68,17 @@ public:
   }
 
   unsigned getDiagnosticCount() const { return diagnosticCount; }
+  bool didEmitCheckerDoesntUnderstandDiagnostic() const {
+    return emittedCheckerDoesntUnderstandDiagnostic;
+  }
+
+  /// Used at the end of the MoveOnlyAddressChecker to tell the user in a nice
+  /// way to file a bug.
+  void emitCheckedMissedCopyError(SILInstruction *copyInst);
 
   void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectGuaranteedDiagnostic(MarkMustCheckInst *markedValue);
   void emitObjectOwnedDiagnostic(MarkMustCheckInst *markedValue);
-
-  bool emittedAnyDiagnostics() const { return valuesWithDiagnostics.size(); }
 
   bool emittedDiagnosticForValue(MarkMustCheckInst *markedValue) const {
     return valuesWithDiagnostics.count(markedValue);
@@ -88,12 +99,25 @@ public:
       TypeTreeLeafTypeRange destructureNeededBits,
       FieldSensitivePrunedLivenessBoundary &boundary);
 
+  void emitObjectInstConsumesValueTwice(MarkMustCheckInst *markedValue,
+                                        Operand *firstConsumingUse,
+                                        Operand *secondConsumingUse);
+  void emitObjectInstConsumesAndUsesValue(MarkMustCheckInst *markedValue,
+                                          Operand *consumingUse,
+                                          Operand *nonConsumingUse);
+
+  void emitAddressEscapingClosureCaptureLoadedAndConsumed(
+      MarkMustCheckInst *markedValue);
+  void emitPromotedBoxArgumentError(MarkMustCheckInst *markedValue,
+                                    SILFunctionArgument *arg);
+
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing
   /// copy. If filter is non-null, allow for the caller to pre-process operands
   /// and emit their own diagnostic. If filter returns true, then we assume that
   /// the caller processed it correctly. false, then we continue to process it.
-  void emitObjectDiagnosticsForFoundUses(bool ignorePartialApply = false) const;
+  void
+  emitObjectDiagnosticsForGuaranteedUses(bool ignorePartialApply = false) const;
   void emitObjectDiagnosticsForPartialApplyUses() const;
 
   void registerDiagnosticEmitted(MarkMustCheckInst *value) {

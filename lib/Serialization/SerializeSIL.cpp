@@ -511,16 +511,15 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
-      (unsigned)F.getClassSubclassScope(),
-      (unsigned)F.hasCReferences(), (unsigned)F.getEffectsKind(),
-      (unsigned)numAttrs, (unsigned)F.hasOwnership(),
-      F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
-      (unsigned)F.isDynamicallyReplaceable(),
-      (unsigned)F.isExactSelfClass(),
-      (unsigned)F.isDistributed(),
+      (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
+      (unsigned)F.getEffectsKind(), (unsigned)numAttrs,
+      (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
+      LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
+      (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
-      FnID, replacedFunctionID, usedAdHocWitnessFunctionID,
-      genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
+      (unsigned)F.forceEnableLexicalLifetimes(), FnID, replacedFunctionID,
+      usedAdHocWitnessFunctionID, genericSigID, clangNodeOwnerID,
+      parentModuleID, SemanticsIDs);
 
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
@@ -915,8 +914,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 
   case SILInstructionKind::DebugValueInst:
-    // Currently we don't serialize debug variable infos, so it doesn't make
-    // sense to write the instruction at all.
+  case SILInstructionKind::DebugStepInst:
+    // Currently we don't serialize debug info, so it doesn't make
+    // sense to write those instructions at all.
     // TODO: decide if we want to serialize those instructions.
     return;
   case SILInstructionKind::TestSpecificationInst:
@@ -1081,6 +1081,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     attr |= unsigned(ASI->isLexical()) << 1;
     attr |= unsigned(ASI->getWasMoved()) << 2;
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
+    break;
+  }
+  case SILInstructionKind::AllocPackInst: {
+    const AllocPackInst *API = cast<AllocPackInst>(&SI);
+    writeOneTypeLayout(API->getKind(), 0, API->getPackType());
+    break;
+  }
+  case SILInstructionKind::PackLengthInst: {
+    const PackLengthInst *PLI = cast<PackLengthInst>(&SI);
+    writeOneTypeLayout(PLI->getKind(), 0, PLI->getPackType());
     break;
   }
   case SILInstructionKind::ProjectBoxInst: {
@@ -1482,6 +1492,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::SetDeallocatingInst:
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocStackRefInst:
+  case SILInstructionKind::DeallocPackInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
@@ -1646,6 +1657,66 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addTypeRef(operand2->getType().getASTType()),
         (unsigned)operand2->getType().getCategory(),
         addValueRef(operand2));
+    break;
+  }
+  case SILInstructionKind::PackElementGetInst: {
+    auto PEGI = cast<PackElementGetInst>(&SI);
+    auto elementType = PEGI->getElementType();
+    auto elementTypeRef = S.addTypeRef(elementType.getASTType());
+    auto pack = PEGI->getPack();
+    auto packType = pack->getType();
+    auto packTypeRef = S.addTypeRef(packType.getASTType());
+    auto packRef = addValueRef(pack);
+    auto indexRef = addValueRef(PEGI->getIndex());
+    SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILPackElementGetLayout::Code],
+        elementTypeRef,
+        (unsigned) elementType.getCategory(),
+        packTypeRef,
+        (unsigned) packType.getCategory(),
+        packRef,
+        indexRef);
+    break;
+  }
+  case SILInstructionKind::PackElementSetInst: {
+    auto PESI = cast<PackElementSetInst>(&SI);
+    auto value = PESI->getValue();
+    auto valueType = value->getType();
+    auto valueTypeRef = S.addTypeRef(valueType.getASTType());
+    auto valueRef = addValueRef(value);
+    auto pack = PESI->getPack();
+    auto packType = pack->getType();
+    auto packTypeRef = S.addTypeRef(packType.getASTType());
+    auto packRef = addValueRef(pack);
+    auto indexRef = addValueRef(PESI->getIndex());
+    SILPackElementSetLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILPackElementSetLayout::Code],
+        valueTypeRef,
+        (unsigned) valueType.getCategory(),
+        valueRef,
+        packTypeRef,
+        (unsigned) packType.getCategory(),
+        packRef,
+        indexRef);
+    break;
+  }
+  case SILInstructionKind::TuplePackElementAddrInst: {
+    auto TPEAI = cast<TuplePackElementAddrInst>(&SI);
+    auto elementType = TPEAI->getElementType();
+    auto elementTypeRef = S.addTypeRef(elementType.getASTType());
+    auto tuple = TPEAI->getTuple();
+    auto tupleType = tuple->getType();
+    auto tupleTypeRef = S.addTypeRef(tupleType.getASTType());
+    auto tupleRef = addValueRef(tuple);
+    auto indexRef = addValueRef(TPEAI->getIndex());
+    SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILPackElementGetLayout::Code],
+        elementTypeRef,
+        (unsigned) elementType.getCategory(),
+        tupleTypeRef,
+        (unsigned) tupleType.getCategory(),
+        tupleRef,
+        indexRef);
     break;
   }
   case SILInstructionKind::TailAddrInst: {
@@ -2418,7 +2489,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       writeKeyPathPatternComponent(component, ListOfValues);
     }
     
-    for (auto &operand : KPI->getAllOperands()) {
+    for (auto &operand : KPI->getPatternOperands()) {
       auto value = operand.get();
       ListOfValues.push_back(addValueRef(value));
       ListOfValues.push_back(S.addTypeRef(value->getType().getASTType()));

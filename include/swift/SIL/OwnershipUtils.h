@@ -9,36 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-///
-/// Terminology:
-///
-/// Simple liveness:
-/// - Ends at lifetime-ending operations.
-/// - Transitively follows guaranteed forwarding operations and address uses
-///   within the current scope.
-/// - Assumes inner scopes are complete, including borrow and address scopes
-/// - Rarely returns AddressUseKind::PointerEscape.
-/// - Per-definition dominance holds
-/// - Insulates outer scopes from inner scope details. Maintains the
-///   invariant that inlining cannot pessimize optimization.
-///
-/// Transitive liveness
-/// - Transitively follows uses within inner scopes, including forwarding
-///   operations and address uses.
-/// - Much more likely to returns AddressUseKind::PointerEscape
-/// - Per-definition dominance holds
-/// - Does not assume that any scopes are complete.
-///
-/// Extended liveness (copy-extension and reborrow-extension)
-/// - Extends a live range across lifetime-ending operations
-/// - Depending on context: owned values are extended across copies or
-///   guaranteed values are extended across reborrows
-/// - Copy-extension is used to canonicalize an OSSA lifetime
-/// - Reborrow-extension is used to check borrow scopes relative to its inner
-///   uses and outer lifetime
-/// - Per-definition dominance does not hold
-///
-//===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_OWNERSHIPUTILS_H
 #define SWIFT_SIL_OWNERSHIPUTILS_H
@@ -255,6 +225,10 @@ bool findUsesOfSimpleValue(SILValue value,
 bool visitGuaranteedForwardingPhisForSSAValue(
     SILValue value, function_ref<bool(Operand *)> func);
 
+//===----------------------------------------------------------------------===//
+//                                Abstractions
+//===----------------------------------------------------------------------===//
+
 /// An operand that forwards ownership to one or more results.
 class ForwardingOperand {
   Operand *use = nullptr;
@@ -301,9 +275,6 @@ public:
   SILValue getSingleForwardedValue() const;
 };
 
-/// Returns true if the instruction is a 'reborrow'.
-bool isReborrowInstruction(const SILInstruction *inst);
-
 class BorrowingOperandKind {
 public:
   enum Kind : uint8_t {
@@ -314,6 +285,8 @@ public:
     Apply,
     TryApply,
     Yield,
+    PartialApplyStack,
+    BeginAsyncLet,
   };
 
 private:
@@ -324,8 +297,8 @@ public:
 
   operator Kind() const { return value; }
 
-  static BorrowingOperandKind get(SILInstructionKind kind) {
-    switch (kind) {
+  static BorrowingOperandKind get(SILInstruction *i) {
+    switch (i->getKind()) {
     default:
       return Kind::Invalid;
     case SILInstructionKind::BeginBorrowInst:
@@ -340,6 +313,15 @@ public:
       return Kind::TryApply;
     case SILInstructionKind::YieldInst:
       return Kind::Yield;
+    case SILInstructionKind::PartialApplyInst:
+      return Kind::PartialApplyStack;
+    case SILInstructionKind::BuiltinInst: {
+      auto bi = cast<BuiltinInst>(i);
+      if (bi->getBuiltinKind() == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+        return Kind::BeginAsyncLet;
+      }
+      return Kind::Invalid;
+    }
     }
   }
 
@@ -367,7 +349,7 @@ struct BorrowingOperand {
   BorrowingOperandKind kind;
 
   BorrowingOperand(Operand *op)
-      : op(op), kind(BorrowingOperandKind::get(op->getUser()->getKind())) {
+      : op(op), kind(BorrowingOperandKind::get(op->getUser())) {
     auto ownership = op->getOperandOwnership();
     if (ownership != OperandOwnership::Borrow
         && ownership != OperandOwnership::Reborrow) {
@@ -434,6 +416,8 @@ struct BorrowingOperand {
     case BorrowingOperandKind::Apply:
     case BorrowingOperandKind::TryApply:
     case BorrowingOperandKind::Yield:
+    case BorrowingOperandKind::PartialApplyStack:
+    case BorrowingOperandKind::BeginAsyncLet:
       return false;
     case BorrowingOperandKind::Branch:
       return true;
@@ -464,6 +448,8 @@ struct BorrowingOperand {
     case BorrowingOperandKind::Apply:
     case BorrowingOperandKind::TryApply:
     case BorrowingOperandKind::Yield:
+    case BorrowingOperandKind::PartialApplyStack:
+    case BorrowingOperandKind::BeginAsyncLet:
       return false;
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -1312,13 +1298,16 @@ void visitExtendedGuaranteedForwardingPhiBaseValuePairs(
 bool visitForwardedGuaranteedOperands(
   SILValue value, function_ref<void(Operand *)> visitOperand);
 
-/// Visit the phis in the same block as \p phi which are reborrows of a borrow
-/// of one of the values reaching \p phi.
+
+/// Return true of the lifetime of \p innerPhiVal depends on \p outerPhiVal.
+bool isInnerAdjacentPhi(SILArgument *innerPhiVal, SILArgument *outerPhiVal);
+
+/// Visit the phis in the same block as \p phi whose lifetime depends on \p phi.
 ///
 /// If the visitor returns false, stops visiting and returns false.  Otherwise,
 /// returns true.
-bool visitAdjacentReborrowsOfPhi(SILPhiArgument *phi,
-                                 function_ref<bool(SILPhiArgument *)> visitor);
+bool visitInnerAdjacentPhis(SILArgument *phi,
+                            function_ref<bool(SILArgument *)> visitor);
 
 /// Visit each definition of a scope that immediately encloses a guaranteed
 /// value. The guaranteed value effectively keeps these scopes alive.

@@ -29,6 +29,7 @@ namespace llvm {
   class AttributeList;
   class Function;
   class FunctionType;
+  class CallBase;
 }
 namespace swift {
 namespace irgen {
@@ -69,6 +70,12 @@ namespace irgen {
   emitCXXConstructorThunkIfNeeded(IRGenModule &IGM, Signature signature,
                                   const clang::CXXConstructorDecl *ctor,
                                   StringRef name, llvm::Constant *ctorAddress);
+
+  llvm::CallBase *emitCXXConstructorCall(IRGenFunction &IGF,
+                                         const clang::CXXConstructorDecl *ctor,
+                                         llvm::FunctionType *ctorFnType,
+                                         llvm::Constant *ctorAddress,
+                                         llvm::ArrayRef<llvm::Value *> args);
 }
 }
 

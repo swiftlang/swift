@@ -182,7 +182,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     return;
   // Don't spend time checking local declarations; this is always valid by the
   // time we get to this point.
-  if (!contextAccessScope.isPublic() &&
+  if (contextAccessScope.isInContext() &&
       contextAccessScope.getDeclContext()->isLocalContext())
     return;
 
@@ -1174,7 +1174,6 @@ public:
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType) // Handled by the Var or Subscript.
-  UNINTERESTING(Macro)
 
   /// If \p VD's layout is exposed by a @frozen struct or class, return said
   /// struct or class.
@@ -1567,6 +1566,10 @@ public:
         highlightOffendingType(diag, complainRepr);
       });
     }
+  }
+
+  void visitMacroDecl(MacroDecl *MD) {
+    // FIXME: Check access of macro generic parameters, parameters and result
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
@@ -2106,6 +2109,8 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
     desiredAccessScope = AccessScope(ED->getModuleContext());
     break;
   case AccessLevel::Package:
+    desiredAccessScope = AccessScope::getPackage();
+    break;
   case AccessLevel::Public:
   case AccessLevel::Open:
     break;

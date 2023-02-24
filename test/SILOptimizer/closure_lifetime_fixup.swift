@@ -30,8 +30,8 @@ public class C {
 // CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:  [[CL:%.*]] = mark_dependence [[PA]] : $@noescape @callee_guaranteed () -> () on [[ARG]] : $C
 // CHECK-NEXT:  // function_ref use_closure(_:)
-// CHECK-NEXT:  [[F2:%.*]] = function_ref @$s22closure_lifetime_fixup04use_A0yyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-// CHECK-NEXT:  apply [[F2]]([[CL]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK-NEXT:  [[F2:%.*]] = function_ref @$s22closure_lifetime_fixup04use_A0yyyyXEF :
+// CHECK-NEXT:  apply [[F2]]([[CL]]) :
 // CHECK-NEXT:  dealloc_stack [[PA]] : $@noescape @callee_guaranteed () -> ()
 // CHECK-NEXT:  strong_release [[ARG]] : $C
 // CHECK-NEXT:  tuple ()

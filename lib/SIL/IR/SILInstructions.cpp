@@ -296,6 +296,21 @@ DeallocStackInst *AllocStackInst::getSingleDeallocStack() const {
   return Dealloc;
 }
 
+AllocPackInst *AllocPackInst::create(SILDebugLocation loc,
+                                     SILType packType,
+                                     SILFunction &F) {
+  assert(packType.isObject());
+  assert(packType.is<SILPackType>() && "pack type must be lowered");
+  auto resultType = packType.getAddressType();
+
+  SmallVector<SILValue, 8> allOperands;
+  collectTypeDependentOperands(allOperands, F, packType);
+
+  auto size = totalSizeToAlloc<swift::Operand>(allOperands.size());
+  auto buffer = F.getModule().allocateInst(size, alignof(AllocPackInst));
+  return ::new (buffer) AllocPackInst(loc, resultType, allOperands);
+}
+
 AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
                                    SILDebugLocation Loc,
                                    SILType ObjectType,
@@ -1219,13 +1234,11 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
 }
 
 AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
-                                         AssignByWrapperInst::Originator origin,
                                          SILValue Src, SILValue Dest,
                                          SILValue Initializer, SILValue Setter,
                                          AssignByWrapperInst::Mode mode)
-    : AssignInstBase(Loc, Src, Dest, Initializer, Setter), originator(origin) {
-  assert(Initializer->getType().is<SILFunctionType>() ||
-         (isa<SILUndef>(Initializer) && originator == Originator::TypeWrapper));
+    : AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
+  assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
 }
 
@@ -2254,6 +2267,28 @@ OpenExistentialValueInst::OpenExistentialValueInst(
     : UnaryInstructionBase(debugLoc, operand, selfTy, forwardingOwnershipKind) {
 }
 
+PackLengthInst *PackLengthInst::create(SILFunction &F,
+                                       SILDebugLocation loc,
+                                       CanPackType packType) {
+  auto resultType = SILType::getBuiltinWordType(F.getASTContext());
+
+  // Always reduce the pack shape.
+  packType = packType->getReducedShape();
+
+  // Under current limitations, that should reliably eliminate
+  // any local archetypes from the pack, but there's no real need to
+  // assume that in the SIL representation.
+  SmallVector<SILValue, 8> typeDependentOperands;
+  collectTypeDependentOperands(typeDependentOperands, F, packType);
+
+  size_t size =
+    totalSizeToAlloc<swift::Operand>(typeDependentOperands.size());
+  void *buffer =
+    F.getModule().allocateInst(size, alignof(PackLengthInst));
+  return ::new (buffer)
+      PackLengthInst(loc, typeDependentOperands, resultType, packType);
+}
+
 DynamicPackIndexInst *DynamicPackIndexInst::create(SILFunction &F,
                                                    SILDebugLocation loc,
                                                    SILValue indexOperand,
@@ -2263,7 +2298,7 @@ DynamicPackIndexInst *DynamicPackIndexInst::create(SILFunction &F,
   SmallVector<SILValue, 8> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, F, packType);
 
-  unsigned size =
+  size_t size =
     totalSizeToAlloc<swift::Operand>(1 + typeDependentOperands.size());
   void *buffer =
     F.getModule().allocateInst(size, alignof(DynamicPackIndexInst));
@@ -2286,7 +2321,7 @@ PackPackIndexInst *PackPackIndexInst::create(SILFunction &F,
   SmallVector<SILValue, 8> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, F, packType);
 
-  unsigned size =
+  size_t size =
     totalSizeToAlloc<swift::Operand>(1 + typeDependentOperands.size());
   void *buffer =
     F.getModule().allocateInst(size, alignof(PackPackIndexInst));
@@ -2309,7 +2344,7 @@ ScalarPackIndexInst *ScalarPackIndexInst::create(SILFunction &F,
   SmallVector<SILValue, 8> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, F, packType);
 
-  unsigned size =
+  size_t size =
     totalSizeToAlloc<swift::Operand>(typeDependentOperands.size());
   void *buffer =
     F.getModule().allocateInst(size, alignof(ScalarPackIndexInst));
@@ -2365,6 +2400,46 @@ CanPackType OpenPackElementInst::getOpenedShapeClass() const {
   });
   assert(pack);
   return cast<PackType>(pack->getCanonicalType());
+}
+
+PackElementGetInst *PackElementGetInst::create(SILFunction &F,
+                                               SILDebugLocation debugLoc,
+                                               SILValue indexOperand,
+                                               SILValue packOperand,
+                                               SILType elementType) {
+  assert(indexOperand->getType().is<BuiltinPackIndexType>());
+  assert(packOperand->getType().is<SILPackType>());
+
+  SmallVector<SILValue, 8> allOperands;
+  allOperands.push_back(indexOperand);
+  allOperands.push_back(packOperand);
+  collectTypeDependentOperands(allOperands, F, elementType);
+
+  auto size = totalSizeToAlloc<swift::Operand>(allOperands.size());
+  auto buffer = F.getModule().allocateInst(size, alignof(PackElementGetInst));
+  return ::new (buffer) PackElementGetInst(debugLoc, allOperands, elementType);
+}
+
+TuplePackElementAddrInst *
+TuplePackElementAddrInst::create(SILFunction &F,
+                                 SILDebugLocation debugLoc,
+                                 SILValue indexOperand,
+                                 SILValue tupleOperand,
+                                 SILType elementType) {
+  assert(indexOperand->getType().is<BuiltinPackIndexType>());
+  assert(tupleOperand->getType().isAddress() &&
+         tupleOperand->getType().is<TupleType>());
+
+  SmallVector<SILValue, 8> allOperands;
+  allOperands.push_back(indexOperand);
+  allOperands.push_back(tupleOperand);
+  collectTypeDependentOperands(allOperands, F, elementType);
+
+  auto size = totalSizeToAlloc<swift::Operand>(allOperands.size());
+  auto buffer =
+    F.getModule().allocateInst(size, alignof(TuplePackElementAddrInst));
+  return ::new (buffer) TuplePackElementAddrInst(debugLoc, allOperands,
+                                                 elementType);
 }
 
 BeginCOWMutationInst::BeginCOWMutationInst(SILDebugLocation loc,
@@ -2824,24 +2899,30 @@ KeyPathInst::create(SILDebugLocation Loc,
   assert(Args.size() == Pattern->getNumOperands()
          && "number of key path args doesn't match pattern");
 
-  auto totalSize = totalSizeToAlloc<Operand>(Args.size());
+  SmallVector<SILValue, 8> allOperands(Args.begin(), Args.end());
+  collectTypeDependentOperands(allOperands, F, Ty);
+
+  auto totalSize = totalSizeToAlloc<Operand>(allOperands.size());
   void *mem = F.getModule().allocateInst(totalSize, alignof(KeyPathInst));
-  return ::new (mem) KeyPathInst(Loc, Pattern, Subs, Args, Ty);
+  return ::new (mem) KeyPathInst(Loc, Pattern, Subs, allOperands, Args.size(), Ty);
 }
 
 KeyPathInst::KeyPathInst(SILDebugLocation Loc,
                          KeyPathPattern *Pattern,
                          SubstitutionMap Subs,
-                         ArrayRef<SILValue> Args,
+                         ArrayRef<SILValue> allOperands,
+                         unsigned numPatternOperands,
                          SILType Ty)
   : InstructionBase(Loc, Ty),
     Pattern(Pattern),
-    NumOperands(Pattern->getNumOperands()),
+    numPatternOperands(numPatternOperands),
+    numTypeDependentOperands(allOperands.size() - numPatternOperands),
     Substitutions(Subs)
 {
+  assert(allOperands.size() >= numPatternOperands);
   auto *operandsBuf = getTrailingObjects<Operand>();
-  for (unsigned i = 0; i < Args.size(); ++i) {
-    ::new ((void*)&operandsBuf[i]) Operand(this, Args[i]);
+  for (unsigned i = 0; i < allOperands.size(); ++i) {
+    ::new ((void*)&operandsBuf[i]) Operand(this, allOperands[i]);
   }
   
   // Increment the use of any functions referenced from the keypath pattern.
@@ -2852,7 +2933,7 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
 
 MutableArrayRef<Operand>
 KeyPathInst::getAllOperands() {
-  return {getTrailingObjects<Operand>(), NumOperands};
+  return {getTrailingObjects<Operand>(), numPatternOperands + numTypeDependentOperands};
 }
 
 KeyPathInst::~KeyPathInst() {

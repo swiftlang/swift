@@ -340,8 +340,12 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     if (error)
       return nullptr;
   }
-
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+  return (const WitnessTable *)
+    swift_getWitnessTableRelative(this, type, conditionalArgs.data());
+#else
   return swift_getWitnessTable(this, type, conditionalArgs.data());
+#endif
 }
 
 namespace {
@@ -1159,6 +1163,7 @@ swift_conformsToProtocolImpl(const Metadata *const type,
     std::tie(table, hasUninstantiatedSuperclass) =
         swift_conformsToProtocolMaybeInstantiateSuperclasses(
             type, protocol, true /*instantiateSuperclassMetadata*/);
+
   return table;
 }
 
@@ -1267,6 +1272,13 @@ static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
                                         // from a Swift class).
                                         return false;
                                       });
+}
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+bool swift::_swift_class_isSubclass(const Metadata *subclass,
+                                    const Metadata *superclass) {
+  return isSubclass(subclass, superclass);
 }
 
 llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(

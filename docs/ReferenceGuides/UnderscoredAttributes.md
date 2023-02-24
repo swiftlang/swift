@@ -53,17 +53,7 @@ Adding this attribute to a type leads to remarks being emitted for all methods.
 
 ## `@_backDeploy(before: ...)`
 
-Causes the body of a function to be emitted into the module interface to be
-available for emission into clients with deployment targets lower than the
-ABI availability of the function. When the client's deployment target is
-before the function's ABI availability, the compiler replaces calls to that
-function with a call to a thunk that checks at runtime whether the original
-library function is available. If the original is available then it is
-called. Otherwise, the fallback copy of the function that was emitted into the
-client is called instead.
-
-For more details, see the [pitch thread](https://forums.swift.org/t/pitch-function-back-deployment/55769/)
-in the forums.
+The spelling of `@backDeployed(before:)` prior to the acceptance of [SE-0376](https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md).
 
 ## `@_borrowed`
 
@@ -543,6 +533,17 @@ If it's not possible to always inline the function, e.g. if it's a self-
 recursive function, the attribute is ignored.
 
 This attribute has no effect in debug builds.
+
+## `@_lexicalLifetimes`
+
+Applies lexical lifetime rules within a module built with lexical lifetimes
+disabled.  Facilitates gradual migration.
+
+In modules built with lexical lifetimes disabled but lexical borrow scopes
+enabled--the behavior of `-enable-lexical-lifetimes=false`--all lexical markers
+are stripped by the LexicalLifetimeEliminator pass.  Functions annotated with
+this attribute keep their lexical markers, affecting the optimizations that run
+on the function subsequently.
 
 ## `@_noEagerMove`
 

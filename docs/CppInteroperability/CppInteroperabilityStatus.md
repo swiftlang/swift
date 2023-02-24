@@ -22,8 +22,7 @@ using V = std::vector<long>;
 ```Swift
 // main.swift
 import CxxTypes
-import std.vector
-import std.algorithm
+import CxxStdlib
 
 // We can extend C++ types in Swift.
 extension V : RandomAccessCollection {

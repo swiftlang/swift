@@ -497,8 +497,8 @@ func create<T>(_ fn: () throws -> T) throws -> T {
 func testThunk(_ fn: () throws -> Int) throws -> Int {
   return try create(fn)
 }
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSis5Error_pIgdzo_SisAA_pIegrzo_TR : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error any Error)) -> (@out Int, @error any Error)
-// CHECK: bb0(%0 : $*Int, %1 : $@noescape @callee_guaranteed () -> (Int, @error any Error)):
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSis5Error_pIgdzo_SisAA_pIegrzo_TR :
+// CHECK: bb0(%0 : $*Int, %1 : @guaranteed $@noescape @callee_guaranteed () -> (Int, @error any Error)):
 // CHECK:   try_apply %1()
 // CHECK: bb1([[T0:%.*]] : $Int):
 // CHECK:   store [[T0]] to [trivial] %0 : $*Int
@@ -511,9 +511,9 @@ func createInt(_ fn: () -> Int) throws {}
 func testForceTry(_ fn: () -> Int) {
   try! createInt(fn)
 }
-// CHECK-LABEL: sil hidden [ossa] @$s6errors12testForceTryyySiyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> ()
-// CHECK: bb0([[ARG:%.*]] : $@noescape @callee_guaranteed () -> Int):
-// CHECK: [[FUNC:%.*]] = function_ref @$s6errors9createIntyySiyXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @error any Error
+// CHECK-LABEL: sil hidden [ossa] @$s6errors12testForceTryyySiyXEF :
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $@noescape @callee_guaranteed () -> Int):
+// CHECK: [[FUNC:%.*]] = function_ref @$s6errors9createIntyySiyXEKF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> @error any Error
 // CHECK: try_apply [[FUNC]]([[ARG]])
 // CHECK: return
 // CHECK: function_ref @swift_unexpectedError

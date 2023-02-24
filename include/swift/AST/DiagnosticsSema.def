@@ -804,9 +804,13 @@ ERROR(serialization_module_too_old,Fatal,
       "rebuild %0 and try again: %1",
       (Identifier, StringRef))
 ERROR(serialization_module_incompatible_revision,Fatal,
-      "compiled module was created by a different version of the compiler; "
-      "rebuild %0 and try again: %1",
-      (Identifier, StringRef))
+      "compiled module was created by a different version of the compiler '%0'; "
+      "rebuild %1 and try again: %2",
+      (StringRef, Identifier, StringRef))
+REMARK(serialization_module_problematic_revision, none,
+      "compiled module was created by a different version of the compiler '%0': "
+      "%1",
+      (StringRef, StringRef))
 ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,Fatal,
@@ -1107,6 +1111,29 @@ ERROR(invalid_optional_chain,none,
 ERROR(ternary_expr_cases_mismatch,none,
       "result values in '? :' expression have mismatching types %0 and %1",
       (Type, Type))
+
+// Statements as expressions
+ERROR(single_value_stmt_branches_mismatch,none,
+      "branches have mismatching types %0 and %1",
+      (Type, Type))
+ERROR(single_value_stmt_out_of_place,none,
+      "'%0' may only be used as expression in return, throw, or as the source "
+      "of an assignment",
+      (StmtKind))
+ERROR(single_value_stmt_must_be_unlabeled,none,
+      "'%0' cannot have a jump label when used as expression",
+      (StmtKind))
+ERROR(if_expr_must_be_syntactically_exhaustive,none,
+      "'if' must have an unconditional 'else' to be used as expression",
+      ())
+ERROR(single_value_stmt_branch_must_end_in_throw,none,
+      "non-expression branch of '%0' expression may only end with a 'throw'",
+      (StmtKind))
+ERROR(cannot_jump_in_single_value_stmt,none,
+      "cannot '%0' in '%1' when used as expression",
+      (StmtKind, StmtKind))
+ERROR(effect_marker_on_single_value_stmt,none,
+      "'%0' may not be used on '%1' expression", (StringRef, StmtKind))
 
 ERROR(did_not_call_function_value,none,
       "function value was used as a property; add () to call it",
@@ -3866,6 +3893,9 @@ ERROR(optional_used_as_boolean,none,
 ERROR(integer_used_as_boolean,none,
      "type %0 cannot be used as a boolean; "
      "test for '%select{!|=}1= 0' instead", (Type, bool))
+ERROR(integer_used_as_boolean_literal,none,
+     "integer literal value '%0' cannot be used as a boolean; "
+     "did you mean '%select{false|true}1'?", (StringRef, bool))
 
 ERROR(interpolation_missing_proto,none,
       "string interpolation requires the protocol 'ExpressibleByStringInterpolation' to be defined",
@@ -3895,7 +3925,7 @@ ERROR(unresolved_member_no_inference,none,
 ERROR(cannot_infer_base_of_unresolved_member,none,
       "cannot infer contextual base in reference to member %0", (DeclNameRef))
 ERROR(cannot_infer_underlying_for_opaque_result,none,
-      "cannot infer underlying type for opaque result %0 from return expression",
+      "underlying type for opaque result type %0 could not be inferred from return expression",
       (Type))
 ERROR(unresolved_nil_literal,none,
       "'nil' requires a contextual type", ())
@@ -5302,6 +5332,8 @@ NOTE(overridden_required_initializer_here,none,
 // Functions
 ERROR(attribute_requires_function_type,none,
       "@%0 attribute only applies to function types", (StringRef))
+ERROR(generic_function_type,none,
+      "function values cannot be generic", ())
 ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
 ERROR(unreferenced_generic_parameter,NoUsage,
@@ -5383,6 +5415,9 @@ ERROR(illegal_sil_type,none,
       "type %0 is not a legal SIL value type", (Type))
 ERROR(sil_box_arg_mismatch,none,
       "SIL box type has wrong number of generic arguments for layout", ())
+ERROR(sil_pack_element_uuid_not_found,none,
+      "open_pack_element instruction not found for @pack_element type UUID; "
+      "possible forward reference?", ())
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,
       "metatypes in SIL must have @thin, @thick, or @objc_metatype attribute",
@@ -6067,7 +6102,7 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
   "a property initializer in a '@frozen' type|" \
-  "a '@_backDeploy' function'}"
+  "a '@backDeployed' function'}"
 
 #define DECL_OR_ACCESSOR "%select{%0|%0 for}"
 
@@ -6648,6 +6683,13 @@ ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
       none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
 ERROR(noimplicitcopy_attr_invalid_in_generic_context,
       none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
+ERROR(moveonly_generics, none, "move-only type %0 cannot be used with generics yet", (Type))
+ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
+      "'@_noImplicitCopy' has no effect when applied to a move only type", ())
+ERROR(moveonly_enums_do_not_support_indirect,none,
+      "move-only enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
+ERROR(moveonly_cast,none,
+      "move-only types cannot be conditionally cast", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
@@ -6712,85 +6754,6 @@ ERROR(move_expression_not_passed_lvalue,none,
       "'move' can only be applied to lvalues", ())
 ERROR(borrow_expression_not_passed_lvalue,none,
       "'borrow' can only be applied to lvalues", ())
-
-//------------------------------------------------------------------------------
-// MARK: Type Wrappers
-//------------------------------------------------------------------------------
-
-ERROR(type_wrappers_are_experimental,none,
-      "type wrappers are an experimental feature", ())
-
-ERROR(type_wrapper_attribute_not_allowed_here,none,
-      "type wrapper attribute %0 can only be applied to a class, struct, or protocol",
-      (Identifier))
-
-ERROR(type_wrapper_requires_two_generic_params,none,
-      "type wrapper has to declare two generic parameters: "
-      "wrapped and storage types", ())
-
-ERROR(cannot_use_multiple_type_wrappers,none,
-      "%0 %1 cannot use more than one type wrapper",
-      (DescriptiveDeclKind, DeclName))
-
-NOTE(type_wrapper_inferred_from,none,
-     "type wrapper %0 inferred from %1 %2",
-     (DeclName, DescriptiveDeclKind, DeclName))
-
-ERROR(type_wrapper_requires_memberwise_init,none,
-      "type wrapper type %0 does not contain a required initializer"
-      " - init(for:storage:)",
-      (DeclName))
-
-ERROR(cannot_overload_type_wrapper_initializer,none,
-      "cannot overload type wrapper initializer 'init(for:storage:)'", ())
-
-ERROR(cannot_declare_type_wrapper_init_with_invalid_first_param,none,
-      "first parameter of type wrapper initializer should be wrapped type - %0", (Type))
-
-ERROR(cannot_declare_type_wrapper_init_with_invalid_second_param,none,
-      "second parameter of type wrapper initializer should be storage type - %0", (Type))
-
-ERROR(type_wrapper_requires_subscript,none,
-      "type wrapper type %0 does not contain a required subscript"
-      " - subscript(propertyKeyPath:storageKeyPath:)",
-      (DeclName))
-
-ERROR(type_wrapper_requires_readonly_subscript,none,
-      "type wrapper type %0 does not contain a required ready-only subscript",
-      (DeclName))
-
-ERROR(type_wrapper_requires_writable_subscript,none,
-      "type wrapper type %0 does not contain a required writable subscript",
-      (DeclName))
-
-NOTE(add_type_wrapper_subscript_stub_note,none,
-     "do you want to add a stub?", ())
-
-ERROR(type_wrapper_failable_init,none,
-      "type wrapper initializer %0 cannot be failable", (DeclName))
-
-ERROR(type_wrapper_subscript_invalid_parameter_type,none,
-      "type wrapper subscript parameter %0 expects type %1 (got: %2)",
-      (Identifier, Type, Type))
-
-ERROR(type_wrapper_subscript_invalid_keypath_parameter,none,
-      "type wrapper subscript parameter %0 expects a key path (got: %1)",
-      (Identifier, Type))
-
-ERROR(type_wrapper_type_requirement_not_accessible,none,
-      "%select{private|fileprivate|internal|package|public|open}0 %1 %2 cannot have "
-      "more restrictive access than its enclosing type wrapper type %3 "
-      "(which is %select{private|fileprivate|internal|package|public|open}4)",
-      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
-
-ERROR(type_wrapper_ignored_on_local_properties,none,
-      "%0 must not be used on local properties", (DeclAttribute))
-ERROR(type_wrapper_ignored_on_computed_properties,none,
-      "%0 must not be used on computed properties", (DeclAttribute))
-ERROR(type_wrapper_ignored_on_static_properties,none,
-      "%0 must not be used on static properties", (DeclAttribute))
-ERROR(type_wrapper_ignored_on_lazy_properties,none,
-      "%0 must not be used on lazy properties", (DeclAttribute))
 
 //------------------------------------------------------------------------------
 // MARK: #_hasSymbol
@@ -6885,7 +6848,7 @@ ERROR(macro_definition_unsupported,none,
       "macro definitions other than '#externalMacro(...)' are unsupported", ())
 ERROR(external_macro_arg_not_type_name,none,
       "argument to `#externalMacro` must be a string literal naming "
-      "the external macro's %select{module|type}", (unsigned))
+      "the external macro's %select{module|type}0", (unsigned))
 ERROR(attached_declaration_macro_not_supported,none,
       "attached declaration macros are not yet supported", ())
 
@@ -6899,12 +6862,15 @@ ERROR(moveonly_copyable_type_that_contains_moveonly_type, none,
 NOTE(moveonly_copyable_type_that_contains_moveonly_type_location, none,
      "contained move-only %0 '%1.%2'",
      (DescriptiveDeclKind, StringRef, StringRef))
-ERROR(moveonly_cannot_conform_to_protocol, none,
-     "move-only %0 %1 cannot conform yet to any protocols",
-     (DescriptiveDeclKind, DeclName))
-ERROR(moveonly_cannot_conform_to_protocol_with_name, none,
-     "move-only %0 %1 cannot conform to protocol %2",
-     (DescriptiveDeclKind, DeclName, DeclName))
+ERROR(moveonly_cannot_conform_to_type, none,
+     "move-only %0 %1 cannot conform to %2",
+     (DescriptiveDeclKind, DeclName, Type))
+ERROR(moveonly_non_final_class_cannot_contain_moveonly_field, none,
+     "non-final classes containing move only fields is not yet supported", ())
+ERROR(moveonly_parameter_missing_ownership, none,
+      "noncopyable parameter must specify its ownership", ())
+NOTE(moveonly_parameter_ownership_suggestion, none,
+      "add '%0' %1", (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Runtime discoverable attributes (@runtimeMetadata)
@@ -6916,6 +6882,14 @@ ERROR(runtime_discoverable_attrs_are_experimental,none,
 ERROR(invalid_decl_for_runtime_discoverable_attr,none,
       "@%0 can only be applied to non-generic types, methods, "
       "instance properties, and global functions", (StringRef))
+
+ERROR(invalid_decl_for_runtime_discoverable_attr_in_extension,none,
+      "@%0 can only be applied to unavailable extensions in the same module"
+      " as %1", (StringRef, DeclName))
+
+ERROR(invalid_attr_redeclaration_in_extension,none,
+      "@%0 is already applied to type %1; did you want to remove it?",
+      (StringRef, DeclName))
 
 ERROR(duplicate_runtime_discoverable_attr,none,
       "duplicate runtime discoverable attribute", ())
@@ -6934,7 +6908,26 @@ ERROR(runtime_attribute_type_requirement_not_accessible,none,
       "(which is %select{private|fileprivate|internal|package|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
 
+ERROR(cannot_use_attr_with_custom_arguments_on_protocol,none,
+      "reflection metadata attributes applied to protocols cannot have"
+      " additional attribute arguments; attribute arguments must be"
+      " explicitly written on the conforming type",
+      ())
+
+NOTE(missing_reflection_metadata_attribute_on_type,none,
+     "protocol %0 requires reflection metadata attribute @%1",
+     (DeclName, StringRef))
+
+ERROR(missing_reflection_metadata_attribute_on_subclass,none,
+      "superclass %0 requires reflection metadata attribute @%1",
+      (DeclName, StringRef))
+NOTE(add_missing_reflection_metadata_attr,none,
+     "add missing reflection metadata attribute @%0", (StringRef))
+NOTE(opt_out_from_missing_reflection_metadata_attr,none,
+     "opt-out of reflection metadata attribute @%0 using"
+     " unavailable extension",
+     (StringRef))
+
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
-

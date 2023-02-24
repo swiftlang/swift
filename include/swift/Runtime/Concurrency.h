@@ -20,7 +20,6 @@
 #include "swift/ABI/AsyncLet.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
-#include "swift/ABI/TaskStatus.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
@@ -643,31 +642,6 @@ void swift_task_localValuePop();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localsCopyTo(AsyncTask* target);
 
-/// This should have the same representation as an enum like this:
-///    enum NearestTaskDeadline {
-///      case none
-///      case alreadyCancelled
-///      case active(TaskDeadline)
-///    }
-/// TODO: decide what this interface should really be.
-struct NearestTaskDeadline {
-  enum Kind : uint8_t {
-    None,
-    AlreadyCancelled,
-    Active
-  };
-
-  TaskDeadline Value;
-  Kind ValueKind;
-};
-
-/// Returns the nearest deadline that's been registered with this task.
-///
-/// This must be called synchronously with the task.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-NearestTaskDeadline
-swift_task_getNearestDeadline(AsyncTask *task);
-
 /// Switch the current task to a new executor if we aren't already
 /// running on a compatible executor.
 ///
@@ -729,6 +703,13 @@ void swift_task_enqueueGlobalWithDeadline(long long sec, long long nsec,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
 
+/// Return true if the caller is running in a Task on the passed Executor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isOnExecutor(
+    HeapObject * executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 
 /// Enqueue the given job on the main executor.
@@ -765,6 +746,17 @@ SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_hook)(
     long long tnsec,
     int clock, Job *job,
     swift_task_enqueueGlobalWithDeadline_original original);
+
+typedef SWIFT_CC(swift) bool (*swift_task_isOnExecutor_original)(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) bool (*swift_task_isOnExecutor_hook)(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable,
+    swift_task_isOnExecutor_original original);
 
 /// A hook to take over main executor enqueueing.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_original)(

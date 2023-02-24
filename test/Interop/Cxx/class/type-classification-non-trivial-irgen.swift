@@ -1,4 +1,4 @@
-// RUN: %target-swiftxx-frontend -I %S/Inputs %s -emit-ir | %FileCheck %s
+// RUN: %target-swiftxx-frontend -I %S/Inputs %s -emit-ir -Xcc -fignore-exceptions | %FileCheck %s
 
 // Verify that non-trivial/address-only C++ classes are constructed and accessed
 // correctly. Make sure that we correctly IRGen functions that construct

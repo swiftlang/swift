@@ -502,12 +502,6 @@ importer::getNormalInvocationArguments(
       "-fmodules",
       "-Xclang", "-fmodule-feature", "-Xclang", "swift"
   });
-  // Don't enforce strict rules when inside the debugger to work around search
-  // path problems caused by a module existing in both the build/install
-  // directory and the source directory.
-  if (!importerOpts.DebuggerSupport)
-    invocationArgStrs.push_back(
-        "-Werror=non-modular-include-in-framework-module");
 
   bool EnableCXXInterop = LangOpts.EnableCXXInterop;
 
@@ -2269,13 +2263,13 @@ ClangImporter::Implementation::Implementation(
           !ctx.ClangImporterOpts.BridgingHeader.empty()),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
       EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
+      importSymbolicCXXDecls(
+          ctx.LangOpts.hasFeature(Feature::ImportSymbolicCXXDecls)),
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
-      Walker(DiagnosticWalker(*this)),
-      BuffersForDiagnostics(ctx.SourceMgr),
+      Walker(DiagnosticWalker(*this)), BuffersForDiagnostics(ctx.SourceMgr),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
-      platformAvailability(ctx.LangOpts),
-      nameImporter(),
+      platformAvailability(ctx.LangOpts), nameImporter(),
       DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
       DWARFImporter(dwarfImporterDelegate) {}
 
@@ -6280,6 +6274,9 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
             hasUnsafeAPIAttr(cxxRecord))
           return false;
 
+        if (hasIteratorAPIAttr(cxxRecord) || isIterator(cxxRecord))
+          return true;
+
         if (hasPointerInSubobjects(cxxRecord))
           return true;
       }
@@ -6563,4 +6560,33 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     return {CustomRefCountingOperationResult::notFound, nullptr, name};
 
   return {CustomRefCountingOperationResult::tooManyFound, nullptr, name};
+}
+
+void ClangImporter::withSymbolicFeatureEnabled(
+    llvm::function_ref<void(void)> callback) {
+  llvm::SaveAndRestore<bool> oldImportSymbolicCXXDecls(
+      Impl.importSymbolicCXXDecls, true);
+  Impl.nameImporter->enableSymbolicImportFeature(true);
+  auto importedDeclsCopy = Impl.ImportedDecls;
+  Impl.ImportedDecls.clear();
+  callback();
+  Impl.ImportedDecls = std::move(importedDeclsCopy);
+  Impl.nameImporter->enableSymbolicImportFeature(
+      oldImportSymbolicCXXDecls.get());
+}
+
+bool importer::requiresCPlusPlus(const clang::Module *module) {
+  // The libc++ modulemap doesn't currently declare the requirement.
+  if (module->getTopLevelModuleName() == "std")
+    return true;
+
+  // Modulemaps often declare the requirement for the top-level module only.
+  if (auto parent = module->Parent) {
+    if (requiresCPlusPlus(parent))
+      return true;
+  }
+
+  return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
+    return req.first == "cplusplus";
+  });
 }

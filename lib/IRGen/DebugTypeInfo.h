@@ -61,7 +61,7 @@ public:
 
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(VarDecl *Decl, swift::Type Ty,
-                                        const TypeInfo &Info,
+                                        const TypeInfo &Info, IRGenModule &IGM,
                                         bool IsFragmentTypeInfo);
   /// Create type for global type metadata.
   static DebugTypeInfo getGlobalMetadata(swift::Type Ty, llvm::Type *StorageTy,
@@ -75,6 +75,7 @@ public:
 
   /// Create a standalone type from a TypeInfo object.
   static DebugTypeInfo getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
+                                       IRGenModule &IGM,
                                        bool IsFragmentTypeInfo);
   /// Global variables.
   static DebugTypeInfo getGlobal(SILGlobalVariable *GV,
@@ -111,7 +112,6 @@ public:
     return SizeIsFragmentSize ? llvm::None : SizeInBits;
   }
   Optional<Size::int_type> getRawSizeInBits() const { return SizeInBits; }
-  void setSizeInBits(Size::int_type NewSize) { SizeInBits = NewSize; }
   Alignment getAlignment() const { return Align; }
   bool isNull() const { return Type == nullptr; }
   bool isForwardDecl() const { return FragmentStorageType == nullptr; }
@@ -139,9 +139,9 @@ public:
   }
 
   static Optional<CompletedDebugTypeInfo>
-  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info) {
+  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM) {
     return CompletedDebugTypeInfo::get(
-        DebugTypeInfo::getFromTypeInfo(Ty, Info, /*IsFragment*/ false));
+        DebugTypeInfo::getFromTypeInfo(Ty, Info, IGM, /*IsFragment*/ false));
   }
 
   Size::int_type getSizeInBits() const { return *SizeInBits; }

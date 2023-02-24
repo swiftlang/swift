@@ -39,13 +39,18 @@ struct ConcurrencyOverrideSection {
 
 #undef OVERRIDE
 
+__attribute__((visibility("hidden")))
 ConcurrencyOverrideSection Swift56ConcurrencyOverrides
 __attribute__((used, section("__DATA,__s_async_hook"))) = {
   .version = 0,
+#if __POINTER_WIDTH__ == 64
+  .task_create_common = swift56override_swift_task_create_common,
+#endif
   .task_future_wait = swift56override_swift_task_future_wait,
   .task_future_wait_throwing = swift56override_swift_task_future_wait_throwing,
 };
 
+__attribute__((visibility("hidden")))
 RuntimeOverrideSection Swift56RuntimeOverrides
 __attribute__((used, section("__DATA,__swift56_hooks"))) = {
   .version = 0,

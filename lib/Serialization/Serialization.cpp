@@ -1011,7 +1011,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     static const char* forcedDebugRevision =
       ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
     auto revision = forcedDebugRevision ?
-      forcedDebugRevision : version::getCurrentCompilerTag();
+      forcedDebugRevision : version::getCurrentCompilerSerializationTag();
     Revision.emit(ScratchRecord, revision);
 
     IsOSSA.emit(ScratchRecord, options.IsOSSA);
@@ -2233,6 +2233,8 @@ static uint8_t getRawStableMacroRole(swift::MacroRole context) {
   CASE(Accessor)
   CASE(MemberAttribute)
   CASE(Member)
+  CASE(Peer)
+  CASE(Conformance)
   }
 #undef CASE
   llvm_unreachable("bad result declaration macro kind");
@@ -2737,11 +2739,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_BackDeploy: {
-      auto *theAttr = cast<BackDeployAttr>(DA);
+    case DAK_BackDeployed: {
+      auto *theAttr = cast<BackDeployedAttr>(DA);
       ENCODE_VER_TUPLE(Version, llvm::Optional<llvm::VersionTuple>(theAttr->Version));
-      auto abbrCode = S.DeclTypeAbbrCodes[BackDeployDeclAttrLayout::Code];
-      BackDeployDeclAttrLayout::emitRecord(
+      auto abbrCode = S.DeclTypeAbbrCodes[BackDeployedDeclAttrLayout::Code];
+      BackDeployedDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           theAttr->isImplicit(),
           LIST_VER_TUPLE_PIECES(Version),
@@ -2866,7 +2868,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto theAttr = cast<CustomAttr>(DA);
 
       // Macro attributes are not serialized.
-      if (theAttr->isAttachedMacro(D))
+      if (D->getResolvedMacro(const_cast<CustomAttr *>(theAttr)))
         return;
 
       auto typeID = S.addTypeRef(theAttr->getType());
@@ -3136,11 +3138,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     if (accessScope.isPublic())
       return true;
 
-    // Testable allows access to internal details.
-    if (value->getDeclContext()->getParentModule()->isTestingEnabled() &&
-        accessScope.isInternal())
-      return true;
-
     if (auto accessor = dyn_cast<AccessorDecl>(value))
       // Accessors are as safe as their storage.
       if (isDeserializationSafe(accessor->getStorage()))
@@ -3189,14 +3186,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 #endif
 
     // Private imports allow safe access to everything.
-    if (DC->getParentModule()->arePrivateImportsEnabled())
+    if (DC->getParentModule()->arePrivateImportsEnabled() ||
+        DC->getParentModule()->isTestingEnabled())
       return;
 
     // Ignore things with no access level.
     // Note: There's likely room to report some of these as unsafe to prevent
     //       failures.
     if (isa<GenericTypeParamDecl>(decl) ||
-        isa<OpaqueTypeDecl>(decl) ||
         isa<ParamDecl>(decl) ||
         isa<EnumCaseDecl>(decl) ||
         isa<EnumElementDecl>(decl))
@@ -3219,7 +3216,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     // Write a human readable name to an identifier.
     SmallString<64> out;
     llvm::raw_svector_ostream outStream(out);
-    if (auto val = dyn_cast<ValueDecl>(decl)) {
+    if (auto opaque = dyn_cast<OpaqueTypeDecl>(decl)) {
+      outStream << "opaque ";
+      outStream << opaque->getOpaqueReturnTypeIdentifier();
+    } else if (auto val = dyn_cast<ValueDecl>(decl)) {
       outStream << val->getName();
     } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
       outStream << "extension ";

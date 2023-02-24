@@ -101,6 +101,8 @@ bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
 ///     invalid positions.
 ///   - Marker protocols cannot occur as the type of an as? or is expression.
 ///   - KeyPath expressions cannot refer to effectful properties / subscripts
+///   - SingleValueStmtExprs may only appear in certain places and has
+///     restrictions on the control flow allowed.
 ///   - Move expressions must have a declref expr subvalue.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
@@ -334,7 +336,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                 tupleExpr->getElementNames());
       }
 
-      // Diagnose checked casts that involve marker protocols.
+      // Specially diagnose some checked casts that are illegal.
       if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
         checkCheckedCastExpr(cast);
       }
@@ -382,16 +384,39 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkCheckedCastExpr(CheckedCastExpr *cast) {
+      Type castType = cast->getCastType();
+      if (!castType)
+        return;
+
+      if (castType->isPureMoveOnly()) {
+        // can't cast anything to move-only; there should be no valid ones.
+        Ctx.Diags.diagnose(cast->getLoc(), diag::moveonly_cast);
+        return;
+      }
+
+      // no support for runtime casts from move-only types.
+      // as of now there is no type it could be cast to except itself, so
+      // there's no reason for it to happen at runtime.
+      if (auto fromType = cast->getSubExpr()->getType()) {
+        if (fromType->isPureMoveOnly()) {
+          // can't cast move-only to anything.
+          Ctx.Diags.diagnose(cast->getLoc(), diag::moveonly_cast);
+          return;
+        }
+      }
+
+      // now, look for conditional casts to marker protocols.
+
       if (!isa<ConditionalCheckedCastExpr>(cast) && !isa<IsExpr>(cast))
         return;
 
-      Type castType = cast->getCastType();
-      if (!castType || !castType->isExistentialType())
+      if(!castType->isExistentialType())
         return;
 
       auto layout = castType->getExistentialLayout();
       for (auto proto : layout.getProtocols()) {
         if (proto->isMarkerProtocol()) {
+          // can't conditionally cast to a marker protocol
           Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
                              proto->getName());
         }
@@ -3788,6 +3813,140 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
   }
 }
 
+namespace {
+class SingleValueStmtUsageChecker final : public ASTWalker {
+  ASTContext &Ctx;
+  DiagnosticEngine &Diags;
+  llvm::DenseSet<SingleValueStmtExpr *> ValidSingleValueStmtExprs;
+
+public:
+  SingleValueStmtUsageChecker(ASTContext &ctx) : Ctx(ctx), Diags(ctx.Diags) {}
+
+private:
+  /// Mark a given expression as a valid position for a SingleValueStmtExpr.
+  void markValidSingleValueStmt(Expr *E) {
+    if (!E)
+      return;
+
+    if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E))
+      ValidSingleValueStmtExprs.insert(SVE);
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
+      // Diagnose a SingleValueStmtExpr in a context that we do not currently
+      // support.
+      if (!ValidSingleValueStmtExprs.contains(SVE)) {
+        Diags.diagnose(SVE->getLoc(), diag::single_value_stmt_out_of_place,
+                       SVE->getStmt()->getKind());
+      }
+
+      // Nested SingleValueStmtExprs are allowed.
+      SmallVector<Expr *, 4> scratch;
+      for (auto *branch : SVE->getSingleExprBranches(scratch))
+        markValidSingleValueStmt(branch);
+
+      // Diagnose invalid SingleValueStmtExprs. This should only happen for
+      // expressions in positions that we didn't support before
+      // (e.g assignment or *explicit* return).
+      auto *S = SVE->getStmt();
+      auto mayProduceSingleValue = S->mayProduceSingleValue(Ctx);
+      switch (mayProduceSingleValue.getKind()) {
+      case IsSingleValueStmtResult::Kind::Valid:
+        break;
+      case IsSingleValueStmtResult::Kind::UnterminatedBranches: {
+        for (auto *branch : mayProduceSingleValue.getUnterminatedBranches()) {
+          Diags.diagnose(branch->getEndLoc(),
+                         diag::single_value_stmt_branch_must_end_in_throw,
+                         S->getKind());
+        }
+        break;
+      }
+      case IsSingleValueStmtResult::Kind::NonExhaustiveIf: {
+        Diags.diagnose(S->getStartLoc(),
+                       diag::if_expr_must_be_syntactically_exhaustive);
+        break;
+      }
+      case IsSingleValueStmtResult::Kind::HasLabel: {
+        // FIXME: We should offer a fix-it to remove (currently we don't track
+        // the colon SourceLoc).
+        auto label = cast<LabeledStmt>(S)->getLabelInfo();
+        Diags.diagnose(label.Loc,
+                       diag::single_value_stmt_must_be_unlabeled, S->getKind())
+          .highlight(label.Loc);
+        break;
+      }
+      case IsSingleValueStmtResult::Kind::InvalidJumps: {
+        // Diagnose each invalid jump.
+        for (auto *jump : mayProduceSingleValue.getInvalidJumps()) {
+          Diags.diagnose(jump->getStartLoc(),
+                         diag::cannot_jump_in_single_value_stmt,
+                         jump->getKind(), S->getKind())
+            .highlight(jump->getSourceRange());
+        }
+        break;
+      }
+      case IsSingleValueStmtResult::Kind::NoExpressionBranches:
+        // This is fine, we will have typed the expression as Void (we verify
+        // as such in the ASTVerifier).
+        break;
+      case IsSingleValueStmtResult::Kind::CircularReference:
+        // Already diagnosed.
+        break;
+      case IsSingleValueStmtResult::Kind::UnhandledStmt:
+        break;
+      }
+      return Action::Continue(E);
+    }
+
+    // Valid as the source of an assignment, as long as it's not a nested
+    // expression (as otherwise this would be effectively allowing it in an
+    // arbitrary expression position).
+    if (auto *AE = dyn_cast<AssignExpr>(E)) {
+      if (!Parent.getAsExpr())
+        markValidSingleValueStmt(AE->getSrc());
+    }
+
+    // Valid as a single expression body of a closure. This is needed in
+    // addition to ReturnStmt checking, as we will remove the return if the
+    // expression is inferred to be Never.
+    if (auto *ACE = dyn_cast<ClosureExpr>(E)) {
+      if (ACE->hasSingleExpressionBody())
+        markValidSingleValueStmt(ACE->getSingleExpressionBody());
+    }
+    return Action::Continue(E);
+  }
+
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    // Valid in a return/throw.
+    if (auto *RS = dyn_cast<ReturnStmt>(S)) {
+      if (RS->hasResult())
+        markValidSingleValueStmt(RS->getResult());
+    }
+    if (auto *TS = dyn_cast<ThrowStmt>(S))
+      markValidSingleValueStmt(TS->getSubExpr());
+
+    return Action::Continue(S);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    // Valid as an initializer of a pattern binding.
+    if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+      for (auto idx : range(PBD->getNumPatternEntries()))
+        markValidSingleValueStmt(PBD->getInit(idx));
+    }
+    // Valid as a single expression body of a function. This is needed in
+    // addition to ReturnStmt checking, as we will remove the return if the
+    // expression is inferred to be Never.
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (AFD->hasSingleExpressionBody())
+        markValidSingleValueStmt(AFD->getSingleExpressionBody());
+    }
+    return Action::Continue();
+  }
+};
+} // end anonymous namespace
+
 /// Apply the warnings managed by VarDeclUsageChecker to the top level
 /// code declarations that haven't been checked yet.
 void swift::
@@ -3795,6 +3954,8 @@ performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
   auto &ctx = TLCD->getDeclContext()->getASTContext();
   VarDeclUsageChecker checker(TLCD, ctx.Diags);
   TLCD->walk(checker);
+  SingleValueStmtUsageChecker sveChecker(ctx);
+  TLCD->walk(sveChecker);
 }
 
 /// Perform diagnostics for func/init/deinit declarations.
@@ -3802,14 +3963,18 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   // Don't produce these diagnostics for implicitly generated code.
   if (AFD->getLoc().isInvalid() || AFD->isImplicit() || AFD->isInvalid())
     return;
-  
-  // Check for unused variables, as well as variables that are could be
-  // declared as constants. Skip local functions though, since they will
-  // be checked as part of their parent function or TopLevelCodeDecl.
+
   if (!AFD->getDeclContext()->isLocalContext()) {
+    // Check for unused variables, as well as variables that are could be
+    // declared as constants. Skip local functions though, since they will
+    // be checked as part of their parent function or TopLevelCodeDecl.
     auto &ctx = AFD->getDeclContext()->getASTContext();
     VarDeclUsageChecker checker(AFD, ctx.Diags);
     AFD->walk(checker);
+
+    // Do a similar walk to check for out of place SingleValueStmtExprs.
+    SingleValueStmtUsageChecker sveChecker(ctx);
+    AFD->walk(sveChecker);
   }
 
   auto *body = AFD->getBody();

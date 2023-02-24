@@ -16,8 +16,9 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILValue.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 
 using namespace swift;
 
@@ -114,9 +115,8 @@ InnerBorrowKind PrunedLiveness::updateForBorrowingOperand(Operand *operand) {
   // A nested borrow scope is considered a use-point at each scope ending
   // instruction.
   //
-  // TODO: Handle reborrowed copies by considering the extended borrow
-  // scope. Temporarily bail-out on reborrows because we can't handle uses
-  // that aren't dominated by currentDef.
+  // Note: Ownership liveness should follow reborrows that are dominated by the
+  // ownership definition.
   if (!BorrowingOperand(operand).visitScopeEndingUses([this](Operand *end) {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
           return false;

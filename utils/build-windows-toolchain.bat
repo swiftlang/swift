@@ -473,7 +473,6 @@ cmake ^
   -G Ninja ^
   -S %SourceRoot%\Yams || (exit /b)
 cmake --build %BuildRoot%\10 || (exit /b)
-cmake --build %BuildRoot%\10 --target install || (exit /b)
 
 :: Build swift-driver
 cmake ^
@@ -511,6 +510,7 @@ cmake --build %BuildRoot%\11 --target install || (exit /b)
 cmake ^
   -B %BuildRoot%\12 ^
 
+  -D BUILD_SHARED_LIBS=NO ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=cl ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
@@ -529,7 +529,6 @@ cmake ^
   -G Ninja ^
   -S %SourceRoot%\swift-crypto || (exit /b)
 cmake --build %BuildRoot%\12 || (exit /b)
-cmake --build %BuildRoot%\12 --target install || (exit /b)
 
 :: Build swift-collections
 cmake ^
@@ -609,7 +608,6 @@ cmake ^
   -G Ninja ^
   -S %SourceRoot%\indexstore-db || (exit /b)
 cmake --build %BuildRoot%\15 || (exit /b)
-cmake --build %BuildRoot%\15 --target install || (exit /b)
 
 :: Build swift-syntax
 cmake ^

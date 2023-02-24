@@ -969,6 +969,10 @@ public:
              llvm::MutableArrayRef<TextEntity*> FuncEnts)
     : SM(SM), BufferID(BufferID), FuncEnts(FuncEnts) {}
 
+  bool shouldWalkMacroExpansions() override {
+    return false;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
       return Action::SkipChildren(); // Skip body.
@@ -1283,8 +1287,9 @@ public:
                         R.EndColumn,
                         R.ArgIndex};
               });
-          return {Start.first, Start.second, End.first,
-                  End.second,  R.Text.str(), std::move(SubRanges)};
+          return {R.Path.str(), Start.first,         Start.second,
+                  End.first,    End.second,          R.BufferName.str(),
+                  R.Text.str(), std::move(SubRanges)};
         });
     unsigned End = AllEdits.size();
     StartEnds.emplace_back(Start, End);

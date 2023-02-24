@@ -33,6 +33,7 @@ import BitCount
 import Breadcrumbs
 import BucketSort
 import BufferFill
+import BufferFind
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
@@ -198,6 +199,7 @@ import SuperChars
 import TwoSum
 import TypeFlood
 import UTF8Decode
+import UTF16Decode
 import Walsh
 import WordCount
 import XorLoop
@@ -221,6 +223,7 @@ register(BitCount.benchmarks)
 register(Breadcrumbs.benchmarks)
 register(BucketSort.benchmarks)
 register(BufferFill.benchmarks)
+register(BufferFind.benchmarks)
 register(ByteSwap.benchmarks)
 register(COWTree.benchmarks)
 register(COWArrayGuaranteedParameterOverhead.benchmarks)
@@ -391,6 +394,7 @@ register(SuperChars.benchmarks)
 register(TwoSum.benchmarks)
 register(TypeFlood.benchmarks)
 register(UTF8Decode.benchmarks)
+register(UTF16Decode.benchmarks)
 register(Walsh.benchmarks)
 register(WordCount.benchmarks)
 register(XorLoop.benchmarks)

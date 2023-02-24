@@ -154,6 +154,22 @@ bool TypeVariableType::Implementation::isCodeCompletionToken() const {
   return locator && locator->directlyAt<CodeCompletionExpr>();
 }
 
+bool TypeVariableType::Implementation::isOpaqueType() const {
+  if (!locator)
+    return false;
+
+  auto GP = locator->getLastElementAs<LocatorPathElt::GenericParameter>();
+  if (!GP)
+    return false;
+
+  if (auto *GPT = GP->getType()->getAs<GenericTypeParamType>()) {
+    auto *decl = GPT->getDecl();
+    return decl && decl->isOpaqueType();
+  }
+
+  return false;
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
@@ -1659,6 +1675,27 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
        !unwrappedIUO)) {
     return CheckedCastKind::Coercion;
   }
+
+  // Since move-only types currently cannot conform to protocols, nor be a class
+  // type, the subtyping hierarchy is a bit bizarre as of now:
+  //
+  //              noncopyable
+  //           structs and enums
+  //                   |
+  //       +--------- Any
+  //       |           |
+  //   AnyObject    protocol
+  //       |       existentials
+  //       |            |   \
+  //       +---------+  |    +-- structs/enums
+  //                 |  |
+  //                classes
+  //           (and their subtyping)
+  //
+  //
+  // Thus, right now, a move-only type is only a subtype of itself.
+  if (fromType->isPureMoveOnly() || toType->isPureMoveOnly())
+    return CheckedCastKind::Unresolved;
   
   // Check for a bridging conversion.
   // Anything bridges to AnyObject.

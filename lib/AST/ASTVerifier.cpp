@@ -26,6 +26,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -33,6 +34,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Subsystems.h"
@@ -232,7 +234,8 @@ class Verifier : public ASTWalker {
       ClosureDiscriminators;
   DeclContext *CanonicalTopLevelSubcontext = nullptr;
 
-  typedef DeclContext * MacroExpansionDiscriminatorKey;
+  typedef std::pair</*MacroDiscriminatorContext*/const void *, Identifier>
+      MacroExpansionDiscriminatorKey;
   llvm::DenseMap<MacroExpansionDiscriminatorKey, SmallBitVector>
       MacroExpansionDiscriminators;
 
@@ -943,12 +946,19 @@ public:
 
       if (D->hasAccess()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
-        if (!D->getASTContext().isAccessControlDisabled() &&
-            D->getFormalAccessScope().isPublic() &&
-            D->getFormalAccess() <= AccessLevel::Package) {
-          Out << "non-public decl has no formal access scope\n";
-          D->dump(Out);
-          abort();
+        if (!D->getASTContext().isAccessControlDisabled()) {
+          if (D->getFormalAccessScope().isPackage() &&
+              D->getFormalAccess() < AccessLevel::Package) {
+            Out << "non-package decl has no formal access scope\n";
+            D->dump(Out);
+            abort();
+          }
+          if (D->getFormalAccessScope().isPublic() &&
+              D->getFormalAccess() < AccessLevel::Public) {
+            Out << "non-public decl has no formal access scope\n";
+            D->dump(Out);
+            abort();
+          }
         }
         if (D->getEffectiveAccess() == AccessLevel::Private) {
           Out << "effective access should use 'fileprivate' for 'private'\n";
@@ -1183,6 +1193,31 @@ public:
       
       checkSameType(DestTy, srcObj, "object types for InOutExpr");
       verifyCheckedBase(E);
+    }
+
+    void verifyChecked(SingleValueStmtExpr *E) {
+      using Kind = IsSingleValueStmtResult::Kind;
+      switch (E->getStmt()->mayProduceSingleValue(Ctx).getKind()) {
+      case Kind::NoExpressionBranches:
+        // These are allowed as long as the type is Void.
+        checkSameType(
+            E->getType(), Ctx.getVoidType(),
+            "SingleValueStmtExpr with no expression branches must be Void");
+        break;
+      case Kind::UnterminatedBranches:
+      case Kind::NonExhaustiveIf:
+      case Kind::UnhandledStmt:
+      case Kind::CircularReference:
+      case Kind::HasLabel:
+      case Kind::InvalidJumps:
+        // These should have been diagnosed.
+        Out << "invalid SingleValueStmtExpr should be been diagnosed:\n";
+        E->dump(Out);
+        Out << "\n";
+        abort();
+      case Kind::Valid:
+        break;
+      }
     }
 
     void verifyParsed(AbstractClosureExpr *E) {
@@ -2377,8 +2412,10 @@ public:
     }
 
     void verifyChecked(MacroExpansionExpr *expansion) {
-      auto dc = getCanonicalDeclContext(expansion->getDeclContext());
-      MacroExpansionDiscriminatorKey key{dc};
+      MacroExpansionDiscriminatorKey key{
+        MacroDiscriminatorContext::getParentOf(expansion).getOpaqueValue(),
+        expansion->getMacroName().getBaseName().getIdentifier()
+      };
       auto &discriminatorSet = MacroExpansionDiscriminators[key];
       unsigned discriminator = expansion->getDiscriminator();
 
@@ -2397,8 +2434,10 @@ public:
     }
 
     void verifyChecked(MacroExpansionDecl *expansion) {
-      auto dc = getCanonicalDeclContext(expansion->getDeclContext());
-      MacroExpansionDiscriminatorKey key{dc};
+      MacroExpansionDiscriminatorKey key{
+        MacroDiscriminatorContext::getParentOf(expansion).getOpaqueValue(),
+        expansion->getMacroName().getBaseName().getIdentifier()
+      };
       auto &discriminatorSet = MacroExpansionDiscriminators[key];
       unsigned discriminator = expansion->getDiscriminator();
 

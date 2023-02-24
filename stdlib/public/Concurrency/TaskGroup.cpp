@@ -39,15 +39,14 @@
 #include <mutex>
 #endif
 
-#if defined(__APPLE__)
-#include <asl.h>
-#include <unistd.h>
-#endif
-
 #if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
+#endif
+
+#if __has_include(<unistd.h>)
+#include <unistd.h>
 #endif
 
 #if defined(_WIN32)
@@ -573,10 +572,10 @@ struct TaskGroupStatus {
 #if defined(_WIN32)
     #define STDERR_FILENO 2
    _write(STDERR_FILENO, message, strlen(message));
-#else
+#elif defined(STDERR_FILENO)
     write(STDERR_FILENO, message, strlen(message));
 #endif
-#if defined(__APPLE__)
+#if defined(SWIFT_STDLIB_HAS_ASL)
     asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #elif defined(__ANDROID__)
     __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
@@ -922,10 +921,10 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
   assert(record->getKind() == swift::TaskStatusRecordKind::TaskGroup);
 
   // ok, now that the group actually is initialized: attach it to the task
-  addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+  addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     // If the task has already been cancelled, reflect that immediately in
     // the group's status.
-    if (parentStatus.isCancelled()) {
+    if (oldStatus.isCancelled()) {
       impl->statusCancel();
     }
     return true;
@@ -1586,7 +1585,7 @@ reevaluate_if_taskgroup_has_results:;
     auto newStatus = TaskGroupStatus{assumedStatus};
     if (status.compare_exchange_strong(
         assumedStatus, newStatus.completingPendingReadyWaiting(this).status,
-        /*success*/ std::memory_order_relaxed,
+        /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
 
       // We're going back to running the task, so if we suspended before,
@@ -1657,7 +1656,7 @@ reevaluate_if_taskgroup_has_results:;
   while (true) {
     if (!hasSuspended) {
       hasSuspended = true;
-      waitingTask->flagAsSuspended();
+      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
     }
     // Put the waiting task at the beginning of the wait queue.
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "WATCH OUT, SET WAITER ONTO waitQueue.head = %p", waitQueue.load(std::memory_order_relaxed));
@@ -1812,7 +1811,7 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
   while (true) {
     if (!hasSuspended) {
       hasSuspended = true;
-      waitingTask->flagAsSuspended();
+      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
     }
     // Put the waiting task at the beginning of the wait queue.
     if (waitQueue.compare_exchange_strong(

@@ -745,6 +745,44 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
   // function, the entire block is dead.
   NoReturnCall = getPrecedingCallToNoReturn(BB);
 
+  // Diagnose the unreachable code within the same block as the call to
+  // noreturn.
+  auto diagnoseUnreachableCode = [&](SILInstruction *noReturnCall,
+                                     SILInstruction *currInst) {
+    if (DiagnosedUnreachableCode)
+      return false;
+
+    // If current instruction belongs to the no-return call itself, skip it.
+    //
+    // It could happen when i.e. result has to be copied to be passed to
+    // some call.
+    if (currInst->getLoc().hasSameSourceLocation(noReturnCall->getLoc()))
+      return false;
+
+    if (!isUserCode(currInst))
+      return false;
+
+    // If we have an instruction that is an end_borrow, ignore it. This
+    // happens when passing a guaranteed argument through generic code paths
+    // to no return functions.
+    if (isa<EndBorrowInst>(currInst))
+      return false;
+
+    // If no-return instruction is not something we can point in code or
+    // it's an explicit cast, skip it.
+    if (!noReturnCall->getLoc().is<RegularLocation>() ||
+        noReturnCall->getLoc().isASTNode<ExplicitCastExpr>())
+      return false;
+
+    diagnose(BB.getModule().getASTContext(), currInst->getLoc().getSourceLoc(),
+             diag::unreachable_code);
+    diagnose(BB.getModule().getASTContext(),
+             noReturnCall->getLoc().getSourceLoc(),
+             diag::call_to_noreturn_note);
+
+    return true;
+  };
+
   // Does this block contain a call to a noreturn function?
   while (I != E) {
     auto *CurrentInst = &*I;
@@ -758,26 +796,8 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
       // We will need to delete the instruction later on.
       ToBeDeleted.push_back(CurrentInst);
 
-      // Diagnose the unreachable code within the same block as the call to
-      // noreturn.
-      if (isUserCode(CurrentInst) && !DiagnosedUnreachableCode) {
-        // If we have an instruction that is an end_borrow, ignore it. This
-        // happens when passing a guaranteed argument through generic code paths
-        // to no return functions.
-        if (!isa<EndBorrowInst>(CurrentInst)) {
-          if (NoReturnCall->getLoc().is<RegularLocation>()) {
-            if (!NoReturnCall->getLoc().isASTNode<ExplicitCastExpr>()) {
-              diagnose(BB.getModule().getASTContext(),
-                       CurrentInst->getLoc().getSourceLoc(),
-                       diag::unreachable_code);
-              diagnose(BB.getModule().getASTContext(),
-                       NoReturnCall->getLoc().getSourceLoc(),
-                       diag::call_to_noreturn_note);
-              DiagnosedUnreachableCode = true;
-            }
-          }
-        }
-      }
+      DiagnosedUnreachableCode |=
+          diagnoseUnreachableCode(NoReturnCall, CurrentInst);
 
       // We are going to bluntly remove these instructions. Change uses in
       // different basic blocks to undef. This is safe because all control flow

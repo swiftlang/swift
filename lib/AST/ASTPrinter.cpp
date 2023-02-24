@@ -81,6 +81,11 @@ const std::function<bool(const ExtensionDecl *)>
 void PrintOptions::setBaseType(Type T) {
   if (T->is<ErrorType>())
     return;
+  if (auto DynamicSelf = T->getAs<DynamicSelfType>()) {
+    // TypeTransformContext requires `T` to have members. Look through dynamic
+    // Self.
+    T = DynamicSelf->getSelfType();
+  }
   TransformContext = TypeTransformContext(T);
 }
 
@@ -1186,16 +1191,6 @@ void PrintAST::printAttributes(const Decl *D) {
 
   D->getAttrs().print(Printer, Options, D);
 
-  // We need to check whether this is a type with an inferred
-  // type wrapper attribute and if so print it explicitly.
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-    auto typeWrapperInfo = NTD->getTypeWrapper();
-    // The attribute has been inferred and we have to print it.
-    if (typeWrapperInfo && typeWrapperInfo->IsInferred) {
-      typeWrapperInfo->Attr->print(Printer, Options, D);
-    }
-  }
-
   // Print the implicit 'final' attribute.
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     auto VarD = dyn_cast<VarDecl>(D);
@@ -1884,6 +1879,11 @@ bool isNonSendableExtension(const Decl *D) {
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    // Always print unavilable extensions that carry reflection
+    // metadata attributes.
+    if (!ED->getRuntimeDiscoverableAttrs().empty())
+      return true;
+
     if (Options.printExtensionContentAsMembers(ED))
       return false;
   }
@@ -2970,17 +2970,7 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureTypeWrappers(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureRuntimeDiscoverableAttrs(Decl *decl) {
-  if (decl->getAttrs().hasAttribute<RuntimeMetadataAttr>())
-    return true;
-
-  if (auto *VD = dyn_cast<ValueDecl>(decl))
-    return !VD->getRuntimeDiscoverableAttrs().empty();
-
   return false;
 }
 
@@ -3027,6 +3017,10 @@ static bool usesFeatureImplicitSelfCapture(Decl *decl) {
 }
 
 static bool usesFeatureBuiltinStackAlloc(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinUnprotectedStackAlloc(Decl *decl) {
   return false;
 }
 
@@ -3170,8 +3164,19 @@ static bool usesFeatureBuiltinMacros(Decl *decl) {
   return false;
 }
 
+
 static bool usesFeatureDisableActorInferenceFromPropertyWrapperUsage(Decl *decl) {
   return false;
+}
+
+static bool usesFeatureImportSymbolicCXXDecls(Decl *decl) { return false; }
+
+static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
+  auto macro = dyn_cast<MacroDecl>(decl);
+  if (!macro)
+    return false;
+
+  return macro->getMacroRoles().contains(MacroRole::Expression);
 }
 
 static void
@@ -4378,7 +4383,9 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
              "unexpected convenience initializer");
     }
   } else if (decl->getInitKind() == CtorInitializerKind::Factory) {
-    Printer << "/*not inherited*/ ";
+    if (Options.PrintFactoryInitializerComment) {
+      Printer << "/*not inherited*/ ";
+    }
   }
 
   printContextIfNeeded(decl);
@@ -4605,7 +4612,7 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
 }
 
 void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
-  Printer << '#' << decl->getMacro();
+  Printer << '#' << decl->getMacroName();
   if (decl->getArgs()) {
     Printer << '(';
     auto args = decl->getArgs()->getOriginalArgs();
@@ -4825,6 +4832,10 @@ void PrintAST::visitErasureExpr(ErasureExpr *expr) {
 }
 
 void PrintAST::visitKeyPathExpr(KeyPathExpr *expr) {
+}
+
+void PrintAST::visitSingleValueStmtExpr(SingleValueStmtExpr *expr) {
+  visit(expr->getStmt());
 }
 
 void PrintAST::visitForceTryExpr(ForceTryExpr *expr) {
@@ -5465,6 +5476,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
       if (archetype->isParameterPack() && Options.PrintExplicitEach)
         return false;
+      if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
+        return false;
     }
     return T->hasSimpleTypeRepr();
   }
@@ -5705,8 +5718,10 @@ public:
         Printer << "error_expr";
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
-      } else {
+      } else if (originator.is<PlaceholderTypeRepr *>()) {
         Printer << "placeholder_type_repr";
+      } else {
+        assert(false && "unknown originator");
       }
       Printer << ">>";
     } else {
@@ -6626,12 +6641,58 @@ public:
     }
   }
 
+  static Type findPackForElementArchetype(ElementArchetypeType *T) {
+    // The type in @pack_element is looked up in the generic params
+    // of the identified open_pack_element instruction.  The param list
+    // is long gone, but the sugar survives in the type parameters of
+    // the generic signature of the contextual substitution map in the
+    // opened element environment.
+    auto env = T->getGenericEnvironment();
+    auto subs = env->getPackElementContextSubstitutions();
+    auto sig = subs.getGenericSignature();
+    auto params = sig.getGenericParams();
+
+    auto elementShapeClass =
+      env->getOpenedElementShapeClass()->mapTypeOutOfContext();
+
+    // The element archetypes are at a depth one past the max depth
+    // of the base signature.
+    unsigned elementDepth = params.back()->getDepth() + 1;
+
+    // Transform the archetype's interface type to be based on the
+    // corresponding non-canonical type parameter.
+    auto interfaceType = T->getInterfaceType();
+    return interfaceType.subst([&](SubstitutableType *type) -> Type {
+      // Don't transform types that aren't element type parameters.
+      auto *elementParam = type->getAs<GenericTypeParamType>();
+      if (!elementParam || elementParam->getDepth() != elementDepth)
+        return Type();
+
+      // Loop through the type parameters looking for the type parameter
+      // pack at the appropriate index.  We only expect to actually do
+      // this once for each type, so it's fine to do it in the callback.
+      unsigned nextIndex = 0;
+      for (auto *genericParam : params) {
+        if (!genericParam->isParameterPack())
+          continue;
+
+        if (!sig->haveSameShape(genericParam, elementShapeClass))
+          continue;
+
+        if (nextIndex == elementParam->getIndex())
+          return genericParam;
+        nextIndex++;
+      }
+      llvm_unreachable("ran out of type parameters");
+      return Type();
+    }, LookUpConformanceInSignature(sig.getPointer()));
+  }
+
   void visitElementArchetypeType(ElementArchetypeType *T) {
     if (Options.PrintForSIL) {
-      Printer << "@element(\"" << T->getOpenedElementID() << ") ";
-
-      auto interfaceTy = T->getInterfaceType();
-      visit(interfaceTy);
+      Printer << "@pack_element(\"" << T->getOpenedElementID() << "\") ";
+      auto packTy = findPackForElementArchetype(T);
+      visit(packTy);
     } else {
       visit(T->getInterfaceType());
     }

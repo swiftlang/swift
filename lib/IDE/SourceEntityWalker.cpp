@@ -19,6 +19,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
@@ -55,6 +56,10 @@ private:
 
   bool shouldWalkSerializedTopLevelInternalDecls() override {
     return false;
+  }
+
+  bool shouldWalkMacroExpansions() override {
+    return SEWalker.shouldWalkMacroExpansions();
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override;
@@ -579,28 +584,15 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // We already visited the children.
     return doSkipChildren();
   } else if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
-    // The macro itself.
+    // Add a reference to the macro
     auto macroRef = ME->getMacroRef();
-    auto macroDecl = macroRef.getDecl();
-    if (macroDecl) {
-      auto macroRefType =
-          macroDecl->getInterfaceType().subst(macroRef.getSubstitutions());
+    if (auto *macroDecl = dyn_cast_or_null<MacroDecl>(macroRef.getDecl())) {
+      auto macroRefType = macroDecl->getDeclaredInterfaceType();
       if (!passReference(
               macroDecl, macroRefType, ME->getMacroNameLoc(),
               ReferenceMetaData(SemaReferenceKind::DeclRef, None)))
         return Action::Stop();
     }
-
-    // Walk the arguments, since they were written directly by the user.
-    if (auto argList = ME->getArgs()) {
-      if (!argList->walk(*this))
-        return Action::Stop();
-    }
-
-    // Do not walk into ME->getRewritten() because it's not what the user wrote.
-
-    // Already walked the children.
-    return doSkipChildren();
   }
 
   return Action::Continue(E);
@@ -691,11 +683,33 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
       return true;
     }
   }
+
+  // FIXME: This should be getSemanticAttrs if we want to walk macro
+  // expansions. We've just already typechecked and this list is mutable so...
   for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+    if (!shouldWalkMacroExpansions() &&
+        D->getModuleContext()->isInGeneratedBuffer(customAttr->getLocation()))
+      continue;
+
     if (auto *Repr = customAttr->getTypeRepr()) {
-      if (!Repr->walk(*this))
+      // It's a little weird that attached macros have a `TypeRepr` to begin
+      // with, but given they aren't types they then don't get bound. So check
+      // for a macro here and and pass a reference to it, or just walk the
+      // `TypeRepr` where we will then pull out the bound decl otherwise.
+      auto *mutableAttr = const_cast<CustomAttr *>(customAttr);
+      if (auto macroDecl = D->getResolvedMacro(mutableAttr)) {
+        Type macroRefType = macroDecl->getDeclaredInterfaceType();
+        if (!passReference(
+              macroDecl, macroRefType, DeclNameLoc(Repr->getStartLoc()),
+              ReferenceMetaData(SemaReferenceKind::DeclRef, None,
+                                /*isImplicit=*/false,
+                                std::make_pair(customAttr, D))))
+          return false;
+      } else if (!Repr->walk(*this)) {
         return false;
+      }
     }
+
     if (auto *SemaInit = customAttr->getSemanticInit()) {
       if (!SemaInit->isImplicit()) {
         assert(customAttr->hasArgs());
@@ -710,6 +724,7 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
         return false;
     }
   }
+
   return true;
 }
 

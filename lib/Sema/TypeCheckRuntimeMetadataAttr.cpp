@@ -78,12 +78,7 @@ static TypeRepr *buildTypeRepr(DeclContext *typeContext,
   // Reverse the components to form a valid outer-to-inner name sequence.
   std::reverse(components.begin(), components.end());
 
-  TypeRepr *typeRepr = nullptr;
-  if (components.size() == 1) {
-    typeRepr = components.front();
-  } else {
-    typeRepr = MemberTypeRepr::create(ctx, components);
-  }
+  TypeRepr *typeRepr = MemberTypeRepr::create(ctx, components);
 
   if (forMetatype)
     return new (ctx) MetatypeTypeRepr(typeRepr, /*MetaLoc=*/SourceLoc());
@@ -97,7 +92,8 @@ static TypeRepr *buildTypeRepr(DeclContext *typeContext,
 /// first parameter is always `self` (with or without `inout`).
 static ClosureExpr *synthesizeMethodThunk(DeclContext *thunkDC,
                                           NominalTypeDecl *nominal,
-                                          FuncDecl *method) {
+                                          FuncDecl *method,
+                                          SourceLoc thunkLoc) {
   auto &ctx = method->getASTContext();
 
   // If this is a method, let's form a thunk so that attribute initializer
@@ -212,17 +208,19 @@ static ClosureExpr *synthesizeMethodThunk(DeclContext *thunkDC,
   }
 
   DeclAttributes attrs;
-  auto *closure = new (ctx) ClosureExpr(
-      attrs, /*bracketRange=*/SourceRange(),
-      /*capturedSelf=*/nullptr, ParameterList::create(ctx, closureParams),
-      /*asyncLoc=*/SourceLoc(),
-      /*throwsLoc=*/SourceLoc(),
-      /*arrowLoc=*/SourceLoc(),
-      /*inLoc=*/SourceLoc(),
-      /*explicitResultType=*/nullptr, thunkDC);
+  auto *closure = new (ctx)
+      ClosureExpr(attrs, /*bracketRange=*/SourceRange(),
+                  /*capturedSelf=*/nullptr,
+                  ParameterList::create(ctx, thunkLoc, closureParams, thunkLoc),
+                  /*asyncLoc=*/SourceLoc(),
+                  /*throwsLoc=*/SourceLoc(),
+                  /*arrowLoc=*/SourceLoc(),
+                  /*inLoc=*/SourceLoc(),
+                  /*explicitResultType=*/nullptr, thunkDC);
 
-  closure->setBody(BraceStmt::createImplicit(ctx, body),
-                   /*isSingleExpr=*/true);
+  closure->setBody(
+      BraceStmt::create(ctx, thunkLoc, body, thunkLoc, /*implicit=*/true),
+      /*isSingleExpr=*/true);
   closure->setImplicit();
 
   return closure;
@@ -246,6 +244,14 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
 
   auto *initContext = new (ctx) RuntimeAttributeInitializer(attr, attachedTo);
 
+  SourceRange sourceRange;
+  if (auto *repr = attr->getTypeRepr()) {
+    sourceRange = repr->getSourceRange();
+  } else {
+    sourceRange = SourceRange(
+      attachedTo->getAttributeInsertionLoc(/*forModifier=*/false));
+  }
+
   Expr *initArgument = nullptr;
   if (auto *nominal = dyn_cast<NominalTypeDecl>(attachedTo)) {
     // Registry attributes on protocols are only used for
@@ -254,26 +260,28 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
       return nullptr;
 
     // Form an initializer call passing in the metatype
-    auto *metatype = TypeExpr::createImplicit(nominal->getDeclaredType(), ctx);
+    auto *metatype = TypeExpr::createImplicitHack(
+        sourceRange.Start, nominal->getDeclaredType(), ctx);
     initArgument = new (ctx)
         DotSelfExpr(metatype, /*dot=*/SourceLoc(), /*self=*/SourceLoc());
   } else if (auto *func = dyn_cast<FuncDecl>(attachedTo)) {
     if (auto *nominal = func->getDeclContext()->getSelfNominalTypeDecl()) {
-      initArgument = synthesizeMethodThunk(initContext, nominal, func);
+      initArgument =
+          synthesizeMethodThunk(initContext, nominal, func, sourceRange.Start);
     } else {
-      initArgument = new (ctx)
-          DeclRefExpr({func}, /*Loc=*/DeclNameLoc(), /*implicit=*/true);
+      initArgument = new (ctx) DeclRefExpr(
+          {func}, /*Loc=*/DeclNameLoc(sourceRange.Start), /*implicit=*/true);
     }
   } else {
     auto *var = cast<VarDecl>(attachedTo);
     assert(!var->isStatic());
 
     auto *keyPath =
-        KeyPathExpr::createImplicit(ctx, /*backslashLoc=*/SourceLoc(),
+        KeyPathExpr::createImplicit(ctx, /*backslashLoc=*/sourceRange.Start,
                                     {KeyPathExpr::Component::forProperty(
                                         {var}, var->getValueInterfaceType(),
-                                        /*Loc=*/SourceLoc())},
-                                    /*endLoc=*/SourceLoc());
+                                        /*Loc=*/sourceRange.Start)},
+                                    /*endLoc=*/sourceRange.Start);
 
     // Build a type repr for base of the key path, since attribute
     // could be attached to an inner type, we need to go up decl
@@ -283,20 +291,13 @@ Expr *SynthesizeRuntimeMetadataAttrGenerator::evaluate(
     initArgument = keyPath;
   }
 
-  SourceRange sourceRange;
-  if (auto *repr = attr->getTypeRepr()) {
-    sourceRange = repr->getSourceRange();
-  } else {
-    sourceRange = SourceRange(
-        attachedTo->getAttributeInsertionLoc(/*forModifier=*/false));
-  }
-
   auto typeExpr =
       TypeExpr::createImplicitHack(sourceRange.Start, attrType, ctx);
 
   // Add the initializer argument at the front of the argument list
   SmallVector<Argument, 4> newArgs;
-  newArgs.push_back({/*loc=*/SourceLoc(), ctx.Id_attachedTo, initArgument});
+  newArgs.push_back(
+      {/*loc=*/sourceRange.Start, ctx.Id_attachedTo, initArgument});
   if (auto *attrArgs = attr->getArgs())
     newArgs.append(attrArgs->begin(), attrArgs->end());
 

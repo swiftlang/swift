@@ -3,3 +3,9 @@ module ProtocolNamingConflict [extern_c] {
   requires objc
 }
 
+module CxxClassWithNSStringInit [extern_c] {
+  header "cxx-class-with-arc-fields-ctor.h"
+  requires objc
+  requires cplusplus
+}
+

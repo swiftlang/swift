@@ -2278,6 +2278,18 @@ ManglingError Remangler::manglePack(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleSILPackDirect(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleTypeList(node, depth + 1));
+  Buffer << "QSd";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleSILPackIndirect(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleTypeList(node, depth + 1));
+  Buffer << "QSi";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::manglePackExpansion(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "Qp";
@@ -2877,6 +2889,46 @@ ManglingError Remangler::mangleFreestandingMacroExpansion(
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
   Buffer << "fMf";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
+ManglingError Remangler::mangleAccessorAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMa";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
+ManglingError Remangler::mangleMemberAttributeAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMA";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
+ManglingError Remangler::mangleMemberAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMm";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
+ManglingError Remangler::manglePeerAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMp";
+  return mangleChildNode(node, 2, depth + 1);
+}
+
+ManglingError Remangler::mangleConformanceAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  Buffer << "fMc";
   return mangleChildNode(node, 2, depth + 1);
 }
 
@@ -3616,9 +3668,9 @@ ManglingError
 Remangler::mangleRuntimeAttributeGenerator(Node *node,
                                            unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
-  Buffer << "fa";
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  return mangleChildNode(node, 2, depth + 1);
+  Buffer << "fa";
+  return ManglingError::Success;
 }
 
 } // anonymous namespace

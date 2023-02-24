@@ -248,6 +248,96 @@ public:
   llvm::MapVector<EnumElementDecl *, EnumElementInfo>
   getEnumTagMapping(const EnumDecl *ED);
 
+  /// Details how a specific method should be dispatched.
+  struct MethodDispatchInfo {
+    enum class Kind {
+      /// A direct call can be made to the underlying function.
+      Direct,
+      /// An indirect call that can be made via a static offset in a vtable.
+      IndirectVTableStaticOffset,
+      /// An indirect call that should be made via an offset relative to
+      /// external base value in a vtable.
+      IndirectVTableRelativeOffset,
+      /// The call should be made via the provided thunk function.
+      Thunk
+    };
+    struct PointerAuthDiscriminator {
+      /// The value of the other discriminator
+      uint64_t value;
+    };
+
+    static MethodDispatchInfo direct() {
+      return MethodDispatchInfo(Kind::Direct, 0);
+    }
+
+    static MethodDispatchInfo indirectVTableStaticOffset(
+        size_t offset, Optional<PointerAuthDiscriminator> discriminator) {
+      return MethodDispatchInfo(Kind::IndirectVTableStaticOffset, offset, "",
+                                discriminator);
+    }
+
+    static MethodDispatchInfo indirectVTableRelativeOffset(
+        size_t offset, std::string symbolName,
+        Optional<PointerAuthDiscriminator> discriminator) {
+      return MethodDispatchInfo(Kind::IndirectVTableRelativeOffset, offset,
+                                symbolName, discriminator);
+    }
+
+    static MethodDispatchInfo thunk(std::string thunkName) {
+      return MethodDispatchInfo(Kind::Thunk, 0, thunkName);
+    }
+
+    Kind getKind() const { return kind; }
+
+    /// Return the byte offset into the vtable from which the method pointer
+    /// should be loaded.
+    size_t getStaticOffset() const {
+      assert(kind == Kind::IndirectVTableStaticOffset);
+      return offset;
+    }
+    Optional<PointerAuthDiscriminator> getPointerAuthDiscriminator() const {
+      assert(kind == Kind::IndirectVTableStaticOffset ||
+             kind == Kind::IndirectVTableRelativeOffset);
+      return discriminator;
+    }
+    StringRef getThunkSymbolName() const {
+      assert(kind == Kind::Thunk);
+      return symbolName;
+    }
+
+    /// Return the byte offset relative to base offset value into the vtable
+    /// from which the method pointer should be loaded.
+    size_t getRelativeOffset() const {
+      assert(kind == Kind::IndirectVTableRelativeOffset);
+      return offset;
+    }
+
+    /// Return the external symbol from which the relative base offset should be
+    /// loaded.
+    StringRef getBaseOffsetSymbolName() const {
+      assert(kind == Kind::IndirectVTableRelativeOffset);
+      return symbolName;
+    }
+
+  private:
+    MethodDispatchInfo(Kind kind, size_t offset, std::string symbolName = "",
+                       Optional<PointerAuthDiscriminator> discriminator = None)
+        : kind(kind), offset(offset), symbolName(symbolName),
+          discriminator(discriminator) {}
+
+    Kind kind;
+    size_t offset;
+    std::string symbolName;
+    Optional<PointerAuthDiscriminator> discriminator;
+  };
+
+  Optional<MethodDispatchInfo>
+  getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl);
+
+  /// Returns the type of the base offset value located at the specific class
+  /// base offset symbol.
+  Type getClassBaseOffsetSymbolType() const;
+
 private:
   std::unique_ptr<IRABIDetailsProviderImpl> impl;
 };

@@ -29,7 +29,7 @@ public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
     attachedTo parent: some DeclGroupSyntax,
-    providingAttributesFor member: DeclSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext
   ) throws -> [AttributeSyntax] {
     return []

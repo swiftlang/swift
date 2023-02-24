@@ -76,7 +76,8 @@ extension Syntax {
 @_cdecl("swift_ASTGen_emitParserDiagnostics")
 public func emitParserDiagnostics(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
-  sourceFilePtr: UnsafeMutablePointer<UInt8>
+  sourceFilePtr: UnsafeMutablePointer<UInt8>,
+  emitOnlyErrors: CInt
 ) -> CInt {
   return sourceFilePtr.withMemoryRebound(
     to: ExportedSourceFile.self, capacity: 1
@@ -91,6 +92,9 @@ public func emitParserDiagnostics(
       // we are in an active region or not.
       // FIXME: This heuristic could be improved.
       if diag.node.isInIfConfig {
+        continue
+      }
+      if emitOnlyErrors != 0, diag.diagMessage.severity != .error {
         continue
       }
 

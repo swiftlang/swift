@@ -41,6 +41,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -55,23 +56,24 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <algorithm>
-#include <queue>
 #include <memory>
+#include <queue>
 
 #if !defined(_WIN32)
 #include <dlfcn.h>
@@ -521,11 +523,15 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
 
-  /// Record of loaded plugin modules.
-  std::vector<std::pair<std::string, void *>> LoadedPluginPaths;
+  /// Plugin registry. Lazily populated by get/setPluginRegistry().
+  /// NOTE: Do not reference this directly. Use ASTContext::getPluginRegistry().
+  PluginRegistry *Plugins = nullptr;
 
   /// Cache of loaded symbols.
   llvm::StringMap<void *> LoadedSymbols;
+
+  /// Map a module name to an executable plugin path that provides the module.
+  llvm::DenseMap<Identifier, StringRef> ExecutablePluginPaths;
 
   /// The permanent arena.
   Arena Permanent;
@@ -583,8 +589,7 @@ struct ASTContext::Implementation {
 
 ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator),
-      IntrinsicScratchContext(new llvm::LLVMContext())
-      {}
+      IntrinsicScratchContext(new llvm::LLVMContext()) {}
 ASTContext::Implementation::~Implementation() {
   for (auto &cleanup : Cleanups)
     cleanup();
@@ -698,6 +703,7 @@ ASTContext::ASTContext(
   registerAccessRequestFunctions(evaluator);
   registerNameLookupRequestFunctions(evaluator);
 
+  // FIXME: Delay this so the client e.g. SourceKit can inject plugin registry.
   loadCompilerPlugins();
 }
 
@@ -1125,7 +1131,10 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     M = getLoadedModule(Id_Distributed);
     break;
   case KnownProtocolKind::CxxConvertibleToCollection:
+  case KnownProtocolKind::CxxDictionary:
+  case KnownProtocolKind::CxxPair:
   case KnownProtocolKind::CxxRandomAccessCollection:
+  case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
@@ -5303,8 +5312,6 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     }
 
     // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
-    // FIXME: Layering violation to use the ClangImporter's define.
-    const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
     if (auto simd = getLoadedModule(Id_simd)) {
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                  \
       {                                                                 \
@@ -5351,7 +5358,6 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   conditionallyAddTrivial(nominal, getSwiftId(KnownFoundationEntity::NSZone), Id_ObjectiveC, true);
   conditionallyAddTrivial(nominal, Id_CGFloat, getIdentifier("CoreGraphics"));
   conditionallyAddTrivial(nominal, Id_CGFloat, getIdentifier("CoreFoundation"));
-  const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
   {                                                                            \
     char name[] = #BASENAME "0";                                               \
@@ -6199,23 +6205,61 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   return result;
 }
 
+void ASTContext::setPluginRegistry(PluginRegistry *newValue) {
+  assert(getImpl().Plugins == nullptr &&
+         "Too late to set a new plugin registry");
+  getImpl().Plugins = newValue;
+}
+
+PluginRegistry *ASTContext::getPluginRegistry() const {
+  PluginRegistry *&registry = getImpl().Plugins;
+
+  // Create a new one if it hasn't been set.
+  if (!registry) {
+    registry = new PluginRegistry();
+    const_cast<ASTContext *>(this)->addCleanup([registry]{
+      delete registry;
+    });
+  }
+
+  assert(registry != nullptr);
+  return registry;
+}
+
 void ASTContext::loadCompilerPlugins() {
+  auto fs = this->SourceMgr.getFileSystem();
   for (auto &path : SearchPathOpts.getCompilerPluginLibraryPaths()) {
-    void *lib = nullptr;
-#if !defined(_WIN32)
-    lib = dlopen(path.c_str(), RTLD_LAZY|RTLD_LOCAL);
-#endif
-    if (!lib) {
-      const char *errorMsg = "Unsupported platform";
-#if !defined(_WIN32)
-      errorMsg = dlerror();
-#endif
+    SmallString<128> resolvedPath;
+    if (auto err = fs->getRealPath(path, resolvedPath)) {
       Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                     errorMsg);
+                     err.message());
       continue;
     }
+    if (auto error = getPluginRegistry()->loadLibraryPlugin(resolvedPath)) {
+      Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
+                     llvm::toString(std::move(error)));
+    }
+  }
 
-    getImpl().LoadedPluginPaths.push_back({path, lib});
+  for (auto &arg : SearchPathOpts.getCompilerPluginExecutablePaths()) {
+    // 'arg' is '<path to executable>#<module names>' where the module names are
+    // comma separated.
+
+    // Create a moduleName -> pluginPath mapping.
+    StringRef path;
+    StringRef modulesStr;
+    std::tie(path, modulesStr) = StringRef(arg).rsplit('#');
+    SmallVector<StringRef, 1> modules;
+    modulesStr.split(modules, ',');
+
+    if (modules.empty() || path.empty()) {
+      // TODO: Error messsage.
+      Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, arg, "");
+    }
+    auto pathStr = AllocateCopy(path);
+    for (auto moduleName : modules) {
+      getImpl().ExecutablePluginPaths[getIdentifier(moduleName)] = pathStr;
+    }
   }
 }
 
@@ -6230,7 +6274,7 @@ void *ASTContext::getAddressOfSymbol(const char *name,
 
     // If we didn't know where to look, look specifically in each plugin.
     if (!address && !libraryHandleHint) {
-      for (const auto &plugin: getImpl().LoadedPluginPaths) {
+      for (const auto &plugin : getPluginRegistry()->getLoadedLibraryPlugins()) {
         address = dlsym(plugin.second, name);
         if (address)
           break;
@@ -6239,4 +6283,66 @@ void *ASTContext::getAddressOfSymbol(const char *name,
   }
 #endif
   return address;
+}
+
+Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
+  if (!module)
+    return Type();
+
+  // Look for the type.
+  Identifier identifier = getIdentifier(name);
+  SmallVector<ValueDecl *, 2> results;
+
+  // Check if the lookup we're about to perform a lookup within is
+  // a Clang module.
+  for (auto *file : module->getFiles()) {
+    if (auto clangUnit = dyn_cast<ClangModuleUnit>(file)) {
+      // If we have an overlay, look in the overlay. Otherwise, skip
+      // the lookup to avoid infinite recursion.
+      if (auto module = clangUnit->getOverlayModule())
+        module->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
+    } else {
+      file->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
+    }
+  }
+
+  if (results.size() != 1)
+    return Type();
+
+  auto decl = dyn_cast<TypeDecl>(results.front());
+  if (!decl)
+    return Type();
+
+  assert(!decl->hasClangNode() && "picked up the original type?");
+
+  if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
+    return nominalDecl->getDeclaredType();
+  return decl->getDeclaredInterfaceType();
+}
+
+LoadedExecutablePlugin *
+ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
+  auto &execPluginPaths = getImpl().ExecutablePluginPaths;
+  auto found = execPluginPaths.find(moduleName);
+  if (found == execPluginPaths.end())
+    return nullptr;
+
+  // Let the VFS to map the path.
+  auto &path = found->second;
+  SmallString<128> resolvedPath;
+  auto fs = this->SourceMgr.getFileSystem();
+  if (auto err = fs->getRealPath(path, resolvedPath)) {
+    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
+                   err.message());
+    return nullptr;
+  }
+
+  // Load the plugin.
+  auto plugin = getPluginRegistry()->loadExecutablePlugin(resolvedPath);
+  if (!plugin) {
+    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
+                   llvm::toString(plugin.takeError()));
+  }
+
+  return plugin.get();
 }

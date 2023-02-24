@@ -1821,7 +1821,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
 
         // If this is a call to a function with a closure argument and the
         // parameter is an autoclosure, let's just increment the score here
-        // so situations like bellow are not ambiguous.
+        // so situations like below are not ambiguous.
         //    func f<T>(_: () -> T) {}
         //    func f<T>(_: @autoclosure () -> T) {}
         //
@@ -2361,7 +2361,7 @@ struct PackTypeVariableCollector: TypeWalker {
 /// pack type. The original pack type is then matched against the instantiated
 /// pack type.
 ///
-/// As a side effect, it binds each pack type variable occuring in the pattern
+/// As a side effect, it binds each pack type variable occurring in the pattern
 /// type to a new pack with the same shape as the original pack, but where the
 /// elements are fresh type variables.
 ///
@@ -3821,6 +3821,18 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     }
 
     return getTypeMatchAmbiguous();
+  }
+
+  // move-only types cannot match with any existential types.
+  if (type1->isPureMoveOnly()) {
+    // tailor error message
+    if (shouldAttemptFixes()) {
+      auto *fix = MustBeCopyable::create(*this, type1,
+                                        getConstraintLocator(locator));
+      if (!recordFix(fix))
+        return getTypeMatchSuccess();
+    }
+    return getTypeMatchFailure(locator);
   }
 
   // FIXME: Feels like a hack.
@@ -5908,7 +5920,7 @@ bool ConstraintSystem::repairFailures(
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
-      break;
+      return true;
 
     // Let's wait until both sides are of the same optionality before
     // attempting `.rawValue` fix.
@@ -5955,7 +5967,7 @@ bool ConstraintSystem::repairFailures(
 
         if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                     conversionsOrFixes, locator))
-          break;
+          return true;
 
         conversionsOrFixes.push_back(
             IgnoreContextualType::create(*this, lhs, rhs, locator));
@@ -6181,7 +6193,7 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::Condition: {
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
-      break;
+      return true;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
@@ -6206,7 +6218,7 @@ bool ConstraintSystem::repairFailures(
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
-      break;
+      return true;
 
     if (repairByTreatingRValueAsLValue(lhs, rhs))
       break;
@@ -6253,13 +6265,17 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  case ConstraintLocator::TernaryBranch: {
+  case ConstraintLocator::TernaryBranch:
+  case ConstraintLocator::SingleValueStmtBranch: {
     recordAnyTypeVarAsPotentialHole(lhs);
     recordAnyTypeVarAsPotentialHole(rhs);
 
-    // If `if` expression has a contextual type, let's consider it a source of
-    // truth and produce a contextual mismatch instead of  per-branch failure,
-    // because it's a better pointer than potential then-to-else type mismatch.
+    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+      return true;
+
+    // If there's a contextual type, let's consider it the source of truth and
+    // produce a contextual mismatch instead of  per-branch failure, because
+    // it's a better pointer than potential then-to-else type mismatch.
     if (auto contextualType =
             getContextualType(anchor, /*forConstraint=*/false)) {
       auto purpose = getContextualTypePurpose(anchor);
@@ -6281,7 +6297,7 @@ bool ConstraintSystem::repairFailures(
     }
 
     // If there is no contextual type, this is most likely a contextual type
-    // mismatch between then/else branches of ternary operator.
+    // mismatch between the branches.
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -7413,6 +7429,29 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           return getTypeMatchSuccess();
         }
       }
+
+      // We also need to propagate this conversion into the branches for single
+      // value statements.
+      //
+      // As with the previous checks, we only allow the Void conversion in
+      // an implicit single-expression closure. In the more general case, we
+      // only allow the Never conversion.
+      auto *loc = getConstraintLocator(locator);
+      if (auto branchKind = loc->isForSingleValueStmtBranch()) {
+        bool allowConversion = false;
+        switch (*branchKind) {
+        case SingleValueStmtBranchKind::Regular:
+          allowConversion = type1->isUninhabited();
+          break;
+        case SingleValueStmtBranchKind::InSingleExprClosure:
+          allowConversion = true;
+          break;
+        }
+        if (allowConversion) {
+          increaseScore(SK_FunctionConversion);
+          return getTypeMatchSuccess();
+        }
+      }
     }
   }
 
@@ -8128,6 +8167,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         if (!recordFix(fix))
           return SolutionKind::Solved;
       }
+    }
+
+    // If this is a failure to conform to Copyable, tailor the error message.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+      auto *fix =
+          MustBeCopyable::create(*this, type, getConstraintLocator(locator));
+      if (!recordFix(fix))
+        return SolutionKind::Solved;
     }
   }
 
@@ -9822,7 +9869,7 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
     }
   }
 
-  if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+  if (cs.generateConstraints(target))
     return true;
 
   // Sub-expression associated with expression pattern is the enum element
@@ -10990,7 +11037,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   if (resultBuilderType) {
     if (auto result = matchResultBuilder(
             closure, resultBuilderType, closureType->getResult(),
-            ConstraintKind::Conversion, locator)) {
+            ConstraintKind::Conversion, contextualType, locator)) {
       return result->isSuccess();
     }
   }
@@ -11103,6 +11150,12 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
 
   if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
     return formUnsolved();
+
+  // Move-only types can't be involved in a bridging conversion since a bridged
+  // type assumes the ability to copy.
+  if (type1->isPureMoveOnly()) {
+    return SolutionKind::Error;
+  }
 
   Type unwrappedFromType;
   unsigned numFromOptionals;
@@ -13943,8 +13996,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreKeyPathContextualMismatch:
   case FixKind::NotCompileTimeConst:
   case FixKind::RenameConflictingPatternVariables:
+  case FixKind::MustBeCopyable:
   case FixKind::MacroMissingPound:
-  case FixKind::MacroMissingArguments:
   case FixKind::AllowGlobalActorMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
@@ -14095,7 +14148,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       if (branchElt->forElse())
         impact = 10;
     }
-
+    using SingleValueStmtBranch = LocatorPathElt::SingleValueStmtBranch;
+    if (auto branchElt = locator->getLastElementAs<SingleValueStmtBranch>()) {
+      // Similar to a ternary, except we have N branches. Let's prefer the fix
+      // on the first branch, and discount subsequent branches by index.
+      if (branchElt->getExprBranchIndex() > 0)
+        impact = 9 + branchElt->getExprBranchIndex();
+    }
     // Increase impact of invalid conversions to `Any` and `AnyHashable`
     // associated with collection elements (i.e. for-in sequence element)
     // because it means that other side is structurally incompatible.
@@ -14517,7 +14576,8 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
 }
 
 void ConstraintSystem::addContextualConversionConstraint(
-    Expr *expr, Type conversionType, ContextualTypePurpose purpose) {
+    Expr *expr, Type conversionType, ContextualTypePurpose purpose,
+    ConstraintLocator *locator) {
   if (conversionType.isNull())
     return;
 
@@ -14570,14 +14630,13 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_WrappedProperty:
   case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
+  case CTP_SingleValueStmtBranch:
     break;
   }
 
   // Add the constraint.
-  auto *convertTypeLocator =
-      getConstraintLocator(expr, LocatorPathElt::ContextualType(purpose));
-  auto openedType = openOpaqueType(conversionType, purpose, convertTypeLocator);
-  addConstraint(constraintKind, getType(expr), openedType, convertTypeLocator,
+  auto openedType = openOpaqueType(conversionType, purpose, locator);
+  addConstraint(constraintKind, getType(expr), openedType, locator,
                 /*isFavored*/ true);
 }
 

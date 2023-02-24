@@ -172,6 +172,17 @@ internal struct _StringObject {
     _internalInvariant(!isSmall)
     return CountAndFlags(rawUnchecked: _countAndFlagsBits)
   }
+
+  // FIXME: This ought to be the setter for property `_countAndFlags`.
+  @_alwaysEmitIntoClient
+  internal mutating func _setCountAndFlags(to value: CountAndFlags) {
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    self._count = value.count
+    self._flags = value.flags
+#else
+    self._countAndFlagsBits = value._storage
+#endif
+  }
 }
 
 // Raw
@@ -894,6 +905,13 @@ extension _StringObject {
       discriminatedObjectRawBits & Nibbles.largeAddressMask)
   }
 
+  @inline(__always)
+  @_alwaysEmitIntoClient
+  internal var largeAddress: UnsafeRawPointer {
+    UnsafeRawPointer(bitPattern: largeAddressBits)
+      ._unsafelyUnwrappedUnchecked
+  }
+
   @inlinable @inline(__always)
   internal var nativeUTF8Start: UnsafePointer<UInt8> {
     _internalInvariant(largeFastIsTailAllocated)
@@ -915,11 +933,12 @@ extension _StringObject {
     _internalInvariant(largeFastIsShared)
 #if _runtime(_ObjC)
     if largeIsCocoa {
-      return stableCocoaUTF8Pointer(cocoaObject)._unsafelyUnwrappedUnchecked
+      return withCocoaObject {
+        stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
+      }
     }
 #endif
-
-    return sharedStorage.start
+    return withSharedStorage { $0.start }
   }
 
   @usableFromInline
@@ -940,7 +959,24 @@ extension _StringObject {
     return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
 #else
     _internalInvariant(hasNativeStorage)
-    return Builtin.reinterpretCast(largeAddressBits)
+    let unmanaged = Unmanaged<__StringStorage>.fromOpaque(largeAddress)
+    return unmanaged.takeUnretainedValue()
+#endif
+  }
+
+  /// Call `body` with the native storage object of `self`, without retaining
+  /// it.
+  @inline(__always)
+  internal func withNativeStorage<R>(
+    _ body: (__StringStorage) -> R
+  ) -> R {
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    // FIXME: Do this properly.
+    return body(nativeStorage)
+#else
+    _internalInvariant(hasNativeStorage)
+    let unmanaged = Unmanaged<__StringStorage>.fromOpaque(largeAddress)
+    return unmanaged._withUnsafeGuaranteedRef { body($0) }
 #endif
   }
 
@@ -954,7 +990,23 @@ extension _StringObject {
 #else
     _internalInvariant(largeFastIsShared && !largeIsCocoa)
     _internalInvariant(hasSharedStorage)
-    return Builtin.reinterpretCast(largeAddressBits)
+    let unmanaged = Unmanaged<__SharedStringStorage>.fromOpaque(largeAddress)
+    return unmanaged.takeUnretainedValue()
+#endif
+  }
+
+  @inline(__always)
+  internal func withSharedStorage<R>(
+    _ body: (__SharedStringStorage) -> R
+  ) -> R {
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    // FIXME: Do this properly.
+    return body(sharedStorage)
+#else
+    _internalInvariant(largeFastIsShared && !largeIsCocoa)
+    _internalInvariant(hasSharedStorage)
+    let unmanaged = Unmanaged<__SharedStringStorage>.fromOpaque(largeAddress)
+    return unmanaged._withUnsafeGuaranteedRef { body($0) }
 #endif
   }
 
@@ -967,7 +1019,24 @@ extension _StringObject {
     return object
 #else
     _internalInvariant(largeIsCocoa && !isImmortal)
-    return Builtin.reinterpretCast(largeAddressBits)
+    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unmanaged.takeUnretainedValue()
+#endif
+  }
+
+  /// Call `body` with the bridged Cocoa object in `self`, without retaining
+  /// it.
+  @inline(__always)
+  internal func withCocoaObject<R>(
+    _ body: (AnyObject) -> R
+  ) -> R {
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    // FIXME: Do this properly.
+    return body(cocoaObject)
+#else
+    _internalInvariant(largeIsCocoa && !isImmortal)
+    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unmanaged._withUnsafeGuaranteedRef { body($0) }
 #endif
   }
 
@@ -976,7 +1045,8 @@ extension _StringObject {
   @inline(__always)
   internal var owner: AnyObject? {
     guard self.isMortal else { return nil }
-    return Builtin.reinterpretCast(largeAddressBits)
+    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unmanaged.takeUnretainedValue()
   }
 }
 
@@ -1055,7 +1125,8 @@ extension _StringObject {
   @inline(__always)
   internal var objCBridgeableObject: AnyObject {
     _internalInvariant(hasObjCBridgeableObject)
-    return Builtin.reinterpretCast(largeAddressBits)
+    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unmanaged.takeUnretainedValue()
   }
 
   // Whether the object provides fast UTF-8 contents that are nul-terminated
@@ -1219,7 +1290,8 @@ extension _StringObject {
         }
       }
       if _countAndFlags.isNativelyStored {
-        let anyObj = Builtin.reinterpretCast(largeAddressBits) as AnyObject
+        let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
+        let anyObj = unmanaged.takeUnretainedValue()
         _internalInvariant(anyObj is __StringStorage)
       }
     }
@@ -1240,7 +1312,7 @@ extension _StringObject {
 
   @inline(never)
   internal func _dump() {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && !SWIFT_STDLIB_STATIC_PRINT
     let raw = self.rawBits
     let word0 = ("0000000000000000" + String(raw.0, radix: 16)).suffix(16)
     let word1 = ("0000000000000000" + String(raw.1, radix: 16)).suffix(16)

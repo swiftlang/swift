@@ -607,7 +607,8 @@ accept(SourceManager &SM, SourceLoc Loc, StringRef Text,
 void swift::ide::SourceEditConsumer::
 accept(SourceManager &SM, CharSourceRange Range, StringRef Text,
        ArrayRef<NoteRegion> SubRegions) {
-  accept(SM, RegionType::ActiveCode, {{Range, Text, SubRegions}});
+  accept(SM, RegionType::ActiveCode,
+         {{/*Path=*/{}, Range, /*BufferName=*/{}, Text, SubRegions}});
 }
 
 void swift::ide::SourceEditConsumer::
@@ -649,15 +650,27 @@ accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
 void swift::ide::SourceEditTextConsumer::
 accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
   for (const auto &Replacement: Replacements) {
-    CharSourceRange Range = Replacement.Range;
-    unsigned BufID = SM.findBufferContainingLoc(Range.getStart());
-    auto Path(SM.getIdentifierForBuffer(BufID));
-    auto Start = SM.getLineAndColumnInBuffer(Range.getStart());
-    auto End = SM.getLineAndColumnInBuffer(Range.getEnd());
+    OS << "// ";
+    StringRef Path = Replacement.Path;
+    if (Path.empty()) {
+      unsigned BufID = SM.findBufferContainingLoc(Replacement.Range.getStart());
+      Path = SM.getIdentifierForBuffer(BufID);
+    } else {
+      OS << "explicit ";
+    }
+    OS << Path.str() << " ";
 
-    OS << "// " << Path.str() << " ";
+    auto Start = SM.getLineAndColumnInBuffer(Replacement.Range.getStart());
+    auto End = SM.getLineAndColumnInBuffer(Replacement.Range.getEnd());
     OS << Start.first << ":" << Start.second << " -> ";
-    OS << End.first << ":" << End.second << "\n";
+    OS << End.first << ":" << End.second;
+
+    if (Replacement.BufferName.empty()) {
+      OS << " (" << Replacement.BufferName << ")\n";
+    } else {
+      OS << "\n";
+    }
+
     OS << Replacement.Text << "\n";
   }
 }
@@ -860,6 +873,9 @@ Expr *swift::ide::getBase(ArrayRef<Expr *> ExprStack) {
 
   Expr *CurrentE = ExprStack.back();
   Expr *ParentE = getContainingExpr(ExprStack, 1);
+  if (ParentE && isa<FunctionConversionExpr>(ParentE)) {
+    ParentE = getContainingExpr(ExprStack, 2);
+  }
   Expr *Base = nullptr;
 
   if (auto DSE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
@@ -925,6 +941,8 @@ bool swift::ide::isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(
   if (!isDeclOverridable(D))
     return false;
 
+  Base = Base->getSemanticsProvidingExpr();
+
   // super.method()
   // TODO: Should be dynamic if `D` is marked as dynamic and @objc, but in
   //       that case we really need to change the role the index outputs as
@@ -956,11 +974,9 @@ void swift::ide::getReceiverType(Expr *Base,
   if (!ReceiverTy)
     return;
 
-  if (auto LVT = ReceiverTy->getAs<LValueType>())
-    ReceiverTy = LVT->getObjectType();
-  else if (auto MetaT = ReceiverTy->getAs<MetatypeType>())
-    ReceiverTy = MetaT->getInstanceType();
-  else if (auto SelfT = ReceiverTy->getAs<DynamicSelfType>())
+  ReceiverTy = ReceiverTy->getWithoutSpecifierType();
+  ReceiverTy = ReceiverTy->getMetatypeInstanceType();
+  if (auto SelfT = ReceiverTy->getAs<DynamicSelfType>())
     ReceiverTy = SelfT->getSelfType();
 
   // TODO: Handle generics and composed protocols

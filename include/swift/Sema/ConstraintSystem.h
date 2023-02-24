@@ -73,8 +73,9 @@ class SolutionApplicationTarget;
 // so they could be made friends of ConstraintSystem.
 namespace TypeChecker {
 
-Optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
-                                                        Type builderType);
+Optional<BraceStmt *> applyResultBuilderBodyTransform(
+    FuncDecl *func, Type builderType,
+    bool ClosuresInResultBuilderDontParticipateInInference);
 
 Optional<constraints::SolutionApplicationTarget>
 typeCheckExpression(constraints::SolutionApplicationTarget &target,
@@ -485,6 +486,9 @@ public:
   /// Determine whether this type variable represents a code completion
   /// expression.
   bool isCodeCompletionToken() const;
+
+  /// Determine whether this type variable represents an opened opaque type.
+  bool isOpaqueType() const;
 
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
@@ -983,6 +987,11 @@ struct AppliedBuilderTransform {
   /// The result type of the body, to which the returned expression will be
   /// converted. Opaque types should be unopened.
   Type bodyResultType;
+
+  /// If transform is applied to a closure, this type represents
+  /// contextual type the closure is converted type (e.g. a parameter
+  /// type or or pattern type).
+  Type contextualType;
 
   /// The version of the original body with result builder applied
   /// as AST transformation.
@@ -1801,6 +1810,12 @@ enum class ConstraintSystemFlags {
 
   /// Disable macro expansions.
   DisableMacroExpansions = 0x100,
+
+  /// Non solver-based code completion expects that closures inside result
+  /// builders don't participate in inference.
+  /// Once all code completion kinds are migrated to solver-based we should be
+  /// able to remove this flag.
+  ClosuresInResultBuildersDontParticipateInInference = 0x200,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1961,11 +1976,18 @@ private:
       /// type-checked.
       DeclContext *dc;
 
+      // TODO: Fold the 3 below fields into ContextualTypeInfo
+
       /// The purpose of the contextual type.
       ContextualTypePurpose contextualPurpose;
 
       /// The type to which the expression should be converted.
       TypeLoc convertType;
+
+      /// The locator for the contextual type conversion constraint, or
+      /// \c nullptr to use the default locator which is anchored directly on
+      /// the expression.
+      ConstraintLocator *convertTypeLocator;
 
       /// When initializing a pattern from the expression, this is the
       /// pattern.
@@ -2054,14 +2076,25 @@ private:
 public:
   SolutionApplicationTarget(Expr *expr, DeclContext *dc,
                             ContextualTypePurpose contextualPurpose,
-                            Type convertType, bool isDiscarded)
+                            Type convertType,
+                            ConstraintLocator *convertTypeLocator,
+                            bool isDiscarded)
       : SolutionApplicationTarget(expr, dc, contextualPurpose,
                                   TypeLoc::withoutLoc(convertType),
-                                  isDiscarded) { }
+                                  convertTypeLocator, isDiscarded) {}
 
   SolutionApplicationTarget(Expr *expr, DeclContext *dc,
                             ContextualTypePurpose contextualPurpose,
-                            TypeLoc convertType, bool isDiscarded);
+                            Type convertType, bool isDiscarded)
+      : SolutionApplicationTarget(expr, dc, contextualPurpose, convertType,
+                                  /*convertTypeLocator*/ nullptr, isDiscarded) {
+  }
+
+  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
+                            ContextualTypePurpose contextualPurpose,
+                            TypeLoc convertType,
+                            ConstraintLocator *convertTypeLocator,
+                            bool isDiscarded);
 
   SolutionApplicationTarget(Expr *expr, DeclContext *dc, ExprPattern *pattern,
                             Type patternType)
@@ -2286,6 +2319,13 @@ public:
     if (contextualTypeIsOnlyAHint())
       return Type();
     return getExprContextualType();
+  }
+
+  /// Retrieve the conversion type locator for the expression, or \c nullptr
+  /// if it has not been set.
+  ConstraintLocator *getExprConvertTypeLocator() const {
+    assert(kind == Kind::expression);
+    return expression.convertTypeLocator;
   }
 
   /// Returns the autoclosure parameter type, or \c nullptr if the
@@ -3609,8 +3649,9 @@ private:
 
   // FIXME: Perhaps these belong on ConstraintSystem itself.
   friend Optional<BraceStmt *>
-  swift::TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func,
-                                                        Type builderType);
+  swift::TypeChecker::applyResultBuilderBodyTransform(
+      FuncDecl *func, Type builderType,
+      bool ClosuresInResultBuilderDontParticipateInInference);
 
   friend Optional<SolutionApplicationTarget>
   swift::TypeChecker::typeCheckExpression(
@@ -4224,7 +4265,8 @@ public:
 
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(Expr *expr, Type conversionType,
-                                         ContextualTypePurpose purpose);
+                                         ContextualTypePurpose purpose,
+                                         ConstraintLocator *locator);
 
   /// Convenience function to pass an \c ArrayRef to \c addJoinConstraint
   Type addJoinConstraint(ConstraintLocator *locator,
@@ -5068,7 +5110,8 @@ public:
   /// \returns true if an error occurred, false otherwise.
   LLVM_NODISCARD
   bool generateConstraints(SolutionApplicationTarget &target,
-                           FreeTypeVariableBinding allowFreeTypeVariables);
+                           FreeTypeVariableBinding allowFreeTypeVariables =
+                               FreeTypeVariableBinding::Disallow);
 
   /// Generate constraints for the body of the given function or closure.
   ///
@@ -5079,6 +5122,11 @@ public:
   /// \returns \c true if constraint generation failed, \c false otherwise
   LLVM_NODISCARD
   bool generateConstraints(AnyFunctionRef fn, BraceStmt *body);
+
+  /// Generate constraints for a given SingleValueStmtExpr.
+  ///
+  /// \returns \c true if constraint generation failed, \c false otherwise
+  bool generateConstraints(SingleValueStmtExpr *E);
 
   /// Generate constraints for the given (unchecked) expression.
   ///
@@ -5688,7 +5736,7 @@ public:
   Optional<TypeMatchResult>
   matchResultBuilder(AnyFunctionRef fn, Type builderType, Type bodyResultType,
                      ConstraintKind bodyResultConstraintKind,
-                     ConstraintLocatorBuilder locator);
+                     Type contextualType, ConstraintLocatorBuilder locator);
 
   /// Matches a wrapped or projected value parameter type to its backing
   /// property wrapper type by applying the property wrapper.
@@ -5978,6 +6026,22 @@ public:
                                SolutionApplicationTarget)>
                                rewriteTarget);
 
+  /// Apply the given solution to the given SingleValueStmtExpr.
+  ///
+  /// \param solution The solution to apply.
+  /// \param SVE The SingleValueStmtExpr to rewrite.
+  /// \param DC The declaration context in which transformations will be
+  /// applied.
+  /// \param rewriteTarget Function that performs a rewrite of any
+  /// solution application target within the context.
+  ///
+  /// \returns true if solution cannot be applied.
+  bool applySolutionToSingleValueStmt(
+      Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
+      std::function<
+          Optional<SolutionApplicationTarget>(SolutionApplicationTarget)>
+          rewriteTarget);
+
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
@@ -6153,7 +6217,7 @@ public:
     this->locator = cs.getConstraintLocator(locator);
   }
 
-  Type operator()(Type packType, PackReferenceTypeRepr *packRepr) const {
+  Type operator()(Type packType, PackElementTypeRepr *packRepr) const {
     // Only assert we have an element environment when invoking the function
     // object. In cases where pack elements are referenced outside of a
     // pack expansion, type resolution will error before opening the pack

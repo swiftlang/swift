@@ -51,6 +51,7 @@ sil @initX : $@convention(method) (@owned X) -> @owned X {
 [%0: escape => %r, escape c*.v** => %r.c*.v**]
 }
 sil @modifyStr : $@convention(method) (@inout Str) -> ()
+sil @guaranteed_yield_coroutine : $@yield_once @convention(thin) (@inout X) -> @yields @inout X
 
 // CHECK-LABEL: Address escape information for test_simple:
 // CHECK:       value:  %1 = struct_element_addr %0 : $*Str, #Str.a
@@ -268,6 +269,28 @@ bb0:
   return %12 : $()
 }
 
+// CHECK-LABEL: Address escape information for indirect_argument_escape_to_yield:
+// CHECK:       value:  %1 = alloc_stack $X
+// CHECK-NEXT:    ==>   (%5, %6) = begin_apply %4(%1) : $@yield_once @convention(thin) (@inout X) -> @yields @inout X
+// CHECK-NEXT:    ==>   %8 = apply %7(%5) : $@convention(thin) (@inout X) -> ()
+// CHECK:       End function indirect_argument_escape_to_yield
+sil @indirect_argument_escape_to_yield : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : $X):
+  %1 = alloc_stack $X
+  store %0 to %1 : $*X
+  fix_lifetime %1 : $*X
+  %3 = function_ref @guaranteed_yield_coroutine : $@yield_once @convention(thin) (@inout X) -> @yields @inout X
+  (%4, %5) = begin_apply %3(%1) : $@yield_once @convention(thin) (@inout X) -> @yields @inout X
+
+  %6 = function_ref @inout_class_argument : $@convention(thin) (@inout X) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@inout X) -> ()
+
+  end_apply %5
+  dealloc_stack %1 : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: Address escape information for ignore_copy_addr_and_release:
 // CHECK:       value:  %1 = ref_element_addr %0 : $X, #X.s
 // CHECK-NEXT:    -     %6 = apply %5(%3) : $@convention(thin) (@in Str) -> ()
@@ -477,6 +500,28 @@ bb0:
   return %7 : $()
 }
 
+// CHECK-LABEL: Address escape information for load_rawpointer:
+// CHECK:       value:  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Int
+// CHECK-NEXT:    ==>   %8 = apply %7(%5) : $@convention(thin) (@in Int) -> ()
+// CHECK:       End function load_rawpointer
+sil @load_rawpointer : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int
+  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %2 = alloc_stack $Builtin.RawPointer
+  store %1 to %2 : $*Builtin.RawPointer
+  %4 = load %2 : $*Builtin.RawPointer
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Int
+  fix_lifetime %5 : $*Int
+  %7 = function_ref @indirect_argument : $@convention(thin) (@in Int) -> ()
+  %8 = apply %7(%5) : $@convention(thin) (@in Int) -> ()
+  dealloc_stack %2 : $*Builtin.RawPointer
+  dealloc_stack %0 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
+
 // CHECK-LABEL: Address escape information for test_addr_alias1:
 // CHECK:      pair 0 - 1
 // CHECK-NEXT:   %2 = ref_element_addr %0 : $XandIntClass, #XandIntClass.x
@@ -561,3 +606,30 @@ bb0:
   %11 = tuple ()
   return %11 : $()
 }
+
+sil @call_closure : $@convention(method) (@noescape @callee_guaranteed () -> ()) -> ()
+sil @closure : $@convention(thin) (@inout_aliasable Int) -> ()
+
+// CHECK-LABEL: Address escape information for test_closure_capturing_address:
+// CHECK:      value:  %0 = alloc_stack $Int
+// CHECK-NEXT:   ==>   %7 = apply %6(%4) : $@convention(method) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:      End function test_closure_capturing_address
+sil @test_closure_capturing_address : $@convention(thin) () -> Int {
+bb0:
+  %0 = alloc_stack $Int
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = struct $Int (%1 : $Builtin.Int64)
+
+  %3 = function_ref @closure : $@convention(thin) (@inout_aliasable Int) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%0) : $@convention(thin) (@inout_aliasable Int) -> ()
+  store %2 to %0 : $*Int
+
+  %6 = function_ref @call_closure : $@convention(method) (@noescape @callee_guaranteed () -> ()) -> ()
+  %7 = apply %6(%4) : $@convention(method) (@noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %4 : $@noescape @callee_guaranteed () -> ()
+  fix_lifetime %0 : $*Int
+  %9 = load %0 : $*Int
+  dealloc_stack %0 : $*Int
+  return %9 : $Int
+}
+

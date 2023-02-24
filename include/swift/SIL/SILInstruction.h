@@ -643,7 +643,7 @@ public:
   NonTypeDependentOperandValueRange getNonTypeDependentOperandValues() const;
 
   TransformedOperandValueRange
-  getOperandValues(std::function<SILValue(SILValue)> transformFn,
+  getOperandValues(std::function<SILValue(const Operand *)> transformFn,
                    bool skipTypeDependentOperands) const;
 
   SILValue getOperand(unsigned Num) const {
@@ -720,8 +720,9 @@ public:
   /// Returns true if the given instruction is completely identical to RHS,
   /// using \p opEqual to compare operands.
   ///
-  template <typename OpCmp>
-  bool isIdenticalTo(const SILInstruction *RHS, OpCmp &&opEqual) const {
+  bool
+  isIdenticalTo(const SILInstruction *RHS,
+                llvm::function_ref<bool(SILValue, SILValue)> opEqual) const {
     // Quick check if both instructions have the same kind, number of operands,
     // and types. This should filter out most cases.
     if (getKind() != RHS->getKind() ||
@@ -735,6 +736,29 @@ public:
     // Check operands.
     for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
       if (!opEqual(getOperand(i), RHS->getOperand(i)))
+        return false;
+
+    // Check any special state of instructions that are not represented in the
+    // instructions operands/type.
+    return hasIdenticalState(RHS);
+  }
+
+  bool isIdenticalTo(const SILInstruction *RHS,
+                     llvm::function_ref<bool(const Operand *, const Operand *)>
+                         opEqual) const {
+    // Quick check if both instructions have the same kind, number of operands,
+    // and types. This should filter out most cases.
+    if (getKind() != RHS->getKind() ||
+        getNumOperands() != RHS->getNumOperands()) {
+      return false;
+    }
+
+    if (!getResults().hasSameTypes(RHS->getResults()))
+      return false;
+
+    // Check operands.
+    for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
+      if (!opEqual(&getOperandRef(i), &RHS->getOperandRef(i)))
         return false;
 
     // Check any special state of instructions that are not represented in the
@@ -972,19 +996,20 @@ struct SILInstruction::NonTypeDependentOperandToValue {
 
 struct SILInstruction::OperandToTransformedValue {
   const SILInstruction &i;
-  std::function<SILValue(SILValue)> transformFn;
+  std::function<SILValue(const Operand *)> transformFn;
   bool skipTypeDependentOps;
 
-  OperandToTransformedValue(const SILInstruction &i,
-                            std::function<SILValue(SILValue)> transformFn,
-                            bool skipTypeDependentOps)
+  OperandToTransformedValue(
+      const SILInstruction &i,
+      std::function<SILValue(const Operand *)> transformFn,
+      bool skipTypeDependentOps)
       : i(i), transformFn(transformFn),
         skipTypeDependentOps(skipTypeDependentOps) {}
 
   Optional<SILValue> operator()(const Operand &use) const {
     if (skipTypeDependentOps && i.isTypeDependentOperand(use))
       return None;
-    return transformFn(use.get());
+    return transformFn(&use);
   }
 };
 
@@ -1005,10 +1030,9 @@ SILInstruction::getNonTypeDependentOperandValues() const
                                            NonTypeDependentOperandToValue(*this));
 }
 
-inline auto
-SILInstruction::getOperandValues(std::function<SILValue(SILValue)> transformFn,
-                                 bool skipTypeDependentOperands) const
-    -> TransformedOperandValueRange {
+inline auto SILInstruction::getOperandValues(
+    std::function<SILValue(const Operand *)> transformFn,
+    bool skipTypeDependentOperands) const -> TransformedOperandValueRange {
   return TransformedOperandValueRange(
       getAllOperands(),
       OperandToTransformedValue(*this, transformFn, skipTypeDependentOperands));
@@ -2221,6 +2245,32 @@ public:
   DeallocStackInst *getSingleDeallocStack() const;
 };
 
+/// AllocPackInst - This represents the allocation of a value pack
+/// in stack memory.  The memory is provided uninitialized.
+class AllocPackInst final
+    : public NullaryInstructionWithTypeDependentOperandsBase<
+                  SILInstructionKind::AllocPackInst,
+                  AllocPackInst,
+                  AllocationInst> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+  AllocPackInst(SILDebugLocation loc, SILType resultType,
+                ArrayRef<SILValue> typeDependentOperands)
+    : NullaryInstructionWithTypeDependentOperandsBase(loc,
+                                                      typeDependentOperands,
+                                                      resultType) {}
+
+  static AllocPackInst *create(SILDebugLocation loc, SILType packType,
+                               SILFunction &F);
+public:
+  /// Return the allocated pack type.  The result type of the instruction
+  /// is an address of this type.
+  CanSILPackType getPackType() const {
+    return getType().castTo<SILPackType>();
+  }
+};
+
 /// The base class for AllocRefInst and AllocRefDynamicInst.
 ///
 /// The first NumTailTypes operands are counts for the tail allocated
@@ -2993,6 +3043,9 @@ public:
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
   }
+  
+  /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
+  bool visitOnStackLifetimeEnds(llvm::function_ref<bool (Operand*)> func) const;
 };
 
 class EndApplyInst;
@@ -3841,7 +3894,8 @@ class KeyPathInst final
   friend TrailingObjects;
   
   KeyPathPattern *Pattern;
-  unsigned NumOperands;
+  unsigned numPatternOperands;
+  unsigned numTypeDependentOperands;
   SubstitutionMap Substitutions;
   
   static KeyPathInst *create(SILDebugLocation Loc,
@@ -3854,11 +3908,12 @@ class KeyPathInst final
   KeyPathInst(SILDebugLocation Loc,
               KeyPathPattern *Pattern,
               SubstitutionMap Subs,
-              ArrayRef<SILValue> Args,
+              ArrayRef<SILValue> allOperands,
+              unsigned numPatternOperands,
               SILType Ty);
   
   size_t numTrailingObjects(OverloadToken<Operand>) const {
-    return NumOperands;
+    return numPatternOperands + numTypeDependentOperands;
   }
   
 public:
@@ -3869,6 +3924,23 @@ public:
     return const_cast<KeyPathInst*>(this)->getAllOperands();
   }
   MutableArrayRef<Operand> getAllOperands();
+
+  ArrayRef<Operand> getPatternOperands() const {
+    return getAllOperands().slice(0, numPatternOperands);
+  }
+
+  MutableArrayRef<Operand> getPatternOperands() {
+    return getAllOperands().slice(0, numPatternOperands);
+  }
+
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().slice(numPatternOperands);
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().slice(numPatternOperands);
+  }
 
   SubstitutionMap getSubstitutions() const { return Substitutions; }
 
@@ -4756,9 +4828,6 @@ class AssignByWrapperInst
   USE_SHARED_UINT8;
 
 public:
-  /// The kind of a wrapper that is being applied.
-  enum class Originator : uint8_t { TypeWrapper, PropertyWrapper };
-
   enum Mode {
     /// The mode is not decided yet (by DefiniteInitialization).
     Unknown,
@@ -4778,17 +4847,13 @@ public:
   };
 
 private:
-  Originator originator;
-
-  AssignByWrapperInst(SILDebugLocation DebugLoc, Originator origin,
+  AssignByWrapperInst(SILDebugLocation DebugLoc,
                       SILValue Src, SILValue Dest, SILValue Initializer,
                       SILValue Setter, Mode mode);
 
 public:
   SILValue getInitializer() { return Operands[2].get(); }
   SILValue getSetter() { return  Operands[3].get(); }
-
-  Originator getOriginator() const { return originator; }
 
   Mode getMode() const {
     return Mode(sharedUInt8().AssignByWrapperInst.mode);
@@ -4901,6 +4966,19 @@ public:
   OperandValueArrayRef getElements() const {
     return OperandValueArrayRef(getAllOperands());
   }
+};
+
+/// This instruction is inserted by Onone optimizations as a replacement for deleted
+/// instructions to ensure that it's possible to set a breakpoint on its location.
+class DebugStepInst final
+    : public InstructionBase<SILInstructionKind::DebugStepInst, NonValueInstruction> {
+  friend SILBuilder;
+
+  DebugStepInst(SILDebugLocation debugLoc) : InstructionBase(debugLoc) {}
+
+public:
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
 /// Define the start or update to a symbolic variable value (for loadable
@@ -6507,7 +6585,8 @@ public:
 
   SILValue getOperand() const { return getAllOperands()[0].get(); }
   SILValue getEnumOperand() const { return getOperand(); }
-  
+  const Operand &getEnumOperandRef() const { return getAllOperands()[0]; }
+
   std::pair<EnumElementDecl*, SILValue>
   getCase(unsigned i) const {
     return std::make_pair(getEnumElementDeclStorage()[i],
@@ -7419,6 +7498,36 @@ class DeinitExistentialValueInst
       : UnaryInstructionBase(DebugLoc, Existential) {}
 };
 
+/// Compute the length of a pack (as a Builtin.Word).
+class PackLengthInst final
+    : public NullaryInstructionWithTypeDependentOperandsBase<
+                  SILInstructionKind::PackLengthInst,
+                  PackLengthInst,
+                  SingleValueInstruction> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+  CanPackType ThePackType;
+
+  PackLengthInst(SILDebugLocation loc,
+                 ArrayRef<SILValue> typeDependentOperands,
+                 SILType resultType,
+                 CanPackType packType)
+    : NullaryInstructionWithTypeDependentOperandsBase(loc,
+                                                      typeDependentOperands,
+                                                      resultType),
+      ThePackType(packType) {}
+
+  static PackLengthInst *create(SILFunction &parent,
+                                SILDebugLocation loc,
+                                CanPackType packType);
+public:
+  /// Return the measured pack type.
+  CanPackType getPackType() const {
+    return ThePackType;
+  }
+};
+
 /// An abstract class for instructions which producing variadic
 /// pack indices.
 ///
@@ -7625,6 +7734,146 @@ public:
 
   AnyPackIndexInst *getIndexOperand() const {
     return cast<AnyPackIndexInst>(getOperand());
+  }
+};
+
+/// Get the value previously stored in a pack by pack_element_set.
+class PackElementGetInst final
+  : public InstructionBaseWithTrailingOperands<
+                           SILInstructionKind::PackElementGetInst,
+                           PackElementGetInst, SingleValueInstruction> {
+public:
+  enum {
+    IndexOperand = 0,
+    PackOperand = 1
+  };
+
+private:
+  friend SILBuilder;
+
+  PackElementGetInst(SILDebugLocation debugLoc,
+                     ArrayRef<SILValue> allOperands,
+                     SILType elementType)
+      : InstructionBaseWithTrailingOperands(allOperands, debugLoc,
+                                            elementType) {}
+
+  static PackElementGetInst *create(SILFunction &F,
+                                    SILDebugLocation debugLoc,
+                                    SILValue indexOperand,
+                                    SILValue packOperand,
+                                    SILType elementType);
+
+public:
+  SILValue getIndex() const {
+    return getAllOperands()[IndexOperand].get();
+  }
+
+  SILValue getPack() const {
+    return getAllOperands()[PackOperand].get();
+  }
+
+  CanSILPackType getPackType() const {
+    return getPack()->getType().castTo<SILPackType>();
+  }
+
+  SILType getElementType() const {
+    return getType();
+  }
+};
+
+/// Set the value stored in a pack.
+class PackElementSetInst
+  : public InstructionBase<SILInstructionKind::PackElementSetInst,
+                           NonValueInstruction> {
+public:
+  enum {
+    ValueOperand = 0,
+    IndexOperand = 1,
+    PackOperand = 2
+  };
+
+private:
+  friend SILBuilder;
+
+  FixedOperandList<3> Operands;
+
+  PackElementSetInst(SILDebugLocation debugLoc,
+                     SILValue valueOperand, SILValue indexOperand,
+                     SILValue packOperand)
+      : InstructionBase(debugLoc),
+        Operands(this, valueOperand, indexOperand, packOperand) {
+    assert(packOperand->getType().is<SILPackType>());
+  }
+
+public:
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  SILValue getValue() const {
+    return getAllOperands()[ValueOperand].get();
+  }
+
+  SILValue getIndex() const {
+    return getAllOperands()[IndexOperand].get();
+  }
+
+  SILValue getPack() const {
+    return getAllOperands()[PackOperand].get();
+  }
+
+  CanSILPackType getPackType() const {
+    return getPack()->getType().castTo<SILPackType>();
+  }
+
+  SILType getElementType() const {
+    return getValue()->getType();
+  }
+};
+
+/// Projects a tuple element as appropriate for the given
+/// pack element index.  The pack index must index into a pack with
+/// the same shape as the tuple element type list.
+class TuplePackElementAddrInst final
+  : public InstructionBaseWithTrailingOperands<
+                           SILInstructionKind::TuplePackElementAddrInst,
+                           TuplePackElementAddrInst,
+                           SingleValueInstruction> {
+public:
+  enum {
+    IndexOperand = 0,
+    TupleOperand = 1
+  };
+
+private:
+  friend SILBuilder;
+
+  TuplePackElementAddrInst(SILDebugLocation debugLoc,
+                           ArrayRef<SILValue> allOperands,
+                           SILType elementType)
+      : InstructionBaseWithTrailingOperands(allOperands, debugLoc,
+                                            elementType) {}
+
+  static TuplePackElementAddrInst *create(SILFunction &F,
+                                          SILDebugLocation debugLoc,
+                                          SILValue indexOperand,
+                                          SILValue tupleOperand,
+                                          SILType elementType);
+
+public:
+  SILValue getIndex() const {
+    return getAllOperands()[IndexOperand].get();
+  }
+
+  SILValue getTuple() const {
+    return getAllOperands()[TupleOperand].get();
+  }
+
+  CanTupleType getTupleType() const {
+    return getTuple()->getType().castTo<TupleType>();
+  }
+
+  SILType getElementType() const {
+    return getType();
   }
 };
 
@@ -7969,6 +8218,10 @@ public:
   void setPoisonRefs(bool poisonRefs = true) {
     sharedUInt8().DestroyValueInst.poisonRefs = poisonRefs;
   }
+  
+  /// If the value being destroyed is a stack allocation of a nonescaping
+  /// closure, then return the PartialApplyInst that allocated the closure.
+  PartialApplyInst *getNonescapingClosureAllocation() const;
 };
 
 class MoveValueInst
@@ -8036,15 +8289,26 @@ public:
   enum class CheckKind : unsigned {
     Invalid = 0,
 
-    // A signal to the move only checker to perform no implicit copy checking on
-    // the result of this instruction. This implies that the result can be
-    // consumed at most once.
-    NoImplicitCopy,
+    /// A signal to the move only checker to perform checking that allows for
+    /// this value to be consumed along its boundary (in the case of let/var
+    /// semantics) and also written over in the case of var semantics. NOTE: Of
+    /// course this still implies the value cannot be copied and can be consumed
+    /// only once along all program paths.
+    ConsumableAndAssignable,
 
-    // A signal to the move only checker ot perform no copy checking. This
-    // forces the result of this instruction owned value to never be consumed
-    // (still allowing for non-consuming uses of course).
-    NoCopy,
+    /// A signal to the move only checker to perform no consume or assign
+    /// checking. This forces the result of this instruction owned value to never
+    /// be consumed (for let/var semantics) or assigned over (for var
+    /// semantics). Of course, we still allow for non-consuming uses.
+    NoConsumeOrAssign,
+
+    /// A signal to the move checker that the given value cannot be consumed,
+    /// but is allowed to be assigned over. This is used for situations like
+    /// global_addr/ref_element_addr/closure escape where we do not want to
+    /// allow for the user to take the value (leaving the memory in an
+    /// uninitialized state), but we are ok with the user assigning a new value,
+    /// completely assigning over the value at once.
+    AssignableButNotConsumable,
   };
 
 private:
@@ -8067,8 +8331,9 @@ public:
     switch (kind) {
     case CheckKind::Invalid:
       return false;
-    case CheckKind::NoImplicitCopy:
-    case CheckKind::NoCopy:
+    case CheckKind::ConsumableAndAssignable:
+    case CheckKind::NoConsumeOrAssign:
+    case CheckKind::AssignableButNotConsumable:
       return true;
     }
   }
@@ -8298,6 +8563,16 @@ class DeallocStackInst :
       : UnaryInstructionBase(DebugLoc, operand) {}
 };
 
+/// DeallocPackInst - Deallocate stack memory allocated by alloc_pack.
+class DeallocPackInst :
+    public UnaryInstructionBase<SILInstructionKind::DeallocPackInst,
+                                DeallocationInst> {
+  friend SILBuilder;
+
+  DeallocPackInst(SILDebugLocation debugLoc, SILValue operand)
+      : UnaryInstructionBase(debugLoc, operand) {}
+};
+
 /// Like DeallocStackInst, but for `alloc_ref [stack]`.
 class DeallocStackRefInst
     : public UnaryInstructionBase<SILInstructionKind::DeallocStackRefInst,
@@ -8492,6 +8767,8 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  const Operand &getBaseOperandRef() const { return getAllOperands()[Base]; }
 
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(IndexingInst)
 };

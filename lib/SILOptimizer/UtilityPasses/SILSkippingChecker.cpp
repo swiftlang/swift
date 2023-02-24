@@ -72,13 +72,13 @@ static bool shouldHaveSkippedFunction(const SILFunction &F) {
       return false;
   }
 
-  // Functions with @_backDeploy may be copied into the client, so they
+  // Functions with @backDeployed may be copied into the client, so they
   // shouldn't be skipped. The SILFunction that may be copied into the client
   // should be serialized and therefore is already handled above. However, a
   // second resilient SILFunction is also emitted for back deployed functions.
   // Since the body of the function as written was not skipped, it's expected
   // that we see the SILFunction for the resilient copy here.
-  if (func->isBackDeployed())
+  if (func->hasBackDeployedAttr())
     return false;
 
   // If none of those conditions trip, then this is something that _should_

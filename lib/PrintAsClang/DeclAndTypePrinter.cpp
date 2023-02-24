@@ -977,6 +977,10 @@ private:
         getForeignResultType(AFD, methodTy, asyncConvention, errorConvention);
 
     if (outputLang == OutputLanguageMode::Cxx) {
+      // FIXME: Support operators.
+      if (AFD->isOperator() || (AFD->isStatic() && AFD->isImplicit()))
+        return;
+
       auto *typeDeclContext = dyn_cast<NominalTypeDecl>(AFD->getParent());
       if (!typeDeclContext) {
         typeDeclContext =
@@ -991,6 +995,13 @@ private:
                              /*selfTypeDeclContext=*/typeDeclContext);
       if (!funcABI)
         return;
+      Optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo;
+      if (!isa<ConstructorDecl>(AFD)) {
+        dispatchInfo = owningPrinter.interopContext.getIrABIDetails()
+                           .getMethodDispatchInfo(AFD);
+        if (!dispatchInfo)
+          return;
+      }
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
       printDocumentationComment(AFD);
@@ -1002,18 +1013,19 @@ private:
           declPrinter.printCxxSubscriptAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
-              /*isDefinition=*/false);
+              /*isDefinition=*/false, dispatchInfo);
         else
           declPrinter.printCxxPropertyAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
               /*isStatic=*/isClassMethod,
-              /*isDefinition=*/false);
+              /*isDefinition=*/false, dispatchInfo);
       } else {
         declPrinter.printCxxMethod(typeDeclContext, AFD,
                                    funcABI->getSignature(),
                                    funcABI->getSymbolName(), resultTy,
-                                   /*isDefinition=*/false);
+                                   /*isStatic=*/isClassMethod,
+                                   /*isDefinition=*/false, dispatchInfo);
       }
 
       DeclAndTypeClangFunctionPrinter defPrinter(
@@ -1025,17 +1037,19 @@ private:
         if (SD)
           defPrinter.printCxxSubscriptAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
-              funcABI->getSymbolName(), resultTy, /*isDefinition=*/true);
+              funcABI->getSymbolName(), resultTy, /*isDefinition=*/true,
+              dispatchInfo);
         else
           defPrinter.printCxxPropertyAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
               /*isStatic=*/isClassMethod,
-              /*isDefinition=*/true);
+              /*isDefinition=*/true, dispatchInfo);
       } else {
         defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
                                   funcABI->getSymbolName(), resultTy,
-                                  /*isDefinition=*/true);
+                                  /*isStatic=*/isClassMethod,
+                                  /*isDefinition=*/true, dispatchInfo);
       }
 
       // FIXME: SWIFT_WARN_UNUSED_RESULT
@@ -1343,6 +1357,47 @@ private:
     LoweredFunctionSignature signature;
   };
 
+  /// Print the C function declaration that represents the given native Swift
+  /// function, or its dispatch thunk.
+  ClangRepresentation printCFunctionWithLoweredSignature(
+      AbstractFunctionDecl *FD, const FunctionSwiftABIInformation &funcABI,
+      Type resultTy, AnyFunctionType *funcTy, StringRef symbolName,
+      StringRef comment = "") {
+    std::string cRepresentationString;
+    llvm::raw_string_ostream cRepresentationOS(cRepresentationString);
+    cRepresentationOS << "SWIFT_EXTERN ";
+
+    DeclAndTypeClangFunctionPrinter funcPrinter(
+        cRepresentationOS, owningPrinter.prologueOS, owningPrinter.typeMapping,
+        owningPrinter.interopContext, owningPrinter);
+
+    auto representation = funcPrinter.printFunctionSignature(
+        FD, funcABI.getSignature(), symbolName, resultTy,
+        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto);
+    if (representation.isUnsupported())
+      return representation;
+
+    os << cRepresentationOS.str();
+    // Swift functions can't throw exceptions, we can only
+    // throw them from C++ when emitting C++ inline thunks for the Swift
+    // functions.
+    if (!funcTy->isThrowing())
+      os << " SWIFT_NOEXCEPT";
+    if (!funcABI.useCCallingConvention())
+      os << " SWIFT_CALL";
+    printAvailability(FD);
+    os << ';';
+    if (funcABI.useMangledSymbolName()) {
+      // add a comment with a demangled function name.
+      os << " // ";
+      if (!comment.empty())
+        os << comment << ' ';
+      FD->getName().print(os);
+    }
+    os << "\n";
+    return representation;
+  }
+
   // Print out the extern C Swift ABI function signature.
   Optional<FunctionSwiftABIInformation>
   printSwiftABIFunctionSignatureAsCxxFunction(
@@ -1365,9 +1420,6 @@ private:
     auto resultTy =
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
-    std::string cRepresentationString;
-    llvm::raw_string_ostream cRepresentationOS(cRepresentationString);
-
     auto signature = owningPrinter.interopContext.getIrABIDetails()
                          .getFunctionLoweredSignature(FD);
     // FIXME: Add a note saying that this func is unsupported.
@@ -1375,37 +1427,41 @@ private:
       return None;
     FunctionSwiftABIInformation funcABI(FD, *signature);
 
-    cRepresentationOS << "SWIFT_EXTERN ";
-
-    DeclAndTypeClangFunctionPrinter funcPrinter(
-        cRepresentationOS, owningPrinter.prologueOS, owningPrinter.typeMapping,
-        owningPrinter.interopContext, owningPrinter);
-
-    auto representation = funcPrinter.printFunctionSignature(
-        FD, funcABI.getSignature(), funcABI.getSymbolName(), resultTy,
-        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto);
-    if (representation.isUnsupported()) {
+    auto representation = printCFunctionWithLoweredSignature(
+        FD, funcABI, resultTy, funcTy, funcABI.getSymbolName());
+    if (representation.isUnsupported())
       // FIXME: Emit remark about unemitted declaration.
       return None;
+
+    if (selfTypeDeclContext && !isa<ConstructorDecl>(FD)) {
+      if (auto dispatchInfo = owningPrinter.interopContext.getIrABIDetails()
+                                  .getMethodDispatchInfo(FD)) {
+        // Emit the C signature for the dispatch thunk.
+        if (dispatchInfo->getKind() ==
+            IRABIDetailsProvider::MethodDispatchInfo::Kind::Thunk) {
+          auto thunkRepresentation = printCFunctionWithLoweredSignature(
+              FD, funcABI, resultTy, funcTy, dispatchInfo->getThunkSymbolName(),
+              "dispatch thunk for");
+          assert(!thunkRepresentation.isUnsupported());
+        } else if (dispatchInfo->getKind() ==
+                   IRABIDetailsProvider::MethodDispatchInfo::Kind::
+                       IndirectVTableRelativeOffset) {
+          // Emit the C signature for the class metadata base offset.
+          owningPrinter.interopContext.runIfStubForDeclNotEmitted(
+              dispatchInfo->getBaseOffsetSymbolName(), [&] {
+                auto baseClassOffsetType =
+                    owningPrinter.interopContext.getIrABIDetails()
+                        .getClassBaseOffsetSymbolType();
+                os << "SWIFT_EXTERN ";
+                ClangSyntaxPrinter(os).printKnownCType(
+                    baseClassOffsetType, owningPrinter.typeMapping);
+                os << ' ' << dispatchInfo->getBaseOffsetSymbolName()
+                   << "; // class metadata base offset\n";
+              });
+        }
+      }
     }
 
-    os << cRepresentationOS.str();
-    // Swift functions can't throw exceptions, we can only
-    // throw them from C++ when emitting C++ inline thunks for the Swift
-    // functions.
-    // FIXME: Support throwing exceptions for Swift errors.
-    if (!funcTy->isThrowing())
-      os << " SWIFT_NOEXCEPT";
-    if (!funcABI.useCCallingConvention())
-      os << " SWIFT_CALL";
-    printAvailability(FD);
-    os << ';';
-    if (funcABI.useMangledSymbolName()) {
-      // add a comment with a demangled function name.
-      os << " // ";
-      FD->getName().print(os);
-    }
-    os << "\n";
     return funcABI;
   }
 
@@ -1652,9 +1708,6 @@ private:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (outputLang == OutputLanguageMode::Cxx) {
-      // FIXME: Support static methods.
-      if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
-        return;
       if (FD->getDeclContext()->isTypeContext())
         return printAbstractFunctionAsMethod(FD, FD->isStatic());
 

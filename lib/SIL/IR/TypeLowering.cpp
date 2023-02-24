@@ -112,15 +112,26 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   assert(var->hasStorage() &&
          "should not have attempted to directly capture this variable");
 
+  auto &lowering = getTypeLowering(
+      var->getType(), TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                          expansion.getResilienceExpansion()));
+
+  // If this is a noncopyable 'let' constant that is not a shared paramdecl or
+  // used by a noescape capture, then we know it is boxed and want to pass it in
+  // its boxed form so we can obey Swift's capture reference semantics.
+  if (!var->supportsMutation() && lowering.getLoweredType().isPureMoveOnly() &&
+      !capture.isNoEscape()) {
+      auto *param = dyn_cast<ParamDecl>(var);
+      if (!param || param->getValueOwnership() != ValueOwnership::Shared) {
+        return CaptureKind::ImmutableBox;
+      }
+  }
+
   // If this is a non-address-only stored 'let' constant, we can capture it
   // by value.  If it is address-only, then we can't load it, so capture it
   // by its address (like a var) instead.
-  if (!var->supportsMutation() &&
-      !getTypeLowering(var->getType(),
-                       TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
-                           expansion.getResilienceExpansion()))
-           .isAddressOnly())
-    return CaptureKind::Constant;
+  if (!var->supportsMutation() && !lowering.isAddressOnly())
+      return CaptureKind::Constant;
 
   // In-out parameters are captured by address.
   if (auto *param = dyn_cast<ParamDecl>(var)) {
@@ -396,14 +407,19 @@ namespace {
       case DifferentiabilityKind::NonDifferentiable:
         break;
       }
-      // Only escaping closures are references.
-      bool isSwiftEscaping = type->getExtInfo().isNoEscape() &&
-                             type->getExtInfo().getRepresentation() ==
-                                 SILFunctionType::Representation::Thick;
-      if (type->getExtInfo().hasContext() && !isSwiftEscaping)
+      if (type->getExtInfo().hasContext()) {
+        // Nonescaping closures ultimately become trivial, but we give them
+        // ownership semantics to do borrow checking on their captures, so we
+        // lower them as reference types. Passes will eliminate ownership
+        // operations on them.
+        //
+        // TODO: Nonescaping closures should also be move-only to ensure we
+        // eliminate copies.
         return asImpl().handleReference(
             type, getReferenceRecursiveProperties(isSensitive));
-      // No escaping closures are trivial types.
+      }
+      
+      // Contextless function references are trivial types.
       return asImpl().handleTrivial(type,
                                     getTrivialRecursiveProperties(isSensitive));
     }
@@ -2292,7 +2308,7 @@ namespace {
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
         auto pointerAuthQual = field->getPointerAuthQualifier();
-        if (pointerAuthQual && pointerAuthQual.isAddressDiscriminated()) {
+        if (pointerAuthQual.isPresent()) {
           properties.setAddressOnly();
         }
         auto substFieldType =

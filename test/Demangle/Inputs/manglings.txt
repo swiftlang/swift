@@ -444,11 +444,16 @@ $s7Library5KlassCTwS ---> #_hasSymbol query for Library.Klass
 $s14swift_ide_test14myColorLiteral3red5green4blue5alphaAA0E0VSf_S3ftcfm ---> swift_ide_test.myColorLiteral(red: Swift.Float, green: Swift.Float, blue: Swift.Float, alpha: Swift.Float) -> swift_ide_test.Color
 $s14swift_ide_test10myFilenamexfm ---> swift_ide_test.myFilename : A
 $s4main4FlagVHa ---> runtime discoverable attribute record for main.Flag
-$s4main4TestV11doSomethingyycvpfaAA4FlagHF ---> accessible function runtime record for runtime attribute generator of main.Test.doSomething : () -> () for attribute = main.Flag
-$s4main10globalTest1a_ySi_SStcvpfaAA4Flag ---> runtime attribute generator of main.globalTest : (a: Swift.Int, _: Swift.String) -> () for attribute = main.Flag
-$s4main4TestV11doSomethingyycvpfaAA4Flag ---> runtime attribute generator of main.Test.doSomething : () -> () for attribute = main.Flag
-$s4main4TestV11doSomethingyycvpZfaAA4Flag ---> runtime attribute generator of static main.Test.doSomething : () -> () for attribute = main.Flag
-$s4main4TestV1xSivpfaAA4Flag ---> runtime attribute generator of main.Test.x : Swift.Int for attribute = main.Flag
-$s4main4TestAaBVmvpfaAA9OtherFlag ---> runtime attribute generator of main.Test : main.Test.Type for attribute = main.OtherFlag
+$s4main4FlagVAA4TestV11doSomethingyycvpfaHF ---> accessible function runtime record for runtime attribute generator of main.Test.doSomething : () -> () for attribute of main.Flag
+$s4main4FlagVAA10globalTest1a_ySi_SStcvpfa ---> runtime attribute generator of main.globalTest : (a: Swift.Int, _: Swift.String) -> () for attribute of main.Flag
+$s4main4FlagVAA4TestV11doSomethingyycvpfa ---> runtime attribute generator of main.Test.doSomething : () -> () for attribute of main.Flag
+$s4main4FlagVAA4TestV11doSomethingyycvpZfa ---> runtime attribute generator of static main.Test.doSomething : () -> () for attribute of main.Flag
+$s4main4FlagVAA4TestV1xSivpfa ---> runtime attribute generator of main.Test.x : Swift.Int for attribute of main.Flag
+$s4main9OtherFlagVAA4TestVfa ---> runtime attribute generator of main.Test for attribute of main.OtherFlag
+$s4main4TestVAA3ABCV4hereyySiFfa ---> runtime attribute generator of main.ABC.here(Swift.Int) -> () for attribute of main.Test
 $s9MacroUser13testStringify1a1bySi_SitF9stringifyfMf1_ ---> freestanding macro expansion #3 of stringify in MacroUser.testStringify(a: Swift.Int, b: Swift.Int) -> ()
 $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0_ ---> unique name #2 of method in freestanding macro expansion #1 of bitwidthNumberedStructs in Foo3 #1 in MacroUser.testFreestandingMacroExpansion() -> ()
+@__swiftmacro_1a13testStringifyAA1bySi_SitF9stringifyfMf_  ---> freestanding macro expansion #1 of stringify in a.testStringify(a: Swift.Int, b: Swift.Int) -> ()
+@__swiftmacro_15accessor_macros8MyStructV4nameSSvp17myPropertyWrapperfMa_ ---> accessor macro expansion #1 of myPropertyWrapper in accessor_macros.MyStruct.name : Swift.String
+@__swiftmacro_18macro_expand_peers1SV1f1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_ ---> peer macro expansion #1 of addCompletionHandler in macro_expand_peers.S.f(a: Swift.Int, for: Swift.String, _: Swift.Double) async -> Swift.String
+@__swiftmacro_25macro_expand_conformances7GenericV20DelegatedConformancefMc_ ---> conformance macro expansion #1 of DelegatedConformance in macro_expand_conformances.Generic

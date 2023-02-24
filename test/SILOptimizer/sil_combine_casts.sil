@@ -37,6 +37,7 @@ bb0:
   %1 = thin_to_thick_function %0 : $@convention(thin) () -> Builtin.Int32 to $@callee_guaranteed () -> Builtin.Int32
   %2 = convert_escape_to_noescape %1 : $@callee_guaranteed () -> Builtin.Int32 to $@noescape @callee_guaranteed () -> Builtin.Int32
   %4 = apply %2() : $@noescape @callee_guaranteed () -> Builtin.Int32
+  destroy_value %2 : $@noescape @callee_guaranteed () -> Builtin.Int32
   return %4 : $Builtin.Int32
 }
 

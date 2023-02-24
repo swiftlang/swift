@@ -24,15 +24,14 @@
 using namespace swift;
 using llvm::ErrorOr;
 
-
 std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
-                                      ImportPath::Element ModuleID,
-                                      const SerializedModuleBaseName &BaseName,
-                                      SmallVectorImpl<char> *ModuleInterfacePath,
-                                      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                                      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-                                      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                                      bool skipBuildingInterface, bool IsFramework) {
+    ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
+    SmallVectorImpl<char> *ModuleInterfacePath,
+    SmallVectorImpl<char> *ModuleInterfaceSourcePath,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool skipBuildingInterface, bool IsFramework) {
   using namespace llvm::sys;
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -72,6 +71,7 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
 
 bool PlaceholderSwiftModuleScanner::findModule(
     ImportPath::Element moduleID, SmallVectorImpl<char> *moduleInterfacePath,
+    SmallVectorImpl<char> *moduleInterfaceSourcePath,
     std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
@@ -83,8 +83,11 @@ bool PlaceholderSwiftModuleScanner::findModule(
   }
   auto &moduleInfo = it->getValue();
   auto dependencies = ModuleDependencyInfo::forPlaceholderSwiftModuleStub(
-      moduleInfo.modulePath, moduleInfo.moduleDocPath,
-      moduleInfo.moduleSourceInfoPath);
+      moduleInfo.modulePath,
+      moduleInfo.moduleDocPath.has_value() ?
+            moduleInfo.moduleDocPath.value() : "",
+      moduleInfo.moduleSourceInfoPath.has_value() ?
+            moduleInfo.moduleSourceInfoPath.value() : "");
   this->dependencies = std::move(dependencies);
   return true;
 }
@@ -112,21 +115,38 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
                                               StringRef(),
                                               SourceLoc(),
                 [&](ASTContext &Ctx, ModuleDecl *mainMod,
-                    ArrayRef<StringRef> Args,
+                    ArrayRef<StringRef> BaseArgs,
                     ArrayRef<StringRef> PCMArgs, StringRef Hash) {
     assert(mainMod);
     std::string InPath = moduleInterfacePath.str();
     auto compiledCandidates = getCompiledCandidates(Ctx, realModuleName.str(),
                                                     InPath);
+    std::vector<std::string> Args(BaseArgs.begin(), BaseArgs.end());
 
+    // Add explicit Swift dependency compilation flags
+    Args.push_back("-explicit-interface-module-build");
+    Args.push_back("-disable-implicit-swift-modules");
+    Args.push_back("-Xcc"); Args.push_back("-fno-implicit-modules");
+    Args.push_back("-Xcc"); Args.push_back("-fno-implicit-module-maps");
+    for (const auto &candidate : compiledCandidates) {
+      Args.push_back("-candidate-module-file");
+      Args.push_back(candidate);
+    }
+
+    // Compute the output path and add it to the command line
     SmallString<128> outputPathBase(moduleCachePath);
     llvm::sys::path::append(
         outputPathBase,
         moduleName.str() + "-" + Hash + "." +
             file_types::getExtension(file_types::TY_SwiftModuleFile));
+    Args.push_back("-o");
+    Args.push_back(outputPathBase.str().str());
+
+    std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());
     Result = ModuleDependencyInfo::forSwiftInterfaceModule(
-        outputPathBase.str().str(), InPath, compiledCandidates, Args, PCMArgs,
+        outputPathBase.str().str(), InPath, compiledCandidates, ArgsRefs, PCMArgs,
         Hash, isFramework);
+
     // Open the interface file.
     auto &fs = *Ctx.SourceMgr.getFileSystem();
     auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);

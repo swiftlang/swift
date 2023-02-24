@@ -33,6 +33,7 @@
 #include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "BitPatternBuilder.h"
+#include "CallEmission.h"
 #include "EnumPayload.h"
 #include "LegacyLayoutFormat.h"
 #include "LoadableTypeInfo.h"
@@ -973,13 +974,13 @@ namespace {
     void loadAsTake(IRGenFunction &IGF, Address addr,
                     Explosion &e) const override {}
     void assign(IRGenFunction &IGF, Explosion &e, Address addr,
-                bool isOutlined) const override {}
+                bool isOutlined, SILType T) const override {}
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
                     bool isOutlined) const override {}
     void copy(IRGenFunction &IGF, Explosion &src,
               Explosion &dest, Atomicity atomicity) const override {}
     void consume(IRGenFunction &IGF, Explosion &src,
-                 Atomicity atomicity) const override {}
+                 Atomicity atomicity, SILType T) const override {}
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {}
@@ -1169,7 +1170,7 @@ namespace {
     }
 
     void assign(IRGenFunction &IGF, Explosion &explosion, Address addr,
-                bool isOutlined) const override {
+                bool isOutlined, SILType T) const override {
       initialize(IGF, explosion, addr, isOutlined);
     }
 
@@ -1203,7 +1204,7 @@ namespace {
     }
 
     void consume(IRGenFunction &IGF, Explosion &explosion,
-                 Atomicity atomicity) const override {
+                 Atomicity atomicity, SILType T) const override {
       for (auto scalarTy: ScalarTypes) {
         (void)scalarTy;
         (void)explosion.claimNext();
@@ -2832,4 +2833,91 @@ void TypeInfo::verify(IRGenTypeVerifierFunction &IGF,
                       llvm::Value *typeMetadata,
                       SILType T) const {
   // By default, no type-specific verifier behavior.
+}
+
+static bool tryEmitDeinitCall(IRGenFunction &IGF,
+                          SILType T,
+                          llvm::function_ref<void (CallEmission*)> direct,
+                          llvm::function_ref<void (CallEmission*)> indirect) {
+  auto ty = T.getASTType();
+  auto nominal = ty->getAnyNominal();
+  // We are only concerned with move-only type deinits here.
+  if (!nominal || isa<ClassDecl>(nominal)) {
+    return false;
+  }
+  
+  auto deinit = IGF.getSILModule().lookUpMoveOnlyDeinit(nominal);
+  if (!deinit)
+    return false;
+    
+  // The deinit should take a single value parameter of the nominal type, either
+  // by @owned or indirect @in convention.
+  auto deinitFn = IGF.IGM.getAddrOfSILFunction(deinit->getImplementation(),
+                                               NotForDefinition);
+  auto deinitTy = deinit->getImplementation()->getLoweredFunctionType();
+  auto deinitFP = FunctionPointer::forDirect(IGF.IGM, deinitFn,
+                                             nullptr, deinitTy);
+  assert(deinitTy->getNumParameters() == 1
+         && deinitTy->getNumResults() == 0
+         && !deinitTy->hasError()
+         && "deinit should have only one parameter");
+
+  auto substitutions = ty->getContextSubstitutionMap(IGF.getSwiftModule(),
+                                                     nominal);
+                                                     
+  CalleeInfo info(deinitTy,
+                  deinitTy->substGenericArgs(IGF.getSILModule(),
+                                     substitutions,
+                                     IGF.IGM.getMaximalTypeExpansionContext()),
+                  substitutions);
+  Callee deinitCallee(std::move(info), deinitFP, nullptr);
+  auto callEmission = getCallEmission(IGF, nullptr, std::move(deinitCallee));
+  callEmission->begin();
+  switch (deinitTy->getParameters()[0].getConvention()) {
+  case ParameterConvention::Direct_Owned:
+    direct(callEmission.get());
+    break;
+  case ParameterConvention::Indirect_In:
+    indirect(callEmission.get());
+    break;
+  default:
+    llvm_unreachable("move-only deinit should only have consuming parameter convention");
+  }
+  Explosion nothing;
+  callEmission->emitToExplosion(nothing, /*isOutlined*/ false);
+  callEmission->end();
+  return true;
+}
+
+bool irgen::tryEmitConsumeUsingDeinit(IRGenFunction &IGF, Explosion &explosion,
+                                      SILType T) {
+  const LoadableTypeInfo *ti = cast<LoadableTypeInfo>(&IGF.getTypeInfo(T));
+  return tryEmitDeinitCall(IGF, T,
+    // Direct parameter case
+    [&](CallEmission *deinitFn) {
+      Explosion arg;
+      ti->reexplode(IGF, explosion, arg);
+      deinitFn->setArgs(arg, /*outlined*/ false, nullptr);
+    },
+    // Indirect parameter case
+    [&](CallEmission *deinitFn) {
+      llvm_unreachable("todo");
+    });
+}
+
+bool irgen::tryEmitDestroyUsingDeinit(IRGenFunction &IGF, Address address,
+                                      SILType T) {
+  return tryEmitDeinitCall(IGF, T,
+    // Direct parameter case
+    [&](CallEmission *deinitFn) {
+      // Load the value from the address.
+      auto *ti = cast<LoadableTypeInfo>(&IGF.getTypeInfo(T));
+      Explosion arg;
+      ti->loadAsTake(IGF, address, arg);
+      deinitFn->setArgs(arg, /*outlined*/ false, nullptr);
+    },
+    // Indirect parameter case
+    [&](CallEmission *deinitFn) {
+      llvm_unreachable("todo");
+    });
 }

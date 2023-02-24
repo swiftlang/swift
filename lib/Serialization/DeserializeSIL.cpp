@@ -534,20 +534,20 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
-      optimizationMode, perfConstr,
-      subclassScope, hasCReferences, effect, numAttrs,
-      hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible;
+      optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
+      numAttrs, hasQualifiedOwnership, isWeakImported,
+      LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
+      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
-      optimizationMode, perfConstr,
-      subclassScope, hasCReferences, effect, numAttrs,
-      hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible, funcTyID,
-      replacedFunctionID, usedAdHocWitnessFunctionID,
-      genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
+      optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
+      numAttrs, hasQualifiedOwnership, isWeakImported,
+      LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
+      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes, funcTyID,
+      replacedFunctionID, usedAdHocWitnessFunctionID, genericSigID,
+      clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
   if (funcTyID == 0)
     return MF->diagnoseFatal("SILFunction typeID is 0");
@@ -680,6 +680,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setIsExactSelfClass(IsExactSelfClass_t(isExactSelfClass));
     fn->setIsDistributed(IsDistributed_t(isDistributed));
     fn->setIsRuntimeAccessible(IsRuntimeAccessible_t(isRuntimeAccessible));
+    fn->setForceEnableLexicalLifetimes(
+        ForceEnableLexicalLifetimes_t(forceEnableLexicalLifetimes));
     if (replacedFunction)
       fn->setDynamicallyReplacedFunction(replacedFunction);
     if (!replacedObjectiveCFunc.empty())
@@ -1280,6 +1282,20 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILInstHasSymbolLayout::readRecord(scratch, ValID, ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::HasSymbolInst;
     break;
+  case SIL_PACK_ELEMENT_GET:
+    SILPackElementGetLayout::readRecord(scratch,
+                                        TyID, TyCategory,
+                                        TyID2, TyCategory2, ValID2,
+                                        ValID3);
+    RawOpCode = (unsigned)SILInstructionKind::PackElementGetInst;
+    break;
+  case SIL_PACK_ELEMENT_SET:
+    SILPackElementSetLayout::readRecord(scratch,
+                                        TyID, TyCategory, ValID,
+                                        TyID2, TyCategory2, ValID2,
+                                        ValID3);
+    RawOpCode = (unsigned)SILInstructionKind::PackElementSetInst;
+    break;
   }
 
   // FIXME: validate
@@ -1288,6 +1304,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   SILInstruction *ResultInst;
   switch (OpCode) {
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugStepInst:
   case SILInstructionKind::TestSpecificationInst:
     llvm_unreachable("not supported");
 
@@ -1306,6 +1323,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createAllocStack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
         None, hasDynamicLifetime, isLexical, wasMoved);
+    break;
+  }
+  case SILInstructionKind::AllocPackInst: {
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultInst = Builder.createAllocStack(
+        Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    break;
+  }
+  case SILInstructionKind::PackLengthInst: {
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultInst = Builder.createPackLength(
+        Loc, cast<PackType>(MF->getType(TyID)->getCanonicalType()));
     break;
   }
   case SILInstructionKind::MetatypeInst:
@@ -1397,6 +1426,44 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto env = MF->getGenericEnvironmentChecked(Attr);
     if (!env) MF->fatal(env.takeError());
     ResultInst = Builder.createOpenPackElement(Loc, index, *env);
+    break;
+  }
+  case SILInstructionKind::PackElementGetInst: {
+    assert(RecordKind == SIL_PACK_ELEMENT_GET);
+    auto elementType = getSILType(MF->getType(TyID),
+                                  (SILValueCategory) TyCategory, Fn);
+    auto packType = getSILType(MF->getType(TyID2),
+                               (SILValueCategory) TyCategory2, Fn);
+    auto pack = getLocalValue(ValID2, packType);
+    auto indexType = SILType::getPackIndexType(MF->getContext());
+    auto index = getLocalValue(ValID3, indexType);
+    ResultInst = Builder.createPackElementGet(Loc, index, pack, elementType);
+    break;
+  }
+  case SILInstructionKind::PackElementSetInst: {
+    assert(RecordKind == SIL_PACK_ELEMENT_SET);
+    auto elementType = getSILType(MF->getType(TyID),
+                                  (SILValueCategory) TyCategory, Fn);
+    auto value = getLocalValue(ValID, elementType);
+    auto packType = getSILType(MF->getType(TyID2),
+                               (SILValueCategory) TyCategory2, Fn);
+    auto pack = getLocalValue(ValID2, packType);
+    auto indexType = SILType::getPackIndexType(MF->getContext());
+    auto index = getLocalValue(ValID3, indexType);
+    ResultInst = Builder.createPackElementSet(Loc, value, index, pack);
+    break;
+  }
+  case SILInstructionKind::TuplePackElementAddrInst: {
+    assert(RecordKind == SIL_PACK_ELEMENT_GET);
+    auto elementType = getSILType(MF->getType(TyID),
+                                  (SILValueCategory) TyCategory, Fn);
+    auto tupleType = getSILType(MF->getType(TyID2),
+                               (SILValueCategory) TyCategory2, Fn);
+    auto tuple = getLocalValue(ValID2, tupleType);
+    auto indexType = SILType::getPackIndexType(MF->getContext());
+    auto index = getLocalValue(ValID3, indexType);
+    ResultInst = Builder.createTuplePackElementAddr(Loc, index, tuple,
+                                                    elementType);
     break;
   }
 
@@ -1778,6 +1845,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::DeallocStackRefInst: {
     auto Ty = MF->getType(TyID);
     ResultInst = Builder.createDeallocStackRef(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
+  case SILInstructionKind::DeallocPackInst: {
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createDeallocPack(
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
     break;
@@ -3132,20 +3206,20 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
-      optimizationMode, perfConstr,
-      subclassScope, hasCReferences, effect, numSpecAttrs,
-      hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible;
+      optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
+      numSpecAttrs, hasQualifiedOwnership, isWeakImported,
+      LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
+      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
-      optimizationMode, perfConstr,
-      subclassScope, hasCReferences, effect, numSpecAttrs,
-      hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
-      isDynamic, isExactSelfClass, isDistributed, isRuntimeAccessible, funcTyID,
-      replacedFunctionID, usedAdHocWitnessFunctionID,
-      genericSigID, clangOwnerID, parentModuleID, SemanticsIDs);
+      optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
+      numSpecAttrs, hasQualifiedOwnership, isWeakImported,
+      LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
+      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes, funcTyID,
+      replacedFunctionID, usedAdHocWitnessFunctionID, genericSigID,
+      clangOwnerID, parentModuleID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage

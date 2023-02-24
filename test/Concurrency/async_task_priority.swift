@@ -13,16 +13,22 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
 
-// rdar://101077408 – Temporarily disable on watchOS simulator
+// rdar://101077408 – Temporarily disable on watchOS & iOS simulator
 // UNSUPPORTED: DARWIN_SIMULATOR=watchos
+// UNSUPPORTED: DARWIN_SIMULATOR=ios
+
+// REQUIRES: rdar105396748
 
 import Darwin
 @preconcurrency import Dispatch
 import StdlibUnittest
 
 func loopUntil(priority: TaskPriority) async {
-  while (Task.currentPriority != priority) {
-    await Task.sleep(1_000_000_000)
+  var currentPriority = Task.currentPriority
+  while (currentPriority != priority) {
+    print("Current priority = \(currentPriority) != \(priority)")
+    await Task.sleep(1_000_000)
+    currentPriority = Task.currentPriority
   }
 }
 
@@ -34,6 +40,13 @@ func expectedBasePri(priority: TaskPriority) -> TaskPriority {
   let basePri = Task.basePriority!
   print("Testing basePri matching expected pri - \(basePri) == \(priority)")
   expectEqual(basePri, priority)
+  Task.withUnsafeCurrentTask { unsafeTask in
+    guard let unsafeTask else {
+      fatalError("Expected to be able to get current task, but could not!")
+    }
+    // The UnsafeCurrentTask must return the same value
+    expectEqual(basePri, unsafeTask.basePriority)
+  }
 
   return basePri
 }
@@ -199,6 +212,62 @@ func childTaskWaitingForEscalation(sem: DispatchSemaphore, basePri: TaskPriority
             sem.wait()
             await task.value
         }
+
+        tests.test("Simple task escalation to a future") {
+            let task1Pri: TaskPriority = .background
+            let task2Pri: TaskPriority = .utility
+            let parentPri: TaskPriority =  Task.currentPriority
+            print("Top level task current priority = \(parentPri)")
+
+            //  After task2 has suspended waiting for task1, escalating task2
+            //  should cause task1 to escalate
+
+            let task1 = Task(priority: task1Pri) {
+                // Wait until task2 has blocked on task1 and escalated it
+                sleep(1)
+                expectedEscalatedPri(priority: task2Pri)
+
+                // Wait until task2 itself has been escalated
+                sleep(5)
+                expectedEscalatedPri(priority: parentPri)
+            }
+
+            let task2 = Task(priority: task2Pri) {
+                await task1.value
+            }
+
+            // Wait for task2 and task1 to run and for task2 to now block on
+            // task1
+            sleep(3)
+
+            await task2.value
+        }
+
+        tests.test("Simple task escalation to a future 2") {
+            // top level task -> unstructured task2 -> child task -> unstructured
+            // task1
+            let task1Pri: TaskPriority = .background
+            let task2Pri: TaskPriority = .utility
+            let parentPri: TaskPriority =  Task.currentPriority
+            print("Top level task current priority = \(parentPri)")
+
+            let task1 = Task(priority: task1Pri) {
+                await loopUntil(priority: parentPri)
+            }
+
+            sleep(1) // Wait for task1 to start running
+
+            let task2 = Task(priority: task2Pri) {
+                func childTask() async {
+                    await task1.value
+                }
+                async let child = childTask()
+            }
+
+            sleep(1) // Wait for task2 to start running
+            await task2.value
+        }
+
       }
       await runAllTestsAsync()
     }

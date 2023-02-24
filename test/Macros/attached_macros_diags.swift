@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -module-name MacrosTest
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature Macros -module-name MacrosTest
 
 @attached(accessor) macro m1() = #externalMacro(module: "MyMacros", type: "Macro1")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro1' could not be found for macro 'm1()'}}
@@ -40,7 +40,7 @@ struct SkipNestedType {
 }
 
 struct TestMacroArgs {
-  @m1("extra arg") struct Args1 {} // expected-error{{argument passed to call that takes no arguments}}
+  @m1("extra arg") struct Args1 {} // expected-error{{argument passed to macro expansion that takes no arguments}}
 
   @m2(10) struct Args2 {}
 

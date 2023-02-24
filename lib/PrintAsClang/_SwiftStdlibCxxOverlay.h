@@ -81,8 +81,7 @@ public:
   using Index =
       decltype(reinterpret_cast<Collection *>(0x123)->getStartIndex());
 
-  SWIFT_INLINE_THUNK CollectionIterator(const Collection &collection)
-      : collection(collection) {
+  SWIFT_INLINE_THUNK CollectionIterator(const Collection &c) : collection(c) {
     index = collection.getStartIndex();
     endIndex = collection.getEndIndex();
     // FIXME: Begin read access.

@@ -62,7 +62,6 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckNameLookup.cpp
   TypeCheckPattern.cpp
   TypeCheckPropertyWrapper.cpp
-  TypeCheckTypeWrapper.cpp
   TypeCheckProtocol.cpp
   TypeCheckProtocolInference.cpp
   TypeCheckRegex.cpp
@@ -82,16 +81,18 @@ if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   endif()
 endif()
 
+target_link_libraries(swiftSema PRIVATE
+  swiftAST
+  swiftParse
+  swiftSerialization)
+
 if (SWIFT_SWIFT_PARSER)
   target_compile_definitions(swiftSema
     PRIVATE
     SWIFT_SWIFT_PARSER
   )
+  target_link_libraries(swiftSema PRIVATE
+    $<TARGET_OBJECTS:swiftASTGen>)
 endif()
-
-target_link_libraries(swiftSema PRIVATE
-  swiftAST
-  swiftParse
-  swiftSerialization)
 
 set_swift_llvm_is_available(swiftSema)

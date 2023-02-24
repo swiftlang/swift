@@ -794,8 +794,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   } else if (Args.hasArg(OPT_warn_concurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
   } else {
-    // Default to "limited" checking in Swift 5.x.
-    Opts.StrictConcurrencyLevel = StrictConcurrency::Targeted;
+    // Default to minimal checking in Swift 5.x.
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Minimal;
   }
 
   Opts.WarnImplicitOverrides =
@@ -1105,6 +1105,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             .Default(ConcurrencyModel::Standard);
   }
 
+  Opts.EnableBuiltinModule = Args.hasArg(OPT_enable_builtin_module);
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -1247,6 +1249,16 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.IndexStorePath = A->getValue();
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
+    StringRef clangArg = A->getValue();
+    if (clangArg.consume_front("-working-directory")) {
+      if (!clangArg.empty() && clangArg.front() != '=') {
+        // Have an old -working-directory<path> argument. Convert it into
+        // two separate arguments as Clang no longer supports that format.
+        Opts.ExtraArgs.push_back("-working-directory");
+        Opts.ExtraArgs.push_back(clangArg.str());
+        continue;
+      }
+    }
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
@@ -1337,6 +1349,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
         llvm::StringSwitch<AccessLevel>(A->getValue())
             .Case("open", AccessLevel::Open)
             .Case("public", AccessLevel::Public)
+            .Case("package", AccessLevel::Package)
             .Case("internal", AccessLevel::Internal)
             .Case("fileprivate", AccessLevel::FilePrivate)
             .Case("private", AccessLevel::Private)
@@ -1350,6 +1363,25 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.EmitSynthesizedMembers = true;
   Opts.PrintMessages = false;
   Opts.IncludeClangDocs = false;
+}
+
+static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModuleArgument,
+                                                  DiagnosticEngine &Diags,
+                                                  std::vector<std::pair<std::string, std::string>> &ExplicitSwiftModuleInputs) {
+  std::size_t foundDelimeterPos = swiftModuleArgument.find_first_of("=");
+  if (foundDelimeterPos == std::string::npos) {
+    Diags.diagnose(SourceLoc(), diag::error_swift_module_file_requires_delimeter,
+                   swiftModuleArgument);
+    return true;
+  }
+  std::string moduleName = swiftModuleArgument.substr(0, foundDelimeterPos),
+              modulePath = swiftModuleArgument.substr(foundDelimeterPos+1);
+  if (!Lexer::isIdentifier(moduleName)) {
+    Diags.diagnose(SourceLoc(), diag::error_bad_module_name, moduleName, false);
+    return true;
+  }
+  ExplicitSwiftModuleInputs.emplace_back(std::make_pair(moduleName, modulePath));
+  return false;
 }
 
 static bool ParseSearchPathArgs(SearchPathOptions &Opts,
@@ -1383,6 +1415,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   Opts.setFrameworkSearchPaths(FrameworkSearchPaths);
 
+  for (const Arg *A : Args.filtered(OPT_plugin_path)) {
+    Opts.PluginSearchPaths.push_back(resolveSearchPath(A->getValue()));
+  }
+
   for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
@@ -1404,6 +1440,11 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
 
   if (const Arg *A = Args.getLastArg(OPT_explicit_swift_module_map))
     Opts.ExplicitSwiftModuleMap = A->getValue();
+  for (auto A : Args.getAllArgValues(options::OPT_swift_module_file)) {
+    if (validateSwiftModuleFileArgumentAndAdd(A, Diags,
+                                              Opts.ExplicitSwiftModuleInputs))
+      return true;
+  }
   for (auto A: Args.filtered(OPT_candidate_module_file)) {
     Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));
   }
@@ -1434,6 +1475,15 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     CompilerPluginLibraryPaths.push_back(resolveSearchPath(A->getValue()));
   }
   Opts.setCompilerPluginLibraryPaths(CompilerPluginLibraryPaths);
+
+  std::vector<std::string> CompilerPluginExecutablePaths(
+      Opts.getCompilerPluginExecutablePaths());
+  for (const Arg *A : Args.filtered(OPT_load_plugin_executable)) {
+    // NOTE: The value has '#<module names>' after the path.
+    // But resolveSearchPath() works as long as the value starts with a path.
+    CompilerPluginExecutablePaths.push_back(resolveSearchPath(A->getValue()));
+  }
+  Opts.setCompilerPluginExecutablePaths(CompilerPluginExecutablePaths);
 
   return false;
 }
@@ -1767,16 +1817,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
                    "enable-experimental-move-only",
                    "enable-lexical-borrow-scopes=false");
-    return true;
-  }
-
-  if (Args.hasArg(OPT_enable_experimental_move_only) &&
-      !enableLexicalLifetimesFlag.value_or(true)) {
-    // Error if move-only is enabled and lexical lifetimes--on which it
-    // depends--has been disabled.
-    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
-                   "enable-experimental-move-only",
-                   "enable-lexical-lifetimes=false");
     return true;
   }
 

@@ -9,6 +9,7 @@ Mangling
 ::
 
   mangled-name ::= '$s' global  // Swift stable mangling
+  mangled-name ::= '@__swiftmacro_' global // Swift mangling for filenames
   mangled-name ::= '_T0' global // Swift 4.0
   mangled-name ::= '$S' global  // Swift 4.2
 
@@ -347,7 +348,7 @@ Entities
   entity-spec ::= type 'fU' INDEX            // explicit anonymous closure expression
   entity-spec ::= type 'fu' INDEX            // implicit anonymous closure
   entity-spec ::= 'fA' INDEX                 // default argument N+1 generator
-  entity-spec ::= 'fa'                       // runtime discoverable attribute generator
+  entity-spec ::= entity 'fa'                // runtime discoverable attribute generator
   entity-spec ::= 'fi'                       // non-local variable initializer
   entity-spec ::= 'fP'                       // property wrapper backing initializer
   entity-spec ::= 'fW'                       // property wrapper init from projected value
@@ -395,7 +396,10 @@ Entities
 
   macro-discriminator-list ::= macro-discriminator-list? 'fM' macro-expansion-operator INDEX
 
+  macro-expansion-operator ::= identifier 'a' // accessor attached macro
+  macro-expansion-operator ::= identifier 'A' // member-attribute attached macro
   macro-expansion-operator ::= identifier 'f' // freestanding macro
+  macro-expansion-operator ::= identifier 'm' // member attached macro
   macro-expansion-operator ::= identifier 'u' // uniquely-named entity
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration

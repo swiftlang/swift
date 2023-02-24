@@ -129,7 +129,8 @@ class SearchPathOptions;
 class CompilerInvocation;
 
 /// A ModuleLoader that loads explicitly built Swift modules specified via
-/// -swift-module-file
+/// -swift-module-file or modules found in a provided
+/// -explicit-swift-module-map-file JSON input.
 class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
   explicit ExplicitSwiftModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
                                      ModuleLoadingMode loadMode,
@@ -137,6 +138,7 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
 
   bool findModule(ImportPath::Element moduleID,
                   SmallVectorImpl<char> *moduleInterfacePath,
+                  SmallVectorImpl<char> *moduleInterfaceSourcePath,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
@@ -144,13 +146,13 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
-                  ImportPath::Element ModuleID,
-                  const SerializedModuleBaseName &BaseName,
-                  SmallVectorImpl<char> *ModuleInterfacePath,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                  bool skipBuildingInterface, bool IsFramework) override;
+      ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
+      SmallVectorImpl<char> *ModuleInterfacePath,
+      SmallVectorImpl<char> *ModuleInterfaceSourcePath,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool skipBuildingInterface, bool IsFramework) override;
 
   bool canImportModule(ImportPath::Module named,
                        ModuleVersionInfo *versionInfo) override;
@@ -164,6 +166,7 @@ public:
   create(ASTContext &ctx,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          StringRef ExplicitSwiftModuleMap,
+         const std::vector<std::pair<std::string, std::string>> &ExplicitSwiftModuleInputs,
          bool IgnoreSwiftSourceInfoFile);
 
   /// Append visible module names to \p names. Note that names are possibly
@@ -173,24 +176,49 @@ public:
   ~ExplicitSwiftModuleLoader();
 };
 
-/// Information about explicitly specified Swift and Clang module files.
-struct ExplicitModuleInfo {
-  // Path of the .swiftmodule file. Empty for pure Clang modules.
+
+// Explicitly-specified Swift module inputs
+struct ExplicitSwiftModuleInputInfo {
+  ExplicitSwiftModuleInputInfo(std::string modulePath,
+                               llvm::Optional<std::string> moduleDocPath,
+                               llvm::Optional<std::string> moduleSourceInfoPath,
+                               bool isFramework = false,
+                               bool isSystem = false)
+    : modulePath(modulePath),
+      moduleDocPath(moduleDocPath),
+      moduleSourceInfoPath(moduleSourceInfoPath),
+      isFramework(isFramework),
+      isSystem(isSystem) {}
+  // Path of the .swiftmodule file.
   std::string modulePath;
-  // Path of the .swiftmoduledoc file. Empty for pure Clang modules.
-  std::string moduleDocPath;
-  // Path of the .swiftsourceinfo file. Empty for pure Clang modules.
-  std::string moduleSourceInfoPath;
+  // Path of the .swiftmoduledoc file.
+  llvm::Optional<std::string> moduleDocPath;
+  // Path of the .swiftsourceinfo file.
+  llvm::Optional<std::string> moduleSourceInfoPath;
   // A flag that indicates whether this module is a framework
   bool isFramework = false;
   // A flag that indicates whether this module is a system module
-  // Set the default to be false.
   bool isSystem = false;
-  // Path of the Clang module map file. Empty for pure Swift modules.
-  std::string clangModuleMapPath;
-  // Path of a compiled Clang explicit module file. Empty for pure Swift
-  // modules.
-  std::string clangModulePath;
+};
+
+// Explicitly-specified Clang module inputs
+struct ExplicitClangModuleInputInfo {
+  ExplicitClangModuleInputInfo(std::string moduleMapPath,
+                               std::string modulePath,
+                               bool isFramework = false,
+                               bool isSystem = false)
+    : moduleMapPath(moduleMapPath),
+      modulePath(modulePath),
+      isFramework(isFramework),
+      isSystem(isSystem) {}
+  // Path of the Clang module map file.
+  std::string moduleMapPath;
+  // Path of a compiled Clang explicit module file (pcm).
+  std::string modulePath;
+  // A flag that indicates whether this module is a framework
+  bool isFramework = false;
+  // A flag that indicates whether this module is a system module
+  bool isSystem = false;
 };
 
 /// Parser of explicit module maps passed into the compiler.
@@ -220,7 +248,8 @@ public:
 
   std::error_code
   parseSwiftExplicitModuleMap(llvm::StringRef fileName,
-                              llvm::StringMap<ExplicitModuleInfo> &moduleMap) {
+                              llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
+                              llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap) {
     using namespace llvm::yaml;
     // Load the input file.
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
@@ -237,7 +266,7 @@ public:
       assert(DI != Stream.end() && "Failed to read a document");
       if (auto *MN = dyn_cast_or_null<SequenceNode>(DI->getRoot())) {
         for (auto &entry : *MN) {
-          if (parseSingleModuleEntry(entry, moduleMap)) {
+          if (parseSingleModuleEntry(entry, swiftModuleMap, clangModuleMap)) {
             return std::make_error_code(std::errc::invalid_argument);
           }
         }
@@ -266,32 +295,36 @@ private:
   }
 
   bool parseSingleModuleEntry(llvm::yaml::Node &node,
-                              llvm::StringMap<ExplicitModuleInfo> &moduleMap) {
+                              llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
+                              llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap) {
     using namespace llvm::yaml;
     auto *mapNode = dyn_cast<MappingNode>(&node);
     if (!mapNode)
       return true;
     StringRef moduleName;
-    ExplicitModuleInfo result;
+    llvm::Optional<std::string> swiftModulePath, swiftModuleDocPath,
+                                swiftModuleSourceInfoPath;
+    std::string clangModuleMapPath = "", clangModulePath = "";
+    bool isFramework = false, isSystem = false;
     for (auto &entry : *mapNode) {
       auto key = getScalaNodeText(entry.getKey());
       auto val = getScalaNodeText(entry.getValue());
       if (key == "moduleName") {
         moduleName = val;
       } else if (key == "modulePath") {
-        result.modulePath = val.str();
+        swiftModulePath = val.str();
       } else if (key == "docPath") {
-        result.moduleDocPath = val.str();
+        swiftModuleDocPath = val.str();
       } else if (key == "sourceInfoPath") {
-        result.moduleSourceInfoPath = val.str();
+        swiftModuleSourceInfoPath = val.str();
       } else if (key == "isFramework") {
-        result.isFramework = parseBoolValue(val);
+        isFramework = parseBoolValue(val);
       } else if (key == "isSystem") {
-        result.isSystem = parseBoolValue(val);
+        isSystem = parseBoolValue(val);
       } else if (key == "clangModuleMapPath") {
-        result.clangModuleMapPath = val.str();
+        clangModuleMapPath = val.str();
       } else if (key == "clangModulePath") {
-        result.clangModulePath = val.str();
+        clangModulePath = val.str();
       } else {
         // Being forgiving for future fields.
         continue;
@@ -299,7 +332,28 @@ private:
     }
     if (moduleName.empty())
       return true;
-    moduleMap[moduleName] = std::move(result);
+
+    if (swiftModulePath.has_value()) {
+      assert((clangModuleMapPath.empty() &&
+              clangModulePath.empty()) &&
+             "Unexpected Clang dependency details for Swift module");
+      ExplicitSwiftModuleInputInfo entry(swiftModulePath.value(),
+                                         swiftModuleDocPath,
+                                         swiftModuleSourceInfoPath,
+                                         isFramework,
+                                         isSystem);
+      swiftModuleMap.try_emplace(moduleName, std::move(entry));
+    } else {
+      assert((!clangModuleMapPath.empty() ||
+              !clangModulePath.empty()) &&
+             "Expected Clang dependency module");
+      ExplicitClangModuleInputInfo entry(clangModuleMapPath,
+                                         clangModulePath,
+                                         isFramework,
+                                         isSystem);
+      clangModuleMap.try_emplace(moduleName, std::move(entry));
+    }
+
     return false;
   }
 
@@ -416,13 +470,13 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
   ArrayRef<std::string> PreferInterfaceForModules;
 
   std::error_code findModuleFilesInDirectory(
-     ImportPath::Element ModuleID,
-     const SerializedModuleBaseName &BaseName,
-     SmallVectorImpl<char> *ModuleInterfacePath,
-     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-     bool skipBuildingInterface, bool IsFramework) override;
+      ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
+      SmallVectorImpl<char> *ModuleInterfacePath,
+      SmallVectorImpl<char> *ModuleInterfaceSourcePath,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+      bool skipBuildingInterface, bool IsFramework) override;
 
   bool isCached(StringRef DepPath) override;
 public:

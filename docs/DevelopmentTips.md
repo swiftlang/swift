@@ -45,7 +45,7 @@ DYLD_LIBRARY_PATH=/Library/Developer/Toolchains/swift-LOCAL-YYYY-MM-DD.xctoolcha
 ### Working with two build directories
 For developing and debugging you are probably building a debug configuration of swift. But it's often beneficial to also build a release-assert configuration in parallel (`utils/build-script -R`).
 
-The standard library takes very long to build with a debug compiler. It's much faster to build everything (including the standard library) with a release compiler and only the swift-frontend (with `ninja swift-frontend`) in debug. Then copy the release-built standard library to the debug build:
+The standard library takes very long to build with a debug compiler. It's much faster to build everything (including the standard library) with a release compiler and only the swift-frontend (with `ninja bin/swift-frontend`) in debug. Then copy the release-built standard library to the debug build:
 ```
 src=/path/to/build/Ninja-ReleaseAssert/swift-macosx-x86_64
 dst=/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64

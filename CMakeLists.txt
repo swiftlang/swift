@@ -268,7 +268,9 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.9")
+set(SWIFT_VERSION_MAJOR 5)
+set(SWIFT_VERSION_MINOR 9)
+set(SWIFT_VERSION "${SWIFT_VERSION_MAJOR}.${SWIFT_VERSION_MINOR}")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -440,16 +442,16 @@ set(SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR "/usr/lib/swift" CACHE STRING
 set(SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR "@rpath" CACHE STRING
     "The directory of the install_name for the private standard library dylibs")
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.9" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.13" CACHE STRING
     "Minimum deployment target version for OS X")
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "7.0" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "11.0" CACHE STRING
     "Minimum deployment target version for iOS")
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "9.0" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "11.0" CACHE STRING
     "Minimum deployment target version for tvOS")
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "4.0" CACHE STRING
     "Minimum deployment target version for watchOS")
 
 #

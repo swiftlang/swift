@@ -1324,7 +1324,7 @@ void CheckRedeclarationRequest::writeDependencySink(
     return;
 
   if (currentDC->isTypeContext()) {
-    if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
+    if (auto nominal = std::get<1>(getStorage())) {
       tracker.addUsedMember(nominal, current->getBaseName());
     }
   } else {
@@ -1539,10 +1539,6 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
     out << "property-wrapper";
     return;
 
-  case CustomAttrTypeKind::TypeWrapper:
-    out << "type-wrapper";
-    return;
-
   case CustomAttrTypeKind::GlobalActor:
     out << "global-actor";
     return;
@@ -1664,7 +1660,7 @@ void swift::simple_display(
 
 DeclNameRef UnresolvedMacroReference::getMacroName() const {
   if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
-    return med->getMacro();
+    return med->getMacroName();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getMacroName();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
@@ -1676,9 +1672,19 @@ DeclNameRef UnresolvedMacroReference::getMacroName() const {
   llvm_unreachable("Unhandled case");
 }
 
+SourceLoc UnresolvedMacroReference::getSigilLoc() const {
+  if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
+    return med->getPoundLoc();
+  if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
+    return mee->getLoc();
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>())
+    return attr->getRangeWithAt().Start;
+  llvm_unreachable("Unhandled case");
+}
+
 DeclNameLoc UnresolvedMacroReference::getMacroNameLoc() const {
   if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
-    return med->getMacroLoc();
+    return med->getMacroNameLoc();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getMacroNameLoc();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
@@ -1695,8 +1701,16 @@ SourceRange UnresolvedMacroReference::getGenericArgsRange() const {
     return med->getGenericArgsRange();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getGenericArgsRange();
-  if (auto *attr = pointer.dyn_cast<CustomAttr *>())
-    return SourceRange();
+
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
+    auto *typeRepr = attr->getTypeRepr();
+    auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(typeRepr);
+    if (!genericTypeRepr)
+      return SourceRange();
+
+    return genericTypeRepr->getAngleBrackets();
+  }
+
   llvm_unreachable("Unhandled case");
 }
 
@@ -1705,8 +1719,16 @@ ArrayRef<TypeRepr *> UnresolvedMacroReference::getGenericArgs() const {
     return med->getGenericArgs();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getGenericArgs();
-  if (auto *attr = pointer.dyn_cast<CustomAttr *>())
-    return {};
+
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
+    auto *typeRepr = attr->getTypeRepr();
+    auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(typeRepr);
+    if (!genericTypeRepr)
+      return {};
+
+    return genericTypeRepr->getGenericArgs();
+  }
+
   llvm_unreachable("Unhandled case");
 }
 
@@ -1718,6 +1740,19 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
   if (auto *attr = pointer.dyn_cast<CustomAttr *>())
     return attr->getArgs();
   llvm_unreachable("Unhandled case");
+}
+
+MacroRoles UnresolvedMacroReference::getMacroRoles() const {
+  if (pointer.is<MacroExpansionExpr *>())
+    return MacroRole::Expression;
+
+  if (pointer.is<MacroExpansionDecl *>())
+    return getFreestandingMacroRoles();
+
+  if (pointer.is<CustomAttr *>())
+    return getAttachedMacroRoles();
+
+  llvm_unreachable("Unsupported macro reference");
 }
 
 void swift::simple_display(llvm::raw_ostream &out,

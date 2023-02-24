@@ -96,7 +96,7 @@ extension Case {
     var value = pair.buffer
     
     if isIndirect {
-      let owner = value.loadUnaligned(as: HeapObject.self)
+      let owner = value.unprotectedLoad(as: HeapObject.self)
       value = swift_projectBox(owner)
     }
     

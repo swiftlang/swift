@@ -14,10 +14,12 @@
 #include "Callee.h"
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
+#include "GenPointerAuth.h"
 #include "GenType.h"
 #include "GenericRequirement.h"
 #include "IRGen.h"
 #include "IRGenModule.h"
+#include "MetadataLayout.h"
 #include "NativeConventionSchema.h"
 
 // FIXME: This include should removed once getFunctionLoweredSignature() is
@@ -28,6 +30,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
@@ -200,6 +203,72 @@ public:
       return None;
 
     return result;
+  }
+
+  using MethodDispatchInfo = IRABIDetailsProvider::MethodDispatchInfo;
+
+  Optional<MethodDispatchInfo::PointerAuthDiscriminator>
+  getMethodPointerAuthInfo(const AbstractFunctionDecl *funcDecl,
+                           SILDeclRef method) {
+    // FIXME: Async support.
+    if (funcDecl->hasAsync())
+      return None;
+    const auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods;
+    if (!schema)
+      return None;
+    auto discriminator =
+        PointerAuthInfo::getOtherDiscriminator(IGM, schema, method);
+    return MethodDispatchInfo::PointerAuthDiscriminator{
+        discriminator->getZExtValue()};
+  }
+
+  Optional<MethodDispatchInfo>
+  getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl) {
+    if (funcDecl->isSemanticallyFinal())
+      return MethodDispatchInfo::direct();
+    // If this is an override of an existing method, then lookup
+    // its base method in its base class.
+    if (auto *overridenDecl = funcDecl->getOverriddenDecl())
+      funcDecl = overridenDecl;
+    auto *parentClass = dyn_cast<ClassDecl>(funcDecl->getDeclContext());
+    if (!parentClass)
+      return MethodDispatchInfo::direct();
+    // Resilient indirect calls should go through a thunk.
+    if (parentClass->hasResilientMetadata())
+      return MethodDispatchInfo::thunk(
+          LinkEntity::forDispatchThunk(
+              SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl)))
+              .mangleAsString());
+    auto &layout = IGM.getMetadataLayout(parentClass);
+    if (!isa<ClassMetadataLayout>(layout))
+      return {};
+    auto &classLayout = cast<ClassMetadataLayout>(layout);
+    auto silDecl = SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl));
+    auto *mi = classLayout.getStoredMethodInfoIfPresent(silDecl);
+    if (!mi)
+      return {};
+    switch (mi->TheKind) {
+    case ClassMetadataLayout::MethodInfo::Kind::DirectImpl:
+      return MethodDispatchInfo::direct();
+    case ClassMetadataLayout::MethodInfo::Kind::Offset:
+      if (mi->TheOffset.isStatic()) {
+        return MethodDispatchInfo::indirectVTableStaticOffset(
+            /*offset=*/mi->TheOffset.getStaticOffset().getValue(),
+            getMethodPointerAuthInfo(funcDecl, silDecl));
+      }
+      assert(mi->TheOffset.isDynamic());
+      return MethodDispatchInfo::indirectVTableRelativeOffset(
+          /*offset=*/mi->TheOffset.getRelativeOffset().getValue(),
+          /*symbolName=*/
+          LinkEntity::forClassMetadataBaseOffset(parentClass).mangleAsString(),
+          getMethodPointerAuthInfo(funcDecl, silDecl));
+    }
+    llvm_unreachable("invalid kind");
+  }
+
+  Type getClassBaseOffsetSymbolType() const {
+    return *getPrimitiveTypeFromLLVMType(
+        silMod->getASTContext(), IGM.ClassMetadataBaseOffsetTy->elements()[0]);
   }
 
   Lowering::TypeConverter typeConverter;
@@ -404,4 +473,14 @@ IRABIDetailsProvider::getTypeMetadataAccessFunctionGenericRequirementParameters(
 llvm::MapVector<EnumElementDecl *, IRABIDetailsProvider::EnumElementInfo>
 IRABIDetailsProvider::getEnumTagMapping(const EnumDecl *ED) {
   return impl->getEnumTagMapping(ED);
+}
+
+Optional<IRABIDetailsProvider::MethodDispatchInfo>
+IRABIDetailsProvider::getMethodDispatchInfo(
+    const AbstractFunctionDecl *funcDecl) {
+  return impl->getMethodDispatchInfo(funcDecl);
+}
+
+Type IRABIDetailsProvider::getClassBaseOffsetSymbolType() const {
+  return impl->getClassBaseOffsetSymbolType();
 }

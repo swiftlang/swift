@@ -1230,7 +1230,8 @@ namespace {
 } // end anonymous namespace
 
 bool SILInstruction::isAllocatingStack() const {
-  if (isa<AllocStackInst>(this))
+  if (isa<AllocStackInst>(this) ||
+      isa<AllocPackInst>(this))
     return true;
 
   if (auto *ARI = dyn_cast<AllocRefInstBase>(this)) {
@@ -1238,11 +1239,19 @@ bool SILInstruction::isAllocatingStack() const {
       return true;
   }
 
-  if (auto *PA = dyn_cast<PartialApplyInst>(this))
-    return PA->isOnStack();
+  // In OSSA, PartialApply is modeled as a value which borrows its operands
+  // and whose lifetime is ended by a `destroy_value`.
+  //
+  // After OSSA, we make the memory allocation and dependencies explicit again,
+  // with a `dealloc_stack` ending the closure's lifetime.
+  if (auto *PA = dyn_cast<PartialApplyInst>(this)) {
+    return PA->isOnStack()
+      && !PA->getFunction()->hasOwnership();
+  }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc) {
+    if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
+        BI->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
       return true;
     }
   }
@@ -1251,7 +1260,9 @@ bool SILInstruction::isAllocatingStack() const {
 }
 
 bool SILInstruction::isDeallocatingStack() const {
-  if (isa<DeallocStackInst>(this) || isa<DeallocStackRefInst>(this))
+  if (isa<DeallocStackInst>(this) ||
+      isa<DeallocStackRefInst>(this) ||
+      isa<DeallocPackInst>(this))
     return true;
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
@@ -1652,6 +1663,93 @@ bool SILInstruction::maySuspend() const {
   }
   
   return false;
+}
+
+static bool visitRecursivelyLifetimeEndingUses(
+  SILValue i,
+  bool &noUsers,
+  llvm::function_ref<bool(Operand *)> func)
+{
+  for (Operand *use : i->getConsumingUses()) {
+    noUsers = false;
+    if (isa<DestroyValueInst>(use->getUser())) {
+      if (!func(use)) {
+        return false;
+      }
+      continue;
+    }
+    
+    // There shouldn't be any dead-end consumptions of a nonescaping
+    // partial_apply that don't forward it along, aside from destroy_value.
+    assert(use->getUser()->hasResults()
+           && use->getUser()->getNumResults() == 1);
+    if (!visitRecursivelyLifetimeEndingUses(use->getUser()->getResult(0),
+                                            noUsers, func)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool
+PartialApplyInst::visitOnStackLifetimeEnds(
+                             llvm::function_ref<bool (Operand *)> func) const {
+  assert(getFunction()->hasOwnership()
+         && isOnStack()
+         && "only meaningful for OSSA stack closures");
+  bool noUsers = true;
+
+  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func)) {
+    return false;
+  }
+  return !noUsers;
+}
+
+PartialApplyInst *
+DestroyValueInst::getNonescapingClosureAllocation() const {
+  SILValue operand = getOperand();
+  auto operandFnTy = operand->getType().getAs<SILFunctionType>();
+  // The query doesn't make sense if we aren't operating on a noescape closure
+  // to begin with.
+  if (!operandFnTy || !operandFnTy->isTrivialNoEscape()) {
+    return nullptr;
+  }
+
+  // Look through marker and conversion instructions that would forward
+  // ownership of the original partial application.
+  while (true) {
+    if (auto mdi = dyn_cast<MarkDependenceInst>(operand)) {
+      operand = mdi->getValue();
+      continue;
+    } else if (isa<ConvertEscapeToNoEscapeInst>(operand)
+               || isa<ThinToThickFunctionInst>(operand)) {
+      // Stop at a conversion from escaping closure, since there's no stack
+      // allocation in that case.
+      return nullptr;
+    } else if (auto conv = dyn_cast<ConversionInst>(operand)) {
+      operand = conv->getConverted();
+      continue;
+    } else if (auto pa = dyn_cast<PartialApplyInst>(operand)) {
+      // If we found the `[on_stack]` partial apply, we're done.
+      if (pa->isOnStack()) {
+        return pa;
+      }
+      // Any other kind of partial apply fails to pass muster.
+      return nullptr;
+    } else {
+      // The original partial_apply instruction should only be forwarded
+      // through one of the above instructions. Anything else should lead us
+      // to a copy or borrow of the closure from somewhere else.
+      assert((isa<CopyValueInst>(operand)
+              || isa<SILArgument>(operand)
+              || isa<DifferentiableFunctionInst>(operand)
+              || isa<DifferentiableFunctionExtractInst>(operand)
+              || isa<LoadInst>(operand)
+              || (operand->dump(), false))
+             && "unexpected forwarding instruction for noescape closure");
+      return nullptr;
+    }
+  }
 }
 
 #ifndef NDEBUG

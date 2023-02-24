@@ -363,6 +363,7 @@ public:
     return RequestResult();
   }
 
+  bool isValue() const { return type == Value; }
   const T &value() const {
     assert(type == Value);
     return *data;
@@ -556,8 +557,15 @@ struct CursorSymbolInfo {
     for (auto ParentContext : ParentContexts) {
       ParentContext.print(OS, Indentation + "    ");
     }
+
+    llvm::SmallVector<ReferencedDeclInfo> SortedReferencedSymbols(
+        ReferencedSymbols.begin(), ReferencedSymbols.end());
+    std::sort(SortedReferencedSymbols.begin(), SortedReferencedSymbols.end(),
+              [](const ReferencedDeclInfo &LHS, const ReferencedDeclInfo &RHS) {
+                return LHS.USR < RHS.USR;
+              });
     OS << Indentation << "ReferencedSymbols:" << '\n';
-    for (auto ReferencedSymbol : ReferencedSymbols) {
+    for (auto ReferencedSymbol : SortedReferencedSymbols) {
       ReferencedSymbol.print(OS, Indentation + "    ");
     }
     OS << Indentation << "ReceiverUSRs:" << '\n';
@@ -581,6 +589,8 @@ struct CursorInfoData {
   llvm::ArrayRef<CursorSymbolInfo> Symbols;
   /// All available actions on the code under cursor.
   llvm::ArrayRef<RefactoringInfo> AvailableActions;
+  /// Whether the ASTContext was reused for this cursor info.
+  bool DidReuseAST = false;
 
   void print(llvm::raw_ostream &OS, std::string Indentation) const {
     OS << Indentation << "CursorInfoData" << '\n';
@@ -592,6 +602,7 @@ struct CursorInfoData {
     for (auto AvailableAction : AvailableActions) {
       AvailableAction.print(OS, Indentation + "    ");
     }
+    OS << Indentation << "DidReuseAST: " << DidReuseAST << '\n';
   }
 
   SWIFT_DEBUG_DUMP { print(llvm::errs(), ""); }
@@ -697,10 +708,16 @@ struct NoteRegion {
 };
 
 struct Edit {
+  /// If the edit is outside of the originally request source file, the path
+  /// to the file it is editing.
+  std::string Path;
   unsigned StartLine;
   unsigned StartColumn;
   unsigned EndLine;
   unsigned EndColumn;
+  /// If the edit is actually a file (which could be generated/from an
+  /// expansion), the name (or path) of that buffer.
+  std::string BufferName;
   std::string NewText;
   SmallVector<NoteRegion, 2> RegionsWithNote;
 };

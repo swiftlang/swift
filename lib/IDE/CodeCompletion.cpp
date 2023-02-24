@@ -200,10 +200,8 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
 
     const auto ty = swift::performTypeResolution(
         ParsedTypeLoc.getTypeRepr(), P.Context,
-        /*isSILMode=*/false,
-        /*isSILType=*/false,
         CurDeclContext->getGenericSignatureOfContext(),
-        /*GenericParams=*/nullptr,
+        /*SILContext=*/nullptr,
         CurDeclContext,
         /*ProduceDiagnostics=*/false);
     if (!ty->hasError()) {

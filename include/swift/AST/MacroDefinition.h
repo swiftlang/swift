@@ -24,6 +24,11 @@ namespace swift {
 
 /// A reference to an external macro definition that is understood by ASTGen.
 struct ExternalMacroDefinition {
+  enum class PluginKind {
+    InProcess = 0,
+    Executable = 1,
+  };
+  PluginKind kind;
   /// ASTGen's notion of an macro definition, which is opaque to the C++ part
   /// of the compiler.
   void *opaqueHandle = nullptr;

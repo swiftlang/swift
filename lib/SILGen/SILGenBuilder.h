@@ -188,6 +188,7 @@ public:
   using SILBuilder::createLoadBorrow;
   ManagedValue createLoadBorrow(SILLocation loc, ManagedValue base);
   ManagedValue createFormalAccessLoadBorrow(SILLocation loc, ManagedValue base);
+  ManagedValue createFormalAccessLoadTake(SILLocation loc, ManagedValue base);
 
   using SILBuilder::createStoreBorrow;
   ManagedValue createStoreBorrow(SILLocation loc, ManagedValue value,
@@ -395,6 +396,20 @@ public:
       SILLocation loc, ManagedValue value,
       SmallVectorImpl<ManagedValue> &destructuredValues);
 
+  using SILBuilder::emitDestructureAddressOperation;
+  void emitDestructureAddressOperation(
+      SILLocation loc, ManagedValue value,
+      function_ref<void(unsigned, ManagedValue)> func);
+
+  using SILBuilder::emitDestructureOperation;
+  void
+  emitDestructureOperation(SILLocation loc, ManagedValue value,
+                           function_ref<void(unsigned, ManagedValue)> func) {
+    if (value.getType().isObject())
+      return emitDestructureValueOperation(loc, value, func);
+    return emitDestructureAddressOperation(loc, value, func);
+  }
+
   using SILBuilder::createProjectBox;
   ManagedValue createProjectBox(SILLocation loc, ManagedValue mv,
                                 unsigned index);
@@ -434,6 +449,10 @@ public:
 
   using SILBuilder::emitCopyValueOperation;
   ManagedValue emitCopyValueOperation(SILLocation Loc, ManagedValue v);
+
+  void emitCopyAddrOperation(SILLocation loc, SILValue srcAddr,
+                             SILValue destAddr, IsTake_t isTake,
+                             IsInitialization_t isInitialize);
 };
 
 } // namespace Lowering

@@ -1000,6 +1000,11 @@ void ConstraintSystem::shrink(Expr *expr) {
         return Action::SkipChildren(expr);
       }
 
+      // Same as TapExpr and ClosureExpr, we'll handle SingleValueStmtExprs
+      // separately.
+      if (isa<SingleValueStmtExpr>(expr))
+        return Action::SkipChildren(expr);
+
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
         if (coerceExpr->isLiteralInit())
           ApplyExprs.push_back({coerceExpr, 1});
@@ -1679,7 +1684,7 @@ bool ConstraintSystem::solveForCodeCompletion(
         << "--- Code Completion ---\n";
   }
 
-  if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+  if (generateConstraints(target))
     return false;
 
   solveForCodeCompletion(solutions);

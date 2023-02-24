@@ -45,6 +45,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Breadcrumbs
     single-source/BucketSort
     single-source/BufferFill
+    single-source/BufferFind
     single-source/ByteSwap
     single-source/COWTree
     single-source/COWArrayGuaranteedParameterOverhead
@@ -197,6 +198,7 @@ set(SWIFT_BENCH_MODULES
     single-source/TwoSum
     single-source/TypeFlood
     single-source/UTF8Decode
+    single-source/UTF16Decode
     single-source/Walsh
     single-source/WordCount
     single-source/XorLoop

@@ -689,6 +689,23 @@ public:
     return TupleTypeRef::create(*this, elements, std::move(labels));
   }
 
+  const TypeRef *createPackType(llvm::ArrayRef<const TypeRef *> elements) {
+    // FIXME: Remote mirrors support for variadic generics.
+    return nullptr;
+  }
+
+  const TypeRef *createSILPackType(llvm::ArrayRef<const TypeRef *> elements,
+                                   bool isElementAddress) {
+    // FIXME: Remote mirrors support for variadic generics.
+    return nullptr;
+  }
+
+  const TypeRef *createPackExpansionType(const TypeRef *patternType,
+                                         const TypeRef *countType) {
+    // FIXME: Remote mirrors support for variadic generics.
+    return nullptr;
+  }
+
   const FunctionTypeRef *createFunctionType(
       llvm::ArrayRef<remote::FunctionParam<const TypeRef *>> params,
       const TypeRef *result, FunctionTypeFlags flags,

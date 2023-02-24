@@ -437,8 +437,7 @@ SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete 
 }
 
 // CHECK-LABEL: sil private [ossa] @${{.*}}doubled{{.*}}TJp{{.*}} : $@convention(thin) (Float, @owned {{.*}}) -> SmallTestModel.TangentVector {
-// CHECK: bb0([[DX:%.*]] : $Float, [[PB_STRUCT:%.*]] : {{.*}}):
-// CHECK:   ([[PB0:%.*]], [[PB1:%.*]]) = destructure_struct [[PB_STRUCT]]
+// CHECK: bb0([[DX:%.*]] : $Float, [[PB0:%.*]] : {{.*}}, [[PB1:%.*]] : {{.*}}):
 // CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
 // CHECK:   ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
 // CHECK:   [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector

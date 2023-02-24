@@ -15,7 +15,7 @@ class AnotherClass : AProtocol {
 // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "$sq_D",
 // CHECK-DAG: !DILocalVariable(name: "x", arg: 1,{{.*}} type: ![[LET_T:.*]])
 // CHECK-DAG: ![[LET_T]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[T:.*]])
-// CHECK-DAG: ![[T]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sxD"
+// CHECK-DAG: ![[T]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sxD", 
 // CHECK-DAG: !DILocalVariable(name: "y", arg: 2,{{.*}} type: ![[LET_Q:.*]])
 // CHECK-DAG: ![[LET_Q]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[Q:.*]])
 // CHECK-DAG: ![[Q]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sq_D"
@@ -28,15 +28,16 @@ aFunction(AClass(),AnotherClass(),"aFunction")
 struct Wrapper<T: AProtocol> {
 
   init<U>(from : Wrapper<U>) {
-  // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "Wrapper",{{.*}} identifier: "$s12generic_args7WrapperVyqd__GD")
+  // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "$s12generic_args7WrapperVyqd__GD"
     var wrapped = from
     wrapped = from
     _ = wrapped
   }
 
   func passthrough(_ t: T) -> T {
-    // CHECK-DAG: ![[WRAPPER:.*]] = !DICompositeType({{.*}}identifier: "$s12generic_args7WrapperVyxGD")
-    // CHECK-DAG: !DILocalVariable(name: "local",{{.*}} line: [[@LINE+1]],{{.*}} type: ![[T]]
+    // CHECK-DAG: ![[WRAPPER:.*]] = !DICompositeType({{.*}}name: "$s12generic_args7WrapperVyxGD"
+    // CHECK-DAG: !DILocalVariable(name: "local",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[T1:[0-9]+]]
+    // CHECK-DAG: ![[T1]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sxD",
     var local = t
     local = t
     return local

@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only) | %FileCheck %s
+// TODO: re-enable the simplification passes once rdar://104875010 is fixed
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only -Xllvm -sil-disable-pass=simplification) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
@@ -22,7 +23,7 @@ public struct BufferView<T> {
 }
 
 extension Array {
-    public mutating func withBufferView<U>(_ f: (BufferView<Element>) -> U) -> U {
+    public mutating func withBufferView<U>(_ f: (__shared BufferView<Element>) -> U) -> U {
         return withUnsafeBufferPointer {
             return f(BufferView(ptr: $0))
         }

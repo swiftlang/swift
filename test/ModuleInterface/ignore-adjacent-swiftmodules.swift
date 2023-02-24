@@ -29,6 +29,7 @@
 // RUN:   -verify -Rmodule-interface-rebuild
 
 import PublicSwift // expected-remark {{rebuilding module 'PublicSwift' from interface}}
+// expected-note @-1 {{was ignored because it belongs to a framework in the SDK}}
 
 // The private adjacent module under PrivateFrameworks should still be tried first, and then rebuilt.
 import PrivateSwift

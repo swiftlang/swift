@@ -1,4 +1,7 @@
-// REQUIRES: rdar101543397
+// Test doesn't pass on all platforms (rdar://101543397)
+// REQUIRES: OS=macosx
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 //
 // Build objc_implementation.framework

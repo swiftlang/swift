@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -module-name moveonly_lifetime -o /dev/null -Xllvm -sil-print-canonical-module -Onone -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-emit-sil -sil-verify-all -module-name moveonly_lifetime -o /dev/null -Xllvm -sil-print-canonical-module -Onone -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s 2>&1 | %FileCheck %s
 
 @_moveOnly
 class C {}
@@ -10,7 +10,7 @@ func getC() -> C
 func takeC(_ c: __owned C)
 
 @_silgen_name("borrowC")
-func borrowC(_ c: C)
+func borrowC(_ c: __shared C)
 
 @_silgen_name("something")
 func something()
@@ -19,19 +19,30 @@ func something()
 // non-consuming scope where it appears but not further (which would require a
 // copy).
 //
+// NOTE: We do not properly maximize lifetimes yet in the address checker. So
+// the lifetimes are shortened in the sides of the diamonds inappropriately.
+//
 // CHECK-LABEL: sil hidden [ossa] @test_diamond__consume_r__use_l : $@convention(thin) (Bool) -> () {
-// CHECK:         [[INSTANCE:%[^,]+]] = move_value [lexical] {{%[^,]+}}
+// CHECK:         [[STACK:%.*]] = alloc_stack
 // CHECK:         cond_br {{%[^,]+}}, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+//
 // CHECK:       [[RIGHT]]:
+// CHECK:         [[INSTANCE:%.*]] = load [take] [[STACK]]
 // CHECK:         [[TAKE_C:%[^,]+]] = function_ref @takeC
 // CHECK:         apply [[TAKE_C]]([[INSTANCE]])
+//
 // CHECK:       [[LEFT]]:
+// CHECK:         [[INSTANCE:%.*]] = load_borrow [[STACK]]
 // CHECK:         [[BORROW_C:%[^,]+]] = function_ref @borrowC
 // CHECK:         apply [[BORROW_C]]([[INSTANCE]])
+//
+// TODO: Once we maximize lifetimes this should be below something.
+// CHECK:         [[DESTROY_C:%[^,]+]] = function_ref @$s17moveonly_lifetime1CCfD
+// CHECK:         [[INSTANCE:%.*]] = load [take] [[STACK]]
+// CHECK:         apply [[DESTROY_C]]([[INSTANCE]])
+//
 // CHECK:         [[SOMETHING:%[^,]+]] = function_ref @something
 // CHECK:         apply [[SOMETHING]]
-// CHECK:         [[DESTROY_C:%[^,]+]] = function_ref @$s17moveonly_lifetime1CCfD
-// CHECK:         apply [[DESTROY_C]]([[INSTANCE]])
 // CHECK-LABEL: } // end sil function 'test_diamond__consume_r__use_l'
 @_silgen_name("test_diamond__consume_r__use_l")
 func test_diamond(_ condition: Bool) {

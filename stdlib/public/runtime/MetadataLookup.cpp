@@ -1761,6 +1761,24 @@ public:
         .Value;
   }
 
+  TypeLookupErrorOr<BuiltType>
+  createPackType(llvm::ArrayRef<BuiltType> elements) const {
+    // FIXME: Runtime support for variadic generics.
+    return BuiltType();
+  }
+
+  TypeLookupErrorOr<BuiltType>
+  createSILPackType(llvm::ArrayRef<BuiltType> elements, bool isElementAddress) const {
+    // FIXME: Runtime support for variadic generics.
+    return BuiltType();
+  }
+
+  TypeLookupErrorOr<BuiltType>
+  createPackExpansionType(BuiltType patternType, BuiltType countType) const {
+    // FIXME: Runtime support for variadic generics.
+    return BuiltType();
+  }
+
   TypeLookupErrorOr<BuiltType> createDependentMemberType(StringRef name,
                                                          BuiltType base) const {
     // Should not have unresolved dependent member types here.
@@ -1785,12 +1803,23 @@ public:
     if (!assocType) return nullptr;
 
     // Call the associated type access function.
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+    auto tbl = reinterpret_cast<RelativeWitnessTable *>(
+      const_cast<WitnessTable *>(witnessTable));
+    return swift_getAssociatedTypeWitnessRelative(
+                                 MetadataState::Abstract,
+                                 tbl,
+                                 base,
+                                 swiftProtocol->getRequirementBaseDescriptor(),
+                                 *assocType).Value;
+#else
     return swift_getAssociatedTypeWitness(
                                  MetadataState::Abstract,
                                  const_cast<WitnessTable *>(witnessTable),
                                  base,
                                  swiftProtocol->getRequirementBaseDescriptor(),
                                  *assocType).Value;
+#endif
   }
 
 #define REF_STORAGE(Name, ...)                                                 \

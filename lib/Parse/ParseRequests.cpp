@@ -198,6 +198,19 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       parser.parseExpandedAttributeList(items);
       break;
     }
+
+    case GeneratedSourceInfo::PeerMacroExpansion: {
+      if (parser.CurDeclContext->isTypeContext()) {
+        parser.parseExpandedMemberList(items);
+      } else {
+        parser.parseTopLevelItems(items);
+      }
+    }
+
+    case GeneratedSourceInfo::ConformanceMacroExpansion: {
+      parser.parseTopLevelItems(items);
+      break;
+    }
     }
   } else {
     parser.parseTopLevelItems(items);

@@ -13,9 +13,10 @@
 #ifndef SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 #define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
-#include "swift/IRGen/GenericRequirement.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -25,6 +26,7 @@ class CanGenericSignature;
 class GenericTypeParamType;
 class ModuleDecl;
 class NominalTypeDecl;
+class PrimitiveTypeMapping;
 
 namespace cxx_synthesis {
 
@@ -224,6 +226,9 @@ public:
   /// Print the macro that applies Clang's `external_source_symbol` attribute
   /// on the generated declaration.
   void printSymbolUSRAttribute(const ValueDecl *D) const;
+
+  /// Print the given **known** type as a C type.
+  void printKnownCType(Type t, PrimitiveTypeMapping &typeMapping) const;
 
 protected:
   raw_ostream &os;

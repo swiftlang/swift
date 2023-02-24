@@ -560,6 +560,7 @@ bb0:
   %3 = convert_escape_to_noescape %2 : $@callee_guaranteed (Str) -> Int to $@noescape @callee_guaranteed (Str) -> Int
   %4 = function_ref @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
+  destroy_value %3 : $@noescape @callee_guaranteed (Str) -> Int
   destroy_value %2 : $@callee_guaranteed (Str) -> Int
   %7 = tuple ()
   return %7 : $()
@@ -580,7 +581,7 @@ bb0:
   %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (Str, @guaranteed KeyPath<Str, Int>) -> Int
   %4 = function_ref @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
   %5 = apply %4(%2) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Int) -> ()
-  dealloc_stack %2 : $@noescape @callee_guaranteed (Str) -> Int
+  destroy_value %2 : $@noescape @callee_guaranteed (Str) -> Int
   destroy_value %0 : $KeyPath<Str, Int>
   %7 = tuple ()
   return %7 : $()

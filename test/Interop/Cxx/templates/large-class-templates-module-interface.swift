@@ -3,15 +3,13 @@
 // CHECK: struct HasTypeWithSelfAsParam<T> {
 // CHECK: }
 
-// CHECK: struct __CxxTemplateInst22HasTypeWithSelfAsParamIiE {
+// CHECK: struct HasTypeWithSelfAsParam<Int32> {
 // CHECK:   init()
-// CHECK:   typealias TT = __CxxTemplateInst22HasTypeWithSelfAsParamIS_IiEE
+// CHECK:   typealias TT = HasTypeWithSelfAsParam<HasTypeWithSelfAsParam<Int32>>
 // CHECK: }
 
-// CHECK: typealias WillBeInfinite = __CxxTemplateInst22HasTypeWithSelfAsParamIiE
+// CHECK: typealias WillBeInfinite = HasTypeWithSelfAsParam<Int32>
 
-// Make sure we fail to import super slow templates.
-// CHECK-NOT: __CxxTemplateInstN14RegressionTest7ValExprINS_9SliceExprINS_5ArrayIiEELi1EEEEE
 // TODO: we should not be importing functions that use this type in their
 // signature (such as the function below).
-// CHECK: mutating func test1() -> RegressionTest.__CxxTemplateInstN14RegressionTest7ValExprINS_9SliceExprINS_5ArrayIiEELi1EEEEE
+// CHECK: mutating func test1() -> RegressionTest.ValExpr<SliceExpr<SliceExpr<Array<Int32>, _>, _>>

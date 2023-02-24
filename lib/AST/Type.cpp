@@ -165,9 +165,17 @@ bool TypeBase::isAny() {
   return constraint->isEqual(getASTContext().TheAnyType);
 }
 
-bool TypeBase::isPureMoveOnly() const {
-  if (auto *nom = getCanonicalType()->getNominalOrBoundGenericNominal())
+bool TypeBase::isPureMoveOnly() {
+  if (auto *nom = getNominalOrBoundGenericNominal())
     return nom->isMoveOnly();
+
+  // if any components of the tuple are move-only, then the tuple is move-only.
+  if (auto *tupl = getCanonicalType()->getAs<TupleType>()) {
+    for (auto eltTy : tupl->getElementTypes())
+      if (eltTy->isPureMoveOnly())
+        return true;
+  }
+
   return false;
 }
 
@@ -638,6 +646,21 @@ void TypeBase::getTypeVariables(
   }
 }
 
+static bool isLegalSILType(CanType type);
+
+static bool isLegalSILTypeOrPackExpansion(CanType type) {
+  // Pack expansions aren't legal in arbitrary positions in SIL;
+  // for example, we should never see a function parameter or result
+  // of pack-expansion type.  But they're allowed within SILPackTypes
+  // and SIL TupleTypes as long as their pattern types are legal.
+  // The count type should always be an AST type.
+  if (auto packExpansionType = dyn_cast<PackExpansionType>(type)) {
+    return isLegalSILType(packExpansionType.getPatternType());
+  }
+
+  return isLegalSILType(type);
+}
+
 static bool isLegalSILType(CanType type) {
   // L-values and inouts are not legal.
   if (!type->isMaterializable()) return false;
@@ -652,19 +675,13 @@ static bool isLegalSILType(CanType type) {
   // Tuples are legal if all their elements are legal.
   if (auto tupleType = dyn_cast<TupleType>(type)) {
     for (auto eltType : tupleType.getElementTypes()) {
-      if (!isLegalSILType(eltType)) return false;
+      if (!isLegalSILTypeOrPackExpansion(eltType)) return false;
     }
     return true;
   }
 
   // Packs must be lowered.
   if (isa<PackType>(type)) return false;
-
-  // Pack expansions are legal if all their pattern and count types are legal.
-  if (auto packExpansionType = dyn_cast<PackExpansionType>(type)) {
-    return (isLegalSILType(packExpansionType.getPatternType()) &&
-            isLegalSILType(packExpansionType.getCountType()));
-  }
 
   // Optionals are legal if their object type is legal.
   if (auto objectType = type.getOptionalObjectType()) {
@@ -3547,9 +3564,14 @@ bool ArchetypeType::requiresClass() const {
 Type ArchetypeType::getNestedType(AssociatedTypeDecl *assocType) {
   Type interfaceType = getInterfaceType();
   Type memberInterfaceType =
-      DependentMemberType::get(interfaceType, assocType->getName());
-  return getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
-      memberInterfaceType);
+      DependentMemberType::get(interfaceType, assocType);
+  auto genericSig = getGenericEnvironment()->getGenericSignature();
+  if (genericSig->isValidTypeParameter(memberInterfaceType)) {
+    return getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
+        memberInterfaceType);
+  }
+
+  return Type();
 }
 
 Type ArchetypeType::getNestedTypeByName(Identifier name) {
@@ -4370,23 +4392,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     return DependentMemberType::get(baseType, name);
   };
 
-  // If we don't have a substituted base type, fail.
-  if (!substBase) return failed();
-
   if (auto *selfType = substBase->getAs<DynamicSelfType>())
     substBase = selfType->getSelfType();
-
-  // If the parent is an archetype, extract the child archetype with the
-  // given name.
-  if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    if (Type memberArchetypeByName = archetypeParent->getNestedTypeByName(name))
-      return memberArchetypeByName;
-
-    // If looking for an associated type and the archetype is constrained to a
-    // class, continue to the default associated type lookup
-    if (!assocType || !archetypeParent->getSuperclass())
-      return failed();
-  }
 
   // If the parent is a type variable or a member rooted in a type variable,
   // or if the parent is a type parameter, we're done. Also handle
@@ -4396,53 +4403,63 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
       substBase->is<UnresolvedType>())
     return getDependentMemberType(substBase);
 
-  // Retrieve the member type with the given name.
+  // All remaining cases require an associated type declaration and not just
+  // the name of a member type.
+  if (!assocType)
+    return failed();
 
-  // If we know the associated type, look in the witness table.
-  if (assocType) {
-    auto proto = assocType->getProtocol();
-    ProtocolConformanceRef conformance =
-        lookupConformances(origBase->getCanonicalType(), substBase, proto);
+  // If the parent is an archetype, extract the child archetype with the
+  // given name.
+  if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
+    if (Type memberArchetypeByName = archetypeParent->getNestedType(assocType))
+      return memberArchetypeByName;
 
-    if (conformance.isInvalid())
+    // If looking for an associated type and the archetype is constrained to a
+    // class, continue to the default associated type lookup
+    if (!assocType || !archetypeParent->getSuperclass())
       return failed();
-
-    Type witnessTy;
-
-    // Retrieve the type witness.
-    if (conformance.isPack()) {
-      auto *packConformance = conformance.getPack();
-
-      witnessTy = packConformance->getAssociatedType(
-          assocType->getDeclaredInterfaceType());
-    } else if (conformance.isConcrete()) {
-      auto witness =
-          conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
-
-      witnessTy = witness.getWitnessType();
-      if (!witnessTy || witnessTy->hasError())
-        return failed();
-
-      // This is a hacky feature allowing code completion to migrate to
-      // using Type::subst() without changing output.
-      if (options & SubstFlags::DesugarMemberTypes) {
-        if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
-          witnessTy = aliasType->getSinglyDesugaredType();
-
-        // Another hack. If the type witness is a opaque result type. They can
-        // only be referred using the name of the associated type.
-        if (witnessTy->is<OpaqueTypeArchetypeType>())
-          witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
-      }
-    }
-
-    if (!witnessTy || witnessTy->is<ErrorType>())
-      return failed();
-
-    return witnessTy;
   }
 
-  return failed();
+  auto proto = assocType->getProtocol();
+  ProtocolConformanceRef conformance =
+      lookupConformances(origBase->getCanonicalType(), substBase, proto);
+
+  if (conformance.isInvalid())
+    return failed();
+
+  Type witnessTy;
+
+  // Retrieve the type witness.
+  if (conformance.isPack()) {
+    auto *packConformance = conformance.getPack();
+
+    witnessTy = packConformance->getAssociatedType(
+        assocType->getDeclaredInterfaceType());
+  } else if (conformance.isConcrete()) {
+    auto witness =
+        conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
+
+    witnessTy = witness.getWitnessType();
+    if (!witnessTy || witnessTy->hasError())
+      return failed();
+
+    // This is a hacky feature allowing code completion to migrate to
+    // using Type::subst() without changing output.
+    if (options & SubstFlags::DesugarMemberTypes) {
+      if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
+        witnessTy = aliasType->getSinglyDesugaredType();
+
+      // Another hack. If the type witness is a opaque result type. They can
+      // only be referred using the name of the associated type.
+      if (witnessTy->is<OpaqueTypeArchetypeType>())
+        witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
+    }
+  }
+
+  if (!witnessTy || witnessTy->is<ErrorType>())
+    return failed();
+
+  return witnessTy;
 }
 
 ProtocolConformanceRef LookUpConformanceInModule::
@@ -4673,9 +4690,6 @@ static Type substType(Type derivedType,
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
       auto newBase = substType(depMemTy->getBase(),
                                substitutions, lookupConformances, options);
-      if (!newBase)
-        return Type();
-      
       return getMemberForBaseType(lookupConformances,
                                   depMemTy->getBase(), newBase,
                                   depMemTy->getAssocType(),
@@ -4710,7 +4724,7 @@ static Type substType(Type derivedType,
     if (origArchetype->isRoot()) {
       // Root opened archetypes are not required to be substituted. Other root
       // archetypes must already have been substituted above.
-      if (isa<OpenedArchetypeType>(origArchetype)) {
+      if (isa<LocalArchetypeType>(origArchetype)) {
         return Type(type);
       } else {
         return ErrorType::get(type);

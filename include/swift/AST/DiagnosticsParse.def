@@ -677,6 +677,7 @@ ERROR(expected_generic_signature,none,
       "expected a generic signature", ())
 ERROR(sil_expected_uuid,none,
       "expected a UUID string literal", ())
+NOTE(sil_previous_instruction,none, "previous instruction", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -888,7 +889,7 @@ ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol-constrained type", ())
 
 ERROR(deprecated_protocol_composition,none,
-      "'protocol<...>' composition syntax has been removed; join the protocols using '&'", ())
+      "'protocol<...>' composition syntax has been removed; join the type constraints using '&'", ())
 ERROR(deprecated_protocol_composition_single,none,
       "'protocol<...>' composition syntax has been removed and is not needed here", ())
 ERROR(deprecated_any_composition,none,
@@ -1592,11 +1593,11 @@ ERROR(originally_defined_in_need_nonempty_module_name,none,
 
 // backDeploy
 ERROR(attr_back_deploy_expected_before_label,none,
-      "expected 'before:' in '@_backDeploy' attribute", ())
+      "expected 'before:' in '@backDeployed' attribute", ())
 ERROR(attr_back_deploy_expected_colon_after_before,none,
-      "expected ':' after 'before' in '@_backDeploy' attribute", ())
+      "expected ':' after 'before' in '@backDeployed' attribute", ())
 ERROR(attr_back_deploy_missing_rparen,none,
-      "expected ')' in '@_backDeploy' argument list", ())
+      "expected ')' in '@backDeployed' argument list", ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,
@@ -1655,6 +1656,14 @@ ERROR(opened_attribute_id_value,none,
       "known id for 'opened' attribute must be a UUID string", ())
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
+
+// pack_element
+ERROR(pack_element_attribute_expected_lparen,none,
+      "expected '(' after 'pack_element' attribute", ())
+ERROR(pack_element_attribute_expected_rparen,none,
+      "expected ')' after id value for 'pack_element' attribute", ())
+ERROR(multiple_open_pack_element,none,
+      "multiple 'open_pack_element' instructions with same UUID", ())
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,

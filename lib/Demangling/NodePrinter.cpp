@@ -308,6 +308,8 @@ private:
     case Node::Kind::Module:
     case Node::Kind::Tuple:
     case Node::Kind::Pack:
+    case Node::Kind::SILPackDirect:
+    case Node::Kind::SILPackIndirect:
     case Node::Kind::ConstrainedExistential:
     case Node::Kind::ConstrainedExistentialRequirementList:
     case Node::Kind::ConstrainedExistentialSelf:
@@ -340,6 +342,7 @@ private:
 
     case Node::Kind::PackExpansion:
     case Node::Kind::ProtocolListWithClass:
+    case Node::Kind::AccessorAttachedMacroExpansion:
     case Node::Kind::AccessorFunctionReference:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
@@ -353,6 +356,7 @@ private:
     case Node::Kind::ClangType:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
+    case Node::Kind::ConformanceAttachedMacroExpansion:
     case Node::Kind::Constructor:
     case Node::Kind::CoroutineContinuationPrototype:
     case Node::Kind::CurryThunk:
@@ -442,6 +446,8 @@ private:
     case Node::Kind::Macro:
     case Node::Kind::MacroExpansionUniqueName:
     case Node::Kind::MaterializeForSet:
+    case Node::Kind::MemberAttributeAttachedMacroExpansion:
+    case Node::Kind::MemberAttachedMacroExpansion:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
     case Node::Kind::MethodDescriptor:
@@ -471,6 +477,7 @@ private:
     case Node::Kind::OwningMutableAddressor:
     case Node::Kind::PartialApplyForwarder:
     case Node::Kind::PartialApplyObjCForwarder:
+    case Node::Kind::PeerAttachedMacroExpansion:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
     case Node::Kind::PrefixOperator:
@@ -1338,9 +1345,29 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                        Node->getNumChildren() == 3? TypePrinting::WithColon
                                                   : TypePrinting::FunctionStyle,
                        /*hasName*/ true);
+  case Node::Kind::AccessorAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "accessor macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::FreestandingMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "freestanding macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::MemberAttributeAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "member attribute macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::MemberAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "member macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::PeerAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "peer macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::ConformanceAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "conformance macro expansion #",
                        (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::MacroExpansionUniqueName:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
@@ -1491,9 +1518,17 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "}";
     return nullptr;
   }
+  case Node::Kind::SILPackDirect:
+  case Node::Kind::SILPackIndirect: {
+    Printer << (kind == Node::Kind::SILPackDirect ? "@direct" : "@indirect");
+    Printer << " Pack{";
+    printChildren(Node, depth, ", ");
+    Printer << "}";
+    return nullptr;
+  }
   case Node::Kind::PackExpansion: {
+    Printer << "repeat ";
     print(Node->getChild(0), depth + 1);
-    Printer << "...";
     return nullptr;
   }
   case Node::Kind::ReturnType:
@@ -3098,11 +3133,14 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "#_hasSymbol query for ";
     return nullptr;
   case Node::Kind::RuntimeAttributeGenerator:
-    printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                /*hasName*/ false,
-                "runtime attribute generator");
-    Printer << " for attribute = " << Node->getChild(1)->getText() << "."
-            << Node->getChild(2)->getText();
+    Printer << "runtime attribute generator of ";
+
+    print(Node->getChild(1), depth);
+
+    printEntity(Node, depth, asPrefixContext,
+                TypePrinting::NoType, /*hasName*/ false,
+                " for attribute");
+
     return nullptr;
   case Node::Kind::OpaqueReturnTypeIndex:
   case Node::Kind::OpaqueReturnTypeParent:

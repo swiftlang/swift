@@ -55,7 +55,7 @@ struct OverrideSection {
 };
 
 OverrideSection ConcurrencyOverrides
-    __attribute__((section("__DATA,__s58async_hook"))) = {
+    __attribute__((section("__DATA," COMPATIBILITY_OVERRIDE_SECTION_NAME_swift_Concurrency))) = {
         0,
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs)   \
   name##Override,
@@ -253,10 +253,6 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_cancel_group_child_
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_escalate) {
   swift_task_escalate(nullptr, {});
-}
-
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getNearestDeadline) {
-  swift_task_getNearestDeadline(nullptr);
 }
 
 #endif

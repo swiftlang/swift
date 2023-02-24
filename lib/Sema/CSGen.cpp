@@ -1211,7 +1211,8 @@ namespace {
 
         auto macroIdent = ctx.getIdentifier(kind);
         auto macros = lookupMacros(
-            macroIdent, expr->getLoc(), FunctionRefKind::Unapplied);
+            macroIdent, expr->getLoc(), FunctionRefKind::Unapplied,
+            MacroRole::Expression);
         if (!macros.empty()) {
           // Introduce an overload set for the macro reference.
           auto locator = CS.getConstraintLocator(expr);
@@ -1353,6 +1354,13 @@ namespace {
     Type visitDeclRefExpr(DeclRefExpr *E) {
       auto locator = CS.getConstraintLocator(E);
 
+      auto invalidateReference = [&]() -> Type {
+        auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
+        (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
+        CS.setType(E, hole);
+        return hole;
+      };
+
       Type knownType;
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
@@ -1360,13 +1368,27 @@ namespace {
           knownType = CS.getVarType(VD);
 
         if (knownType) {
+          // An out-of-scope type variable(s) could appear the type of
+          // a declaration only in diagnostic mode when invalid variable
+          // declaration is recursively referenced inside of a multi-statement
+          // closure located somewhere within its initializer e.g.:
+          // `let x = [<call>] { ... print(x) }`. It happens because the
+          // variable assumes the result type of its initializer unless
+          // its specified explicitly.
+          if (isa<ClosureExpr>(CurDC) && knownType->hasTypeVariable()) {
+            if (knownType.findIf([&](Type type) {
+                  auto *typeVar = type->getAs<TypeVariableType>();
+                  if (!typeVar || CS.getFixedType(typeVar))
+                    return false;
+
+                  return !CS.isActiveTypeVariable(typeVar);
+                }))
+              return invalidateReference();
+          }
+
           // If the known type has an error, bail out.
           if (knownType->hasError()) {
-            auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
-            (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
-            if (!CS.hasType(E))
-              CS.setType(E, hole);
-            return hole;
+            return invalidateReference();
           }
 
           if (!knownType->hasPlaceholder()) {
@@ -1383,10 +1405,7 @@ namespace {
       // (in getTypeOfReference) so we can match non-error param types.
       if (!knownType && E->getDecl()->isInvalid() &&
           !CS.isForCodeCompletion()) {
-        auto *hole = CS.createTypeVariable(locator, TVO_CanBindToHole);
-        (void)CS.recordFix(AllowRefToInvalidDecl::create(CS, locator));
-        CS.setType(E, hole);
-        return hole;
+        return invalidateReference();
       }
 
       // Create an overload choice referencing this declaration and immediately
@@ -2374,6 +2393,12 @@ namespace {
       // function, to set the type of the pattern.
       auto setType = [&](Type type) {
         CS.setType(pattern, type);
+        if (auto PE = dyn_cast<ExprPattern>(pattern)) {
+          // Set the type of the pattern's sub-expression as well, so code
+          // completion can retrieve the expression's type in case it is a code
+          // completion token.
+          CS.setType(PE->getSubExpr(), type);
+        }
         return type;
       };
 
@@ -3037,7 +3062,7 @@ namespace {
         Type packType;
         if (auto *elementExpr = getAsExpr<PackElementExpr>(pack)) {
           packType = CS.getType(elementExpr->getPackRefExpr());
-        } else if (auto *elementType = getAsTypeRepr<PackReferenceTypeRepr>(pack)) {
+        } else if (auto *elementType = getAsTypeRepr<PackElementTypeRepr>(pack)) {
           packType = CS.getType(elementType->getPackType());
         } else {
           llvm_unreachable("unsupported pack reference ASTNode");
@@ -3713,6 +3738,10 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
 
+    Type visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+      llvm_unreachable("Handled by the walker directly");
+    }
+
     Type visitOneWayExpr(OneWayExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);
       auto resultTypeVar = CS.createTypeVariable(locator, 0);
@@ -3742,12 +3771,42 @@ namespace {
       SmallVector<std::pair<Type, ConstraintLocator *>, 4> elements;
       elements.reserve(expr->getNumElements());
 
-      for (auto *element : expr->getElements()) {
-        elements.emplace_back(CS.getType(element),
-                              CS.getConstraintLocator(element));
+      if (auto *SVE = expr->getSingleValueStmtExpr()) {
+        // If we have a SingleValueStmtExpr, form a join of the branch types.
+        SmallVector<Expr *, 4> scratch;
+        auto branches = SVE->getSingleExprBranches(scratch);
+        for (auto idx : indices(branches)) {
+          auto *eltLoc = CS.getConstraintLocator(
+              SVE, {LocatorPathElt::SingleValueStmtBranch(idx)});
+          elements.emplace_back(CS.getType(branches[idx]), eltLoc);
+        }
+      } else {
+        for (auto *element : expr->getElements()) {
+          elements.emplace_back(CS.getType(element),
+                                CS.getConstraintLocator(element));
+        }
       }
 
-      auto resultTy = CS.getType(expr->getVar());
+      Type resultTy;
+
+      if (auto *var = expr->getVar()) {
+        resultTy = CS.getType(var);
+      } else {
+        resultTy = expr->getType();
+      }
+
+      assert(resultTy);
+
+      // If we have a single branch of a SingleValueStmtExpr, we want a
+      // conversion of the result, not a join, which would skip the conversion.
+      // This is needed to ensure we apply the Void/Never conversions.
+      if (elements.size() == 1 && expr->getSingleValueStmtExpr()) {
+        auto &elt = elements[0];
+        CS.addConstraint(ConstraintKind::Conversion, elt.first,
+                         resultTy, elt.second);
+        return resultTy;
+      }
+
       // The type of a join expression is obtained by performing
       // a "join-meet" operation on deduced types of its elements
       // and the underlying variable.
@@ -3760,10 +3819,11 @@ namespace {
     /// Lookup all macros with the given macro name.
     SmallVector<OverloadChoice, 1>
     lookupMacros(Identifier macroName, SourceLoc loc,
-                 FunctionRefKind functionRefKind) {
+                 FunctionRefKind functionRefKind,
+                 MacroRoles roles) {
       SmallVector<OverloadChoice, 1> choices;
       auto results = TypeChecker::lookupMacros(
-          CurDC, DeclNameRef(macroName), loc, MacroRole::Expression);
+          CurDC, DeclNameRef(macroName), loc, roles);
       for (const auto &result : results) {
         OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);
         choices.push_back(choice);
@@ -3782,19 +3842,14 @@ namespace {
       auto &ctx = CS.getASTContext();
       auto locator = CS.getConstraintLocator(expr);
 
-      // For calls, set up the argument list.
-      bool isCall = expr->getArgs() != nullptr;
-      if (isCall) {
-        CS.associateArgumentList(locator, expr->getArgs());
-      }
+      CS.associateArgumentList(locator, expr->getArgs());
 
       // Look up the macros with this name.
       auto macroIdent = expr->getMacroName().getBaseIdentifier();
-      FunctionRefKind functionRefKind = isCall ? FunctionRefKind::SingleApply
-                                               : FunctionRefKind::Unapplied;
+      FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
       auto macros = lookupMacros(
           macroIdent, expr->getMacroNameLoc().getBaseNameLoc(),
-          functionRefKind);
+          functionRefKind, expr->getMacroRoles());
       if (macros.empty()) {
         ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                            macroIdent)
@@ -3814,11 +3869,7 @@ namespace {
           return Type();
       }
 
-      // For non-calls, the type variable is the result.
-      if (!isCall)
-        return macroRefType;
-
-      // For calls, form the applicable-function constraint. The result type
+      // Form the applicable-function constraint. The result type
       // is the result of that call.
       SmallVector<AnyFunctionType::Param, 8> params;
       getMatchingParams(expr->getArgs(), params);
@@ -3994,6 +4045,12 @@ namespace {
         return Action::SkipChildren(expr);
       }
 
+      if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
+        if (CS.generateConstraints(SVE))
+          return Action::Stop();
+        return Action::SkipChildren(expr);
+      }
+
       // Note that the subexpression of a #selector expression is
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
@@ -4017,7 +4074,7 @@ namespace {
         auto &CS = CG.getConstraintSystem();
         for (const auto &capture : captureList->getCaptureList()) {
           SolutionApplicationTarget target(capture.PBD);
-          if (CS.generateConstraints(target, FreeTypeVariableBinding::Disallow))
+          if (CS.generateConstraints(target))
             return Action::Stop();
         }
       }
@@ -4270,8 +4327,7 @@ generateForEachStmtConstraints(
         TypeLoc::withoutLoc(sequenceProto->getDeclaredInterfaceType()),
         CTP_ForEachSequence);
 
-    if (cs.generateConstraints(makeIteratorTarget,
-                               FreeTypeVariableBinding::Disallow))
+    if (cs.generateConstraints(makeIteratorTarget))
       return None;
 
     forEachStmtInfo.makeIteratorVar = PB;
@@ -4440,8 +4496,14 @@ bool ConstraintSystem::generateConstraints(
     // constraint.
     if (Type convertType = target.getExprConversionType()) {
       ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
-      auto *convertTypeLocator =
-          getConstraintLocator(expr, LocatorPathElt::ContextualType(ctp));
+
+      // If a custom locator wasn't specified, create a locator anchored on
+      // the expression itself.
+      auto *convertTypeLocator = target.getExprConvertTypeLocator();
+      if (!convertTypeLocator) {
+        convertTypeLocator =
+            getConstraintLocator(expr, LocatorPathElt::ContextualType(ctp));
+      }
 
       auto getLocator = [&](Type ty) -> ConstraintLocator * {
         // If we have a placeholder originating from a PlaceholderTypeRepr,
@@ -4479,7 +4541,8 @@ bool ConstraintSystem::generateConstraints(
         });
       }
 
-      addContextualConversionConstraint(expr, convertType, ctp);
+      addContextualConversionConstraint(expr, convertType, ctp,
+                                        convertTypeLocator);
     }
 
     // For an initialization target, generate constraints for the pattern.
@@ -4549,7 +4612,7 @@ bool ConstraintSystem::generateConstraints(
                          : SolutionApplicationTarget::forUninitializedVar(
                                patternBinding, index, patternType);
 
-      if (generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      if (generateConstraints(target)) {
         hadError = true;
         continue;
       }
@@ -4634,7 +4697,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
       auto target = SolutionApplicationTarget(symbolExpr, dc, CTP_Unused,
                                               Type(), /*isDiscarded=*/false);
 
-      if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+      if (generateConstraints(target))
         return true;
 
       setSolutionApplicationTarget(&condElement, target);
@@ -4705,9 +4768,15 @@ bool ConstraintSystem::generateConstraints(
     // Generate constraints for the guard expression, if there is one.
     Expr *guardExpr = caseLabelItem.getGuardExpr();
     if (guardExpr) {
-      guardExpr = generateConstraints(guardExpr, dc);
-      if (!guardExpr)
+      auto &ctx = dc->getASTContext();
+      SolutionApplicationTarget guardTarget(
+          guardExpr, dc, CTP_Condition, ctx.getBoolType(), /*discarded*/ false);
+
+      if (generateConstraints(guardTarget))
         return true;
+
+      guardExpr = guardTarget.getAsExpr();
+      setSolutionApplicationTarget(guardExpr, guardTarget);
     }
 
     // Save this info.

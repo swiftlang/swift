@@ -126,7 +126,7 @@ protected:
     auto error =
       loader->findModuleFilesInDirectory({moduleName, SourceLoc()},
         SerializedModuleBaseName(tempDir, SerializedModuleBaseName("Library")),
-        /*ModuleInterfacePath*/nullptr,
+        /*ModuleInterfacePath=*/nullptr, /*ModuleInterfaceSourcePath=*/nullptr,
         &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer,
         /*skipBuildingInterface*/ false, /*IsFramework*/false);
     ASSERT_FALSE(error);

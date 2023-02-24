@@ -25,13 +25,30 @@ if (SWIFT_SWIFT_PARSER)
     Sources/ASTGen/Exprs.swift
     Sources/ASTGen/Generics.swift
     Sources/ASTGen/Literals.swift
+    Sources/ASTGen/LLVMJSON.swift
     Sources/ASTGen/Macros.swift
     Sources/ASTGen/Misc.swift
+    Sources/ASTGen/PluginHost.swift
+    Sources/ASTGen/PluginMessages.swift
     Sources/ASTGen/SourceFile.swift
     Sources/ASTGen/SourceManager.swift
+    Sources/ASTGen/SourceManager+MacroExpansionContext.swift
     Sources/ASTGen/Stmts.swift
     Sources/ASTGen/Types.swift
   )
+
+  # The compat56 library is not available in current toolchains. The stage-0
+  # compiler will build fine since the builder compiler is not aware of the 56
+  # compat library, but the stage-1 and subsequent stage compilers will fail as
+  # the stage-0 compiler is aware and will attempt to include the appropriate
+  # compatibility library. We should turn this back on once we are building the
+  # compiler correctly.
+  # Note: This is safe at the moment because the 5.6 compat library only
+  #       contains concurrency runtime fixes, and the compiler frontend does not
+  #       use concurrency at the moment.
+  target_compile_options(swiftASTGen PRIVATE
+    $<$<COMPILE_LANGUAGE:Swift>:-runtime-compatibility-version>
+    $<$<COMPILE_LANGUAGE:Swift>:none>)
 
   # Set the appropriate target triple.
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)

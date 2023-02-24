@@ -542,6 +542,7 @@ bb0(%0 : $Int):
   %access = begin_access [modify] [dynamic] %s1 : $*Int
   %call = apply %npa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
   end_access %access : $*Int
+  destroy_value %npa : $@noescape @callee_guaranteed (@inout Int) -> ()
   end_borrow %borrow : $@callee_guaranteed (@inout Int) -> ()
   destroy_value %copy : $@callee_guaranteed (@inout Int) -> ()
   destroy_value %pa : $@callee_guaranteed (@inout Int) -> ()

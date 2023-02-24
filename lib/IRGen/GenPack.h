@@ -17,8 +17,10 @@
 #ifndef SWIFT_IRGEN_GENPACK_H
 #define SWIFT_IRGEN_GENPACK_H
 
+#include "IRGen.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
 
@@ -31,6 +33,7 @@ namespace swift {
 namespace irgen {
 class Address;
 class IRGenFunction;
+class IRGenModule;
 class DynamicMetadataRequest;
 class MetadataResponse;
 class StackAddress;
@@ -50,8 +53,28 @@ emitTypeMetadataPackRef(IRGenFunction &IGF,
                         CanPackType packType,
                         DynamicMetadataRequest request);
 
+void bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
+                                        GenericEnvironment *env,
+                                        llvm::Value *index);
+
+llvm::Value *
+emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
+                               ArrayRef<ProtocolDecl *> protocols,
+                               llvm::Value *index,
+                               DynamicMetadataRequest request,
+                               llvm::SmallVectorImpl<llvm::Value *> &wtables);
+
 void cleanupTypeMetadataPack(IRGenFunction &IGF,
                              StackAddress pack,
+                             Optional<unsigned> elementCount);
+
+StackAddress emitWitnessTablePack(IRGenFunction &IGF, CanPackType packType,
+                                  PackConformance *conformance);
+
+llvm::Value *emitWitnessTablePackRef(IRGenFunction &IGF, CanPackType packType,
+                                     PackConformance *conformance);
+
+void cleanupWitnessTablePack(IRGenFunction &IGF, StackAddress pack,
                              Optional<unsigned> elementCount);
 
 /// Emit the dynamic index of a particular structural component
@@ -61,6 +84,20 @@ void cleanupTypeMetadataPack(IRGenFunction &IGF,
 llvm::Value *emitIndexOfStructuralPackComponent(IRGenFunction &IGF,
                                                 CanPackType packType,
                                                 unsigned componentIndex);
+
+/// Emit the address that stores the given pack element.
+///
+/// For indirect packs, note that this is the address of the pack
+/// array element, not the address stored in the pack array element.
+Address emitStorageAddressOfPackElement(IRGenFunction &IGF, Address pack,
+                                        llvm::Value *index, SILType elementType,
+                                        CanSILPackType packType);
+
+Size getPackElementSize(IRGenModule &, CanSILPackType ty);
+
+StackAddress allocatePack(IRGenFunction &IGF, CanSILPackType packType);
+
+void deallocatePack(IRGenFunction &IGF, StackAddress addr, CanSILPackType packType);
 
 } // end namespace irgen
 } // end namespace swift

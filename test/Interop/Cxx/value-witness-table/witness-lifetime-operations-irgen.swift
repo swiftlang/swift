@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-cxx-interop -I %S/Inputs %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-cxx-interop -I %S/Inputs %s -emit-ir -Xcc -fignore-exceptions | %FileCheck %s
 
 // Temporarily restrict to x86 (rdar://89908618)
 // REQUIRES: CPU=x86_64

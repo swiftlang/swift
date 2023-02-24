@@ -67,6 +67,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintGenericRequirements = true;
   Opts.PrintInherited = false;
   Opts.ExplodeEnumCaseDecls = true;
+  Opts.PrintFactoryInitializerComment = false;
 
   Opts.ExclusiveAttrList.clear();
 
@@ -546,6 +547,21 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
         S.serialize(OS);
       }
     });
+
+#ifndef NDEBUG
+    // FIXME (solver-based-verification-sorting): In assert builds sort the
+    // edges so we get consistent symbol graph output. This allows us to compare
+    // the string representation of the symbolgraph between the solver-based
+    // and AST-based result.
+    // This can be removed once the AST-based cursor info has been removed.
+    SmallVector<Edge> Edges(this->Edges.begin(), this->Edges.end());
+    std::sort(Edges.begin(), Edges.end(), [](const Edge &LHS, const Edge &RHS) {
+      SmallString<256> LHSTargetUSR, RHSTargetUSR;
+      LHS.Target.getUSR(LHSTargetUSR);
+      RHS.Target.getUSR(RHSTargetUSR);
+      return LHSTargetUSR < RHSTargetUSR;
+    });
+#endif
 
     OS.attributeArray("relationships", [&](){
       for (const auto &Relationship : Edges) {

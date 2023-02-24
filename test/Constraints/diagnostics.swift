@@ -1531,6 +1531,22 @@ func testUnwrapFixIts(x: Int?) throws {
   let _: Int = try! .optionalThrowsMember ?? 0
 }
 
+// https://github.com/apple/swift/issues/63746
+func issue63746() {
+  let fn1 = {
+    switch 0 {
+      case 1 where 0: // expected-error {{integer literal value '0' cannot be used as a boolean; did you mean 'false'?}}
+        ()
+    }
+  }
+  let fn2 = {
+    switch 0 {
+      case 1 where 0: // expected-error {{integer literal value '0' cannot be used as a boolean; did you mean 'false'?}}
+        break
+    }
+  }
+}
+
 func rdar86611718(list: [Int]) {
   String(list.count())
   // expected-error@-1 {{cannot call value of non-function type 'Int'}}

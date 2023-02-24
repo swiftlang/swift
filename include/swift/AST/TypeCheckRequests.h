@@ -55,6 +55,7 @@ class PropertyWrapperInitializerInfo;
 struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
+class ReturnStmt;
 class SpecializeAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
@@ -65,7 +66,6 @@ struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
-struct TypeWrapperInfo;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -3102,7 +3102,8 @@ public:
 
 class CheckRedeclarationRequest
     : public SimpleRequest<
-          CheckRedeclarationRequest, evaluator::SideEffect(ValueDecl *),
+          CheckRedeclarationRequest,
+          evaluator::SideEffect(ValueDecl *, NominalTypeDecl *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySource |
               RequestFlags::DependencySink> {
 public:
@@ -3112,10 +3113,13 @@ public:
   friend SimpleRequest;
 
    // Evaluation.
-  evaluator::SideEffect
-  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+  /// \p SelfNominalType is \c VD->getDeclContext()->getSelfNominalType().
+  /// Passed as a parameter in here so this request doesn't tigger self nominal
+  /// type computation.
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD,
+                                 NominalTypeDecl *SelfNominalType) const;
 
- public:
+public:
   // Separate caching.
   bool isCached() const { return true; }
   Optional<evaluator::SideEffect> getCachedResult() const;
@@ -3151,11 +3155,15 @@ public:
     return pointer.getOpaqueValue();
   }
 
+  SourceLoc getSigilLoc() const;
   DeclNameRef getMacroName() const;
   DeclNameLoc getMacroNameLoc() const;
   SourceRange getGenericArgsRange() const;
   ArrayRef<TypeRepr *> getGenericArgs() const;
   ArgumentList *getArgs() const;
+
+  /// Returns the macro roles corresponding to this macro reference.
+  MacroRoles getMacroRoles() const;
 
   friend bool operator==(const UnresolvedMacroReference &lhs,
                          const UnresolvedMacroReference &rhs) {
@@ -3173,8 +3181,8 @@ void simple_display(llvm::raw_ostream &out,
 /// Resolve a given custom attribute to an attached macro declaration.
 class ResolveMacroRequest
     : public SimpleRequest<ResolveMacroRequest,
-                           MacroDecl *(UnresolvedMacroReference, MacroRoles,
-                                       DeclContext *),
+                           ConcreteDeclRef(UnresolvedMacroReference,
+                                           DeclContext *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3182,9 +3190,9 @@ public:
 private:
   friend SimpleRequest;
 
-  MacroDecl *
+  ConcreteDeclRef
   evaluate(Evaluator &evaluator, UnresolvedMacroReference macroRef,
-           MacroRoles roles, DeclContext *dc) const;
+           DeclContext *dc) const;
 
 public:
   bool isCached() const { return true; }
@@ -3291,8 +3299,7 @@ public:
 
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
-                           Type(const TypeResolution *, TypeRepr *,
-                                GenericParamList *),
+                           Type(const TypeResolution *, TypeRepr *),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3301,12 +3308,15 @@ public:
   // Cycle handling.
   void noteCycleStep(DiagnosticEngine &diags) const;
 
+  static Type evaluate(const TypeResolution &resolution,
+                       TypeRepr *repr);
+
 private:
   friend SimpleRequest;
 
   // Evaluation.
   Type evaluate(Evaluator &evaluator, const TypeResolution *resolution,
-                TypeRepr *repr, GenericParamList *silParams) const;
+                TypeRepr *repr) const;
 };
 
 void simple_display(llvm::raw_ostream &out, const TypeResolution *resolution);
@@ -3431,10 +3441,6 @@ enum class CustomAttrTypeKind {
   /// Property wrappers have some funky rules, like allowing
   /// unbound generic types.
   PropertyWrapper,
-
-  /// Just like property wrappers, type wrappers are represented
-  /// as custom type attributes and allow unbound generic types.
-  TypeWrapper,
 
   /// Global actors are represented as custom type attributes. They don't
   /// have any particularly interesting semantics.
@@ -3610,173 +3616,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Return a type wrapper (if any) associated with the given declaration.
-class GetTypeWrapper
-    : public SimpleRequest<GetTypeWrapper,
-                           Optional<TypeWrapperInfo>(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  Optional<TypeWrapperInfo> evaluate(Evaluator &evaluator,
-                                     NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Inject or get `$Storage` type which has all of the stored properties
-/// of the given type with a type wrapper.
-class GetTypeWrapperStorage
-    : public SimpleRequest<GetTypeWrapperStorage, TypeDecl *(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  TypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Inject or get `$storage` property which is used to route accesses through
-/// to all stored properties of a type that has a type wrapper.
-class GetTypeWrapperProperty
-    : public SimpleRequest<GetTypeWrapperProperty, VarDecl *(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Given a stored property associated with a type wrapped type,
-/// produce a property that mirrors it in the type wrapper context.
-class GetTypeWrapperStorageForProperty
-    : public SimpleRequest<GetTypeWrapperStorageForProperty,
-                           VarDecl *(VarDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  VarDecl *evaluate(Evaluator &evaluator, VarDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Synthesize the body of a getter for a stored property that belongs to
-/// a type wrapped type.
-class SynthesizeTypeWrappedPropertyGetterBody
-    : public SimpleRequest<SynthesizeTypeWrappedPropertyGetterBody,
-                           BraceStmt *(AccessorDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  BraceStmt *evaluate(Evaluator &evaluator, AccessorDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Synthesize the body of a setter for a stored property that belongs to
-/// a type wrapped type.
-class SynthesizeTypeWrappedPropertySetterBody
-    : public SimpleRequest<SynthesizeTypeWrappedPropertySetterBody,
-                           BraceStmt *(AccessorDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  BraceStmt *evaluate(Evaluator &evaluator, AccessorDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-/// Inject or get `$Storage` type which has all of the stored properties
-/// of the given type with a type wrapper.
-class IsPropertyAccessedViaTypeWrapper
-    : public SimpleRequest<IsPropertyAccessedViaTypeWrapper, bool(VarDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, VarDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-class SynthesizeTypeWrappedTypeMemberwiseInitializer
-    : public SimpleRequest<SynthesizeTypeWrappedTypeMemberwiseInitializer,
-                           ConstructorDecl *(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-class SynthesizeTypeWrappedTypeStorageWrapperInitializer
-    : public SimpleRequest<SynthesizeTypeWrappedTypeStorageWrapperInitializer,
-                           ConstructorDecl *(NominalTypeDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-class SynthesizeLocalVariableForTypeWrapperStorage
-    : public SimpleRequest<SynthesizeLocalVariableForTypeWrapperStorage,
-                           VarDecl *(ConstructorDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  VarDecl *evaluate(Evaluator &evaluator, ConstructorDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 /// Lookup the target of a break statement.
 class BreakTargetRequest
     : public SimpleRequest<BreakTargetRequest,
@@ -3811,9 +3650,11 @@ public:
   bool isCached() const { return true; }
 };
 
-class GetTypeWrapperInitializer
-    : public SimpleRequest<GetTypeWrapperInitializer,
-                           ConstructorDecl *(NominalTypeDecl *),
+/// Precheck a ReturnStmt, which involves some initial validation, as well as
+/// applying a conversion to a FailStmt if needed.
+class PreCheckReturnStmtRequest
+    : public SimpleRequest<PreCheckReturnStmtRequest,
+                           Stmt *(ReturnStmt *, DeclContext *DC),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3821,7 +3662,129 @@ public:
 private:
   friend SimpleRequest;
 
-  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+  Stmt *evaluate(Evaluator &evaluator, ReturnStmt *RS, DeclContext *DC) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// The result of the query for whether a statement can produce a single value.
+class IsSingleValueStmtResult {
+public:
+  enum class Kind {
+    /// The statement may become a SingleValueStmtExpr.
+    Valid,
+
+    /// There are non-single-expression branches that do not end in a throw.
+    UnterminatedBranches,
+
+    /// The statement is an 'if' statement without an unconditional 'else'.
+    NonExhaustiveIf,
+
+    /// There are no single-expression branches.
+    NoExpressionBranches,
+
+    /// There is an unhandled statement branch. This should only be the case
+    /// for invalid AST.
+    UnhandledStmt,
+
+    /// There was a circular reference when evaluating the request. This can be
+    /// ignored, as we will have already diagnosed it.
+    CircularReference,
+
+    /// There is a 'break' or 'continue' within the statement that prevents it
+    /// from being treated as an expression.
+    InvalidJumps,
+
+    /// The statement has a jump label, which is invalid for an expression.
+    HasLabel
+  };
+
+private:
+  Kind TheKind;
+  TinyPtrVector<Stmt *> InvalidJumps;
+  TinyPtrVector<Stmt *> UnterminatedBranches;
+
+  IsSingleValueStmtResult(Kind kind) : TheKind(kind) {
+    assert(kind != Kind::UnterminatedBranches && kind != Kind::InvalidJumps);
+  }
+
+  IsSingleValueStmtResult(Kind kind, TinyPtrVector<Stmt *> stmts)
+      : TheKind(kind) {
+    switch (kind) {
+    case Kind::UnterminatedBranches: {
+      UnterminatedBranches = std::move(stmts);
+      break;
+    }
+    case Kind::InvalidJumps: {
+      InvalidJumps = std::move(stmts);
+      break;
+    }
+    default:
+      llvm_unreachable("Unhandled case in switch!");
+    }
+  }
+
+public:
+  static IsSingleValueStmtResult valid() {
+    return IsSingleValueStmtResult(Kind::Valid);
+  }
+  static IsSingleValueStmtResult
+  unterminatedBranches(TinyPtrVector<Stmt *> branches) {
+    return IsSingleValueStmtResult(Kind::UnterminatedBranches,
+                                   std::move(branches));
+  }
+  static IsSingleValueStmtResult nonExhaustiveIf() {
+    return IsSingleValueStmtResult(Kind::NonExhaustiveIf);
+  }
+  static IsSingleValueStmtResult noExpressionBranches() {
+    return IsSingleValueStmtResult(Kind::NoExpressionBranches);
+  }
+  static IsSingleValueStmtResult unhandledStmt() {
+    return IsSingleValueStmtResult(Kind::UnhandledStmt);
+  }
+  static IsSingleValueStmtResult circularReference() {
+    return IsSingleValueStmtResult(Kind::CircularReference);
+  }
+  static IsSingleValueStmtResult invalidJumps(TinyPtrVector<Stmt *> jumps) {
+    return IsSingleValueStmtResult(Kind::InvalidJumps, std::move(jumps));
+  }
+  static IsSingleValueStmtResult hasLabel() {
+    return IsSingleValueStmtResult(Kind::HasLabel);
+  }
+
+  Kind getKind() const { return TheKind; }
+
+  /// For an unterminated branch kind, retrieves the branch.
+  const TinyPtrVector<Stmt *> &getUnterminatedBranches() const {
+    assert(TheKind == Kind::UnterminatedBranches);
+    return UnterminatedBranches;
+  }
+
+  /// For an invalid jump kind, retrieves the list of invalid jumps.
+  const TinyPtrVector<Stmt *> &getInvalidJumps() const {
+    assert(TheKind == Kind::InvalidJumps);
+    return InvalidJumps;
+  }
+
+  explicit operator bool() const {
+    return TheKind == Kind::Valid;
+  }
+};
+
+/// Computes whether a given statement can be treated as a SingleValueStmtExpr.
+class IsSingleValueStmtRequest
+    : public SimpleRequest<IsSingleValueStmtRequest,
+                           IsSingleValueStmtResult(const Stmt *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  IsSingleValueStmtResult
+  evaluate(Evaluator &evaluator, const Stmt *stmt) const;
 
 public:
   bool isCached() const { return true; }
@@ -3865,11 +3828,12 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Expand all member attribute macros attached to the given
-/// declaration.
-class ExpandMemberAttributeMacros
-    : public SimpleRequest<ExpandMemberAttributeMacros,
-                           bool(Decl *),
+/// Expand all accessor macros attached to the given declaration.
+///
+/// Produces the set of macro expansion buffer IDs.
+class ExpandAccessorMacros
+    : public SimpleRequest<ExpandAccessorMacros,
+                           ArrayRef<unsigned>(AbstractStorageDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3877,16 +3841,59 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  ArrayRef<unsigned> evaluate(
+      Evaluator &evaluator, AbstractStorageDecl *storage) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Expand all conformance macros attached to the given declaration.
+///
+/// Produces the set of macro expansion buffer IDs.
+class ExpandConformanceMacros
+    : public SimpleRequest<ExpandConformanceMacros,
+                           ArrayRef<unsigned>(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<unsigned> evaluate(Evaluator &evaluator,
+                              NominalTypeDecl *nominal) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Expand all member attribute macros attached to the given
+/// declaration.
+///
+/// Produces the set of macro expansion buffer IDs.
+class ExpandMemberAttributeMacros
+    : public SimpleRequest<ExpandMemberAttributeMacros,
+                           ArrayRef<unsigned>(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<unsigned> evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
 };
 
 /// Expand synthesized member macros attached to the given declaration.
+///
+/// Produces the set of macro expansion buffer IDs.
 class ExpandSynthesizedMemberMacroRequest
     : public SimpleRequest<ExpandSynthesizedMemberMacroRequest,
-                           bool(Decl *),
+                           ArrayRef<unsigned>(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3894,7 +3901,48 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  ArrayRef<unsigned> evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Load a plugin module with the given name.
+///
+///
+class CompilerPluginLoadRequest
+  : public SimpleRequest<CompilerPluginLoadRequest,
+                         void *(ASTContext *, Identifier),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  void *evaluate(
+      Evaluator &evaluator, ASTContext *ctx, Identifier moduleName
+  ) const;
+
+public:
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); }
+
+  bool isCached() const { return true; }
+};
+
+/// Expand peer macros attached to the given declaration.
+class ExpandPeerMacroRequest
+    : public SimpleRequest<ExpandPeerMacroRequest,
+                           ArrayRef<unsigned>(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<unsigned> evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -3903,7 +3951,7 @@ public:
 /// Resolve an external macro given its module and type name.
 class ExternalMacroDefinitionRequest
     : public SimpleRequest<ExternalMacroDefinitionRequest,
-                           ExternalMacroDefinition(
+                           llvm::Optional<ExternalMacroDefinition>(
                                ASTContext *, Identifier, Identifier),
                            RequestFlags::Cached> {
 public:
@@ -3912,9 +3960,9 @@ public:
 private:
   friend SimpleRequest;
 
-  ExternalMacroDefinition evaluate(
-      Evaluator &evaluator, ASTContext *ctx, Identifier moduleName,
-      Identifier typeName
+  llvm::Optional<ExternalMacroDefinition> evaluate(
+      Evaluator &evaluator, ASTContext *ctx,
+      Identifier moduleName, Identifier typeName
   ) const;
 
 public:
@@ -3926,7 +3974,7 @@ public:
 
 class GetRuntimeDiscoverableAttributes
     : public SimpleRequest<GetRuntimeDiscoverableAttributes,
-                           ArrayRef<CustomAttr *>(ValueDecl *),
+                           ArrayRef<CustomAttr *>(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3934,7 +3982,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<CustomAttr *> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  ArrayRef<CustomAttr *> evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }

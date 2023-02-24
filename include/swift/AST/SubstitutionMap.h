@@ -169,7 +169,7 @@ public:
   bool isCanonical() const;
 
   /// Return the canonical form of this substitution map.
-  SubstitutionMap getCanonical() const;
+  SubstitutionMap getCanonical(bool canonicalizeSignature = true) const;
 
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.

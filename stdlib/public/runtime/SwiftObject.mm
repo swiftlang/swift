@@ -25,6 +25,7 @@
 #endif
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/CustomRRABI.h"
 #include "swift/Runtime/Debug.h"
@@ -41,6 +42,7 @@
 #include "ErrorObject.h"
 #include "Private.h"
 #include "SwiftObject.h"
+#include "SwiftValue.h"
 #include "WeakReference.h"
 #if SWIFT_OBJC_INTEROP
 #include <dlfcn.h>
@@ -1269,6 +1271,12 @@ SWIFT_RUNTIME_EXPORT
 id swift_dynamicCastObjCProtocolConditional(id object,
                                             size_t numProtocols,
                                             Protocol * const *protocols) {
+  if (!runtime::bincompat::useLegacySwiftValueUnboxingInCasting()) {
+    if (getAsSwiftValue(object) != nil) {
+      // SwiftValue wrapper never holds a class object
+      return nil;
+    }
+  }
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       return nil;

@@ -20,6 +20,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -92,7 +93,8 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
   SILValue fnValue = fn.getValue();
   SILValue result =
       createConvertEscapeToNoEscape(loc, fnValue, resultTy, false);
-  return ManagedValue::forTrivialObjectRValue(result);
+  
+  return SGF.emitManagedRValueWithCleanup(result);
 }
 
 ManagedValue SILGenBuilder::createInitExistentialValue(
@@ -294,6 +296,18 @@ ManagedValue SILGenBuilder::createFormalAccessLoadBorrow(SILLocation loc,
   auto *i = createLoadBorrow(loc, baseValue);
   return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
                                                                   baseValue, i);
+}
+
+ManagedValue SILGenBuilder::createFormalAccessLoadTake(SILLocation loc,
+                                                       ManagedValue base) {
+  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
+    auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
+    return ManagedValue::forUnmanaged(i);
+  }
+
+  SILValue baseValue = base.getValue();
+  auto i = emitLoadValueOperation(loc, baseValue, LoadOwnershipQualifier::Take);
+  return SGF.emitFormalAccessManagedRValueWithCleanup(loc, i);
 }
 
 ManagedValue
@@ -881,6 +895,26 @@ void SILGenBuilder::emitDestructureValueOperation(
       });
 }
 
+void SILGenBuilder::emitDestructureAddressOperation(
+    SILLocation loc, ManagedValue value,
+    llvm::function_ref<void(unsigned, ManagedValue)> func) {
+  CleanupCloner cloner(*this, value);
+  // NOTE: We can not directly use SILBuilder::emitDestructureAddressOperation()
+  // here since we need to create all of our cleanups before invoking \p
+  // func. This is necessary since our func may want to emit conditional code
+  // with an early exit, emitting unused cleanups from the current scope via the
+  // function emitBranchAndCleanups(). If we have not yet created those
+  // cleanups, we will introduce a leak along that path.
+  SmallVector<ManagedValue, 8> destructuredAddresses;
+  emitDestructureAddressOperation(
+      loc, value.forward(SGF), [&](unsigned index, SILValue subValue) {
+        destructuredAddresses.push_back(cloner.clone(subValue));
+      });
+  for (auto p : llvm::enumerate(destructuredAddresses)) {
+    func(p.index(), p.value());
+  }
+}
+
 ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
                                              unsigned index) {
   auto *pbi = createProjectBox(loc, mv.getValue(), index);
@@ -967,4 +1001,11 @@ ManagedValue SILGenBuilder::emitCopyValueOperation(SILLocation loc,
   if (cvi == value.getValue())
     return value;
   return SGF.emitManagedRValueWithCleanup(cvi);
+}
+
+void SILGenBuilder::emitCopyAddrOperation(SILLocation loc, SILValue srcAddr,
+                                          SILValue destAddr, IsTake_t isTake,
+                                          IsInitialization_t isInitialize) {
+  auto &lowering = getTypeLowering(srcAddr->getType());
+  lowering.emitCopyInto(*this, loc, srcAddr, destAddr, isTake, isInitialize);
 }

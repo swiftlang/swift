@@ -25,6 +25,7 @@
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILType.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
@@ -143,11 +144,41 @@ enum class SGFAccessKind : uint8_t {
   /// The access is a read-modify-write.
   ///
   /// The caller will be calling emitAddressOfLValue on the l-value.
-  ReadWrite
+  ReadWrite,
+
+  /// The access is a consuming operation that would prefer a loaded address
+  /// value. The lvalue will subsequently be left in an uninitialized state.
+  ///
+  /// The caller will be calling emitAddressOfLValue and then load from the
+  /// l-value.
+  OwnedAddressConsume,
+
+  /// The access is a consuming operation that would prefer a loaded owned
+  /// value. The lvalue will subsequently be left in an uninitialized state.
+  ///
+  /// The caller will be calling emitAddressOfLValue and then load from the
+  /// l-value.
+  OwnedObjectConsume,
 };
 
 static inline bool isReadAccess(SGFAccessKind kind) {
   return uint8_t(kind) <= uint8_t(SGFAccessKind::OwnedObjectRead);
+}
+
+static inline bool isConsumeAccess(SGFAccessKind kind) {
+  switch (kind) {
+  case SGFAccessKind::IgnoredRead:
+  case SGFAccessKind::BorrowedAddressRead:
+  case SGFAccessKind::BorrowedObjectRead:
+  case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::OwnedObjectRead:
+  case SGFAccessKind::Write:
+  case SGFAccessKind::ReadWrite:
+    return false;
+  case SGFAccessKind::OwnedAddressConsume:
+  case SGFAccessKind::OwnedObjectConsume:
+    return true;
+  }
 }
 
 /// Given a read access kind, does it require an owned result?
@@ -170,9 +201,12 @@ static inline SGFAccessKind getAddressAccessKind(SGFAccessKind kind) {
     return SGFAccessKind::BorrowedAddressRead;
   case SGFAccessKind::OwnedObjectRead:
     return SGFAccessKind::OwnedAddressRead;
+  case SGFAccessKind::OwnedObjectConsume:
+    return SGFAccessKind::OwnedAddressConsume;
   case SGFAccessKind::IgnoredRead:
   case SGFAccessKind::BorrowedAddressRead:
   case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::OwnedAddressConsume:
   case SGFAccessKind::Write:
   case SGFAccessKind::ReadWrite:
     return kind;
@@ -190,6 +224,10 @@ static inline AccessKind getFormalAccessKind(SGFAccessKind kind) {
     return AccessKind::Read;
   case SGFAccessKind::Write:
     return AccessKind::Write;
+
+  // TODO: Do we need our own AccessKind here?
+  case SGFAccessKind::OwnedAddressConsume:
+  case SGFAccessKind::OwnedObjectConsume:
   case SGFAccessKind::ReadWrite:
     return AccessKind::ReadWrite;
   }
@@ -310,6 +348,20 @@ public:
   
   std::vector<BreakContinueDest> BreakContinueDestStack;
   std::vector<PatternMatchContext*> SwitchStack;
+
+  /// Information for a parent SingleValueStmtExpr initialization.
+  struct SingleValueStmtInitialization {
+    /// The target expressions to be used for initialization.
+    SmallPtrSet<Expr *, 4> Exprs;
+    Initialization *Init;
+
+    SingleValueStmtInitialization(Initialization *init) : Init(init) {}
+  };
+
+  /// A stack of active SingleValueStmtExpr initializations that may be
+  /// initialized by the branches of a statement.
+  std::vector<SingleValueStmtInitialization> SingleValueStmtInitStack;
+
   /// Keep track of our current nested scope.
   ///
   /// The boolean tracks whether this is a binding scope, which should be
@@ -343,11 +395,12 @@ public:
   FormalEvaluationContext FormalEvalContext;
 
   /// VarLoc - representation of an emitted local variable or constant.  There
-  /// are three scenarios here:
+  /// are four scenarios here:
   ///
-  ///  1) This could be a simple "var" or "let" emitted into an alloc_box.  In
-  ///     this case, 'value' contains a pointer (it is always an address) to the
-  ///     value, and 'box' contains a pointer to the retain count for the box.
+  ///  1) This could be a simple copyable "var" or "let" emitted into an
+  ///     alloc_box.  In this case, 'value' contains a pointer (it is always an
+  ///     address) to the value, and 'box' contains a pointer to the retain
+  ///     count for the box.
   ///  2) This could be a simple non-address-only "let" represented directly. In
   ///     this case, 'value' is the value of the let and is never of address
   ///     type.  'box' is always nil.
@@ -356,13 +409,20 @@ public:
   ///     incoming argument of 'in_guaranteed' convention).  In this case,
   ///     'value' is a pointer to the memory (and thus, its type is always an
   ///     address) and the 'box' is nil.
+  ///  4) This could be a noncopyable "var" or "let" emitted into an
+  ///     alloc_box. In this case, 'value' is nil and the 'box' contains the box
+  ///     itself. The user must always reproject from the box and insert an
+  ///     access marker/must_must_check as appropriate.
   ///
-  /// Generally, code shouldn't be written to enumerate these three cases, it
+  /// Generally, code shouldn't be written to enumerate these four cases, it
   /// should just handle the case of "box or not" or "address or not", depending
   /// on what the code cares about.
   struct VarLoc {
     /// value - the value of the variable, or the address the variable is
     /// stored at (if "value.getType().isAddress()" is true).
+    ///
+    /// It may be invalid if we are supposed to lazily project out an address
+    /// from a box.
     SILValue value;
 
     /// box - This is the retainable box for something emitted to an alloc_box.
@@ -375,6 +435,25 @@ public:
       Result.value = value;
       Result.box = box;
       return Result;
+    }
+
+    static VarLoc getForBox(SILValue box) {
+      VarLoc Result;
+      Result.value = SILValue();
+      Result.box = box;
+      return Result;
+    }
+
+    /// Return either the value if we have one or if we only have a box, project
+    /// our a new box address and return that.
+    SILValue getValueOrBoxedValue(SILGenFunction &SGF,
+                                  SILLocation loc = SILLocation::invalid()) {
+      if (value)
+        return value;
+      assert(box);
+      if (loc.isNull())
+        loc = SGF.CurrentSILLoc;
+      return SGF.B.createProjectBox(loc, box, 0);
     }
   };
   
@@ -600,8 +679,8 @@ public:
   /// ends.
   void enterDebugScope(SILLocation Loc, bool isBindingScope = false,
                        Optional<SILLocation> MacroExpansion = {},
-                       DeclNameRef MacroName = {},
-                       DeclNameLoc MacroNameLoc = {});
+                       StringRef MacroName = {},
+                       Optional<SILLocation> MacroLoc = {});
 
   /// Return to the previous debug scope.
   void leaveDebugScope();
@@ -611,6 +690,11 @@ public:
                             CanType formalResultType,
                             SmallVectorImpl<SILValue> &directResultsBuffer,
                             SmallVectorImpl<CleanupHandle> &cleanups);
+
+  /// Check to see if an initalization for a SingleValueStmtExpr is active, and
+  /// if the provided expression is for one of its branches. If so, returns the
+  /// initialization to use for the expression. Otherwise returns \c nullptr.
+  Initialization *getSingleValueStmtInit(Expr *E);
 
   //===--------------------------------------------------------------------===//
   // Entry points for codegen
@@ -1411,6 +1495,9 @@ public:
   ManagedValue maybeEmitValueOfLocalVarDecl(
       VarDecl *var, AccessKind accessKind);
 
+  ManagedValue maybeEmitAddressForBoxOfLocalVarDecl(SILLocation loc,
+                                                    VarDecl *var);
+
   /// Produce an RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified expression.  Try to
   /// emit into the specified SGFContext to avoid copies (when provided).
@@ -1647,6 +1734,8 @@ public:
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    TSanKind tsanKind = TSanKind::None);
   ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
+                                  TSanKind tsanKind = TSanKind::None);
+  ManagedValue emitConsumedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,

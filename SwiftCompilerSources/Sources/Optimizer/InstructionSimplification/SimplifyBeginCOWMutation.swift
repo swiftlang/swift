@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BeginCOWMutationInst : SILCombineSimplifyable {
+extension BeginCOWMutationInst : Simplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
     /// The buffer of an empty Array/Set/Dictionary singleton is known to be not
@@ -56,7 +56,7 @@ extension BeginCOWMutationInst : SILCombineSimplifyable {
 private extension BeginCOWMutationInst {
 
   func optimizeEmptySingleton(_ context: SimplifyContext) {
-    if !isEmptyCOWSingleton(operand) {
+    if !isEmptyCOWSingleton(instance) {
       return
     }
     if uniquenessResult.nonDebugUses.isEmpty {
@@ -73,14 +73,14 @@ private extension BeginCOWMutationInst {
     if !uniquenessResult.nonDebugUses.isEmpty {
       return false
     }
-    let buffer = bufferResult
+    let buffer = instanceResult
     if buffer.nonDebugUses.contains(where: { !($0.instruction is EndCOWMutationInst) }) {
       return false
     }
 
     for use in buffer.nonDebugUses {
       let endCOW = use.instruction as! EndCOWMutationInst
-      endCOW.uses.replaceAll(with: operand, context)
+      endCOW.uses.replaceAll(with: instance, context)
       context.erase(instruction: endCOW)
     }
     context.erase(instructionIncludingDebugUses: self)
@@ -91,14 +91,14 @@ private extension BeginCOWMutationInst {
     if !uniquenessResult.nonDebugUses.isEmpty {
       return false
     }
-    guard let endCOW = operand as? EndCOWMutationInst else {
+    guard let endCOW = instance as? EndCOWMutationInst else {
       return false
     }
     if endCOW.nonDebugUses.contains(where: { $0.instruction != self }) {
       return false
     }
 
-    bufferResult.uses.replaceAll(with: endCOW.operand, context)
+    instanceResult.uses.replaceAll(with: endCOW.instance, context)
     context.erase(instructionIncludingDebugUses: self)
     context.erase(instructionIncludingDebugUses: endCOW)
     return true
@@ -114,7 +114,7 @@ private func isEmptyCOWSingleton(_ value: Value) -> Bool {
            is RawPointerToRefInst,
            is AddressToPointerInst,
            is CopyValueInst:
-        v = (v as! UnaryInstruction).operand
+        v = (v as! UnaryInstruction).operand.value
       case let globalAddr as GlobalAddrInst:
         let name = globalAddr.global.name
         return name == "_swiftEmptyArrayStorage" ||

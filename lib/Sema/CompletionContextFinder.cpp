@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Sema/CompletionContextFinder.h"
+#include "swift/Parse/Lexer.h"
 
 using namespace swift;
 using Fallback = CompletionContextFinder::Fallback;
@@ -28,7 +29,8 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
     Contexts.push_back({ContextKind::StringInterpolation, E});
   }
 
-  if (isa<ApplyExpr>(E) || isa<SequenceExpr>(E)) {
+  if (isa<ApplyExpr>(E) || isa<SequenceExpr>(E) ||
+      isa<SingleValueStmtExpr>(E)) {
     Contexts.push_back({ContextKind::FallbackExpression, E});
   }
 
@@ -63,7 +65,8 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
 ASTWalker::PostWalkResult<Expr *>
 CompletionContextFinder::walkToExprPost(Expr *E) {
   if (isa<ClosureExpr>(E) || isa<InterpolatedStringLiteralExpr>(E) ||
-      isa<ApplyExpr>(E) || isa<SequenceExpr>(E) || isa<ErrorExpr>(E)) {
+      isa<ApplyExpr>(E) || isa<SequenceExpr>(E) || isa<ErrorExpr>(E) ||
+      isa<SingleValueStmtExpr>(E)) {
     assert(Contexts.back().E == E);
     Contexts.pop_back();
   }
@@ -129,4 +132,12 @@ Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
   if (getCompletionExpr() != InitialExpr)
     return Fallback{getCompletionExpr(), fallbackDC, separatePrecheck};
   return None;
+}
+
+bool swift::containsIDEInspectionTarget(SourceRange range,
+                                        const SourceManager &SourceMgr) {
+  if (range.isInvalid())
+    return false;
+  auto charRange = Lexer::getCharSourceRangeFromSourceRange(SourceMgr, range);
+  return SourceMgr.rangeContainsIDEInspectionTarget(charRange);
 }

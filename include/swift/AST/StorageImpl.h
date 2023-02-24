@@ -81,7 +81,7 @@ enum class AccessKind : uint8_t {
   Write,
 
   /// The access may require either reading or writing the current value.
-  ReadWrite
+  ReadWrite,
 };
 
 /// Produce the aggregate access kind of the combination of two accesses.

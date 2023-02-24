@@ -281,6 +281,11 @@ namespace {
         // Otherwise, it'll have been separately type-checked.
         if (!CE->isSeparatelyTypeChecked()) {
           SetLocalDiscriminators innerVisitor;
+          if (auto params = CE->getParameters()) {
+            for (auto *param : *params) {
+              innerVisitor.setLocalDiscriminator(param);
+            }
+          }
           CE->getBody()->walk(innerVisitor);
         }
 
@@ -332,16 +337,22 @@ namespace {
 
     /// Set the local discriminator for a named declaration.
     void setLocalDiscriminator(ValueDecl *valueDecl) {
-      if (valueDecl->hasLocalDiscriminator() &&
-          valueDecl->getRawLocalDiscriminator() ==
-              ValueDecl::InvalidDiscriminator) {
-        // Assign the next discriminator.
-        Identifier name = valueDecl->getBaseIdentifier();
-        auto &discriminator = DeclDiscriminators[name];
-        if (discriminator < InitialDiscriminator)
-          discriminator = InitialDiscriminator;
+      if (valueDecl->hasLocalDiscriminator()) {
+        if (valueDecl->getRawLocalDiscriminator() ==
+            ValueDecl::InvalidDiscriminator) {
+          // Assign the next discriminator.
+          Identifier name = valueDecl->getBaseIdentifier();
+          auto &discriminator = DeclDiscriminators[name];
+          if (discriminator < InitialDiscriminator)
+            discriminator = InitialDiscriminator;
 
-        valueDecl->setLocalDiscriminator(discriminator++);
+          valueDecl->setLocalDiscriminator(discriminator++);
+        } else {
+          // Assign the next discriminator.
+          Identifier name = valueDecl->getBaseIdentifier();
+          auto &discriminator = DeclDiscriminators[name];
+          discriminator = std::max(discriminator, std::max(InitialDiscriminator, valueDecl->getLocalDiscriminator() + 1));
+        }
       }
 
       // If this is a property wrapper, check for projected storage.
@@ -1010,20 +1021,20 @@ public:
   Stmt *visitBraceStmt(BraceStmt *BS);
 
   Stmt *visitReturnStmt(ReturnStmt *RS) {
-    auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
+    // First, let's do a pre-check, and bail if the return is completely
+    // invalid.
+    auto &eval = getASTContext().evaluator;
+    auto *S =
+        evaluateOrDefault(eval, PreCheckReturnStmtRequest{RS, DC}, nullptr);
 
-    if (!TheFunc.has_value()) {
-      getASTContext().Diags.diagnose(RS->getReturnLoc(),
-                                     diag::return_invalid_outside_func);
-      return nullptr;
-    }
-    
-    // If the return is in a defer, then it isn't valid either.
-    if (isInDefer()) {
-      getASTContext().Diags.diagnose(RS->getReturnLoc(),
-                                     diag::jump_out_of_defer, "return");
-      return nullptr;
-    }
+    // We do a cast here as it may have been turned into a FailStmt. We should
+    // return that without doing anything else.
+    RS = dyn_cast_or_null<ReturnStmt>(S);
+    if (!RS)
+      return S;
+
+    auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
+    assert(TheFunc && "Should have bailed from pre-check if this is None");
 
     Type ResultTy = TheFunc->getBodyResultType();
     if (!ResultTy || ResultTy->hasError())
@@ -1061,40 +1072,6 @@ public:
     }
 
     Expr *E = RS->getResult();
-
-    // In an initializer, the only expression allowed is "nil", which indicates
-    // failure from a failable initializer.
-    if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
-                                          TheFunc->getAbstractFunctionDecl())) {
-      // The only valid return expression in an initializer is the literal
-      // 'nil'.
-      auto nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
-      if (!nilExpr) {
-        getASTContext().Diags.diagnose(RS->getReturnLoc(),
-                                       diag::return_init_non_nil)
-          .highlight(E->getSourceRange());
-        RS->setResult(nullptr);
-        return RS;
-      }
-
-      // "return nil" is only permitted in a failable initializer.
-      if (!ctor->isFailable()) {
-        getASTContext().Diags.diagnose(RS->getReturnLoc(),
-                                       diag::return_non_failable_init)
-          .highlight(E->getSourceRange());
-        getASTContext().Diags.diagnose(ctor->getLoc(), diag::make_init_failable,
-                    ctor->getName())
-          .fixItInsertAfter(ctor->getLoc(), "?");
-        RS->setResult(nullptr);
-        return RS;
-      }
-
-      // Replace the "return nil" with a new 'fail' statement.
-      return new (getASTContext()) FailStmt(RS->getReturnLoc(),
-                                            nilExpr->getLoc(),
-                                            RS->isImplicit());
-    }
-    
     TypeCheckExprOptions options = {};
     
     if (LeaveBraceStmtBodyUnchecked) {
@@ -1546,6 +1523,62 @@ public:
 
 };
 } // end anonymous namespace
+
+Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
+                                          DeclContext *DC) const {
+  auto &ctx = DC->getASTContext();
+  auto fn = AnyFunctionRef::fromDeclContext(DC);
+
+  // Not valid outside of a function.
+  if (!fn) {
+    ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_invalid_outside_func);
+    return nullptr;
+  }
+
+  // If the return is in a defer, then it isn't valid either.
+  if (isDefer(DC)) {
+    ctx.Diags.diagnose(RS->getReturnLoc(), diag::jump_out_of_defer, "return");
+    return nullptr;
+  }
+
+  // The rest of the checks only concern return statements with results.
+  if (!RS->hasResult())
+    return RS;
+
+  auto *E = RS->getResult();
+
+  // In an initializer, the only expression allowed is "nil", which indicates
+  // failure from a failable initializer.
+  if (auto *ctor =
+          dyn_cast_or_null<ConstructorDecl>(fn->getAbstractFunctionDecl())) {
+
+    // The only valid return expression in an initializer is the literal
+    // 'nil'.
+    auto *nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
+    if (!nilExpr) {
+      ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
+          .highlight(E->getSourceRange());
+      RS->setResult(nullptr);
+      return RS;
+    }
+
+    // "return nil" is only permitted in a failable initializer.
+    if (!ctor->isFailable()) {
+      ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_non_failable_init)
+          .highlight(E->getSourceRange());
+      ctx.Diags
+          .diagnose(ctor->getLoc(), diag::make_init_failable, ctor->getName())
+          .fixItInsertAfter(ctor->getLoc(), "?");
+      RS->setResult(nullptr);
+      return RS;
+    }
+
+    // Replace the "return nil" with a new 'fail' statement.
+    return new (ctx)
+        FailStmt(RS->getReturnLoc(), nilExpr->getLoc(), RS->isImplicit());
+  }
+  return RS;
+}
 
 static bool isDiscardableType(Type type) {
   return (type->hasError() ||
@@ -2336,8 +2369,10 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   // Function builder function doesn't support partial type checking.
   if (auto *func = dyn_cast<FuncDecl>(DC)) {
     if (Type builderType = getResultBuilderType(func)) {
-      auto optBody =
-          TypeChecker::applyResultBuilderBodyTransform(func, builderType);
+      auto optBody = TypeChecker::applyResultBuilderBodyTransform(
+          func, builderType,
+          /*ClosuresInResultBuilderDontParticipateInInference=*/
+              ctx.CompletionCallback == nullptr);
       if (optBody && *optBody) {
         // Wire up the function body now.
         func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
@@ -2357,6 +2392,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       func->getBody()->setLastElement(func->getSingleExpressionBody());
     }
   }
+
+  bool LeaveBodyUnchecked = !ctx.CompletionCallback;
 
   // The enclosing closure might be a single expression closure or a function
   // builder closure. In such cases, the body elements are type checked with
@@ -2381,13 +2418,17 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       auto ActorIsolation = determineClosureActorIsolation(
           CE, __Expr_getType, __AbstractClosureExpr_getActorIsolation);
       CE->setActorIsolation(ActorIsolation);
+      if (!LeaveBodyUnchecked) {
+        // Type checking the parent closure also type checked this node.
+        // Nothing to do anymore.
+        return false;
+      }
       if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
         return false;
     }
   }
 
-  TypeChecker::typeCheckASTNode(finder.getRef(), DC,
-                                /*LeaveBodyUnchecked=*/true);
+  TypeChecker::typeCheckASTNode(finder.getRef(), DC, LeaveBodyUnchecked);
   return false;
 }
 
@@ -2440,25 +2481,24 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
     } else if (func->hasSingleExpressionBody() &&
                func->getResultInterfaceType()->isVoid()) {
       // The function returns void.  We don't need an explicit return, no matter
-      // what the type of the expression is.  Take the inserted return back out.
+      // what the type of the expression is. Take the inserted return back out.
       body->setLastElement(func->getSingleExpressionBody());
+    } else if (func->getBody()->getNumElements() == 1 &&
+               !func->getResultInterfaceType()->isVoid()) {
+      // If there is a single statement in the body that can be turned into a
+      // single expression return, do so now.
+      if (auto *S = func->getBody()->getLastElement().dyn_cast<Stmt *>()) {
+        if (S->mayProduceSingleValue(evaluator)) {
+          auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
+              ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
+          auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
+          body->setLastElement(RS);
+          func->setHasSingleExpressionBody();
+          func->setSingleExpressionBody(SVE);
+        }
+      }
     }
   } else if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
-    // If this is user-defined constructor that requires `_storage`
-    // variable injection, do so now so now.
-    if (auto *storageVar = ctor->getLocalTypeWrapperStorageVar()) {
-      SmallVector<ASTNode, 8> Elts;
-
-      Elts.push_back(storageVar->getParentPatternBinding());
-      Elts.push_back(storageVar);
-
-      Elts.append(body->getElements().begin(),
-                  body->getElements().end());
-
-      body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
-                               body->getRBraceLoc(), body->isImplicit());
-    }
-
     if (body->empty() ||
         !isKnownEndOfConstructor(body->getLastElement())) {
       // For constructors, we make sure that the body ends with a "return" stmt,
@@ -2566,6 +2606,145 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   checkTopLevelActorIsolation(TLCD);
   checkTopLevelEffects(TLCD);
   performTopLevelDeclDiagnostics(TLCD);
+}
+
+/// Whether the given brace statement ends with a throw.
+static bool doesBraceEndWithThrow(BraceStmt *BS) {
+  auto elts = BS->getElements();
+  if (elts.empty())
+    return false;
+
+  auto lastElt = elts.back();
+  auto *S = lastElt.dyn_cast<Stmt *>();
+  if (!S)
+    return false;
+
+  return isa<ThrowStmt>(S);
+}
+
+namespace {
+/// An ASTWalker that searches for any break/continue/return statements that
+/// jump out of the context the walker starts at.
+class JumpOutOfContextFinder : public ASTWalker {
+  TinyPtrVector<Stmt *> &Jumps;
+  SmallPtrSet<Stmt *, 4> ParentLabeledStmts;
+
+public:
+  JumpOutOfContextFinder(TinyPtrVector<Stmt *> &jumps) : Jumps(jumps) {}
+
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    if (auto *LS = dyn_cast<LabeledStmt>(S))
+      ParentLabeledStmts.insert(LS);
+
+    // Cannot 'break', 'continue', or 'return' out of the statement. A jump to
+    // a statement within a branch however is fine.
+    if (auto *BS = dyn_cast<BreakStmt>(S)) {
+      if (!ParentLabeledStmts.contains(BS->getTarget()))
+        Jumps.push_back(BS);
+    }
+    if (auto *CS = dyn_cast<ContinueStmt>(S)) {
+      if (!ParentLabeledStmts.contains(CS->getTarget()))
+        Jumps.push_back(CS);
+    }
+    if (isa<ReturnStmt>(S) || isa<FailStmt>(S))
+      Jumps.push_back(S);
+
+    return Action::Continue(S);
+  }
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
+    if (auto *LS = dyn_cast<LabeledStmt>(S)) {
+      auto removed = ParentLabeledStmts.erase(LS);
+      assert(removed);
+      (void)removed;
+    }
+    return Action::Continue(S);
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    // We don't need to walk into closures, you can't jump out of them.
+    return Action::SkipChildrenIf(isa<AbstractClosureExpr>(E), E);
+  }
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    // We don't need to walk into any nested local decls.
+    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+  }
+};
+} // end anonymous namespace
+
+IsSingleValueStmtResult
+areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
+  TinyPtrVector<Stmt *> invalidJumps;
+  TinyPtrVector<Stmt *> unterminatedBranches;
+  JumpOutOfContextFinder jumpFinder(invalidJumps);
+
+  // Must have a single expression brace, and non-single-expression branches
+  // must end with a throw.
+  bool hadSingleExpr = false;
+  for (auto *branch : branches) {
+    auto *BS = dyn_cast<BraceStmt>(branch);
+    if (!BS)
+      return IsSingleValueStmtResult::unhandledStmt();
+
+    // Check to see if there are any invalid jumps.
+    BS->walk(jumpFinder);
+
+    if (BS->getSingleExpressionElement()) {
+      hadSingleExpr = true;
+      continue;
+    }
+
+    // We also allow single value statement branches, which we can wrap in
+    // a SingleValueStmtExpr.
+    auto elts = BS->getElements();
+    if (elts.size() == 1) {
+      if (auto *S = elts.back().dyn_cast<Stmt *>()) {
+        if (S->mayProduceSingleValue(eval)) {
+          hadSingleExpr = true;
+          continue;
+        }
+      }
+    }
+    if (!doesBraceEndWithThrow(BS))
+      unterminatedBranches.push_back(BS);
+  }
+
+  if (!invalidJumps.empty())
+    return IsSingleValueStmtResult::invalidJumps(std::move(invalidJumps));
+
+  if (!unterminatedBranches.empty()) {
+    return IsSingleValueStmtResult::unterminatedBranches(
+        std::move(unterminatedBranches));
+  }
+
+  if (!hadSingleExpr)
+    return IsSingleValueStmtResult::noExpressionBranches();
+
+  return IsSingleValueStmtResult::valid();
+}
+
+IsSingleValueStmtResult
+IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S) const {
+  if (!isa<IfStmt>(S) && !isa<SwitchStmt>(S))
+    return IsSingleValueStmtResult::unhandledStmt();
+
+  // Statements must be unlabeled.
+  auto *LS = cast<LabeledStmt>(S);
+  if (LS->getLabelInfo())
+    return IsSingleValueStmtResult::hasLabel();
+
+  if (auto *IS = dyn_cast<IfStmt>(S)) {
+    // Must be exhaustive.
+    if (!IS->isSyntacticallyExhaustive())
+      return IsSingleValueStmtResult::nonExhaustiveIf();
+
+    SmallVector<Stmt *, 4> scratch;
+    return areBranchesValidForSingleValueStmt(eval, IS->getBranches(scratch));
+  }
+  if (auto *SS = dyn_cast<SwitchStmt>(S)) {
+    SmallVector<Stmt *, 4> scratch;
+    return areBranchesValidForSingleValueStmt(eval, SS->getBranches(scratch));
+  }
+  llvm_unreachable("Unhandled case");
 }
 
 void swift::checkUnknownAttrRestrictions(

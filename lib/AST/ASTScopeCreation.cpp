@@ -258,6 +258,8 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     case MacroRole::Declaration:
     case MacroRole::Accessor:
     case MacroRole::MemberAttribute:
+    case MacroRole::Peer:
+    case MacroRole::Conformance:
       parentLoc = expansion.getStartLoc();
       break;
     case MacroRole::Member: {
@@ -492,9 +494,15 @@ public:
 
   ASTScopeImpl *visitExpr(Expr *expr, ASTScopeImpl *p,
                           ScopeCreator &scopeCreator) {
-    if (expr)
-      scopeCreator.addExprToScopeTree(expr, p);
+    if (!expr)
+      return p;
 
+    // If we have a single value statement expression, we expand scopes based
+    // on the underlying statement.
+    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr))
+      return visit(SVE->getStmt(), p, scopeCreator);
+
+    scopeCreator.addExprToScopeTree(expr, p);
     return p;
   }
 };
@@ -922,7 +930,7 @@ namespace {
       }
     }
 
-    return decl->getGenericParams();
+    return decl->getParsedGenericParams();
   }
 }
 

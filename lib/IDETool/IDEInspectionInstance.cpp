@@ -346,8 +346,9 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
         newBufferID,
         GeneratedSourceInfo{
           GeneratedSourceInfo::ReplacedFunctionBody,
-          AFD->getOriginalBodySourceRange(),
-          newBodyRange,
+          Lexer::getCharSourceRangeFromSourceRange(
+              SM, AFD->getOriginalBodySourceRange()),
+          Lexer::getCharSourceRangeFromSourceRange(SM, newBodyRange),
           AFD,
           nullptr
         }
@@ -826,13 +827,13 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
         : ReusingASTContext(ReusingASTContext),
           CancellationFlag(CancellationFlag), Callback(Callback) {}
 
-    void handleResults(const ResolvedCursorInfo &result) override {
+    void handleResults(ResolvedCursorInfoPtr result) override {
       HandleResultsCalled = true;
       if (CancellationFlag &&
           CancellationFlag->load(std::memory_order_relaxed)) {
         Callback(ResultType::cancelled());
       } else {
-        Callback(ResultType::success({&result, ReusingASTContext}));
+        Callback(ResultType::success({result, ReusingASTContext}));
       }
     }
   };
@@ -842,10 +843,9 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
       CancellationFlag,
       [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<CursorInfoResults>(
-            [&CancellationFlag, Offset](auto &Result, auto DeliverTransformed) {
+            [&CancellationFlag](auto &Result, auto DeliverTransformed) {
               auto &Mgr = Result.CI->getSourceMgr();
-              auto RequestedLoc = Mgr.getLocForOffset(
-                  Mgr.getIDEInspectionTargetBufferID(), Offset);
+              auto RequestedLoc = Mgr.getIDEInspectionTargetLoc();
               ConsumerToCallbackAdapter Consumer(
                   Result.DidReuseAST, CancellationFlag, DeliverTransformed);
               std::unique_ptr<IDEInspectionCallbacksFactory> callbacksFactory(

@@ -1166,12 +1166,12 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   // FIXME(https://github.com/apple/swift/issues/54259): Support throwing functions.
   assert(!throws && "Throwing functions are not yet supported");
 
-  auto origFnVal = args[0].getValue();
+  auto origFnVal = args[0];
   SmallVector<SILValue, 2> origFnArgVals;
   for (auto& arg : args.drop_front(1))
     origFnArgVals.push_back(arg.getValue());
 
-  auto origFnType = origFnVal->getType().castTo<SILFunctionType>();
+  auto origFnType = origFnVal.getType().castTo<SILFunctionType>();
   auto origFnUnsubstType = origFnType->getUnsubstitutedType(SGF.getModule());
   if (origFnType != origFnUnsubstType) {
     origFnVal = SGF.B.createConvertFunction(
@@ -1180,8 +1180,9 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   }
 
   // Get the derivative function.
+  origFnVal = SGF.B.createBeginBorrow(loc, origFnVal);
   SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
-      loc, kind, origFnVal);
+      loc, kind, origFnVal.getValue());
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
   assert(derivativeFnType->getNumResults() == 2);
   assert(derivativeFnType->getNumParameters() == origFnArgVals.size());
@@ -1196,9 +1197,9 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   }
 
   // We don't need to destroy the original function or retain the
-  // `derivativeFn`, because they are trivial (because they are @noescape).
-  assert(origFnVal->getType().isTrivial(SGF.F));
-  assert(derivativeFn->getType().isTrivial(SGF.F));
+  // `derivativeFn`, because they are noescape.
+  assert(origFnType->isTrivialNoEscape());
+  assert(derivativeFnType->isTrivialNoEscape());
 
   // Do the apply for the indirect result case.
   if (derivativeFnType->hasIndirectFormalResults()) {
