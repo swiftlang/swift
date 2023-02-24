@@ -291,7 +291,7 @@ public:
   ///
   /// Returns false when called on a non-phi and when the visitor returns false.
   bool visitTransitiveIncomingPhiOperands(
-      function_ref<bool(SILPhiArgument *, Operand *)> visitor);
+      function_ref<bool(SILPhiArgument *, Operand *)> visitor) const;
 
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are
