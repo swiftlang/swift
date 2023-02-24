@@ -35,24 +35,7 @@
 
 using namespace swift;
 
-// Pointers my have spare bits stored in the high and low bits. Mask them out
-// before we pass them to retain/release functions
-#define MASK_PTR(x)                                                            \
-  ((__swift_uintptr_t)x & ~heap_object_abi::SwiftSpareBitsMask)
-
 static const size_t layoutStringHeaderSize = sizeof(size_t);
-
-/// Get the generic argument vector for the passed in metadata
-///
-/// NB: We manually compute the offset instead of using Metadata::getGenericArgs
-/// because Metadata::getGenericArgs checks the isSwift bit which we cannot do
-/// in a compatibility library. Once we merge this into the runtime, we can
-/// safely use Metadata::getGenericArgs. For our purposes right now anyways,
-/// struct and enums always have their generic argument vector at offset + 2 so
-/// we can hard code that.
-Metadata **getGenericArgs(Metadata *metadata) {
-  return ((Metadata **)metadata) + 2;
-}
 
 /// Given a pointer and an offset, read the requested data and increment the
 /// offset
@@ -74,7 +57,7 @@ Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
   return reinterpret_cast<Metadata**>(object)[NumWords_ValueBuffer];
 }
 
-typedef Metadata* (*MetadataAccessor)(Metadata**);
+typedef Metadata* (*MetadataAccessor)(const Metadata* const *);
 
 const Metadata *getResilientTypeMetadata(Metadata* metadata, const uint8_t *layoutStr, size_t &offset) {
   auto absolute = layoutStr + offset;
@@ -89,7 +72,7 @@ const Metadata *getResilientTypeMetadata(Metadata* metadata, const uint8_t *layo
   fn = (MetadataAccessor)((uintptr_t) + absolute + relativeOffset);
 #endif
 
-  return fn(getGenericArgs(metadata));
+  return fn(metadata->getGenericArgs());
 }
 
 typedef void (*DestrFn)(void*);
@@ -135,7 +118,7 @@ const DestroyFuncAndMask destroyTable[] = {
   {(DestrFn)&existential_destroy, UINTPTR_MAX, false},
 };
 
-__attribute__((weak)) extern "C" void
+extern "C" void
 swift_generic_destroy(void *address, void *metadata) {
   uint8_t *addr = (uint8_t *)address;
   Metadata *typedMetadata = (Metadata *)metadata;
@@ -161,12 +144,11 @@ swift_generic_destroy(void *address, void *metadata) {
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
       auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
       type->vw_destroy((OpaqueValue *)(addr + addrOffset));
-      //addrOffset += type->vw_size();
     } else {
       const auto &destroyFunc = destroyTable[static_cast<uint8_t>(tag)];
       if (SWIFT_LIKELY(destroyFunc.isIndirect)) {
         destroyFunc.fn(
-            (void *)((*(uintptr_t *)(addr + addrOffset))));// & destroyFunc.mask));
+            (void *)((*(uintptr_t *)(addr + addrOffset))));
       } else {
         destroyFunc.fn(((void *)(addr + addrOffset)));
       }
@@ -220,7 +202,7 @@ const RetainFuncAndMask retainTable[] = {
   {(void*)&existential_initializeWithCopy, UINTPTR_MAX, false},
 };
 
-__attribute__((weak)) extern "C" void *
+extern "C" void *
 swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
   uintptr_t addrOffset = 0;
   Metadata *typedMetadata = (Metadata *)metadata;
@@ -245,16 +227,14 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
       auto *type = reinterpret_cast<Metadata*>(typePtr);
       type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
-      //addrOffset += type->vw_size();
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
       auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
       type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
-      //addrOffset += type->vw_size();
     } else {
       const auto &retainFunc = retainTable[static_cast<uint8_t>(tag)];
       if (SWIFT_LIKELY(retainFunc.isSingle)) {
-        ((RetainFn)retainFunc.fn)(*(void**)(((uintptr_t)dest + addrOffset))); // & retainFunc.mask));
+        ((RetainFn)retainFunc.fn)(*(void**)(((uintptr_t)dest + addrOffset)));
       } else {
         ((CopyInitFn)retainFunc.fn)((void*)((uintptr_t)dest + addrOffset), (void*)((uintptr_t)src + addrOffset));
       }
@@ -262,7 +242,7 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
   }
 }
 
-__attribute__((weak)) extern "C" void *
+extern "C" void *
 swift_generic_initWithTake(void *dest, void *src, void *metadata) {
   Metadata *typedMetadata = (Metadata *)metadata;
   const uint8_t *typeLayout = typedMetadata->getLayoutString();
@@ -323,19 +303,19 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
   return dest;
 }
 
-__attribute__((weak)) extern "C" void *
+extern "C" void *
 swift_generic_assignWithCopy(void *dest, void *src, void *metadata) {
   swift_generic_destroy(dest, metadata);
   return swift_generic_initWithCopy(dest, src, metadata);
 }
 
-__attribute__((weak)) extern "C" void *
+extern "C" void *
 swift_generic_assignWithTake(void *dest, void *src, void *metadata) {
   swift_generic_destroy(dest, metadata);
   return swift_generic_initWithTake(dest, src, metadata);
 }
 
-__attribute__((weak)) extern "C" void
+extern "C" void
 swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
                                       Metadata* type) {
   size_t offset = 0;
@@ -357,12 +337,12 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
       const Metadata *genericType;
       if (tag == 2) {
         auto index = readBytes<uint32_t>(layoutStr, offset);
-        genericType = getGenericArgs(type)[index];
+        genericType = type->getGenericArgs()[index];
       } else {
         genericType = getResilientTypeMetadata(type, layoutStr, offset);
       }
 
-      if ((false)) {//genericType->getTypeContextDescriptor()->hasLayoutString()) {
+      if (genericType->getTypeContextDescriptor()->hasLayoutString()) {
         const uint8_t *genericLayoutStr = genericType->getLayoutString();
         size_t countOffset = 0;
         genericRefCountSize += readBytes<size_t>(genericLayoutStr, countOffset);
@@ -416,12 +396,12 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
       const Metadata *genericType;
       if (tag == 2) {
         auto index = readBytes<uint32_t>(layoutStr, offset);
-        genericType = getGenericArgs(type)[index];
+        genericType = type->getGenericArgs()[index];
       } else {
         genericType = getResilientTypeMetadata(type, layoutStr, offset);
       }
 
-      if ((false)) {//genericType->getTypeContextDescriptor()->hasLayoutString()) {
+      if (genericType->getTypeContextDescriptor()->hasLayoutString()) {
         const uint8_t *genericLayoutStr = genericType->getLayoutString();
         size_t countOffset = 0;
         auto genericRefCountSize = readBytes<size_t>(genericLayoutStr, countOffset);
@@ -486,7 +466,3 @@ swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
 
   type->setLayoutString(instancedLayoutStr);
 }
-
-// Allow this library to get force-loaded by autolinking
-__attribute__((weak, visibility("hidden"))) extern "C" char
-    _swift_FORCE_LOAD_$_swiftCompatibilityBytecodeLayouts = 0;
