@@ -606,3 +606,30 @@ bb0:
   %11 = tuple ()
   return %11 : $()
 }
+
+sil @call_closure : $@convention(method) (@noescape @callee_guaranteed () -> ()) -> ()
+sil @closure : $@convention(thin) (@inout_aliasable Int) -> ()
+
+// CHECK-LABEL: Address escape information for test_closure_capturing_address:
+// CHECK:      value:  %0 = alloc_stack $Int
+// CHECK-NEXT:   ==>   %7 = apply %6(%4) : $@convention(method) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:      End function test_closure_capturing_address
+sil @test_closure_capturing_address : $@convention(thin) () -> Int {
+bb0:
+  %0 = alloc_stack $Int
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = struct $Int (%1 : $Builtin.Int64)
+
+  %3 = function_ref @closure : $@convention(thin) (@inout_aliasable Int) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%0) : $@convention(thin) (@inout_aliasable Int) -> ()
+  store %2 to %0 : $*Int
+
+  %6 = function_ref @call_closure : $@convention(method) (@noescape @callee_guaranteed () -> ()) -> ()
+  %7 = apply %6(%4) : $@convention(method) (@noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %4 : $@noescape @callee_guaranteed () -> ()
+  fix_lifetime %0 : $*Int
+  %9 = load %0 : $*Int
+  dealloc_stack %0 : $*Int
+  return %9 : $Int
+}
+
