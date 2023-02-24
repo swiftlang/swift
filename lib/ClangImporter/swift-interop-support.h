@@ -21,7 +21,7 @@
 #define SAFE_TO_IMPORT __attribute__((swift_attr("import_unsafe")))
 
 #define _CXX_INTEROP_STRINGIFY(_x) #_x
-#define REFERENCE(_retain, _release)                                           \
+#define SWIFT_REFERENCE_TYPE(_retain, _release)                                \
   __attribute__((swift_attr("import_reference")))                              \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:_retain))))          \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:_release))))
