@@ -98,14 +98,14 @@ struct AliasAnalysis {
       },
 
       // isAddrVisibleFromObj
-      { (bridgedCtxt: BridgedPassContext, bridgedAddr: BridgedValue, bridgedObj: BridgedValue) -> Bool in
+      { (bridgedCtxt: BridgedPassContext, bridgedAddr: BridgedValue, bridgedObj: BridgedValue, complexityBudget: Int) -> Bool in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let addr = bridgedAddr.value.at(AliasAnalysis.getPtrOrAddressPath(for: bridgedAddr.value))
 
         // This is similar to `canReferenceSameFieldFn`, except that all addresses of all objects are
         // considered which are transitively visible from `bridgedObj`.
         let anythingReachableFromObj = bridgedObj.value.at(SmallProjectionPath(.anything))
-        return addr.canAddressAlias(with: anythingReachableFromObj, context)
+        return addr.canAddressAlias(with: anythingReachableFromObj, complexityBudget: complexityBudget, context)
       },
 
       // canReferenceSameFieldFn
