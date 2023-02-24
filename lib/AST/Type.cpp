@@ -4502,6 +4502,24 @@ operator()(CanType dependentType, Type conformingReplacementType,
 ProtocolConformanceRef MakeAbstractConformanceForGenericType::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
+  // The places that use this can also produce conformance packs, generally
+  // just for singleton pack expansions.
+  if (auto conformingPack = conformingReplacementType->getAs<PackType>()) {
+    SmallVector<ProtocolConformanceRef, 4> conformances;
+    for (auto conformingPackElt : conformingPack->getElementTypes()) {
+      // Look through pack expansions; there's no equivalent conformance
+      // expansion right now.
+      auto expansion = conformingPackElt->getAs<PackExpansionType>();
+      if (expansion) conformingPackElt = expansion->getPatternType();
+
+      auto conformance =
+        (*this)(dependentType, conformingPackElt, conformedProtocol);
+      conformances.push_back(conformance);
+    }
+    return ProtocolConformanceRef(
+        PackConformance::get(conformingPack, conformedProtocol, conformances));
+  }
+
   assert((conformingReplacementType->is<ErrorType>() ||
           conformingReplacementType->is<SubstitutableType>() ||
           conformingReplacementType->is<DependentMemberType>() ||
@@ -4966,6 +4984,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
       substTy = ErrorType::get(baseTy->getASTContext());
     else if (genericEnv)
       substTy = genericEnv->mapTypeIntoContext(gp);
+
+    if (gp->isParameterPack() && !substTy->hasError())
+      substTy = PackType::getSingletonPackExpansion(substTy);
 
     auto result = substitutions.insert(
       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),

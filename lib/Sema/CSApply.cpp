@@ -95,8 +95,12 @@ Solution::computeSubstitutions(GenericSignature sig,
     return SubstitutionMap();
 
   TypeSubstitutionMap subs;
-  for (const auto &opened : openedTypes->second)
-    subs[opened.first] = getFixedType(opened.second);
+  for (const auto &opened : openedTypes->second) {
+    auto type = getFixedType(opened.second);
+    if (opened.first->isParameterPack() && !type->is<PackType>())
+      type = PackType::getSingletonPackExpansion(type);
+    subs[opened.first] = type;
+  }
 
   auto lookupConformanceFn =
       [&](CanType original, Type replacement,
