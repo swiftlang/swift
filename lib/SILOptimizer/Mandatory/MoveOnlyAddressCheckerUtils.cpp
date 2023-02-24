@@ -959,7 +959,8 @@ struct MoveOnlyAddressCheckerPImpl {
 
   bool performSingleCheck(MarkMustCheckInst *markedValue);
 
-  void insertDestroysOnBoundary(FieldSensitiveMultiDefPrunedLiveRange &liveness,
+  void insertDestroysOnBoundary(MarkMustCheckInst *markedValue,
+                                FieldSensitiveMultiDefPrunedLiveRange &liveness,
                                 FieldSensitivePrunedLivenessBoundary &boundary);
 
   void rewriteUses(FieldSensitiveMultiDefPrunedLiveRange &liveness,
@@ -1845,10 +1846,23 @@ static void insertDestroyBeforeInstruction(UseState &addressUseState,
 }
 
 void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
+    MarkMustCheckInst *markedValue,
     FieldSensitiveMultiDefPrunedLiveRange &liveness,
     FieldSensitivePrunedLivenessBoundary &boundary) {
   using IsInterestingUser = FieldSensitivePrunedLiveness::IsInterestingUser;
   LLVM_DEBUG(llvm::dbgs() << "Inserting destroys on boundary!\n");
+
+  // If we're in no_consume_or_assign mode, we don't insert destroys, as we've
+  // already checked that there are no consumes. There can only be borrow uses,
+  // which means no destruction is needed at all.
+  if (markedValue->getCheckKind() ==
+      MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "    Skipping destroy insertion b/c no_consume_or_assign\n");
+    consumes.finishRecordingFinalConsumes();
+    return;
+  }
+
   LLVM_DEBUG(llvm::dbgs() << "    Visiting users!\n");
 
   for (auto &pair : boundary.getLastUsers()) {
@@ -2113,7 +2127,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   SWIFT_DEFER { consumes.clear(); };
   FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
   liveness.computeBoundary(boundary);
-  insertDestroysOnBoundary(liveness, boundary);
+  insertDestroysOnBoundary(markedAddress, liveness, boundary);
   rewriteUses(liveness, boundary);
 
   return true;
