@@ -58,6 +58,7 @@ copied, but do not need to be released or retained.
    I16 = 's',
    I32 = 'l',
    I64 = 'L',
+   I128 = 'Q',
 
 We also have reference types. While they are all 64bit sized, we need to
 differentiate between them because they have different ways of being

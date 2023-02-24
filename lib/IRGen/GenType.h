@@ -189,7 +189,8 @@ public:
   const TypeInfo *getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
 
-  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
+  const TypeLayoutEntry
+  &getTypeLayoutEntry(SILType T, bool useStructLayouts);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
@@ -370,9 +371,9 @@ TypeLayoutEntry *buildTypeLayoutEntryForFields(IRGenModule &IGM, SILType T,
     return IGM.typeLayoutCache.getEmptyEntry();
   }
 
-  if (fields.size() == 1 && minFieldAlignment >= minimumAlignment) {
-    return fields[0];
-  }
+  // if (fields.size() == 1 && minFieldAlignment >= minimumAlignment) {
+  //   return fields[0];
+  // }
   if (minimumAlignment < minFieldAlignment)
     minimumAlignment = minFieldAlignment;
   return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(

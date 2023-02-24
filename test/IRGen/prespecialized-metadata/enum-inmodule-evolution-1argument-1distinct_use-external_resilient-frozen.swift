@@ -53,7 +53,7 @@ enum Value<First> {
 // CHECK-SAME:       to %swift.full_type*
 // CHECK-SAME:     ), 
 // CHECK-SAME:     i32 0, 
-// CHECK-SAME:     i32 1
+// CHECK-SAME:     i32 2
 // CHECK-SAME:   )
 // CHECK-SAME: )
 // CHECK: }
