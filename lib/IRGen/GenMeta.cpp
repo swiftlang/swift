@@ -3642,7 +3642,9 @@ namespace {
         return;
 
       if (auto *layoutString = getLayoutString()) {
-        B.add(layoutString);
+        B.addSignedPointer(layoutString,
+                           IGM.getOptions().PointerAuth.TypeLayoutString,
+                           PointerAuthEntity::Special::TypeLayoutString);
       } else {
         B.addNullPointer(IGM.Int8PtrTy);
       }
@@ -4863,7 +4865,9 @@ namespace {
 
     void addLayoutStringPointer() {
       if (auto *layoutString = getLayoutString()) {
-        B.add(layoutString);
+        B.addSignedPointer(layoutString,
+                           IGM.getOptions().PointerAuth.TypeLayoutString,
+                           PointerAuthEntity::Special::TypeLayoutString);
       } else {
         B.addNullPointer(IGM.Int8PtrTy);
       }
@@ -5256,7 +5260,9 @@ namespace {
 
     void addLayoutStringPointer() {
       if (auto *layoutString = getLayoutString()) {
-        B.add(layoutString);
+        B.addSignedPointer(layoutString,
+                           IGM.getOptions().PointerAuth.TypeLayoutString,
+                           PointerAuthEntity::Special::TypeLayoutString);
       } else {
         B.addNullPointer(IGM.Int8PtrTy);
       }

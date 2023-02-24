@@ -207,6 +207,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Relative protocol witness table descriminator.
   PointerAuthSchema RelativeProtocolWitnessTable;
+
+  /// Type layout string descriminator.
+  PointerAuthSchema TypeLayoutString;
 };
 
 enum class JITDebugArtifact : unsigned {

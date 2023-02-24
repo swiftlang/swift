@@ -310,7 +310,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_objc_superclass                                        \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             swift::SpecialPointerAuthDiscriminators::ObjCSuperclass)
-#define __ptrauth_swift_nonunique_extended_existential_type_shape                        \
+#define __ptrauth_swift_nonunique_extended_existential_type_shape              \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape)
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer)         \
