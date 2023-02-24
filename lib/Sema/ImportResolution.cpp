@@ -918,6 +918,41 @@ CheckInconsistentSPIOnlyImportsRequest::evaluate(
 }
 
 evaluator::SideEffect
+CheckInconsistentAccessLevelOnImport::evaluate(
+    Evaluator &evaluator, SourceFile *SF) const {
+
+  auto mod = SF->getParentModule();
+  auto diagnose = [mod](const ImportDecl *implicitImport,
+                        const ImportDecl *otherImport) {
+    auto otherAccessLevel = otherImport->getAccessLevel();
+
+    auto &diags = mod->getDiags();
+    {
+      InFlightDiagnostic error =
+        diags.diagnose(implicitImport, diag::inconsistent_implicit_access_level_on_import,
+                       implicitImport->getModule()->getName(), otherAccessLevel);
+      error.fixItInsert(implicitImport->getStartLoc(),
+                        diag::inconsistent_implicit_access_level_on_import_fixit,
+                        otherAccessLevel);
+    }
+
+    SourceLoc accessLevelLoc = otherImport->getStartLoc();
+    if (auto attr = otherImport->getAttrs().getAttribute<AccessControlAttr>())
+      accessLevelLoc = attr->getLocation();
+    diags.diagnose(accessLevelLoc,
+                   diag::inconsistent_implicit_access_level_on_import_here,
+                   otherAccessLevel);
+  };
+
+  auto predicate = [](ImportDecl *decl) {
+    return !decl->isAccessLevelImplicit();
+  };
+
+  findInconsistentImportsAcrossModule(mod, predicate, diagnose);
+  return {};
+}
+
+evaluator::SideEffect
 CheckInconsistentWeakLinkedImportsRequest::evaluate(Evaluator &evaluator,
                                                     ModuleDecl *mod) const {
   if (!moduleHasAnyImportsMatchingFlag(mod, ImportFlags::WeakLinked))
