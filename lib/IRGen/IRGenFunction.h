@@ -103,6 +103,16 @@ public:
   void emitBBForReturn();
   bool emitBranchToReturnBB();
 
+  llvm::BasicBlock *createExceptionUnwindBlock();
+
+  void setCallsThunksWithForeignExceptionTraps() {
+    callsAnyAlwaysInlineThunksWithForeignExceptionTraps = true;
+  }
+
+  void createExceptionTrapScope(
+      llvm::function_ref<void(llvm::BasicBlock *, llvm::BasicBlock *)>
+          invokeEmitter);
+
   void emitAllExtractValues(llvm::Value *aggValue, llvm::StructType *type,
                             Explosion &out);
 
@@ -195,6 +205,14 @@ private:
 
   /// The unique block that calls @llvm.coro.end.
   llvm::BasicBlock *CoroutineExitBlock = nullptr;
+
+  /// The blocks that handle thrown exceptions from all throwing foreign calls
+  /// in this function.
+  llvm::SmallVector<llvm::BasicBlock *, 4> ExceptionUnwindBlocks;
+
+  /// True if this function calls any always inline thunks that have a foreign
+  /// exception trap.
+  bool callsAnyAlwaysInlineThunksWithForeignExceptionTraps = false;
 
 public:
   void emitCoroutineOrAsyncExit();

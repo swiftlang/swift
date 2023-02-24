@@ -1,4 +1,4 @@
-// RUN: %swift -I %S/Inputs -enable-experimental-cxx-interop -enable-objc-interop -emit-ir %s | %FileCheck %s
+// RUN: %swift -I %S/Inputs -enable-experimental-cxx-interop -enable-objc-interop -emit-ir %s -Xcc -fignore-exceptions | %FileCheck %s
 
 import AnonymousUnionPartlyInvalid
 
