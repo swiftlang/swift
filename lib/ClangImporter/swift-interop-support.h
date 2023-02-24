@@ -1,4 +1,4 @@
-//===--- cxx-interop.h - C++ and Swift Interop ------------------*- C++ -*-===//
+//===--- swift-interop-support.h - C++ and Swift Interop --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,8 +14,8 @@
 // codebases that interoperate with Swift.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_CLANGIMPORTER_CXX_INTEROP_H
-#define SWIFT_CLANGIMPORTER_CXX_INTEROP_H
+#ifndef SWIFT_CLANGIMPORTER_SWIFT_INTEROP_SUPPORT_H
+#define SWIFT_CLANGIMPORTER_SWIFT_INTEROP_SUPPORT_H
 
 #define SELF_CONTAINED __attribute__((swift_attr("import_owned")))
 #define SAFE_TO_IMPORT __attribute__((swift_attr("import_unsafe")))
@@ -28,4 +28,4 @@
 
 #define SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
 
-#endif // SWIFT_CLANGIMPORTER_CXX_INTEROP_H
+#endif // SWIFT_CLANGIMPORTER_SWIFT_INTEROP_SUPPORT_H
