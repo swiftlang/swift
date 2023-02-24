@@ -955,9 +955,17 @@ private:
   // emitted.
   llvm::DenseMap<llvm::GlobalVariable*, llvm::CallInst*> AsyncCoroIDsForPadding;
 
+  /// The personality function used for foreign exception handling in this
+  /// module.
+  llvm::Function *foreignExceptionHandlingPersonalityFunc = nullptr;
+
+public:
+  /// The set of emitted foreign function thunks that trap on exception in the
+  /// underlying call that the thunk dispatches.
+  llvm::SmallPtrSet<llvm::Function *, 4>
+      emittedForeignFunctionThunksWithExceptionTraps;
 
 //--- Types -----------------------------------------------------------------
-public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D, ProtocolInfoKind kind);
 
   // Not strictly a type operation, but similar.
@@ -1800,6 +1808,10 @@ public:
   /// the SIL function is correctly lowered even if the lowering passes do not
   /// run on the SIL module that owns this function.
   void lowerSILFunction(SILFunction *f);
+
+  llvm::Function *getForeignExceptionHandlingPersonalityFunc();
+
+  bool isForeignExceptionHandlingEnabled() const;
 
 private:
   llvm::Constant *
