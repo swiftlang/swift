@@ -752,7 +752,7 @@ func expandAttachedMacroInProcess(
       // the existential.
       func expandConformanceMacro<Node: DeclGroupSyntax>(
         _ node: Node
-      ) throws -> [(TypeSyntax, WhereClauseSyntax?)] {
+      ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
         return try attachedMacro.expansion(
           of: sourceManager.detach(
             customAttrNode,

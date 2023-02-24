@@ -1018,7 +1018,7 @@ public struct EquatableMacro: ConformanceMacro {
     of node: AttributeSyntax,
     providingConformancesOf decl: some DeclGroupSyntax,
     in context: some MacroExpansionContext
-  ) throws -> [(TypeSyntax, WhereClauseSyntax?)] {
+  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
     let protocolName: TypeSyntax = "Equatable"
     return [(protocolName, nil)]
   }
