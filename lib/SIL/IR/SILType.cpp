@@ -121,7 +121,10 @@ bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
 bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
   const TypeLowering &tyLowering = F.getTypeLowering(contextType);
-  return !tyLowering.isTrivial() || tyLowering.isOrContainsRawPointer();
+  bool result = !tyLowering.isTrivial() || tyLowering.isOrContainsRawPointer();
+  assert((result || !isFunctionTypeWithContext()) &&
+         "a function type with context must either be non trivial or marked as containing a pointer");
+  return result;
 }
 
 bool SILType::isEmpty(const SILFunction &F) const {
