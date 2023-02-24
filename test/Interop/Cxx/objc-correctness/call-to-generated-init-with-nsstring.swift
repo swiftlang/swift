@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CxxClassWithNSStringInit -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-objc-interop | %FileCheck -check-prefix=CHECK-IDE-TEST %s
-// RUN: %target-swift-frontend -I %S/Inputs -enable-experimental-cxx-interop -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %S/Inputs -enable-experimental-cxx-interop -emit-ir %s -Xcc -fignore-exceptions | %FileCheck %s
 
 
 // REQUIRES: objc_interop
