@@ -955,7 +955,7 @@ bool SILDeclRef::isBackDeployed() const {
 
   auto *decl = getDecl();
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl))
-    return afd->isBackDeployed();
+    return afd->isBackDeployed(getASTContext());
 
   return false;
 }

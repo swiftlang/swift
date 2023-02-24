@@ -6,8 +6,17 @@
 
 // REQUIRES: OS=macosx
 
+// CHECK: sil non_abi [serialized] [ossa] @$s11back_deploy8someFuncyyFTwB
+// CHECK: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy8someFuncyyFTwb
+// CHECK: sil [available 10.52] [ossa] @$s11back_deploy8someFuncyyF
 @backDeployed(before: macOS 10.52)
 public func someFunc() {}
+
+// CHECK-NOT: @$s11back_deploy0A13DeployedOniOSyyFTwB
+// CHECK-NOT: @$s11back_deploy0A13DeployedOniOSyyFTwb
+// CHECK: sil [ossa] @$s11back_deploy0A13DeployedOniOSyyF
+@backDeployed(before: iOS 13.13)
+public func backDeployedOniOS() {}
 
 public struct S<T> {
   @usableFromInline var _x: T
@@ -28,6 +37,8 @@ func resilientCaller(_ s: inout S<Z>) {
   // CHECK-BACK-DEPLOY: function_ref @$s11back_deploy8someFuncyyFTwb : $@convention(thin) () -> ()
   // CHECK-NATIVE: function_ref @$s11back_deploy8someFuncyyF : $@convention(thin) () -> ()
   someFunc()
+  // CHECK: function_ref @$s11back_deploy0A13DeployedOniOSyyF : $@convention(thin) () -> ()
+  backDeployedOniOS()
   // CHECK-BACK-DEPLOY: function_ref @$s11back_deploy1SV1xxvgTwb : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @out τ_0_0
   // CHECK-NATIVE: function_ref @$s11back_deploy1SV1xxvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @out τ_0_0
   _ = s.x
@@ -41,6 +52,8 @@ func resilientCaller(_ s: inout S<Z>) {
 func inlinableCaller(_ s: inout S<Z>) {
   // CHECK: function_ref @$s11back_deploy8someFuncyyFTwb : $@convention(thin) () -> ()
   someFunc()
+  // CHECK: function_ref @$s11back_deploy0A13DeployedOniOSyyF : $@convention(thin) () -> ()
+  backDeployedOniOS()
   // CHECK: function_ref @$s11back_deploy1SV1xxvgTwb : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @out τ_0_0
   _ = s.x
   // CHECK: function_ref @$s11back_deploy1SV1xxvsTwb : $@convention(method) <τ_0_0> (@in τ_0_0, @inout S<τ_0_0>) -> ()
@@ -52,6 +65,8 @@ func inlinableCaller(_ s: inout S<Z>) {
 func aeicCaller(_ s: inout S<Z>) {
   // CHECK: function_ref @$s11back_deploy8someFuncyyFTwb : $@convention(thin) () -> ()
   someFunc()
+  // CHECK: function_ref @$s11back_deploy0A13DeployedOniOSyyF : $@convention(thin) () -> ()
+  backDeployedOniOS()
   // CHECK: function_ref @$s11back_deploy1SV1xxvgTwb : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @out τ_0_0
   _ = s.x
   // CHECK: function_ref @$s11back_deploy1SV1xxvsTwb : $@convention(method) <τ_0_0> (@in τ_0_0, @inout S<τ_0_0>) -> ()
@@ -63,6 +78,8 @@ func aeicCaller(_ s: inout S<Z>) {
 public func backDeployedCaller(_ s: inout S<Z>) {
   // CHECK: function_ref @$s11back_deploy8someFuncyyFTwb : $@convention(thin) () -> ()
   someFunc()
+  // CHECK: function_ref @$s11back_deploy0A13DeployedOniOSyyF : $@convention(thin) () -> ()
+  backDeployedOniOS()
   // CHECK: function_ref @$s11back_deploy1SV1xxvgTwb : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @out τ_0_0
   _ = s.x
   // CHECK: function_ref @$s11back_deploy1SV1xxvsTwb : $@convention(method) <τ_0_0> (@in τ_0_0, @inout S<τ_0_0>) -> ()
