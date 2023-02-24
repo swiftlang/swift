@@ -327,7 +327,10 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 
   public func _customLastIndexOfEquatableElement(_ element: UInt8) -> Index?? {
-    guard let ptr = baseAddress else { return Optional(nil) }
+    // Benchmarks show there's no benefit for this optimization for short buffer
+    guard count > 64 else { return nil }
+
+    guard let ptr = baseAddress { return Optional(nil) }
 
     let address = Int(bitPattern: ptr)
 
