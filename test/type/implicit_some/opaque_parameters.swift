@@ -64,7 +64,7 @@ func consumingB(fn: FnType<P>) { } // expected-error{{'some' cannot appear in pa
 
 // TO-DO Handle plain generic opaque parameters
 func takePrimaryCollections(
-  _ strings:some Collection<String>,
+  _ strings:some  Collection<String>,
   _ ints : some Collection<Int>
 ) {
   for s in strings {
