@@ -1694,7 +1694,23 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
 
   if (match.Witness->getAttrs().isUnavailable(getASTContext()) &&
       !requirement->getAttrs().isUnavailable(getASTContext())) {
-    return CheckKind::WitnessUnavailable;
+    auto nominalOrExtensionIsUnavailable = [&]() {
+      if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
+        if (extension->getAttrs().isUnavailable(getASTContext()))
+          return true;
+      }
+
+      if (auto adoptingNominal = DC->getSelfNominalTypeDecl()) {
+        if (adoptingNominal->getAttrs().isUnavailable(getASTContext()))
+          return true;
+      }
+
+      return false;
+    };
+
+    // Allow unavailable nominals or extension to have unavailable witnesses.
+    if (!nominalOrExtensionIsUnavailable())
+      return CheckKind::WitnessUnavailable;
   }
 
   return CheckKind::Success;

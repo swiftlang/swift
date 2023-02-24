@@ -41,6 +41,28 @@ struct ConformsToP2 {
 extension ConformsToP2: P {} // expected-error{{type 'ConformsToP2' does not conform to protocol 'P'}}
 // expected-error@-1 {{unavailable instance method 'foo(bar:)' was used to satisfy a requirement of protocol 'P'}}
 
+@available(*, unavailable)
+struct ConformsToP3: P {
+  func foo(bar: Foo) { }
+}
+
+// Ok, an unavailable decl should be allowed to witness a requirement when the
+// conforming type is itself unavailable.
+@available(*, unavailable)
+struct ConformsToP4: P {
+  @available(*, unavailable)
+  func foo(bar: Foo) { }
+}
+
+struct ConformsToP5 {}
+
+// Ok, an unavailable decl should be allowed to witness a requirement when the
+// conformance extension is itself unavailable.
+@available(*, unavailable)
+extension ConformsToP5: P {
+  @available(*, unavailable)
+  func foo(bar: Foo) { }
+}
 
 // Include message string from @available attribute if provided
 protocol Unavail {
