@@ -52,6 +52,9 @@ enum class MacroRole: uint32_t {
   /// An attached macro that generates declarations that are peers
   /// of the declaration the macro is attached to.
   Peer = 0x20,
+  /// An attached macro that adds conformances to the declaration the
+  /// macro is attached to.
+  Conformance = 0x40,
 };
 
 /// The contexts in which a particular macro declaration can be used.

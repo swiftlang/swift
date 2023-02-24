@@ -2659,6 +2659,7 @@ getActualMacroRole(uint8_t context) {
   CASE(MemberAttribute)
   CASE(Member)
   CASE(Peer)
+  CASE(Conformance)
 #undef CASE
   }
   return None;

@@ -383,18 +383,33 @@ DeclAttributes Decl::getSemanticAttrs() const {
 void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<Decl *>(this);
+  SourceManager &sourceMgr = ctx.SourceMgr;
+  auto *moduleDecl = getModuleContext();
+
   auto peerBuffers =
       evaluateOrDefault(ctx.evaluator,
                         ExpandPeerMacroRequest{mutableThis},
                         {});
 
-  SourceManager &sourceMgr = ctx.SourceMgr;
-  auto *moduleDecl = getModuleContext();
   for (auto bufferID : peerBuffers) {
     auto startLoc = sourceMgr.getLocForBufferStart(bufferID);
     auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
     for (auto *peer : sourceFile->getTopLevelDecls()) {
       callback(peer);
+    }
+  }
+
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(mutableThis)) {
+    auto conformanceBuffers =
+        evaluateOrDefault(ctx.evaluator,
+                          ExpandConformanceMacros{nominal},
+                          {});
+    for (auto bufferID : conformanceBuffers) {
+      auto startLoc = sourceMgr.getLocForBufferStart(bufferID);
+      auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
+      for (auto *extension : sourceFile->getTopLevelDecls()) {
+        callback(extension);
+      }
     }
   }
 
@@ -9810,6 +9825,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::Peer:
     return "peer";
+
+  case MacroRole::Conformance:
+    return "conformance";
   }
 }
 
@@ -9856,7 +9874,8 @@ static MacroRoles attachedMacroRoles = (MacroRoles() |
                                         MacroRole::Accessor |
                                         MacroRole::MemberAttribute |
                                         MacroRole::Member |
-                                        MacroRole::Peer);
+                                        MacroRole::Peer |
+                                        MacroRole::Conformance);
 
 bool swift::isFreestandingMacro(MacroRoles contexts) {
   return bool(contexts & freestandingMacroRoles);
@@ -10035,6 +10054,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
+  case GeneratedSourceInfo::ConformanceMacroExpansion:
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
     return origDC;

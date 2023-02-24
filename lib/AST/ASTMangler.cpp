@@ -3771,7 +3771,8 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
-  case GeneratedSourceInfo::PeerMacroExpansion: {
+  case GeneratedSourceInfo::PeerMacroExpansion:
+  case GeneratedSourceInfo::ConformanceMacroExpansion: {
     auto decl = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
       .get<Decl *>();
     auto attr = generatedSourceInfo->attachedMacroCustomAttr;
@@ -3791,6 +3792,10 @@ void ASTMangler::appendMacroExpansionContext(
 
     case GeneratedSourceInfo::PeerMacroExpansion:
       role = MacroRole::Peer;
+      break;
+
+    case GeneratedSourceInfo::ConformanceMacroExpansion:
+      role = MacroRole::Conformance;
       break;
 
     default:
@@ -3850,6 +3855,10 @@ void ASTMangler::appendMacroExpansionOperator(
 
   case MacroRole::Peer:
     appendOperator("fMp", Index(discriminator));
+    break;
+
+  case MacroRole::Conformance:
+    appendOperator("fMc", Index(discriminator));
     break;
   }
 }
