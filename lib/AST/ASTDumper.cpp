@@ -4231,7 +4231,13 @@ namespace {
     }
 
     void visitLValueType(LValueType *T, StringRef label) {
-      printCommon(label, "lvalue_type");
+      SmallString<64> name;
+      if (T->isMutable())
+        name += "mutable_";
+      else
+        name += "immutable_";
+      name += "lvalue_type";
+      printCommon(label, name);
       printRec(T->getObjectType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

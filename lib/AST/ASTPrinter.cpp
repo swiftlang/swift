@@ -6610,6 +6610,10 @@ public:
 
   void visitLValueType(LValueType *T) {
     Printer << "@lvalue ";
+    if (T->isMutable())
+      Printer << "@mutable ";
+    else
+      Printer << "@immutable ";
     visit(T->getObjectType());
   }
 

@@ -122,6 +122,7 @@ public:
   /// Note that the property polarities should be chosen so that 0 is
   /// the correct default value and bitwise-or correctly merges things.
   enum Property : unsigned {
+    // clang-format off
     /// This type expression contains a TypeVariableType.
     HasTypeVariable      = 0x01,
 
@@ -171,7 +172,8 @@ public:
     /// This type contains an ElementArchetype.
     HasElementArchetype = 0x4000,
 
-    Last_Property = HasElementArchetype
+    Last_Property = HasElementArchetype,
+    // clang-format on
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -278,9 +280,7 @@ public:
   }
 
   /// Test for a particular property in this set.
-  bool operator&(Property prop) const {
-    return Bits & prop;
-  }
+  bool operator&(Property prop) const { return Bits & prop; }
 };
 
 inline RecursiveTypeProperties operator~(RecursiveTypeProperties::Property P) {
@@ -5761,16 +5761,20 @@ END_CAN_TYPE_WRAPPER(BuiltinTupleType, NominalType)
 /// to their object type.
 class LValueType : public TypeBase {
   Type ObjectTy;
+  bool IsMutable;
 
-  LValueType(Type objectTy, const ASTContext *canonicalContext,
+  LValueType(Type objectTy, bool isMutable,
+             const ASTContext *canonicalContext,
              RecursiveTypeProperties properties)
     : TypeBase(TypeKind::LValue, canonicalContext, properties),
-      ObjectTy(objectTy) {}
+      ObjectTy(objectTy), IsMutable(isMutable) {}
 
 public:
-  static LValueType *get(Type type);
+  static LValueType *get(Type type, bool isMutable = true);
 
   Type getObjectType() const { return ObjectTy; }
+
+  bool isMutable() const { return IsMutable; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *type) {
@@ -5779,8 +5783,8 @@ public:
 };
 BEGIN_CAN_TYPE_WRAPPER(LValueType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getObjectType)
-  static CanLValueType get(CanType type) {
-    return CanLValueType(LValueType::get(type));
+  static CanLValueType get(CanType type, bool isMutable) {
+    return CanLValueType(LValueType::get(type, isMutable));
   }
 END_CAN_TYPE_WRAPPER(LValueType, Type)
   
