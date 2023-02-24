@@ -1941,6 +1941,11 @@ ManglingError Remangler::mangleDependentPseudogenericSignature(Node *node,
   return mangleDependentGenericSignature(node, depth + 1);
 }
 
+ManglingError Remangler::mangleDependentGenericParamPackMarker(Node *node,
+                                                               unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleDependentGenericSignature(Node *node,
                                                          unsigned depth) {
   auto i = node->begin(), e = node->end();

@@ -368,6 +368,7 @@ private:
     case Node::Kind::DefaultAssociatedConformanceAccessor:
     case Node::Kind::DependentAssociatedTypeRef:
     case Node::Kind::DependentGenericSignature:
+    case Node::Kind::DependentGenericParamPackMarker:
     case Node::Kind::DependentGenericParamCount:
     case Node::Kind::DependentGenericConformanceRequirement:
     case Node::Kind::DependentGenericLayoutRequirement:
@@ -984,21 +985,60 @@ private:
 
   void printGenericSignature(NodePointer Node, unsigned depth) {
     Printer << '<';
-    
-    unsigned gpDepth = 0;
+
     unsigned numChildren = Node->getNumChildren();
-    for (;
-         gpDepth < numChildren
-           && Node->getChild(gpDepth)->getKind()
-               == Node::Kind::DependentGenericParamCount;
-         ++gpDepth) {
+
+    unsigned numGenericParams = 0;
+    for (; numGenericParams < numChildren; ++numGenericParams) {
+      if (Node->getChild(numGenericParams)->getKind()
+               != Node::Kind::DependentGenericParamCount) {
+        break;
+      }
+    }
+
+    unsigned firstRequirement = numGenericParams;
+    for (; firstRequirement < numChildren; ++firstRequirement) {
+      auto child = Node->getChild(firstRequirement);
+      if (child->getKind() == Node::Kind::Type)
+        child = child->getChild(0);
+      if (child->getKind() != Node::Kind::DependentGenericParamPackMarker) {
+        break;
+      }
+    }
+
+    auto isGenericParamPack = [&](unsigned depth, unsigned index) {
+      for (unsigned i = numGenericParams; i < firstRequirement; ++i) {
+        auto child = Node->getChild(i);
+        if (child->getKind() != Node::Kind::DependentGenericParamPackMarker)
+          continue;
+        child = child->getChild(0);
+
+        if (child->getKind() != Node::Kind::Type)
+          continue;
+
+        child = child->getChild(0);
+        if (child->getKind() != Node::Kind::DependentGenericParamType)
+          continue;
+
+        if (index == child->getChild(0)->getIndex() &&
+            depth == child->getChild(1)->getIndex()) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    unsigned gpDepth = 0;
+    for (; gpDepth < numGenericParams; ++gpDepth) {
       if (gpDepth != 0)
         Printer << "><";
-      
+
       unsigned count = Node->getChild(gpDepth)->getIndex();
       for (unsigned index = 0; index < count; ++index) {
         if (index != 0)
           Printer << ", ";
+
         // Limit the number of printed generic parameters. In practice this
         // it will never be exceeded. The limit is only important for malformed
         // symbols where count can be really huge.
@@ -1006,17 +1046,21 @@ private:
           Printer << "...";
           break;
         }
+
+        if (isGenericParamPack(gpDepth, index))
+          Printer << "each ";
+
         // FIXME: Depth won't match when a generic signature applies to a
         // method in generic type context.
         Printer << Options.GenericParameterName(gpDepth, index);
       }
     }
-    
-    if (gpDepth != numChildren) {
+
+    if (firstRequirement != numChildren) {
       if (Options.DisplayWhereClauses) {
         Printer << " where ";
-        for (unsigned i = gpDepth; i < numChildren; ++i) {
-          if (i > gpDepth)
+        for (unsigned i = firstRequirement; i < numChildren; ++i) {
+          if (i > firstRequirement)
             Printer << ", ";
           print(Node->getChild(i), depth + 1);
         }
@@ -2681,6 +2725,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   }
   case Node::Kind::DependentGenericParamCount:
+  case Node::Kind::DependentGenericParamPackMarker:
     printer_unreachable("should be printed as a child of a "
                         "DependentGenericSignature");
   case Node::Kind::DependentGenericConformanceRequirement: {

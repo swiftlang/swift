@@ -24,7 +24,7 @@ func receive_simple_owned<T...>(_ args: repeat __owned each T) {}
 // CHECK-NEXT:    pack_element_set [[STRING_TEMP]] : $*String into [[STRING_INDEX]] of [[PACK]] : $*Pack{Int, Float, String}
 //   Perform the call.
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[FN:%.*]] = function_ref @$s4main14receive_simpleyyxxQplF : $@convention(thin) <τ_0_0...> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
+// CHECK-NEXT:    [[FN:%.*]] = function_ref @$s4main14receive_simpleyyxxQpRvzlF : $@convention(thin) <τ_0_0...> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
 // CHECK-NEXT:    apply [[FN]]<Pack{Int, Float, String}>([[PACK]])
 //   Clean up.
 // CHECK-NEXT:    destroy_addr [[STRING_TEMP]] : $*String
@@ -57,7 +57,7 @@ func scalar_test0(i: Int, f: Float, s: String) {
 // CHECK-NEXT:    pack_element_set [[STRING_TEMP]] : $*String into [[STRING_INDEX]] of [[PACK]] : $*Pack{Int, Float, String}
 //   Perform the call.
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[FN:%.*]] = function_ref  @$s4main20receive_simple_ownedyyxxQpnlF : $@convention(thin) <τ_0_0...> (@pack_owned Pack{repeat each τ_0_0}) -> ()
+// CHECK-NEXT:    [[FN:%.*]] = function_ref  @$s4main20receive_simple_ownedyyxxQpnRvzlF : $@convention(thin) <τ_0_0...> (@pack_owned Pack{repeat each τ_0_0}) -> ()
 // CHECK-NEXT:    apply [[FN]]<Pack{Int, Float, String}>([[PACK]])
 //   Clean up.
 // CHECK-NEXT:    dealloc_stack [[STRING_TEMP]] : $*String
