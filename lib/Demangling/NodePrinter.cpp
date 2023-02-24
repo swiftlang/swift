@@ -982,6 +982,49 @@ private:
     }
   }
 
+  void printGenericSignature(NodePointer Node, unsigned depth) {
+    Printer << '<';
+    
+    unsigned gpDepth = 0;
+    unsigned numChildren = Node->getNumChildren();
+    for (;
+         gpDepth < numChildren
+           && Node->getChild(gpDepth)->getKind()
+               == Node::Kind::DependentGenericParamCount;
+         ++gpDepth) {
+      if (gpDepth != 0)
+        Printer << "><";
+      
+      unsigned count = Node->getChild(gpDepth)->getIndex();
+      for (unsigned index = 0; index < count; ++index) {
+        if (index != 0)
+          Printer << ", ";
+        // Limit the number of printed generic parameters. In practice this
+        // it will never be exceeded. The limit is only important for malformed
+        // symbols where count can be really huge.
+        if (index >= 128) {
+          Printer << "...";
+          break;
+        }
+        // FIXME: Depth won't match when a generic signature applies to a
+        // method in generic type context.
+        Printer << Options.GenericParameterName(gpDepth, index);
+      }
+    }
+    
+    if (gpDepth != numChildren) {
+      if (Options.DisplayWhereClauses) {
+        Printer << " where ";
+        for (unsigned i = gpDepth; i < numChildren; ++i) {
+          if (i > gpDepth)
+            Printer << ", ";
+          print(Node->getChild(i), depth + 1);
+        }
+      }
+    }
+    Printer << '>';
+  }
+
   void printFunctionSigSpecializationParams(NodePointer Node, unsigned depth);
 
   void printSpecializationPrefix(NodePointer node, StringRef Description,
@@ -2634,46 +2677,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       
   case Node::Kind::DependentPseudogenericSignature:
   case Node::Kind::DependentGenericSignature: {
-    Printer << '<';
-    
-    unsigned depth = 0;
-    unsigned numChildren = Node->getNumChildren();
-    for (;
-         depth < numChildren
-           && Node->getChild(depth)->getKind()
-               == Node::Kind::DependentGenericParamCount;
-         ++depth) {
-      if (depth != 0)
-        Printer << "><";
-      
-      unsigned count = Node->getChild(depth)->getIndex();
-      for (unsigned index = 0; index < count; ++index) {
-        if (index != 0)
-          Printer << ", ";
-        // Limit the number of printed generic parameters. In practice this
-        // it will never be exceeded. The limit is only important for malformed
-        // symbols where count can be really huge.
-        if (index >= 128) {
-          Printer << "...";
-          break;
-        }
-        // FIXME: Depth won't match when a generic signature applies to a
-        // method in generic type context.
-        Printer << Options.GenericParameterName(depth, index);
-      }
-    }
-    
-    if (depth != numChildren) {
-      if (Options.DisplayWhereClauses) {
-        Printer << " where ";
-        for (unsigned i = depth; i < numChildren; ++i) {
-          if (i > depth)
-            Printer << ", ";
-          print(Node->getChild(i), depth + 1);
-        }
-      }
-    }
-    Printer << '>';
+    printGenericSignature(Node, depth);
     return nullptr;
   }
   case Node::Kind::DependentGenericParamCount:
