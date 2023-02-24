@@ -42,8 +42,11 @@ protected:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
 
   WitnessSizedTypeInfo(llvm::Type *type, Alignment align, IsTriviallyDestroyable_t pod,
-                       IsBitwiseTakable_t bt, IsABIAccessible_t abi)
-    : super(type, align, pod, bt, IsNotFixedSize, abi,
+                       IsBitwiseTakable_t bt,
+                       IsCopyable_t cp,
+                       IsABIAccessible_t abi)
+    : super(type, align, pod, bt, cp,
+            IsNotFixedSize, abi,
             SpecialTypeInfoKind::None) {}
 
 private:

@@ -276,7 +276,9 @@ protected:
                           SpareBitVector spareBits,
                           Alignment align, T &&...args)
     : SingleScalarTypeInfo<Derived, Base>(storage, size, spareBits, align,
-                                          IsTriviallyDestroyable, IsFixedSize,
+                                          IsTriviallyDestroyable,
+                                          IsCopyable,
+                                          IsFixedSize,
                                           ::std::forward<T>(args)...) {}
 
   const Derived &asDerived() const {

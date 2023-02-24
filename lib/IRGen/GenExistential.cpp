@@ -680,6 +680,7 @@ namespace {
                                                 ty, size, std::move(spareBits), \
                                                 align, IsNotTriviallyDestroyable, \
                                                 IsNotBitwiseTakable, \
+                                                IsCopyable, \
                                                 IsFixedSize), \
         IsOptional(isOptional) {} \
     TypeLayoutEntry \
@@ -735,7 +736,10 @@ namespace {
         ReferenceCounting refcounting, \
         bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
-                                      spareBits, align, IsNotTriviallyDestroyable, IsFixedSize), \
+                                      spareBits, align, \
+                                      IsNotTriviallyDestroyable, \
+                                      IsCopyable, \
+                                      IsFixedSize), \
         Refcounting(refcounting), ValueType(valueTy), IsOptional(isOptional) { \
       assert(refcounting == ReferenceCounting::Native || \
              refcounting == ReferenceCounting::Unknown); \
@@ -869,7 +873,8 @@ class OpaqueExistentialTypeInfo final :
                             Alignment align)
     : super(protocols, ty, size,
             std::move(spareBits), align,
-            IsNotTriviallyDestroyable, IsBitwiseTakable, IsFixedSize) {}
+            IsNotTriviallyDestroyable, IsBitwiseTakable, IsCopyable,
+            IsFixedSize) {}
 
 public:
   OpaqueExistentialLayout getLayout() const {
@@ -1360,7 +1365,9 @@ class ExistentialMetatypeTypeInfo final
                               Alignment align,
                               const LoadableTypeInfo &metatypeTI)
     : ScalarExistentialTypeInfoBase(storedProtocols, ty, size,
-                                    std::move(spareBits), align, IsTriviallyDestroyable,
+                                    std::move(spareBits), align,
+                                    IsTriviallyDestroyable,
+                                    IsCopyable,
                                     IsFixedSize),
       MetatypeTI(metatypeTI) {}
 

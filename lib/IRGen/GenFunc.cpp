@@ -450,6 +450,7 @@ namespace {
                          SpareBitVector &&spareBits,
                          IsTriviallyDestroyable_t pod, IsBitwiseTakable_t bt, Size captureOffset)
       : IndirectTypeInfo(type, size, std::move(spareBits), align, pod, bt,
+                         IsCopyable,
                          IsFixedSize),
         CaptureOffset(captureOffset)
     {}

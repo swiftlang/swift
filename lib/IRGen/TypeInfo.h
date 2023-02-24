@@ -99,7 +99,7 @@ protected:
     uint64_t OpaqueBits;
 
     SWIFT_INLINE_BITFIELD_BASE(TypeInfo,
-                               bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+3+1+1,
+                             bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+1+3+1+1,
       /// The kind of supplemental API this type has, if any.
       Kind : bitmax(NumSpecialTypeInfoKindBits,8),
 
@@ -108,9 +108,12 @@ protected:
 
       /// Whether this type is known to be trivially destructible.
       TriviallyDestroyable : 1,
-
+      
       /// Whether this type is known to be bitwise-takable.
       BitwiseTakable : 1,
+
+      /// Whether this type is known to be copyable.
+      Copyable : 1,
 
       /// An arbitrary discriminator for the subclass.  This is useful for e.g.
       /// distinguishing between different TypeInfos that all implement the same
@@ -144,6 +147,7 @@ protected:
 
   TypeInfo(llvm::Type *Type, Alignment A, IsTriviallyDestroyable_t pod,
            IsBitwiseTakable_t bitwiseTakable,
+           IsCopyable_t copyable,
            IsFixedSize_t alwaysFixedSize,
            IsABIAccessible_t abiAccessible,
            SpecialTypeInfoKind stik) : StorageType(Type) {
@@ -153,6 +157,7 @@ protected:
     Bits.TypeInfo.AlignmentShift = llvm::Log2_32(A.getValue());
     Bits.TypeInfo.TriviallyDestroyable = pod;
     Bits.TypeInfo.BitwiseTakable = bitwiseTakable;
+    Bits.TypeInfo.Copyable = copyable;
     Bits.TypeInfo.SubclassKind = InvalidSubclassKind;
     Bits.TypeInfo.AlwaysFixedSize = alwaysFixedSize;
     Bits.TypeInfo.ABIAccessible = abiAccessible;
@@ -206,10 +211,16 @@ public:
     return IsABIAccessible_t(Bits.TypeInfo.ABIAccessible);
   }
 
-  /// Whether this type is known to be POD, i.e. to not require any
-  /// particular action on copy or destroy.
+  /// Whether this type is known to be trivially destroyable, i.e. to not
+  /// require any particular action on destroy. If the type is also copyable,
+  /// this implies that copying is also bitwise, i.e., equivalent to memcpy.
   IsTriviallyDestroyable_t isTriviallyDestroyable(ResilienceExpansion expansion) const {
     return IsTriviallyDestroyable_t(Bits.TypeInfo.TriviallyDestroyable);
+  }
+  
+  /// Whether this type is known to be copyable.
+  IsCopyable_t isCopyable(ResilienceExpansion expansion) const {
+    return IsCopyable_t(Bits.TypeInfo.Copyable);
   }
   
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"

@@ -23,10 +23,6 @@ struct Butt {
     // by making this stored property private
     private var _value: C
 
-    // TODO: prevent IRGen from reusing value witnesses or box metadata
-    // for the common single-refcounted layout
-    private var _x: Bool = false
-
     var value: Int { return _value.value }
 
     deinit { print("Butt died \(value)") }

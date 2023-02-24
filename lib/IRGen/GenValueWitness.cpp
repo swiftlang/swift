@@ -852,6 +852,7 @@ ValueWitnessFlags getValueWitnessFlags(const TypeInfo *TI, SILType concreteType,
     assert(isBitwiseTakable || !isInline);
     flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
                 .withPOD(fixedTI->isTriviallyDestroyable(ResilienceExpansion::Maximal))
+                .withCopyable(fixedTI->isCopyable(ResilienceExpansion::Maximal))
                 .withInlineStorage(isInline)
                 .withBitwiseTakable(isBitwiseTakable);
   } else {
@@ -1169,6 +1170,11 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
   
   auto &ti = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(), type);
 
+    // We only have known value witness tables for copyable types currently.
+  if (!ti.isCopyable(ResilienceExpansion::Maximal)) {
+    return {};
+  }
+  
   // We only have witnesses for fixed type info.
   auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
   if (!fixedTI)

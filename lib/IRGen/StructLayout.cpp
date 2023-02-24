@@ -65,6 +65,11 @@ StructLayout::StructLayout(IRGenModule &IGM,
 
   bool nonEmpty = builder.addFields(Elements, strategy);
 
+  auto deinit = (decl && decl->getValueTypeDestructor())
+    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
+  auto copyable = (decl && decl->isMoveOnly())
+    ? IsNotCopyable : IsCopyable;
+
   // Special-case: there's nothing to store.
   // In this case, produce an opaque type;  this tends to cause lovely
   // assertions.
@@ -75,9 +80,10 @@ StructLayout::StructLayout(IRGenModule &IGM,
     headerSize = builder.getHeaderSize();
     SpareBits.clear();
     IsFixedLayout = true;
-    IsKnownTriviallyDestroyable = IsTriviallyDestroyable;
+    IsKnownTriviallyDestroyable = deinit;
     IsKnownBitwiseTakable = IsBitwiseTakable;
     IsKnownAlwaysFixedSize = IsFixedSize;
+    IsKnownCopyable = copyable;
     Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
   } else {
     MinimumAlign = builder.getAlignment();
@@ -85,9 +91,10 @@ StructLayout::StructLayout(IRGenModule &IGM,
     headerSize = builder.getHeaderSize();
     SpareBits = builder.getSpareBits();
     IsFixedLayout = builder.isFixedLayout();
-    IsKnownTriviallyDestroyable = builder.isTriviallyDestroyable();
+    IsKnownTriviallyDestroyable = deinit & builder.isTriviallyDestroyable();
     IsKnownBitwiseTakable = builder.isBitwiseTakable();
     IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
+    IsKnownCopyable = copyable & builder.isCopyable();
     if (typeToFill) {
       builder.setAsBodyOfStruct(typeToFill);
       Ty = typeToFill;

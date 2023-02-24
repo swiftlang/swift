@@ -963,7 +963,9 @@ namespace {
   /// A TypeInfo implementation for empty types.
   struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
-      : ScalarTypeInfo(ty, Size(0), SpareBitVector{}, Alignment(1), IsTriviallyDestroyable,
+      : ScalarTypeInfo(ty, Size(0), SpareBitVector{}, Alignment(1),
+                       IsTriviallyDestroyable,
+                       IsCopyable,
                        IsFixedSize) {}
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
@@ -1128,7 +1130,9 @@ namespace {
                           Size size,
                           SpareBitVector &&spareBits,
                           Alignment align)
-      : ScalarTypeInfo(storage, size, std::move(spareBits), align, IsTriviallyDestroyable,
+      : ScalarTypeInfo(storage, size, std::move(spareBits), align,
+                       IsTriviallyDestroyable,
+                       IsCopyable,
                        IsFixedSize),
         ScalarTypes(std::move(scalarTypes))
     {}
@@ -1315,7 +1319,10 @@ namespace {
                       SpareBitVector &&spareBits,
                       Alignment align)
       : ImmovableTypeInfoBase(storage, size, std::move(spareBits), align,
-                              IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsFixedSize) {}
+                              IsNotTriviallyDestroyable,
+                              IsNotBitwiseTakable,
+                              IsNotCopyable,
+                              IsFixedSize) {}
   };
 
   /// A TypeInfo implementation for address-only types which can never
@@ -1325,7 +1332,9 @@ namespace {
   public:
     OpaqueImmovableTypeInfo(llvm::Type *storage, Alignment minAlign)
       : ImmovableTypeInfoBase(storage, minAlign, IsNotTriviallyDestroyable,
-                              IsNotBitwiseTakable, IsNotFixedSize,
+                              IsNotBitwiseTakable,
+                              IsNotCopyable,
+                              IsNotFixedSize,
                               IsNotABIAccessible,
                               SpecialTypeInfoKind::None) {}
 
@@ -1814,11 +1823,11 @@ const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
 }
 
 const TypeInfo &
-TypeConverter::getResilientStructTypeInfo(IsABIAccessible_t isAccessible) {
-  auto &cache = isAccessible ? AccessibleResilientStructTI
-                             : InaccessibleResilientStructTI;
+TypeConverter::getResilientStructTypeInfo(IsCopyable_t isCopyable,
+                                          IsABIAccessible_t isAccessible) {
+  auto &cache = ResilientStructTI[(unsigned)isCopyable][(unsigned)isAccessible];
   if (cache) return *cache;
-  cache = convertResilientStruct(isAccessible);
+  cache = convertResilientStruct(isCopyable, isAccessible);
   cache->NextConverted = FirstType;
   FirstType = cache;
   return *cache;
@@ -2485,6 +2494,7 @@ public:
                     Alignment(node.Alignment),
                     IsNotTriviallyDestroyable, /* irrelevant */
                     IsNotBitwiseTakable, /* irrelevant */
+                    IsCopyable, /* irrelevant */
                     IsFixedSize /* irrelevant */),
       NumExtraInhabitants(node.NumExtraInhabitants) {}
 

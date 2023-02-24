@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -emit-ir %s | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %{python} %utils/chex.py < %s > %t/moveonly_deinit.sil
+// RUN: %target-swift-frontend -enable-experimental-move-only -emit-ir %t/moveonly_deinit.sil | %FileCheck %t/moveonly_deinit.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 import Builtin
 import Swift
@@ -10,6 +12,10 @@ sil_stage canonical
 
 class C {}
 
+// CHECK-LABEL: @{{.*}}8MOStructVWV" =
+// noncopyable, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x81_0007>
+// CHECK-32-SAME: <i32 0x81_0003>
 @_moveOnly
 struct MOStruct {
   var x: Int
@@ -18,6 +24,10 @@ struct MOStruct {
   deinit
 }
 
+// CHECK-LABEL: @{{.*}}6MOEnumOWV" =
+// noncopyable, enum, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0xA1_0007>
+// CHECK-32-SAME: <i32 0xA1_0003>
 @_moveOnly
 enum MOEnum {
   case x(Int)
@@ -26,6 +36,10 @@ enum MOEnum {
   deinit
 }
 
+// CHECK-LABEL: @{{.*}}13MOComboStructVWV" =
+// noncopyable, non-inline, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x83_0007>
+// CHECK-32-SAME: <i32 0x83_0003>
 @_moveOnly
 struct MOComboStruct {
   var a: MOStruct
@@ -33,6 +47,10 @@ struct MOComboStruct {
   var c: C
 }
 
+// CHECK-LABEL: @{{.*}}11MOComboEnumOWV" =
+// noncopyable, enum, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0xA1_0007>
+// CHECK-32-SAME: <i32 0xA1_0003>
 @_moveOnly
 enum MOComboEnum {
   case a(MOStruct)
@@ -42,6 +60,19 @@ enum MOComboEnum {
 
 // Move-only types should not share value witnesses or box metadata with
 // common layout types.
+
+// CHECK-LABEL: @{{.*}}13MOEmptyStructVWV" =
+// noncopyable, nontrivial deinit, byte aligned
+// CHECK-SAME: <i32 0x81_0000>
+@_moveOnly
+struct MOEmptyStruct {
+  deinit
+}
+
+// CHECK-LABEL: @{{.*}}15MOIntLikeStructVWV" =
+// noncopyable, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x81_0007>
+// CHECK-32-SAME: <i32 0x81_0003>
 @_moveOnly
 struct MOIntLikeStruct {
   var x: Int
@@ -49,6 +80,10 @@ struct MOIntLikeStruct {
   deinit
 }
 
+// CHECK-LABEL: @{{.*}}26MOSingleRefcountLikeStructVWV" =
+// noncopyable, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x81_0007>
+// CHECK-32-SAME: <i32 0x81_0003>
 @_moveOnly
 struct MOSingleRefcountLikeStruct {
   var x: C
@@ -56,6 +91,32 @@ struct MOSingleRefcountLikeStruct {
   deinit
 }
 
+// Even if they don't have deinits, we shouldn't share a vwt.
+
+// CHECK-LABEL: @{{.*}}21MOEmptyStructNoDeinitVWV" =
+// noncopyable, trivial deinit, byte aligned
+// CHECK-SAME: <i32 0x80_0000>
+@_moveOnly
+struct MOEmptyStructNoDeinit {
+}
+
+// CHECK-LABEL: @{{.*}}23MOIntLikeStructNoDeinitVWV" =
+// noncopyable, trivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x80_0007>
+// CHECK-32-SAME: <i32 0x80_0003>
+@_moveOnly
+struct MOIntLikeStructNoDeinit {
+  var x: Int
+}
+
+// CHECK-LABEL: @{{.*}}34MOSingleRefcountLikeStructNoDeinitVWV" =
+// noncopyable, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x81_0007>
+// CHECK-32-SAME: <i32 0x81_0003>
+@_moveOnly
+struct MOSingleRefcountLikeStructNoDeinit {
+  var x: C
+}
 
 // CHECK-LABEL: define{{.*}}@destroy_struct_value(
 // CHECK-NEXT:  entry:
@@ -152,12 +213,14 @@ entry(%0 : $MOComboStruct):
 sil @destroy_struct : $@convention(method) (@owned MOStruct) -> ()
 sil @destroy_enum : $@convention(method) (@owned MOEnum) -> ()
 sil @destroy_intlike_struct : $@convention(method) (@owned MOIntLikeStruct) -> ()
+sil @destroy_empty_struct : $@convention(method) (@owned MOEmptyStruct) -> ()
 sil @destroy_single_refcount_like_struct : $@convention(method) (@owned MOSingleRefcountLikeStruct) -> ()
 
 sil_vtable C {}
 
 sil_moveonlydeinit MOStruct { @destroy_struct }
 sil_moveonlydeinit MOEnum { @destroy_enum }
+sil_moveonlydeinit MOEmptyStruct { @destroy_empty_struct }
 sil_moveonlydeinit MOIntLikeStruct { @destroy_intlike_struct }
 sil_moveonlydeinit MOSingleRefcountLikeStruct { @destroy_single_refcount_like_struct }
 
@@ -175,5 +238,9 @@ sil_moveonlydeinit MOSingleRefcountLikeStruct { @destroy_single_refcount_like_st
 // CHECK-LABEL: define {{.*}} @"{{.*}}11MOComboEnumOwxx"
 // CHECK:         call {{.*}} @[[COMBO_ENUM_OUTLINED_DESTROY]]
 
-// C/HECK-LABEL: define {{.*}} @"{{.*}}15MOIntLikeStructVwxx"
-// C/HECK-LABEL: define {{.*}} @"{{.*}}26MOSingleRefcountLikeStructVwxx"
+// CHECK-LABEL: define {{.*}} @"{{.*}}13MOEmptyStructVwxx"
+// CHECK:         call {{.*}} @destroy_empty_struct(
+// CHECK-LABEL: define {{.*}} @"{{.*}}15MOIntLikeStructVwxx"
+// CHECK:         call {{.*}} @destroy_intlike_struct(
+// CHECK-LABEL: define {{.*}} @"{{.*}}26MOSingleRefcountLikeStructVwxx"
+// CHECK:         call {{.*}} @destroy_single_refcount_like_struct(

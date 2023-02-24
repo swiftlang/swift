@@ -6337,9 +6337,13 @@ namespace {
   public:
     FixedEnumTypeInfo(EnumImplStrategy &strategy,
                       llvm::StructType *T, Size S, SpareBitVector SB,
-                      Alignment A, IsTriviallyDestroyable_t isTriviallyDestroyable, IsBitwiseTakable_t isBT,
+                      Alignment A,
+                      IsTriviallyDestroyable_t isTriviallyDestroyable,
+                      IsBitwiseTakable_t isBT,
+                      IsCopyable_t copyable,
                       IsFixedSize_t alwaysFixedSize)
-      : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A, isTriviallyDestroyable, isBT,
+      : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
+                              isTriviallyDestroyable, isBT, copyable,
                               alwaysFixedSize) {}
   };
 
@@ -6349,9 +6353,12 @@ namespace {
     // FIXME: Derive spare bits from element layout.
     LoadableEnumTypeInfo(EnumImplStrategy &strategy,
                          llvm::StructType *T, Size S, SpareBitVector SB,
-                         Alignment A, IsTriviallyDestroyable_t isTriviallyDestroyable,
+                         Alignment A,
+                         IsTriviallyDestroyable_t isTriviallyDestroyable,
+                         IsCopyable_t copyable,
                          IsFixedSize_t alwaysFixedSize)
-      : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A, isTriviallyDestroyable,
+      : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
+                              isTriviallyDestroyable, copyable,
                               alwaysFixedSize) {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -6421,8 +6428,9 @@ namespace {
                          Alignment align,
                          IsTriviallyDestroyable_t pod,
                          IsBitwiseTakable_t bt,
+                         IsCopyable_t copy,
                          IsABIAccessible_t abiAccessible)
-      : EnumTypeInfoBase(strategy, irTy, align, pod, bt, abiAccessible) {}
+      : EnumTypeInfoBase(strategy, irTy, align, pod, bt, copy, abiAccessible) {}
   };
 
   /// TypeInfo for dynamically-sized enum types.
@@ -6431,8 +6439,10 @@ namespace {
   {
   public:
     ResilientEnumTypeInfo(EnumImplStrategy &strategy,
-                          llvm::Type *irTy, IsABIAccessible_t abiAccessible)
-      : EnumTypeInfoBase(strategy, irTy, abiAccessible) {}
+                          llvm::Type *irTy,
+                          IsCopyable_t copyable,
+                          IsABIAccessible_t abiAccessible)
+      : EnumTypeInfoBase(strategy, irTy, copyable, abiAccessible) {}
   };
 } // end anonymous namespace
 
@@ -6455,19 +6465,26 @@ irgen::getEnumImplStrategy(IRGenModule &IGM, CanType ty) {
 TypeInfo *
 EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
                                        SpareBitVector SB,
-                                       Alignment A, IsTriviallyDestroyable_t isTriviallyDestroyable,
-                                       IsBitwiseTakable_t isBT) {
+                                       Alignment A,
+                                       IsTriviallyDestroyable_t isTriviallyDestroyable,
+                                       IsBitwiseTakable_t isBT,
+                                       IsCopyable_t isCopyable) {
   TypeInfo *mutableTI;
   switch (TIK) {
   case Opaque:
     llvm_unreachable("not valid");
   case Fixed:
-    mutableTI = new FixedEnumTypeInfo(*this, T, S, std::move(SB), A, isTriviallyDestroyable, isBT,
+    mutableTI = new FixedEnumTypeInfo(*this, T, S, std::move(SB), A,
+                                      isTriviallyDestroyable,
+                                      isBT,
+                                      isCopyable,
                                       AlwaysFixedSize);
     break;
   case Loadable:
     assert(isBT && "loadable enum not bitwise takable?!");
-    mutableTI = new LoadableEnumTypeInfo(*this, T, S, std::move(SB), A, isTriviallyDestroyable,
+    mutableTI = new LoadableEnumTypeInfo(*this, T, S, std::move(SB), A,
+                                         isTriviallyDestroyable,
+                                         isCopyable,
                                          AlwaysFixedSize);
     break;
   }
@@ -6480,15 +6497,20 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   SILType Type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
+  auto deinit = theEnum->getValueTypeDestructor()
+    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
+  auto copyable = theEnum->isMoveOnly()
+    ? IsNotCopyable : IsCopyable;
   if (ElementsWithPayload.empty()) {
     enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
     Alignment alignment(1);
     applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
-                                                         Size(0), {},
-                                                         alignment,
-                                                         IsTriviallyDestroyable,
-                                                         AlwaysFixedSize));
+                 Size(0), {},
+                 alignment,
+                 deinit,
+                 copyable,
+                 AlwaysFixedSize));
   } else {
     const TypeInfo &eltTI = *getSingleton();
 
@@ -6505,21 +6527,23 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
       applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
       auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
-                             alignment,
-                             eltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
-                             eltTI.isBitwiseTakable(ResilienceExpansion::Maximal),
-                             enumAccessible));
+             alignment,
+             deinit & eltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
+             eltTI.isBitwiseTakable(ResilienceExpansion::Maximal),
+             copyable,
+             enumAccessible));
     } else {
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
       auto alignment = fixedEltTI.getFixedAlignment();
       applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
       return getFixedEnumTypeInfo(enumTy,
-                        fixedEltTI.getFixedSize(),
-                        fixedEltTI.getSpareBits(),
-                        alignment,
-                        fixedEltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
-                        fixedEltTI.isBitwiseTakable(ResilienceExpansion::Maximal));
+        fixedEltTI.getFixedSize(),
+        fixedEltTI.getSpareBits(),
+        alignment,
+        deinit & fixedEltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
+        fixedEltTI.isBitwiseTakable(ResilienceExpansion::Maximal),
+        copyable);
     }
   }
 }
@@ -6549,9 +6573,16 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   Alignment alignment(tagSize.getValue());
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
+  auto deinit = theEnum->getValueTypeDestructor()
+    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
+  auto copyable = theEnum->isMoveOnly()
+    ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                               enumTy, tagSize, std::move(spareBits),
-                              alignment, IsTriviallyDestroyable, AlwaysFixedSize));
+                              alignment,
+                              deinit,
+                              copyable,
+                              AlwaysFixedSize));
 }
 
 TypeInfo *
@@ -6597,6 +6628,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                rawFixedTI.getSpareBits(),
                                                alignment,
                                                IsTriviallyDestroyable,
+                                               IsCopyable,
                                                IsFixedSize));
 }
 
@@ -6661,10 +6693,15 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   auto alignment = payloadTI.getFixedAlignment();
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
+  auto deinit = theEnum->getValueTypeDestructor()
+    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
+  auto copyable = theEnum->isMoveOnly()
+    ? IsNotCopyable : IsCopyable;
   getFixedEnumTypeInfo(
       enumTy, Size(sizeWithTag), spareBits.build(), alignment,
-      payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
-      payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal));
+      deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
+      payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal),
+      copyable);
   if (TIK >= Loadable && CopyDestroyKind == Normal) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
     loweredType = Type;
@@ -6691,10 +6728,15 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   
   auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
 
+  auto deinit = theEnum->getValueTypeDestructor()
+    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
+  auto copyable = theEnum->isMoveOnly()
+    ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
-         payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
+         deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
          payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal),
+         copyable,
          enumAccessible));
 }
 
@@ -6724,7 +6766,10 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   // of the largest payload.
   CommonSpareBits = {};
   Alignment worstAlignment(1);
-  IsTriviallyDestroyable_t isTriviallyDestroyable = IsTriviallyDestroyable;
+  auto isCopyable = theEnum->isMoveOnly()
+    ? IsNotCopyable : IsCopyable;
+  auto isTriviallyDestroyable = theEnum->getValueTypeDestructor()
+    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   IsBitwiseTakable_t isBT = IsBitwiseTakable;
   PayloadSize = 0;
   for (auto &elt : ElementsWithPayload) {
@@ -6864,7 +6909,8 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/ true, worstAlignment);
 
   getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
-                       worstAlignment, isTriviallyDestroyable, isBT);
+                       worstAlignment, isTriviallyDestroyable, isBT,
+                       isCopyable);
   if (TIK >= Loadable &&
       (CopyDestroyKind == Normal || CopyDestroyKind == BitwiseTakable)) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
@@ -6888,12 +6934,13 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   // during initializeMetadata. We can at least glean the best available
   // static information from the payloads.
   Alignment alignment(1);
-  IsTriviallyDestroyable_t pod = IsTriviallyDestroyable;
-  IsBitwiseTakable_t bt = IsBitwiseTakable;
+  auto td = theEnum->getValueTypeDestructor()
+    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
+  auto bt = IsBitwiseTakable;
   for (auto &element : ElementsWithPayload) {
     auto &payloadTI = *element.ti;
     alignment = std::max(alignment, payloadTI.getBestKnownAlignment());
-    pod &= payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
+    td &= payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
     bt &= payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   }
   
@@ -6901,8 +6948,10 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
 
   auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
   
+  auto cp = theEnum->isMoveOnly()
+    ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
-                                                       alignment, pod, bt,
+                                                       alignment, td, bt, cp,
                                                        enumAccessible));
 }
 
@@ -6923,8 +6972,11 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
   auto abiAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
+  auto copyable = theEnum->isMoveOnly()
+    ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(
-                       new ResilientEnumTypeInfo(*this, enumTy, abiAccessible));
+                       new ResilientEnumTypeInfo(*this, enumTy, copyable,
+                                                 abiAccessible));
 }
 
 const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,

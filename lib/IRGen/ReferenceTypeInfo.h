@@ -32,7 +32,7 @@ protected:
   // FIXME: Get spare bits for pointers from a TargetInfo-like structure.
   ReferenceTypeInfo(llvm::Type *type, Size size, SpareBitVector spareBits,
                     Alignment align, IsTriviallyDestroyable_t pod = IsNotTriviallyDestroyable)
-    : LoadableTypeInfo(type, size, spareBits, align, pod,
+    : LoadableTypeInfo(type, size, spareBits, align, pod, IsCopyable,
                        IsFixedSize, SpecialTypeInfoKind::Reference)
   {}
 

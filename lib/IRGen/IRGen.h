@@ -88,6 +88,14 @@ inline IsBitwiseTakable_t &operator&=(IsBitwiseTakable_t &l, IsBitwiseTakable_t 
   return (l = (l & r));
 }
 
+enum IsCopyable_t : bool { IsNotCopyable, IsCopyable };
+inline IsCopyable_t operator&(IsCopyable_t l, IsCopyable_t r) {
+  return IsCopyable_t(unsigned(l) & unsigned(r));
+}
+inline IsCopyable_t &operator&=(IsCopyable_t &l, IsCopyable_t r) {
+  return (l = (l & r));
+}
+
 enum IsABIAccessible_t : bool {
   IsNotABIAccessible = false,
   IsABIAccessible = true  

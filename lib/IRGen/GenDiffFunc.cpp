@@ -96,7 +96,7 @@ public:
                              SpareBitVector &&spareBits, Alignment align,
                              IsTriviallyDestroyable_t isTriviallyDestroyable, IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, ty, size, std::move(spareBits), align,
-              isTriviallyDestroyable, alwaysFixedSize) {}
+              isTriviallyDestroyable, IsCopyable, alwaysFixedSize) {}
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const DifferentiableFuncFieldInfo &field) const {
@@ -270,7 +270,7 @@ public:
                      SpareBitVector &&spareBits, Alignment align, IsTriviallyDestroyable_t isTriviallyDestroyable,
                      IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, ty, size, std::move(spareBits), align,
-              isTriviallyDestroyable, alwaysFixedSize) {}
+              isTriviallyDestroyable, IsCopyable, alwaysFixedSize) {}
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const LinearFuncFieldInfo &field) const {

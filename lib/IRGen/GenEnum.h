@@ -160,8 +160,10 @@ protected:
   /// Constructs a TypeInfo for an enum of the best possible kind for its
   /// layout, FixedEnumTypeInfo or LoadableEnumTypeInfo.
   TypeInfo *getFixedEnumTypeInfo(llvm::StructType *T, Size S, SpareBitVector SB,
-                                 Alignment A, IsTriviallyDestroyable_t isTriviallyDestroyable,
-                                 IsBitwiseTakable_t isBT);
+                                 Alignment A,
+                                 IsTriviallyDestroyable_t isTriviallyDestroyable,
+                                 IsBitwiseTakable_t isBT,
+                                 IsCopyable_t isCopyable);
   
 public:
   virtual ~EnumImplStrategy() { }

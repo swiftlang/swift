@@ -285,6 +285,7 @@ private:
   bool IsFixedLayout = true;
   IsTriviallyDestroyable_t IsKnownTriviallyDestroyable = IsTriviallyDestroyable;
   IsBitwiseTakable_t IsKnownBitwiseTakable = IsBitwiseTakable;
+  IsCopyable_t IsKnownCopyable = IsCopyable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
 public:
   StructLayoutBuilder(IRGenModule &IGM) : IGM(IGM) {}
@@ -331,6 +332,12 @@ public:
   /// resilience scope.
   IsBitwiseTakable_t isBitwiseTakable() const {
     return IsKnownBitwiseTakable;
+  }
+  
+  /// Return whether the structure is known to be copyable in the local
+  /// resilience scope.
+  IsCopyable_t isCopyable() const {
+    return IsKnownCopyable;
   }
 
   /// Return whether the structure is known to be fixed-size in all
@@ -394,6 +401,7 @@ class StructLayout {
 
   IsTriviallyDestroyable_t IsKnownTriviallyDestroyable;
   IsBitwiseTakable_t IsKnownBitwiseTakable;
+  IsCopyable_t IsKnownCopyable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
   
   llvm::Type *Ty;
@@ -425,6 +433,7 @@ public:
       IsFixedLayout(builder.isFixedLayout()),
       IsKnownTriviallyDestroyable(builder.isTriviallyDestroyable()),
       IsKnownBitwiseTakable(builder.isBitwiseTakable()),
+      IsKnownCopyable(builder.isCopyable()),
       IsKnownAlwaysFixedSize(builder.isAlwaysFixedSize()),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
@@ -441,9 +450,14 @@ public:
   const SpareBitVector &getSpareBits() const { return SpareBits; }
   SpareBitVector &getSpareBits() { return SpareBits; }
   bool isKnownEmpty() const { return isFixedLayout() && MinimumSize.isZero(); }
-  IsTriviallyDestroyable_t isTriviallyDestroyable() const { return IsKnownTriviallyDestroyable; }
+  IsTriviallyDestroyable_t isTriviallyDestroyable() const {
+    return IsKnownTriviallyDestroyable;
+  }
   IsBitwiseTakable_t isBitwiseTakable() const {
     return IsKnownBitwiseTakable;
+  }
+  IsCopyable_t isCopyable() const {
+    return IsKnownCopyable;
   }
   IsFixedSize_t isAlwaysFixedSize() const {
     return IsKnownAlwaysFixedSize;

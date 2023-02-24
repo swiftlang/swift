@@ -73,7 +73,7 @@ namespace {
                                     SpareBitVector &&spareBits, \
                                     bool isOptional) \
       : IndirectTypeInfo(type, size, std::move(spareBits), alignment, \
-                         IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsFixedSize), \
+                         IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsCopyable, IsFixedSize), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr, \
                             Address srcAddr, SILType T, \
@@ -148,7 +148,9 @@ namespace {
                                               SpareBitVector &&spareBits, \
                                               bool isOptional) \
       : SingleScalarTypeInfo(type, size, std::move(spareBits), \
-                             alignment, IsNotTriviallyDestroyable, IsFixedSize), \
+                             alignment, IsNotTriviallyDestroyable, \
+                             IsCopyable, \
+                             IsFixedSize), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     enum { IsScalarTriviallyDestroyable = false }; \
     TypeLayoutEntry \
@@ -1652,7 +1654,8 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   }
 
   // We can share box info for all similarly-shaped POD types.
-  if (fixedTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
+  if (fixedTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)
+      && fixedTI.isCopyable(ResilienceExpansion::Maximal)) {
     auto stride = fixedTI.getFixedStride();
     auto align = fixedTI.getFixedAlignment();
     auto foundPOD = PODBoxTI.find({stride.getValue(),align.getValue()});

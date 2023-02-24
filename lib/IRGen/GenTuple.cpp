@@ -229,10 +229,14 @@ namespace {
                           unsigned explosionSize,
                           llvm::Type *ty,
                           Size size, SpareBitVector &&spareBits,
-                          Alignment align, IsTriviallyDestroyable_t isTriviallyDestroyable,
+                          Alignment align,
+                          IsTriviallyDestroyable_t isTriviallyDestroyable,
+                          IsCopyable_t isCopyable,
                           IsFixedSize_t alwaysFixedSize)
       : TupleTypeInfoBase(fields, explosionSize,
-                          ty, size, std::move(spareBits), align, isTriviallyDestroyable,
+                          ty, size, std::move(spareBits), align,
+                          isTriviallyDestroyable,
+                          isCopyable,
                           alwaysFixedSize)
       {}
 
@@ -286,10 +290,13 @@ namespace {
     // FIXME: Spare bits between tuple elements.
     FixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields, llvm::Type *ty,
                        Size size, SpareBitVector &&spareBits, Alignment align,
-                       IsTriviallyDestroyable_t isTriviallyDestroyable, IsBitwiseTakable_t isBT,
+                       IsTriviallyDestroyable_t isTriviallyDestroyable,
+                       IsBitwiseTakable_t isBT,
+                       IsCopyable_t isCopyable,
                        IsFixedSize_t alwaysFixedSize)
       : TupleTypeInfoBase(fields, ty, size, std::move(spareBits), align,
-                          isTriviallyDestroyable, isBT, alwaysFixedSize)
+                          isTriviallyDestroyable, isBT, isCopyable,
+                          alwaysFixedSize)
     {}
 
     TypeLayoutEntry
@@ -352,9 +359,12 @@ namespace {
                           llvm::Type *T,
                           Alignment minAlign, IsTriviallyDestroyable_t isTriviallyDestroyable,
                           IsBitwiseTakable_t isBT,
+                          IsCopyable_t isCopyable,
                           IsABIAccessible_t tupleAccessible)
       : TupleTypeInfoBase(fields, fieldsABIAccessible,
-                          T, minAlign, isTriviallyDestroyable, isBT, tupleAccessible) {}
+                          T, minAlign, isTriviallyDestroyable, isBT, isCopyable,
+                          tupleAccessible) {
+      }
 
     TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
                                             SILType T) const {
@@ -428,6 +438,7 @@ namespace {
                                         layout.getAlignment(),
                                         layout.isTriviallyDestroyable(),
                                         layout.isBitwiseTakable(),
+                                        layout.isCopyable(),
                                         layout.isAlwaysFixedSize());
     }
 
@@ -439,6 +450,7 @@ namespace {
                                            std::move(layout.getSpareBits()),
                                            layout.getAlignment(),
                                            layout.isTriviallyDestroyable(),
+                                           layout.isCopyable(),
                                            layout.isAlwaysFixedSize());
     }
 
@@ -452,6 +464,7 @@ namespace {
                                            layout.getAlignment(),
                                            layout.isTriviallyDestroyable(),
                                            layout.isBitwiseTakable(),
+                                           layout.isCopyable(),
                                            tupleAccessible);
     }
 

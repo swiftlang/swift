@@ -43,7 +43,7 @@ public:
   IntegerLiteralTypeInfo(llvm::StructType *storageType,
                          Size size, Alignment align, SpareBitVector &&spareBits)
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
-                                  IsTriviallyDestroyable, IsFixedSize) {}
+                            IsTriviallyDestroyable, IsCopyable, IsFixedSize) {}
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
