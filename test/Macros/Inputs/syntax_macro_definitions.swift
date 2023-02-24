@@ -1147,3 +1147,52 @@ public struct ExtendableEnum: MemberMacro {
     return [unknownDecl]
   }
 }
+
+public struct DefineStructWithUnqualifiedLookupMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["""
+    struct StructWithUnqualifiedLookup {
+      let hello = 1
+
+      func foo() -> Int {
+        hello + world // looks up "world" in the parent scope
+      }
+    }
+    """]
+  }
+}
+
+public struct DefineAnonymousTypesMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let body = node.trailingClosure else {
+      throw CustomError.message("#anonymousTypes macro requires a trailing closure")
+    }
+    return [
+      """
+
+      class \(context.createUniqueName("name")) {
+        func hello() {
+          \(body.statements)
+        }
+      }
+      """,
+      """
+
+      enum \(context.createUniqueName("name")) {
+        case apple
+        case banana
+
+        func hello() {
+          \(body.statements)
+        }
+      }
+      """
+    ]
+  }
+}

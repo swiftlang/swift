@@ -1446,6 +1446,21 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   });
 }
 
+void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
+  MacroScope scope(*this, CleanupLocation(D), D,
+                   D->getMacroName().getBaseIdentifier().str(),
+                   D->getMacroRef().getDecl());
+  D->visitAuxiliaryDecls([&](Decl *decl) {
+    visit(decl);
+  });
+  D->forEachExpandedExprOrStmt([&](ASTNode node) {
+    if (auto *expr = node.dyn_cast<Expr *>())
+      emitIgnoredExpr(expr);
+    else if (auto *stmt = node.dyn_cast<Stmt *>())
+      emitStmt(stmt);
+  });
+}
+
 /// Emit literals for the major, minor, and subminor components of the version
 /// and return a tuple of SILValues for them.
 static std::tuple<SILValue, SILValue, SILValue>

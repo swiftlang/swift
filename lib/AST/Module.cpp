@@ -176,7 +176,7 @@ class swift::SourceLookupCache {
 
   using AuxiliaryDeclMap = llvm::DenseMap<DeclName, TinyPtrVector<MissingDecl *>>;
   AuxiliaryDeclMap TopLevelAuxiliaryDecls;
-  SmallVector<ValueDecl *, 4> MayHaveAuxiliaryDecls;
+  SmallVector<Decl *, 4> MayHaveAuxiliaryDecls;
   void populateAuxiliaryDeclCache();
 
 public:
@@ -267,11 +267,31 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
     if (auto *OD = dyn_cast<OperatorDecl>(D))
       Operators[OD->getName()].push_back(OD);
 
-    if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
+    else if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
       PrecedenceGroups[PG->getName()].push_back(PG);
 
-    if (auto *macro = dyn_cast<MacroDecl>(D))
+    else if (auto *macro = dyn_cast<MacroDecl>(D))
       MacroDecls[macro->getBaseIdentifier()].push_back(macro);
+
+    else if (auto *MED = dyn_cast<MacroExpansionDecl>(D))
+      MayHaveAuxiliaryDecls.push_back(MED);
+
+    // Top-level macro expansion expressions can actually produce declarations,
+    // when they resolve to a substitute macro expansion decl.
+    else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      for (auto node : TLCD->getBody()->getElements()) {
+        if (auto *E = node.dyn_cast<Expr *>()) {
+          if (auto *MEE = dyn_cast<MacroExpansionExpr>(E)) {
+            auto *MED = MEE->getSubstituteDecl();
+            if (!MED) {
+              MED = MEE->createSubstituteDecl();
+              MEE->setSubstituteDecl(MED);
+            }
+            MayHaveAuxiliaryDecls.push_back(MED);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -326,9 +346,11 @@ void SourceLookupCache::addToMemberCache(Range decls) {
 }
 
 void SourceLookupCache::populateAuxiliaryDeclCache() {
+  using MacroRef = llvm::PointerUnion<MacroExpansionDecl *, CustomAttr *>;
   for (auto *decl : MayHaveAuxiliaryDecls) {
     // Gather macro-introduced peer names.
-    llvm::SmallDenseMap<CustomAttr *, llvm::SmallVector<DeclName, 2>> introducedNames;
+    llvm::SmallDenseMap<MacroRef, llvm::SmallVector<DeclName, 2>>
+        introducedNames;
 
     // This code deliberately avoids `forEachAttachedMacro`, because it
     // will perform overload resolution and possibly invoke unqualified
@@ -353,17 +375,32 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
 
       for (const auto *macro : found->second) {
         macro->getIntroducedNames(MacroRole::Peer,
-                                  decl, introducedNames[attr]);
+                                  dyn_cast<ValueDecl>(decl),
+                                  introducedNames[attr]);
+      }
+    }
+
+    if (auto *med = dyn_cast<MacroExpansionDecl>(decl)) {
+      UnresolvedMacroReference macroRef(med);
+      auto macroName = macroRef.getMacroName().getBaseIdentifier();
+
+      auto found = MacroDecls.find(macroName);
+      if (found == MacroDecls.end())
+        continue;
+
+      for (const auto *macro : found->second) {
+        macro->getIntroducedNames(MacroRole::Declaration,
+                                  /*attachedTo*/ nullptr,
+                                  introducedNames[med]);
       }
     }
 
     // Add macro-introduced names to the top-level auxiliary decl cache as
-    // unexpanded peer decls represented by a MissingDecl.
+    // unexpanded decls represented by a MissingDecl.
     for (auto macroNames : introducedNames) {
-      auto *macroAttr = macroNames.getFirst();
+      auto macroRef = macroNames.getFirst();
       for (auto name : macroNames.getSecond()) {
-        auto *placeholder =
-            MissingDecl::forUnexpandedPeer(macroAttr, decl);
+        auto *placeholder = MissingDecl::forUnexpandedMacro(macroRef, decl);
         name.addToLookupTable(TopLevelAuxiliaryDecls, placeholder);
       }
     }
@@ -397,11 +434,11 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
 void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
                                     SmallVectorImpl<ValueDecl*> &Result) {
   auto I = TopLevelValues.find(Name);
-  if (I == TopLevelValues.end()) return;
-
-  Result.reserve(I->second.size());
-  for (ValueDecl *Elt : I->second)
-    Result.push_back(Elt);
+  if (I != TopLevelValues.end()) {
+    Result.reserve(I->second.size());
+    for (ValueDecl *Elt : I->second)
+      Result.push_back(Elt);
+  }
 
   // Add top-level auxiliary decls to the result.
   //
@@ -414,9 +451,9 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
 
   for (auto *unexpandedDecl : auxDecls->second) {
     // Add expanded peers to the result.
-    unexpandedDecl->forEachExpandedPeer(
-        [&](ValueDecl *expandedPeer) {
-          Result.push_back(expandedPeer);
+    unexpandedDecl->forEachMacroExpandedDecl(
+        [&](ValueDecl *decl) {
+          Result.push_back(decl);
         });
   }
 }
@@ -3889,6 +3926,21 @@ void FileUnit::getTopLevelDeclsWhereAttributesMatch(
       return !matchAttributes(D->getAttrs());
     });
   Results.erase(newEnd, Results.end());
+}
+
+void FileUnit::getExpandedTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
+  SmallVector<Decl *, 32> nonExpandedDecls;
+  nonExpandedDecls.reserve(results.capacity());
+  getTopLevelDecls(nonExpandedDecls);
+  for (auto *decl : nonExpandedDecls) {
+    if (auto *med = dyn_cast<MacroExpansionDecl>(decl)) {
+      med->visitAuxiliaryDecls([&](Decl *decl) {
+        results.push_back(decl);
+      });
+    } else {
+      results.push_back(decl);
+    }
+  }
 }
 
 void FileUnit::dumpDisplayDecls() const {

@@ -6197,6 +6197,7 @@ private:
   ArgumentList *ArgList;
   Expr *Rewritten;
   MacroRoles Roles;
+  MacroExpansionDecl *SubstituteDecl;
 
   /// The referenced macro.
   ConcreteDeclRef macroRef;
@@ -6219,7 +6220,7 @@ public:
         MacroName(macroName), MacroNameLoc(macroNameLoc),
         LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
         GenericArgs(genericArgs),
-        Rewritten(nullptr), Roles(roles) {
+        Rewritten(nullptr), Roles(roles), SubstituteDecl(nullptr) {
     Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
 
     // Macro expansions always have an argument list. If one is not provided, create
@@ -6275,6 +6276,10 @@ public:
   }
 
   SourceRange getSourceRange() const;
+
+  MacroExpansionDecl *createSubstituteDecl() const;
+  MacroExpansionDecl *getSubstituteDecl() const;
+  void setSubstituteDecl(MacroExpansionDecl *decl);
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::MacroExpansion;

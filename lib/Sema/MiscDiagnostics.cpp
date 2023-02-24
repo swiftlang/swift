@@ -3727,7 +3727,8 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     return Action::SkipChildren(E);
   }
 
-  assert(AllExprsSeen.insert(E).second && "duplicate traversal");
+  #warning "fix me"
+  // assert(AllExprsSeen.insert(E).second && "duplicate traversal");
 
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.

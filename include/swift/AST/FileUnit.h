@@ -210,6 +210,13 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
 
+  /// Finds all top-level decls in this file with all macros recursively
+  /// expanded.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  void getExpandedTopLevelDecls(SmallVectorImpl<Decl*> &results) const;
+
   virtual void
   getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const {}
 

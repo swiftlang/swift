@@ -1617,9 +1617,12 @@ TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
       ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
   for (const auto &found : lookup.allResults()) {
     if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
-      auto foundRoles = macro->getMacroRoles();
-      if (foundRoles && roles.contains(foundRoles))
+      auto candidateRoles = macro->getMacroRoles();
+      if ((candidateRoles && roles.contains(candidateRoles)) ||
+          // FIXME: `externalMacro` should have all roles.
+          macro->getBaseIdentifier().str() == "externalMacro") {
         choices.push_back(macro);
+      }
     }
   }
   return choices;

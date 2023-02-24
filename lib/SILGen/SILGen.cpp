@@ -1792,9 +1792,7 @@ void SILGenModule::visitMacroDecl(MacroDecl *d) {
 }
 
 void SILGenModule::visitMacroExpansionDecl(MacroExpansionDecl *d) {
-  d->visitAuxiliaryDecls([&](Decl *decl) {
-    visit(decl);
-  });
+  // Expansion already visited as auxiliary decls.
 }
 
 bool
@@ -1986,6 +1984,13 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
     if (auto *S = ESD.dyn_cast<Stmt*>()) {
       TopLevelSGF->emitStmt(S);
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
+      if (auto *MEE = dyn_cast<MacroExpansionExpr>(E)) {
+        if (auto *MED = MEE->getSubstituteDecl()) {
+          MED->visitAuxiliaryDecls([&](Decl *decl) {
+            visit(decl);
+          });
+        }
+      }
       TopLevelSGF->emitIgnoredExpr(E);
     } else {
       TopLevelSGF->visit(ESD.get<Decl*>());

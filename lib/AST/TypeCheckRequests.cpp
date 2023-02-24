@@ -1743,10 +1743,7 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
 }
 
 MacroRoles UnresolvedMacroReference::getMacroRoles() const {
-  if (pointer.is<MacroExpansionExpr *>())
-    return MacroRole::Expression;
-
-  if (pointer.is<MacroExpansionDecl *>())
+  if (pointer.is<MacroExpansionExpr *>() || pointer.is<MacroExpansionDecl *>())
     return getFreestandingMacroRoles();
 
   if (pointer.is<CustomAttr *>())

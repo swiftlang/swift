@@ -9986,26 +9986,28 @@ MacroRoles swift::getAttachedMacroRoles() {
   return attachedMacroRoles;
 }
 
-void
-MissingDecl::forEachExpandedPeer(ExpandedPeerCallback callback) {
-  auto *macro = unexpandedPeer.macroAttr;
-  auto *attachedTo = unexpandedPeer.attachedTo;
-  if (!macro || !attachedTo)
+void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
+  auto macroRef = unexpandedMacro.macroRef;
+  auto *baseDecl = unexpandedMacro.baseDecl;
+  if (!macroRef || !baseDecl)
     return;
 
-  attachedTo->visitAuxiliaryDecls(
-      [&](Decl *auxiliaryDecl) {
-        auto *sf = auxiliaryDecl->getInnermostDeclContext()->getParentSourceFile();
-        auto *macroAttr = sf->getAttachedMacroAttribute();
-        if (macroAttr != unexpandedPeer.macroAttr)
-          return;
-
-        auto *value = dyn_cast<ValueDecl>(auxiliaryDecl);
-        if (!value)
-          return;
-
-        callback(value);
-      });
+  baseDecl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
+    auto *sf = auxiliaryDecl->getInnermostDeclContext()->getParentSourceFile();
+    // We only visit auxiliary decls that are macro expansions associated with
+    // this macro reference.
+    if (auto *med = macroRef.dyn_cast<MacroExpansionDecl *>()) {
+     if (med != sf->getMacroExpansion().dyn_cast<Decl *>())
+       return;
+    } else if (auto *attr = macroRef.dyn_cast<CustomAttr *>()) {
+     if (attr != sf->getAttachedMacroAttribute())
+       return;
+    } else {
+      return;
+    }
+    if (auto *vd = dyn_cast<ValueDecl>(auxiliaryDecl))
+      callback(vd);
+  });
 }
 
 MacroDecl::MacroDecl(
@@ -10142,10 +10144,24 @@ Optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
   return def.getBuiltinKind();
 }
 
+MacroExpansionDecl::MacroExpansionDecl(
+    DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
+    DeclNameLoc macroLoc, SourceLoc leftAngleLoc,
+    ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
+    ArgumentList *args)
+    : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
+      MacroName(macro), MacroNameLoc(macroLoc),
+      LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
+      GenericArgs(genericArgs),
+      ArgList(args ? args
+                   : ArgumentList::createImplicit(dc->getASTContext(), {})) {
+  Bits.MacroExpansionDecl.Discriminator = InvalidDiscriminator;
+}
+
 SourceRange MacroExpansionDecl::getSourceRange() const {
   SourceLoc endLoc;
-  if (ArgList)
-    endLoc = ArgList->getEndLoc();
+  if (auto argsEndList = ArgList->getEndLoc())
+    endLoc = argsEndList;
   else if (RightAngleLoc.isValid())
     endLoc = RightAngleLoc;
   else
@@ -10169,6 +10185,23 @@ unsigned MacroExpansionDecl::getDiscriminator() const {
 
   assert(getRawDiscriminator() != InvalidDiscriminator);
   return getRawDiscriminator();
+}
+
+void MacroExpansionDecl::forEachExpandedExprOrStmt(
+    ExprOrStmtExpansionCallback callback) const {
+  auto mutableThis = const_cast<MacroExpansionDecl *>(this);
+  auto bufferID = evaluateOrDefault(
+      getASTContext().evaluator,
+      ExpandMacroExpansionDeclRequest{mutableThis}, {});
+  auto &sourceMgr = getASTContext().SourceMgr;
+  auto *moduleDecl = getModuleContext();
+  if (!bufferID)
+    return;
+  auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
+  auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
+  for (auto node : sourceFile->getTopLevelItems())
+    if (node.is<Expr *>() || node.is<Stmt *>())
+      callback(node);
 }
 
 NominalTypeDecl *

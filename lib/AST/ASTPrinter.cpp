@@ -4683,20 +4683,18 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
 
 void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
   Printer << '#' << decl->getMacroName();
-  if (decl->getArgs()) {
-    Printer << '(';
-    auto args = decl->getArgs()->getOriginalArgs();
-    bool isFirst = true;
-    // FIXME: handle trailing closures.
-    for (auto arg : *args) {
-      if (!isFirst) {
-        Printer << ", ";
-      }
-      printArgument(arg);
-      isFirst = false;
+  Printer << '(';
+  auto args = decl->getArgs()->getOriginalArgs();
+  bool isFirst = true;
+  // FIXME: handle trailing closures.
+  for (auto arg : *args) {
+    if (!isFirst) {
+      Printer << ", ";
     }
-    Printer << ')';
+    printArgument(arg);
+    isFirst = false;
   }
+  Printer << ')';
 }
 
 void PrintAST::visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {

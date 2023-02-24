@@ -2745,6 +2745,23 @@ unsigned MacroExpansionExpr::getDiscriminator() const {
   return getRawDiscriminator();
 }
 
+MacroExpansionDecl *MacroExpansionExpr::createSubstituteDecl() const {
+  auto dc = DC;
+  if (auto *tlcd = dyn_cast_or_null<TopLevelCodeDecl>(dc->getAsDecl()))
+    dc = tlcd->getDeclContext();
+  return new (DC->getASTContext()) MacroExpansionDecl(
+      dc, SigilLoc, MacroName, MacroNameLoc, LeftAngleLoc,
+      GenericArgs, RightAngleLoc, ArgList);
+}
+
+MacroExpansionDecl *MacroExpansionExpr::getSubstituteDecl() const {
+  return SubstituteDecl;
+}
+
+void MacroExpansionExpr::setSubstituteDecl(MacroExpansionDecl *decl) {
+  SubstituteDecl = decl;
+}
+
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
   if (!CE) {
     out << "(null)";

@@ -3773,22 +3773,23 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
   auto &ctx = MED->getASTContext();
   auto *dc = MED->getDeclContext();
-  auto foundMacros = TypeChecker::lookupMacros(
-      MED->getDeclContext(), MED->getMacroName(),
-      MED->getLoc(), MacroRole::Declaration);
-  if (foundMacros.empty()) {
-    MED->diagnose(diag::macro_undefined, MED->getMacroName().getBaseIdentifier())
-        .highlight(MED->getMacroNameLoc().getSourceRange());
-    return {};
-  }
+
   // Resolve macro candidates.
   auto macro = evaluateOrDefault(
       ctx.evaluator, ResolveMacroRequest{MED, dc},
       ConcreteDeclRef());
   if (!macro)
-    return {};
+    return None;
   MED->setMacroRef(macro);
 
-  // Expand the macro.
-  return expandFreestandingDeclarationMacro(MED);
+  auto roles = cast<MacroDecl>(macro.getDecl())->getMacroRoles();
+  // If it's not a declaration macro or a code item macro, it must have been
+  // parsed as an expression macro, and this decl is just its substitute decl.
+  // So there's no thing to be done here.
+  if (!roles.contains(MacroRole::Declaration))
+    return None;
+
+  // Otherwise, we treat it as a declaration macro.
+  assert(roles.contains(MacroRole::Declaration));
+  return expandFreestandingMacro(MED);
 }

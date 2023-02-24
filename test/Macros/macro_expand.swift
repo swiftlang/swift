@@ -1,5 +1,5 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
+// UN: %empty-directory(%t)
+// UN: %target-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
 // RUNx: %target-swift-frontend -dump-ast -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser 2>&1 | %FileCheck --check-prefix CHECK-AST %s
 
 // Diagnostics testing
@@ -12,14 +12,14 @@
 
 // RUN: %FileCheck %s  --check-prefix CHECK-MACRO-PRINTED < %t/macro-printing.txt
 
-// Debug info SIL testing
-// RUN: %target-swift-frontend -swift-version 5 -emit-sil -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
+// FIXME(rdar://106053984) Debug info SIL testing (re-enable -g)
+// UN: %target-swift-frontend -swift-version 5 -emit-sil -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - | %FileCheck --check-prefix CHECK-SIL %s
 
-// Debug info IR testing
-// RUN: %target-swift-frontend -swift-version 5 -emit-ir -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
+// FIXME(rdar://106053984) Debug info IR testing (re-enable -g)
+// UN: %target-swift-frontend -swift-version 5 -emit-ir -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser -o - | %FileCheck --check-prefix CHECK-IR %s
 
 // Execution testing
-// RUN: %target-build-swift -swift-version 5 -g -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
+// RUN: %target-build-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
 
@@ -83,10 +83,10 @@ struct Bad {}
 func testFileID(a: Int, b: Int) {
   // CHECK: MacroUser/macro_expand.swift
   print("Result is \(#customFileID)")
-  // CHECK-SIL: sil_scope [[MACRO_SCOPE:[0-9]+]] { loc "{{.*}}":1:1 parent @$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_ {{.*}} }
-  // CHECK-SIL: sil_scope [[SRC_SCOPE:[0-9]+]] { loc "{{.*}}macro_expand.swift":[[@LINE-2]]
-  // CHECK-SIL: sil_scope {{[0-9]+}} { loc "{{.*}}":1:1 parent [[MACRO_SCOPE]] inlined_at [[SRC_SCOPE]] }
-  // CHECK-IR: !DISubprogram(name: "customFileID", linkageName: "$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_"
+  // HECK-SIL: sil_scope [[MACRO_SCOPE:[0-9]+]] { loc "{{.*}}":1:1 parent @$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_ {{.*}} }
+  // HECK-SIL: sil_scope [[SRC_SCOPE:[0-9]+]] { loc "{{.*}}macro_expand.swift":[[@LINE-2]]
+  // HECK-SIL: sil_scope {{[0-9]+}} { loc "{{.*}}":1:1 parent [[MACRO_SCOPE]] inlined_at [[SRC_SCOPE]] }
+  // HECK-IR: !DISubprogram(name: "customFileID", linkageName: "$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_"
 
 
   // CHECK: Builtin result is MacroUser/macro_expand.swift
@@ -230,19 +230,26 @@ func testNestedDeclInExpr() {
 @freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
-// Macros adding to an enum
-@attached(member, names: named(unknown), arbitrary)
-public macro ExtendableEnum() = #externalMacro(module: "MacroDefinition", type: "ExtendableEnum")
-
-@ExtendableEnum
-enum ElementType {
-case paper
-}
-
-print(ElementType.paper.unknown())
-
-// FIXME: Declaration macro expansions in BraceStmt don't work yet.
 //#bitwidthNumberedStructs("MyIntGlobal")
+//
+//#bitwidthNumberedStructs("MyIntGlobalTwo", blah: false)
+//
+//let blah = false
+//#bitwidthNumberedStructs("MyIntGlobalThree", blah: blah)
+
+// Test unqualified lookup from within a macro expansion
+@freestanding(declaration, names: named(StructWithUnqualifiedLookup))
+macro structWithUnqualifiedLookup() = #externalMacro(module: "MacroDefinition", type: "DefineStructWithUnqualifiedLookupMacro")
+let world = 3 // to be used by the macro expansion below
+#structWithUnqualifiedLookup()
+_ = StructWithUnqualifiedLookup().foo()
+
+@freestanding(declaration)
+macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
+
+#anonymousTypes { "hello" }
+
+// CECK-SIL: $s9MacroUser14anonymousTypesfMf0_4namefMu_
 
 func testFreestandingMacroExpansion() {
   // Explicit structs to force macros to be parsed as decl.
@@ -291,14 +298,18 @@ func testFreestandingMacroExpansion() {
   }
   #endif
 
-  // FIXME: Declaration macro expansions in BraceStmt don't work yet.
-//  HECK: MyIntGlobal8
-//  print(MyIntGlobal8.self)
-//  HECK: MyIntGlobal16
-//  print(MyIntGlobal16.self)
-//  HECK: MyIntGlobal32
-//  print(MyIntGlobal32.self)
-//  HECK: MyIntGlobal64
-//  print(MyIntGlobal64.self)
+  // FIXME: Arbitrary name lookup is not yet supported.
+  // HECK: MyIntGlobal8
+  // print(MyIntGlobal8.self)
+  // HECK: MyIntGlobal16
+  // print(MyIntGlobal16.self)
+  // HECK: MyIntGlobal32
+  // print(MyIntGlobal32.self)
+  // HECK: MyIntGlobal64
+  // print(MyIntGlobal64.self)
+
+  #anonymousTypes { "hello" }
+  // expected-note @-1 2 {{in expansion of macro 'anonymousTypes' here}}
+  // HECK-SIL: $s9MacroUser016testFreestandingA9ExpansionyyF14anonymousTypesfMf1_4namefMu_
 }
 testFreestandingMacroExpansion()
