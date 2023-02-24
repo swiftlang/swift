@@ -10,7 +10,7 @@ public protocol Action {}
 //--- test.swift
 import MyModule
 
-// RUN: %sourcekitd-test -req=cursor -pos=%(line+1):19 -length=6 -cursor-action %t/test.swift -- %t/test.swift -I %t/build | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=%(line+1):19 -length=6 -cursor-action %t/test.swift -- %t/test.swift -target %target-triple -I %t/build | %FileCheck %s
 func test(action: Action) { }
 // CHECK: ACTIONS BEGIN
 // CHECK-NEXT: source.refactoring.kind.rename.global
