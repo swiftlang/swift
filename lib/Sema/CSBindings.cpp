@@ -1483,6 +1483,7 @@ void PotentialBindings::infer(Constraint *constraint) {
       auto *elementEnv = CS.getPackElementEnvironment(constraint->getLocator(),
                                                       shapeClass);
       auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
+      assert(!elementType->is<PackType>());
       addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});
 
       break;

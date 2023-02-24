@@ -8782,6 +8782,19 @@ ConstraintSystem::simplifyBindTupleOfFunctionParamsConstraint(
   return SolutionKind::Solved;
 }
 
+static Type lookThroughSingletonPackExpansion(Type ty) {
+  if (auto pack = ty->getAs<PackType>()) {
+    if (pack->getNumElements() == 1) {
+      if (auto expansion = pack->getElementType(0)->getAs<PackExpansionType>()) {
+        auto countType = expansion->getCountType();
+        if (countType->isEqual(expansion->getPatternType()))
+          return countType;
+      }
+    }
+  }
+  return ty;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
                                                   TypeMatchOptions flags,
@@ -8800,6 +8813,11 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
 
     return SolutionKind::Solved;
   }
+
+  // FIXME: I'm not sure this is actually necessary; I may only be seeing
+  // this because of something I've screwed up in element generic
+  // environments.
+  elementType = lookThroughSingletonPackExpansion(elementType);
 
   // This constraint only exists to vend bindings.
   auto *packEnv = DC->getGenericEnvironmentOfContext();

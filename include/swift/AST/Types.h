@@ -6699,6 +6699,10 @@ public:
                        TypeArrayView<GenericTypeParamType> params,
                        ArrayRef<Type> args);
 
+  /// Given a pack parameter or pack archetype `T`, produce the
+  /// pack type `Pack{repeat each T}`.
+  static PackType *getSingletonPackExpansion(Type packParam);
+
 public:
   /// Retrieves the number of elements in this pack.
   unsigned getNumElements() const { return Bits.PackType.Count; }

@@ -681,10 +681,37 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
   }, LookUpConformanceInSignature(sig.getPointer()));
 }
 
+namespace {
+/// A function suitable for use as a \c TypeSubstitutionFn that produces
+/// correct forwarding substitutions for a generic environment.
+///
+/// This differs from QueryInterfaceTypeSubstitutions only in that it
+/// always produces PackTypes for pack parameters.
+class BuildForwardingSubstitutions {
+  QueryInterfaceTypeSubstitutions Query;
+
+public:
+  BuildForwardingSubstitutions(const GenericEnvironment *self)
+    : Query(self) { }
+
+  Type operator()(SubstitutableType *type) const;
+};
+} // end anonymous namespace
+
+Type BuildForwardingSubstitutions::operator()(SubstitutableType *type) const {
+  if (auto resultType = Query(type)) {
+    auto param = type->castTo<GenericTypeParamType>();
+    if (!param->isParameterPack())
+      return resultType;
+    return PackType::getSingletonPackExpansion(resultType);
+  }
+  return Type();
+}
+
 SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
   auto genericSig = getGenericSignature();
   return SubstitutionMap::get(genericSig,
-                              QueryInterfaceTypeSubstitutions(this),
+                              BuildForwardingSubstitutions(this),
                               MakeAbstractConformanceForGenericType());
 }
 
