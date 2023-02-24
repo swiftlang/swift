@@ -432,7 +432,7 @@ class RemoteASTContextConcreteImpl final : public RemoteASTContextImpl {
 public:
   RemoteASTContextConcreteImpl(std::shared_ptr<MemoryReader> &&reader,
                                ASTContext &ctx)
-    : Reader(std::move(reader), ctx, GenericSignature()) {}
+    : Reader(std::move(reader), ctx) {}
 
   Result<Type> getTypeForRemoteTypeMetadata(RemoteAddress metadata,
                                             bool skipArtificial) override {

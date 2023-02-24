@@ -37,16 +37,13 @@ namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
 
 Type getTypeForMangling(ASTContext &ctx,
-                        llvm::StringRef mangling,
-                        GenericSignature genericSig=GenericSignature());
+                        llvm::StringRef mangling);
 
 TypeDecl *getTypeDeclForMangling(ASTContext &ctx,
-                                 llvm::StringRef mangling,
-                                 GenericSignature genericSig=GenericSignature());
+                                 llvm::StringRef mangling);
 
 TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
-                            llvm::StringRef usr,
-                            GenericSignature genericSig=GenericSignature());
+                            llvm::StringRef usr);
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
@@ -57,11 +54,6 @@ class ASTBuilder {
   /// The notional context in which we're writing and type-checking code.
   /// Created lazily.
   DeclContext *NotionalDC = nullptr;
-
-  /// The generic signature for interpreting type parameters. This is used
-  /// because the mangling for a type parameter doesn't record whether it
-  /// is a pack or not, so we have to find it here.
-  GenericSignature GenericSig;
 
 public:
   using BuiltType = swift::Type;
@@ -74,8 +66,7 @@ public:
 
   static constexpr bool needsToPrecomputeParentGenericContextShapes = false;
 
-  explicit ASTBuilder(ASTContext &ctx, GenericSignature genericSig)
-    : Ctx(ctx), GenericSig(genericSig) {}
+  explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
 
   ASTContext &getASTContext() { return Ctx; }
   DeclContext *getNotionalDC();
@@ -110,12 +101,6 @@ public:
                               Type parent);
 
   Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels);
-
-  Type createPackType(ArrayRef<Type> eltTypes);
-
-  Type createSILPackType(ArrayRef<Type> eltTypes, bool isElementAddress);
-
-  Type createPackExpansionType(Type patternType, Type countType);
 
   Type createFunctionType(
       ArrayRef<Demangle::FunctionParam<Type>> params,

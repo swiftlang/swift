@@ -1072,46 +1072,6 @@ protected:
       return decodeMangledType(Node->getChild(0), depth + 1,
                                /*forRequirement=*/false);
 
-    case NodeKind::Pack:
-    case NodeKind::SILPackDirect:
-    case NodeKind::SILPackIndirect: {
-      llvm::SmallVector<BuiltType, 8> elements;
-
-      for (auto &element : *Node) {
-        // Decode the element type.
-        auto elementType =
-            decodeMangledType(element, depth + 1, /*forRequirement=*/false);
-        if (elementType.isError())
-          return elementType;
-
-        elements.push_back(elementType.getType());
-      }
-
-      switch (Node->getKind()) {
-      case NodeKind::Pack:
-        return Builder.createPackType(elements);
-      case NodeKind::SILPackDirect:
-        return Builder.createSILPackType(elements, /*isElementAddress=*/false);
-      case NodeKind::SILPackIndirect:
-        return Builder.createSILPackType(elements, /*isElementAddress=*/true);
-      default:
-        llvm_unreachable("Bad kind");
-      }
-    }
-
-    case NodeKind::PackExpansion: {
-      if (Node->getNumChildren() < 2)
-        return MAKE_NODE_TYPE_ERROR(Node,
-                                    "fewer children (%zu) than required (2)",
-                                    Node->getNumChildren());
-
-      auto patternType = decodeMangledType(Node->getChild(0), depth + 1);
-      auto countType = decodeMangledType(Node->getChild(1), depth + 1);
-
-      return Builder.createPackExpansionType(patternType.getType(),
-                                             countType.getType());
-    }
-
     case NodeKind::DependentGenericType: {
       if (Node->getNumChildren() < 2)
         return MAKE_NODE_TYPE_ERROR(Node,

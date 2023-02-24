@@ -308,8 +308,6 @@ private:
     case Node::Kind::Module:
     case Node::Kind::Tuple:
     case Node::Kind::Pack:
-    case Node::Kind::SILPackDirect:
-    case Node::Kind::SILPackIndirect:
     case Node::Kind::ConstrainedExistential:
     case Node::Kind::ConstrainedExistentialRequirementList:
     case Node::Kind::ConstrainedExistentialSelf:
@@ -1513,17 +1511,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "}";
     return nullptr;
   }
-  case Node::Kind::SILPackDirect:
-  case Node::Kind::SILPackIndirect: {
-    Printer << (kind == Node::Kind::SILPackDirect ? "@direct" : "@indirect");
-    Printer << " Pack{";
-    printChildren(Node, depth, ", ");
-    Printer << "}";
-    return nullptr;
-  }
   case Node::Kind::PackExpansion: {
-    Printer << "repeat ";
     print(Node->getChild(0), depth + 1);
+    Printer << "...";
     return nullptr;
   }
   case Node::Kind::ReturnType:
