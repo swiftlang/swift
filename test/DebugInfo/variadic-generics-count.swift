@@ -2,6 +2,9 @@
 // RUN:    -enable-experimental-feature VariadicGenerics \
 // RUN:    -parse-as-library -module-name a | %FileCheck %s
 
+// Because of -enable-experimental-feature VariadicGenerics
+// REQUIRES: asserts
+
 public func f1<T...>(ts: repeat each T) {
   // CHECK: define {{.*}} @"$s1a2f12tsyxxQp_tlF"(%swift.opaque** {{.*}}, i{{32|64}} [[COUNT1_1:.*]], %swift.type** {{.*}})
   // CHECK-DAG: store i{{32|64}} [[COUNT1_1]], i{{32|64}}* %[[COUNT1_1_A:.*]], align
