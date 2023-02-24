@@ -50,6 +50,9 @@ public:
     /// The expansion of an attached peer macro.
     PeerMacroExpansion,
 
+    /// The expansion of an attached conformance macro.
+    ConformanceMacroExpansion,
+
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
 

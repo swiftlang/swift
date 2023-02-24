@@ -859,6 +859,9 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   DeclContext *dc;
   if (role == MacroRole::Peer) {
     dc = attachedTo->getDeclContext();
+  } else if (role == MacroRole::Conformance) {
+    // Conformance macros always expand to extensions at file-scope.
+    dc = attachedTo->getDeclContext()->getParentSourceFile();
   } else {
     dc = attachedTo->getInnermostDeclContext();
   }
@@ -1073,6 +1076,14 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
     break;
   }
 
+  case MacroRole::Conformance: {
+    generatedSourceKind = GeneratedSourceInfo::ConformanceMacroExpansion;
+    SourceLoc afterDeclLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, attachedTo->getEndLoc());
+    generatedOriginalSourceRange = CharSourceRange(afterDeclLoc, 0);
+    break;
+  }
+
   case MacroRole::Expression:
   case MacroRole::Declaration:
     llvm_unreachable("freestanding macro in attached macro evaluation");
@@ -1227,6 +1238,72 @@ swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
     } else if (auto *extension = dyn_cast<ExtensionDecl>(parent)) {
       extension->addMember(peer);
     }
+  }
+
+  return macroSourceFile->getBufferID();
+}
+
+ArrayRef<unsigned>
+ExpandConformanceMacros::evaluate(Evaluator &evaluator,
+                                  NominalTypeDecl *nominal) const {
+  SmallVector<unsigned, 2> bufferIDs;
+  nominal->forEachAttachedMacro(MacroRole::Conformance,
+      [&](CustomAttr *attr, MacroDecl *macro) {
+        if (auto bufferID = expandConformances(attr, macro, nominal))
+          bufferIDs.push_back(*bufferID);
+      });
+
+  return nominal->getASTContext().AllocateCopy(bufferIDs);
+}
+
+Optional<unsigned>
+swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
+                          NominalTypeDecl *nominal) {
+  auto macroSourceFile =
+      evaluateAttachedMacro(macro, nominal, attr,
+                            /*passParentContext*/false,
+                            MacroRole::Conformance);
+
+  if (!macroSourceFile)
+    return None;
+
+  PrettyStackTraceDecl debugStack(
+      "applying expanded conformance macro", nominal);
+
+  auto topLevelDecls = macroSourceFile->getTopLevelDecls();
+  for (auto *decl : topLevelDecls) {
+    auto *extension = dyn_cast<ExtensionDecl>(decl);
+    if (!extension)
+      continue;
+
+    auto &extensionCtx = extension->getASTContext();
+
+    // Bind the extension to the original nominal type.
+    extension->setExtendedNominal(nominal);
+
+    // Resolve the protocol type.
+    assert(extension->getInherited().size() == 1);
+    auto inheritedType = evaluateOrDefault(
+        extensionCtx.evaluator,
+        InheritedTypeRequest{extension, 0, TypeResolutionStage::Interface},
+        Type());
+
+    if (!inheritedType || inheritedType->hasError())
+      continue;
+
+    auto protocolType = inheritedType->getAs<ProtocolType>();
+    if (!protocolType)
+      continue;
+
+    // Create a synthesized conformance and register it with the nominal type.
+    auto conformance = extensionCtx.getConformance(
+        nominal->getDeclaredInterfaceType(), protocolType->getDecl(),
+        nominal->getLoc(), extension, ProtocolConformanceState::Incomplete,
+        /*isUnchecked=*/false);
+    conformance->setSourceKindAndImplyingConformance(
+        ConformanceEntryKind::Synthesized, nullptr);
+
+    nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
   }
 
   return macroSourceFile->getBufferID();

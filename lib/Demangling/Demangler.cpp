@@ -3934,7 +3934,8 @@ static bool isMacroExpansionNodeKind(Node::Kind kind) {
          kind == Node::Kind::MemberAttributeAttachedMacroExpansion ||
          kind == Node::Kind::FreestandingMacroExpansion ||
          kind == Node::Kind::MemberAttachedMacroExpansion ||
-         kind == Node::Kind::PeerAttachedMacroExpansion;
+         kind == Node::Kind::PeerAttachedMacroExpansion ||
+         kind == Node::Kind::ConformanceAttachedMacroExpansion;
 }
 
 NodePointer Demangler::demangleMacroExpansion() {
@@ -3958,6 +3959,10 @@ NodePointer Demangler::demangleMacroExpansion() {
 
   case 'p':
     kind = Node::Kind::PeerAttachedMacroExpansion;
+    break;
+
+  case 'c':
+    kind = Node::Kind::ConformanceAttachedMacroExpansion;
     break;
 
   case 'u':
