@@ -492,6 +492,21 @@ Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx) const {
   return None;
 }
 
+bool Decl::isBackDeployed(ASTContext &Ctx) const {
+  return getBackDeployedBeforeOSVersion(Ctx) != None;
+}
+
+bool Decl::hasBackDeployedAttr() const {
+  if (getAttrs().hasAttribute<BackDeployedAttr>())
+    return true;
+
+  // Accessors may inherit `@backDeployed`.
+  if (auto *AD = dyn_cast<AccessorDecl>(this))
+    return AD->getStorage()->hasBackDeployedAttr();
+
+  return false;
+}
+
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      StaticSpellingKind SSK) {
   switch (SSK) {
@@ -8152,19 +8167,6 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
 
 bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
-}
-
-bool AbstractFunctionDecl::isBackDeployed() const {
-  if (getAttrs().hasAttribute<BackDeployedAttr>())
-    return true;
-
-  // Property and subscript accessors inherit the attribute.
-  if (auto *AD = dyn_cast<AccessorDecl>(this)) {
-    if (AD->getStorage()->getAttrs().hasAttribute<BackDeployedAttr>())
-      return true;
-  }
-
-  return false;
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {

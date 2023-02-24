@@ -478,7 +478,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
                 /*allowUsableFromInline=*/true};
       }
 
-      if (AFD->getAttrs().hasAttribute<BackDeployedAttr>()) {
+      if (AFD->isBackDeployed(context->getASTContext())) {
         return {FragileFunctionKind::BackDeploy,
                 /*allowUsableFromInline=*/true};
       }
@@ -495,7 +495,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
           return {FragileFunctionKind::AlwaysEmitIntoClient,
                   /*allowUsableFromInline=*/true};
         }
-        if (storage->getAttrs().hasAttribute<BackDeployedAttr>()) {
+        if (storage->isBackDeployed(context->getASTContext())) {
           return {FragileFunctionKind::BackDeploy,
                   /*allowUsableFromInline=*/true};
         }
