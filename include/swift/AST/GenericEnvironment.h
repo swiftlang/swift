@@ -38,8 +38,10 @@ class OpaqueTypeDecl;
 class ElementArchetypeType;
 class OpenedArchetypeType;
 class PackArchetypeType;
+class PackExpansionType;
 class SILModule;
 class SILType;
+template <class> class CanTypeWrapper;
 
 /// Query function suitable for use as a \c TypeSubstitutionFn that queries
 /// the mapping of interface types to archetypes.
@@ -309,6 +311,23 @@ public:
   void dump(raw_ostream &os) const;
 
   SWIFT_DEBUG_DUMP;
+};
+
+/// A pair of an opened-element generic signature and an opened-element
+/// generic environment.
+struct OpenedElementContext {
+  /// The opened-element environment for this expansion.
+  GenericEnvironment *environment;
+
+  /// The opened-element signature for this expansion.
+  CanGenericSignature signature;
+
+  /// Create a fresh opened element context from a contextual pack
+  /// expansion type.  This is useful when writing code that needs to
+  /// break down the components of a pack expansion.
+  static OpenedElementContext
+  createForContextualExpansion(ASTContext &ctx,
+                   CanTypeWrapper<PackExpansionType> expansionType);
 };
   
 } // end namespace swift
