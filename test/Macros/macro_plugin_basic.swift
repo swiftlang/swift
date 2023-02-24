@@ -1,3 +1,4 @@
+// REQUIRES: rdar105870339
 // REQUIRES: OS=macosx
 
 // RUN: %empty-directory(%t)
