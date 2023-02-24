@@ -356,6 +356,7 @@ private:
     case Node::Kind::ClangType:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
+    case Node::Kind::ConformanceAttachedMacroExpansion:
     case Node::Kind::Constructor:
     case Node::Kind::CoroutineContinuationPrototype:
     case Node::Kind::CurryThunk:
@@ -1363,6 +1364,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::PeerAttachedMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "peer macro expansion #",
+                       (int)Node->getChild(2)->getIndex() + 1);
+  case Node::Kind::ConformanceAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true, "conformance macro expansion #",
                        (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::MacroExpansionUniqueName:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,

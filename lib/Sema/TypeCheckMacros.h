@@ -73,6 +73,13 @@ expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 /// If expansion occurred, returns the macro expansion buffer ID.
 Optional<unsigned> expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl);
 
+/// Expand the conformances for the given declaration based on
+/// the custom attribute that references the given macro.
+///
+/// If expansion occurred, returns the macro expansion buffer ID.
+Optional<unsigned> expandConformances(CustomAttr *attr, MacroDecl *macro,
+                                      NominalTypeDecl *nominal);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKMACROS_H */

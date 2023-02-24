@@ -62,6 +62,7 @@ enum MacroRole: UInt8 {
   case MemberAttribute = 0x08
   case Member = 0x10
   case Peer = 0x20
+  case Conformance = 0x40
 }
 
 extension String {
@@ -514,6 +515,8 @@ func expandAttachedMacro(
     expandedSource = expandedSources.joined(separator: " ")
   case .Peer:
     expandedSource = expandedSources.joined(separator: "\n\n")
+  case .Conformance:
+    expandedSource = expandedSources.joined(separator: "\n\n")
   case .Expression,
       .FreestandingDeclaration:
     fatalError("unreachable")
@@ -737,6 +740,39 @@ func expandAttachedMacroInProcess(
       // Form a buffer of peer declarations to return to the caller.
       expandedSources = peers.map {
         $0.trimmedDescription
+      }
+
+    case (let attachedMacro as ConformanceMacro.Type, .Conformance):
+      guard let declGroup = declarationNode.asProtocol(DeclGroupSyntax.self),
+            let identified = declarationNode.asProtocol(IdentifiedDeclSyntax.self) else {
+        return nil
+      }
+
+      // Local function to expand a conformance macro once we've opened up
+      // the existential.
+      func expandConformanceMacro<Node: DeclGroupSyntax>(
+        _ node: Node
+      ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
+        return try attachedMacro.expansion(
+          of: sourceManager.detach(
+            customAttrNode,
+            foldingWith: OperatorTable.standardOperators
+          ),
+          providingConformancesOf: sourceManager.detach(node),
+          in: context
+        )
+      }
+
+      let conformances = try _openExistential(
+        declGroup, do: expandConformanceMacro
+      )
+
+      // Form a buffer of extension declarations to return to the caller.
+      expandedSources = conformances.map { typeSyntax, whereClause in
+        let typeName = identified.identifier.trimmedDescription
+        let protocolName = typeSyntax.trimmedDescription
+        let whereClause = whereClause?.trimmedDescription ?? ""
+        return "extension \(typeName) : \(protocolName) \(whereClause) {}"
       }
 
     default:

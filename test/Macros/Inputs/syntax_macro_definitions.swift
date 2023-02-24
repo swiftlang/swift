@@ -1012,3 +1012,49 @@ public struct EmptyMacro: MemberMacro {
     return []
   }
 }
+
+public struct EquatableMacro: ConformanceMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingConformancesOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
+    let protocolName: TypeSyntax = "Equatable"
+    return [(protocolName, nil)]
+  }
+}
+
+public struct DelegatedConformanceMacro: ConformanceMacro, MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingConformancesOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
+    let protocolName: TypeSyntax = "P"
+    let conformance: DeclSyntax =
+      """
+      extension Placeholder where Element: P {}
+      """
+
+    guard let extensionDecl = conformance.as(ExtensionDeclSyntax.self) else {
+      return []
+    }
+
+    return [(protocolName, extensionDecl.genericWhereClause)]
+  }
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let requirement: DeclSyntax =
+      """
+      static func requirement() where Element : P {
+        Element.requirement()
+      }
+      """
+
+    return [requirement]
+  }
+}
