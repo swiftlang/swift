@@ -369,6 +369,11 @@ public:
     return record->getKind() == TaskStatusRecordKind::TaskDependency;
   }
 
+  void updateDependencyToEnqueuedOn(ExecutorRef executor) {
+    DependencyKind = EnqueuedOnExecutor;
+    DependentOn.Executor = executor;
+  }
+
   void performEscalationAction(JobPriority newPriority);
 };
 

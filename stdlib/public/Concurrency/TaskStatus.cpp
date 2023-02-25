@@ -479,6 +479,7 @@ void swift::updateStatusRecord(AsyncTask *task, TaskStatusRecord *record,
      ActiveTaskStatus& status,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
 
+  SWIFT_TASK_DEBUG_LOG("Updating status record %p of task %p", record, task);
   withStatusRecordLock(task, status, [&](ActiveTaskStatus lockedStatus) {
 #if NDEBUG
     bool foundRecord = false;
@@ -841,6 +842,7 @@ void TaskDependencyStatusRecord::performEscalationAction(JobPriority newPriority
     case EnqueuedOnExecutor:
       SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record",
         this->DependentOn.Executor, this);
+      swift_executor_escalate(this->DependentOn.Executor, this->WaitingTask, newPriority);
       break;
   }
 }
