@@ -627,7 +627,7 @@ namespace {
       auto var = cast<llvm::GlobalVariable>(addr);
       
       var->setConstant(true);
-      IGM.setTrueConstGlobal(var);
+      IGM.setColocateTypeDescriptorSection(var);
     }
   };
 
@@ -685,7 +685,7 @@ namespace {
       auto var = cast<llvm::GlobalVariable>(addr);
       
       var->setConstant(true);
-      IGM.setTrueConstGlobal(var);
+      IGM.setColocateTypeDescriptorSection(var);
     }
   };
   
@@ -763,7 +763,7 @@ namespace {
       auto var = cast<llvm::GlobalVariable>(addr);
       
       var->setConstant(true);
-      IGM.setTrueConstGlobal(var);
+      IGM.setColocateTypeDescriptorSection(var);
     }
   };
 
@@ -831,7 +831,7 @@ namespace {
       auto var = cast<llvm::GlobalVariable>(addr);
 
       var->setConstant(true);
-      IGM.setTrueConstGlobal(var);
+      IGM.setColocateTypeDescriptorSection(var);
     }
 
     void addName() {
@@ -1361,7 +1361,7 @@ namespace {
       }
 
       var->setConstant(true);
-      IGM.setTrueConstGlobal(var);
+      IGM.setColocateTypeDescriptorSection(var);
       return var;
     }
 
@@ -2172,7 +2172,7 @@ namespace {
       auto var = cast<llvm::GlobalVariable>(addr);
       
       var->setConstant(true);
-      IGM.setTrueConstGlobal(var);
+      IGM.setColocateTypeDescriptorSection(var);
       IGM.emitOpaqueTypeDescriptorAccessor(O);
     }
     
