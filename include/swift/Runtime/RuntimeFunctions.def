@@ -876,11 +876,36 @@ FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
          ATTRS(NoUnwind),
          EFFECT(MetaData))
 
+// Metadata *swift_allocateGenericClassMetadataWithLayoutString(
+//     ClassDescriptor *type,
+//     const void * const *arguments,
+//     const void *template);
+FUNCTION(AllocateGenericClassMetadataWithLayoutString,
+         swift_allocateGenericClassMetadataWithLayoutString,
+         C_CC, AlwaysAvailable,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(MetaData))
+
 // Metadata *swift_allocateGenericValueMetadata(ValueTypeDescriptor *type,
 //                                              const void * const *arguments,
 //                                              const void *template,
 //                                              size_t extraSize);
 FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
+         C_CC, AlwaysAvailable,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(MetaData))
+
+// Metadata *swift_allocateGenericValueMetadataWithLayoutString(
+//     ValueTypeDescriptor *type,
+//     const void * const *arguments,
+//     const void *template,
+//     size_t extraSize);
+FUNCTION(AllocateGenericValueMetadataWithLayoutString,
+         swift_allocateGenericValueMetadataWithLayoutString,
          C_CC, AlwaysAvailable,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy, SizeTy),

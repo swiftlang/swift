@@ -677,6 +677,16 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
   return metadata;
 }
 
+ClassMetadata *
+swift::swift_allocateGenericClassMetadataWithLayoutString(
+    const ClassDescriptor *description,
+    const void *arguments,
+    const GenericClassMetadataPattern *pattern) {
+  return swift::swift_allocateGenericClassMetadata(description,
+                                                   arguments,
+                                                   pattern);
+}
+
 static void
 initializeValueMetadataFromPattern(ValueMetadata *metadata,
                                    const ValueTypeDescriptor *description,
@@ -747,6 +757,18 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   installGenericArguments(metadata, description, arguments);
 
   return metadata;
+}
+
+ValueMetadata *
+swift::swift_allocateGenericValueMetadataWithLayoutString(
+    const ValueTypeDescriptor *description,
+    const void *arguments,
+    const GenericValueMetadataPattern *pattern,
+    size_t extraDataSize) {
+  return swift::swift_allocateGenericValueMetadata(description,
+                                                   arguments,
+                                                   pattern,
+                                                   extraDataSize);
 }
 
 // Look into the canonical prespecialized metadata attached to the type
