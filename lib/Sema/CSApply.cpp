@@ -4621,10 +4621,12 @@ namespace {
     }
     
     Expr *visitIsCaseExpr(IsCaseExpr *expr) {
-      auto &e = llvm::errs();
-      e << "IsCaseExpr CSApply \n";
+      // Turn the subexpression into an rvalue.
+      // Why does this still never get called?
+      auto &ctx = cs.getASTContext();
+      auto sub = cs.coerceToRValue(expr->getSubExpr());
+      expr->setSubExpr(sub);
       
-      // TODO: What do we do here?
       return simplifyExprType(expr);
     }
     

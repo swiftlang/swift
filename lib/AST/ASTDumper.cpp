@@ -2796,8 +2796,10 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitIsCaseExpr(IsCaseExpr *E) {
-    printCommon(E, "is_case_expr") << ' ' <<
-      E->getPattern() << "\n";
+    printCommon(E, "is_case_expr") << ' ' << "\n";
+    printRec(E->getSubExpr());
+    OS << '\n';
+    printRec(E->getPattern());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {

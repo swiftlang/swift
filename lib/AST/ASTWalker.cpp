@@ -1085,10 +1085,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitIsCaseExpr(IsCaseExpr *E) {
-    Pattern *sub = doIt(E->getPattern());
-    if (!sub) return nullptr;
+    if (E->getSubExpr()) {
+      if (Expr *subExpr = doIt(E->getSubExpr())) {
+        E->setSubExpr(subExpr);
+      } else {
+        return nullptr;
+      }
+    }
     
-    E->setPattern(sub);
+    if(Pattern *sub = doIt(E->getPattern())) {
+      E->setPattern(sub);
+    } else {
+      return nullptr;
+    }
+    
     return E;
   }
 

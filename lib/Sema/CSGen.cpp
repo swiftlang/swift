@@ -3409,30 +3409,30 @@ namespace {
     }
     
     Type visitIsCaseExpr(IsCaseExpr *expr) {
-      
-      // TODO: Add a constraint that the type of the LHS (`expr->getSubExpr()`)
-      // is the same as the type of the RHS (`expr->getPattern()`)
-      
-      // Some potentially relevant code copied from elsewhere about getting types from patterns:
-      
       auto exprPattern = expr->getPattern();
       Pattern *pattern = TypeChecker::resolvePattern(exprPattern, CurDC,
-                                                     /*isStmtCondition*/ false);
+                                                     /*isStmtCondition*/ true); // true or false?
       if (!pattern) {
         return nullptr;
       }
 
       auto contextualPattern = ContextualPattern::forRawPattern(pattern, CurDC);
-      auto contextualPatternPattern = contextualPattern.getPattern();
       Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
       if (patternType->hasError()) {
         return nullptr;
       }
 
-      // This doesn't work because `CS.setType` hasn't been called?
-//      auto fromType = CS.getType(expr->getSubExpr());
-//      CS.addConstraint(ConstraintKind::Equal, fromType, patternType,
-//                       CS.getConstraintLocator(expr));
+      // Trying to emulate how `TypeChecker::typeCheckStmtConditionElement`
+      // handles `if case .bar = value { ... }`. For some reason this returns
+      // `hadError` with `value is case .bar` but not `value is case .bar(1)`.
+      // Even when `hadError` is false, we get an assertion later 
+      auto subExpr = expr->getSubExpr();
+      bool hadError = TypeChecker::typeCheckBinding(pattern, subExpr, CurDC, patternType);
+      if (hadError) {
+        return nullptr;
+      }
+      expr->setPattern(pattern);
+      expr->setSubExpr(subExpr);
       
       // The `IsCaseExpr` itself always has `Bool` type
       auto &ctx = CS.getASTContext();
