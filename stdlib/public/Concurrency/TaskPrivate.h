@@ -103,6 +103,11 @@ void _swift_taskGroup_detachChild(TaskGroup *group, AsyncTask *child);
 /// on the same address.
 void _swift_tsan_acquire(void *addr);
 void _swift_tsan_release(void *addr);
+/// Technically, this consume relies on implicit HW address dependency ordering
+/// and is paired with a corresponding release. Since TSAN doesn't know how to
+/// reason about this, we tell TSAN it's an acquire instead. See also
+/// SWIFT_MEMORY_ORDER_CONSUME definition.
+#define _swift_tsan_consume _swift_tsan_acquire
 
 /// Special values used with DispatchQueueIndex to indicate the global and main
 /// executors.
