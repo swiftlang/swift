@@ -14,8 +14,8 @@ public struct VariadicType<T...> {
   // CHECK: bb0(%0 : $*Pack{repeat (each T, each U)}, %1 : $*Pack{repeat each T}, %2 : $*Pack{repeat each U}, %3 : $VariadicType<repeat each T>):
   public func variadicMethod<U...>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) {}
 
-  // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type12VariadicTypeV13takesFunction1tyqd__qd__Qp_txxQpXE_tlF : $@convention(method) <T...><U...> (@noescape @callee_guaranteed @substituted <τ_0_0..., τ_0_1..., τ_0_2..., τ_0_3...> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_2} for <T, T, U, U>, VariadicType<repeat each T>) -> () {
-  // CHECK: bb0(%0 : $@noescape @callee_guaranteed @substituted <τ_0_0..., τ_0_1..., τ_0_2..., τ_0_3...> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_2} for <T, T, U, U>, %1 : $VariadicType<repeat each T>):
+  // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type12VariadicTypeV13takesFunction1tyqd__qd__Qp_txxQpXE_tlF : $@convention(method) <T...><U...> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0..., τ_0_1..., τ_0_2..., τ_0_3...> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_2} for <T, T, U, U>, VariadicType<repeat each T>) -> () {
+  // CHECK: bb0(%0 : @guaranteed $@noescape @callee_guaranteed @substituted <τ_0_0..., τ_0_1..., τ_0_2..., τ_0_3...> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_2} for <T, T, U, U>, %1 : $VariadicType<repeat each T>):
   public func takesFunction<U...>(t: (repeat each T) -> (repeat each U)) {}
 }
 
