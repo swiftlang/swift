@@ -1132,6 +1132,13 @@ def disable_collocate_metadata_functions :
   Flag<["-"], "disable-collocate-metadata-functions">,
   HelpText<"Disable collocate metadata functions">;
 
+def enable_colocate_type_descriptors :
+  Flag<["-"], "enable-colocate-type-descriptors">,
+  HelpText<"Enable colocate type descriptors">;
+def disable_colocate_type_descriptors :
+  Flag<["-"], "disable-colocate-type-descriptors">,
+  HelpText<"Disable colocate type descriptors">;
+
 def enable_relative_protocol_witness_tables :
   Flag<["-"], "enable-relative-protocol-witness-tables">,
   HelpText<"Enable relative protocol witness tables">;

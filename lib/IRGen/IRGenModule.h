@@ -1588,6 +1588,7 @@ public:
                                       const ProtocolConformance *conformance);
 
   void setColocateMetadataSection(llvm::Function *f);
+  void setColocateTypeDescriptorSection(llvm::GlobalVariable *v);
 
   llvm::Constant *
   getAddrOfTypeMetadata(CanType concreteType,
