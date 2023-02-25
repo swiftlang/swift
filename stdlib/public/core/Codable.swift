@@ -5537,38 +5537,33 @@ internal struct _DictionaryCodingKey: CodingKey {
 /// unkeyed container of alternating key-value pairs.
 @available(SwiftStdlib 5.6, *)
 public protocol CodingKeyRepresentable {
-
   @available(SwiftStdlib 5.6, *)
-  var codingKey: any CodingKey { get }
-
+  var codingKey: CodingKey { get }
   @available(SwiftStdlib 5.6, *)
-  init?(codingKey: some CodingKey)
+  init?<T: CodingKey>(codingKey: T)
 }
 
 @available(SwiftStdlib 5.6, *)
-extension RawRepresentable<String> where Self: CodingKeyRepresentable {
-
+extension RawRepresentable
+where Self: CodingKeyRepresentable, RawValue == String {
   @available(SwiftStdlib 5.6, *)
-  public var codingKey: any CodingKey {
+  public var codingKey: CodingKey {
     _DictionaryCodingKey(stringValue: rawValue)
   }
-
   @available(SwiftStdlib 5.6, *)
-  public init?(codingKey: some CodingKey) {
+  public init?<T: CodingKey>(codingKey: T) {
     self.init(rawValue: codingKey.stringValue)
   }
 }
 
 @available(SwiftStdlib 5.6, *)
-extension RawRepresentable<Int> where Self: CodingKeyRepresentable {
-
+extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == Int {
   @available(SwiftStdlib 5.6, *)
-  public var codingKey: any CodingKey {
+  public var codingKey: CodingKey {
     _DictionaryCodingKey(intValue: rawValue)
   }
-
   @available(SwiftStdlib 5.6, *)
-  public init?(codingKey: some CodingKey) {
+  public init?<T: CodingKey>(codingKey: T) {
     if let intValue = codingKey.intValue {
       self.init(rawValue: intValue)
     } else {
@@ -5579,14 +5574,12 @@ extension RawRepresentable<Int> where Self: CodingKeyRepresentable {
 
 @available(SwiftStdlib 5.6, *)
 extension Int: CodingKeyRepresentable {
-
   @available(SwiftStdlib 5.6, *)
-  public var codingKey: any CodingKey {
+  public var codingKey: CodingKey {
     _DictionaryCodingKey(intValue: self)
   }
-
   @available(SwiftStdlib 5.6, *)
-  public init?(codingKey: some CodingKey) {
+  public init?<T: CodingKey>(codingKey: T) {
     if let intValue = codingKey.intValue {
       self = intValue
     } else {
@@ -5597,14 +5590,12 @@ extension Int: CodingKeyRepresentable {
 
 @available(SwiftStdlib 5.6, *)
 extension String: CodingKeyRepresentable {
-
   @available(SwiftStdlib 5.6, *)
-  public var codingKey: any CodingKey {
+  public var codingKey: CodingKey {
     _DictionaryCodingKey(stringValue: self)
   }
-
   @available(SwiftStdlib 5.6, *)
-  public init?(codingKey: some CodingKey) {
+  public init?<T: CodingKey>(codingKey: T) {
     self = codingKey.stringValue
   }
 }
