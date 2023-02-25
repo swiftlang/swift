@@ -1,5 +1,3 @@
-// REQUIRES: rdar104716322
-
 // RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics) | %FileCheck %s
 
 // REQUIRES: executable_test

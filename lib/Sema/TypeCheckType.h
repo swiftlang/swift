@@ -510,19 +510,18 @@ class TypeResolution {
   OpenUnboundGenericTypeFn unboundTyOpener;
   HandlePlaceholderTypeReprFn placeholderHandler;
   OpenPackElementFn packElementOpener;
-
-private:
   GenericSignature genericSig;
 
-  TypeResolution(DeclContext *dc, TypeResolutionStage stage,
-                 TypeResolutionOptions options,
+private:
+  TypeResolution(DeclContext *dc, GenericSignature genericSig,
+                 TypeResolutionStage stage, TypeResolutionOptions options,
                  OpenUnboundGenericTypeFn unboundTyOpener,
                  HandlePlaceholderTypeReprFn placeholderHandler,
                  OpenPackElementFn packElementOpener)
       : dc(dc), stage(stage), options(options),
         unboundTyOpener(unboundTyOpener),
         placeholderHandler(placeholderHandler),
-        packElementOpener(packElementOpener) {}
+        packElementOpener(packElementOpener), genericSig(genericSig) {}
 
 public:
   /// Form a type resolution for the structure of a type, which does not
@@ -571,6 +570,8 @@ public:
 
 public:
   TypeResolution withOptions(TypeResolutionOptions opts) const;
+
+  TypeResolution withoutPackElementOpener() const;
 
 public:
   /// Retrieve the ASTContext in which this resolution occurs.
