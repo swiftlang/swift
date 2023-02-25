@@ -24,7 +24,7 @@ public enum E {
     indirect case e(E)
 }
 
-// CHECK:       inline E E::getE() const {
+// CHECK:       SWIFT_INLINE_THUNK E E::getE() const {
 // CHECK-NEXT:    if (!isE()) abort();
 // CHECK-NEXT:    alignas(E) unsigned char buffer[sizeof(E)];
 // CHECK-NEXT:    auto *thisCopy = new(buffer) E(*this);
@@ -48,7 +48,7 @@ public indirect enum IndirectEnum {
     case ie(IndirectEnum)
 }
 
-// CHECK:       inline uint64_t IndirectEnum::getUi64() const {
+// CHECK:       SWIFT_INLINE_THUNK uint64_t IndirectEnum::getUi64() const {
 // CHECK-NEXT:    if (!isUi64()) abort();
 // CHECK-NEXT:    alignas(IndirectEnum) unsigned char buffer[sizeof(IndirectEnum)];
 // CHECK-NEXT:    auto *thisCopy = new(buffer) IndirectEnum(*this);
@@ -61,7 +61,7 @@ public indirect enum IndirectEnum {
 // CHECK-NEXT:    return result;
 // CHECK-NEXT:  }
 
-// CHECK:       inline double IndirectEnum::getD() const {
+// CHECK:       SWIFT_INLINE_THUNK double IndirectEnum::getD() const {
 // CHECK-NEXT:    if (!isD()) abort();
 // CHECK-NEXT:    alignas(IndirectEnum) unsigned char buffer[sizeof(IndirectEnum)];
 // CHECK-NEXT:    auto *thisCopy = new(buffer) IndirectEnum(*this);
@@ -74,7 +74,7 @@ public indirect enum IndirectEnum {
 // CHECK-NEXT:    return result;
 // CHECK-NEXT:  }
 
-// CHECK:       inline S IndirectEnum::getS() const {
+// CHECK:       SWIFT_INLINE_THUNK S IndirectEnum::getS() const {
 // CHECK-NEXT:    if (!isS()) abort();
 // CHECK-NEXT:    alignas(IndirectEnum) unsigned char buffer[sizeof(IndirectEnum)];
 // CHECK-NEXT:    auto *thisCopy = new(buffer) IndirectEnum(*this);
@@ -88,7 +88,7 @@ public indirect enum IndirectEnum {
 // CHECK-NEXT:    return toReturn;
 // CHECK-NEXT:  }
 
-// CHECK:       inline C IndirectEnum::getC() const {
+// CHECK:       SWIFT_INLINE_THUNK C IndirectEnum::getC() const {
 // CHECK-NEXT:    if (!isC()) abort();
 // CHECK-NEXT:    alignas(IndirectEnum) unsigned char buffer[sizeof(IndirectEnum)];
 // CHECK-NEXT:    auto *thisCopy = new(buffer) IndirectEnum(*this);
@@ -102,7 +102,7 @@ public indirect enum IndirectEnum {
 // CHECK-NEXT:    return toReturn;
 // CHECK-NEXT:  }
 
-// CHECK:       inline IndirectEnum IndirectEnum::getIe() const {
+// CHECK:       SWIFT_INLINE_THUNK IndirectEnum IndirectEnum::getIe() const {
 // CHECK-NEXT:    if (!isIe()) abort();
 // CHECK-NEXT:    alignas(IndirectEnum) unsigned char buffer[sizeof(IndirectEnum)];
 // CHECK-NEXT:    auto *thisCopy = new(buffer) IndirectEnum(*this);
