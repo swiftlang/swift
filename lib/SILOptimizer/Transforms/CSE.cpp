@@ -564,7 +564,20 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
       return true;
     return false;
   };
-  return LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI, opCmp);
+  bool isEqual =
+      LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI, opCmp);
+#ifdef NDEBUG
+  if (isEqual && getHashValue(LHS) != getHashValue(RHS)) {
+    llvm::dbgs() << "LHS: ";
+    LHSI->dump();
+    llvm::dbgs() << "RHS: ";
+    RHSI->dump();
+    llvm::dbgs() << "In function:\n";
+    LHSI->getFunction()->dump();
+    llvm_unreachable("Mismatched isEqual and getHashValue() function in CSE\n");
+  }
+#endif
+  return isEqual;
 }
 
 namespace {
