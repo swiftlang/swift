@@ -11,7 +11,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT:  } // namespace Functions
 
-// CHECK-NOT: inline bool alwaysEmitIntoClientFunc(bool x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NOT: SWIFT_INLINE_THUNK bool alwaysEmitIntoClientFunc(bool x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NOT:   return _impl::$s9Functions24alwaysEmitIntoClientFuncyS2bF(x);
 // CHECK-NOT: }
 

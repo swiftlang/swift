@@ -72,6 +72,7 @@ public func single_concrete() {
 // CHECK-SAME:        %swift.full_type, 
 // CHECK-SAME:        %swift.full_type* bitcast (
 // CHECK-SAME:          <{ 
+// CHECK-SAME:            i8*, 
 // CHECK-SAME:            i8**, 
 // CHECK-SAME:            [[INT]], 
 // CHECK-SAME:            %swift.type_descriptor*, 
@@ -81,12 +82,13 @@ public func single_concrete() {
 // CHECK-SAME:          to %swift.full_type*
 // CHECK-SAME:        ), 
 // CHECK-SAME:        i32 0, 
-// CHECK-SAME:        i32 1
+// CHECK-SAME:        i32 2
 // CHECK-SAME:      ), 
 // CHECK-SAME:      %swift.type* getelementptr inbounds (
 // CHECK-SAME:        %swift.full_type, 
 // CHECK-SAME:        %swift.full_type* bitcast (
 // CHECK-SAME:          <{ 
+// CHECK-SAME:            i8*, 
 // CHECK-SAME:            i8**, 
 // CHECK-SAME:            [[INT]], 
 // CHECK-SAME:            %swift.type_descriptor*, 
@@ -96,7 +98,7 @@ public func single_concrete() {
 // CHECK-SAME:          to %swift.full_type*
 // CHECK-SAME:        ), 
 // CHECK-SAME:        i32 0, 
-// CHECK-SAME:        i32 1
+// CHECK-SAME:        i32 2
 // CHECK-SAME:      ), 
 // CHECK-SAME:      i8** [[Single_P1]]
 // CHECK-SAME:    )
@@ -137,7 +139,7 @@ public func single_concrete() {
 // CHECK-SAME:          to %swift.full_type*
 // CHECK-SAME:        ), 
 // CHECK-SAME:        i32 0, 
-// CHECK-SAME:        i32 1
+// CHECK-SAME:        i32 2
 // CHECK-SAME:      ), 
 // CHECK-SAME:      i8*** [[CONDITIONAL_REQUIREMENTS]]
 // CHECK-SAME:    )
@@ -282,6 +284,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK-SAME:      %swift.type* bitcast (
 // CHECK-SAME:        i64* getelementptr inbounds (
 // CHECK-SAME:          <{ 
+// CHECK-SAME:            i8*, 
 // CHECK-SAME:            i8**, 
 // CHECK-SAME:            i64, 
 // CHECK-SAME:            <{ i32, i32, i32, i32, i32, i32, i32 }>*, 
@@ -294,7 +297,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK-SAME:            i64 
 // CHECK-SAME:          }>* @"$s42conditional_conformance_basic_conformances4IsP3VMf", 
 // CHECK-SAME:          i32 0, 
-// CHECK-SAME:          i32 1
+// CHECK-SAME:          i32 2
 // CHECK-SAME:        ) to %swift.type*
 // CHECK-SAME:      )
 // CHECK-SAME:    )
@@ -334,6 +337,7 @@ public func double_concrete_concrete() {
 // CHECK-SAME:        %swift.full_type, 
 // CHECK-SAME:        %swift.full_type* bitcast (
 // CHECK-SAME:          <{ 
+// CHECK-SAME:            i8*, 
 // CHECK-SAME:            i8**, 
 // CHECK-SAME:            [[INT]], 
 // CHECK-SAME:            %swift.type_descriptor*, 
@@ -344,12 +348,13 @@ public func double_concrete_concrete() {
 // CHECK-SAME:          to %swift.full_type*
 // CHECK-SAME:        ), 
 // CHECK-SAME:        i32 0, 
-// CHECK-SAME:        i32 1
+// CHECK-SAME:        i32 2
 // CHECK-SAME:      ), 
 // CHECK-SAME:      %swift.type* getelementptr inbounds (
 // CHECK-SAME:        %swift.full_type, 
 // CHECK-SAME:        %swift.full_type* bitcast (
 // CHECK-SAME:          <{ 
+// CHECK-SAME:            i8*, 
 // CHECK-SAME:            i8**, 
 // CHECK-SAME:            [[INT]], 
 // CHECK-SAME:            %swift.type_descriptor*, 
@@ -360,7 +365,7 @@ public func double_concrete_concrete() {
 // CHECK-SAME:          to %swift.full_type*
 // CHECK-SAME:        ), 
 // CHECK-SAME:        i32 0, 
-// CHECK-SAME:        i32 1
+// CHECK-SAME:        i32 2
 // CHECK-SAME:      ), 
 // CHECK-SAME:      i8** [[Double_P1]]
 // CHECK-SAME:    )
@@ -393,6 +398,7 @@ public func double_concrete_concrete() {
 // CHECK-SAME:        %swift.full_type, 
 // CHECK-SAME:        %swift.full_type* bitcast (
 // CHECK-SAME:          <{ 
+// CHECK-SAME:            i8*, 
 // CHECK-SAME:            i8**, 
 // CHECK-SAME:            i64, 
 // CHECK-SAME:            %swift.type_descriptor*, 
@@ -403,7 +409,7 @@ public func double_concrete_concrete() {
 // CHECK-SAME:          to %swift.full_type*
 // CHECK-SAME:        ), 
 // CHECK-SAME:        i32 0, 
-// CHECK-SAME:        i32 1
+// CHECK-SAME:        i32 2
 // CHECK-SAME:      ), 
 // CHECK-SAME:      i8*** [[CONDITIONAL_REQUIREMENTS]]
 // CHECK-SAME:    )

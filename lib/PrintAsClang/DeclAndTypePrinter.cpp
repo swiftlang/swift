@@ -434,11 +434,15 @@ private:
       ClangSyntaxPrinter(nameOS).printIdentifier(caseName);
       name[0] = std::toupper(name[0]);
 
-      os << "  inline bool is" << name << "() const;\n";
+      os << "  ";
+      ClangSyntaxPrinter(os).printInlineForThunk();
+      os << "bool is" << name << "() const;\n";
 
       outOfLineSyntaxPrinter
           .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
-      outOfLineOS << "  inline bool ";
+      outOfLineOS << "  ";
+      ClangSyntaxPrinter(outOfLineOS).printInlineForThunk();
+      outOfLineOS << " bool ";
       outOfLineSyntaxPrinter.printNominalTypeQualifier(
           ED, /*moduleContext=*/ED->getModuleContext());
       outOfLineOS << "is" << name << "() const {\n";
@@ -469,10 +473,14 @@ private:
           /*NeedsReturnTypes=*/true,
           [&](auto &types) {
             // Printing function name and return type
-            os << "  inline " << types[paramType] << " get" << name;
+            os << "  ";
+            ClangSyntaxPrinter(os).printInlineForThunk();
+            os << types[paramType] << " get" << name;
             outOfLineSyntaxPrinter
                 .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
-            outOfLineOS << "  inline " << types[paramType] << ' ';
+            outOfLineOS << "  ";
+            ClangSyntaxPrinter(outOfLineOS).printInlineForThunk();
+            outOfLineOS << types[paramType] << ' ';
             outOfLineSyntaxPrinter.printNominalTypeQualifier(
                 ED, /*moduleContext=*/ED->getModuleContext());
             outOfLineOS << "get" << name;
@@ -550,7 +558,9 @@ private:
                                elementInfo) {
       os << "  inline const static struct _impl_" << caseName << " {  "
          << "// impl struct for case " << caseName << '\n';
-      os << "    inline constexpr operator cases() const {\n";
+      os << "    ";
+      syntaxPrinter.printInlineForThunk();
+      os << "constexpr operator cases() const {\n";
       os << "      return cases::";
       syntaxPrinter.printIdentifier(caseName);
       os << ";\n";
@@ -579,14 +589,15 @@ private:
             [&](auto &types) {
               const auto *ED = elementDecl->getParentEnum();
               // Printing function name and return type
-              os << "    inline ";
+              os << "    SWIFT_INLINE_THUNK "; // TODO
               syntaxPrinter.printNominalTypeReference(ED,
                                                       ED->getModuleContext());
               os << " operator()";
 
               outOfLineSyntaxPrinter
                   .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
-              outOfLineOS << "  inline ";
+              outOfLineOS << "  ";
+              outOfLineSyntaxPrinter.printInlineForThunk();
               outOfLineSyntaxPrinter.printNominalTypeReference(
                   ED, ED->getModuleContext());
               outOfLineOS << ' ';
@@ -794,7 +805,9 @@ private:
       os << "#pragma clang diagnostic pop\n";
 
       // Printing operator cases()
-      os << "  inline operator cases() const {\n";
+      os << "  ";
+      ClangSyntaxPrinter(os).printInlineForThunk();
+      os << "operator cases() const {\n";
       if (ED->isResilient()) {
         if (!elementTagMapping.empty()) {
           os << "    auto tag = _getEnumTag();\n";

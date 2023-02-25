@@ -117,9 +117,11 @@ public:
     }
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts || !areFieldsABIAccessible()) {
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    if (!useStructLayouts || !areFieldsABIAccessible()) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
 
@@ -130,14 +132,14 @@ public:
     std::vector<TypeLayoutEntry *> fields;
     for (auto &field : getFields()) {
       auto fieldTy = field.getType(IGM, T);
-      fields.push_back(field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+      fields.push_back(field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
     }
 
-    if (fields.size() == 1) {
-      return fields[0];
-    }
+    // if (fields.size() == 1) {
+    //   return fields[0];
+    // }
 
-    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
   }
 
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
@@ -289,9 +291,11 @@ public:
     }
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts || !areFieldsABIAccessible()) {
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    if (!useStructLayouts || !areFieldsABIAccessible()) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
 
@@ -302,14 +306,14 @@ public:
     std::vector<TypeLayoutEntry *> fields;
     for (auto &field : getFields()) {
       auto fieldTy = field.getType(IGM, T);
-      fields.push_back(field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+      fields.push_back(field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
     }
 
-    if (fields.size() == 1) {
-      return fields[0];
-    }
+    // if (fields.size() == 1) {
+    //   return fields[0];
+    // }
 
-    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
   }
 
   llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }

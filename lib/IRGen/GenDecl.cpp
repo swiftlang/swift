@@ -4963,6 +4963,10 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     if (isa<ClassDecl>(nominal)) {
       adjustmentIndex = MetadataAdjustmentIndex::Class;
     }
+
+    if (concreteType->is<TupleType>()) {
+      adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
+    }
   }
 
   llvm::Constant *indices[] = {
@@ -5005,8 +5009,10 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-
-  if (fullMetadata) {
+  if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
+    defaultVarTy = FullExistentialTypeMetadataStructTy;
+    adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
+  } else if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
     if (concreteType->getClassOrBoundGenericClass() && !foreign) {
       adjustmentIndex = MetadataAdjustmentIndex::Class;

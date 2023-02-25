@@ -52,6 +52,7 @@ import Argument
 // CHECK-SAME:       %swift.full_type,
 // CHECK-SAME:       %swift.full_type* bitcast (
 // CHECK-SAME:         <{
+// CHECK-SAME:           i8*,
 // CHECK-SAME:           i8**,
 // CHECK-SAME:           [[INT]],
 // CHECK-SAME:           %swift.type_descriptor*,
@@ -62,7 +63,7 @@ import Argument
 // CHECK-SAME:         }>* @"$s8Argument03OneA0VyAA7IntegerVGMN" to %swift.full_type*
 // CHECK-SAME:       ),
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     ),
 // CHECK-SAME:   %swift.type** @"$s8Argument03OneA0VyAA7IntegerVGMJ"
 // CHECK-SAME:   )

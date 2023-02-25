@@ -2160,33 +2160,60 @@ FUNCTION(StoreMultiPayloadEnumTagSinglePayload,
          ATTRS(NoUnwind),
          EFFECT(NoEffect))
 
-// void *swift_generic_destroy(opaque*, const Metadata* type, const char*);
+// void swift_generic_destroy(opaque*, const Metadata* type);
 FUNCTION(GenericDestroy,
          swift_generic_destroy,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy, TypeMetadataPtrTy, Int8PtrTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Deallocating))
 
 
-// void *swift_generic_assign(opaque* dest, opaque* src, const Metadata* type, const char*, bool isTake);
-FUNCTION(GenericAssign,
-         swift_generic_assign,
+// void *swift_generic_assignWithCopy(opaque* dest, opaque* src, const Metadata* type);
+FUNCTION(GenericAssignWithCopy,
+         swift_generic_assignWithCopy,
          C_CC, AlwaysAvailable,
-         RETURNS(VoidTy),
-         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy, Int8PtrTy, Int1Ty),
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Refcounting, Deallocating))
 
-// void *swift_generic_initialize(opaque* dest, opaque* src, const Metadata* type, const char*, bool isTake);
-FUNCTION(GenericInitialize,
-         swift_generic_initialize,
+// void *swift_generic_assignWithTake(opaque* dest, opaque* src, const Metadata* type);
+FUNCTION(GenericAssignWithTake,
+         swift_generic_assignWithTake,
          C_CC, AlwaysAvailable,
-         RETURNS(VoidTy),
-         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy, Int8PtrTy, Int1Ty),
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(Refcounting, Deallocating))
+
+// void *swift_generic_initWithCopy(opaque* dest, opaque* src, const Metadata* type);
+FUNCTION(GenericInitWithCopy,
+         swift_generic_initWithCopy,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
          EFFECT(Refcounting))
+
+// void *swift_generic_initWithTake(opaque* dest, opaque* src, const Metadata* type);
+FUNCTION(GenericInitWithTake,
+         swift_generic_initWithTake,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(Refcounting))
+
+// void swift_generic_instantiateLayoutString(const uint8_t* layoutStr, Metadata* type);
+FUNCTION(GenericInstantiateLayoutString,
+         swift_generic_instantiateLayoutString,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(MetaData))
 
 #undef RETURNS
 #undef ARGS

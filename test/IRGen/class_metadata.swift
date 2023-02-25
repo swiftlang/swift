@@ -19,7 +19,7 @@ class A {}
 //   Superclass.
 // CHECK-SAME: i32 0,
 //   Negative size in words.
-// CHECK-SAME: i32 2,
+// CHECK-SAME: i32 3,
 //   Positive size in words.
 // CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
 // CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],
@@ -60,7 +60,7 @@ class B : A {}
 //   Superclass type.
 // CHECK-SAME: @"symbolic _____ 14class_metadata1AC"
 //   Negative size in words.
-// CHECK-SAME: i32 2,
+// CHECK-SAME: i32 3,
 //   Positive size in words.
 // CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
 // CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],
@@ -99,7 +99,7 @@ class C<T> : B {}
 //   Superclass type.
 // CHECK-SAME: @"symbolic _____ 14class_metadata1BC"
 //   Negative size in words.
-// CHECK-SAME: i32 2,
+// CHECK-SAME: i32 3,
 //   Positive size in words.
 // CHECK-32-SAME: i32 [[#MDSIZE + 6 + 2]],
 // CHECK-64-SAME: i32 [[#MDSIZE + 3 + 2]],
@@ -162,7 +162,7 @@ class D : E {}
 //   Superclass type.
 // CHECK-SAME: @"symbolic _____ 14class_metadata1EC"
 //   Negative size in words.
-// CHECK-SAME: i32 2,
+// CHECK-SAME: i32 3,
 //   Positive size in words.
 // CHECK-32-SAME: i32 [[#MDSIZE + 6 + 1]],
 // CHECK-64-SAME: i32 [[#MDSIZE + 3 + 1]],

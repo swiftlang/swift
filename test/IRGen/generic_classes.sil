@@ -21,7 +21,7 @@ import Swift
 // --       name
 // CHECK-SAME:   [12 x i8]* [[ROOTGENERIC_NAME]]
 // --       negative size in words
-// CHECK-SAME:   i32 2,
+// CHECK-SAME:   i32 3,
 // --       positive size in words
 // CHECK-objc-SAME:   i32 18,
 // CHECK-native-SAME:   i32 15,

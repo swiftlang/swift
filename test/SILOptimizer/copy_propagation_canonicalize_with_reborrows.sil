@@ -297,14 +297,15 @@ bb1(%4 : @guaranteed $X, %5 : @owned $X):
 // Lifetime analysis is successful; the copy/destroy in bb1 are removed. The
 // end_borrow/destroy maintain their position.
 //
-// CHECK-LABEL: sil [ossa] @reborrow_adjacent_to_consume : $@convention(thin) (@owned X) -> () {
+// CHECK-LABEL: sil [ossa] @reborrow_adjacent_to_consume : $@convention(thin) () -> () {
 // CHECK: bb1(%{{.*}} : @guaranteed $X, %{{.*}} : @owned $X):
 // CHECK-NEXT:   br bb2
 // CHECK: bb2(%{{.*}} : @guaranteed $X, %{{.*}} : @owned $X):
 // CHECK-NEXT:   end_borrow
 // CHECK-NEXT:   destroy_value
-sil [ossa] @reborrow_adjacent_to_consume : $@convention(thin) (@owned X) -> () {
-bb0(%0 : @owned $X):
+sil [ossa] @reborrow_adjacent_to_consume : $@convention(thin) () -> () {
+bb0:
+  %0 = apply undef() : $@convention(thin) () -> (@owned X)
   %1 = begin_borrow %0 : $X
   br bb1(%1 : $X, %0 : $X)
 
@@ -328,14 +329,15 @@ bb2(%6 : @guaranteed $X, %7 : @owned $X):
 //
 // Lifetime analysis is successful; the copy/destroy in bb2 are removed.
 //
-// CHECK-LABEL: sil [ossa] @reborrow_no_adjacent_consume : $@convention(thin) (@owned X) -> () {
+// CHECK-LABEL: sil [ossa] @reborrow_no_adjacent_consume : $@convention(thin) () -> () {
 // CHECK: bb1(%{{.*}} : @guaranteed $X, %{{.*}} : @owned $X):
 // CHECK-NEXT:   br bb2
 // CHECK: bb2(%{{.*}} : @guaranteed $X):
 // CHECK-NEXT:   end_borrow
 // CHECK-NEXT:   destroy_value
-sil [ossa] @reborrow_no_adjacent_consume : $@convention(thin) (@owned X) -> () {
-bb0(%0 : @owned $X):
+sil [ossa] @reborrow_no_adjacent_consume : $@convention(thin) () -> () {
+bb0:
+  %0 = apply undef() : $@convention(thin) () -> (@owned X)
   %1 = begin_borrow %0 : $X
   br bb1(%1 : $X, %0 : $X)
 

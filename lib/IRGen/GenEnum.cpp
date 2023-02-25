@@ -380,13 +380,15 @@ namespace {
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) override;
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
+    TypeLayoutEntry *
+    buildTypeLayoutEntry(IRGenModule &IGM,
+                         SILType T,
+                         bool useStructLayouts) const override {
       if (ElementsWithPayload.empty())
         return IGM.typeLayoutCache.getEmptyEntry();
       if (!ElementsAreABIAccessible)
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
-      if (TIK >= Loadable && !IGM.getOptions().ForceStructTypeLayouts) {
+      if (TIK >= Loadable && !useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(),
                                                                  T);
       }
@@ -395,9 +397,10 @@ namespace {
       std::vector<TypeLayoutEntry *> nonEmptyCases;
       nonEmptyCases.push_back(
         getSingleton()->buildTypeLayoutEntry(IGM,
-                                             getSingletonType(IGM, T)));
-      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases,
-                                                      nonEmptyCases);
+                                             getSingletonType(IGM, T),
+                                             useStructLayouts));
+      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases, nonEmptyCases,
+                                                      T, getTypeInfo());
     }
 
     llvm::Value *
@@ -1086,9 +1089,11 @@ namespace {
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) override;
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry *
+    buildTypeLayoutEntry(IRGenModule &IGM,
+                         SILType T,
+                         bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(), T);
       }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T,
@@ -1242,9 +1247,11 @@ namespace {
                                      EnumDecl *theEnum,
                                      llvm::StructType *enumTy) override;
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry *
+    buildTypeLayoutEntry(IRGenModule &IGM,
+                         SILType T,
+                         bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(), T);
       }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(getTypeInfo(), T,
@@ -1649,17 +1656,24 @@ namespace {
       return false;
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-     if (!ElementsAreABIAccessible)
-       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+    TypeLayoutEntry *
+    buildTypeLayoutEntry(IRGenModule &IGM,
+                         SILType T,
+                         bool useStructLayouts) const override {
+      if (!ElementsAreABIAccessible)
+        return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+
+      // TODO: Remove once single payload enums are fully supported
+      // if (CopyDestroyKind == Normal)
+      //   return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(),
+      //                                                            T);
 
       unsigned emptyCases = ElementsWithNoPayload.size();
       std::vector<TypeLayoutEntry *> nonEmptyCases;
       nonEmptyCases.push_back(getPayloadTypeInfo().buildTypeLayoutEntry(
-          IGM, getPayloadType(IGM, T)));
-      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases,
-                                                      nonEmptyCases);
+          IGM, getPayloadType(IGM, T), useStructLayouts));
+      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases, nonEmptyCases,
+                                                      T, getTypeInfo());
     }
 
     EnumElementDecl *getPayloadElement() const {
@@ -3536,12 +3550,14 @@ namespace {
     mutable llvm::Function *consumeEnumFunction = nullptr;
     SmallVector<llvm::Type *, 2> PayloadTypesAndTagType;
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
+    TypeLayoutEntry *
+    buildTypeLayoutEntry(IRGenModule &IGM,
+                         SILType T,
+                         bool useStructLayouts) const override {
       if (!ElementsAreABIAccessible)
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
 
-      if (!IGM.getOptions().ForceStructTypeLayouts && AllowFixedLayoutOptimizations && TIK >= Loadable) {
+      if (!useStructLayouts && AllowFixedLayoutOptimizations && TIK >= Loadable) {
         // The type layout entry code does not handle spare bits atm.
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(),
                                                                  T);
@@ -3554,10 +3570,10 @@ namespace {
             elt.decl, IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
 
         nonEmptyCases.push_back(
-            elt.ti->buildTypeLayoutEntry(IGM, eltPayloadType));
+            elt.ti->buildTypeLayoutEntry(IGM, eltPayloadType, useStructLayouts));
       }
-      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases,
-                                                      nonEmptyCases);
+      return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases, nonEmptyCases,
+                                                      T, getTypeInfo());
     }
 
     llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, SILType type) const {
@@ -5668,7 +5684,10 @@ namespace {
       emitDestructiveProjectEnumDataCall(IGF, T, enumAddr);
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T) const override {
+    TypeLayoutEntry *
+    buildTypeLayoutEntry(IRGenModule &IGM,
+                         SILType T,
+                         bool useStructLayouts) const override {
       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
     }
 
@@ -6259,9 +6278,11 @@ namespace {
                                    ReferenceCounting *rc) const override {
       return Strategy.isSingleRetainablePointer(expansion, rc);
     }
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType ty) const override {
-      return Strategy.buildTypeLayoutEntry(IGM, ty);
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType ty,
+                          bool useStructLayouts) const override {
+      return Strategy.buildTypeLayoutEntry(IGM, ty, useStructLayouts);
     }
     bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                              unsigned index) const override {

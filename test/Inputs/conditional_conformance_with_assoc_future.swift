@@ -143,13 +143,14 @@ public func generic_concrete<T: P2>(_: T.Type)
 // CHECK-SAME:           %swift.type* bitcast (
 // CHECK-SAME:             i64* getelementptr inbounds (
 // CHECK-SAME:               <{ 
+// CHECK-SAME:                 i8*, 
 // CHECK-SAME:                 i8**, 
 // CHECK-SAME:                 i64, 
 // CHECK-SAME:                 <{ {{[^}]*}} }>* 
 // CHECK-SAME:               }>, 
 // CHECK-SAME:               <{ {{.*}} }>* @"$s34conditional_conformance_with_assoc4IsP3VMf", 
 // CHECK-SAME:               i32 0, 
-// CHECK-SAME:               i32 1
+// CHECK-SAME:               i32 2
 // CHECK-SAME:             ) to %swift.type*
 // CHECK-SAME:           ), 
 // CHECK-SAME:           i8** %T.P2
@@ -179,7 +180,7 @@ public func concrete_generic<U>(_: U.Type)
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc16concrete_genericyyxmAA2P3RzlF"(%swift.type* %0, %swift.type* %U, i8** %U.P3)
 // CHECK-NEXT:  entry:
 // CHECK:       %conditional.requirement.buffer = alloca [3 x i8**], align 8
-// CHECK:       [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVMa"(i64 0, %swift.type* bitcast (i64* getelementptr inbounds (<{ {{.*}} }>, <{ {{.*}} }>* @"$s34conditional_conformance_with_assoc8IsAlsoP2VMf", i32 0, i32 1) to %swift.type*), %swift.type* %U, i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @"$s34conditional_conformance_with_assoc8IsAlsoP2VAA0G0AAWP", i32 0, i32 0))
+// CHECK:       [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVMa"(i64 0, %swift.type* bitcast (i64* getelementptr inbounds (<{ {{.*}} }>, <{ {{.*}} }>* @"$s34conditional_conformance_with_assoc8IsAlsoP2VMf", i32 0, i32 2) to %swift.type*), %swift.type* %U, i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @"$s34conditional_conformance_with_assoc8IsAlsoP2VAA0G0AAWP", i32 0, i32 0))
 // CHECK-NEXT:  [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT:  [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:  [[C_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
@@ -206,6 +207,7 @@ public func concrete_concrete() {
 // CHECK-SAME:        %swift.full_type, 
 // CHECK-SAME:        %swift.full_type* bitcast (
 // CHECK-SAME:          <{ 
+// CHECK-SAME:            i8*, 
 // CHECK-SAME:            i8**, 
 // CHECK-SAME:            [[INT]], 
 // CHECK-SAME:            %swift.type_descriptor*, 
@@ -217,12 +219,13 @@ public func concrete_concrete() {
 // CHECK-SAME:          to %swift.full_type*
 // CHECK-SAME:        ), 
 // CHECK-SAME:        i32 0, 
-// CHECK-SAME:        i32 1
+// CHECK-SAME:        i32 2
 // CHECK-SAME:      ), 
 // CHECK-SAME:      %swift.type* getelementptr inbounds (
 // CHECK-SAME:        %swift.full_type, 
 // CHECK-SAME:        %swift.full_type* bitcast (
 // CHECK-SAME:          <{ 
+// CHECK-SAME:            i8*, 
 // CHECK-SAME:            i8**, 
 // CHECK-SAME:            [[INT]], 
 // CHECK-SAME:            %swift.type_descriptor*, 
@@ -234,7 +237,7 @@ public func concrete_concrete() {
 // CHECK-SAME:          to %swift.full_type*
 // CHECK-SAME:        ), 
 // CHECK-SAME:        i32 0, 
-// CHECK-SAME:        i32 1
+// CHECK-SAME:        i32 2
 // CHECK-SAME:      )
 // CHECK-SAME:    )
 // CHECK-NEXT:    ret void
@@ -267,6 +270,7 @@ public func concrete_concrete() {
 // CHECK-SAME:        %swift.full_type, 
 // CHECK-SAME:        %swift.full_type* bitcast (
 // CHECK-SAME:          <{ 
+// CHECK-SAME:            i8*, 
 // CHECK-SAME:            i8**, 
 // CHECK-SAME:            [[INT]], 
 // CHECK-SAME:            %swift.type_descriptor*, 
@@ -278,7 +282,7 @@ public func concrete_concrete() {
 // CHECK-SAME:          to %swift.full_type*
 // CHECK-SAME:        ), 
 // CHECK-SAME:        i32 0, 
-// CHECK-SAME:        i32 1
+// CHECK-SAME:        i32 2
 // CHECK-SAME:      ), 
 // CHECK-SAME:      i8*** [[CONDITIONAL_REQUIREMENTS]]
 // CHECK-SAME:    )

@@ -29,6 +29,9 @@ static void destroyLinearMapContext(SWIFT_CONTEXT HeapObject *obj) {
 static FullMetadata<HeapMetadata> linearMapContextHeapMetadata = {
   {
     {
+      /*type layout*/ nullptr,
+    },
+    {
       &destroyLinearMapContext
     },
     {

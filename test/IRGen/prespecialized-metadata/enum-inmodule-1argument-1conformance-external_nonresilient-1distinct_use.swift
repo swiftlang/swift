@@ -14,7 +14,7 @@ import TestModule
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-// CHECK: @"$sytN" = external{{( dllimport)?}} global %swift.full_type
+// CHECK: @"$sytN" = external{{( dllimport)?}} global %swift.full_existential_type
 
 // CHECK-NOT: @"$s4main5ValueOySiGMf"
 
@@ -46,7 +46,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:         to %swift.full_type*
 // CHECK-SAME:       ), 
 // CHECK-SAME:       i32 0, 
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     )
 // CHECK-SAME:   )
 // CHECK: }

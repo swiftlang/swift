@@ -359,6 +359,9 @@ static const unsigned long dispatchSwiftObjectType = 1;
 FullMetadata<DispatchClassMetadata> swift::jobHeapMetadata = {
   {
     {
+      /*type layout*/ nullptr,
+    },
+    {
       &destroyJob
     },
     {
@@ -375,6 +378,9 @@ FullMetadata<DispatchClassMetadata> swift::jobHeapMetadata = {
 /// Heap metadata for an asynchronous task.
 static FullMetadata<DispatchClassMetadata> taskHeapMetadata = {
   {
+    {
+      /*type layout*/ nullptr
+    },
     {
       &destroyTask
     },

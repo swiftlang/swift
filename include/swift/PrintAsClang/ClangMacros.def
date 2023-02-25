@@ -224,6 +224,17 @@ CLANG_MACRO_DEFINED("SWIFT_IMPORT_STDLIB_SYMBOL")
 
 CLANG_MACRO_CXX("SWIFT_NOEXCEPT", , "noexcept", )
 
+CLANG_MACRO_BODY("SWIFT_C_INLINE_THUNK", \
+    "# if __has_attribute(always_inline)\n" \
+    "# if __has_attribute(nodebug)\n" \
+    "#  define SWIFT_C_INLINE_THUNK inline __attribute__((always_inline)) __attribute__((nodebug))\n" \
+    "# else\n" \
+    "#  define SWIFT_C_INLINE_THUNK inline __attribute__((always_inline))\n" \
+    "# endif\n" \
+    "# else\n" \
+    "#  define SWIFT_C_INLINE_THUNK inline\n"\
+    "# endif")
+
 #undef CLANG_MACRO
 #undef CLANG_MACRO_BODY
 #undef CLANG_MACRO_DEFINED

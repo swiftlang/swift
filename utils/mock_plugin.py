@@ -98,14 +98,21 @@ def handle_request(req):
 
 
 def main():
+    if sys.version_info >= (3, 0):
+        stdin = sys.stdin.buffer
+        stdout = sys.stdout.buffer
+    else:
+        stdin = sys.stdin
+        stdout = sys.stdout
+
     # Message handling loop.
     while True:
         # Read request
-        request_header = sys.stdin.buffer.read(8)
+        request_header = stdin.read(8)
         if len(request_header) < 8:
             break
         request_size = struct.unpack('<Q', request_header)[0]
-        request_data = sys.stdin.buffer.read(request_size)
+        request_data = stdin.read(request_size)
         if len(request_data) != request_size:
             break
         request_object = json.loads(request_data)
@@ -118,9 +125,9 @@ def main():
         response_data = response_json.encode('utf-8')
         response_size = len(response_data)
         response_header = struct.pack('<Q', response_size)
-        sys.stdout.buffer.write(response_header)
-        sys.stdout.buffer.write(response_data)
-        sys.stdout.buffer.flush()
+        stdout.write(response_header)
+        stdout.write(response_data)
+        stdout.flush()
 
 
 if __name__ == '__main__':
