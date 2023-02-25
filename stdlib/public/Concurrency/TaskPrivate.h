@@ -1063,7 +1063,6 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
 inline void AsyncTask::destroyTaskDependency(TaskDependencyStatusRecord *dependencyRecord) {
   assert(_private().dependencyRecord == dependencyRecord);
 
-  dependencyRecord->destroy();
   _swift_task_dealloc_specific(this, dependencyRecord);
 
   _private().dependencyRecord = nullptr;
@@ -1075,7 +1074,7 @@ inline void AsyncTask::flagAsSuspendedOnTask(AsyncTask *task) {
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(task);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(this, task);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on task %p", allocation, task);
   _private().dependencyRecord = record;
 
@@ -1086,7 +1085,7 @@ inline void AsyncTask::flagAsSuspendedOnContinuation(ContinuationAsyncContext *c
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(context);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(this, context);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on continuation %p", allocation, context);
   _private().dependencyRecord = record;
 
@@ -1097,7 +1096,7 @@ inline void AsyncTask::flagAsSuspendedOnTaskGroup(TaskGroup *taskGroup) {
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(taskGroup);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(this, taskGroup);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on taskGroup %p", allocation, taskGroup);
   _private().dependencyRecord = record;
 
