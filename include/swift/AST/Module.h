@@ -794,13 +794,11 @@ public:
     /// Include imports declared with `@_implementationOnly` or with an
     /// access-level of `package` or less.
     ImplementationOnly = 1 << 2,
-    /// Include imports of SPIs declared with `@_spi`.
-    SPIAccessControl = 1 << 3,
     /// Include imports declared with `@_spiOnly`.
-    SPIOnly = 1 << 4,
+    SPIOnly = 1 << 3,
     /// Include imports shadowed by a cross-import overlay. Unshadowed imports
     /// are included whether or not this flag is specified.
-    ShadowedByCrossImportOverlay = 1 << 5
+    ShadowedByCrossImportOverlay = 1 << 4
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;

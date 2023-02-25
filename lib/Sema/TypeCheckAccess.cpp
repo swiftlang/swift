@@ -1810,7 +1810,6 @@ swift::getDisallowedOriginKind(const Decl *decl,
     auto filter = ModuleDecl::ImportFilter(
         {ModuleDecl::ImportFilterKind::Exported,
          ModuleDecl::ImportFilterKind::Default,
-         ModuleDecl::ImportFilterKind::SPIAccessControl,
          ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay});
     SmallVector<ImportedModule, 4> sfImportedModules;
     SF->getImportedModules(sfImportedModules, filter);

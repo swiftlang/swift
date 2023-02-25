@@ -85,8 +85,7 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
       clangImporter->getImportedHeaderModule()->getImportedModules(
           imported, {ModuleDecl::ImportFilterKind::Exported,
                      ModuleDecl::ImportFilterKind::Default,
-                     ModuleDecl::ImportFilterKind::ImplementationOnly,
-                     ModuleDecl::ImportFilterKind::SPIAccessControl});
+                     ModuleDecl::ImportFilterKind::ImplementationOnly});
 
       for (auto IM : imported) {
         if (auto clangModule = IM.importedModule->findUnderlyingClangModule())

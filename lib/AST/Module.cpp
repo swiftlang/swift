@@ -1906,8 +1906,6 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
     else if (desc.options.contains(ImportFlags::SPIOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
-    else if (desc.options.contains(ImportFlags::SPIAccessControl))
-      requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     else
       requiredFilter |= ModuleDecl::ImportFilterKind::Default;
 
@@ -2271,8 +2269,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
   ModuleDecl::ImportFilter filter = {
       ModuleDecl::ImportFilterKind::Exported,
-      ModuleDecl::ImportFilterKind::Default,
-      ModuleDecl::ImportFilterKind::SPIAccessControl};
+      ModuleDecl::ImportFilterKind::Default};
 
   auto *topLevel = getParentModule();
 
@@ -2985,7 +2982,6 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
   ModuleDecl::ImportFilter filter = {
     ModuleDecl::ImportFilterKind::Exported,
     ModuleDecl::ImportFilterKind::Default,
-    ModuleDecl::ImportFilterKind::SPIAccessControl,
     ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
   SmallVector<ImportedModule, 4> results;
   getImportedModules(results, filter);
@@ -3011,8 +3007,7 @@ canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
   // @_implementationOnly or @_spi.
   ModuleDecl::ImportFilter filter = {
     ModuleDecl::ImportFilterKind::ImplementationOnly,
-    ModuleDecl::ImportFilterKind::SPIOnly,
-    ModuleDecl::ImportFilterKind::SPIAccessControl
+    ModuleDecl::ImportFilterKind::SPIOnly
   };
   SmallVector<ImportedModule, 4> results;
   getImportedModules(results, filter);
