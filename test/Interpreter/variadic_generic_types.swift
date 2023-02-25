@@ -11,5 +11,8 @@ struct G<T...> {
   }
 }
 
+// CHECK: ()
+G< >().makeTuple()
+
 // CHECK: (Array<Int>, Array<String>, Array<Float>)
 G<Int, String, Float>().makeTuple()
