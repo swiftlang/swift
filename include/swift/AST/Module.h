@@ -757,7 +757,8 @@ public:
     Exported = 1 << 0,
     /// Include "regular" imports with no special annotation.
     Default = 1 << 1,
-    /// Include imports declared with `@_implementationOnly`.
+    /// Include imports declared with `@_implementationOnly` or with an
+    /// access-level of `package` or less.
     ImplementationOnly = 1 << 2,
     /// Include imports of SPIs declared with `@_spi`.
     SPIAccessControl = 1 << 3,
