@@ -80,7 +80,7 @@ ExpressionTimer::~ExpressionTimer() {
 
   if (PrintDebugTiming) {
     // Round up to the nearest 100th of a millisecond.
-    llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100)
+    llvm::errs() << llvm::format("%0.2f", std::ceil(elapsed * 100000) / 100)
                  << "ms\t";
     if (auto *E = Anchor.dyn_cast<Expr *>()) {
       E->getLoc().print(llvm::errs(), Context.SourceMgr);
