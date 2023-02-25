@@ -771,8 +771,8 @@ static void validateDyldResults(
   };
 
   if (dyldCachedConformanceDescriptor) {
-    if (std::find(conformances.begin(), conformances.end(),
-                  dyldCachedConformanceDescriptor) == conformances.end()) {
+    if (conformances.find(dyldCachedConformanceDescriptor) ==
+        conformances.end()) {
       auto typeName = swift_getTypeName(type, true);
       swift::fatalError(
           0,
@@ -1163,7 +1163,6 @@ swift_conformsToProtocolImpl(const Metadata *const type,
     std::tie(table, hasUninstantiatedSuperclass) =
         swift_conformsToProtocolMaybeInstantiateSuperclasses(
             type, protocol, true /*instantiateSuperclassMetadata*/);
-
   return table;
 }
 
