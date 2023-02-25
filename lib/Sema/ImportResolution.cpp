@@ -737,7 +737,8 @@ void UnboundImport::validateAllowableClient(ModuleDecl *importee,
 
 void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                        SourceFile &SF) {
-  if (import.options.contains(ImportFlags::ImplementationOnly))
+  if (import.options.contains(ImportFlags::ImplementationOnly) ||
+      import.accessLevel < AccessLevel::Public)
     return;
 
   // Per getTopLevelModule(), we'll only get nullptr here for non-Swift modules,
@@ -760,12 +761,20 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
       topLevelModule.get()->isResilient())
     return;
 
-  ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
-                     diag::module_not_compiled_with_library_evolution,
-                     topLevelModule.get()->getName(),
-                     SF.getParentModule()->getName());
-  // FIXME: Once @_implementationOnly is a real feature, we should have a fix-it
-  // to add it.
+  auto inFlight = ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
+                                     diag::module_not_compiled_with_library_evolution,
+                                     topLevelModule.get()->getName(),
+                                     SF.getParentModule()->getName());
+
+  if (ctx.LangOpts.hasFeature(Feature::AccessLevelOnImport)) {
+    SourceLoc attrLoc = import.accessLevelLoc;
+    if (attrLoc.isValid())
+      inFlight.fixItReplace(attrLoc, "internal");
+    else
+      inFlight.fixItInsert(import.importLoc, "internal ");
+  } else {
+    inFlight.limitBehavior(DiagnosticBehavior::Warning);
+  }
 }
 
 void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
