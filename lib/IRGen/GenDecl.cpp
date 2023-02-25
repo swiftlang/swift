@@ -5980,6 +5980,27 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
   return fn;
 }
 
+void IRGenModule::setColocateTypeDescriptorSection(llvm::GlobalVariable *v) {
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::MachO:
+    if (IRGen.Opts.ColocateTypeDescriptors)
+      v->setSection("__TEXT,__textg_swiftt,regular");
+    else
+      setTrueConstGlobal(v);
+    break;
+  case llvm::Triple::DXContainer:
+  case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
+  case llvm::Triple::UnknownObjectFormat:
+  case llvm::Triple::Wasm:
+  case llvm::Triple::ELF:
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::COFF:
+    setTrueConstGlobal(v);
+    break;
+  }
+
+}
 void IRGenModule::setColocateMetadataSection(llvm::Function *f) {
   if (!IRGen.Opts.CollocatedMetadataFunctions)
     return;
