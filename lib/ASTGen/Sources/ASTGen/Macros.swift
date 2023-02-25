@@ -554,12 +554,15 @@ func expandAttachedMacroIPC(
 
   // Map the macro role.
   let macroRole: PluginMessage.MacroRole
-  switch MacroRole(rawValue: rawMacroRole) {
+  switch MacroRole(rawValue: rawMacroRole)! {
   case .Accessor: macroRole = .accessor
   case .Member: macroRole = .member
   case .MemberAttribute: macroRole = .memberAttribute
   case .Peer: macroRole = .peer
-  default:
+  case .Conformance: macroRole = .conformance
+  case
+      .Expression,
+      .FreestandingDeclaration:
     preconditionFailure("unhandled macro role for attached macro")
   }
 
