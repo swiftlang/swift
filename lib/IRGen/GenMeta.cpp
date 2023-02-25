@@ -4258,7 +4258,9 @@ namespace {
       }
 
       auto metadata = IGF.Builder.CreateCall(
-          IGM.getAllocateGenericClassMetadataFunctionPointer(),
+          getLayoutString() ?
+            IGM.getAllocateGenericClassMetadataWithLayoutStringFunctionPointer() :
+            IGM.getAllocateGenericClassMetadataFunctionPointer(),
           {descriptor, arguments, templatePointer});
 
       return metadata;
@@ -4985,6 +4987,8 @@ namespace {
       }
 
       return IGF.Builder.CreateCall(
+          getLayoutString() ?
+          IGM.getAllocateGenericValueMetadataWithLayoutStringFunctionPointer() :
           IGM.getAllocateGenericValueMetadataFunctionPointer(),
           {descriptor, arguments, templatePointer, extraSizeV});
     }
@@ -5412,7 +5416,9 @@ namespace {
       }
 
       return IGF.Builder.CreateCall(
-          IGM.getAllocateGenericValueMetadataFunctionPointer(),
+          getLayoutString() ?
+            IGM.getAllocateGenericValueMetadataWithLayoutStringFunctionPointer() :
+            IGM.getAllocateGenericValueMetadataFunctionPointer(),
           {descriptor, arguments, templatePointer, extraSizeV});
     }
 
