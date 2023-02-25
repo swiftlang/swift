@@ -83,25 +83,25 @@ public final class ExposedClass {
 // CHECK: ExposedStruct2(ExposedStruct2 &&)
 // CHECK-NEXT: swift::Int getY() const SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: void setY(swift::Int value) SWIFT_SYMBOL("{{.*}}");
-// CHECK-NEXT: static inline ExposedStruct2 init() SWIFT_SYMBOL("{{.*}}");
-// CHECK-NEXT: static inline ExposedStruct2 initWithValue(swift::Int x) SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: static SWIFT_INLINE_THUNK ExposedStruct2 init() SWIFT_SYMBOL("{{.*}}");
+// CHECK-NEXT: static SWIFT_INLINE_THUNK ExposedStruct2 initWithValue(swift::Int x) SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: swift::Int getRenamedProp() const SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: void setRenamedProp(swift::Int value) SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: swift::Int getProp3() const SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: void renamedMethod() const SWIFT_SYMBOL("{{.*}}");
 // CHECK-NEXT: private:
 
-// CHECK: inline void exposed1() noexcept SWIFT_SYMBOL("{{.*}}") {
+// CHECK: SWIFT_INLINE_THUNK void exposed1() noexcept SWIFT_SYMBOL("{{.*}}") {
 // CHECK-NEXT:   return _impl::$s6Expose8exposed1yyF();
 // CHECK-NEXT: }
 // CHECK-EMPTY:
 // CHECK-EMPTY:
-// CHECK-NEXT: inline void exposed3() noexcept SWIFT_SYMBOL("{{.*}}") {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void exposed3() noexcept SWIFT_SYMBOL("{{.*}}") {
 // CHECK-NEXT:   return _impl::$s6Expose8exposed3yyF();
 // CHECK-NEXT: }
 // CHECK-EMPTY:
 // CHECK-EMPTY:
-// CHECK-NEXT: inline void exposed4() noexcept SWIFT_SYMBOL("{{.*}}") {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void exposed4() noexcept SWIFT_SYMBOL("{{.*}}") {
 // CHECK-NEXT:   return _impl::$s6Expose15exposed4RenamedyyF();
 // CHECK-NEXT: }
 
