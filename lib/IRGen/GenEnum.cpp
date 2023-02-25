@@ -628,6 +628,10 @@ namespace {
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity,
                  SILType T) const override {
+      if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
+        return;
+      }
+
       if (getLoadableSingleton())
         getLoadableSingleton()->consume(IGF, src, atomicity,
                                         getSingletonType(IGF.IGM, T));
@@ -639,6 +643,10 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
+      if (tryEmitDestroyUsingDeinit(IGF, addr, T)) {
+        return;
+      }
+                 
       if (getSingleton() &&
           !getSingleton()->isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!ElementsAreABIAccessible) {
@@ -2660,6 +2668,9 @@ namespace {
 
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity, SILType T) const override {
+      if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
+        return;
+      }
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
@@ -2784,6 +2795,10 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
+      if (tryEmitDestroyUsingDeinit(IGF, addr, T)) {
+        return;
+      }
+
       if (CopyDestroyKind == TriviallyDestroyable) {
         return;
       }
@@ -4663,6 +4678,9 @@ namespace {
 
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity, SILType T) const override {
+      if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
+        return;
+      }
       assert(TIK >= Loadable);
       switch (CopyDestroyKind) {
       case TriviallyDestroyable:
@@ -5006,6 +5024,10 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
+      if (tryEmitDestroyUsingDeinit(IGF, addr, T)) {
+        return;
+      }
+
       if (CopyDestroyKind == TriviallyDestroyable) {
         return;
       }

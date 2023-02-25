@@ -143,12 +143,28 @@ entry(%b : $*MOStruct):
   return undef : $()
 }
 
+// CHECK-LABEL: define{{.*}}@destroy_enum_value(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    trunc
+// CHECK-NEXT:    zext
+// CHECK-NEXT:    call{{.*}}@destroy_enum(
+// CHECK-NEXT:    ret void
 sil @destroy_enum_value : $@convention(thin) (@owned MOEnum) -> () {
 entry(%b : $MOEnum):
   release_value %b : $MOEnum
   return undef : $()
 }
 
+// CHECK-LABEL: define{{.*}}@destroy_enum_value_indirect(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    bitcast
+// CHECK-NEXT:    load
+// CHECK-NEXT:    getelementptr
+// CHECK-NEXT:    bitcast
+// CHECK-NEXT:    load
+// CHECK-NEXT:    zext
+// CHECK-NEXT:    call{{.*}}@destroy_enum(
+// CHECK-NEXT:    ret void
 sil @destroy_enum_value_indirect : $@convention(thin) (@in MOEnum) -> () {
 entry(%b : $*MOEnum):
   destroy_addr %b : $*MOEnum
@@ -167,7 +183,7 @@ entry(%b : $MOComboStruct):
 
 // CHECK: define{{.*}}@[[COMBO_STRUCT_OUTLINED_DESTROY]](
 // CHECK:   call {{.*}} @destroy_struct
-// CH/ECK:   call {{.*}} @destroy_enum
+// CHECK:   call {{.*}} @destroy_enum
 // CHECK:   call {{.*}} @swift_release
 // CHECK:   ret {{.*}} %0
 
@@ -190,7 +206,7 @@ entry(%b : $MOComboEnum):
 // CHECK:      [[STRUCT]]:
 // CHECK:        call {{.*}} @destroy_struct
 // CHECK:      [[ENUM]]:
-// C/HECK:        call {{.*}} @destroy_enum
+// CHECK:        call {{.*}} @destroy_enum
 // CHECK:      [[CLASS]]:
 // CHECK:        call {{.*}} @swift_release
 
@@ -199,7 +215,7 @@ entry(%b : $MOComboEnum):
 
 // CHECK:       define{{.*}}@[[BOX_STRUCT_DESTRUCTOR]](
 // CHECK:        call {{.*}} @destroy_struct
-// C/HECK:        call {{.*}} @destroy_enum
+// CHECK:        call {{.*}} @destroy_enum
 // CHECK:        call {{.*}} @swift_release
 sil @box_struct : $@convention(thin) (@owned MOComboStruct) -> Builtin.NativeObject {
 entry(%0 : $MOComboStruct):
@@ -230,10 +246,10 @@ sil_moveonlydeinit MOSingleRefcountLikeStruct { @destroy_single_refcount_like_st
 // CHECK-LABEL: define {{.*}} @"{{.*}}8MOStructVwxx"
 // CHECK:         call {{.*}} @destroy_struct(
 // CHECK-LABEL: define {{.*}} @"{{.*}}6MOEnumOwxx"
-// C/HECK:         call {{.*}} @destroy_enum(
+// CHECK:         call {{.*}} @destroy_enum(
 // CHECK-LABEL: define {{.*}} @"{{.*}}13MOComboStructVwxx"
 // CHECK:         call {{.*}} @destroy_struct(
-// C/HECK:         call {{.*}} @destroy_enum(
+// CHECK:         call {{.*}} @destroy_enum(
 // CHECK:         call {{.*}} @swift_retain(
 // CHECK-LABEL: define {{.*}} @"{{.*}}11MOComboEnumOwxx"
 // CHECK:         call {{.*}} @[[COMBO_ENUM_OUTLINED_DESTROY]]

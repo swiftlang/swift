@@ -2861,13 +2861,12 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
   auto ty = T.getASTType();
   auto nominal = ty->getAnyNominal();
   // We are only concerned with move-only type deinits here.
-  if (!nominal || isa<ClassDecl>(nominal)) {
+  if (!nominal || !nominal->getValueTypeDestructor()) {
     return false;
   }
   
   auto deinit = IGF.getSILModule().lookUpMoveOnlyDeinit(nominal);
-  if (!deinit)
-    return false;
+  assert(deinit && "type has a deinit declared in AST but SIL deinit record is not present!");
     
   // The deinit should take a single value parameter of the nominal type, either
   // by @owned or indirect @in convention.
