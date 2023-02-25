@@ -261,28 +261,6 @@ static llvm::Value *bindWitnessTableAtIndex(IRGenFunction &IGF,
   return wtable;
 }
 
-struct OpenedElementContext {
-  GenericEnvironment *environment;
-  CanGenericSignature signature;
-
-  static OpenedElementContext
-  createForPackExpansion(IRGenFunction &IGF, CanPackExpansionType expansionTy) {
-    // Get the outer generic signature and environment.
-    auto *genericEnv = cast<ArchetypeType>(expansionTy.getCountType())
-                           ->getGenericEnvironment();
-    auto subMap = genericEnv->getForwardingSubstitutionMap();
-
-    auto genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
-    // Create an opened element signature and environment.
-    auto elementSig = IGF.IGM.Context.getOpenedElementSignature(
-        genericSig, expansionTy.getCountType());
-    auto *elementEnv = GenericEnvironment::forOpenedElement(
-        elementSig, UUID::fromTime(), expansionTy.getCountType(), subMap);
-
-    return {elementEnv, elementSig};
-  }
-};
-
 static void bindElementSignatureRequirementsAtIndex(
     IRGenFunction &IGF, OpenedElementContext const &context, llvm::Value *index,
     DynamicMetadataRequest request) {
@@ -417,7 +395,7 @@ static void emitPackExpansionMetadataPack(IRGenFunction &IGF, Address pack,
   emitPackExpansionPack(
       IGF, pack, expansionTy, dynamicIndex, dynamicLength, [&](auto *index) {
         auto context =
-            OpenedElementContext::createForPackExpansion(IGF, expansionTy);
+            OpenedElementContext::createForContextualExpansion(IGF.IGM.Context, expansionTy);
         auto patternTy = expansionTy.getPatternType();
         return emitPackExpansionElementMetadata(IGF, context, patternTy, index,
                                                 request);
@@ -544,7 +522,7 @@ static void emitPackExpansionWitnessTablePack(
       IGF, pack, expansionTy, dynamicIndex, dynamicLength, [&](auto *index) {
         llvm::Value *_metadata = nullptr;
         auto context =
-            OpenedElementContext::createForPackExpansion(IGF, expansionTy);
+            OpenedElementContext::createForContextualExpansion(IGF.IGM.Context, expansionTy);
         auto patternTy = expansionTy.getPatternType();
         return emitPackExpansionElementWitnessTable(
             IGF, context, patternTy, conformance,
@@ -862,7 +840,7 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
       // pack expansion at that index.
       auto *relativeIndex = IGF.Builder.CreateSub(index, lowerBound);
       auto context =
-          OpenedElementContext::createForPackExpansion(IGF, expansionTy);
+          OpenedElementContext::createForContextualExpansion(IGF.IGM.Context, expansionTy);
       auto patternTy = expansionTy.getPatternType();
       metadata = emitPackExpansionElementMetadata(IGF, context, patternTy,
                                                   relativeIndex, request);
