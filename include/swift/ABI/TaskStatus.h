@@ -61,25 +61,10 @@ public:
 
   TaskStatusRecord *getParent() const { return Parent; }
 
-  /// Change the parent of this unregistered status record to the
-  /// given record.
-  ///
-  /// This should be used when the record has been previously initialized
-  /// without knowing what the true parent is.  If we decide to cache
-  /// important information (e.g. the earliest timeout) in the innermost
-  /// status record, this is the method that should fill that in
-  /// from the parent.
+  /// Change the parent of this status record to the given record.
   void resetParent(TaskStatusRecord *newParent) {
     Parent = newParent;
-    // TODO: cache
   }
-
-  /// Splice a record out of the status-record chain.
-  ///
-  /// Unlike resetParent, this assumes that it's just removing one or
-  /// more records from the chain and that there's no need to do any
-  /// extra cache manipulation.
-  void spliceParent(TaskStatusRecord *newParent) { Parent = newParent; }
 };
 
 /// A status record which states that a task has one or

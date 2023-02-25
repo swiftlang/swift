@@ -299,6 +299,7 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
     ActiveTaskStatus& oldStatus,
     llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> shouldAddRecord) {
 
+  SWIFT_TASK_DEBUG_LOG("Adding %p record to task %p", newRecord, task);
   while (true) {
     // Wait for any active lock to be released.
     if (oldStatus.isStatusRecordLocked()) {
@@ -343,16 +344,22 @@ bool swift::addStatusRecordToSelf(TaskStatusRecord *record,
   return addStatusRecord(swift_task_getCurrent(), record, testAddRecord);
 }
 
+SWIFT_CC(swift)
+bool swift::addStatusRecordToSelf(TaskStatusRecord *record, ActiveTaskStatus &status,
+     llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord) {
+  return addStatusRecord(swift_task_getCurrent(), record, status, testAddRecord);
+}
+
 static void removeStatusRecordLocked(ActiveTaskStatus status, TaskStatusRecord *record) {
   bool removedRecord = false;
   auto cur = status.getInnermostRecord();
   assert(cur->getKind() == TaskStatusRecordKind::Private_RecordLock);
 
-  // Splice the record out.
+  // Cut the record out.
   while (cur != nullptr) {
     auto next = cur->getParent();
     if (next == record) {
-      cur->spliceParent(record->getParent());
+      cur->resetParent(record->getParent());
       removedRecord = true;
       break;
     }
@@ -365,12 +372,11 @@ static void removeStatusRecordLocked(ActiveTaskStatus status, TaskStatusRecord *
 // modify some flags in the ActiveTaskStatus at the same time.
 SWIFT_CC(swift)
 void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
-     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr) {
+     ActiveTaskStatus& oldStatus,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
 
   SWIFT_TASK_DEBUG_LOG("remove status record = %p, from task = %p",
                        record, task);
-
-  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
 
   if (oldStatus.isStatusRecordLocked() &&
         waitForStatusRecordUnlockIfNotSelfLocked(task, oldStatus)) {
@@ -446,16 +452,46 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
 
 }
 
-// Convenience wrapper for when we don't care to make any modifications to the
-// flags fields of the active task status when we are removing a task status
-// record
+// Convenience wrapper for when client hasnt already done the load of the status
 SWIFT_CC(swift)
-void swift::removeStatusRecord(TaskStatusRecord *record) {
+void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  return removeStatusRecord(task, record, oldStatus, fn);
+}
 
-  auto task = swift_task_getCurrent();
-  SWIFT_TASK_DEBUG_LOG("remove status record = %p, from current task = %p",
-                       record, task);
-  return removeStatusRecord(task, record);
+// Convenience wrapper for modifications on current task
+SWIFT_CC(swift)
+void swift::removeStatusRecordFromSelf(TaskStatusRecord *record, ActiveTaskStatus &status,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
+  return removeStatusRecord(swift_task_getCurrent(), record, status, fn);
+}
+
+SWIFT_CC(swift)
+void swift::removeStatusRecordFromSelf(TaskStatusRecord *record,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
+  return removeStatusRecord(swift_task_getCurrent(), record, fn);
+}
+
+SWIFT_CC(swift)
+void swift::updateStatusRecord(AsyncTask *task, TaskStatusRecord *record,
+     llvm::function_ref<void()>updateRecord,
+     ActiveTaskStatus& status,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
+
+  withStatusRecordLock(task, status, [&](ActiveTaskStatus lockedStatus) {
+#if NDEBUG
+    bool foundRecord = false;
+    for (auto cur: lockedStatus.records()) {
+      if (cur == record) {
+        foundRecord = true;
+        break;
+      }
+    }
+    assert(foundRecord);
+#endif
+    updateRecord();
+  }, fn);
 }
 
 SWIFT_CC(swift)
