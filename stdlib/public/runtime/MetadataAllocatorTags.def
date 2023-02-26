@@ -46,5 +46,7 @@ TAG(GlobalMetadataCache, 20)
 TAG(GlobalWitnessTableCache, 21)
 TAG(ExtendedExistentialTypes, 22)
 TAG(ExtendedExistentialTypeShapes, 23)
+TAG(MetadataPack, 24)
+TAG(WitnessTablePack, 25)
 
 #undef TAG
