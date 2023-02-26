@@ -33,6 +33,7 @@ add_swift_tool_subdirectory(swift-ast-script)
 add_swift_tool_subdirectory(swift-refactor)
 add_swift_tool_subdirectory(libSwiftScan)
 add_swift_tool_subdirectory(libStaticMirror)
+add_swift_tool_subdirectory(libMockPlugin)
 
 if(SWIFT_INCLUDE_TESTS OR SWIFT_INCLUDE_TEST_BINARIES)
   add_swift_tool_subdirectory(swift-ide-test)
