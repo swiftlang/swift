@@ -887,8 +887,10 @@ now codified into the ABI; the index 0 is therefore reserved.
 
 ::
 
-  generic-signature ::= requirement* 'l'     // one generic parameter
-  generic-signature ::= requirement* 'r' GENERIC-PARAM-COUNT* 'l'
+  generic-signature ::= requirement* generic-param-pack-marker* 'l'     // one generic parameter
+  generic-signature ::= requirement* generic-param-pack-marker* 'r' GENERIC-PARAM-COUNT* 'l'
+
+  generic-param-pack-marker ::= 'Rv' GENERIC_PARAM-INDEX   // generic parameter pack marker
 
   GENERIC-PARAM-COUNT ::= 'z'                // zero parameters
   GENERIC-PARAM-COUNT ::= INDEX              // N+1 parameters
@@ -931,9 +933,11 @@ now codified into the ABI; the index 0 is therefore reserved.
   LAYOUT-SIZE ::= INDEX // Size only
   LAYOUT-SIZE-AND-ALIGNMENT ::= INDEX INDEX // Size followed by alignment
 
-
-
 A generic signature begins with an optional list of requirements.
+
+This is followed by an optional list of generic-param-pack-markers to record
+which generic parameters are packs (variadic).
+
 The ``<GENERIC-PARAM-COUNT>`` describes the number of generic parameters at
 each depth of the signature. As a special case, no ``<GENERIC-PARAM-COUNT>``
 values indicates a single generic parameter at the outermost depth::

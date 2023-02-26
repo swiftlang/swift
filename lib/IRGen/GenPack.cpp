@@ -161,6 +161,8 @@ llvm::Value *IRGenFunction::emitPackShapeExpression(CanType type) {
   if (pair.first > 0) {
     auto *constant = llvm::ConstantInt::get(IGM.SizeTy, pair.first);
     accumulateSum(*this, pair.second, constant);
+  } else if (pair.second == nullptr) {
+    pair.second = llvm::ConstantInt::get(IGM.SizeTy, 0);
   }
 
   setScopedLocalTypeData(type, kind, pair.second);
