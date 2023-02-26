@@ -327,37 +327,36 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 
   public func _customLastIndexOfEquatableElement(_ element: UInt8) -> Index?? {
-    // Benchmarks show there's no benefit for this optimization for short buffer
-    guard count > 64 else { return nil }
-
-    guard let ptr = baseAddress { return Optional(nil) }
-
-    let address = Int(bitPattern: ptr)
+    guard let ptr = baseAddress else { return Optional(nil) }
 
     var i = endIndex - 1
 
-    let stride = MemoryLayout<UInt64>.stride
+    if count > 16 {
+      let address = Int(bitPattern: ptr)
 
-    while (address &+ i + 1) % stride != 0 && i >= startIndex {
-      guard self[i] != element else { return Optional(i) }
-      i &-= 1
-    }
+      let stride = MemoryLayout<UInt64>.stride
 
-    var mask = UInt64(0)
-    withUnsafeMutableBytes(of: &mask) {
-      _ = $0.initializeMemory(as: UInt8.self, repeating: element)
-    }
+      while (address &+ i + 1) % stride != 0 && i >= startIndex {
+        guard self[i] != element else { return Optional(i) }
+        i &-= 1
+      }
 
-    let word7f = UInt64(0x7f7f_7f7f_7f7f_7f7f)
+      var mask = UInt64(0)
+      withUnsafeMutableBytes(of: &mask) {
+        _ = $0.initializeMemory(as: UInt8.self, repeating: element)
+      }
 
-    while true {
-      let index = i &- stride + 1
-      guard index >= startIndex else { break }
-      let word = ptr.load(fromByteOffset: index, as: UInt64.self)
-      let input = word ^ mask
-      let tmp = (input & word7f) + word7f
-      guard ~(tmp | input | word7f) == 0 else { break }
-      i &-= stride
+      let word7f = UInt64(0x7f7f_7f7f_7f7f_7f7f)
+
+      while true {
+        let index = i &- stride + 1
+        guard index >= startIndex else { break }
+        let word = ptr.load(fromByteOffset: index, as: UInt64.self)
+        let input = word ^ mask
+        let tmp = (input & word7f) + word7f
+        guard ~(tmp | input | word7f) == 0 else { break }
+        i &-= stride
+      }
     }
 
     while i >= startIndex {
