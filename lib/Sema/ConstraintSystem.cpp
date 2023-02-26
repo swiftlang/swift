@@ -1557,7 +1557,7 @@ DeclReferenceType
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
-                                     DeclContext *useDC) {
+                                     DeclContext *useDC, bool accessViaBorrow) {
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
@@ -1683,6 +1683,15 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   Type valueType =
       getUnopenedTypeOfReference(varDecl, Type(), useDC, /*base=*/nullptr,
                                  wantInterfaceType);
+
+  if (accessViaBorrow) {
+    if (auto lvalueType = valueType->getAs<LValueType>()) {
+      if (lvalueType->isMutable()) {
+        valueType =
+            LValueType::get(lvalueType->getObjectType(), false /*is mutable*/);
+      }
+    }
+  }
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
@@ -2294,13 +2303,10 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   return type;
 }
 
-DeclReferenceType
-ConstraintSystem::getTypeOfMemberReference(
+DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
-    bool isDynamicResult,
-    FunctionRefKind functionRefKind,
-    ConstraintLocator *locator,
-    OpenedTypeMap *replacementsPtr) {
+    GetTypeOfMemberReferenceOptions options, FunctionRefKind functionRefKind,
+    ConstraintLocator *locator, OpenedTypeMap *replacementsPtr) {
   // Figure out the instance type used for the base.
   Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
@@ -2401,6 +2407,15 @@ ConstraintSystem::getTypeOfMemberReference(
                                            /*adjustForPreconcurrency=*/false);
     }
 
+    if (options.contains(GetTypeOfMemberReferenceFlags::needsImmutableLValue)) {
+      if (auto lvalueType = refType->getAs<LValueType>()) {
+        if (lvalueType->isMutable()) {
+          refType = LValueType::get(lvalueType->getObjectType(),
+                                    false /*is mutable*/);
+        }
+      }
+    }
+
     auto selfTy = outerDC->getSelfInterfaceType();
 
     // If this is a reference to an instance member that applies self,
@@ -2476,7 +2491,8 @@ ConstraintSystem::getTypeOfMemberReference(
     // if it didn't conform.
     addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator));
-  } else if (!isDynamicResult) {
+  } else if (!options.contains(
+                 GetTypeOfMemberReferenceFlags::isDynamicResult)) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
   }
 
@@ -2535,14 +2551,18 @@ ConstraintSystem::getTypeOfMemberReference(
   // Compute the type of the reference.
   Type type = getMemberReferenceTypeFromOpenedType(
       openedType, baseObjTy, value, outerDC, locator, hasAppliedSelf,
-      isStaticMemberRefOnProtocol, isDynamicResult, replacements);
+      isStaticMemberRefOnProtocol,
+      options.contains(GetTypeOfMemberReferenceFlags::isDynamicResult),
+      replacements);
 
   // Do the same thing for the original type, if there can be any difference.
   Type origType = type;
   if (openedType.getPointer() != origOpenedType.getPointer()) {
     origType = getMemberReferenceTypeFromOpenedType(
         origOpenedType, baseObjTy, value, outerDC, locator, hasAppliedSelf,
-        isStaticMemberRefOnProtocol, isDynamicResult, replacements);
+        isStaticMemberRefOnProtocol,
+        options.contains(GetTypeOfMemberReferenceFlags::isDynamicResult),
+        replacements);
   }
 
   // If we opened up any type variables, record the replacements.
@@ -3450,6 +3470,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     const auto semantics =
         TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
     DeclReferenceType declRefType;
+    bool shouldBorrow = false;
+    if (auto typeVar = boundType->getAs<TypeVariableType>()) {
+      shouldBorrow = typeVar->getImpl().shouldBindToImmutableLValue();
+      assert((!shouldBorrow || typeVar->getImpl().canBindToLValue()) &&
+             "Can only set should bind to immutable lvalue if we can also "
+             "bind to an lvalue");
+    }
     if (semantics != DeclTypeCheckingSemantics::Normal) {
       declRefType = getTypeOfReferenceWithSpecialTypeCheckingSemantics(
           *this, locator, semantics);
@@ -3457,13 +3484,18 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       // Retrieve the type of a reference to the specific declaration choice.
       assert(!baseTy->hasTypeParameter());
 
+      GetTypeOfMemberReferenceOptions options;
+      if (kind == OverloadChoiceKind::DeclViaDynamic)
+        options |= GetTypeOfMemberReferenceFlags::isDynamicResult;
+      if (shouldBorrow)
+        options |= GetTypeOfMemberReferenceFlags::needsImmutableLValue;
       declRefType = getTypeOfMemberReference(
-          baseTy, choice.getDecl(), useDC,
-          (kind == OverloadChoiceKind::DeclViaDynamic),
-          choice.getFunctionRefKind(), locator, nullptr);
+          baseTy, choice.getDecl(), useDC, options, choice.getFunctionRefKind(),
+          locator, nullptr);
     } else {
-      declRefType = getTypeOfReference(
-          choice.getDecl(), choice.getFunctionRefKind(), locator, useDC);
+      declRefType =
+          getTypeOfReference(choice.getDecl(), choice.getFunctionRefKind(),
+                             locator, useDC, shouldBorrow);
     }
 
     openedType = declRefType.openedType;

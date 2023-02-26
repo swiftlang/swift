@@ -924,9 +924,13 @@ namespace {
             CS.getConstraintLocator(expr, ConstraintLocator::Member),
             TVO_CanBindToHole);
       }
+      auto options = TVO_CanBindToLValue | TVO_CanBindToNoEscape;
+      if (auto lvalueType = baseTy->getAs<LValueType>()) {
+        if (!lvalueType->isMutable())
+          options |= TVO_ShouldBindToImmutableLValue;
+      }
       auto tv = CS.createTypeVariable(
-                  CS.getConstraintLocator(expr, ConstraintLocator::Member),
-                  TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+          CS.getConstraintLocator(expr, ConstraintLocator::Member), options);
       SmallVector<OverloadChoice, 4> outerChoices;
       for (auto decl : outerAlternatives) {
         outerChoices.push_back(OverloadChoice(Type(), decl, functionRefKind));
@@ -1421,11 +1425,32 @@ namespace {
         return invalidateReference();
       }
 
+      auto options = TVO_CanBindToLValue | TVO_CanBindToNoEscape;
+
+      // Walk up the expr stack and see if we find a chain of paren_expr,
+      // member_ref_expr, ending in a borrow_expr. In such a case, we want an
+      // immutable lvalue.
+      auto stack = llvm::makeArrayRef(ExprStack).drop_back();
+      while (!stack.empty()) {
+        auto *next = stack.back();
+        stack = stack.drop_back();
+        if (isa<MemberRefExpr>(next) || isa<UnresolvedDotExpr>(next))
+          continue;
+        if (isa<BorrowExpr>(next)) {
+          options |= TVO_ShouldBindToImmutableLValue;
+          break;
+        }
+
+        if (next != next->getSemanticsProvidingExpr())
+          continue;
+
+        // Otherwise, break out.
+        break;
+      }
+
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
-      auto tv = CS.createTypeVariable(locator,
-                                      TVO_CanBindToLValue |
-                                      TVO_CanBindToNoEscape);
+      auto tv = CS.createTypeVariable(locator, options);
 
       OverloadChoice choice =
           OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());

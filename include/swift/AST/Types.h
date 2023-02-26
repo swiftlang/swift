@@ -358,6 +358,10 @@ protected:
   enum { NumSILExtInfoBits = 11 };
   union { uint64_t OpaqueBits;
 
+  // Turn off clang-format over all of our inline bitfield declarations.
+  //
+  // clang-format off
+
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
                              RecursiveTypeProperties::BitWidth + 1,
     /// Kind - The discriminator that indicates what subclass of type this is.
@@ -398,12 +402,12 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 6+32,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+31,
     /// Type variable options.
-    Options : 6,
+    Options : 7,
     : NumPadBits,
     /// The unique number assigned to this type variable.
-    ID : 32
+    ID : 31
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+4+1+2+1+1,
@@ -482,6 +486,7 @@ protected:
   );
 
   } Bits;
+  // clang-format on
 
 protected:
   TypeBase(TypeKind kind, const ASTContext *CanTypeCtx,
@@ -5787,7 +5792,7 @@ BEGIN_CAN_TYPE_WRAPPER(LValueType, Type)
     return CanLValueType(LValueType::get(type, isMutable));
   }
 END_CAN_TYPE_WRAPPER(LValueType, Type)
-  
+
 /// InOutType - An inout qualified type is an argument to a function passed
 /// with an explicit "Address of" operator.  It is read in and then written back
 /// to after the callee function is done.  This also models the receiver of
