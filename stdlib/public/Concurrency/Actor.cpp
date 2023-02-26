@@ -1387,7 +1387,6 @@ bool DefaultActorImpl::tryLock(bool asDrainer) {
   dispatch_thread_override_info_s threadOverrideInfo;
   threadOverrideInfo = swift_dispatch_thread_get_current_override_qos_floor();
   qos_class_t overrideFloor = threadOverrideInfo.override_qos_floor;
-  bool receivedOverride = false;
 retry:;
 #else
   SWIFT_TASK_DEBUG_LOG("Thread attempting to jump onto %p, as drainer = %d", this, asDrainer);
@@ -1406,10 +1405,6 @@ retry:;
         // (4).
         swift_release(this);
 
-        if (receivedOverride) {
-          // Reset any override as a result of contending for the actor lock.
-          swift_dispatch_lock_override_end(overrideFloor);
-        }
         return false;
       }
 #endif
@@ -1429,7 +1424,6 @@ retry:;
 
         (void) swift_dispatch_thread_override_self(maxActorPriority);
         overrideFloor = maxActorPriority;
-        receivedOverride = true;
         goto retry;
       }
 #endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
@@ -1447,6 +1441,7 @@ retry:;
     // Taking the drain lock clears the max priority escalated bit because we've
     // already represented the current max priority of the actor on the thread.
     auto newState = oldState.withRunning();
+    newState = newState.withoutEscalatedPriority();
 
     // This needs an acquire since we are taking a lock
     if (_status().compare_exchange_weak(oldState, newState,
@@ -1546,8 +1541,11 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
       }
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-      // Reset any override on this thread as a result of this thread running
-      // the actor. Only do this after we have reenqueued the actor
+      // Reset any asynchronous escalations we may have gotten on this thread
+      // after taking the drain lock.
+      //
+      // Only do this after we have reenqueued the actor so that we don't lose
+      // any "mojo" prior to the enqueue.
       if (oldState.isMaxPriorityEscalated()) {
         swift_dispatch_lock_override_end((qos_class_t) oldState.getMaxPriority());
       }
