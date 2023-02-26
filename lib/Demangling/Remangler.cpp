@@ -1160,6 +1160,15 @@ ManglingError Remangler::mangleDependentGenericSignature(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleDependentGenericParamPackMarker(Node *node,
+                                                      unsigned depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
+  DEMANGLER_ASSERT(node->getChild(0)->getKind() == Node::Kind::Type, node);
+  Buffer << "Rv";
+  mangleDependentGenericParamIndex(node->getChild(0)->getChild(0));
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDependentGenericType(Node *node,
                                                     unsigned depth) {
   RETURN_IF_ERROR(
