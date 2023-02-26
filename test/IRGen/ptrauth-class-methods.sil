@@ -5,9 +5,9 @@
 
 import Builtin
 
-// CHECK: @"$s4test1ACfD.ptrauth" = private constant { i8*, i32, i64, i64 } { i8* bitcast (void (%T4test1AC*)* @"$s4test1ACfD" to i8*), i32 0, i64 ptrtoint ({{.*}} @"$s4test1ACMf" to i64), i64 48063 }, section "llvm.ptrauth", align 8
+// CHECK: @"$s4test1ACfD.ptrauth" = private constant { i8*, i32, i64, i64 } { i8* bitcast (void (%T4test1AC*)* @"$s4test1ACfD" to i8*), i32 0, i64 ptrtoint ({{.*}} @"$s4test1ACMf", i32 0, i32 1) to i64), i64 48063 }, section "llvm.ptrauth", align 8
 // CHECK: @A_foo.ptrauth = private constant { i8*, i32, i64, i64 } { i8* bitcast (void (%T4test1AC*)* @A_foo to i8*), i32 0, i64 ptrtoint ({{.*}} getelementptr inbounds ({{.*}} @"$s4test1ACMf", i32 0, i32 {{.*}}) to i64), i64 23008 }, section "llvm.ptrauth", align 8
-// CHECK: @"$s4test1BCfD.ptrauth" = private constant { i8*, i32, i64, i64 } { i8* bitcast (void (%T4test1BC*)* @"$s4test1BCfD" to i8*), i32 0, i64 ptrtoint ({{.*}} @"$s4test1BCMf" to i64), i64 48063 }, section "llvm.ptrauth", align 8
+// CHECK: @"$s4test1BCfD.ptrauth" = private constant { i8*, i32, i64, i64 } { i8* bitcast (void (%T4test1BC*)* @"$s4test1BCfD" to i8*), i32 0, i64 ptrtoint ({{.*}} @"$s4test1BCMf", i32 0, i32 1) to i64), i64 48063 }, section "llvm.ptrauth", align 8
 // CHECK: @B_foo.ptrauth = private constant { i8*, i32, i64, i64 } { i8* bitcast (void (%T4test1BC*)* @B_foo to i8*), i32 0, i64 ptrtoint ({{.*}} getelementptr inbounds ({{.*}} @"$s4test1BCMf", i32 0, i32 {{.*}}) to i64), i64 23008 }, section "llvm.ptrauth", align 8
 
 // CHECK: @"$s4test1GCMn" =
