@@ -76,6 +76,13 @@ extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
 
+struct AllocBoxReturnTy {
+  void *_Null_unspecified refCountedPtr;
+  void *_Null_unspecified opaquePtr;
+};
+
+extern "C" AllocBoxReturnTy swift_allocBox(void *_Nonnull) noexcept SWIFT_CALL;
+
 extern "C" void *_Nonnull swift_projectBox(void *_Nonnull) noexcept;
 
 SWIFT_INLINE_THUNK void *_Nonnull opaqueAlloc(size_t size,

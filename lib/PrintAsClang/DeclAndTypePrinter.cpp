@@ -728,18 +728,40 @@ private:
                       objectType->getNominalOrBoundGenericNominal();
                   assert(objectTypeDecl != nullptr);
 
+                  if (isIndirectCase(elementDecl)) {
+                    outOfLineOS
+                        << "    auto metadata = swift::TypeMetadataTrait<"
+                        << types[paramType] << ">::getTypeMetadata();\n";
+                    outOfLineOS
+                        << "    auto allocBoxResult = "
+                        << cxx_synthesis::getCxxSwiftNamespaceName()
+                        << "::" << cxx_synthesis::getCxxImplNamespaceName()
+                        << "::"
+                        << "swift_allocBox(metadata);\n";
+                  }
+
                   if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                          objectTypeDecl)) {
-                    outOfLineOS
-                        << "    memcpy(result._getOpaquePointer(), &val, "
-                           "sizeof(val));\n";
-                  } else if (isa<ClassDecl>(objectTypeDecl)) {
-                    outOfLineOS
-                        << "    auto op = swift::"
-                        << cxx_synthesis::getCxxImplNamespaceName()
-                        << "::_impl_RefCountedClass::copyOpaquePointer(val);\n";
-                    outOfLineOS << "    memcpy(result._getOpaquePointer(), "
-                                   "&op, sizeof(op));\n";
+                          objectTypeDecl) ||
+                      isa<ClassDecl>(objectTypeDecl)) {
+                    if (isa<ClassDecl>(objectTypeDecl)) {
+                      outOfLineOS << "    auto src = swift::"
+                                  << cxx_synthesis::getCxxImplNamespaceName()
+                                  << "::_impl_RefCountedClass::"
+                                     "copyOpaquePointer(val);\n";
+                    } else {
+                      outOfLineOS << "    auto src = val;\n";
+                    }
+
+                    if (isIndirectCase(elementDecl)) {
+                      outOfLineOS << "    memcpy(allocBoxResult.opaquePtr, "
+                                     "&src, sizeof(src));\n";
+                      outOfLineOS << "    memcpy(result._getOpaquePointer(), "
+                                     "&allocBoxResult.refCountedPtr, "
+                                     "sizeof(allocBoxResult.refCountedPtr));\n";
+                    } else {
+                      outOfLineOS << "    memcpy(result._getOpaquePointer(), "
+                                     "&src, sizeof(src));\n";
+                    }
                   } else {
                     objectTypeDecl =
                         paramType->getNominalOrBoundGenericNominal();
@@ -773,9 +795,13 @@ private:
                             objectTypeDecl->getModuleContext(),
                             ED->getModuleContext());
                     outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                    outOfLineOS << ">::type::initializeWithTake(result._"
-                                   "getOpaquePointer(), ";
-                    outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
+                    outOfLineOS << ">::type::initializeWithTake(";
+                    outOfLineOS << (isIndirectCase(elementDecl)
+                                        ? "static_cast<char * "
+                                          "_Nonnull>(allocBoxResult.opaquePtr)"
+                                        : "result._getOpaquePointer()");
+                    outOfLineOS << ", "
+                                << cxx_synthesis::getCxxSwiftNamespaceName()
                                 << "::";
                     outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
                     outOfLineOS << "::implClassFor<";
@@ -786,6 +812,12 @@ private:
                     outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
                     outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
                     outOfLineOS << ");\n";
+
+                    if (isIndirectCase(elementDecl)) {
+                      outOfLineOS << "    memcpy(result._getOpaquePointer(), "
+                                     "&allocBoxResult.refCountedPtr, "
+                                     "sizeof(allocBoxResult.refCountedPtr));\n";
+                    }
                   }
                 }
               }

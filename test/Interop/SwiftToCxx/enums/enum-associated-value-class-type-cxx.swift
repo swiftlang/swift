@@ -16,8 +16,8 @@ public enum E {
 
 // CHECK:      SWIFT_INLINE_THUNK E E::_impl_c::operator()(const C& val) const {
 // CHECK-NEXT:   auto result = E::_make();
-// CHECK-NEXT:   auto op = swift::_impl::_impl_RefCountedClass::copyOpaquePointer(val);
-// CHECK-NEXT:   memcpy(result._getOpaquePointer(), &op, sizeof(op));
+// CHECK-NEXT:   auto src = swift::_impl::_impl_RefCountedClass::copyOpaquePointer(val);
+// CHECK-NEXT:   memcpy(result._getOpaquePointer(), &src, sizeof(src));
 // CHECK-NEXT:   result._destructiveInjectEnumTag(0);
 // CHECK-NEXT:   return result;
 // CHECK-NEXT: }

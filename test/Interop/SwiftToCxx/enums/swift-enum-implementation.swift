@@ -169,7 +169,8 @@ public struct S {
 // CHECK:      namespace Enums __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Enums") {
 // CHECK:        SWIFT_INLINE_THUNK E E::_impl_x::operator()(double val) const {
 // CHECK-NEXT:     auto result = E::_make();
-// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK-NEXT:     auto src = val;
+// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &src, sizeof(src));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(0);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
@@ -187,7 +188,8 @@ public struct S {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_y::operator()(void const * _Nullable val) const {
 // CHECK-NEXT:     auto result = E::_make();
-// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK-NEXT:     auto src = val;
+// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &src, sizeof(src));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(1);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
@@ -225,7 +227,8 @@ public struct S {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_w::operator()(swift::Int val) const {
 // CHECK-NEXT:     auto result = E::_make();
-// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK-NEXT:     auto src = val;
+// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &src, sizeof(src));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(3);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
@@ -243,7 +246,8 @@ public struct S {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_auto::operator()(void * _Nonnull val) const {
 // CHECK-NEXT:     auto result = E::_make();
-// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK-NEXT:     auto src = val;
+// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &src, sizeof(src));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(4);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
