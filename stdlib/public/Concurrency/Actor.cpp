@@ -1137,8 +1137,8 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
     }
 
     // This needs to be a store release so that we also publish the contents of
-    // the new Job we are adding to the atomic job queue. Pairs with load
-    // acquire in drainOne.
+    // the new Job we are adding to the atomic job queue. Pairs with consume
+    // in drainOne.
     if (_status().compare_exchange_weak(oldState, newState,
                    /* success */ std::memory_order_release,
                    /* failure */ std::memory_order_relaxed)) {
@@ -1180,13 +1180,13 @@ Job * DefaultActorImpl::drainOne() {
   SWIFT_TASK_DEBUG_LOG("Draining one job from default actor %p", this);
 
   // Pairs with the store release in DefaultActorImpl::enqueue
-  auto oldState = _status().load(std::memory_order_acquire);
+  auto oldState = _status().load(SWIFT_MEMORY_ORDER_CONSUME);
+  _swift_tsan_consume(this);
 
   auto jobToPreprocessFrom = oldState.getFirstJob();
   Job *firstJob = preprocessQueue(jobToPreprocessFrom);
   traceJobQueue(this, firstJob);
 
-  _swift_tsan_release(this);
   while (true) {
     assert(oldState.isAnyRunning());
 
@@ -1200,8 +1200,8 @@ Job * DefaultActorImpl::drainOne() {
     // Dequeue the first job and set up a new head
     newState = newState.withFirstJob(getNextJobInQueue(firstJob));
     if (_status().compare_exchange_weak(oldState, newState,
-                            /* success */ std::memory_order_release,
-                            /* failure */ std::memory_order_acquire)) {
+                            /* success */ std::memory_order_relaxed,
+                            /* failure */ std::memory_order_relaxed)) {
       SWIFT_TASK_DEBUG_LOG("Drained first job %p from actor %p", firstJob, this);
       traceActorStateTransition(this, oldState, newState);
       concurrency::trace::actor_dequeue(this, firstJob);
@@ -1393,8 +1393,6 @@ retry:;
   SWIFT_TASK_DEBUG_LOG("Thread attempting to jump onto %p, as drainer = %d", this, asDrainer);
 #endif
 
-  // Note: This doesn't have to be a load acquire because the jobQueue is part
-  // of the same atomic.
   auto oldState = _status().load(std::memory_order_relaxed);
   while (true) {
 
@@ -1446,9 +1444,13 @@ retry:;
       assert(!oldState.getFirstJob());
     }
 
+    // Taking the drain lock clears the max priority escalated bit because we've
+    // already represented the current max priority of the actor on the thread.
     auto newState = oldState.withRunning();
+
+    // This needs an acquire since we are taking a lock
     if (_status().compare_exchange_weak(oldState, newState,
-                                 std::memory_order_relaxed,
+                                 std::memory_order_acquire,
                                  std::memory_order_relaxed)) {
       _swift_tsan_acquire(this);
       traceActorStateTransition(this, oldState, newState);
@@ -1527,9 +1529,11 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
       newState = newState.resetPriority();
     }
 
+    // This needs to be a release since we are unlocking a lock
     if (_status().compare_exchange_weak(oldState, newState,
-                      /* success */ std::memory_order_relaxed,
+                      /* success */ std::memory_order_release,
                       /* failure */ std::memory_order_relaxed)) {
+      _swift_tsan_release(this);
       traceActorStateTransition(this, oldState, newState);
 
       if (newState.isScheduled()) {
