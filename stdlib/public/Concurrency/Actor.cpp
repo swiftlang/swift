@@ -589,6 +589,13 @@ class alignas(sizeof(void *) * 2) ActiveActorStatus {
   }
 
 public:
+  bool operator==(ActiveActorStatus other) const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return (Flags == other.Flags) && (DrainLock == other.DrainLock) && (FirstJob == other.FirstJob);
+#else
+    return (Flags == other.Flags) && (FirstJob == other.FirstJob);
+#endif
+  }
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   constexpr ActiveActorStatus()
@@ -879,9 +886,12 @@ public:
   bool unlock(bool forceUnlock);
 
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-  /// Enqueue a job onto the actor. This typically means that the actor hit
-  /// contention during the tryLock and so we're taking the slow path
+  /// Enqueue a job onto the actor.
   void enqueue(Job *job, JobPriority priority);
+
+  /// Enqueue a stealer for the given task since it has been escalated to the
+  /// new priority
+  void enqueueStealer(Job *job, JobPriority priority);
 
   // The calling thread must be holding the actor lock while calling this
   Job *drainOne();
@@ -1126,7 +1136,6 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
     newState = newState.withFirstJob(newHead);
 
     if (oldState.isIdle()) {
-      // Someone gave up the actor lock after we failed fast path.
       // Schedule the actor
       newState = newState.withScheduled();
       newState = newState.withNewPriority(priority);
@@ -1173,6 +1182,79 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
       return;
     }
   }
+}
+
+// The input job is already escalated to the new priority and has already been
+// enqueued into the actor. Push a stealer job for it on the actor.
+//
+// The caller of this function is escalating the input task and holding its
+// TaskStatusRecordLock and escalating this executor via the
+// TaskDependencyStatusRecord.
+void DefaultActorImpl::enqueueStealer(Job *job, JobPriority priority) {
+
+  SWIFT_TASK_DEBUG_LOG("[Override] Escalating an actor %p due to job that is enqueued being escalated", this);
+
+  auto oldState = _status().load(std::memory_order_relaxed);
+  while (true) {
+    // Until we figure out how to safely enqueue a stealer and rendevouz with
+    // the original job so that we don't double-invoke the job, we shall simply
+    // escalate the actor's max priority to match the new one.
+    //
+    // Ideally, we'd also re-sort the job queue so that the escalated job gets
+    // to the front of the queue but since the actor's max QoS is a saturating
+    // function, this still handles the priority inversion correctly but with
+    // priority overhang instead.
+
+    if (oldState.isIdle()) {
+      // We are observing a race. Possible scenarios:
+      //
+      //  1. Escalator is racing with the drain of the actor/task. The task has
+      //  just been popped off the actor and is about to run. The thread running
+      //  the task will readjust its own priority once it runs since it should
+      //  see the escalation in the ActiveTaskStatus and we don't need to
+      //  escalate the actor as it will be spurious.
+      //
+      //  2. Escalator is racing with the enqueue of the task. The task marks
+      //  the place it will enqueue in the dependency record before it enqueues
+      //  itself. Escalator raced in between these two operations and escalated the
+      //  task. Pushing a stealer job for the task onto the actor should fix it.
+      return;
+    }
+    auto newState = oldState;
+
+    if (priority > oldState.getMaxPriority()) {
+      newState = newState.withEscalatedPriority(priority);
+    }
+
+    if (oldState == newState)
+      return;
+
+    if (_status().compare_exchange_weak(oldState, newState,
+                   /* success */ std::memory_order_relaxed,
+                   /* failure */ std::memory_order_relaxed)) {
+      traceActorStateTransition(this, oldState, newState);
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+      if (newState.isRunning()) {
+        // Actor is running on a thread, escalate the thread running it
+        SWIFT_TASK_DEBUG_LOG("[Override] Escalating actor %p which is running on %#x to %#x priority", this, newState.currentDrainer(), priority);
+        dispatch_lock_t *lockAddr = this->drainLockAddr();
+        swift_dispatch_lock_override_start_with_debounce(lockAddr, newState.currentDrainer(),
+                       (qos_class_t) priority);
+
+      } else if (newState.isEnqueued()) {
+        // We are scheduling a stealer for an actor due to priority override.
+        // This extra processing job has a reference on the actor. See
+        // ownership rule (2).
+        SWIFT_TASK_DEBUG_LOG(
+            "[Override] Scheduling a stealer for actor %p at %#x priority",
+            this, newState.getMaxPriority());
+        swift_retain(this);
+        scheduleActorProcessJob(newState.getMaxPriority());
+      }
+#endif
+    }
+  }
+
 }
 
 // Called with actor lock held on current thread
@@ -1820,9 +1902,28 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
   _swift_task_enqueueOnExecutor(job, executorObject, executorType, wtable);
 }
 
+static void
+swift_actor_escalate(DefaultActorImpl *actor, AsyncTask *task, JobPriority newPriority)
+{
+  return actor->enqueueStealer(task, newPriority);
+}
+
 SWIFT_CC(swift)
 void swift::swift_executor_escalate(ExecutorRef executor, AsyncTask *task,
   JobPriority newPriority) {
+  if (executor.isGeneric()) {
+    // TODO (rokhinip): We'd push a stealer job for the task on the executor.
+    return;
+  }
+
+  if (executor.isDefaultActor()) {
+    return swift_actor_escalate(asImpl(executor.getDefaultActor()), task, newPriority);
+  }
+
+  // TODO (rokhinip): This is either the main actor or an actor with a custom
+  // executor. We need to let the executor know that the job has been escalated.
+  // For now, do nothing
+  return;
 }
 
 #define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE

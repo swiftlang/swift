@@ -481,7 +481,7 @@ void swift::updateStatusRecord(AsyncTask *task, TaskStatusRecord *record,
 
   SWIFT_TASK_DEBUG_LOG("Updating status record %p of task %p", record, task);
   withStatusRecordLock(task, status, [&](ActiveTaskStatus lockedStatus) {
-#if NDEBUG
+#ifndef NDEBUG
     bool foundRecord = false;
     for (auto cur: lockedStatus.records()) {
       if (cur == record) {
