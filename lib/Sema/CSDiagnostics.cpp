@@ -708,6 +708,8 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_default_arg_value;
   case CTP_YieldByValue:
     return diag::cannot_convert_yield_value;
+  case CTP_ForgetStmt:
+    return diag::cannot_convert_forget_value;
   case CTP_CallArgument:
     return diag::cannot_convert_argument_value;
   case CTP_ClosureResult:
@@ -2686,6 +2688,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
 
   case CTP_CaseStmt:
   case CTP_ThrowStmt:
+  case CTP_ForgetStmt:
   case CTP_ForEachStmt:
   case CTP_ForEachSequence:
   case CTP_YieldByReference:
@@ -3480,6 +3483,9 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
   case CTP_SingleValueStmtBranch:
     return diag::cannot_convert_initializer_value;
+
+  case CTP_ForgetStmt:
+    return diag::cannot_convert_forget_value;
 
   case CTP_CaseStmt:
   case CTP_ThrowStmt:

@@ -55,6 +55,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_case:
   case tok::kw_default:
   case tok::kw_yield:
+  case tok::kw_forget:
   case tok::pound_assert:
   case tok::pound_if:
   case tok::pound_warning:
@@ -90,8 +91,8 @@ bool Parser::isStartOfStmt() {
   case tok::identifier: {
     // "identifier ':' for/while/do/switch" is a label on a loop/switch.
     if (!peekToken().is(tok::colon)) {
-      // "yield" in the right context begins a yield statement.
-      if (isContextualYieldKeyword()) {
+      // "yield" or "forget" in the right context begins a statement.
+      if (isContextualYieldKeyword() || isContextualForgetKeyword()) {
         return true;
       }
       return false;
@@ -555,6 +556,8 @@ ParserResult<Stmt> Parser::parseStmt() {
   // to parsing a statement.
   if (isContextualYieldKeyword()) {
     Tok.setKind(tok::kw_yield);
+  } else if (isContextualForgetKeyword()) {
+    Tok.setKind(tok::kw_forget);
   }
 
   // This needs to handle everything that `Parser::isStartOfStmt()` accepts as
@@ -609,6 +612,10 @@ ParserResult<Stmt> Parser::parseStmt() {
   case tok::kw_for:
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtForEach(LabelInfo);
+  case tok::kw_forget:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    return parseStmtForget();
   case tok::kw_switch:
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtSwitch(LabelInfo);
@@ -919,6 +926,33 @@ ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
 
   return makeParserResult(Result,
               new (Context) ThrowStmt(throwLoc, Result.get()));
+}
+
+/// parseStmtForget
+///
+/// stmt-forget
+///   'forget' 'self'
+///
+ParserResult<Stmt> Parser::parseStmtForget() {
+  SourceLoc forgetLoc = consumeToken(tok::kw_forget);
+  SourceLoc exprLoc;
+  if (Tok.isNot(tok::eof))
+    exprLoc = Tok.getLoc();
+
+  // We parse the whole expression, because we might have something like:
+  //                         forget self.x.y
+  // and we want to emit good diagnostics for this later on.
+  ParserResult<Expr> Result = parseExpr(diag::expected_expr_forget);
+  bool hasCodeCompletion = Result.hasCodeCompletion();
+
+  if (Result.isNull())
+    Result = makeParserErrorResult(new (Context) ErrorExpr(forgetLoc));
+
+  if (hasCodeCompletion)
+    Result.setHasCodeCompletionAndIsError();
+
+  return makeParserResult(Result,
+                          new (Context) ForgetStmt(forgetLoc, Result.get()));
 }
 
 /// parseStmtDefer

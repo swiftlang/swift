@@ -1598,6 +1598,14 @@ Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
   return nullptr;
 }
 
+Stmt *Traversal::visitForgetStmt(ForgetStmt *FS) {
+  if (Expr *E = doIt(FS->getSubExpr())) {
+    FS->setSubExpr(E);
+    return FS;
+  }
+  return nullptr;
+}
+
 Stmt *Traversal::visitPoundAssertStmt(PoundAssertStmt *S) {
   if (auto *condition = doIt(S->getCondition())) {
     S->setCondition(condition);

@@ -1803,6 +1803,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitForgetStmt(ForgetStmt *S) {
+    printCommon(S, "forget_stmt") << '\n';
+    printRec(S->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitPoundAssertStmt(PoundAssertStmt *S) {
     printCommon(S, "pound_assert");
     OS << " message=" << QuotedString(S->getMessage()) << "\n";

@@ -550,6 +550,34 @@ static bool isDefer(DeclContext *dc) {
   return false;
 }
 
+/// Climb the context to find the method or accessor we're within. We do not
+/// look past local functions or closures, since those cannot contain a
+/// forget statement.
+/// \param dc the inner decl context containing the forget statement
+/// \return either the type member we reside in, or the offending context that
+///         stopped the search for the type member (e.g. closure).
+static DeclContext *climbContextForForgetStmt(DeclContext *dc) {
+  do {
+    if (auto decl = dc->getAsDecl()) {
+      auto func = dyn_cast<AbstractFunctionDecl>(decl);
+      // If we found a non-func decl, we're done.
+      if (func == nullptr)
+        break;
+
+      // If this function's parent is the type context, our search is done.
+      if (func->getDeclContext()->isTypeContext())
+        break;
+
+      // Only continue if we're in a defer. We want to stop at the first local
+      // function or closure.
+      if (!isDefer(dc))
+        break;
+    }
+  } while ((dc = dc->getParent()));
+
+  return dc;
+}
+
 /// Check that a labeled statement doesn't shadow another statement with the
 /// same label.
 static void checkLabeledStmtShadowing(
@@ -1177,6 +1205,115 @@ public:
     TS->setSubExpr(E);
 
     return TS;
+  }
+
+  Stmt *visitForgetStmt(ForgetStmt *FS) {
+    // There are a lot of rules about whether a forget statement is even valid.
+    //
+    // The order of the checks below roughly reflects a sort of funneling from
+    // least correct to most correct usage, while aiming to not emit more than
+    // one diagnostic for misuse, since there are so many ways you can write it
+    // in the wrong place.
+
+    constraints::ContextualTypeInfo contextualInfo;
+    auto &ctx = getASTContext();
+    bool diagnosed = false;
+
+    auto *outerDC = climbContextForForgetStmt(DC);
+    AbstractFunctionDecl *fn = nullptr; // the type member we reside in.
+    if (outerDC->getParent()->isTypeContext()) {
+      fn = dyn_cast<AbstractFunctionDecl>(outerDC);
+    }
+
+    // The forget statement must be in some type's member.
+    if (!fn) {
+      // Then we're not in some type's member function; emit diagnostics.
+      if (auto decl = outerDC->getAsDecl()) {
+        ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_context_decl,
+                           decl->getDescriptiveKind());
+      } else if (auto clos = dyn_cast<AbstractClosureExpr>(outerDC)) {
+        ctx.Diags.diagnose(FS->getForgetLoc(),
+                           diag::forget_wrong_context_closure);
+      } else {
+        ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_context_misc);
+      }
+      diagnosed = true;
+    }
+
+    // Member function-like-thing must have a 'self' and not be a destructor.
+    if (!diagnosed) {
+      // Save this for SILGen, since Stmt's don't know their decl context.
+      FS->setInnermostMethodContext(fn);
+
+      if (fn->isStatic() || isa<DestructorDecl>(fn)) {
+        ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_context_decl,
+                           fn->getDescriptiveKind());
+        diagnosed = true;
+      }
+    }
+
+    // This member function/accessor/etc has to be within a noncopyable type.
+    if (!diagnosed) {
+      Type nominalType =
+          fn->getDeclContext()->getSelfNominalTypeDecl()->getDeclaredType();
+      if (nominalType->isPureMoveOnly()) {
+        // Set the contextual type for the sub-expression before we typecheck.
+        contextualInfo = {nominalType, CTP_ForgetStmt};
+      } else {
+        ctx.Diags.diagnose(FS->getForgetLoc(),
+                           diag::forget_wrong_context_copyable,
+                           fn->getDescriptiveKind());
+        diagnosed = true;
+      }
+    }
+
+    {
+      // Typecheck the sub expression unconditionally.
+      auto E = FS->getSubExpr();
+      TypeChecker::typeCheckExpression(E, DC, contextualInfo);
+      FS->setSubExpr(E);
+    }
+
+    // Can only 'forget self'. This check must happen after typechecking.
+    if (!diagnosed) {
+      bool isSelf = false;
+      auto *checkE = FS->getSubExpr();
+
+      // Look through a load. Only expected if we're in an init.
+      if (auto *load = dyn_cast<LoadExpr>(checkE))
+          checkE = load->getSubExpr();
+
+      if (auto DRE = dyn_cast<DeclRefExpr>(checkE))
+        isSelf = DRE->getDecl()->getName().isSimpleName("self");
+
+      if (!isSelf) {
+        ctx.Diags
+            .diagnose(FS->getStartLoc(), diag::forget_wrong_not_self)
+            .fixItReplace(FS->getSubExpr()->getSourceRange(), "self");
+        diagnosed = true;
+      }
+    }
+
+    // The 'self' parameter must be owned (aka "consuming").
+    if (!diagnosed) {
+      bool isConsuming = false;
+      if (auto *funcDecl = dyn_cast<FuncDecl>(fn))
+        isConsuming = funcDecl->isConsuming();
+      else if (auto *accessor = dyn_cast<AccessorDecl>(fn))
+        isConsuming = accessor->isConsuming();
+      else if (isa<ConstructorDecl>(fn))
+        // constructors are implicitly "consuming" of the self instance.
+        isConsuming = true;
+
+      if (!isConsuming) {
+        ctx.Diags.diagnose(FS->getForgetLoc(),
+                           diag::forget_wrong_context_nonconsuming,
+                           fn->getDescriptiveKind());
+        diagnosed = true;
+      }
+    }
+
+    return FS;
   }
 
   Stmt *visitPoundAssertStmt(PoundAssertStmt *PA) {

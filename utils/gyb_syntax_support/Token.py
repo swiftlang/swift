@@ -300,6 +300,7 @@ SYNTAX_TOKENS = [
     Misc('StringSegment', 'string_segment'),
     Misc('StringInterpolationAnchor', 'string_interpolation_anchor', text=')'),
     Misc('Yield', 'kw_yield', text='yield'),
+    Misc('Forget', 'kw_forget', text='_forget'),
 
 ]
 

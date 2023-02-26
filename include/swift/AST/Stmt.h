@@ -38,6 +38,7 @@ class DeclContext;
 class Evaluator;
 class Expr;
 class FuncDecl;
+class AbstractFunctionDecl;
 class Pattern;
 class PatternBindingDecl;
 class VarDecl;
@@ -1479,6 +1480,44 @@ public:
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Throw;
+  }
+};
+
+/// ForgetStmt - Consumes a noncopyable value and performs memberwise
+/// destruction of unconsumed fields, without invoking its deinit. Only
+/// supported form is "forget self".
+class ForgetStmt : public Stmt {
+  Expr *SubExpr;
+  SourceLoc ForgetLoc;
+  AbstractFunctionDecl *InnermostMethod;
+
+public:
+  explicit ForgetStmt(SourceLoc forgetLoc, Expr *subExpr)
+      : Stmt(StmtKind::Forget, /*Implicit=*/false),
+        SubExpr(subExpr), ForgetLoc(forgetLoc), InnermostMethod(nullptr) {}
+
+  SourceLoc getForgetLoc() const { return ForgetLoc; }
+
+  SourceLoc getStartLoc() const { return ForgetLoc; }
+  SourceLoc getEndLoc() const;
+  SourceRange getSourceRange() const {
+    return SourceRange(ForgetLoc, getEndLoc());
+  }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+
+  /// Retrieves the saved innermost method / accessor decl in which this Stmt
+  /// resides. Corresponds to \c DeclContext::getInnermostMethodContext.
+  /// Must be saved with \c setInnermostMethodContext during typechecking.
+  AbstractFunctionDecl *getInnermostMethodContext() { return InnermostMethod; }
+  void setInnermostMethodContext(AbstractFunctionDecl *afd) {
+    assert(afd); // shouldn't be clearing this
+    InnermostMethod = afd;
+  }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Forget;
   }
 };
 

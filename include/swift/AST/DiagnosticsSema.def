@@ -493,6 +493,10 @@ ERROR(cannot_convert_yield_value_protocol,none,
 ERROR(cannot_convert_yield_value_nil,none,
       "nil is not compatible with expected yield type %0", (Type))
 
+ERROR(cannot_convert_forget_value,none,
+      "cannot convert value of type %0 to expected forget type %1",
+      (Type,Type))
+
 ERROR(cannot_convert_closure_result,none,
       "cannot convert value of type %0 to closure result type %1",
       (Type,Type))
@@ -4496,6 +4500,25 @@ ERROR(opaque_type_var_no_init,none,
 ERROR(opaque_type_var_no_underlying_type,none,
       "property declares an opaque return type, but cannot infer the "
       "underlying type from its initializer expression", ())
+
+ERROR(forget_wrong_context_decl,none,
+      "'forget' statement cannot appear in %0",
+      (DescriptiveDeclKind))
+ERROR(forget_wrong_context_closure,none,
+      "'forget' statement cannot appear in closure",
+      ())
+ERROR(forget_wrong_context_misc,none,
+      "'forget' statement cannot appear in this context",
+      ())
+ERROR(forget_wrong_context_copyable,none,
+      "'forget' statement can only appear in noncopyable type's member",
+      (DescriptiveDeclKind))
+ERROR(forget_wrong_context_nonconsuming,none,
+      "'forget' statement can only appear in consuming %0",
+      (DescriptiveDeclKind))
+ERROR(forget_wrong_not_self,none,
+      "you can only forget 'self'", ())
+
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Patterns

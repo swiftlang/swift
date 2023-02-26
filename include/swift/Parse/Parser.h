@@ -615,6 +615,24 @@ public:
             isa<AccessorDecl>(CurDeclContext) &&
             cast<AccessorDecl>(CurDeclContext)->isCoroutine());
   }
+
+  /// `forget self` is the only valid phrase, but we peek ahead for just any
+  /// identifier after `forget` to determine if it's the statement. This helps
+  /// us avoid interpreting `forget(self)` as the statement and not a call.
+  /// We also want to be mindful of statements like `forget ++ something` where
+  /// folks have defined a custom operator returning void.
+  ///
+  /// Later, type checking will verify that you're forgetting the right thing
+  /// so that when people make a mistake, thinking they can `forget x` we give
+  /// a nice diagnostic.
+  bool isContextualForgetKeyword() {
+    // must be `forget` ...
+    if (!Tok.isContextualKeyword("_forget"))
+      return false;
+
+    // followed by either an identifier, `self`, or `Self`.
+    return peekToken().isAny(tok::identifier, tok::kw_self, tok::kw_Self);
+  }
   
   /// Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
@@ -1848,6 +1866,7 @@ public:
   ParserResult<Stmt> parseStmtReturn(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtYield(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtThrow(SourceLoc tryLoc);
+  ParserResult<Stmt> parseStmtForget();
   ParserResult<Stmt> parseStmtDefer();
   ParserStatus
   parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,

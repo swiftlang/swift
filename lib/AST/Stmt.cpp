@@ -81,6 +81,8 @@ StringRef Stmt::getDescriptiveKindName(StmtKind K) {
     return "return";
   case StmtKind::Throw:
     return "throw";
+  case StmtKind::Forget:
+    return "forget";
   case StmtKind::PoundAssert:
     return "#assert";
   }
@@ -333,6 +335,7 @@ SourceLoc YieldStmt::getEndLoc() const {
 
 SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
+SourceLoc ForgetStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
 SourceLoc DeferStmt::getEndLoc() const {
   return tempDecl->getBody()->getEndLoc();

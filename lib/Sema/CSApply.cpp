@@ -9109,6 +9109,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     case CTP_YieldByValue:
     case CTP_YieldByReference:
     case CTP_ThrowStmt:
+    case CTP_ForgetStmt:
     case CTP_EnumCaseRawValue:
     case CTP_DefaultParameter:
     case CTP_AutoclosureDefaultParameter:
