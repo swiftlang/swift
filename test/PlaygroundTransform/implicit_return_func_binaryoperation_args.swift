@@ -16,6 +16,8 @@ func add<I : SignedNumeric>(_ lhs: I, _ rhs: I) -> I {
 }
 add(3, 4)
 // CHECK: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[lhs='3']
+// CHECK-NEXT: {{.*}} __builtin_log[rhs='4']
 // CHECK-NEXT: {{.*}} __builtin_log[='7']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log[='7']

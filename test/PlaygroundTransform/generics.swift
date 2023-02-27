@@ -21,18 +21,21 @@ for i in 0..<3 {
 
 // CHECK:      __builtin_log_scope_entry
 // CHECK-NEXT: __builtin_log_scope_entry
+// CHECK-NEXT: __builtin_log[t='0']
 // CHECK-NEXT: __builtin_log[='0']
 // CHECK-NEXT: __builtin_log_scope_exit
 // CHECK-NEXT: __builtin_log[='0']
 // CHECK-NEXT: __builtin_log_scope_exit
 // CHECK-NEXT: __builtin_log_scope_entry
 // CHECK-NEXT: __builtin_log_scope_entry
+// CHECK-NEXT: __builtin_log[t='1']
 // CHECK-NEXT: __builtin_log[='1']
 // CHECK-NEXT: __builtin_log_scope_exit
 // CHECK-NEXT: __builtin_log[='1']
 // CHECK-NEXT: __builtin_log_scope_exit
 // CHECK-NEXT: __builtin_log_scope_entry
 // CHECK-NEXT: __builtin_log_scope_entry
+// CHECK-NEXT: __builtin_log[t='2']
 // CHECK-NEXT: __builtin_log[='2']
 // CHECK-NEXT: __builtin_log_scope_exit
 // CHECK-NEXT: __builtin_log[='2']

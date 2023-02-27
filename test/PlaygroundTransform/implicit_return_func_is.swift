@@ -17,10 +17,14 @@ func iss<T>(_ instance: Any, anInstanceOf type: T.Type) -> Bool {
 iss("hello", anInstanceOf: String.self)
 iss(57, anInstanceOf: String.self)
 // CHECK: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[instance='hello']
+// CHECK-NEXT: {{.*}} __builtin_log[type='String']
 // CHECK-NEXT: {{.*}} __builtin_log[='true']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log[='true']
 // CHECK: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[instance='57']
+// CHECK-NEXT: {{.*}} __builtin_log[type='String']
 // CHECK-NEXT: {{.*}} __builtin_log[='false']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log[='false']
