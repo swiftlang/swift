@@ -13,7 +13,6 @@
 #ifndef SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 #define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -231,14 +230,8 @@ public:
   /// Print the given **known** type as a C type.
   void printKnownCType(Type t, PrimitiveTypeMapping &typeMapping) const;
 
-  /// Print the nominal type's Swift mangled name as a typedef from a char to
-  /// the mangled name, and a static constexpr variable declaration, whose type
-  /// is the aforementioned typedef, and whose name is known to the debugger.
-  void printSwiftMangledNameForDebugger(const NominalTypeDecl *typeDecl);
-
 protected:
   raw_ostream &os;
-  swift::Mangle::ASTMangler mangler;
 };
 
 } // end namespace swift
