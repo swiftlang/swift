@@ -225,8 +225,7 @@ class PluginDiagnosticsEngine {
     else {
       return nil
     }
-    let address = bufferBaseAddress.advanced(by: offset)
-    return CxxSourceLoc(mutating: address)
+    return bufferBaseAddress.advanced(by: offset)
   }
 
   /// C++ source location from a position value from a plugin.

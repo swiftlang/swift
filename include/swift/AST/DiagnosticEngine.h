@@ -41,6 +41,7 @@ namespace swift {
   class Decl;
   class DeclAttribute;
   class DiagnosticEngine;
+  class GeneratedSourceInfo;
   class SourceManager;
   class ValueDecl;
   class SourceFile;
@@ -1477,6 +1478,10 @@ namespace swift {
 /// This is correlated with diag::availability_deprecated and others.
 std::pair<unsigned, DeclName>
 getAccessorKindAndNameForDiagnostics(const ValueDecl *D);
+
+/// Retrieve the macro name for a generated source info that represents
+/// a macro expansion.
+DeclName getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info);
 
 } // end namespace swift
 
