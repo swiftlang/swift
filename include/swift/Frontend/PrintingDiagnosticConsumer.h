@@ -22,6 +22,7 @@
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LLVM.h"
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Process.h"
 
@@ -47,10 +48,14 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   bool SuppressOutput = false;
 
   /// swift-syntax rendering
+
+  /// A queued up source file known to the queued diagnostics.
+  using QueuedBuffer = void *;
+
+  /// The queued diagnostics structure.
   void *queuedDiagnostics = nullptr;
-  void *queuedSourceFile = nullptr;
-  unsigned queuedDiagnosticsBufferID;
-  StringRef queuedBufferName;
+  llvm::DenseMap<unsigned, QueuedBuffer> queuedBuffers;
+  unsigned queuedDiagnosticsOutermostBufferID;
 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());
@@ -91,6 +96,7 @@ public:
   }
 
 private:
+  void queueBuffer(SourceManager &sourceMgr, unsigned bufferID);
   void printDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
 };
   

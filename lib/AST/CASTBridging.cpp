@@ -20,7 +20,7 @@ inline llvm::ArrayRef<T> getArrayRef(BridgedArrayRef bridged) {
   return {static_cast<const T *>(bridged.data), size_t(bridged.numElements)};
 }
 
-static SourceLoc getSourceLocFromPointer(void *loc) {
+static SourceLoc getSourceLocFromPointer(const void *loc) {
   auto smLoc = llvm::SMLoc::getFromPointer((const char *)loc);
   return SourceLoc(smLoc);
 }
@@ -46,7 +46,7 @@ namespace {
 
 BridgedDiagnostic SwiftDiagnostic_create(
     void *diagnosticEngine, BridgedDiagnosticSeverity severity,
-    void *sourceLocPtr,
+    const void *sourceLocPtr,
     const uint8_t *textPtr, long textLen
 ) {
   StringRef origText{
@@ -81,7 +81,7 @@ BridgedDiagnostic SwiftDiagnostic_create(
 
 /// Highlight a source range as part of the diagnostic.
 void SwiftDiagnostic_highlight(
-    BridgedDiagnostic diagPtr, void *startLocPtr, void *endLocPtr
+    BridgedDiagnostic diagPtr, const void *startLocPtr, const void *endLocPtr
 ) {
   SourceLoc startLoc = getSourceLocFromPointer(startLocPtr);
   SourceLoc endLoc = getSourceLocFromPointer(endLocPtr);
@@ -92,7 +92,8 @@ void SwiftDiagnostic_highlight(
 
 /// Add a Fix-It to replace a source range as part of the diagnostic.
 void SwiftDiagnostic_fixItReplace(
-    BridgedDiagnostic diagPtr, void *replaceStartLocPtr, void *replaceEndLocPtr,
+    BridgedDiagnostic diagPtr,
+    const void *replaceStartLocPtr, const void *replaceEndLocPtr,
     const uint8_t *newTextPtr, long newTextLen) {
 
   SourceLoc startLoc = getSourceLocFromPointer(replaceStartLocPtr);

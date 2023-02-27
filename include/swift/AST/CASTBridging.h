@@ -118,17 +118,18 @@ extern "C" {
 /// information and then must be finished via \c SwiftDiagnostic_finish.
 BridgedDiagnostic SwiftDiagnostic_create(
     void *diagnosticEngine, BridgedDiagnosticSeverity severity,
-    void *_Nullable sourceLoc,
+    const void *_Nullable sourceLoc,
     const uint8_t *_Nullable text, long textLen);
 
 /// Highlight a source range as part of the diagnostic.
 void SwiftDiagnostic_highlight(
-    BridgedDiagnostic diag, void *_Nullable startLoc, void *_Nullable endLoc);
+    BridgedDiagnostic diag, const void *_Nullable startLoc, const void *_Nullable endLoc);
 
 /// Add a Fix-It to replace a source range as part of the diagnostic.
 void SwiftDiagnostic_fixItReplace(
     BridgedDiagnostic diag,
-    void *_Nullable replaceStartLoc, void *_Nullable replaceEndLoc,
+    const void *_Nullable replaceStartLoc,
+    const void *_Nullable replaceEndLoc,
     const uint8_t *_Nullable newText, long newTextLen);
 
 /// Finish the given diagnostic and emit it.
