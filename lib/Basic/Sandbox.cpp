@@ -21,8 +21,11 @@ static StringRef sandboxProfile(llvm::BumpPtrAllocator &Alloc) {
   // Import the system sandbox profile.
   contents += "(import \"system.sb\")\n";
 
-  // Allow reading all files, we need to read various system files.
-  contents += "(allow file-read*)\n";
+  // Allow reading file metadata of any files.
+  contents += "(allow file-read-metadata)\n";
+
+  // Allow reading dylibs.
+  contents += "(allow file-read* (regex #\"\\.dylib$\"))\n";
 
   // This is required to launch any processes (execve(2)).
   contents += "(allow process-exec*)\n";
