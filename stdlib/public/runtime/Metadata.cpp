@@ -1209,32 +1209,31 @@ MetadataPackCacheEntry::MetadataPackCacheEntry(const Key &key) {
 static SimpleGlobalCache<MetadataPackCacheEntry, MetadataPackTag> MetadataPacks;
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
-const Metadata * const *
-swift_allocateMetadataPack(const Metadata * const *pack, unsigned count) {
-  if (reinterpret_cast<uintptr_t>(pack) & 1)
+MetadataPackPointer
+swift_allocateMetadataPack(MetadataPackPointer pack, unsigned count) {
+  if (pack.getLifetime() == PackLifetime::OnHeap)
     return pack;
 
-  MetadataPackCacheEntry::Key key{pack, count};
+  MetadataPackCacheEntry::Key key{pack.getElements(), count};
   auto bytes = MetadataPacks.getOrInsert(key).first->getElements();
 
-  uintptr_t bytesWithLSBSet = reinterpret_cast<uintptr_t>(bytes) | 1;
-  return reinterpret_cast<const Metadata * const *>(bytesWithLSBSet);
+  return MetadataPackPointer(bytes, PackLifetime::OnHeap);
 }
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
-const WitnessTable * const *
-swift_allocateWitnessTablePack(const WitnessTable * const *pack, unsigned count) {
-  if (reinterpret_cast<uintptr_t>(pack) & 1)
+WitnessTablePackPointer
+swift_allocateWitnessTablePack(WitnessTablePackPointer pack, unsigned count) {
+  if (pack.getLifetime() == PackLifetime::OnHeap)
     return pack;
 
   size_t totalSize = (size_t) count * sizeof(const WitnessTable *);
 
-  auto bytes = (char*) MetadataAllocator(WitnessTablePackTag)
-    .Allocate(totalSize, alignof(const WitnessTable *));
-  memcpy(bytes, pack, totalSize);
+  auto bytes = (const WitnessTable **)
+    MetadataAllocator(WitnessTablePackTag)
+      .Allocate(totalSize, alignof(const WitnessTable *));
+  memcpy((char*) bytes, pack.getElements(), totalSize);
 
-  uintptr_t bytesWithLSBSet = reinterpret_cast<uintptr_t>(bytes) | 1;
-  return reinterpret_cast<const WitnessTable * const *>(bytesWithLSBSet);
+  return WitnessTablePackPointer(bytes, PackLifetime::OnHeap);
 }
 
 /***************************************************************************/

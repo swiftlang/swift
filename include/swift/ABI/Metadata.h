@@ -4863,6 +4863,50 @@ public:
   }
 };
 
+enum class PackLifetime : uint8_t {
+  OnStack = 0,
+  OnHeap = 1
+};
+
+/// A pointer to a metadata or witness table pack. If the LSB is set,
+/// the pack is allocated on the heap; otherwise, it is allocated on
+/// the stack.
+template<typename Runtime, template <typename> class Pointee>
+class TargetPackPointer {
+  typename Runtime::StoredSize Ptr;
+
+  using PointerType = typename Runtime::template Pointer<const Pointee<Runtime>>;
+
+public:
+  explicit TargetPackPointer(PointerType const *ptr, PackLifetime lifetime)
+    : Ptr(reinterpret_cast<typename Runtime::StoredSize>(ptr) |
+          (lifetime == PackLifetime::OnHeap ? 1 : 0)) {}
+
+  const PointerType *getElements() const {
+    return reinterpret_cast<const PointerType *>(Ptr & ~1);
+  }
+
+  PointerType *getElements() {
+    return reinterpret_cast<PointerType *>(Ptr & ~1);
+  }
+
+  PackLifetime getLifetime() const {
+    return (bool)(Ptr & 1) ? PackLifetime::OnHeap : PackLifetime::OnStack;
+  }
+};
+
+/// A pointer to a metadata pack.
+template<typename Runtime>
+using TargetMetadataPackPointer = TargetPackPointer<Runtime, TargetMetadata>;
+
+using MetadataPackPointer = TargetMetadataPackPointer<InProcess>;
+
+/// A pointer to a witness table pack.
+template<typename Runtime>
+using TargetWitnessTablePackPointer = TargetPackPointer<Runtime, TargetWitnessTable>;
+
+using WitnessTablePackPointer = TargetWitnessTablePackPointer<InProcess>;
+
 } // end namespace swift
 
 #pragma clang diagnostic pop
