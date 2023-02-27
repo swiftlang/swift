@@ -33,13 +33,23 @@
 using namespace swift;
 using namespace swift::markup;
 
-extern "C" void *swift_ASTGen_createQueuedDiagnostics(void *sourceFile);
+extern "C" void *swift_ASTGen_createQueuedDiagnostics();
 extern "C" void swift_ASTGen_destroyQueuedDiagnostics(void *queued);
+extern "C" void swift_ASTGen_addQueuedSourceFile(
+      void *queuedDiagnostics,
+      int bufferID,
+      void *sourceFile,
+      const uint8_t *displayNamePtr,
+      intptr_t displayNameLength,
+      int parentID,
+      int positionInParent);
 extern "C" void swift_ASTGen_addQueuedDiagnostic(
     void *queued,
     const char* text, ptrdiff_t textLength,
     BridgedDiagnosticSeverity severity,
-    const void *sourceLoc
+    const void *sourceLoc,
+    const void **highlightRanges,
+    ptrdiff_t numHighlightRanges
 );
 extern "C" void swift_ASTGen_renderQueuedDiagnostics(
     void *queued, ptrdiff_t contextSize, ptrdiff_t colorize,
@@ -984,11 +994,96 @@ static void enqueueDiagnostic(
     break;
   }
 
+  // Map the highlight ranges.
+  SmallVector<const void *, 2> highlightRanges;
+  for (const auto &range : info.Ranges) {
+    if (range.isInvalid())
+      continue;
+
+    highlightRanges.push_back(range.getStart().getOpaquePointerValue());
+    highlightRanges.push_back(range.getEnd().getOpaquePointerValue());
+  }
+
+  // FIXME: Translate Fix-Its.
+
   swift_ASTGen_addQueuedDiagnostic(
       queuedDiagnostics, text.data(), text.size(), severity,
-      info.Loc.getOpaquePointerValue());
+      info.Loc.getOpaquePointerValue(),
+      highlightRanges.data(), highlightRanges.size() / 2);
+}
+#endif
 
-  // FIXME: Need a way to add highlights, Fix-Its, and so on.
+/// Retrieve the stack of source buffers from the provided location out to
+/// a physical source file, with source buffer IDs for each step along the way
+/// due to (e.g.) macro expansions or generated code.
+///
+/// The resulting vector will always contain valid source locations. If the
+/// initial location is invalid, the result will be empty.
+static SmallVector<unsigned, 1> getSourceBufferStack(
+    SourceManager &sourceMgr, SourceLoc loc) {
+  SmallVector<unsigned, 1> stack;
+  while (true) {
+    if (loc.isInvalid())
+      return stack;
+
+    unsigned bufferID = sourceMgr.findBufferContainingLoc(loc);
+    stack.push_back(bufferID);
+
+    auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
+    if (!generatedSourceInfo)
+      return stack;
+
+    loc = generatedSourceInfo->originalSourceRange.getStart();
+  }
+}
+
+#if SWIFT_SWIFT_PARSER
+void PrintingDiagnosticConsumer::queueBuffer(
+    SourceManager &sourceMgr, unsigned bufferID) {
+  QueuedBuffer knownSourceFile = queuedBuffers[bufferID];
+  if (knownSourceFile)
+    return;
+
+  auto bufferContents = sourceMgr.getEntireTextForBuffer(bufferID);
+  auto sourceFile = swift_ASTGen_parseSourceFile(
+      bufferContents.data(), bufferContents.size(),
+      "module", "file.swift");
+
+  // Find the parent and position in parent, if there is one.
+  int parentID = -1;
+  int positionInParent = 0;
+  std::string displayName;
+  auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
+  if (generatedSourceInfo) {
+    SourceLoc parentLoc = generatedSourceInfo->originalSourceRange.getEnd();
+    if (parentLoc.isValid()) {
+      parentID = sourceMgr.findBufferContainingLoc(parentLoc);
+      positionInParent = sourceMgr.getLocOffsetInBuffer(parentLoc, parentID);
+
+      // Queue the parent buffer.
+      queueBuffer(sourceMgr, parentID);
+    }
+
+    if (DeclName macroName =
+            getGeneratedSourceInfoMacroName(*generatedSourceInfo)) {
+      SmallString<64> buffer;
+      if (generatedSourceInfo->attachedMacroCustomAttr)
+        displayName = ("macro expansion @" + macroName.getString(buffer)).str();
+      else
+        displayName = ("macro expansion #" + macroName.getString(buffer)).str();
+    }
+  }
+
+  if (displayName.empty()) {
+    displayName = sourceMgr.getDisplayNameForLoc(
+        sourceMgr.getLocForBufferStart(bufferID)).str();
+  }
+
+  swift_ASTGen_addQueuedSourceFile(
+      queuedDiagnostics, bufferID, sourceFile,
+      (const uint8_t*)displayName.data(), displayName.size(),
+      parentID, positionInParent);
+  queuedBuffers[bufferID] = sourceFile;
 }
 #endif
 
@@ -1008,32 +1103,21 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
   switch (FormattingStyle) {
   case DiagnosticOptions::FormattingStyle::SwiftSyntax: {
 #if SWIFT_SWIFT_PARSER
-    if (Info.Loc.isValid()) {
-      // Ignore "in macro expansion" diagnostics; we want to put them
-      // elsewhere.
-      // FIXME: We should render the "in macro expansion" information in
-      // some other manner. Not quite sure how at this point, though.
-      if (Info.ID == diag::in_macro_expansion.ID)
-        break;
-
-      // If there are no enqueued diagnostics, they are from a different
-      // buffer, flush any enqueued diagnostics and create a new set.
-      unsigned bufferID = SM.findBufferContainingLoc(Info.Loc);
-      if (!queuedDiagnostics || bufferID != queuedDiagnosticsBufferID) {
+    auto bufferStack = getSourceBufferStack(SM, Info.Loc);
+    if (!bufferStack.empty()) {
+      // If there are no enqueued diagnostics, or they are from a different
+      // outermost buffer, flush any enqueued diagnostics and start fresh.
+      unsigned outermostBufferID = bufferStack.back();
+      if (!queuedDiagnostics ||
+          outermostBufferID != queuedDiagnosticsOutermostBufferID) {
         flush(/*includeTrailingBreak*/ true);
 
-        // FIXME: Go parse the source file again. This is an awful hack.
-        auto bufferContents = SM.getEntireTextForBuffer(bufferID);
-        queuedSourceFile = swift_ASTGen_parseSourceFile(
-            bufferContents.data(), bufferContents.size(),
-            "module", "file.swift");
-
-        queuedBufferName = SM.getDisplayNameForLoc(Info.Loc);
-        queuedDiagnostics =
-            swift_ASTGen_createQueuedDiagnostics(queuedSourceFile);
-        queuedDiagnosticsBufferID = bufferID;
+        queuedDiagnosticsOutermostBufferID = outermostBufferID;
+        queuedDiagnostics = swift_ASTGen_createQueuedDiagnostics();
       }
 
+      unsigned innermostBufferID = bufferStack.front();
+      queueBuffer(SM, innermostBufferID);
       enqueueDiagnostic(queuedDiagnostics, Info, SM);
       break;
     }
@@ -1102,8 +1186,6 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
 
 #if SWIFT_SWIFT_PARSER
   if (queuedDiagnostics) {
-    Stream << "=== " << queuedBufferName << " ===\n";
-
     char *renderedString = nullptr;
     ptrdiff_t renderedStringLen = 0;
     swift_ASTGen_renderQueuedDiagnostics(
@@ -1113,9 +1195,11 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
       Stream.write(renderedString, renderedStringLen);
     }
     swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);
-    swift_ASTGen_destroySourceFile(queuedSourceFile);
     queuedDiagnostics = nullptr;
-    queuedSourceFile = nullptr;
+    for (const auto &buffer : queuedBuffers) {
+      swift_ASTGen_destroySourceFile(buffer.second);
+    }
+    queuedBuffers.clear();
 
     if (includeTrailingBreak)
       Stream << "\n";
