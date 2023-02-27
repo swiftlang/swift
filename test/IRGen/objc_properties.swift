@@ -250,7 +250,7 @@ class SomeWrapperTests {
 
 // CHECK: @"_CATEGORY__TtC15objc_properties10SomeObject_$_objc_properties" = internal constant { {{.+}} } {
 // CHECK:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
-// CHECK:   @"$s15objc_properties10SomeObjectCMf", i32 0, i32 2
+// CHECK:   @"$s15objc_properties10SomeObjectCMf", i32 0, i32 3
 // CHECK:   { {{.+}} }* @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}"
 // CHECK:   { {{.+}} }* @"_CATEGORY_CLASS_METHODS__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}"
 // CHECK:   i8* null,

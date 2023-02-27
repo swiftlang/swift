@@ -147,7 +147,7 @@ struct SymbolicP {
   uint8_t _4;
 } __attribute__((packed));
 
-inline const void *_Nullable getErrorMetadata() {
+SWIFT_INLINE_THUNK const void *_Nullable getErrorMetadata() {
   static SymbolicP errorSymbol;
   static int *_Nonnull got_ss5ErrorMp = &$ss5ErrorMp;
   errorSymbol._1 = 2;
@@ -169,24 +169,27 @@ inline const void *_Nullable getErrorMetadata() {
 
 class Error {
 public:
-  Error() {}
-  Error(void *_Nonnull swiftError) { opaqueValue = swiftError; }
-  ~Error() {
+  SWIFT_INLINE_THUNK Error() {}
+  SWIFT_INLINE_THUNK Error(void *_Nonnull swiftError) {
+    opaqueValue = swiftError;
+  }
+  SWIFT_INLINE_THUNK ~Error() {
     if (opaqueValue)
       swift_errorRelease(opaqueValue);
   }
-  void *_Nonnull getPointerToOpaquePointer() { return opaqueValue; }
-  Error(Error &&other) : opaqueValue(other.opaqueValue) {
+  SWIFT_INLINE_THUNK void *_Nonnull getPointerToOpaquePointer() {
+    return opaqueValue;
+  }
+  SWIFT_INLINE_THUNK Error(Error &&other) : opaqueValue(other.opaqueValue) {
     other.opaqueValue = nullptr;
   }
-  Error(const Error &other) {
+  SWIFT_INLINE_THUNK Error(const Error &other) {
     if (other.opaqueValue)
       swift_errorRetain(other.opaqueValue);
     opaqueValue = other.opaqueValue;
   }
 
-  template <class T>
-  Swift::Optional<T> as() {
+  template <class T> SWIFT_INLINE_THUNK Swift::Optional<T> as() {
     alignas(alignof(T)) char buffer[sizeof(T)];
     const void *em = getErrorMetadata();
     void *ep = getPointerToOpaquePointer();

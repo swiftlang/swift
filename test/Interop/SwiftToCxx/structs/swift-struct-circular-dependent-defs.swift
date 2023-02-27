@@ -44,5 +44,5 @@ public struct B {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) B final {
 
-// CHECK: inline B A::returnsB() const {
-// CHECK: inline A B::returnsA() const {
+// CHECK: SWIFT_INLINE_THUNK B A::returnsB() const {
+// CHECK: SWIFT_INLINE_THUNK A B::returnsA() const {

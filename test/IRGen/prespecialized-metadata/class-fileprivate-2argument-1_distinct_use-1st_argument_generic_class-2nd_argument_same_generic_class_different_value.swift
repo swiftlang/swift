@@ -78,9 +78,9 @@
 //         CHECK-SAME:   i32 {{(32|16)}}, 
 //         CHECK-SAME:   i16 {{(7|3)}}, 
 //         CHECK-SAME:   i16 0, 
-//   CHECK-apple-SAME:   i32 {{(136|80)}}, 
-// CHECK-unknown-SAME:   i32 112,
-//         CHECK-SAME:   i32 {{(16|8)}}, 
+//   CHECK-apple-SAME:   i32 {{(144|84)}}, 
+// CHECK-unknown-SAME:   i32 120,
+//         CHECK-SAME:   i32 {{(24|12)}}, 
 //                   :   %swift.type_descriptor* bitcast (
 //                   :     <{
 //                   :       i32,
@@ -142,7 +142,7 @@
 //         CHECK-SAME:       }>* @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMf" to %swift.full_heapmetadata*
 //         CHECK-SAME:     ),
 //         CHECK-SAME:     i32 0,
-//         CHECK-SAME:     i32 2
+//         CHECK-SAME:     i32 3
 //         CHECK-SAME:   ),
 //         CHECK-SAME:   %swift.type* getelementptr inbounds (
 //         CHECK-SAME:     %swift.full_heapmetadata,
@@ -176,7 +176,7 @@
 //         CHECK-SAME:       }>* @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySSGMf" to %swift.full_heapmetadata*
 //         CHECK-SAME:     ),
 //         CHECK-SAME:     i32 0,
-//         CHECK-SAME:     i32 2
+//         CHECK-SAME:     i32 3
 //         CHECK-SAME:   ),
 //         CHECK-SAME:   [[INT]] {{(16|8)}},
 //         CHECK-SAME:   [[INT]] {{(24|12)}},

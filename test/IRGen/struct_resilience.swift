@@ -297,7 +297,7 @@ public func memoryLayoutDotOffsetOfWithResilientStruct() -> Int? {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s17struct_resilience6MySizeVMa"
 // CHECK-SAME:    ([[INT]] %0)
-// CHECK: ret %swift.metadata_response { %swift.type* bitcast ([[INT]]* getelementptr inbounds {{.*}} @"$s17struct_resilience6MySizeVMf", i32 0, i32 1) to %swift.type*), [[INT]] 0 }
+// CHECK: ret %swift.metadata_response { %swift.type* bitcast ([[INT]]* getelementptr inbounds {{.*}} @"$s17struct_resilience6MySizeVMf", i32 0, i32 2) to %swift.type*), [[INT]] 0 }
 
 
 // CHECK-LABEL:  define internal swiftcc %swift.metadata_response @"$s17struct_resilience26StructWithResilientStorageVMr"(%swift.type* %0, i8* %1, i8** %2)

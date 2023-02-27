@@ -2200,6 +2200,11 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   assert(typeRepr != nullptr && "Should call setSpecifier() on "
          "synthesized parameter declarations");
 
+  // Look through top-level pack expansions.  These specifiers are
+  // part of what's repeated.
+  if (auto expansion = dyn_cast<PackExpansionTypeRepr>(typeRepr))
+    typeRepr = expansion->getPatternType();
+
   // Look through parens here; other than parens, specifiers
   // must appear at the top level of a parameter type.
   auto *nestedRepr = typeRepr->getWithoutParens();

@@ -50,6 +50,7 @@ import Generic
 // CHECK-SAME:       %swift.full_type,
 // CHECK-SAME:       %swift.full_type* bitcast (
 // CHECK-SAME:         <{
+// CHECK-SAME:           i8*,
 // CHECK-SAME:           i8**,
 // CHECK-SAME:           [[INT]],
 // CHECK-SAME:           %swift.type_descriptor*,
@@ -60,7 +61,7 @@ import Generic
 // CHECK-SAME:         }>* @"$s7Generic11OneArgumentVyAA7IntegerVGMN" to %swift.full_type*
 // CHECK-SAME:       ),
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     ),
 // CHECK-SAME:   %swift.type** @"$s7Generic11OneArgumentVyAA7IntegerVGMJ"
 // CHECK-SAME:   )

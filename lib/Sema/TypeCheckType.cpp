@@ -66,9 +66,8 @@ TypeResolution::forStructural(DeclContext *dc, TypeResolutionOptions options,
                               OpenUnboundGenericTypeFn unboundTyOpener,
                               HandlePlaceholderTypeReprFn placeholderHandler,
                               OpenPackElementFn packElementOpener) {
-  return TypeResolution(dc, TypeResolutionStage::Structural, options,
-                        unboundTyOpener, placeholderHandler,
-                        packElementOpener);
+  return TypeResolution(dc, {}, TypeResolutionStage::Structural, options,
+                        unboundTyOpener, placeholderHandler, packElementOpener);
 }
 
 TypeResolution
@@ -86,18 +85,18 @@ TypeResolution::forInterface(DeclContext *dc, GenericSignature genericSig,
                              OpenUnboundGenericTypeFn unboundTyOpener,
                              HandlePlaceholderTypeReprFn placeholderHandler,
                              OpenPackElementFn packElementOpener) {
-  TypeResolution result(dc, TypeResolutionStage::Interface, options,
-                        unboundTyOpener, placeholderHandler,
-                        packElementOpener);
-  result.genericSig = genericSig;
-  return result;
+  return TypeResolution(dc, genericSig, TypeResolutionStage::Interface, options,
+                        unboundTyOpener, placeholderHandler, packElementOpener);
 }
 
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
-  TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler,
-                        packElementOpener);
-  result.genericSig = genericSig;
-  return result;
+  return TypeResolution(dc, genericSig, stage, opts, unboundTyOpener,
+                        placeholderHandler, packElementOpener);
+}
+
+TypeResolution TypeResolution::withoutPackElementOpener() const {
+  return TypeResolution(dc, genericSig, stage, options, unboundTyOpener,
+                        placeholderHandler, {});
 }
 
 ASTContext &TypeResolution::getASTContext() const {
@@ -4548,7 +4547,11 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
 
   auto elementOptions = options;
   elementOptions |= TypeResolutionFlags::AllowPackReferences;
-  auto patternType = resolveType(repr->getPatternType(), elementOptions);
+
+  auto elementResolution =
+      resolution.withoutPackElementOpener().withOptions(elementOptions);
+  auto patternType =
+      elementResolution.resolveType(repr->getPatternType(), silContext);
   if (patternType->hasError())
     return ErrorType::get(ctx);
 
@@ -4590,6 +4593,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
                                                TypeResolutionOptions options) {
   auto &ctx = getASTContext();
   options |= TypeResolutionFlags::FromPackReference;
+
   auto packReference = resolveType(repr->getPackType(), options);
 
   // If we already failed, don't diagnose again.

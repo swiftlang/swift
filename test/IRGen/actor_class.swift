@@ -26,7 +26,7 @@
 // Type descriptor.
 // CHECK-LABEL: @"$s11actor_class9ExchangerCMn" = {{.*}}constant
 //   superclass ref, negative bounds, positive bounds, num immediate members, num fields, field offset vector offset
-// CHECK-SAME: i32 0, i32 2, i32 [[#CLASS_METADATA_HEADER+8]], i32 8, i32 2, i32 [[#CLASS_METADATA_HEADER+1]],
+// CHECK-SAME: i32 0, i32 3, i32 [[#CLASS_METADATA_HEADER+8]], i32 8, i32 2, i32 [[#CLASS_METADATA_HEADER+1]],
 
 // Reflection field records.
 // CHECK-LABEL: @"$s11actor_class9ExchangerCMF" = internal constant

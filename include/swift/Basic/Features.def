@@ -118,6 +118,9 @@ EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 EXPERIMENTAL_FEATURE(ModuleInterfaceExportAs, true)
 
+/// Whether to enable experimental layout string value witnesses
+EXPERIMENTAL_FEATURE(LayoutStringValueWitnesses, true)
+
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.
 EXPERIMENTAL_FEATURE(DifferentiableProgramming, false)

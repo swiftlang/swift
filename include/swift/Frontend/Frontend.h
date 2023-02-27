@@ -188,6 +188,10 @@ public:
     return SearchPathOpts.getFrameworkSearchPaths();
   }
 
+  void setVFSOverlays(const std::vector<std::string> &Overlays) {
+    SearchPathOpts.VFSOverlayFiles = Overlays;
+  }
+
   void setCompilerPluginLibraryPaths(const std::vector<std::string> &Paths) {
     SearchPathOpts.setCompilerPluginLibraryPaths(Paths);
   }

@@ -1011,12 +1011,8 @@ LayoutConstraint ASTBuilder::getLayoutConstraintWithSizeAlign(
 CanGenericSignature ASTBuilder::demangleGenericSignature(
     NominalTypeDecl *nominalDecl,
     NodePointer node) {
-  // The type parameters appearing in the signature's requirements are not
-  // notionally part of our current generic signature.
-  //
-  // FIXME: Fix this to support variadic generics.
   llvm::SaveAndRestore<GenericSignature> savedSignature(
-      GenericSig, GenericSignature());
+      GenericSig, nominalDecl->getGenericSignature());
 
   SmallVector<Requirement, 2> requirements;
 

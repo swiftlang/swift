@@ -47,12 +47,12 @@ public enum Empty {
 // CHECK-NEXT:      unknownDefault
 // CHECK-NEXT:    };
 // CHECK:         inline const static struct _impl_unknownDefault {  // impl struct for case unknownDefault
-// CHECK-NEXT:      inline constexpr operator cases() const {
+// CHECK-NEXT:      SWIFT_INLINE_THUNK constexpr operator cases() const {
 // CHECK-NEXT:        return cases::unknownDefault;
 // CHECK-NEXT:      }
 // CHECK-NEXT:    } unknownDefault;
-// CHECK-NEXT:    inline bool isUnknownDefault() const;
-// CHECK:         inline operator cases() const {
+// CHECK-NEXT:    SWIFT_INLINE_THUNK bool isUnknownDefault() const;
+// CHECK:         SWIFT_INLINE_THUNK operator cases() const {
 // CHECK-NEXT:      return cases::unknownDefault;
 // CHECK-NEXT:    }
 // CHECK:         // Tags for resilient enum Foo
@@ -71,25 +71,25 @@ public enum Empty {
 // CHECK-NEXT:      unknownDefault
 // CHECK-NEXT:    }
 // CHECK:         inline const static struct _impl_unknownDefault {  // impl struct for case unknownDefault
-// CHECK-NEXT:      inline constexpr operator cases() const {
+// CHECK-NEXT:      SWIFT_INLINE_THUNK constexpr operator cases() const {
 // CHECK-NEXT:        return cases::unknownDefault;
 // CHECK-NEXT:      }
 // CHECK-NEXT:    } unknownDefault;
-// CHECK-NEXT:    inline bool isUnknownDefault() const;
+// CHECK-NEXT:    SWIFT_INLINE_THUNK bool isUnknownDefault() const;
 // CHECK-EMPTY:
-// CHECK:         inline operator cases() const {
+// CHECK:         SWIFT_INLINE_THUNK operator cases() const {
 // CHECK-NEXT:      auto tag = _getEnumTag();
 // CHECK-NEXT:      if (tag == _impl::$s5Enums3FooO1ayACSdcACmFWC) return cases::a;
 // NEW_CASE-NEXT:   if (tag == _impl::$s5Enums3FooO1byACSicACmFWC) return cases::b;
 // CHECK-NEXT:      return cases::unknownDefault;
 // CHECK-NEXT:    }
-// CHECK:         inline Foo Foo::_impl_a::operator()(double val) const {
+// CHECK:         SWIFT_INLINE_THUNK Foo Foo::_impl_a::operator()(double val) const {
 // CHECK-NEXT:      auto result = Foo::_make();
 // CHECK-NEXT:      memcpy(result._getOpaquePointer(), &val, sizeof(val));
 // CHECK-NEXT:      result._destructiveInjectEnumTag(_impl::$s5Enums3FooO1ayACSdcACmFWC);
 // CHECK-NEXT:      return result;
 // CHECK-NEXT:    }
-// NEW_CASE:      inline Foo Foo::_impl_b::operator()(swift::Int val) const {
+// NEW_CASE:      SWIFT_INLINE_THUNK Foo Foo::_impl_b::operator()(swift::Int val) const {
 // NEW_CASE-NEXT:   auto result = Foo::_make();
 // NEW_CASE-NEXT:   memcpy(result._getOpaquePointer(), &val, sizeof(val));
 // NEW_CASE-NEXT:   result._destructiveInjectEnumTag(_impl::$s5Enums3FooO1byACSicACmFWC);

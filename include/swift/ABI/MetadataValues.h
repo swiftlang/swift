@@ -1445,6 +1445,8 @@ namespace SpecialPointerAuthDiscriminators {
 
   // Relative protocol witness table descriminator
   const uint16_t RelativeProtocolWitnessTable = 0xb830; // = 47152
+
+  const uint16_t TypeLayoutString = 0x8b65; // = 35685
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -1598,6 +1600,9 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// prespecializations.
     HasCanonicalMetadataPrespecializations = 3,
 
+    /// Set if the metadata contains a pointer to a layout string
+    HasLayoutString = 4,
+
     // Type-specific flags:
 
     /// Set if the class is an actor.
@@ -1679,6 +1684,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasCanonicalMetadataPrespecializations, hasCanonicalMetadataPrespecializations, setHasCanonicalMetadataPrespecializations)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasLayoutString,
+                                hasLayoutString,
+                                setHasLayoutString)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,

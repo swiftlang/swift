@@ -234,7 +234,7 @@ public:
 } // end anonymous namespace
 
 namespace {
-/// Cleanup to destroy an initialized variable.
+/// Cleanup to deallocate a now-uninitialized variable.
 class DeallocStackCleanup : public Cleanup {
   SILValue Addr;
 public:

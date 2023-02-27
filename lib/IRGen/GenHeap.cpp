@@ -34,6 +34,7 @@
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
+#include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -56,9 +57,11 @@ namespace {
                                 FixedTypeInfo> { \
     llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
   public: \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                        SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+    TypeLayoutEntry \
+    *buildTypeLayoutEntry(IRGenModule &IGM, \
+                          SILType T, \
+                          bool useStructLayouts) const override { \
+      if (!useStructLayouts) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry( \
@@ -148,9 +151,11 @@ namespace {
                              alignment, IsNotPOD, IsFixedSize), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     enum { IsScalarPOD = false }; \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                          SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+    TypeLayoutEntry \
+    *buildTypeLayoutEntry(IRGenModule &IGM, \
+                          SILType T, \
+                          bool useStructLayouts) const override { \
+      if (!useStructLayouts) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry( \

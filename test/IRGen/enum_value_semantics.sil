@@ -242,7 +242,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-LABEL: define internal i32 @"$s20enum_value_semantics20SinglePayloadTrivialOwug"
 // CHECK:  [[SELF:%.*]] = bitcast %swift.opaque* %value to %T20enum_value_semantics20SinglePayloadTrivialO*
 // CHECK:  [[OPAQUE:%.*]] = bitcast %T20enum_value_semantics20SinglePayloadTrivialO* [[SELF]] to %swift.opaque*
-// CHECK:  [[TAG:%.*]] = call i32 %getEnumTagSinglePayload(%swift.opaque* noalias [[OPAQUE]], i32 3, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sBi64_N", i32 0, i32 1))
+// CHECK:  [[TAG:%.*]] = call i32 %getEnumTagSinglePayload(%swift.opaque* noalias [[OPAQUE]], i32 3, %swift.type* getelementptr inbounds (%swift.full_existential_type, %swift.full_existential_type* @"$sBi64_N", i32 0, i32 1))
 // CHECK:  ret i32 [[TAG]]
 
 
@@ -260,7 +260,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-LABEL: define internal void @"$s20enum_value_semantics20SinglePayloadTrivialOwui"
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %T20enum_value_semantics20SinglePayloadTrivialO*
 // CHECK-NEXT: [[OPAQUE:%.*]] = bitcast %T20enum_value_semantics20SinglePayloadTrivialO* [[SELF]] to %swift.opaque*
-// CHECK: call void %storeEnumTagSinglePayload(%swift.opaque* noalias [[OPAQUE]], i32 %tag, i32 3, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sBi64_N", i32 0, i32 1))
+// CHECK: call void %storeEnumTagSinglePayload(%swift.opaque* noalias [[OPAQUE]], i32 %tag, i32 3, %swift.type* getelementptr inbounds (%swift.full_existential_type, %swift.full_existential_type* @"$sBi64_N", i32 0, i32 1))
 // CHECK-NEXT: ret void
 
 

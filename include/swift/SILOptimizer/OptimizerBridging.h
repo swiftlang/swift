@@ -133,10 +133,12 @@ typedef bool (* _Nonnull AliasAnalysisEscaping2InstFn)(
       BridgedPassContext context, BridgedValue, BridgedInstruction);
 typedef bool (* _Nonnull AliasAnalysisEscaping2ValFn)(
       BridgedPassContext context, BridgedValue, BridgedValue);
+typedef bool (* _Nonnull AliasAnalysisEscaping2ValIntFn)(
+      BridgedPassContext context, BridgedValue, BridgedValue, SwiftInt);
 
 void AliasAnalysis_register(AliasAnalysisGetMemEffectFn getMemEffectsFn,
                             AliasAnalysisEscaping2InstFn isObjReleasedFn,
-                            AliasAnalysisEscaping2ValFn isAddrVisibleFromObjFn,
+                            AliasAnalysisEscaping2ValIntFn isAddrVisibleFromObjFn,
                             AliasAnalysisEscaping2ValFn mayPointToSameAddrFn);
 
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab);

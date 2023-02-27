@@ -311,8 +311,10 @@ public:
   ExplosionSchema getSchema() const;
 
   /// Build the type layout for this type info.
-  virtual TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                                SILType T) const = 0;
+  virtual TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts = false) const = 0;
 
   /// Allocate a variable of this type on the stack.
   virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,

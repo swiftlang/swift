@@ -6740,6 +6740,8 @@ private:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
+  static CanPackType get(const ASTContext &ctx, ArrayRef<CanType> elements);
+
   CanType getElementType(unsigned elementNo) const {
     return CanType(getPointer()->getElementType(elementNo));
   }

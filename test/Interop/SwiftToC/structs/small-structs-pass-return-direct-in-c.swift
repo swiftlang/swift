@@ -62,7 +62,7 @@ public func getStructDoubleAndFloat_y(_ x: StructDoubleAndFloat) -> Float { retu
 // CHECK-NEXT:  float _2;
 // CHECK-NEXT: };
 
-// CHECK:      static inline struct swift_interop_passStub_Structs_double_0_8_float_8_12 swift_interop_passDirect_Structs_double_0_8_float_8_12(const char * _Nonnull value) __attribute__((always_inline)) {
+// CHECK:      static SWIFT_C_INLINE_THUNK struct swift_interop_passStub_Structs_double_0_8_float_8_12 swift_interop_passDirect_Structs_double_0_8_float_8_12(const char * _Nonnull value) {
 // CHECK-NEXT:  struct swift_interop_passStub_Structs_double_0_8_float_8_12 result;
 // CHECK-NEXT:  memcpy(&result._1, value + 0, 8);
 // CHECK-NEXT:  memcpy(&result._2, value + 8, 4);
@@ -78,7 +78,7 @@ public func getStructDoubleAndFloat_y(_ x: StructDoubleAndFloat) -> Float { retu
 // CHECK-NEXT:  void * _Nullable _2;
 // CHECK-NEXT: };
 
-// CHECK:      static inline struct swift_interop_passStub_Structs_[[StructU16AndPointer]] swift_interop_passDirect_Structs_[[StructU16AndPointer]](const char * _Nonnull value) __attribute__((always_inline)) {
+// CHECK:      static SWIFT_C_INLINE_THUNK struct swift_interop_passStub_Structs_[[StructU16AndPointer]] swift_interop_passDirect_Structs_[[StructU16AndPointer]](const char * _Nonnull value) {
 // CHECK-NEXT:  struct swift_interop_passStub_Structs_[[StructU16AndPointer]] result;
 // CHECK-NEXT:  memcpy(&result._1, value + 0, 1);
 // CHECK-NEXT:  memcpy(&result._2, value + [[PTRSIZE:[48]]], [[PTRSIZE]]);
@@ -93,7 +93,7 @@ public func getStructDoubleAndFloat_y(_ x: StructDoubleAndFloat) -> Float { retu
 // CHECK-NEXT:  uint64_t _1;
 // CHECK-NEXT: };
 
-// CHECK:      static inline void swift_interop_returnDirect_Structs_uint64_t_0_8(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint64_t_0_8 value) __attribute__((always_inline)) {
+// CHECK:      static SWIFT_C_INLINE_THUNK void swift_interop_returnDirect_Structs_uint64_t_0_8(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint64_t_0_8 value) {
 // CHECK-NEXT:  memcpy(result + 0, &value._1, 8);
 // CHECK-NEXT: }
 
@@ -101,7 +101,7 @@ public func getStructDoubleAndFloat_y(_ x: StructDoubleAndFloat) -> Float { retu
 // CHECK-NEXT:  uint64_t _1;
 // CHECK-NEXT: };
 
-// CHECK:      static inline struct swift_interop_passStub_Structs_uint64_t_0_8 swift_interop_passDirect_Structs_uint64_t_0_8(const char * _Nonnull value) __attribute__((always_inline)) {
+// CHECK:      static SWIFT_C_INLINE_THUNK struct swift_interop_passStub_Structs_uint64_t_0_8 swift_interop_passDirect_Structs_uint64_t_0_8(const char * _Nonnull value) {
 // CHECK-NEXT:  struct swift_interop_passStub_Structs_uint64_t_0_8 result;
 // CHECK-NEXT:  memcpy(&result._1, value + 0, 8);
 // CHECK-NEXT:  return result;
@@ -116,7 +116,7 @@ public func getStructDoubleAndFloat_y(_ x: StructDoubleAndFloat) -> Float { retu
 // CHECK-NEXT:  float _2;
 // CHECK-NEXT: };
 
-// CHECK: static inline void swift_interop_returnDirect_Structs_double_0_8_float_8_12(char * _Nonnull result, struct swift_interop_returnStub_Structs_double_0_8_float_8_12 value) __attribute__((always_inline)) {
+// CHECK: static SWIFT_C_INLINE_THUNK void swift_interop_returnDirect_Structs_double_0_8_float_8_12(char * _Nonnull result, struct swift_interop_returnStub_Structs_double_0_8_float_8_12 value) {
 // CHECK-NEXT:   memcpy(result + 0, &value._1, 8);
 // CHECK-NEXT:   memcpy(result + 8, &value._2, 4);
 // CHECK-NEXT: }
@@ -130,7 +130,7 @@ public func getStructDoubleAndFloat_y(_ x: StructDoubleAndFloat) -> Float { retu
 // CHECK-NEXT:   void * _Nullable _2;
 // CHECK-NEXT: };
 
-// CHECK:      static inline void swift_interop_returnDirect_Structs_[[StructU16AndPointer]](char * _Nonnull result, struct swift_interop_returnStub_Structs_[[StructU16AndPointer]] value) __attribute__((always_inline)) {
+// CHECK:      static SWIFT_C_INLINE_THUNK void swift_interop_returnDirect_Structs_[[StructU16AndPointer]](char * _Nonnull result, struct swift_interop_returnStub_Structs_[[StructU16AndPointer]] value) {
 // CHECK-NEXT:  memcpy(result + 0, &value._1, 1);
 // CHECK-NEXT:  memcpy(result + [[PTRSIZE]], &value._2, [[PTRSIZE]]);
 // CHECK-NEXT: }

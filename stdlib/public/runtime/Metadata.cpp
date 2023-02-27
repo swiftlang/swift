@@ -677,6 +677,16 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
   return metadata;
 }
 
+ClassMetadata *
+swift::swift_allocateGenericClassMetadataWithLayoutString(
+    const ClassDescriptor *description,
+    const void *arguments,
+    const GenericClassMetadataPattern *pattern) {
+  return swift::swift_allocateGenericClassMetadata(description,
+                                                   arguments,
+                                                   pattern);
+}
+
 static void
 initializeValueMetadataFromPattern(ValueMetadata *metadata,
                                    const ValueTypeDescriptor *description,
@@ -747,6 +757,18 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   installGenericArguments(metadata, description, arguments);
 
   return metadata;
+}
+
+ValueMetadata *
+swift::swift_allocateGenericValueMetadataWithLayoutString(
+    const ValueTypeDescriptor *description,
+    const void *arguments,
+    const GenericValueMetadataPattern *pattern,
+    size_t extraDataSize) {
+  return swift::swift_allocateGenericValueMetadata(description,
+                                                   arguments,
+                                                   pattern,
+                                                   extraDataSize);
 }
 
 // Look into the canonical prespecialized metadata attached to the type
@@ -1525,7 +1547,7 @@ static Lazy<TupleCache> TupleTypes;
 /// Given a metatype pointer, produce the value-witness table for it.
 /// This is equivalent to metatype->ValueWitnesses but more efficient.
 static const ValueWitnessTable *tuple_getValueWitnesses(const Metadata *metatype) {
-  return ((const ValueWitnessTable*) asFullMetadata(metatype)) - 1;
+  return asFullMetadata(metatype)->ValueWitnesses;
 }
 
 /// Generic tuple value witness for 'projectBuffer'.
@@ -4086,7 +4108,6 @@ swift::swift_getExistentialTypeMetadata(
                                   const Metadata *superclassConstraint,
                                   size_t numProtocols,
                                   const ProtocolDescriptorRef *protocols) {
-
   // The empty compositions Any and AnyObject have fixed metadata.
   if (numProtocols == 0 && !superclassConstraint) {
     switch (classConstraint) {
@@ -4323,11 +4344,12 @@ public:
   };
 
   ExtendedExistentialTypeCacheEntry(Key key)
-      : Data{{getOrCreateVWT(key)}, key.Shape} {
+      : Data{ TargetTypeMetadataHeader<InProcess>({getOrCreateTypeLayout(key)}, {getOrCreateVWT(key)}), key.Shape} {
     key.Arguments.installInto(Data.getTrailingObjects<const void *>());
   }
 
   static const ValueWitnessTable *getOrCreateVWT(Key key);
+  static const uint8_t *getOrCreateTypeLayout(Key key);
 
   intptr_t getKeyIntValueForDump() {
     return 0;
@@ -4428,6 +4450,12 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
   // We can support back-deployment of new special kinds (at least here)
   // if we just require them to provide suggested value witnesses.
   swift_unreachable("shape with unknown special kind had no suggested VWT");
+}
+
+const uint8_t *
+ExtendedExistentialTypeCacheEntry::getOrCreateTypeLayout(Key key) {
+  // TODO: implement
+  return nullptr;
 }
 
 /// The uniquing structure for extended existential type metadata.

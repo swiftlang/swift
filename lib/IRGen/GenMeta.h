@@ -147,11 +147,15 @@ namespace irgen {
     enum : unsigned {
       // Class metadata has two words of head-allocated data: the destructor
       // and the value witness table.
-      Class = 2,
+      Class = 3,
       
       // Struct and enum metadata have one word of head-allocated data:
       // the value witness table.
-      ValueType = 1,
+      ValueType = 2,
+
+      // Some builtin and well-known types don't have a layout string
+      // for binary compatibility reasons.
+      NoTypeLayoutString = 1,
       
       // Other metadata objects have no head allocation.
       None = 0,
