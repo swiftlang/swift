@@ -383,6 +383,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
   printCxxImplClassName(os, typeDecl);
   printGenericParamRefs(os);
   os << ";\n";
+
+  printer.printSwiftMangledNameForDebugger(typeDecl);
+
   os << "};\n";
   os << '\n';
 
