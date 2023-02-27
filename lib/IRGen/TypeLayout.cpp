@@ -2181,6 +2181,10 @@ llvm::Value *EnumTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 llvm::Constant *
 EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
                                   GenericSignature genericSig) const {
+  if (_layoutString) {
+    return *_layoutString;
+  }
+
   switch (copyDestroyKind(IGM)) {
   case CopyDestroyStrategy::POD:
   case CopyDestroyStrategy::Normal: {
@@ -2192,7 +2196,7 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
 
     if (containsArchetypeField() || containsResilientField() ||
         isMultiPayloadEnum() || !refCountString(IGM, B, genericSig)) {
-      return nullptr;
+      return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
     }
 
     ConstantInitBuilder IB(IGM);
@@ -2207,8 +2211,9 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
             "type_layout_string", genericSig.getCanonicalSignature(),
             ty.getASTType()->mapTypeOutOfContext()->getCanonicalType());
 
-    return SB.finishAndCreateGlobal(symbolName, IGM.getPointerAlignment(),
-                                    /*constant*/ true);
+    _layoutString = SB.finishAndCreateGlobal(symbolName, IGM.getPointerAlignment(),
+                                             /*constant*/ true);
+    return *_layoutString;
   }
   }
 }
