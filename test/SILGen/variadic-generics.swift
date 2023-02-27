@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature VariadicGenerics %s | %FileCheck %s
+// REQUIRES: asserts
 
 func receive_simple<T...>(_ args: repeat each T) {}
 func receive_simple_owned<T...>(_ args: repeat __owned each T) {}
