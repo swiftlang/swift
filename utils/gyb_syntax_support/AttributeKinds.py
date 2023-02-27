@@ -821,7 +821,7 @@ DECL_MODIFIER_KINDS = [
                                   code=44),
     DeclAttribute('private', 'AccessControl',
                   OnFunc, OnAccessor, OnExtension, OnGenericType, OnVar, OnSubscript,
-                  OnConstructor, OnMacro,
+                  OnConstructor, OnMacro, OnImport,
                   DeclModifier,
                   NotSerialized,
                   ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIStableToRemove,

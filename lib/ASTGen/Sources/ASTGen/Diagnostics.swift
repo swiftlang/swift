@@ -44,8 +44,8 @@ fileprivate func emitDiagnosticParts(
   // Emit highlights
   for highlight in highlights {
     SwiftDiagnostic_highlight(
-      diag, sourceLoc(at: highlight.position),
-      sourceLoc(at: highlight.endPosition)
+      diag, sourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
+      sourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
     )
   }
 
@@ -154,8 +154,8 @@ extension SourceManager {
     for highlight in highlights {
       SwiftDiagnostic_highlight(
         diag,
-        cxxSourceLocation(for: highlight),
-        cxxSourceLocation(for: highlight, at: highlight.endPosition)
+        cxxSourceLocation(for: highlight, at: highlight.positionAfterSkippingLeadingTrivia),
+        cxxSourceLocation(for: highlight, at: highlight.endPositionBeforeTrailingTrivia)
       )
     }
 
@@ -241,47 +241,23 @@ extension SourceManager {
   }
 }
 
-/// A set of queued diagnostics created by the C++ compiler and rendered
-/// via the swift-syntax renderer.
 struct QueuedDiagnostics {
-  /// The source file in which all of the diagnostics occur.
-  let sourceFile: SourceFileSyntax
+  var grouped: GroupedDiagnostics = GroupedDiagnostics()
 
-  /// The underlying buffer within the C++ SourceManager, which is used
-  /// for computations of source locations.
-  let buffer: UnsafeBufferPointer<UInt8>
+  /// The source file IDs we allocated, mapped from the buffer IDs used
+  /// by the C++ source manager.
+  var sourceFileIDs: [Int: UnsafeMutablePointer<GroupedDiagnostics.SourceFileID>] = [:]
 
-  /// The set of diagnostics.
-  fileprivate var diagnostics: [Diagnostic] = []
-
-  mutating func diagnose(_ diagnostic: Diagnostic) {
-    assert(diagnostic.node.root == sourceFile.root)
-    diagnostics.append(diagnostic)
-  }
-
-  func render() -> String {
-    return DiagnosticsFormatter.annotatedSource(
-      tree: sourceFile,
-      diags: diagnostics
-    )
-  }
+  /// The known source files
+  var sourceFiles: [ExportedSourceFile] = []
 }
 
-/// Create a queued diagnostics structure in which we can
+/// Create a grouped diagnostics structure in which we can add osou
 @_cdecl("swift_ASTGen_createQueuedDiagnostics")
-public func createQueuedDiagnostics(
-  sourceFilePtr: UnsafeMutablePointer<UInt8>
-) -> UnsafeRawPointer {
-  return sourceFilePtr.withMemoryRebound(
-    to: ExportedSourceFile.self, capacity: 1
-  ) { sourceFile in
-    let ptr = UnsafeMutablePointer<QueuedDiagnostics>.allocate(capacity: 1)
-    ptr.initialize(to: .init(
-      sourceFile: sourceFile.pointee.syntax,
-      buffer: sourceFile.pointee.buffer)
-    )
-    return UnsafeRawPointer(ptr)
-  }
+public func createQueuedDiagnostics() -> UnsafeRawPointer {
+  let ptr = UnsafeMutablePointer<QueuedDiagnostics>.allocate(capacity: 1)
+  ptr.initialize(to: .init())
+  return UnsafeRawPointer(ptr)
 }
 
 /// Destroy the queued diagnostics.
@@ -290,6 +266,11 @@ public func destroyQueuedDiagnostics(
   queuedDiagnosticsPtr: UnsafeMutablePointer<UInt8>
 ) {
   queuedDiagnosticsPtr.withMemoryRebound(to: QueuedDiagnostics.self, capacity: 1) { queuedDiagnostics in
+    for (_, sourceFileID) in queuedDiagnostics.pointee.sourceFileIDs {
+      sourceFileID.deinitialize(count: 1)
+      sourceFileID.deallocate()
+    }
+
     queuedDiagnostics.deinitialize(count: 1)
     queuedDiagnostics.deallocate()
   }
@@ -319,6 +300,50 @@ extension BridgedDiagnosticSeverity {
   }
 }
 
+/// Register a source file wih the queued diagnostics.
+@_cdecl("swift_ASTGen_addQueuedSourceFile")
+public func addQueuedSourceFile(
+  queuedDiagnosticsPtr: UnsafeMutableRawPointer,
+  bufferID: Int,
+  sourceFilePtr: UnsafeRawPointer,
+  displayNamePtr: UnsafePointer<UInt8>,
+  displayNameLength: Int,
+  parentID: Int,
+  positionInParent: Int
+) {
+  let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(to: QueuedDiagnostics.self)
+  // Determine the parent link, for a child buffer.
+  let parent: (GroupedDiagnostics.SourceFileID, AbsolutePosition)?
+  if parentID >= 0,
+      let parentSourceFileID = queuedDiagnostics.pointee.sourceFileIDs[parentID] {
+    parent = (parentSourceFileID.pointee, AbsolutePosition(utf8Offset: positionInParent))
+  } else {
+    parent = nil
+  }
+
+  let displayName = String(
+    decoding: UnsafeBufferPointer(
+      start: displayNamePtr,
+      count: displayNameLength
+    ),
+    as: UTF8.self
+  )
+
+  // Add the source file.
+  let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
+  let sourceFileID = queuedDiagnostics.pointee.grouped.addSourceFile(
+    tree: sourceFile.pointee.syntax,
+    displayName: displayName,
+    parent: parent
+  )
+  queuedDiagnostics.pointee.sourceFiles.append(sourceFile.pointee)
+
+  // Record the buffer ID.
+  let allocatedSourceFileID = UnsafeMutablePointer<GroupedDiagnostics.SourceFileID>.allocate(capacity: 1)
+  allocatedSourceFileID.initialize(to: sourceFileID)
+  queuedDiagnostics.pointee.sourceFileIDs[bufferID] = allocatedSourceFileID
+}
+
 /// Add a new diagnostic to the queue.
 @_cdecl("swift_ASTGen_addQueuedDiagnostic")
 public func addQueuedDiagnostic(
@@ -326,23 +351,76 @@ public func addQueuedDiagnostic(
   text: UnsafePointer<UInt8>,
   textLength: Int,
   severity: BridgedDiagnosticSeverity,
-  position: UnsafePointer<UInt8>
+  position: CxxSourceLoc,
+  highlightRangesPtr: UnsafePointer<CxxSourceLoc>?,
+  numHighlightRanges: Int
 ) {
-  let queuedDiagnostics = queuedDiagnosticsPtr.bindMemory(
-    to: QueuedDiagnostics.self, capacity: 1
+  let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(
+    to: QueuedDiagnostics.self
   )
 
-  // Find the offset.
-  let buffer = queuedDiagnostics.pointee.buffer
-  let offset = position - buffer.baseAddress!
-  if offset < 0 || offset >= buffer.count {
+  // Find the source file that contains this location.
+  let sourceFile = queuedDiagnostics.pointee.sourceFiles.first { sf in
+    guard let baseAddress = sf.buffer.baseAddress else {
+      return false
+    }
+
+    return position >= baseAddress && position < baseAddress + sf.buffer.count
+  }
+  guard let sourceFile = sourceFile else {
+    // FIXME: Hard to report an error here...
     return
   }
 
   // Find the token at that offset.
-  let sf = queuedDiagnostics.pointee.sourceFile
-  guard let token = sf.token(at: AbsolutePosition(utf8Offset: offset)) else {
+  let sourceFileBaseAddress = sourceFile.buffer.baseAddress!
+  let sourceFileEndAddress = sourceFileBaseAddress + sourceFile.buffer.count
+  let offset = position - sourceFileBaseAddress
+  guard let token = sourceFile.syntax.token(at: AbsolutePosition(utf8Offset: offset)) else {
     return
+  }
+
+  // Map the highlights.
+  var highlights: [Syntax] = []
+  let highlightRanges = UnsafeBufferPointer<CxxSourceLoc>(
+    start: highlightRangesPtr, count: numHighlightRanges * 2
+  )
+  for index in 0..<numHighlightRanges {
+    // Make sure both the start and the end land within this source file.
+    let start = highlightRanges[index * 2]
+    let end = highlightRanges[index * 2 + 1]
+
+    guard start >= sourceFileBaseAddress && start < sourceFileEndAddress,
+          end >= sourceFileBaseAddress && end <= sourceFileEndAddress else {
+      continue
+    }
+
+    // Find start tokens in the source file.
+    let startPos = AbsolutePosition(utf8Offset: start - sourceFileBaseAddress)
+    guard let startToken = sourceFile.syntax.token(at: startPos) else {
+      continue
+    }
+
+    // Walk up from the start token until we find a syntax node that matches
+    // the highlight range.
+    let endPos = AbsolutePosition(utf8Offset: end - sourceFileBaseAddress)
+    var highlightSyntax = Syntax(startToken)
+    while true {
+      // If this syntax matches our starting/ending positions, add the
+      // highlight and we're done.
+      if highlightSyntax.positionAfterSkippingLeadingTrivia == startPos &&
+          highlightSyntax.endPositionBeforeTrailingTrivia == endPos {
+        highlights.append(highlightSyntax)
+        break
+      }
+
+      // Go up to the parent.
+      guard let parent = highlightSyntax.parent else {
+        break
+      }
+
+      highlightSyntax = parent
+    }
   }
 
   let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
@@ -351,12 +429,12 @@ public func addQueuedDiagnostic(
     message: SimpleDiagnostic(
       message: String(decoding: textBuffer, as: UTF8.self),
       severity: severity.asSeverity
-    )
+    ),
+    highlights: highlights
   )
 
-  queuedDiagnostics.pointee.diagnose(diagnostic)
+  queuedDiagnostics.pointee.grouped.addDiagnostic(diagnostic)
 }
-
 
 /// Render the queued diagnostics into a UTF-8 string.
 @_cdecl("swift_ASTGen_renderQueuedDiagnostics")
@@ -368,12 +446,8 @@ public func renterQueuedDiagnostics(
   renderedLength: UnsafeMutablePointer<Int>
 ) {
   queuedDiagnosticsPtr.withMemoryRebound(to: QueuedDiagnostics.self, capacity: 1) { queuedDiagnostics in
-    let renderedStr = DiagnosticsFormatter.annotatedSource(
-      tree: queuedDiagnostics.pointee.sourceFile,
-      diags: queuedDiagnostics.pointee.diagnostics,
-      contextSize: contextSize,
-      colorize: colorize != 0
-    )
+    let formatter = DiagnosticsFormatter(contextSize: contextSize, colorize: colorize != 0)
+    let renderedStr = formatter.annotateSources(in: queuedDiagnostics.pointee.grouped)
 
     (renderedPointer.pointee, renderedLength.pointee) =
         allocateUTF8String(renderedStr)

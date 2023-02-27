@@ -2181,51 +2181,63 @@ llvm::Value *EnumTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 llvm::Constant *
 EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
                                   GenericSignature genericSig) const {
-  return nullptr;
-  // LayoutStringBuilder B{};
+  switch (copyDestroyKind(IGM)) {
+  case CopyDestroyStrategy::POD:
+  case CopyDestroyStrategy::Normal: {
+    return nullptr;
+  }
+  case CopyDestroyStrategy::ForwardToPayload:
+  case CopyDestroyStrategy::NullableRefcounted: {
+    LayoutStringBuilder B{};
 
-  // if (containsArchetypeField() ||
-  //     containsResilientField() ||
-  //     isMultiPayloadEnum() ||
-  //     !refCountString(IGM, B)) {
-  //   return nullptr;
-  // }
+    if (containsArchetypeField() || containsResilientField() ||
+        isMultiPayloadEnum() || !refCountString(IGM, B, genericSig)) {
+      return nullptr;
+    }
 
-  // ConstantInitBuilder IB(IGM);
-  // auto SB = IB.beginStruct();
-  // SB.setPacked(true);
+    ConstantInitBuilder IB(IGM);
+    auto SB = IB.beginStruct();
+    SB.setPacked(true);
 
-  // B.result(IGM, SB);
+    B.result(IGM, SB);
 
-  // return SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
-  //                                 /*constant*/ true);
+    IRGenMangler mangler;
+    std::string symbolName =
+        mangler.mangleSymbolNameForMangledMetadataAccessorString(
+            "type_layout_string", genericSig.getCanonicalSignature(),
+            ty.getASTType()->mapTypeOutOfContext()->getCanonicalType());
+
+    return SB.finishAndCreateGlobal(symbolName, IGM.getPointerAlignment(),
+                                    /*constant*/ true);
+  }
+  }
 }
 
 bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                          LayoutStringBuilder &B,
                                          GenericSignature genericSig) const {
-  // switch (copyDestroyKind(IGM)) {
-  // case CopyDestroyStrategy::POD: {
-  //   auto size = fixedSize(IGM);
-  //   assert(size && "POD should not have dynamic size");
-  //   B.addSkip(size->getValue());
-  //   return true;
-  // }
-  // case CopyDestroyStrategy::NullableRefcounted:
-  // case CopyDestroyStrategy::ForwardToPayload:
-  //   return cases[0]->refCountString(IGM, B, genericSig);
-  // case CopyDestroyStrategy::Normal:
-    auto *accessor = createMetatypeAccessorFunction(IGM, ty, genericSig);
+  switch (copyDestroyKind(IGM)) {
+  case CopyDestroyStrategy::POD: {
+    auto size = fixedSize(IGM);
+    assert(size && "POD should not have dynamic size");
+    B.addSkip(size->getValue());
+    return true;
+  }
+  case CopyDestroyStrategy::NullableRefcounted:
+  case CopyDestroyStrategy::ForwardToPayload:
+    return cases[0]->refCountString(IGM, B, genericSig);
+  case CopyDestroyStrategy::Normal: {
     if (genericSig || !isFixedSize(IGM)) {
-      B.addResilientRefCount(accessor);
+      //      B.addResilientRefCount(accessor);
       return false;
-    } else {
-      B.addFixedEnumRefCount(accessor);
-      B.addSkip(fixedSize(IGM)->getValue());
     }
 
+    auto *accessor = createMetatypeAccessorFunction(IGM, ty, genericSig);
+    B.addFixedEnumRefCount(accessor);
+    B.addSkip(fixedSize(IGM)->getValue());
     return true;
-  // }
+  }
+  }
 }
 
 void EnumTypeLayoutEntry::computeProperties() {
@@ -2245,7 +2257,8 @@ EnumTypeLayoutEntry::copyDestroyKind(IRGenModule &IGM) const {
     return NullableRefcounted;
   } else {
     unsigned numTags = numEmptyCases;
-    if (cases[0]->canValueWitnessExtraInhabitantsUpTo(IGM, numTags - 1)) {
+    if (cases.size() == 1 &&
+        cases[0]->canValueWitnessExtraInhabitantsUpTo(IGM, numTags - 1)) {
       return ForwardToPayload;
     }
     return Normal;

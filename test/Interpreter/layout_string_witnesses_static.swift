@@ -1,14 +1,15 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-type-layout -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-build-swift -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -c -parse-as-library -o %t/layout_string_witnesses_types.o %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-type-layout -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-build-swift -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -c -parse-as-library -o %t/layout_string_witnesses_types.o %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-library-evolution -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
 // RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -module-name layout_string_witnesses_static %t/layout_string_witnesses_types.o %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s
+// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -module-name layout_string_witnesses_static %t/layout_string_witnesses_types.o %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
 // REQUIRES: executable_test
 
+import Swift
 import layout_string_witnesses_types
 import layout_string_witnesses_types_resilient
 
@@ -189,7 +190,7 @@ class ClassWithSomeProtocol: SomeProtocol {
 
 func testExistential() {
     let ptr = UnsafeMutablePointer<ExistentialWrapper>.allocate(capacity: 1)
-    
+
     do {
         let x = ClassWithSomeProtocol()
         testInit(ptr, to: ExistentialWrapper(x: x))
@@ -271,15 +272,72 @@ func testMultiPayloadEnum() {
 
     // CHECK-NEXT: Before deinit
     print("Before deinit")
-        
 
     // CHECK-NEXT: SimpleClass deinitialized!
     testDestroy(ptr)
-    
+
     ptr.deallocate()
 }
 
 testMultiPayloadEnum()
+
+func testNullableRefEnum() {
+    let ptr = UnsafeMutablePointer<NullableRefEnum>.allocate(capacity: 1)
+
+    do {
+        let x = NullableRefEnum.nonEmpty(SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = NullableRefEnum.nonEmpty(SimpleClass(x: 28))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNullableRefEnum()
+
+func testForwardToPayloadEnum() {
+    let ptr = UnsafeMutablePointer<ForwardToPayloadEnum>.allocate(capacity: 1)
+
+    do {
+        let x = ForwardToPayloadEnum.nonEmpty(SimpleClass(x: 23), 43)
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = ForwardToPayloadEnum.nonEmpty(SimpleClass(x: 28), 65)
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testForwardToPayloadEnum()
 
 #if os(macOS)
 func testObjc() {

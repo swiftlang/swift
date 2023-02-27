@@ -15,7 +15,9 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -85,19 +87,42 @@ void ContextInfoCallbacks::completeCaseStmtBeginning(CodeCompletionExpr *E) {
   // TODO: Implement?
 }
 
+class TypeContextInfoCallback : public TypeCheckCompletionCallback {
+  Expr *ParsedExpr;
+  SmallVector<Type, 2> Types;
+
+  void sawSolutionImpl(const constraints::Solution &S) override {
+    if (!S.hasType(ParsedExpr)) {
+      return;
+    }
+    if (Type T = getTypeForCompletion(S, ParsedExpr)) {
+      Types.push_back(T);
+    }
+  }
+
+public:
+  TypeContextInfoCallback(Expr *ParsedExpr) : ParsedExpr(ParsedExpr) {}
+
+  ArrayRef<Type> getTypes() const { return Types; }
+};
+
 void ContextInfoCallbacks::doneParsing(SourceFile *SrcFile) {
   if (!ParsedExpr)
     return;
 
-  typeCheckContextAt(TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
-                     ParsedExpr->getLoc());
-
-  ExprContextInfo Info(CurDeclContext, ParsedExpr);
+  TypeContextInfoCallback TypeCheckCallback(ParsedExpr);
+  {
+    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+        Context.CompletionCallback, &TypeCheckCallback);
+    typeCheckContextAt(
+        TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
+        ParsedExpr->getLoc());
+  }
 
   llvm::SmallSet<CanType, 2> seenTypes;
   SmallVector<TypeContextInfoItem, 2> results;
 
-  for (auto T : Info.getPossibleTypes()) {
+  for (auto T : TypeCheckCallback.getTypes()) {
     if (T->is<ErrorType>() || T->is<UnresolvedType>())
       continue;
 

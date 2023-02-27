@@ -63,7 +63,7 @@ var unterminatedEmptySubject = 0
 duplicateAttr(1) // expected-error{{argument passed to call that takes no arguments}}
 
 // CHECK ALLOWED DECLS
-private import Swift // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-9=}}
+private import Swift // expected-error {{Access level on imports require '-enable-experimental-feature AccessLevelOnImport}}
 private(set) infix operator ~~~ // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-14=}}
 
 private typealias MyInt = Int

@@ -1316,19 +1316,7 @@ std::vector<Diagnostic> DiagnosticEngine::getGeneratedSourceBufferNotes(
     case GeneratedSourceInfo::PeerMacroExpansion:
     case GeneratedSourceInfo::ConformanceMacroExpansion: {
       SourceRange origRange = expansionNode.getSourceRange();
-      DeclName macroName;
-      if (auto customAttr = generatedInfo->attachedMacroCustomAttr) {
-        // FIXME: How will we handle deserialized custom attributes like this?
-        auto declRefType = dyn_cast<DeclRefTypeRepr>(customAttr->getTypeRepr());
-        macroName = declRefType->getNameRef().getFullName();
-      } else if (auto expansionExpr = dyn_cast_or_null<MacroExpansionExpr>(
-              expansionNode.dyn_cast<Expr *>())) {
-        macroName = expansionExpr->getMacroName().getFullName();
-      } else {
-        auto expansionDecl =
-            cast<MacroExpansionDecl>(expansionNode.get<Decl *>());
-        macroName = expansionDecl->getMacroName().getFullName();
-      }
+      DeclName macroName = getGeneratedSourceInfoMacroName(*generatedInfo);
 
       Diagnostic expansionNote(diag::in_macro_expansion, macroName);
       expansionNote.setLoc(origRange.Start);
@@ -1509,4 +1497,38 @@ swift::getAccessorKindAndNameForDiagnostics(const ValueDecl *D) {
   }
 
   return {NOT_ACCESSOR_INDEX, D->getName()};
+}
+
+DeclName
+swift::getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
+  ASTNode expansionNode = ASTNode::getFromOpaqueValue(info.astNode);
+  switch (info.kind) {
+  case GeneratedSourceInfo::ExpressionMacroExpansion:
+  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+  case GeneratedSourceInfo::AccessorMacroExpansion:
+  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::MemberMacroExpansion:
+  case GeneratedSourceInfo::PeerMacroExpansion:
+  case GeneratedSourceInfo::ConformanceMacroExpansion: {
+    DeclName macroName;
+    if (auto customAttr = info.attachedMacroCustomAttr) {
+      // FIXME: How will we handle deserialized custom attributes like this?
+      auto declRefType = cast<DeclRefTypeRepr>(customAttr->getTypeRepr());
+      return declRefType->getNameRef().getFullName();
+    }
+
+    if (auto expansionExpr = dyn_cast_or_null<MacroExpansionExpr>(
+            expansionNode.dyn_cast<Expr *>())) {
+      return expansionExpr->getMacroName().getFullName();
+    }
+
+    auto expansionDecl =
+        cast<MacroExpansionDecl>(expansionNode.get<Decl *>());
+      return expansionDecl->getMacroName().getFullName();
+  }
+
+  case GeneratedSourceInfo::PrettyPrinted:
+  case GeneratedSourceInfo::ReplacedFunctionBody:
+    return DeclName();
+  }
 }

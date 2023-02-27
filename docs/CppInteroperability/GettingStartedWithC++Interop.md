@@ -32,12 +32,12 @@ module CxxTest {
 Add the C++ module to the include path and enable C++ interop:
 - Navigate to your project directory
 - In `Project` navigate to `Build Settings` -> `Swift Compiler`
-- Under `Custom Flags` -> `Other Swift Flags` add`-enable-experimental-cxx-interop`
-- Under `Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `./ProjectName/CxxTest`). Repeat this step in `Other Swift Flags`
+- Under `Custom Flags` -> `Other Swift Flags` add `-Xfrontend -enable-experimental-cxx-interop`
+- Under `Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `./ProjectName/CxxTest`). 
 
 ```
-//Add to Other Swift Flags and Import Paths respectively
--enable-experimental-cxx-interop
+// Add to Other Swift Flags and Import Paths respectively
+-Xfrontend -enable-experimental-cxx-interop
 -I./ProjectName/CxxTest
 ```
 
