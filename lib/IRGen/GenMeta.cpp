@@ -1591,14 +1591,16 @@ namespace {
     
     Size PayloadSizeOffset;
     const EnumImplStrategy &Strategy;
-    
+    bool hasLayoutString;
+
   public:
     EnumContextDescriptorBuilder(IRGenModule &IGM, EnumDecl *Type,
-                                 RequireMetadata_t requireMetadata)
-      : super(IGM, Type, requireMetadata),
-        Strategy(getEnumImplStrategy(IGM,
-                     getType()->getDeclaredTypeInContext()->getCanonicalType()))
-    {
+                                 RequireMetadata_t requireMetadata,
+                                 bool hasLayoutString)
+        : super(IGM, Type, requireMetadata),
+          Strategy(getEnumImplStrategy(
+              IGM, getType()->getDeclaredTypeInContext()->getCanonicalType())),
+          hasLayoutString(hasLayoutString) {
       auto &layout = IGM.getMetadataLayout(getType());
       if (layout.hasPayloadSizeOffset())
         PayloadSizeOffset = layout.getPayloadSizeOffset().getStatic();
@@ -1635,6 +1637,8 @@ namespace {
       TypeContextDescriptorFlags flags;
 
       setCommonFlags(flags);
+      flags.setHasLayoutString(hasLayoutString);
+
       return flags.getOpaqueValue();
     }
 
@@ -2567,7 +2571,9 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
     StructContextDescriptorBuilder(IGM, sd, requireMetadata,
                                    /*hasLayoutString*/ false).emit();
   } else if (auto ed = dyn_cast<EnumDecl>(type)) {
-    EnumContextDescriptorBuilder(IGM, ed, requireMetadata).emit();
+    EnumContextDescriptorBuilder(IGM, ed, requireMetadata,
+                                 /*hasLayoutString*/ false)
+        .emit();
   } else if (auto cd = dyn_cast<ClassDecl>(type)) {
     ClassContextDescriptorBuilder(IGM, cd, requireMetadata).emit();
   } else {
@@ -5277,8 +5283,9 @@ namespace {
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
-      auto descriptor =
-        EnumContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
+      auto descriptor = EnumContextDescriptorBuilder(
+                            IGM, Target, RequireMetadata, !!getLayoutString())
+                            .emit();
       return descriptor;
     }
 
@@ -5471,7 +5478,9 @@ namespace {
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
-      return EnumContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
+      return EnumContextDescriptorBuilder(IGM, Target, RequireMetadata,
+                                          /*hasLayoutString*/ false)
+          .emit();
     }
 
     GenericMetadataPatternFlags getPatternFlags() {
