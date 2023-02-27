@@ -2372,7 +2372,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       auto optBody = TypeChecker::applyResultBuilderBodyTransform(
           func, builderType,
           /*ClosuresInResultBuilderDontParticipateInInference=*/
-              ctx.CompletionCallback == nullptr);
+              ctx.CompletionCallback == nullptr && ctx.SolutionCallback == nullptr);
       if (optBody && *optBody) {
         // Wire up the function body now.
         func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);

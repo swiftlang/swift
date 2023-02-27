@@ -2365,6 +2365,24 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   SmallVector<Solution, 4> solutions;
   bool solvingFailed = cs.solve(solutions);
 
+  auto reportSolutionsToSolutionCallback = [&](const SolutionResult &result) {
+    if (!cs.getASTContext().SolutionCallback) {
+      return;
+    }
+    switch (result.getKind()) {
+    case SolutionResult::Success:
+      cs.getASTContext().SolutionCallback->sawSolution(result.getSolution());
+      break;
+    case SolutionResult::Ambiguous:
+      for (auto &solution : result.getAmbiguousSolutions()) {
+        cs.getASTContext().SolutionCallback->sawSolution(solution);
+      }
+      break;
+    default:
+      break;
+    }
+  };
+
   if (solvingFailed || solutions.size() != 1) {
     // Try to fix the system or provide a decent diagnostic.
     auto salvagedResult = cs.salvage();
@@ -2376,14 +2394,17 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 
     case SolutionResult::Kind::Error:
     case SolutionResult::Kind::Ambiguous:
+      reportSolutionsToSolutionCallback(salvagedResult);
       return nullptr;
 
     case SolutionResult::Kind::UndiagnosedError:
+      reportSolutionsToSolutionCallback(salvagedResult);
       cs.diagnoseFailureFor(SolutionApplicationTarget(func));
       salvagedResult.markAsDiagnosed();
       return nullptr;
 
     case SolutionResult::Kind::TooComplex:
+      reportSolutionsToSolutionCallback(salvagedResult);
       func->diagnose(diag::expression_too_complex)
         .highlight(func->getBodySourceRange());
       salvagedResult.markAsDiagnosed();
@@ -2399,6 +2420,13 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     log << "--- Applying Solution ---\n";
     solutions.front().dump(log, indent);
     log << '\n';
+  }
+
+  if (cs.getASTContext().SolutionCallback) {
+    for (auto &solution : solutions) {
+      cs.getASTContext().SolutionCallback->sawSolution(solution);
+    }
+    return nullptr;
   }
 
   // FIXME: Shouldn't need to do this.
