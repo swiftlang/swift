@@ -3118,6 +3118,10 @@ static bool usesFeatureModuleInterfaceExportAs(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureAccessLevelOnImport(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureNamedOpaqueTypes(Decl *decl) {
   return false;
 }

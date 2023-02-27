@@ -1423,6 +1423,12 @@ public:
   /// the decls it references. Otherwise, returns an empty array.
   ArrayRef<ValueDecl *> getDecls() const;
 
+  /// Access level of this import, either explicitly declared or implicit.
+  AccessLevel getAccessLevel() const;
+
+  /// Is the access level of this import implicit, aka a default import?
+  bool isAccessLevelImplicit() const;
+
   const clang::Module *getClangModule() const {
     return getClangNode().getClangModule();
   }
