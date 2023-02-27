@@ -970,6 +970,14 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
                             attr);
       return true;
     }
+
+    if (attr->getAccess() != AccessLevel::Public) {
+      if (auto exportedAttr = D->getAttrs().getAttribute<ExportedAttr>()) {
+        diagnoseAndRemoveAttr(attr, diag::access_level_conflict_with_exported,
+                              exportedAttr, attr);
+        return true;
+      }
+    }
   }
 
   return false;
