@@ -18,8 +18,6 @@
 // UNSUPPORTED: DARWIN_SIMULATOR=ios
 // UNSUPPORTED: DARWIN_SIMULATOR=tvos
 
-// REQUIRES: rdar105396748
-
 import Darwin
 @preconcurrency import Dispatch
 import StdlibUnittest
@@ -41,7 +39,7 @@ func expectedBasePri(priority: TaskPriority) -> TaskPriority {
   let basePri = Task.basePriority!
   print("Testing basePri matching expected pri - \(basePri) == \(priority)")
   expectEqual(basePri, priority)
-  Task.withUnsafeCurrentTask { unsafeTask in
+  withUnsafeCurrentTask { unsafeTask in
     guard let unsafeTask else {
       fatalError("Expected to be able to get current task, but could not!")
     }
