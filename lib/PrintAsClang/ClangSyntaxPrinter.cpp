@@ -438,11 +438,13 @@ void ClangSyntaxPrinter::printKnownCType(
 
 void ClangSyntaxPrinter::printSwiftMangledNameForDebugger(
     const NominalTypeDecl *typeDecl) {
-  auto mangled_name =
-      mangler.mangleTypeForDebugger(typeDecl->getDeclaredInterfaceType(), nullptr);
-  if (!mangled_name.empty()) {
-    os << "  typedef char " << mangled_name << ";\n";
-    os << "  static inline constexpr " << mangled_name
-       << " $__swift_mangled_name = 0;\n";
-  }
+  printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+    auto mangled_name = mangler.mangleTypeForDebugger(
+        typeDecl->getDeclaredInterfaceType(), nullptr);
+    if (!mangled_name.empty()) {
+      os << "  typedef char " << mangled_name << ";\n";
+      os << "  static inline constexpr " << mangled_name
+         << " $__swift_mangled_name = 0;\n";
+    }
+  });
 }
