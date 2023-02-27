@@ -933,7 +933,7 @@ void AttributeChecker::visitLazyAttr(LazyAttr *attr) {
 bool AttributeChecker::visitAbstractAccessControlAttr(
     AbstractAccessControlAttr *attr) {
   // Access control attr may only be used on value decls and extensions.
-  if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
+  if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<ImportDecl>(D)) {
     diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
     return true;
   }
@@ -957,6 +957,19 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
     diagnoseAndRemoveAttr(attr, diag::access_control_in_protocol, attr);
     diagnose(attr->getLocation(), diag::access_control_in_protocol_detail);
     return true;
+  }
+
+  if (auto importDecl = dyn_cast<ImportDecl>(D)) {
+    if (!D->getASTContext().LangOpts.hasFeature(Feature::AccessLevelOnImport)) {
+      diagnoseAndRemoveAttr(attr, diag::access_level_on_import_not_enabled);
+      return true;
+    }
+
+    if (attr->getAccess() == AccessLevel::Open) {
+      diagnoseAndRemoveAttr(attr, diag::access_level_on_import_unsupported,
+                            attr);
+      return true;
+    }
   }
 
   return false;
