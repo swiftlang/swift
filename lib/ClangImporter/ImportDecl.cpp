@@ -1960,10 +1960,14 @@ namespace {
           !Impl.SwiftContext.LangOpts.CForeignReferenceTypes)
         return false;
 
-      auto semanticsKind = evaluateOrDefault(
-          Impl.SwiftContext.evaluator,
-          CxxRecordSemantics({decl, Impl.SwiftContext}), {});
-      return semanticsKind == CxxRecordSemanticsKind::Reference;
+      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+               if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+                 return swiftAttr->getAttribute() == "import_reference" ||
+                        // TODO: Remove this once libSwift hosttools no longer
+                        // requires it.
+                        swiftAttr->getAttribute() == "import_as_ref";
+               return false;
+             });
     }
 
     bool recordHasMoveOnlySemantics(const clang::RecordDecl *decl) {
