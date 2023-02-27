@@ -443,6 +443,6 @@ void ClangSyntaxPrinter::printSwiftMangledNameForDebugger(
   if (!mangled_name.empty()) {
     os << "  typedef char " << mangled_name << ";\n";
     os << "  static inline constexpr " << mangled_name
-       << " __swift_mangled_name = 0;\n";
+       << " $__swift_mangled_name = 0;\n";
   }
 }
