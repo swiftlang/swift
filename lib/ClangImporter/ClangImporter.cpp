@@ -6235,6 +6235,19 @@ static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
          });
 }
 
+// Is this a pointer to a foreign reference type.
+static bool isForeignReferenceType(const clang::QualType type) {
+  if (!type->isPointerType())
+    return false;
+
+  auto pointeeType =
+      dyn_cast<clang::RecordType>(type->getPointeeType().getCanonicalType());
+  if (pointeeType == nullptr)
+    return false;
+
+  return hasImportAsRefAttr(pointeeType->getDecl());
+}
+
 static bool hasOwnedValueAttr(const clang::RecordDecl *decl) {
   // Hard-coded special cases from the standard library (this will go away once
   // API notes support namespaces).
@@ -6397,14 +6410,16 @@ CxxRecordSemanticsKind
 CxxRecordSemantics::evaluate(Evaluator &evaluator,
                              CxxRecordSemanticsDescriptor desc) const {
   const auto *decl = desc.decl;
+  auto &clangSema = desc.ctx.getClangModuleLoader()->getClangSema();
 
   if (hasImportAsRefAttr(decl)) {
     return CxxRecordSemanticsKind::Reference;
   }
 
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl);
-  if (!cxxDecl)
+  if (!cxxDecl) {
     return CxxRecordSemanticsKind::Trivial;
+  }
 
   if (!hasRequiredValueTypeOperations(cxxDecl)) {
     if (hasUnsafeAPIAttr(cxxDecl))
@@ -6446,58 +6461,52 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
                                   SafeUseOfCxxDeclDescriptor desc) const {
   const clang::Decl *decl = desc.decl;
-  const clang::CXXRecordDecl *recordDecl = nullptr;
-  bool cxxMethodIsSafe = true;
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(decl)) {
+    // The user explicitly asked us to import this method.
     if (hasUnsafeAPIAttr(method))
       return true;
 
+    // If it's a static method, it cannot project anything. It's fine.
     if (method->isOverloadedOperator() || method->isStatic() ||
         isa<clang::CXXConstructorDecl>(decl))
       return true;
 
+    if (isForeignReferenceType(method->getReturnType()))
+      return true;
+
+    // If it returns a pointer or reference, that's a projection.
     if (method->getReturnType()->isPointerType() ||
         method->getReturnType()->isReferenceType())
-      cxxMethodIsSafe = false;
+      return false;
 
+    // Try to figure out the semantics of the return type. If it's a
+    // pointer/iterator, it's unsafe.
     if (auto returnType = dyn_cast<clang::RecordType>(
             method->getReturnType().getCanonicalType())) {
       if (auto cxxRecordReturnType =
               dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
-        auto semanticsKind = evaluateOrDefault(
-            evaluator, CxxRecordSemantics({cxxRecordReturnType, desc.ctx}), {});
+        if (hasIteratorAPIAttr(cxxRecordReturnType) ||
+            isIterator(cxxRecordReturnType)) {
+          return false;
+        }
 
-        if (semanticsKind == CxxRecordSemanticsKind::UnsafePointerMember ||
-            // Pretend all methods that return iterators are unsafe so protocol
-            // conformances work.
-            semanticsKind == CxxRecordSemanticsKind::Iterator)
-          cxxMethodIsSafe = false;
+        // Mark this as safe to help our diganostics down the road.
+        if (!cxxRecordReturnType->getDefinition()) {
+          return true;
+        }
+
+        if (!cxxRecordReturnType->hasUserDeclaredCopyConstructor() &&
+            !cxxRecordReturnType->hasUserDeclaredMoveConstructor() &&
+            hasPointerInSubobjects(cxxRecordReturnType)) {
+          return false;
+        }
       }
     }
-
-    recordDecl = method->getParent();
-  } else if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-    recordDecl = cxxRecordDecl;
-  } else {
-    llvm_unreachable("decl must be a C++ method or C++ record.");
   }
 
-  auto semanticsKind = evaluateOrDefault(
-      evaluator, CxxRecordSemantics({recordDecl, desc.ctx}), {});
-
-  // Always unsafe.
-  if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation)
-    return false;
-
-  // Always OK.
-  if (semanticsKind == CxxRecordSemanticsKind::Reference)
-    return true;
-
-
-  // All other record semantics kinds are some varient of an "owned" type, so
-  // dis-allow potential projections.
-  return cxxMethodIsSafe;
+  // Otherwise, it's safe.
+  return true;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,

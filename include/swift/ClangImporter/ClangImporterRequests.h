@@ -342,6 +342,12 @@ SourceLoc extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc);
 
 /// What pattern does this C++ API fit? Uses attributes such as
 /// import_owned and import_as_reference to determine the pattern.
+///
+/// Do not evaluate this request before importing has started. For example, it
+/// is OK to invoke this request when importing a decl, but it is not OK to
+/// import this request when importing names. This is because when importing
+/// names, Clang sema has not yet defined implicit special members, so the
+/// results will be flakey/incorrect.
 class CxxRecordSemantics
     : public SimpleRequest<CxxRecordSemantics,
                            CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor),
