@@ -1,3 +1,5 @@
+import Swift
+
 public class SimpleClass {
     public let x: Int
 
@@ -132,6 +134,16 @@ public struct ExistentialRefWrapper {
     public init(x: any SomeClassProtocol) {
         self.x = x
     }
+}
+
+public enum NullableRefEnum {
+    case nonEmpty(SimpleClass)
+    case empty
+}
+
+public enum ForwardToPayloadEnum {
+    case nonEmpty(SimpleClass, Int)
+    case empty
 }
 
 #if os(macOS)
