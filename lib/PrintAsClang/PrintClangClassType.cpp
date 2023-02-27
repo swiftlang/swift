@@ -77,9 +77,6 @@ void ClangClassTypePrinter::printClassTypeDecl(
   os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
   os << ";\n";
-
-  printer.printSwiftMangledNameForDebugger(typeDecl);
-
   os << "};\n\n";
 
   // Print out the "hidden" _impl class.
