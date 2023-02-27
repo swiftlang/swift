@@ -63,6 +63,14 @@ public final class ClassWithIntField {
 // CHECK-NEXT:   inline ClassWithIntField(void * _Nonnull ptr) noexcept : RefCountedClass(ptr) {}
 // CHECK-NEXT: private:
 // CHECK-NEXT:   friend class _impl::_impl_ClassWithIntField;
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wreserved-identifier"
+// CHECK-NEXT:   typedef char $s5Class0A12WithIntFieldCD;
+// CHECK-NEXT:   static inline constexpr $s5Class0A12WithIntFieldCD __swift_mangled_name = 0;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT:namespace _impl {

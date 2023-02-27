@@ -47,6 +47,14 @@
 // CHECK-EMPTY:
 // CHECK-NEXT:   alignas(8) char _storage[8];
 // CHECK-NEXT:   friend class _impl::_impl_StructWithIntField;
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wreserved-identifier"
+// CHECK-NEXT:  typedef char $s7Structs18StructWithIntFieldVD;
+// CHECK-NEXT:  static inline constexpr $s7Structs18StructWithIntFieldVD __swift_mangled_name = 0;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: };
 
 // CHECK:      namespace _impl {
@@ -105,6 +113,14 @@ public struct StructWithIntField {
 // CHECK: class SWIFT_SYMBOL({{.*}}) register_ final {
 // CHECK: alignas(8) char _storage[16];
 // CHECK-NEXT:   friend class
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wreserved-identifier"
+// CHECK-NEXT:   typedef char $s7Structs8registerVD;
+// CHECK-NEXT:   static inline constexpr $s7Structs8registerVD __swift_mangled_name = 0;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: };
 public struct register {
   let field1: Int64

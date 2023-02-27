@@ -52,6 +52,14 @@ public func printStructOneI64_resilient(_ x : StructOneI64_resilient) {
 // RESILIENT:       class SWIFT_SYMBOL({{.*}}) StructOneI64_resilient final {
 // RESILIENT:         swift::_impl::OpaqueStorage _storage;
 // RESILIENT-NEXT:    friend class _impl::_impl_StructOneI64_resilient;
+// RESILIENT-NEXT: #pragma clang diagnostic push
+// RESILIENT-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// RESILIENT-NEXT: #pragma clang diagnostic push
+// RESILIENT-NEXT: #pragma clang diagnostic ignored "-Wreserved-identifier"
+// RESILIENT-NEXT:  typedef char $s7Structs22StructOneI64_resilientVD;
+// RESILIENT-NEXT:  static inline constexpr $s7Structs22StructOneI64_resilientVD __swift_mangled_name = 0;
+// RESILIENT-NEXT: #pragma clang diagnostic pop
+// RESILIENT-NEXT: #pragma clang diagnostic pop
 // RESILIENT-NEXT:  };
 #endif
 
