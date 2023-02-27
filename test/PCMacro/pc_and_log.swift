@@ -20,6 +20,7 @@ foo(1)
 [1,2,3].map(foo)
 
 // CHECK: [19:1-19:7] pc before
+// CHECK-NEXT: [15:10-15:18] __builtin_log[x='1']
 // CHECK-NEXT: [15:1-15:27] pc before
 // CHECK-NEXT: [15:1-15:27] pc after
 // CHECK-NEXT: [16:3-16:16] pc before
@@ -30,18 +31,21 @@ foo(1)
 // CHECK-NEXT: [19:1-19:7] pc after
 // now for the array
 // CHECK-NEXT: [20:1-20:17] pc before
+// CHECK-NEXT: [15:10-15:18] __builtin_log[x='1']
 // CHECK-NEXT: [15:1-15:27] pc before
 // CHECK-NEXT: [15:1-15:27] pc after
 // CHECK-NEXT: [16:3-16:16] pc before
 // CHECK-NEXT: [16:3-16:16] pc after
 // this next result is unexpected...
 // CHECK-NEXT: [16:10-16:11] __builtin_log[='true']
+// CHECK-NEXT: [15:10-15:18] __builtin_log[x='2']
 // CHECK-NEXT: [15:1-15:27] pc before
 // CHECK-NEXT: [15:1-15:27] pc after
 // CHECK-NEXT: [16:3-16:16] pc before
 // CHECK-NEXT: [16:3-16:16] pc after
 // this next result is unexpected...
 // CHECK-NEXT: [16:10-16:11] __builtin_log[='false']
+// CHECK-NEXT: [15:10-15:18] __builtin_log[x='3']
 // CHECK-NEXT: [15:1-15:27] pc before
 // CHECK-NEXT: [15:1-15:27] pc after
 // CHECK-NEXT: [16:3-16:16] pc before
