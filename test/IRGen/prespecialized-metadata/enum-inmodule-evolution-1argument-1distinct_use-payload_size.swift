@@ -65,7 +65,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:         }>* @"$s4main5ValueOySiGMf" to %swift.full_type*
 // CHECK-SAME:       ), 
 // CHECK-SAME:       i32 0, 
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     )
 // CHECK-SAME:   )
 //      CHECK: }

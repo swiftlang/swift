@@ -74,4 +74,4 @@ func externalErasure(c: ExternalConformer) -> ExternalP {
 // FIXME: why do these have different linkages?
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s18sil_witness_tables14AssocConformerVMa"(i64 %0)
-// CHECK:         ret %swift.metadata_response { %swift.type* bitcast (i64* getelementptr inbounds {{.*}} @"$s18sil_witness_tables14AssocConformerVMf", i32 0, i32 1) to %swift.type*), i64 0 }
+// CHECK:         ret %swift.metadata_response { %swift.type* bitcast (i64* getelementptr inbounds {{.*}} @"$s18sil_witness_tables14AssocConformerVMf", i32 0, i32 2) to %swift.type*), i64 0 }

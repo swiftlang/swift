@@ -105,6 +105,12 @@ private:
   /// scopes.
   llvm::SmallPtrSet<SILInstruction *, 16> immutableScopeComputed;
 
+  /// Used to limit complexity.
+  /// The side is computed lazily. Therefore the actual value depends on what
+  /// SIL modifications an optimization pass already performed when the size
+  /// is requested.
+  int estimatedFunctionSize = -1;
+
   AliasResult aliasAddressProjection(SILValue V1, SILValue V2,
                                      SILValue O1, SILValue O2);
 
@@ -209,6 +215,8 @@ public:
 
   /// Returns true if `lhs` can reference the same field as `rhs`.
   bool canReferenceSameField(SILValue lhs, SILValue rhs);
+
+  int getEstimatedFunctionSize(SILValue valueInFunction);
 };
 
 

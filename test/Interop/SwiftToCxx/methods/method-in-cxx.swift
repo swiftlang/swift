@@ -88,19 +88,19 @@ public final class PassStructInClassMethod {
 // CHECK: class SWIFT_SYMBOL("s:7Methods09ClassWithA0C") ClassWithMethods final : public swift::_impl::RefCountedClass {
 // CHECK:   using RefCountedClass::RefCountedClass;
 // CHECK-NEXT:   using RefCountedClass::operator=;
-// CHECK-NEXT:   inline void dump() SWIFT_SYMBOL("s:7Methods09ClassWithA0C4dumpyyF");
-// CHECK-NEXT:   inline ClassWithMethods sameRet() SWIFT_SYMBOL("s:7Methods09ClassWithA0C7sameRetACyF");
-// CHECK-NEXT:   inline void mutate() SWIFT_SYMBOL("s:7Methods09ClassWithA0C6mutateyyF");
-// CHECK-NEXT:   inline ClassWithMethods deepCopy(swift::Int x) SWIFT_SYMBOL("s:7Methods09ClassWithA0C8deepCopyyACSiF");
-// CHECK-NEXT:   static inline LargeStruct staticFinalClassMethod(swift::Int x) SWIFT_SYMBOL("s:7Methods09ClassWithA0C011staticFinalB6Method1xAA11LargeStructVSi_tFZ");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK void dump() SWIFT_SYMBOL("s:7Methods09ClassWithA0C4dumpyyF");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ClassWithMethods sameRet() SWIFT_SYMBOL("s:7Methods09ClassWithA0C7sameRetACyF");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK void mutate() SWIFT_SYMBOL("s:7Methods09ClassWithA0C6mutateyyF");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ClassWithMethods deepCopy(swift::Int x) SWIFT_SYMBOL("s:7Methods09ClassWithA0C8deepCopyyACSiF");
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK LargeStruct staticFinalClassMethod(swift::Int x) SWIFT_SYMBOL("s:7Methods09ClassWithA0C011staticFinalB6Method1xAA11LargeStructVSi_tFZ");
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11LargeStructV") LargeStruct final {
-// CHECK: inline LargeStruct(LargeStruct &&)
-// CHECK-NEXT: inline LargeStruct doubled() const SWIFT_SYMBOL("s:7Methods11LargeStructV7doubledACyF");
-// CHECK-NEXT: inline void dump() const SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");
-// CHECK-NEXT: inline LargeStruct scaled(swift::Int x, swift::Int y) const SWIFT_SYMBOL("s:7Methods11LargeStructV6scaledyACSi_SitF");
-// CHECK-NEXT: inline LargeStruct added(const LargeStruct& x) const SWIFT_SYMBOL("s:7Methods11LargeStructV5addedyA2CF");
-// CHECK-NEXT: static inline void staticMethod() SWIFT_SYMBOL("s:7Methods11LargeStructV12staticMethodyyFZ");
+// CHECK: SWIFT_INLINE_THUNK LargeStruct(LargeStruct &&)
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct doubled() const SWIFT_SYMBOL("s:7Methods11LargeStructV7doubledACyF");
+// CHECK-NEXT: SWIFT_INLINE_THUNK void dump() const SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct scaled(swift::Int x, swift::Int y) const SWIFT_SYMBOL("s:7Methods11LargeStructV6scaledyACSi_SitF");
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct added(const LargeStruct& x) const SWIFT_SYMBOL("s:7Methods11LargeStructV5addedyA2CF");
+// CHECK-NEXT: static SWIFT_INLINE_THUNK void staticMethod() SWIFT_SYMBOL("s:7Methods11LargeStructV12staticMethodyyFZ");
 // CHECK-NEXT: private
 
 public func createClassWithMethods(_ x: Int) -> ClassWithMethods {
@@ -116,51 +116,51 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 }
 
 
-// CHECK: inline void ClassWithMethods::dump() {
+// CHECK: SWIFT_INLINE_THUNK void ClassWithMethods::dump() {
 // CHECK-NEXT: return _impl::$s7Methods09ClassWithA0C4dumpyyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
-// CHECK-NEXT: inline ClassWithMethods ClassWithMethods::sameRet() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK ClassWithMethods ClassWithMethods::sameRet() {
 // CHECK-NEXT: return _impl::_impl_ClassWithMethods::makeRetained(_impl::$s7Methods09ClassWithA0C7sameRetACyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT: }
-// CHECK-NEXT: inline void ClassWithMethods::mutate() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void ClassWithMethods::mutate() {
 // CHECK-NEXT: return _impl::$s7Methods09ClassWithA0C6mutateyyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
-// CHECK-NEXT: inline ClassWithMethods ClassWithMethods::deepCopy(swift::Int x) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK ClassWithMethods ClassWithMethods::deepCopy(swift::Int x) {
 // CHECK-NEXT: return _impl::_impl_ClassWithMethods::makeRetained(_impl::$s7Methods09ClassWithA0C8deepCopyyACSiF(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT: }
-// CHECK-NEXT: inline LargeStruct ClassWithMethods::staticFinalClassMethod(swift::Int x) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct ClassWithMethods::staticFinalClassMethod(swift::Int x) {
 // CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s7Methods09ClassWithA0C011staticFinalB6Method1xAA11LargeStructVSi_tFZ(result, x, swift::TypeMetadataTrait<ClassWithMethods>::getTypeMetadata());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
-// CHECK:      inline LargeStruct LargeStruct::doubled() const {
+// CHECK:      SWIFT_INLINE_THUNK LargeStruct LargeStruct::doubled() const {
 // CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV7doubledACyF(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: inline void LargeStruct::dump() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void LargeStruct::dump() const {
 // CHECK-NEXT: return _impl::$s7Methods11LargeStructV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }
-// CHECK-NEXT: inline LargeStruct LargeStruct::scaled(swift::Int x, swift::Int y) const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::scaled(swift::Int x, swift::Int y) const {
 // CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV6scaledyACSi_SitF(result, x, y, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: inline LargeStruct LargeStruct::added(const LargeStruct& x) const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::added(const LargeStruct& x) const {
 // CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV5addedyA2CF(result, _impl::_impl_LargeStruct::getOpaquePointer(x), _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: inline void LargeStruct::staticMethod() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void LargeStruct::staticMethod() {
 // CHECK-NEXT: return _impl::$s7Methods11LargeStructV12staticMethodyyFZ();
 // CHECK-NEXT: }
 
-// CHECK: inline LargeStruct PassStructInClassMethod::retStruct(swift::Int x) {
+// CHECK: SWIFT_INLINE_THUNK LargeStruct PassStructInClassMethod::retStruct(swift::Int x) {
 // CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s7Methods23PassStructInClassMethodC03retC0yAA05LargeC0VSiF(result, x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: inline void PassStructInClassMethod::updateStruct(swift::Int x, const LargeStruct& y) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void PassStructInClassMethod::updateStruct(swift::Int x, const LargeStruct& y) {
 // CHECK-NEXT: return _impl::$s7Methods23PassStructInClassMethodC06updateC0yySi_AA05LargeC0VtF(x, _impl::_impl_LargeStruct::getOpaquePointer(y), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }

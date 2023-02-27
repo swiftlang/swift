@@ -1,5 +1,3 @@
-// REQUIRES: rdar104716322
-
 // RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics) | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -12,6 +10,9 @@ struct G<T...> {
     print((repeat (Array<each T>)).self)
   }
 }
+
+// CHECK: ()
+G< >().makeTuple()
 
 // CHECK: (Array<Int>, Array<String>, Array<Float>)
 G<Int, String, Float>().makeTuple()

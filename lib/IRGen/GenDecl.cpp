@@ -540,11 +540,6 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName)         \
       addBackDeployLib(llvm::VersionTuple Version, LibraryName);
     #include "swift/Frontend/BackDeploymentLibs.def"
-
-    if (IRGen.Opts.AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary)
-      this->addLinkLibrary(LinkLibrary("swiftCompatibilityBytecodeLayouts",
-                                       LibraryKind::Library,
-                                       /*forceLoad*/ true));
   }
 }
 
@@ -4949,6 +4944,10 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     if (isa<ClassDecl>(nominal)) {
       adjustmentIndex = MetadataAdjustmentIndex::Class;
     }
+
+    if (concreteType->is<TupleType>()) {
+      adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
+    }
   }
 
   llvm::Constant *indices[] = {
@@ -4991,8 +4990,10 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-
-  if (fullMetadata) {
+  if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
+    defaultVarTy = FullExistentialTypeMetadataStructTy;
+    adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
+  } else if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
     if (concreteType->getClassOrBoundGenericClass() && !foreign) {
       adjustmentIndex = MetadataAdjustmentIndex::Class;
@@ -5960,6 +5961,27 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
   return fn;
 }
 
+void IRGenModule::setColocateTypeDescriptorSection(llvm::GlobalVariable *v) {
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::MachO:
+    if (IRGen.Opts.ColocateTypeDescriptors)
+      v->setSection("__TEXT,__textg_swiftt,regular");
+    else
+      setTrueConstGlobal(v);
+    break;
+  case llvm::Triple::DXContainer:
+  case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
+  case llvm::Triple::UnknownObjectFormat:
+  case llvm::Triple::Wasm:
+  case llvm::Triple::ELF:
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::COFF:
+    setTrueConstGlobal(v);
+    break;
+  }
+
+}
 void IRGenModule::setColocateMetadataSection(llvm::Function *f) {
   if (!IRGen.Opts.CollocatedMetadataFunctions)
     return;

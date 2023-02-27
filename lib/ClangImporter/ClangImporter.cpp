@@ -995,11 +995,11 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
     // the diagnostic options here explicitly.
     std::unique_ptr<clang::DiagnosticOptions> clangDiagOpts =
         clang::CreateAndPopulateDiagOpts(invocationArgs);
-    ClangDiagnosticConsumer diagClient{importer->Impl, *clangDiagOpts,
-                                       importerOpts.DumpClangDiagnostics};
+    auto *diagClient = new ClangDiagnosticConsumer(
+        importer->Impl, *clangDiagOpts, importerOpts.DumpClangDiagnostics);
     clangDiags = clang::CompilerInstance::createDiagnostics(
-        clangDiagOpts.release(), &diagClient,
-        /*owned*/ false);
+        clangDiagOpts.release(), diagClient,
+        /*owned*/ true);
 
     // Finally, use the CC1 command-line and the diagnostic engine
     // to instantiate our Invocation.
@@ -1019,11 +1019,11 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
     llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> tempDiagOpts{
         new clang::DiagnosticOptions};
 
-    ClangDiagnosticConsumer tempDiagClient{importer->Impl, *tempDiagOpts,
-                                           importerOpts.DumpClangDiagnostics};
+    auto *tempDiagClient = new ClangDiagnosticConsumer(
+        importer->Impl, *tempDiagOpts, importerOpts.DumpClangDiagnostics);
     clangDiags = clang::CompilerInstance::createDiagnostics(tempDiagOpts.get(),
-                                                            &tempDiagClient,
-                                                            /*owned*/ false);
+                                                            tempDiagClient,
+                                                            /*owned*/ true);
     clang::CreateInvocationOptions CIOpts;
     CIOpts.VFS = VFS;
     CIOpts.Diags = clangDiags;

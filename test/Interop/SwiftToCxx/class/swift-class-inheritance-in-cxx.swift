@@ -62,7 +62,7 @@ public func useDerivedClass(_ x: DerivedClass) {
 // CHECK-NEXT:    using BaseClass::BaseClass;
 // CHECK-NEXT:    using BaseClass::operator=;
 // CHECK-NEXT:  protected:
-// CHECK-NEXT:    inline DerivedClass(void * _Nonnull ptr) noexcept : BaseClass(ptr) {}
+// CHECK-NEXT:    SWIFT_INLINE_THUNK DerivedClass(void * _Nonnull ptr) noexcept : BaseClass(ptr) {}
 // CHECK-NEXT:  private:
 // CHECK-NEXT:    friend class _impl::_impl_DerivedClass;
 // CHECK-NEXT:  };
@@ -72,7 +72,7 @@ public func useDerivedClass(_ x: DerivedClass) {
 // CHECK-NEXT:   using DerivedClass::DerivedClass;
 // CHECK-NEXT:   using DerivedClass::operator=;
 // CHECK-NEXT: protected:
-// CHECK-NEXT:   inline DerivedDerivedClass(void * _Nonnull ptr) noexcept : DerivedClass(ptr) {}
+// CHECK-NEXT:   SWIFT_INLINE_THUNK DerivedDerivedClass(void * _Nonnull ptr) noexcept : DerivedClass(ptr) {}
 // CHECK-NEXT: private:
 // CHECK-NEXT:   friend class _impl::_impl_DerivedDerivedClass;
 // CHECK-NEXT: };
@@ -84,4 +84,4 @@ public class derivedRegister: auto {}
 // CHECK:      class SWIFT_SYMBOL("s:5Class15derivedRegisterC") derivedRegister : public auto_ {
 // CHECK:        using auto_::auto_;
 // CHECK:        using auto_::operator=;
-// CHECK:        inline derivedRegister(void * _Nonnull ptr) noexcept : auto_(ptr) {}
+// CHECK:        SWIFT_INLINE_THUNK derivedRegister(void * _Nonnull ptr) noexcept : auto_(ptr) {}

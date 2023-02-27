@@ -1,11 +1,10 @@
-// REQUIRES: rdar105870339
 // REQUIRES: OS=macosx
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: sed -i '' -e 's#UTILS_DIR#%utils#' %t/plugin
-// RUN: sed -i '' -e 's#TEMP_DIR#%t#' %t/plugin
+// RUN: sed -i '' -e 's#PYTHON_EXEC_PATH#%{python}#' %t/plugin
+// RUN: sed -i '' -e 's#UTILS_DIR_PATH#%utils#' %t/plugin
 // RUN: chmod +x %t/plugin
 
 // RUN: %swift-target-frontend -typecheck -verify -swift-version 5 -enable-experimental-feature Macros -load-plugin-executable %t/plugin#TestPlugin %t/test.swift
@@ -21,9 +20,9 @@ func test() {
 }
 
 //--- plugin
-#!/usr/bin/env python3
+#!PYTHON_EXEC_PATH
 import sys
-sys.path.append('UTILS_DIR')
+sys.path.append('UTILS_DIR_PATH')
 
 import mock_plugin
 

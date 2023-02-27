@@ -65,8 +65,11 @@ protected:
 
 public:
   void layout() {
-    static_assert(MetadataAdjustmentIndex::Class == 2,
+    static_assert(MetadataAdjustmentIndex::Class == 3,
                   "Adjustment index must be synchronized with this layout");
+
+    // Pointer to layout string
+    asImpl().addLayoutStringPointer();
 
     // HeapMetadata header.
     asImpl().addDestructorFunction();
@@ -225,6 +228,7 @@ public:
   void addNominalTypeDescriptor() { addPointer(); }
   void addIVarDestroyer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
+  void addLayoutStringPointer() { addPointer(); }
   void addDestructorFunction() { addPointer(); }
   void addSuperclass() { addPointer(); }
   void addClassFlags() { addInt32(); }

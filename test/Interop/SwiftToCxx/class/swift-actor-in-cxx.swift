@@ -35,8 +35,8 @@ public final actor ActorWithField {
 // CHECK: SWIFT_EXTERN void $s5Actor0A9WithFieldC6methodyyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // method()
 
 // CHECK: class SWIFT_SYMBOL("s:5Actor0A9WithFieldC") ActorWithField final : public swift::_impl::RefCountedClass {
-// CHECK:   static inline ActorWithField init() SWIFT_SYMBOL("s:5Actor0A9WithFieldCACycfc");
-// CHECK:   inline void method() SWIFT_SYMBOL("s:5Actor0A9WithFieldC6methodyyF");
+// CHECK:   static SWIFT_INLINE_THUNK ActorWithField init() SWIFT_SYMBOL("s:5Actor0A9WithFieldCACycfc");
+// CHECK:   SWIFT_INLINE_THUNK void method() SWIFT_SYMBOL("s:5Actor0A9WithFieldC6methodyyF");
 
 @_expose(Cxx)
 public func takeActorWithIntField(_ x: ActorWithField) {

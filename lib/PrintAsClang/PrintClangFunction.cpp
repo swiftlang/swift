@@ -610,9 +610,10 @@ static void printDirectReturnOrParamCType(
     minimalStubName.consume_front(stubTypeName);
     if (isResultType) {
       // Emit a stub that returns a value directly from swiftcc function.
-      os << "static inline void swift_interop_returnDirect_" << minimalStubName;
+      os << "static SWIFT_C_INLINE_THUNK void swift_interop_returnDirect_"
+         << minimalStubName;
       os << "(char * _Nonnull result, struct " << stubName << " value";
-      os << ") __attribute__((always_inline)) {\n";
+      os << ") {\n";
       for (size_t i = 0; i < fields.size(); ++i) {
         os << "  memcpy(result + " << fields[i].first.getQuantity() << ", "
            << "&value._" << (i + 1) << ", "
@@ -621,9 +622,9 @@ static void printDirectReturnOrParamCType(
     } else {
       // Emit a stub that is used to pass value type directly to swiftcc
       // function.
-      os << "static inline struct " << stubName << " swift_interop_passDirect_"
-         << minimalStubName;
-      os << "(const char * _Nonnull value) __attribute__((always_inline)) {\n";
+      os << "static SWIFT_C_INLINE_THUNK struct " << stubName
+         << " swift_interop_passDirect_" << minimalStubName;
+      os << "(const char * _Nonnull value) {\n";
       os << "  struct " << stubName << " result;\n";
       for (size_t i = 0; i < fields.size(); ++i) {
         os << "  memcpy(&result._" << (i + 1) << ", value + "
@@ -710,7 +711,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     os << "static ";
   }
   if (modifiers.isInline)
-    os << "inline ";
+    ClangSyntaxPrinter(os).printInlineForThunk();
 
   ClangRepresentation resultingRepresentation =
       ClangRepresentation::representable;

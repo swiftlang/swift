@@ -105,6 +105,7 @@ func makeGenericMetatypes() {
   // CHECK-SAME:   %swift.type* getelementptr inbounds (
   // CHECK-SAME:     %swift.full_type, %swift.full_type* bitcast (
   // CHECK-SAME:       <{ 
+  // CHECK-SAME:         i8*, 
   // CHECK-SAME:         i8**, 
   // CHECK-SAME:         [[INT]], 
   // CHECK-SAME:         %swift.type_descriptor*, 
@@ -114,12 +115,13 @@ func makeGenericMetatypes() {
   // CHECK-SAME:       to %swift.full_type*
   // CHECK-SAME:     ), 
   // CHECK-SAME:     i32 0, 
-  // CHECK-SAME:     i32 1
+  // CHECK-SAME:     i32 2
   // CHECK-SAME:   ), 
   // CHECK-SAME:   %swift.type* getelementptr inbounds (
   // CHECK-SAME:     %swift.full_type, 
   // CHECK-SAME:     %swift.full_type* bitcast (
   // CHECK-SAME:       <{ 
+  // CHECK-SAME:         i8*, 
   // CHECK-SAME:         i8**, 
   // CHECK-SAME:         [[INT]], 
   // CHECK-SAME:         %swift.type_descriptor*, 
@@ -129,7 +131,7 @@ func makeGenericMetatypes() {
   // CHECK-SAME:       to %swift.full_type*
   // CHECK-SAME:     ), 
   // CHECK-SAME:     i32 0, 
-  // CHECK-SAME:     i32 1
+  // CHECK-SAME:     i32 2
   // CHECK-SAME:   )
   // CHECK-SAME: )
   genericMetatype(OneArg<Foo>.self)

@@ -86,6 +86,9 @@ ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
 static llvm::cl::list<std::string>
 FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
 
+static llvm::cl::list<std::string>
+VFSOverlays("vfsoverlay", llvm::cl::desc("add a VFS overlay"));
+
 static llvm::cl::opt<std::string>
 ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
                                          " a module. Necessary for processing "
@@ -542,6 +545,9 @@ int main(int argc, char **argv) {
     FramePaths.push_back({path, /*isSystem=*/false});
   }
   Invocation.setFrameworkSearchPaths(FramePaths);
+
+  Invocation.setVFSOverlays(VFSOverlays);
+
   // Set the SDK path and target if given.
   if (SDKPath.getNumOccurrences() == 0) {
     const char *SDKROOT = getenv("SDKROOT");

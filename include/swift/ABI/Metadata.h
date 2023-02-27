@@ -116,6 +116,15 @@ struct MetadataDependency {
   }
 };
 
+/// Prefix of a metadata header, containing a pointer to the
+/// type layout string.
+template <typename Runtime>
+struct TargetTypeMetadataLayoutPrefix {
+    TargetSignedPointer<Runtime, const uint8_t *
+                                      __ptrauth_swift_type_layout_string>
+        layoutString;
+};
+
 /// The header before a metadata object which appears on all type
 /// metadata.  Note that heap metadata are not necessarily type
 /// metadata, even for objects of a heap type: for example, objects of
@@ -124,11 +133,25 @@ struct MetadataDependency {
 /// This case can be distinguished using the isTypeMetadata() flag
 /// on ClassMetadata.
 template <typename Runtime>
-struct TargetTypeMetadataHeader {
+struct TargetTypeMetadataHeaderBase {
   /// A pointer to the value-witnesses for this type.  This is only
   /// present for type metadata.
   TargetPointer<Runtime, const ValueWitnessTable> ValueWitnesses;
 };
+
+template <typename Runtime>
+struct TargetTypeMetadataHeader
+    : TargetTypeMetadataLayoutPrefix<Runtime>,
+      TargetTypeMetadataHeaderBase<Runtime> {
+
+  TargetTypeMetadataHeader() = default;
+  constexpr TargetTypeMetadataHeader(
+    const TargetTypeMetadataLayoutPrefix<Runtime> &layout,
+    const TargetTypeMetadataHeaderBase<Runtime> &header)
+      : TargetTypeMetadataLayoutPrefix<Runtime>(layout),
+        TargetTypeMetadataHeaderBase<Runtime>(header) {}
+};
+
 using TypeMetadataHeader = TargetTypeMetadataHeader<InProcess>;
 
 /// A "full" metadata pointer is simply an adjusted address point on a
@@ -284,6 +307,17 @@ public:
     return isAnyKindOfClass(getKind());
   }
 
+  const uint8_t *getLayoutString() const {
+    assert(hasLayoutString());
+    if (isAnyClass()) {
+      return asFullMetadata(
+                 reinterpret_cast<const TargetAnyClassMetadata<Runtime> *>(
+                     this))
+          ->layoutString;
+    }
+    return asFullMetadata(this)->layoutString;
+  }
+
   const ValueWitnessTable *getValueWitnesses() const {
     return asFullMetadata(this)->ValueWitnesses;
   }
@@ -294,6 +328,19 @@ public:
 
   void setValueWitnesses(const ValueWitnessTable *table) {
     asFullMetadata(this)->ValueWitnesses = table;
+  }
+
+  void setLayoutString(const uint8_t *layoutString) {
+    if (isAnyClass()) {
+      asFullMetadata(reinterpret_cast<TargetAnyClassMetadata<Runtime> *>(this))
+          ->layoutString = layoutString;
+    } else {
+      asFullMetadata(this)->layoutString = layoutString;
+    }
+  }
+
+  bool hasLayoutString() const {
+    return getTypeContextDescriptor()->hasLayoutString();
   }
   
   // Define forwarders for value witnesses. These invoke this metadata's value
@@ -445,7 +492,7 @@ protected:
 /// The common structure of opaque metadata.  Adds nothing.
 template <typename Runtime>
 struct TargetOpaqueMetadata {
-  typedef TargetTypeMetadataHeader<Runtime> HeaderType;
+  typedef TargetTypeMetadataHeaderBase<Runtime> HeaderType;
 
   // We have to represent this as a member so we can list-initialize it.
   TargetMetadata<Runtime> base;
@@ -469,13 +516,16 @@ using HeapMetadataHeaderPrefix =
 /// The header present on all heap metadata.
 template <typename Runtime>
 struct TargetHeapMetadataHeader
-    : TargetHeapMetadataHeaderPrefix<Runtime>,
-      TargetTypeMetadataHeader<Runtime> {
+    : TargetTypeMetadataLayoutPrefix<Runtime>,
+      TargetHeapMetadataHeaderPrefix<Runtime>,
+      TargetTypeMetadataHeaderBase<Runtime> {
   constexpr TargetHeapMetadataHeader(
+      const TargetTypeMetadataLayoutPrefix<Runtime> &typeLayoutPrefix,
       const TargetHeapMetadataHeaderPrefix<Runtime> &heapPrefix,
-      const TargetTypeMetadataHeader<Runtime> &typePrefix)
-    : TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
-      TargetTypeMetadataHeader<Runtime>(typePrefix) {}
+      const TargetTypeMetadataHeaderBase<Runtime> &typePrefix)
+    : TargetTypeMetadataLayoutPrefix<Runtime>(typeLayoutPrefix),
+      TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
+      TargetTypeMetadataHeaderBase<Runtime>(typePrefix) {}
 };
 using HeapMetadataHeader =
   TargetHeapMetadataHeader<InProcess>;
@@ -1511,6 +1561,7 @@ using MetatypeMetadata = TargetMetatypeMetadata<InProcess>;
 template <typename Runtime>
 struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
+  using HeaderType = TargetTypeMetadataHeaderBase<Runtime>;
   TargetTupleTypeMetadata() = default;
   constexpr TargetTupleTypeMetadata(const TargetMetadata<Runtime> &base,
                                     uint32_t numElements,
@@ -1696,6 +1747,7 @@ struct TargetExistentialTypeMetadata
       TargetExistentialTypeMetadata<Runtime>,
       ConstTargetMetadataPointer<Runtime, TargetMetadata>,
       TargetProtocolDescriptorRef<Runtime>> {
+  using HeaderType = TargetTypeMetadataHeaderBase<Runtime>;
 
 private:
   using ProtocolDescriptorRef = TargetProtocolDescriptorRef<Runtime>;
@@ -3640,6 +3692,10 @@ public:
 
   bool hasCanonicalMetadataPrespecializations() const {
     return getTypeContextDescriptorFlags().hasCanonicalMetadataPrespecializations();
+  }
+
+  bool hasLayoutString() const {
+    return getTypeContextDescriptorFlags().hasLayoutString();
   }
 
   /// Given that this type has foreign metadata initialization, return the
