@@ -58,14 +58,14 @@ public:
                       bool isOutlined) const override {
     Explosion temp;
     asDerived().Derived::loadAsCopy(IGF, src, temp);
-    asDerived().Derived::assign(IGF, temp, dest, isOutlined);
+    asDerived().Derived::assign(IGF, temp, dest, isOutlined, T);
   }
 
   void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                       bool isOutlined) const override {
     Explosion temp;
     asDerived().Derived::loadAsTake(IGF, src, temp);
-    asDerived().Derived::assign(IGF, temp, dest, isOutlined);
+    asDerived().Derived::assign(IGF, temp, dest, isOutlined, T);
   }
 
   void reexplode(IRGenFunction &IGF, Explosion &in,
@@ -161,7 +161,7 @@ public:
   }
 
   void assign(IRGenFunction &IGF, Explosion &src, Address dest,
-              bool isOutlined) const override {
+              bool isOutlined, SILType T) const override {
     // Project down.
     dest = asDerived().projectScalar(IGF, dest);
 
@@ -188,7 +188,7 @@ public:
   }
 
   void consume(IRGenFunction &IGF, Explosion &in,
-               Atomicity atomicity) const override {
+               Atomicity atomicity, SILType T) const override {
     llvm::Value *value = in.claimNext();
     asDerived().emitScalarRelease(IGF, value, atomicity);
   }
@@ -251,9 +251,11 @@ protected:
 public:
   friend class SingleScalarTypeInfo<Derived, Base>;
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts) {
+  TypeLayoutEntry *
+  buildTypeLayoutEntry(IRGenModule &IGM,
+                       SILType T,
+                       bool useStructLayouts = false) const override {
+    if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T, kind);
@@ -294,9 +296,11 @@ private:
   void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts) {
+  TypeLayoutEntry *
+  buildTypeLayoutEntry(IRGenModule &IGM,
+                       SILType T,
+                       bool useStructLayouts = false) const override {
+    if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(asDerived(), T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T,

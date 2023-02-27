@@ -4600,6 +4600,14 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
     if (type->getOptionalObjectType())
       fromType = type;
 
+    // Don't attempt the fix until sub-expression is resolved
+    // if chain is not using leading-dot syntax. This is better
+    // than attempting to propagate type information down optional
+    // chain which is hard to diagnose.
+    if (type->isTypeVariableOrMember() &&
+        !isa<UnresolvedMemberChainResultExpr>(subExpr))
+      return false;
+
     // If this is a conversion from optional chain to some
     // other type e.g. contextual type or a parameter type,
     // let's use `Bind` to match object types because
@@ -5920,7 +5928,7 @@ bool ConstraintSystem::repairFailures(
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
-      break;
+      return true;
 
     // Let's wait until both sides are of the same optionality before
     // attempting `.rawValue` fix.
@@ -5967,7 +5975,7 @@ bool ConstraintSystem::repairFailures(
 
         if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                     conversionsOrFixes, locator))
-          break;
+          return true;
 
         conversionsOrFixes.push_back(
             IgnoreContextualType::create(*this, lhs, rhs, locator));
@@ -6193,7 +6201,7 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::Condition: {
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
-      break;
+      return true;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
@@ -6218,7 +6226,7 @@ bool ConstraintSystem::repairFailures(
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
-      break;
+      return true;
 
     if (repairByTreatingRValueAsLValue(lhs, rhs))
       break;

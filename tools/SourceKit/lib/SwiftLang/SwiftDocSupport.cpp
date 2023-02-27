@@ -1287,8 +1287,9 @@ public:
                         R.EndColumn,
                         R.ArgIndex};
               });
-          return {Start.first, Start.second, End.first,
-                  End.second,  R.Text.str(), std::move(SubRanges)};
+          return {R.Path.str(), Start.first,         Start.second,
+                  End.first,    End.second,          R.BufferName.str(),
+                  R.Text.str(), std::move(SubRanges)};
         });
     unsigned End = AllEdits.size();
     StartEnds.emplace_back(Start, End);

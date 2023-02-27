@@ -929,6 +929,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.TypeDescriptorsAsArguments =
     PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);
 
+  opts.TypeLayoutString =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
   opts.SwiftDynamicReplacements =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.SwiftDynamicReplacementKeys =

@@ -207,6 +207,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Relative protocol witness table descriminator.
   PointerAuthSchema RelativeProtocolWitnessTable;
+
+  /// Type layout string descriminator.
+  PointerAuthSchema TypeLayoutString;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -425,6 +428,9 @@ public:
   /// Collocate metadata functions in their own section.
   unsigned CollocatedMetadataFunctions : 1;
 
+  /// Colocate type descriptors in their own section.
+  unsigned ColocateTypeDescriptors : 1;
+
   /// Use relative (and constant) protocol witness tables.
   unsigned UseRelativeProtocolWitnessTables : 1;
 
@@ -500,6 +506,7 @@ public:
         EmitGenericRODatas(false), NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false),
         CollocatedMetadataFunctions(false),
+        ColocateTypeDescriptors(true),
         UseRelativeProtocolWitnessTables(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {

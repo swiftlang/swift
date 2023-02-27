@@ -906,9 +906,13 @@ public:
   Optional<llvm::VersionTuple> getIntroducedOSVersion(PlatformKind Kind) const;
 
   /// Returns the OS version in which the decl became ABI as specified by the
-  /// @backDeployed attribute.
+  /// `@backDeployed` attribute.
   Optional<llvm::VersionTuple>
   getBackDeployedBeforeOSVersion(ASTContext &Ctx) const;
+
+  /// Returns true if the decl has an active `@backDeployed` attribute for the
+  /// given context.
+  bool isBackDeployed(ASTContext &Ctx) const;
 
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
@@ -1176,6 +1180,9 @@ public:
   // SPI groups are inherited from the parent contexts only if the local decl
   // doesn't declare any @_spi.
   ArrayRef<Identifier> getSPIGroups() const;
+
+  /// Returns true if this declaration has any `@backDeployed` attributes.
+  bool hasBackDeployedAttr() const;
 
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
@@ -6792,10 +6799,6 @@ public:
   /// \return the synthesized thunk, or null if the base of the call has
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
-
-  /// Returns 'true' if the function has (or inherits) the `@backDeployed`
-  /// attribute.
-  bool isBackDeployed() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 

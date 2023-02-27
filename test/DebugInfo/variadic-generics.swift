@@ -2,8 +2,11 @@
 // RUN:    -enable-experimental-feature VariadicGenerics \
 // RUN:    -parse-as-library -module-name a | %FileCheck %s
 
+// Because of -enable-experimental-feature VariadicGenerics
+// REQUIRES: asserts
+
 public func foo<T...>(args: repeat each T) {
-  // CHECK: define {{.*}} @"$s1a3foo4argsyxxQp_tlF"
+  // CHECK: define {{.*}} @"$s1a3foo4argsyxxQp_tRvzlF"
   // CHECK-SAME: %swift.type** %[[TYPE_PACK_ARG:.*]])
   // CHECK: %[[TYPE_PACK_ALLOCA:.*]] = alloca %swift.type**
   // CHECK: call void @llvm.dbg.declare(metadata %swift.type*** %[[TYPE_PACK_ALLOCA]], metadata ![[TYPE_PACK_VAR:[0-9]+]], metadata !DIExpression())

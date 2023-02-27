@@ -1166,7 +1166,7 @@ static llvm::Constant *emitEmptyTupleTypeMetadataRef(IRGenModule &IGM) {
     llvm::ConstantInt::get(IGM.Int32Ty, 1)
   };
   return llvm::ConstantExpr::getInBoundsGetElementPtr(
-      IGM.FullTypeMetadataStructTy, fullMetadata, indices);
+      IGM.FullExistentialTypeMetadataStructTy, fullMetadata, indices);
 }
 
 static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
@@ -1790,7 +1790,7 @@ namespace {
       };
       return MetadataResponse::forComplete(
           llvm::ConstantExpr::getInBoundsGetElementPtr(
-              IGF.IGM.FullTypeMetadataStructTy, singletonMetadata, indices));
+              IGF.IGM.FullExistentialTypeMetadataStructTy, singletonMetadata, indices));
     }
 
     llvm::Value *emitExistentialTypeMetadata(CanExistentialType type) {

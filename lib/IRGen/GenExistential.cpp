@@ -450,7 +450,7 @@ namespace {
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address address,
-                bool isOutlined) const override {
+                bool isOutlined, SILType T) const override {
       // Assign the value.
       Address instanceAddr = asDerived().projectValue(IGF, address);
       llvm::Value *old = IGF.Builder.CreateLoad(instanceAddr);
@@ -483,7 +483,8 @@ namespace {
       src.transferInto(dest, getNumStoredProtocols());
     }
 
-    void consume(IRGenFunction &IGF, Explosion &src, Atomicity atomicity)
+    void consume(IRGenFunction &IGF, Explosion &src, Atomicity atomicity,
+                 SILType T)
     const override {
       // Copy the instance pointer.
       llvm::Value *value = src.claimNext();
@@ -681,9 +682,11 @@ namespace {
                                                 IsNotBitwiseTakable, \
                                                 IsFixedSize), \
         IsOptional(isOptional) {} \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                          SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+    TypeLayoutEntry \
+    *buildTypeLayoutEntry(IRGenModule &IGM, \
+                          SILType T, \
+                          bool useStructLayouts) const override { \
+      if (!useStructLayouts) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } else if (Refcounting == ReferenceCounting::Native) { \
         return IGM.typeLayoutCache.getOrCreateScalarEntry( \
@@ -737,9 +740,11 @@ namespace {
       assert(refcounting == ReferenceCounting::Native || \
              refcounting == ReferenceCounting::Unknown); \
     } \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                          SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+    TypeLayoutEntry \
+    *buildTypeLayoutEntry(IRGenModule &IGM, \
+                          SILType T, \
+                          bool useStructLayouts) const override { \
+      if (!useStructLayouts) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } \
       ScalarKind kind; \
@@ -798,9 +803,11 @@ namespace {
         bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
                                       spareBits, align, IsPOD, IsFixedSize) {} \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                          SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+    TypeLayoutEntry \
+    *buildTypeLayoutEntry(IRGenModule &IGM, \
+                          SILType T, \
+                          bool useStructLayouts) const override { \
+      if (!useStructLayouts) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, ScalarKind::POD); \
@@ -869,9 +876,11 @@ public:
     return OpaqueExistentialLayout(getNumStoredProtocols());
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts) {
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(
@@ -1022,11 +1031,13 @@ class ClassExistentialTypeInfo final
            refcounting == ReferenceCounting::ObjC);
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
     // We can't create an objc typeinfo by itself, so don't destructure if we
     // have one
-    if (!IGM.getOptions().ForceStructTypeLayouts ||
+    if (!useStructLayouts ||
         Refcounting == ReferenceCounting::ObjC) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
@@ -1049,7 +1060,7 @@ class ClassExistentialTypeInfo final
           ScalarKind::POD));
     }
 
-    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(alignedGroup, 0);
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(alignedGroup, T, getBestKnownAlignment().getValue());
   }
 
   /// Given an explosion with multiple pointer elements in them, pack them
@@ -1359,9 +1370,11 @@ public:
     return MetatypeTI;
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts) {
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
@@ -1399,9 +1412,11 @@ public:
     : HeapTypeInfo(refcounting, storage, size, spareBits, align),
       ErrorProto(errorProto), Refcounting(refcounting) {}
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts) {
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
     ScalarKind kind;

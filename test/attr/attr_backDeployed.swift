@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library \
 // RUN:   -define-availability "_myProject 2.0:macOS 12.0"
 
+// REQUIRES: OS=macosx
+
 // MARK: - Valid declarations
 
 // Ok, top level functions
@@ -270,7 +272,7 @@ public struct FunctionBodyDiagnostics {
   private func privateFunc() {} // expected-note {{instance method 'privateFunc()' is not '@usableFromInline' or public}}
 
   @backDeployed(before: macOS 12.0)
-  public func backDeployedMethod() {
+  public func backDeployedMethod_macOS() {
     struct Nested {} // expected-error {{type 'Nested' cannot be nested inside a '@backDeployed' function}}
 
     publicFunc()
@@ -278,6 +280,21 @@ public struct FunctionBodyDiagnostics {
     internalFunc() // expected-error {{instance method 'internalFunc()' is internal and cannot be referenced from a '@backDeployed' function}}
     fileprivateFunc() // expected-error {{instance method 'fileprivateFunc()' is fileprivate and cannot be referenced from a '@backDeployed' function}}
     privateFunc() // expected-error {{instance method 'privateFunc()' is private and cannot be referenced from a '@backDeployed' function}}
+  }
+
+  @backDeployed(before: iOS 13.0)
+  public func backDeployedMethod_iOS() {
+#if !os(iOS)
+    // Since this function body is only back deployed on iOS, the statements
+    // of the body in a #if !os(iOS) block should be considered resilient.
+    struct Nested {}
+
+    publicFunc()
+    usableFromInlineFunc()
+    internalFunc()
+    fileprivateFunc()
+    privateFunc()
+#endif
   }
 }
 

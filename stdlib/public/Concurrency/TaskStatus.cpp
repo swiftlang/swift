@@ -116,6 +116,7 @@ static bool waitForStatusRecordUnlockIfNotSelfLocked(AsyncTask *task,
       // withStatusRecordLock so that lock record contents are visible due to
       // load-through HW address dependency
       status = task->_private()._status().load(SWIFT_MEMORY_ORDER_CONSUME);
+      _swift_tsan_consume(task);
 
       if (!status.isStatusRecordLocked())
         return nullptr;
@@ -134,6 +135,7 @@ static bool waitForStatusRecordUnlockIfNotSelfLocked(AsyncTask *task,
 
     // Reload the status before trying to relock
     status = task->_private()._status().load(SWIFT_MEMORY_ORDER_CONSUME);
+    _swift_tsan_consume(task);
     if (!status.isStatusRecordLocked())
       return false;
   }
@@ -159,6 +161,7 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
       // withStatusRecordLock so that lock record contents are visible due to
       // load-through HW address dependency
       status = task->_private()._status().load(SWIFT_MEMORY_ORDER_CONSUME);
+      _swift_tsan_consume(task);
       if (!status.isStatusRecordLocked())
         return nullptr;
 
@@ -175,6 +178,7 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
 
     // Reload the status before trying to relock.
     status = task->_private()._status().load(SWIFT_MEMORY_ORDER_CONSUME);
+    _swift_tsan_consume(task);
     if (!status.isStatusRecordLocked())
       return;
   }
@@ -215,13 +219,17 @@ static bool withStatusRecordLock(AsyncTask *task, ActiveTaskStatus status,
     oldRecord = status.getInnermostRecord();
     lockingRecord = worker.createQueue(oldRecord);
 
-    // Publish the lock record with an acquire so that all lock operations are
-    // bounded.
+    // Publish the lock record
+    // * We need an acquire to pair with release of someone else who might have
+    // unlocked
+    // * We need a store release to publish the lock record contents
     ActiveTaskStatus newStatus = status.withLockingRecord(lockingRecord);
     if (task->_private()._status().compare_exchange_weak(status, newStatus,
-            /*success*/ std::memory_order_acquire,
+            /*success*/ std::memory_order_acq_rel,
             /*failure*/ std::memory_order_relaxed)) {
       _swift_tsan_acquire(task);
+      _swift_tsan_release(task);
+
       status = newStatus;
 
       status.traceStatusChanged(task);
@@ -617,6 +625,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
             /*success*/ SWIFT_MEMORY_ORDER_CONSUME,
             /*failure*/ std::memory_order_relaxed)) {
+      _swift_tsan_consume(task);
       break;
     }
   }
@@ -723,6 +732,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
             /* success */ SWIFT_MEMORY_ORDER_CONSUME,
             /* failure */ std::memory_order_relaxed)) {
+      _swift_tsan_consume(task);
       break;
     }
   }

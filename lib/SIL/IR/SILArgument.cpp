@@ -227,12 +227,12 @@ bool SILPhiArgument::getIncomingPhiValues(
 }
 
 bool SILPhiArgument::visitTransitiveIncomingPhiOperands(
-    function_ref<bool(SILPhiArgument *, Operand *)> visitor) {
+    function_ref<bool(SILPhiArgument *, Operand *)> visitor) const {
   if (!isPhi())
     return false;
 
   GraphNodeWorklist<SILPhiArgument *, 4> worklist;
-  worklist.initialize(this);
+  worklist.insert(const_cast<SILPhiArgument *>(this));
 
   while (auto *argument = worklist.pop()) {
     SmallVector<Operand *> operands;

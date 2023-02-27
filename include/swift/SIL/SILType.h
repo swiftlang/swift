@@ -444,6 +444,13 @@ public:
     return isObject() && isClassOrClassMetatype(getASTType());
   }
 
+  bool isFunctionTypeWithContext() const {
+    if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
+      return fTy->getExtInfo().hasContext();
+    }
+    return false;
+  }
+
   /// True if the type involves any archetypes.
   bool hasArchetype() const { return getASTType()->hasArchetype(); }
 

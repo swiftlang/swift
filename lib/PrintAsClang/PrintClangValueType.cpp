@@ -117,20 +117,21 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
                    "uint32_t _3;\n"
                    "#endif\n"
                    "};\n";
-    cPrologueOS << "static inline struct swift_interop_stub_Swift_String "
-                   "swift_interop_passDirect_Swift_String(const char * "
-                   "_Nonnull value) {\n"
-                   "struct swift_interop_stub_Swift_String result;\n"
-                   "#if UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu\n"
-                   "memcpy(&result._1, value, 8);\n"
-                   "memcpy(&result._2, value + 8, 8);\n"
-                   "#elif UINTPTR_MAX == 0xFFFFFFFF\n"
-                   "memcpy(&result._1, value, 4);\n"
-                   "memcpy(&result._2, value + 4, 4);\n"
-                   "memcpy(&result._3, value + 8, 4);\n"
-                   "#endif\n"
-                   "return result;\n"
-                   "}\n";
+    cPrologueOS
+        << "static SWIFT_INLINE_THUNK struct swift_interop_stub_Swift_String "
+           "swift_interop_passDirect_Swift_String(const char * "
+           "_Nonnull value) {\n"
+           "struct swift_interop_stub_Swift_String result;\n"
+           "#if UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu\n"
+           "memcpy(&result._1, value, 8);\n"
+           "memcpy(&result._2, value + 8, 8);\n"
+           "#elif UINTPTR_MAX == 0xFFFFFFFF\n"
+           "memcpy(&result._1, value, 4);\n"
+           "memcpy(&result._2, value + 4, 4);\n"
+           "memcpy(&result._3, value + 8, 4);\n"
+           "#endif\n"
+           "return result;\n"
+           "}\n";
     cPrologueOS << "SWIFT_EXTERN void *_Nonnull "
                    "$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(swift_interop_stub_"
                    "Swift_String) SWIFT_NOEXCEPT SWIFT_CALL;\n";
@@ -272,7 +273,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
         *genericSignature);
 
   // Print out the destructor.
-  os << "  inline ~";
+  os << "  ";
+  printer.printInlineForThunk();
+  os << '~';
   printer.printBaseName(typeDecl);
   os << "() {\n";
   ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
@@ -280,7 +283,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
   os << "  }\n";
 
-  os << "  inline ";
+  os << "  ";
+  printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
   os << "(const ";
   printer.printBaseName(typeDecl);
@@ -298,7 +302,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "  }\n";
 
   // FIXME: implement the move constructor.
-  os << "  [[noreturn]] inline ";
+  os << "  [[noreturn]] ";
+  printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
   os << "(";
   printer.printBaseName(typeDecl);
@@ -311,7 +316,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "private:\n";
 
   // Print out private default constructor.
-  os << "  inline ";
+  os << "  ";
+  printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
   // FIXME: make noexcept.
   if (isOpaqueLayout) {
@@ -324,7 +330,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   }
   // Print out '_make' function which returns an unitialized instance for
   // passing to Swift.
-  os << "  static inline ";
+  os << "  static ";
+  printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
   os << " _make() {";
   if (isOpaqueLayout) {
@@ -340,30 +347,40 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "(); }\n";
   }
   // Print out the private accessors to the underlying Swift value storage.
-  os << "  inline const char * _Nonnull _getOpaquePointer() const { return "
+  os << "  ";
+  printer.printInlineForThunk();
+  os << "const char * _Nonnull _getOpaquePointer() const { return "
         "_storage";
   if (isOpaqueLayout)
     os << ".getOpaquePointer()";
   os << "; }\n";
-  os << "  inline char * _Nonnull _getOpaquePointer() { return _storage";
+  os << "  ";
+  printer.printInlineForThunk();
+  os << "char * _Nonnull _getOpaquePointer() { return _storage";
   if (isOpaqueLayout)
     os << ".getOpaquePointer()";
   os << "; }\n";
   os << "\n";
   // Print out helper function for enums
   if (isa<EnumDecl>(typeDecl)) {
-    os << "  inline char * _Nonnull _destructiveProjectEnumData() {\n";
+    os << "  ";
+    printer.printInlineForThunk();
+    os << "char * _Nonnull _destructiveProjectEnumData() {\n";
     printEnumVWTableVariable();
     os << "    enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), "
           "metadata._0);\n";
     os << "    return _getOpaquePointer();\n";
     os << "  }\n";
-    os << "  inline void _destructiveInjectEnumTag(unsigned tag) {\n";
+    os << "  ";
+    printer.printInlineForThunk();
+    os << "void _destructiveInjectEnumTag(unsigned tag) {\n";
     printEnumVWTableVariable();
     os << "    enumVWTable->destructiveInjectEnumTag(_getOpaquePointer(), tag, "
           "metadata._0);\n";
     os << "  }\n";
-    os << "  inline unsigned _getEnumTag() const {\n";
+    os << "  ";
+    printer.printInlineForThunk();
+    os << "unsigned _getEnumTag() const {\n";
     printEnumVWTableVariable();
     os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
           "metadata._0);\n";
@@ -399,18 +416,23 @@ void ClangValueTypePrinter::printValueTypeDecl(
           ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
               *genericSignature);
 
-        os << "  static inline char * _Nonnull getOpaquePointer(";
+        os << "  static ";
+        ClangSyntaxPrinter(os).printInlineForThunk();
+        os << "char * _Nonnull getOpaquePointer(";
         printCxxTypeName(os, typeDecl, moduleContext);
         printGenericParamRefs(os);
         os << " &object) { return object._getOpaquePointer(); }\n";
 
-        os << "  static inline const char * _Nonnull getOpaquePointer(const ";
+        os << "  static ";
+        ClangSyntaxPrinter(os).printInlineForThunk();
+        os << "const char * _Nonnull getOpaquePointer(const ";
         printCxxTypeName(os, typeDecl, moduleContext);
         printGenericParamRefs(os);
         os << " &object) { return object._getOpaquePointer(); }\n";
 
         os << "  template<class T>\n";
-        os << "  static inline ";
+        os << "  static ";
+        ClangSyntaxPrinter(os).printInlineForThunk();
         printCxxTypeName(os, typeDecl, moduleContext);
         printGenericParamRefs(os);
         os << " returnNewValue(T callable) {\n";
@@ -422,7 +444,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "    return result;\n";
         os << "  }\n";
         // Print out helper function for initializeWithTake
-        os << "  static inline void initializeWithTake(char * _Nonnull "
+        os << "  static ";
+        ClangSyntaxPrinter(os).printInlineForThunk();
+        os << "void initializeWithTake(char * _Nonnull "
               "destStorage, char * _Nonnull srcStorage) {\n";
         ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
             os, typeMetadataFuncName, typeMetadataFuncGenericParams);
@@ -565,7 +589,9 @@ void ClangValueTypePrinter::printTypeGenericTraits(
                                       /*moduleContext=*/nullptr);
   }
   os << "> {\n";
-  os << "  static inline void * _Nonnull getTypeMetadata() {\n";
+  os << "  static ";
+  ClangSyntaxPrinter(os).printInlineForThunk();
+  os << "void * _Nonnull getTypeMetadata() {\n";
   os << "    return ";
   if (!typeDecl->hasClangNode()) {
     printer.printBaseName(typeDecl->getModuleContext());

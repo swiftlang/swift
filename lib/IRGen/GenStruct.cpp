@@ -250,6 +250,18 @@ namespace {
       return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
     }
 
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
+      // If the struct has a deinit declared, then call it to destroy the
+      // value.
+      if (tryEmitDestroyUsingDeinit(IGF, address, T)) {
+        return;
+      }
+      
+      // Otherwise, perform elementwise destruction of the value.
+      return super::destroy(IGF, address, T, isOutlined);
+    }
+
     void verify(IRGenTypeVerifierFunction &IGF,
                 llvm::Value *metadata,
                 SILType structType) const override {
@@ -360,29 +372,34 @@ namespace {
                              std::move(spareBits), align, IsPOD, IsFixedSize),
           ClangDecl(clangDecl) {}
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (!areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+      }
+      if (getFields().empty()) {
+        return IGM.typeLayoutCache.getEmptyEntry();
       }
 
       std::vector<TypeLayoutEntry *> fields;
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be LoadableClangRecordTypeInfo");
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1 && getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -456,9 +473,11 @@ namespace {
       (void)clangDecl;
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       assert(false && "Implement proper type layout info in the future");
@@ -567,6 +586,7 @@ namespace {
       auto callee = cast<llvm::Function>(clangFnAddr->stripPointerCasts());
       Signature signature = IGF.IGM.getSignature(fnType);
       std::string name = "__swift_cxx_copy_ctor" + callee->getName().str();
+      auto *origClangFnAddr = clangFnAddr;
       clangFnAddr = emitCXXConstructorThunkIfNeeded(
           IGF.IGM, signature, copyConstructor, name, clangFnAddr);
       callee = cast<llvm::Function>(clangFnAddr);
@@ -576,7 +596,19 @@ namespace {
         src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
                               IGF.IGM.DataLayout);
       }
-      IGF.Builder.CreateCall(callee->getFunctionType(), callee, {dest, src});
+      llvm::Value *args[] = {dest, src};
+      if (clangFnAddr == origClangFnAddr) {
+        // Ensure we can use 'invoke' to trap on uncaught exceptions when
+        // calling original copy constructor without going through the thunk.
+        emitCXXConstructorCall(IGF, copyConstructor, callee->getFunctionType(),
+                               callee, args);
+        return;
+      }
+      // Check if we're calling a thunk that traps on exception thrown from copy
+      // constructor.
+      if (IGF.IGM.emittedForeignFunctionThunksWithExceptionTraps.count(callee))
+        IGF.setCallsThunksWithForeignExceptionTraps();
+      IGF.Builder.CreateCall(callee->getFunctionType(), callee, args);
     }
 
   public:
@@ -641,14 +673,33 @@ namespace {
                                         IGF.IGM.DataLayout);
         args.push_back(implicitParam);
       }
+      bool canThrow = false;
+      if (IGF.IGM.isForeignExceptionHandlingEnabled()) {
+        if (auto *fpt =
+                destructor->getType()->getAs<clang::FunctionProtoType>()) {
+          if (!fpt->isNothrow())
+            canThrow = true;
+        }
+      }
+      if (canThrow) {
+        IGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
+                                         llvm::BasicBlock *invokeUnwindDest) {
+          IGF.Builder.createInvoke(destructorFnAddr->getFunctionType(),
+                                   destructorFnAddr, args, invokeNormalDest,
+                                   invokeUnwindDest);
+        });
+        return;
+      }
 
       IGF.Builder.CreateCall(destructorFnAddr->getFunctionType(),
                              destructorFnAddr, args);
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts || getCXXDestructor(T) ||
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts || getCXXDestructor(T) ||
           !areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
@@ -657,16 +708,16 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be AddressOnlyRecordTypeInfo");
 
-      if (fields.size() == 1) {
+      if (fields.size() == 1 && getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
         return fields[0];
       }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -748,6 +799,7 @@ namespace {
   /// A type implementation for loadable struct types.
   class LoadableStructTypeInfo final
       : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
+    using super = StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo>;
   public:
     LoadableStructTypeInfo(ArrayRef<StructFieldInfo> fields,
                            unsigned explosionSize,
@@ -770,9 +822,11 @@ namespace {
       }
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
@@ -788,14 +842,15 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
 
-      if (fields.size() == 1) {
+      if (fields.size() == 1 && isFixedSize() &&
+          getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
         return fields[0];
       }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -813,6 +868,18 @@ namespace {
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
                                    const StructFieldInfo &field) const {
       llvm_unreachable("non-fixed field in loadable type?");
+    }
+    
+    void consume(IRGenFunction &IGF, Explosion &explosion,
+                 Atomicity atomicity, SILType T) const override {
+      // If the struct has a deinit declared, then call it to consume the
+      // value.
+      if (tryEmitConsumeUsingDeinit(IGF, explosion, T)) {
+        return;
+      }
+      
+      // Otherwise, do elementwise destruction of the value.
+      return super::consume(IGF, explosion, atomicity, T);
     }
   };
 
@@ -832,9 +899,11 @@ namespace {
                            isPOD, isBT, alwaysFixedSize)
     {}
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
@@ -846,16 +915,16 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be FixedStructTypeInfo");
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1  && getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -922,8 +991,10 @@ namespace {
                            T, align, isPOD, isBT, structAccessible) {
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
       if (!areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
@@ -932,16 +1003,16 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be NonFixedStructTypeInfo");
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1 && getBestKnownAlignment() > Alignment(1)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, T, getBestKnownAlignment().getValue());
     }
 
     // We have an indirect schema.
@@ -1450,8 +1521,10 @@ namespace {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
     }
   };

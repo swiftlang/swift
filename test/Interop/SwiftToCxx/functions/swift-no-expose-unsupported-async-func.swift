@@ -11,7 +11,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT:  } // namespace Functions
 
-// CHECK-NOT: inline double asyncFunc(double x) noexcept {{.*}}{
+// CHECK-NOT: SWIFT_INLINE_THUNK double asyncFunc(double x) noexcept {{.*}}{
 // CHECK-NOT:   return _impl::$s9Functions9asyncFuncyS2dYaF(x);
 // CHECK-NOT: }
 

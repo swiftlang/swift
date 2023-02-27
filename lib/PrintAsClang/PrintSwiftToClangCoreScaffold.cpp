@@ -186,7 +186,9 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
        << typeInfo.name << "> = true;\n\n";
 
     os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
-       << "  static inline void * _Nonnull getTypeMetadata() {\n"
+       << "  static ";
+    ClangSyntaxPrinter(os).printInlineForThunk();
+    os << "void * _Nonnull getTypeMetadata() {\n"
        << "    return &" << cxx_synthesis::getCxxImplNamespaceName()
        << "::" << typeMetadataVarName << ";\n"
        << "  }\n};\n\n";

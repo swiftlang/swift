@@ -868,7 +868,9 @@ public:
   /// \param subs - Used to get subscript function type and to substitute generic args.
   /// \param argList - The argument list of the subscript.
   SmallVector<ManagedValue, 4>
-  emitKeyPathSubscriptOperands(SubscriptDecl *subscript, SubstitutionMap subs,
+  emitKeyPathSubscriptOperands(SILLocation loc,
+                               SubscriptDecl *subscript,
+                               SubstitutionMap subs,
                                ArgumentList *argList);
 
   /// Convert a block to a native function with a thunk.
@@ -1138,6 +1140,11 @@ public:
   SILValue emitTemporaryAllocation(SILLocation loc, SILType ty,
                                    bool hasDynamicLifetime = false,
                                    bool isLexical = false);
+
+  /// Emits a temporary allocation for a pack that will be deallocated
+  /// automatically at the end of the current scope.  Returns the address
+  /// of the allocation.
+  SILValue emitTemporaryPackAllocation(SILLocation loc, SILType packTy);
 
   /// Prepares a buffer to receive the result of an expression, either using the
   /// 'emit into' initialization buffer if available, or allocating a temporary
@@ -1537,7 +1544,8 @@ public:
                                 SubstitutionMap subs,
                                 bool alreadyConverted);
 
-  PreparedArguments prepareSubscriptIndices(SubscriptDecl *subscript,
+  PreparedArguments prepareSubscriptIndices(SILLocation loc,
+                                            SubscriptDecl *subscript,
                                             SubstitutionMap subs,
                                             AccessStrategy strategy,
                                             ArgumentList *argList);
@@ -2346,9 +2354,23 @@ public:
 
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);
+
+  /// Enter a cleanup to deallocate a pack.
+  CleanupHandle enterDeallocPackCleanup(SILValue address);
   
   /// Enter a cleanup to emit a ReleaseValue/DestroyAddr of the specified value.
   CleanupHandle enterDestroyCleanup(SILValue valueOrAddr);
+
+  /// Enter a cleanup to destroy all of the values in the given pack.
+  CleanupHandle enterDestroyPackCleanup(SILValue addr,
+                                        CanPackType formalPackType);
+
+  /// Enter a cleanup to destroy the preceding values in a pack-expansion
+  /// component of a pack.
+  CleanupHandle enterPartialDestroyPackCleanup(SILValue addr,
+                                               CanPackType formalPackType,
+                                               unsigned componentIndex,
+                                               SILValue limitWithinComponent);
 
   /// Return an owned managed value for \p value that is cleaned up using an end_lifetime instruction.
   ///
@@ -2452,6 +2474,65 @@ public:
   SILDeclRef getAccessorDeclRef(AccessorDecl *accessor) {
     return SGM.getAccessorDeclRef(accessor, F.getResilienceExpansion());
   }
+
+  /// Emit a dynamic loop over a single pack-expansion component of a pack.
+  ///
+  /// \param formalPackType - a pack type with the right shape for the
+  ///   overall pack being iterated over
+  /// \param componentIndex - the index of the pack expansion component
+  ///   within the formal pack type
+  /// \param limitWithinComponent - the number of elements in a prefix of
+  ///   the expansion component to dynamically visit; if null, all elements
+  ///   will be visited
+  /// \param openedElementEnv - a set of opened element archetypes to bind
+  ///   within the loop; can be null to bind no elements
+  /// \param reverse - if true, iterate the elements in reverse order,
+  ///   starting at index limitWithinComponent - 1
+  /// \param emitBody - a function that will be called to emit the body of
+  ///   the loop. It's okay if this has paths that exit the body of the loop,
+  ///   but it should leave the insertion point set at the end. Will be
+  ///   called within a cleanups scope. The first parameter is the current
+  ///   index within the expansion component, a value of type Builtin.Word.
+  ///   The second parameter is that index as a pack indexing instruction
+  ///   that indexes into packs with the shape of the pack expasion.
+  ///   The third parameter is the current pack index within the overall
+  ///   pack, a pack indexing instruction that indexes into packs with the
+  ///   shape of formalPackType.
+  void emitDynamicPackLoop(SILLocation loc,
+                           CanPackType formalPackType,
+                           unsigned componentIndex,
+                           SILValue limitWithinComponent,
+                           GenericEnvironment *openedElementEnv,
+                           bool reverse,
+                        llvm::function_ref<void(SILValue indexWithinComponent,
+                                                SILValue packExpansionIndex,
+                                                SILValue packIndex)> emitBody);
+
+  /// Emit a loop which destroys a prefix of a pack expansion component
+  /// of a pack value.
+  ///
+  /// \param packAddr - the address of the overall pack value
+  /// \param formalPackType - a pack type with the same shape as the
+  ///   overall pack value
+  /// \param componentIndex - the index of the pack expansion component
+  ///   within the formal pack type
+  /// \param limitWithinComponent - the number of elements in a prefix of
+  ///   the expansion component to destroy; if null, all elements in the
+  ///   component will be destroyed
+  void emitPartialDestroyPack(SILLocation loc,
+                              SILValue packAddr,
+                              CanPackType formalPackType,
+                              unsigned componentIndex,
+                              SILValue limitWithinComponent);
+
+  /// Emit a loop which destroys all the elements of a pack value.
+  ///
+  /// \param packAddr - the address of the overall pack value
+  /// \param formalPackType - a pack type with the same shape as the
+  ///   overall pack value
+  void emitDestroyPack(SILLocation loc,
+                       SILValue packAddr,
+                       CanPackType formalPackType);
 };
 
 

@@ -64,6 +64,7 @@ public:
     DynamicReplacementKey,
     ProtocolConformanceDescriptor,
     ProtocolConformanceDescriptorAsArgument,
+    TypeLayoutString,
   };
 
 private:

@@ -189,7 +189,8 @@ public:
   const TypeInfo *getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
 
-  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
+  const TypeLayoutEntry
+  &getTypeLayoutEntry(SILType T, bool useStructLayouts);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
@@ -370,14 +371,32 @@ TypeLayoutEntry *buildTypeLayoutEntryForFields(IRGenModule &IGM, SILType T,
     return IGM.typeLayoutCache.getEmptyEntry();
   }
 
-  if (fields.size() == 1 && minFieldAlignment >= minimumAlignment) {
-    return fields[0];
-  }
+  // if (fields.size() == 1 && minFieldAlignment >= minimumAlignment) {
+  //   return fields[0];
+  // }
   if (minimumAlignment < minFieldAlignment)
     minimumAlignment = minFieldAlignment;
   return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
       fields, minimumAlignment, true);
 }
+
+/// Emit a call to the deinit for T to destroy the value at the given address,
+/// if a deinit is available.
+///
+/// Returns true if the deinit call was emitted, or false if there is no deinit.
+/// No code emission occurs if the function returns false.
+bool tryEmitDestroyUsingDeinit(IRGenFunction &IGF,
+                               Address address,
+                               SILType T);
+                               
+/// Emit a call to the deinit for T to destroy the value in the given explosion,
+/// if a deinit is available.
+///
+/// Returns true if the deinit call was emitted, or false if there is no deinit.
+/// No code emission occurs if the function returns false.
+bool tryEmitConsumeUsingDeinit(IRGenFunction &IGF,
+                               Explosion &explosion,
+                               SILType T);
 
 } // end namespace irgen
 } // end namespace swift

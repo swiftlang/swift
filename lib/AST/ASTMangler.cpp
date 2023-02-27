@@ -2979,7 +2979,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
     if (tryMangleTypeSubstitution(DT, sig)) {
       switch (reqt.getKind()) {
         case RequirementKind::SameShape:
-          llvm_unreachable("Same-shape requirement not supported here");
+          llvm_unreachable("Same-shape requirement with dependent member type?");
         case RequirementKind::Conformance:
           return appendOperator("RQ");
         case RequirementKind::Layout:
@@ -3038,12 +3038,18 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
 
 void ASTMangler::appendGenericSignatureParts(
                                      GenericSignature sig,
-                                     ArrayRef<CanTypeWrapper<GenericTypeParamType>> params,
+                                     ArrayRef<CanGenericTypeParamType> params,
                                      unsigned initialParamDepth,
                                      ArrayRef<Requirement> requirements) {
   // Mangle the requirements.
   for (const Requirement &reqt : requirements) {
     appendRequirement(reqt, sig);
+  }
+
+  // Mangle which generic parameters are pack parameters.
+  for (auto param : params) {
+    if (param->isParameterPack())
+      appendOpWithGenericParamIndex("Rv", param);
   }
 
   if (params.size() == 1 && params[0]->getDepth() == initialParamDepth)
@@ -3771,7 +3777,8 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
-  case GeneratedSourceInfo::PeerMacroExpansion: {
+  case GeneratedSourceInfo::PeerMacroExpansion:
+  case GeneratedSourceInfo::ConformanceMacroExpansion: {
     auto decl = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
       .get<Decl *>();
     auto attr = generatedSourceInfo->attachedMacroCustomAttr;
@@ -3791,6 +3798,10 @@ void ASTMangler::appendMacroExpansionContext(
 
     case GeneratedSourceInfo::PeerMacroExpansion:
       role = MacroRole::Peer;
+      break;
+
+    case GeneratedSourceInfo::ConformanceMacroExpansion:
+      role = MacroRole::Conformance;
       break;
 
     default:
@@ -3850,6 +3861,10 @@ void ASTMangler::appendMacroExpansionOperator(
 
   case MacroRole::Peer:
     appendOperator("fMp", Index(discriminator));
+    break;
+
+  case MacroRole::Conformance:
+    appendOperator("fMc", Index(discriminator));
     break;
   }
 }

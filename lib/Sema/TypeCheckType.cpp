@@ -66,9 +66,8 @@ TypeResolution::forStructural(DeclContext *dc, TypeResolutionOptions options,
                               OpenUnboundGenericTypeFn unboundTyOpener,
                               HandlePlaceholderTypeReprFn placeholderHandler,
                               OpenPackElementFn packElementOpener) {
-  return TypeResolution(dc, TypeResolutionStage::Structural, options,
-                        unboundTyOpener, placeholderHandler,
-                        packElementOpener);
+  return TypeResolution(dc, {}, TypeResolutionStage::Structural, options,
+                        unboundTyOpener, placeholderHandler, packElementOpener);
 }
 
 TypeResolution
@@ -86,18 +85,18 @@ TypeResolution::forInterface(DeclContext *dc, GenericSignature genericSig,
                              OpenUnboundGenericTypeFn unboundTyOpener,
                              HandlePlaceholderTypeReprFn placeholderHandler,
                              OpenPackElementFn packElementOpener) {
-  TypeResolution result(dc, TypeResolutionStage::Interface, options,
-                        unboundTyOpener, placeholderHandler,
-                        packElementOpener);
-  result.genericSig = genericSig;
-  return result;
+  return TypeResolution(dc, genericSig, TypeResolutionStage::Interface, options,
+                        unboundTyOpener, placeholderHandler, packElementOpener);
 }
 
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
-  TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler,
-                        packElementOpener);
-  result.genericSig = genericSig;
-  return result;
+  return TypeResolution(dc, genericSig, stage, opts, unboundTyOpener,
+                        placeholderHandler, packElementOpener);
+}
+
+TypeResolution TypeResolution::withoutPackElementOpener() const {
+  return TypeResolution(dc, genericSig, stage, options, unboundTyOpener,
+                        placeholderHandler, {});
 }
 
 ASTContext &TypeResolution::getASTContext() const {
@@ -758,14 +757,32 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     }
 
     // Build ParameterizedProtocolType if the protocol has a primary associated
-    // type and we're in a supported context (for now just generic requirements,
-    // inheritance clause, extension binding).
+    // type and we're in a supported context.
     if (resolution.getOptions().isConstraintImplicitExistential() &&
         !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-      diags.diagnose(loc, diag::existential_requires_any,
-                     protoDecl->getDeclaredInterfaceType(),
-                     protoDecl->getDeclaredExistentialType(),
-                     /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
+
+      if (!genericArgs.empty()) {
+
+        SmallVector<Type, 2> argTys;
+        for (auto *genericArg : genericArgs) {
+          Type argTy = resolution.resolveType(genericArg);
+          if (!argTy || argTy->hasError())
+            return ErrorType::get(ctx);
+
+          argTys.push_back(argTy);
+        }
+
+        auto parameterized =
+            ParameterizedProtocolType::get(ctx, protoType, argTys);
+        diags.diagnose(loc, diag::existential_requires_any, parameterized,
+                       ExistentialType::get(parameterized),
+                       /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
+      } else {
+        diags.diagnose(loc, diag::existential_requires_any,
+                       protoDecl->getDeclaredInterfaceType(),
+                       protoDecl->getDeclaredExistentialType(),
+                       /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
+      }
 
       return ErrorType::get(ctx);
     }
@@ -4530,7 +4547,11 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
 
   auto elementOptions = options;
   elementOptions |= TypeResolutionFlags::AllowPackReferences;
-  auto patternType = resolveType(repr->getPatternType(), elementOptions);
+
+  auto elementResolution =
+      resolution.withoutPackElementOpener().withOptions(elementOptions);
+  auto patternType =
+      elementResolution.resolveType(repr->getPatternType(), silContext);
   if (patternType->hasError())
     return ErrorType::get(ctx);
 
@@ -4572,6 +4593,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
                                                TypeResolutionOptions options) {
   auto &ctx = getASTContext();
   options |= TypeResolutionFlags::FromPackReference;
+
   auto packReference = resolveType(repr->getPackType(), options);
 
   // If we already failed, don't diagnose again.

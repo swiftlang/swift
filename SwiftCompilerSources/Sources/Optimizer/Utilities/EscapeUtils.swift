@@ -75,8 +75,9 @@ extension ProjectedValue {
   /// the walk. See `EscapeVisitor` for details.
   ///
   func isEscaping(using visitor: some EscapeVisitor = DefaultVisitor(),
+                  complexityBudget: Int = Int.max,
                   _ context: some Context) -> Bool {
-    var walker = EscapeWalker(visitor: visitor, context)
+    var walker = EscapeWalker(visitor: visitor, complexityBudget: complexityBudget, context)
     return walker.walkUp(addressOrValue: value, path: path.escapePath) == .abortWalk
   }
 
@@ -287,9 +288,10 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
                                                     AddressUseDefWalker {
   typealias Path = EscapeUtilityTypes.EscapePath
   
-  init(visitor: V, _ context: some Context) {
+  init(visitor: V, complexityBudget: Int = Int.max, _ context: some Context) {
     self.calleeAnalysis = context.calleeAnalysis
     self.visitor = visitor
+    self.complexityBudget = complexityBudget
   }
 
   //===--------------------------------------------------------------------===//
@@ -313,6 +315,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   }
   
   mutating func walkDown(value: Operand, path: Path) -> WalkResult {
+    if complexityBudgetExceeded(value.value) {
+      return .abortWalk
+    }
     if hasRelevantType(value.value, at: path.projectionPath) {
       switch visitor.visitUse(operand: value, path: path) {
       case .continueWalk:
@@ -409,6 +414,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   }
   
   mutating func walkDown(address: Operand, path: Path) -> WalkResult {
+    if complexityBudgetExceeded(address.value) {
+      return .abortWalk
+    }
     if hasRelevantType(address.value, at: path.projectionPath) {
       switch visitor.visitUse(operand: address, path: path) {
       case .continueWalk:
@@ -508,7 +516,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       return .continueWalk
     }
     if !visitor.followLoads && p.matches(pattern: SmallProjectionPath(.anyValueFields).push(.anyClassField)) {
-      // Any address of a class property of the object to destroy cannot esacpe the destructor.
+      // Any address of a class property of the object to destroy cannot escape the destructor.
       // (Whereas a value stored in such a property could escape.)
       return .continueWalk
     }
@@ -644,6 +652,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   }
   
   mutating func walkUp(value: Value, path: Path) -> WalkResult {
+    if complexityBudgetExceeded(value) {
+      return .abortWalk
+    }
     if hasRelevantType(value, at: path.projectionPath) {
       switch visitor.visitDef(def: value, path: path) {
       case .continueWalkUp:
@@ -697,6 +708,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   }
   
   mutating func walkUp(address: Value, path: Path) -> WalkResult {
+    if complexityBudgetExceeded(address) {
+      return .abortWalk
+    }
     if hasRelevantType(address, at: path.projectionPath) {
       switch visitor.visitDef(def: address, path: path) {
       case .continueWalkUp:
@@ -785,6 +799,10 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   var walkDownCache = WalkerCache<Path>()
   var walkUpCache = WalkerCache<Path>()
 
+  // Only this number of up/and down walks are done until the walk aborts.
+  // Used to avoid quadratic complexity in some scenarios.
+  var complexityBudget: Int
+
   private let calleeAnalysis: CalleeAnalysis
   
   //===--------------------------------------------------------------------===//
@@ -823,6 +841,14 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       return path
     }
     return path.popLastClassAndValuesFromTail()
+  }
+
+  private mutating func complexityBudgetExceeded(_ v: Value) -> Bool {
+    if complexityBudget <= 0 {
+      return true
+    }
+    complexityBudget = complexityBudget &- 1
+    return false
   }
 
   // Set a breakpoint here to debug when a value is escaping.

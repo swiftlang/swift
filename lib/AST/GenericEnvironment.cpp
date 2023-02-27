@@ -709,3 +709,24 @@ GenericEnvironment::mapConformanceRefIntoContext(
   auto contextType = mapTypeIntoContext(conformingInterfaceType);
   return {contextType, contextConformance};
 }
+
+OpenedElementContext
+OpenedElementContext::createForContextualExpansion(ASTContext &ctx,
+                                       CanPackExpansionType expansionType) {
+  assert(!expansionType->hasTypeParameter() &&
+         "must be given a contextual type");
+
+  // Get the outer generic signature and environment.
+  auto *genericEnv = cast<ArchetypeType>(expansionType.getCountType())
+                         ->getGenericEnvironment();
+  auto subMap = genericEnv->getForwardingSubstitutionMap();
+
+  auto genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
+  // Create an opened element signature and environment.
+  auto elementSig = ctx.getOpenedElementSignature(
+      genericSig, expansionType.getCountType());
+  auto *elementEnv = GenericEnvironment::forOpenedElement(
+      elementSig, UUID::fromTime(), expansionType.getCountType(), subMap);
+
+  return {elementEnv, elementSig};
+}

@@ -1072,6 +1072,15 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
   return alloc;
 }
 
+SILValue
+SILGenFunction::emitTemporaryPackAllocation(SILLocation loc, SILType ty) {
+  assert(ty.is<SILPackType>());
+  ty = ty.getObjectType();
+  auto *alloc = B.createAllocPack(loc, ty);
+  enterDeallocPackCleanup(alloc);
+  return alloc;
+}
+
 SILValue SILGenFunction::
 getBufferForExprResult(SILLocation loc, SILType ty, SGFContext C) {
   // If you change this, change manageBufferForExprResult below as well.
@@ -4000,7 +4009,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
 
       auto subscript = cast<SubscriptDecl>(decl);
       auto loweredArgs = SGF.emitKeyPathSubscriptOperands(
-          subscript, component.getDeclRef().getSubstitutions(),
+          E, subscript,
+          component.getDeclRef().getSubstitutions(),
           component.getSubscriptArgs());
 
       for (auto &arg : loweredArgs) {

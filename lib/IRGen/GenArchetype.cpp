@@ -116,8 +116,10 @@ public:
     collector.collectTypeMetadataForLayout(T);
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
     return IGM.typeLayoutCache.getOrCreateArchetypeEntry(T.getObjectType());
   }
 };

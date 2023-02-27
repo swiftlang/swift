@@ -259,6 +259,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     case MacroRole::Accessor:
     case MacroRole::MemberAttribute:
     case MacroRole::Peer:
+    case MacroRole::Conformance:
       parentLoc = expansion.getStartLoc();
       break;
     case MacroRole::Member: {

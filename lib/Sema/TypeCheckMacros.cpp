@@ -20,8 +20,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -45,31 +46,31 @@
 using namespace swift;
 
 extern "C" void *swift_ASTGen_resolveMacroType(const void *macroType);
-
 extern "C" void swift_ASTGen_destroyMacro(void *macro);
 
+extern "C" void *swift_ASTGen_resolveExecutableMacro(
+    const char *moduleName, ptrdiff_t moduleNameLength,
+    const char *typeName, ptrdiff_t typeNameLength,
+    void * opaquePluginHandle);
+extern "C" void swift_ASTGen_destroyExecutableMacro(void *macro);
+
 extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
-    void *diagEngine, void *macro,
-    const char *discriminator,
-    ptrdiff_t discriminatorLength,
-    void *sourceFile,
-    const void *sourceLocation,
-    const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
+    void *diagEngine, void *macro, uint8_t externalKind,
+    const char *discriminator, ptrdiff_t discriminatorLength, void *sourceFile,
+    const void *sourceLocation, const char **evaluatedSource,
+    ptrdiff_t *evaluatedSourceLength);
 
 extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
-    void *diagEngine, void *macro,
-    const char *discriminator,
-    ptrdiff_t discriminatorLength,
-    uint32_t rawMacroRole,
-    void *customAttrSourceFile,
-    const void *customAttrSourceLocation,
-    void *declarationSourceFile,
-    const void *declarationSourceLocation,
-    void *parentDeclSourceFile,
-    const void *parentDeclSourceLocation,
-    const char **evaluatedSource,
-    ptrdiff_t *evaluatedSourceLength
-);
+    void *diagEngine, void *macro, uint8_t externalKind,
+    const char *discriminator, ptrdiff_t discriminatorLength,
+    uint8_t rawMacroRole,
+    void *customAttrSourceFile, const void *customAttrSourceLocation,
+    void *declarationSourceFile, const void *declarationSourceLocation,
+    void *parentDeclSourceFile, const void *parentDeclSourceLocation,
+    const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
+
+extern "C" void swift_ASTGen_initializePlugin(void *handle);
+extern "C" void swift_ASTGen_deinitializePlugin(void *handle);
 
 /// Produce the mangled name for the nominal type descriptor of a type
 /// referenced by its module and type name.
@@ -346,19 +347,51 @@ resolveInProcessMacro(
         swift_ASTGen_destroyMacro(inProcess);
       });
 
-      return ExternalMacroDefinition{inProcess};
+      return ExternalMacroDefinition{
+          ExternalMacroDefinition::PluginKind::InProcess, inProcess};
     }
+  }
+#endif
+  return None;
+}
+
+static Optional<ExternalMacroDefinition>
+resolveExecutableMacro(ASTContext &ctx, Identifier moduleName,
+                      Identifier typeName) {
+#if SWIFT_SWIFT_PARSER
+  // Find macros in exectuable plugins.
+  auto *executablePlugin =
+      ctx.lookupExecutablePluginByModuleName(moduleName);
+  if (!executablePlugin)
+    return None;
+
+  // FIXME: Ideally this should be done right after invoking the plugin.
+  // But plugin loading is in libAST and it can't link ASTGen symbols.
+  if (!executablePlugin->isInitialized()) {
+    swift_ASTGen_initializePlugin(executablePlugin);
+    executablePlugin->setCleanup([executablePlugin] {
+      swift_ASTGen_deinitializePlugin(executablePlugin);
+    });
+  }
+
+  if (auto *execMacro = swift_ASTGen_resolveExecutableMacro(
+          moduleName.str().data(), moduleName.str().size(),
+          typeName.str().data(), typeName.str().size(), executablePlugin)) {
+    // Make sure we clean up after the macro.
+    ctx.addCleanup(
+        [execMacro]() { swift_ASTGen_destroyExecutableMacro(execMacro); });
+    return ExternalMacroDefinition{
+        ExternalMacroDefinition::PluginKind::Executable, execMacro};
   }
 #endif
 
   return None;
 }
 
-ExternalMacroDefinition
-ExternalMacroDefinitionRequest::evaluate(
-    Evaluator &evaluator, ASTContext *ctx,
-    Identifier moduleName, Identifier typeName
-) const {
+Optional<ExternalMacroDefinition>
+ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                         Identifier moduleName,
+                                         Identifier typeName) const {
   // Try to load a plugin module from the plugin search paths. If it
   // succeeds, resolve in-process from that plugin
   CompilerPluginLoadRequest loadRequest{ctx, moduleName};
@@ -373,7 +406,13 @@ ExternalMacroDefinitionRequest::evaluate(
   if (auto inProcess = resolveInProcessMacro(*ctx, moduleName, typeName))
     return *inProcess;
 
-  return ExternalMacroDefinition{nullptr};
+  // Try executable plugins.
+  if (auto executableMacro =
+          resolveExecutableMacro(*ctx, moduleName, typeName)) {
+    return executableMacro;
+  }
+
+  return None;
 }
 
 /// Adjust the given mangled name for a macro expansion to produce a valid
@@ -518,10 +557,8 @@ Expr *swift::expandMacroExpr(
     ExternalMacroDefinitionRequest request{
       &ctx, external.moduleName, external.macroTypeName
     };
-    auto externalDef = evaluateOrDefault(
-        ctx.evaluator, request, ExternalMacroDefinition()
-    );
-    if (!externalDef.opaqueHandle) {
+    auto externalDef = evaluateOrDefault(ctx.evaluator, request, None);
+    if (!externalDef) {
       ctx.Diags.diagnose(
          expr->getLoc(), diag::external_macro_not_found,
          external.moduleName.str(),
@@ -554,11 +591,11 @@ Expr *swift::expandMacroExpr(
     const char *evaluatedSourceAddress;
     ptrdiff_t evaluatedSourceLength;
     swift_ASTGen_expandFreestandingMacro(
-        &ctx.Diags,
-        externalDef.opaqueHandle,
-        discriminator.data(), discriminator.size(),
-        astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
-        &evaluatedSourceAddress, &evaluatedSourceLength);
+        &ctx.Diags, externalDef->opaqueHandle,
+        static_cast<uint32_t>(externalDef->kind), discriminator.data(),
+        discriminator.size(), astGenSourceFile,
+        expr->getStartLoc().getOpaquePointerValue(), &evaluatedSourceAddress,
+        &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
       return nullptr;
     evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
@@ -690,10 +727,8 @@ bool swift::expandFreestandingDeclarationMacro(
     ExternalMacroDefinitionRequest request{
         &ctx, external.moduleName, external.macroTypeName
     };
-    auto externalDef = evaluateOrDefault(
-        ctx.evaluator, request, ExternalMacroDefinition()
-    );
-    if (!externalDef.opaqueHandle) {
+    auto externalDef = evaluateOrDefault(ctx.evaluator, request, None);
+    if (!externalDef) {
       med->diagnose(diag::external_macro_not_found,
                     external.moduleName.str(),
                     external.macroTypeName.str(),
@@ -723,11 +758,11 @@ bool swift::expandFreestandingDeclarationMacro(
     const char *evaluatedSourceAddress;
     ptrdiff_t evaluatedSourceLength;
     swift_ASTGen_expandFreestandingMacro(
-        &ctx.Diags,
-        externalDef.opaqueHandle,
-        discriminator.data(), discriminator.size(),
-        astGenSourceFile, med->getStartLoc().getOpaquePointerValue(),
-        &evaluatedSourceAddress, &evaluatedSourceLength);
+        &ctx.Diags, externalDef->opaqueHandle,
+        static_cast<uint32_t>(externalDef->kind), discriminator.data(),
+        discriminator.size(), astGenSourceFile,
+        med->getStartLoc().getOpaquePointerValue(), &evaluatedSourceAddress,
+        &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
       return false;
     evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
@@ -824,6 +859,9 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   DeclContext *dc;
   if (role == MacroRole::Peer) {
     dc = attachedTo->getDeclContext();
+  } else if (role == MacroRole::Conformance) {
+    // Conformance macros always expand to extensions at file-scope.
+    dc = attachedTo->getDeclContext()->getParentSourceFile();
   } else {
     dc = attachedTo->getInnermostDeclContext();
   }
@@ -888,10 +926,8 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
     ExternalMacroDefinitionRequest request{
         &ctx, external.moduleName, external.macroTypeName
     };
-    auto externalDef = evaluateOrDefault(
-        ctx.evaluator, request, ExternalMacroDefinition()
-    );
-    if (!externalDef.opaqueHandle) {
+    auto externalDef = evaluateOrDefault(ctx.evaluator, request, None);
+    if (!externalDef) {
       attachedTo->diagnose(diag::external_macro_not_found,
                         external.moduleName.str(),
                         external.macroTypeName.str(),
@@ -941,14 +977,13 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
     const char *evaluatedSourceAddress;
     ptrdiff_t evaluatedSourceLength;
     swift_ASTGen_expandAttachedMacro(
-        &ctx.Diags,
-        externalDef.opaqueHandle,
-        discriminator.data(), discriminator.size(),
-        static_cast<uint32_t>(role),
-        astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
-        astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
-        astGenParentDeclSourceFile, parentDeclLoc,
-        &evaluatedSourceAddress, &evaluatedSourceLength);
+        &ctx.Diags, externalDef->opaqueHandle,
+        static_cast<uint32_t>(externalDef->kind), discriminator.data(),
+        discriminator.size(), static_cast<uint32_t>(role), astGenAttrSourceFile,
+        attr->AtLoc.getOpaquePointerValue(), astGenDeclSourceFile,
+        searchDecl->getStartLoc().getOpaquePointerValue(),
+        astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceAddress,
+        &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
       return nullptr;
     evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
@@ -1035,6 +1070,14 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
 
   case MacroRole::Peer: {
     generatedSourceKind = GeneratedSourceInfo::PeerMacroExpansion;
+    SourceLoc afterDeclLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, attachedTo->getEndLoc());
+    generatedOriginalSourceRange = CharSourceRange(afterDeclLoc, 0);
+    break;
+  }
+
+  case MacroRole::Conformance: {
+    generatedSourceKind = GeneratedSourceInfo::ConformanceMacroExpansion;
     SourceLoc afterDeclLoc =
         Lexer::getLocForEndOfToken(sourceMgr, attachedTo->getEndLoc());
     generatedOriginalSourceRange = CharSourceRange(afterDeclLoc, 0);
@@ -1195,6 +1238,72 @@ swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
     } else if (auto *extension = dyn_cast<ExtensionDecl>(parent)) {
       extension->addMember(peer);
     }
+  }
+
+  return macroSourceFile->getBufferID();
+}
+
+ArrayRef<unsigned>
+ExpandConformanceMacros::evaluate(Evaluator &evaluator,
+                                  NominalTypeDecl *nominal) const {
+  SmallVector<unsigned, 2> bufferIDs;
+  nominal->forEachAttachedMacro(MacroRole::Conformance,
+      [&](CustomAttr *attr, MacroDecl *macro) {
+        if (auto bufferID = expandConformances(attr, macro, nominal))
+          bufferIDs.push_back(*bufferID);
+      });
+
+  return nominal->getASTContext().AllocateCopy(bufferIDs);
+}
+
+Optional<unsigned>
+swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
+                          NominalTypeDecl *nominal) {
+  auto macroSourceFile =
+      evaluateAttachedMacro(macro, nominal, attr,
+                            /*passParentContext*/false,
+                            MacroRole::Conformance);
+
+  if (!macroSourceFile)
+    return None;
+
+  PrettyStackTraceDecl debugStack(
+      "applying expanded conformance macro", nominal);
+
+  auto topLevelDecls = macroSourceFile->getTopLevelDecls();
+  for (auto *decl : topLevelDecls) {
+    auto *extension = dyn_cast<ExtensionDecl>(decl);
+    if (!extension)
+      continue;
+
+    auto &extensionCtx = extension->getASTContext();
+
+    // Bind the extension to the original nominal type.
+    extension->setExtendedNominal(nominal);
+
+    // Resolve the protocol type.
+    assert(extension->getInherited().size() == 1);
+    auto inheritedType = evaluateOrDefault(
+        extensionCtx.evaluator,
+        InheritedTypeRequest{extension, 0, TypeResolutionStage::Interface},
+        Type());
+
+    if (!inheritedType || inheritedType->hasError())
+      continue;
+
+    auto protocolType = inheritedType->getAs<ProtocolType>();
+    if (!protocolType)
+      continue;
+
+    // Create a synthesized conformance and register it with the nominal type.
+    auto conformance = extensionCtx.getConformance(
+        nominal->getDeclaredInterfaceType(), protocolType->getDecl(),
+        nominal->getLoc(), extension, ProtocolConformanceState::Incomplete,
+        /*isUnchecked=*/false);
+    conformance->setSourceKindAndImplyingConformance(
+        ConformanceEntryKind::Synthesized, nullptr);
+
+    nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
   }
 
   return macroSourceFile->getBufferID();

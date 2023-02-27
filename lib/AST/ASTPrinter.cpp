@@ -3110,6 +3110,10 @@ static bool usesFeatureLayoutPrespecialization(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureLayoutStringValueWitnesses(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureModuleInterfaceExportAs(Decl *decl) {
   return false;
 }

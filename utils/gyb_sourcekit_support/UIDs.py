@@ -202,6 +202,7 @@ UID_KEYS = [
     # in this time. For cancellation testing purposes.
     KEY('SimulateLongRequest', 'key.simulate_long_request'),
     KEY('IsSynthesized', 'key.is_synthesized'),
+    KEY('BufferName', 'key.buffer_name')
 ]
 
 

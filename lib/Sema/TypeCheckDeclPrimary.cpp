@@ -2038,10 +2038,8 @@ public:
       ExternalMacroDefinitionRequest request{
         &Ctx, external.moduleName, external.macroTypeName
       };
-      auto externalDef = evaluateOrDefault(
-          Ctx.evaluator, request, ExternalMacroDefinition()
-      );
-      if (!externalDef.opaqueHandle) {
+      auto externalDef = evaluateOrDefault(Ctx.evaluator, request, None);
+      if (!externalDef) {
         MD->diagnose(
             diag::external_macro_not_found,
             external.moduleName.str(),

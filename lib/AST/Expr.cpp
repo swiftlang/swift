@@ -2224,24 +2224,29 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
   return new (C) TypeExpr(TR);
 }
 
-TypeExpr *TypeExpr::createForMemberDecl(DeclRefTypeRepr *ParentTR,
-                                        DeclNameLoc NameLoc, TypeDecl *Decl) {
+TypeExpr *TypeExpr::createForMemberDecl(TypeRepr *ParentTR, DeclNameLoc NameLoc,
+                                        TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
-
-  // Create a new list of components.
-  SmallVector<IdentTypeRepr *, 2> Components;
-  if (auto *MemberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
-    auto MemberComps = MemberTR->getMemberComponents();
-    Components.append(MemberComps.begin(), MemberComps.end());
-  }
 
   // Add a new component for the member we just found.
   auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc, Decl->createNameRef());
   NewComp->setValue(Decl, nullptr);
-  Components.push_back(NewComp);
 
-  auto *TR =
-      MemberTypeRepr::create(C, ParentTR->getBaseComponent(), Components);
+  TypeRepr *TR = nullptr;
+  if (auto *DeclRefTR = dyn_cast<DeclRefTypeRepr>(ParentTR)) {
+    // Create a new list of components.
+    SmallVector<IdentTypeRepr *, 4> Components;
+    if (auto *MemberTR = dyn_cast<MemberTypeRepr>(ParentTR)) {
+      auto MemberComps = MemberTR->getMemberComponents();
+      Components.append(MemberComps.begin(), MemberComps.end());
+    }
+
+    Components.push_back(NewComp);
+    TR = MemberTypeRepr::create(C, DeclRefTR->getBaseComponent(), Components);
+  } else {
+    TR = MemberTypeRepr::create(C, ParentTR, NewComp);
+  }
+
   return new (C) TypeExpr(TR);
 }
 

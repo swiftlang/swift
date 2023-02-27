@@ -145,10 +145,16 @@ protocol Collection<T> {
   associatedtype T
 }
 
+struct TestParameterizedProtocol<T> : Collection {
+  typealias T = T
+
+  let x : Collection<T> // expected-error {{use of protocol 'Collection<T>' as a type must be written 'any Collection<T>'}}
+}
+
 func acceptAny(_: Collection<Int>) {}
-// expected-error@-1 {{use of protocol 'Collection' as a type must be written 'any Collection'}}
+// expected-error@-1 {{use of protocol 'Collection<Int>' as a type must be written 'any Collection<Int>'}}
 func returnsAny() -> Collection<Int> {}
-// expected-error@-1 {{use of protocol 'Collection' as a type must be written 'any Collection'}}
+// expected-error@-1 {{use of protocol 'Collection<Int>' as a type must be written 'any Collection<Int>'}}
 
 func testInvalidAny() {
   struct S: HasAssoc {

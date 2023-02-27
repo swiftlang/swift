@@ -434,6 +434,22 @@ struct IsDeinitBarrierTest : UnitTest {
   }
 };
 
+// Arguments:
+// - value
+// Dumps:
+// - value
+// - whether it's lexical
+struct IsLexicalTest : UnitTest {
+  IsLexicalTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto value = arguments.takeValue();
+    auto isLexical = value->isLexical();
+    value->dump();
+    auto *boolString = isLexical ? "true" : "false";
+    llvm::errs() << boolString << "\n";
+  }
+};
+
 struct ShrinkBorrowScopeTest : UnitTest {
   ShrinkBorrowScopeTest(UnitTestRunner *pass) : UnitTest(pass) {}
   void invoke(Arguments &arguments) override {
@@ -759,6 +775,7 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index", FunctionGetSelfArgumentIndex)
     ADD_UNIT_TEST_SUBCLASS("interior-liveness", InteriorLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
+    ADD_UNIT_TEST_SUBCLASS("is-lexical", IsLexicalTest)
     ADD_UNIT_TEST_SUBCLASS("linear-liveness", LinearLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("multidef-liveness", MultiDefLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("pruned-liveness-boundary-with-list-of-last-users-insertion-points", PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)

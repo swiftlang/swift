@@ -109,7 +109,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<bool> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$sSbN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -119,7 +119,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<int8_t> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss4Int8VN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -129,7 +129,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<uint8_t> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss5UInt8VN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -139,7 +139,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<int16_t> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss5Int16VN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -149,7 +149,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<uint16_t> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss6UInt16VN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -159,7 +159,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<int32_t> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss5Int32VN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -169,7 +169,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<uint32_t> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss6UInt32VN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -179,7 +179,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<int64_t> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss5Int64VN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -189,7 +189,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<uint64_t> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss6UInt64VN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -199,7 +199,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<float> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$sSfN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -209,7 +209,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<double> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$sSdN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -219,7 +219,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<void *> {
-// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss13OpaquePointerVN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };

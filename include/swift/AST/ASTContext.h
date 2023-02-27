@@ -79,6 +79,7 @@ namespace swift {
   class DifferentiableAttr;
   class ExtensionDecl;
   struct ExternalSourceLocs;
+  class LoadedExecutablePlugin;
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
@@ -91,6 +92,7 @@ namespace swift {
   class ModuleDependencyInfo;
   class PatternBindingDecl;
   class PatternBindingInitializer;
+  class PluginRegistry;
   class SourceFile;
   class SourceLoc;
   class Type;
@@ -1457,6 +1459,16 @@ public:
   void *getAddressOfSymbol(const char *name, void *libraryHandleHint = nullptr);
   
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
+
+  LoadedExecutablePlugin *
+  lookupExecutablePluginByModuleName(Identifier moduleName);
+
+  /// Get the plugin registry this ASTContext is using.
+  PluginRegistry *getPluginRegistry() const;
+
+  /// Set the plugin registory this ASTContext should use.
+  /// This should be called before any plugin is loaded.
+  void setPluginRegistry(PluginRegistry *newValue);
 
 private:
   friend Decl;

@@ -619,6 +619,7 @@ enum class MacroRole : uint8_t {
   MemberAttribute,
   Member,
   Peer,
+  Conformance,
 };
 using MacroRoleField = BCFixed<3>;
 

@@ -1,5 +1,3 @@
-// REQUIRES: rdar104716322
-
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
 
 // REQUIRES: asserts
@@ -22,5 +20,7 @@ func g<T...>(_: repeat each T) {
   _ = ((repeat each T) -> ()).self
   _ = ((Int, repeat Array<each T>) -> ()).self
 
-  _ = (repeat each Int).self // expected-error {{variadic expansion 'Int' must contain at least one variadic generic parameter}}
+  _ = (repeat each Int).self
+  // expected-error@-1 {{variadic expansion 'Int' must contain at least one variadic generic parameter}}
+  // expected-error@-2 {{'each' cannot be applied to non-pack type 'Int'}}
 }
