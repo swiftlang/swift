@@ -956,6 +956,14 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
       // nextBB will point to the last inlined block
       SILBasicBlock *lastBB =
           Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
+
+      // When inlining an OSSA function into a non-OSSA function, ownership of
+      // nonescaping closures is lowered.  At that point, they are recognized
+      // as stack users.  Since they weren't recognized as such before, they
+      // may not satisfy stack discipline.  Fix that up now.
+      invalidatedStackNesting |=
+          (CalleeFunction->hasOwnership() && !F->hasOwnership());
+
       if (SILPrintInliningCallerAfter) {
         printInliningDetailsCallerAfter("MandatoryInlining", F, CalleeFunction);
       }
