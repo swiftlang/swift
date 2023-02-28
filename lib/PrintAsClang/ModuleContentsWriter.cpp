@@ -289,12 +289,14 @@ public:
       return;
     auto it = seenClangTypes.insert(clangType.getTypePtr());
     if (it.second)
-      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
+      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M,
+                                                              printer);
   }
 
   void forwardDeclareCxxValueTypeIfNeeded(const NominalTypeDecl *NTD) {
-    forwardDeclare(NTD,
-                   [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+    forwardDeclare(NTD, [&]() {
+      ClangValueTypePrinter::forwardDeclType(os, NTD, printer);
+    });
   }
 
   void forwardDeclareType(const TypeDecl *TD) {

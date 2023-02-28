@@ -119,6 +119,7 @@ public:
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
   void printCxxMethod(
+      DeclAndTypePrinter &declAndTypePrinter,
       const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
       const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
       Type resultTy, bool isStatic, bool isDefinition,
@@ -126,6 +127,7 @@ public:
 
   /// Print the C++ getter/setter method signature.
   void printCxxPropertyAccessorMethod(
+      DeclAndTypePrinter &declAndTypePrinter,
       const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
       const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
       Type resultTy, bool isStatic, bool isDefinition,
@@ -133,6 +135,7 @@ public:
 
   /// Print the C++ subscript method.
   void printCxxSubscriptAccessorMethod(
+      DeclAndTypePrinter &declAndTypePrinter,
       const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
       const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
       Type resultTy, bool isDefinition,
