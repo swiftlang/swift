@@ -102,7 +102,7 @@ class OpaqueArchetypeTypeInfo
   : public ResilientTypeInfo<OpaqueArchetypeTypeInfo>
 {
   OpaqueArchetypeTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
-      : ResilientTypeInfo(type, abiAccessible) {}
+      : ResilientTypeInfo(type, IsCopyable, abiAccessible) {}
 
 public:
   static const OpaqueArchetypeTypeInfo *

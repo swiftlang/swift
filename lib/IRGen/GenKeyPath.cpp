@@ -365,7 +365,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       ? genericEnv->mapTypeIntoContext(IGM.getSILModule(), component.LoweredType)
       : component.LoweredType;
     auto &ti = IGM.getTypeInfo(ty);
-    isTrivial &= ti.isPOD(ResilienceExpansion::Minimal);
+    isTrivial &= ti.isTriviallyDestroyable(ResilienceExpansion::Minimal);
   }
   
   llvm::Constant *destroy = nullptr;

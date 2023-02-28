@@ -43,7 +43,8 @@ public:
   ExecutorTypeInfo(llvm::StructType *storageType,
                    Size size, Alignment align, SpareBitVector &&spareBits)
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits),
-                                  align, IsPOD, IsFixedSize) {}
+                                  align, IsTriviallyDestroyable,
+                                  IsCopyable, IsFixedSize) {}
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
@@ -60,7 +61,7 @@ public:
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                      ScalarKind::POD);
+                                            ScalarKind::TriviallyDestroyable);
   }
 
   static Size getSecondElementOffset(IRGenModule &IGM) {
