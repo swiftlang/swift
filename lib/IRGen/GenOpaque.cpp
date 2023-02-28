@@ -965,13 +965,13 @@ llvm::Value *irgen::emitLoadOfAlignmentMask(IRGenFunction &IGF, SILType T) {
   return emitAlignMaskFromFlags(IGF, flags);
 }
 
-/// Load the 'isPOD' valueWitness from the given table as an i1.
-llvm::Value *irgen::emitLoadOfIsPOD(IRGenFunction &IGF, SILType T) {
+/// Load the 'isTriviallyDestroyable' valueWitness from the given table as an i1.
+llvm::Value *irgen::emitLoadOfIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) {
   auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
   auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsNonPOD);
   auto masked = IGF.Builder.CreateAnd(flags, mask);
   return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getInt32(0),
-                                  flags->getName() + ".isPOD");
+                                  flags->getName() + ".isTriviallyDestroyable");
 }
 
 /// Load the 'isBitwiseTakable' valueWitness from the given table as an i1.

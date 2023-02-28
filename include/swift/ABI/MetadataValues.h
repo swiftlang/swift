@@ -163,7 +163,8 @@ public:
     IsNonBitwiseTakable = 0x00100000,
     HasEnumWitnesses =    0x00200000,
     Incomplete =          0x00400000,
-    // unused             0xFF800000,
+    IsNonCopyable =       0x00800000,
+    // unused             0xFF000000,
   };
 
   static constexpr const uint32_t MaxNumExtraInhabitants = 0x7FFFFFFF;
@@ -209,8 +210,8 @@ public:
                                    (isInline ? 0 : IsNonInline));
   }
 
-  /// True if values of this type can be copied with memcpy and
-  /// destroyed with a no-op.
+  /// True if values of this type can be copied with memcpy (if it's copyable)
+  /// and destroyed with a no-op.
   bool isPOD() const { return !(Data & IsNonPOD); }
   constexpr TargetValueWitnessFlags withPOD(bool isPOD) const {
     return TargetValueWitnessFlags((Data & ~IsNonPOD) |
@@ -226,6 +227,13 @@ public:
   constexpr TargetValueWitnessFlags withBitwiseTakable(bool isBT) const {
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
+  }
+  
+  /// True if values of this type can be copied.
+  bool isCopyable() const { return !(Data & IsNonCopyable); }
+  constexpr TargetValueWitnessFlags withCopyable(bool isCopyable) const {
+    return TargetValueWitnessFlags((Data & ~IsNonCopyable) |
+                                   (isCopyable ? 0 : IsNonCopyable));
   }
 
   /// True if this type's binary representation is that of an enum, and the

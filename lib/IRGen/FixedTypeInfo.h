@@ -42,10 +42,12 @@ private:
 protected:
   FixedTypeInfo(llvm::Type *type, Size size,
                 const SpareBitVector &spareBits,
-                Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
+                Alignment align, IsTriviallyDestroyable_t pod,
+                IsBitwiseTakable_t bt,
+                IsCopyable_t copy,
                 IsFixedSize_t alwaysFixedSize,
                 SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
-      : TypeInfo(type, align, pod, bt, alwaysFixedSize, IsABIAccessible, stik),
+      : TypeInfo(type, align, pod, bt, copy, alwaysFixedSize, IsABIAccessible, stik),
         SpareBits(spareBits) {
     assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
@@ -55,10 +57,12 @@ protected:
 
   FixedTypeInfo(llvm::Type *type, Size size,
                 SpareBitVector &&spareBits,
-                Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
+                Alignment align, IsTriviallyDestroyable_t pod,
+                IsBitwiseTakable_t bt,
+                IsCopyable_t copy,
                 IsFixedSize_t alwaysFixedSize,
                 SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
-      : TypeInfo(type, align, pod, bt, alwaysFixedSize, IsABIAccessible, stik),
+      : TypeInfo(type, align, pod, bt, copy, alwaysFixedSize, IsABIAccessible, stik),
         SpareBits(std::move(spareBits)) {
     assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
@@ -90,7 +94,7 @@ public:
   llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override;
-  llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override;
