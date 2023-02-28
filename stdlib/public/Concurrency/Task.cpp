@@ -1520,7 +1520,7 @@ swift_task_addCancellationHandlerImpl(
 SWIFT_CC(swift)
 static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
-  removeStatusRecord(record);
+  removeStatusRecordFromSelf(record);
   swift_task_dealloc(record);
 }
 
