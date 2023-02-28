@@ -3284,10 +3284,21 @@ namespace {
       auto fromType = CS.getType(expr->getSubExpr());
       auto locator = CS.getConstraintLocator(expr);
 
-      // Add a conversion constraint for the direct conversion between
-      // types.
-      CS.addExplicitConversionConstraint(fromType, toType, RememberChoice,
-                                         locator);
+      // Literal initialization (e.g. `UInt32(0)`) doesn't require
+      // a conversion because the literal is supposed to assume the
+      // `to` type.
+      //
+      // `to` type could be a type variable if i.e. the repr is invalid,
+      // in such cases a slower conversion path is a better choice to
+      // let it be inferred from the context and/or from the literal itself.
+      if (expr->isLiteralInit() && !toType->isTypeVariableOrMember()) {
+        CS.addConstraint(ConstraintKind::Equal, fromType, toType, locator);
+      } else {
+        // Add a conversion constraint for the direct conversion between
+        // types.
+        CS.addExplicitConversionConstraint(fromType, toType, RememberChoice,
+                                           locator);
+      }
 
       // If the result type was declared IUO, add a disjunction for
       // bindings for the result of the coercion.
