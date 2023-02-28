@@ -314,7 +314,7 @@ public protocol KeyedEncodingContainerProtocol {
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  mutating func encode<T: Encodable>(_ value: T, forKey key: Key) throws
+  mutating func encode(_ value: some Encodable, forKey key: Key) throws
 
   /// Encodes a reference to the given object only if it is encoded
   /// unconditionally elsewhere in the payload (previously, or in the future).
@@ -326,8 +326,8 @@ public protocol KeyedEncodingContainerProtocol {
   /// - parameter key: The key to associate the object with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  mutating func encodeConditional<T: AnyObject & Encodable>(
-    _ object: T,
+  mutating func encodeConditional(
+    _ object: some AnyObject & Encodable,
     forKey key: Key
   ) throws
 
@@ -449,8 +449,8 @@ public protocol KeyedEncodingContainerProtocol {
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  mutating func encodeIfPresent<T: Encodable>(
-    _ value: T?,
+  mutating func encodeIfPresent(
+    _ value: (some Encodable)?,
     forKey key: Key
   ) throws
 
@@ -671,8 +671,8 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  public mutating func encode<T: Encodable>(
-    _ value: T,
+  public mutating func encode(
+    _ value: some Encodable,
     forKey key: Key
   ) throws {
     try _box.encode(value, forKey: key)
@@ -688,8 +688,8 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   /// - parameter key: The key to associate the object with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  public mutating func encodeConditional<T: AnyObject & Encodable>(
-    _ object: T,
+  public mutating func encodeConditional(
+    _ object: some AnyObject & Encodable,
     forKey key: Key
   ) throws {
     try _box.encodeConditional(object, forKey: key)
@@ -883,8 +883,8 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  public mutating func encodeIfPresent<T: Encodable>(
-    _ value: T?,
+  public mutating func encodeIfPresent(
+    _ value: (some Encodable)?,
     forKey key: Key
   ) throws {
     try _box.encodeIfPresent(value, forKey: key)
@@ -2240,7 +2240,7 @@ public protocol UnkeyedEncodingContainer {
   /// - parameter value: The value to encode.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  mutating func encode<T: Encodable>(_ value: T) throws
+  mutating func encode(_ value: some Encodable) throws
 
   /// Encodes a reference to the given object only if it is encoded
   /// unconditionally elsewhere in the payload (previously, or in the future).
@@ -2254,7 +2254,7 @@ public protocol UnkeyedEncodingContainer {
   /// - parameter object: The object to encode.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  mutating func encodeConditional<T: AnyObject & Encodable>(_ object: T) throws
+  mutating func encodeConditional(_ object: some AnyObject & Encodable) throws
 
   /// Encodes the elements of the given sequence.
   ///
@@ -2964,7 +2964,7 @@ public protocol SingleValueEncodingContainer {
   ///   the current context for this format.
   /// - precondition: May not be called after a previous `self.encode(_:)`
   ///   call.
-  mutating func encode<T: Encodable>(_ value: T) throws
+  mutating func encode(_ value: some Encodable) throws
 }
 
 /// A container that can support the storage and direct decoding of a single
@@ -5749,8 +5749,8 @@ extension Dictionary: Decodable where Key: Decodable, Value: Decodable {
 // Default implementation of encodeConditional(_:forKey:) in terms of
 // encode(_:forKey:)
 extension KeyedEncodingContainerProtocol {
-  public mutating func encodeConditional<T: AnyObject & Encodable>(
-    _ object: T,
+  public mutating func encodeConditional(
+    _ object: some AnyObject & Encodable,
     forKey key: Key
   ) throws {
     try encode(object, forKey: key)
@@ -5872,8 +5872,8 @@ extension KeyedEncodingContainerProtocol {
     try encode(value, forKey: key)
   }
 
-  public mutating func encodeIfPresent<T: Encodable>(
-    _ value: T?,
+  public mutating func encodeIfPresent(
+    _ value: (some Encodable)?,
     forKey key: Key
   ) throws {
     guard let value = value else { return }
@@ -6023,8 +6023,8 @@ extension KeyedDecodingContainerProtocol {
 // Default implementation of encodeConditional(_:) in terms of encode(_:),
 // and encode(contentsOf:) in terms of encode(_:) loop.
 extension UnkeyedEncodingContainer {
-  public mutating func encodeConditional<T: AnyObject & Encodable>(
-    _ object: T
+  public mutating func encodeConditional(
+    _ object: some AnyObject & Encodable
   ) throws {
     try self.encode(object)
   }
