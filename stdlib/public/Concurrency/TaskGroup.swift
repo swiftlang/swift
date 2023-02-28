@@ -616,6 +616,35 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   }
 
   /// Wait for all of the group's remaining tasks to complete.
+  ///
+  /// If any of the tasks throw, the *first* error thrown is captured
+  /// and re-thrown by this method although the task group is *not* cancelled
+  /// when this happens.
+  ///
+  /// ### Cancelling the task group on first error
+  ///
+  /// If you want to cancel the task group, and all "sibling" tasks,
+  /// whenever any of child tasks throws an error, use the following pattern instead:
+  ///
+  /// ```
+  /// while !group.isEmpty {
+  ///     do {
+  ///         try await group.next()
+  ///     } catch is CancellationError {
+  ///         // we decide that cancellation errors thrown by children,
+  ///         // should not cause cancellation of the entire group.
+  ///         continue;
+  ///     } catch {
+  ///         // other errors though we print and cancel the group,
+  ///         // and all of the remaining child tasks within it.
+  ///         group.cancelAll()
+  ///     }
+  /// }
+  /// assert(group.isEmpty())
+  /// ```
+  ///
+  /// - Throws: The *first* error that was thrown by a child task during draining all the tasks.
+  ///           This first error is stored until all other tasks have completed, and is re-thrown afterwards.
   @_alwaysEmitIntoClient
   public mutating func waitForAll() async throws {
     var firstError: Error? = nil
