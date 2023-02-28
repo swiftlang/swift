@@ -74,7 +74,7 @@ bool _swift_exists(const char *path);
 
 SWIFT_RUNTIME_EXPORT
 const char *
-swift_getRuntimePath()
+swift_getRuntimeLibraryPath()
 {
   swift::once(runtimePathToken, _swift_initRuntimePath, nullptr);
   return runtimePath;
@@ -121,7 +121,7 @@ _swift_lookingAtBin(const char *ptr, const char *base)
 const char *
 _swift_getDefaultRootPath()
 {
-  const char *runtimePath = swift_getRuntimePath();
+  const char *runtimePath = swift_getRuntimeLibraryPath();
   size_t runtimePathLen = std::strlen(runtimePath);
 
   // Scan backwards until we find a path separator
@@ -357,7 +357,7 @@ _swift_win32NameFromNTName(LPWSTR pszFilename) {
 
 SWIFT_RUNTIME_EXPORT
 const char *
-swift_getAuxiliaryExecutablePath(const char *name)
+swift_copyAuxiliaryExecutablePath(const char *name)
 {
   const char *rootPath = swift_getRootPath();
 

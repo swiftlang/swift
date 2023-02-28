@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -60,7 +61,7 @@ containsLibSwift(const char *path) {
 }
 
 int main(void) {
-  const char *runtimePath = swift_getRuntimePath();
+  const char *runtimePath = swift_getRuntimeLibraryPath();
 
   // Runtime path must point to libswiftCore and must be a file.
 
@@ -89,12 +90,14 @@ int main(void) {
   printf("root path contains /lib/swift/: %s\n",
          containsLibSwift(rootPath) ? "yes" : "no");
 
-  const char *auxPath = swift_getAuxiliaryExecutablePath("Foo");
+  const char *auxPath = swift_copyAuxiliaryExecutablePath("Foo");
 
   // CHECK: aux path: <NULL>
   // CHECK-FR: aux path: {{.*[\\/]libexec[\\/]swift[\\/]Foo(\.exe)?}}
 
   printf("aux path: %s\n", auxPath ? auxPath : "<NULL>");
+
+  free(auxPath);
 
   return 0;
 }

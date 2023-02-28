@@ -28,7 +28,7 @@
 ///         owned by the runtime and should not be freed.
 SWIFT_RUNTIME_EXPORT
 const char *
-swift_getRuntimePath();
+swift_getRuntimeLibraryPath();
 
 /// Return the path of the Swift root.
 ///
@@ -40,7 +40,8 @@ swift_getRuntimePath();
 ///
 /// \return A string containing the full path to the Swift root directory, based
 ///         either on the location of the Swift runtime, or on the `SWIFT_ROOT`
-///         environment variable if set.
+///         environment variable if set.  The string is owned by the runtime
+///         and should not be freed.
 SWIFT_RUNTIME_EXPORT
 const char *
 swift_getRootPath();
@@ -73,6 +74,6 @@ swift_getRootPath();
 ///         should be released with `free()` when no longer required.
 SWIFT_RUNTIME_EXPORT
 const char *
-swift_getAuxiliaryExecutablePath(const char *name);
+swift_copyAuxiliaryExecutablePath(const char *name);
 
 #endif // SWIFT_RUNTIME_PATHS_H
