@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
 import Swift
 
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// An asynchronous sequence generated from an error-throwing closure that
 /// calls a continuation to produce new elements.
 ///
