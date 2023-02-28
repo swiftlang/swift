@@ -1996,6 +1996,14 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
                diag::expose_unsupported_client_emission_to_cxx,
                VD->getDescriptiveKind(), VD);
       break;
+    case UnrepresentableGeneric:
+      diagnose(attr->getLocation(), diag::expose_generic_decl_to_cxx,
+               VD->getDescriptiveKind(), VD);
+      break;
+    case UnrepresentableGenericRequirements:
+      diagnose(attr->getLocation(), diag::expose_generic_requirement_to_cxx,
+               VD->getDescriptiveKind(), VD);
+      break;
     }
   }
 

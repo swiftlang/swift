@@ -69,6 +69,8 @@ enum RepresentationError {
   UnrepresentableAsync,
   UnrepresentableIsolatedInActor,
   UnrepresentableRequiresClientEmission,
+  UnrepresentableGeneric,
+  UnrepresentableGenericRequirements
 };
 
 struct DeclRepresentation {
