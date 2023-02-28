@@ -843,10 +843,9 @@ public:
 
     // If we have a no implicit copy lexical, emit the instruction stream so
     // that the move checker knows to check this variable.
-    value = SGF.B.createBeginBorrow(
-        PrologueLoc, value,
-        /*isLexical*/ true, /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
-    value = SGF.B.createCopyValue(PrologueLoc, value);
+    value =
+        SGF.B.createMoveValue(PrologueLoc, value, /*IisLexical*/ true,
+                              /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
     value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
     return SGF.B.createMarkUnresolvedNonCopyableValueInst(
         PrologueLoc, value,
@@ -2192,14 +2191,10 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 
       if (auto *copyToMove = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
               mvi->getOperand())) {
-        if (auto *cvi = dyn_cast<CopyValueInst>(copyToMove->getOperand())) {
-          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-            if (bbi->isLexical()) {
-              B.emitDestroyValueOperation(silLoc, mvi);
-              B.createEndBorrow(silLoc, bbi);
-              B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-              return;
-            }
+        if (auto *move = dyn_cast<MoveValueInst>(copyToMove->getOperand())) {
+          if (move->isLexical()) {
+            B.emitDestroyValueOperation(silLoc, mvi);
+            return;
           }
         }
       }
