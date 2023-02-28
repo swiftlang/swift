@@ -22,6 +22,7 @@
 
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/Task.h"
+#include "swift/ABI/Executor.h"
 #include "swift/Runtime/HeapObject.h"
 
 namespace swift {
@@ -278,22 +279,23 @@ public:
 // This record is allocated for a task to record what it is dependent on before
 // the task can make progress again.
 class TaskDependencyStatusRecord : public TaskStatusRecord {
-  // A word sized storage which references what this task is suspended waiting
-  // for. Note that this is different from the waitQueue in the future fragment
-  // of a task since that denotes all the tasks which this specific task, will
-  // unblock.
+  // A word sized storage which references what this task is waiting for. Note
+  // that this is different from the waitQueue in the future fragment of a task
+  // since that denotes all the tasks which this specific task, will unblock.
   //
   // This field is only really pointing to something valid when the
-  // ActiveTaskStatus specifies that the task is suspended. It can be accessed
-  // asynchronous to the task during escalation which will therefore require the
-  // task status record lock for synchronization.
+  // ActiveTaskStatus specifies that the task is suspended or enqueued. It can
+  // be accessed asynchronous to the task during escalation which will therefore
+  // require the task status record lock for synchronization.
   //
   // When a task has TaskDependencyStatusRecord in the status record list, it
   // must be the innermost status record, barring the status record lock which
   // could be taken while this record is present.
   //
   // The type of thing we are waiting on, is specified in the enum below
-  union {
+  union Dependent {
+    constexpr Dependent() {}
+
     // This task is suspended waiting on another task. This could be an async
     // let child task or it could be another unstructured task.
     AsyncTask *Task;
@@ -310,38 +312,66 @@ class TaskDependencyStatusRecord : public TaskStatusRecord {
     // the duration of the wait. We do not need to take an additional +1 on this
     // task group in this dependency record.
     TaskGroup *TaskGroup;
-  } WaitingOn;
+
+    // The task is enqueued waiting on an executor. It could be any kind of
+    // executor - the generic executor, the default actor's executor, or an
+    // actor with a custom executor.
+    //
+    // This information is helpful to know *where* a task is enqueued into
+    // (potentially intrusively), so that the appropriate escalation effect
+    // (which may be different for each type of executor) can happen if a task
+    // is escalated while enqueued.
+    ExecutorRef Executor;
+  } DependentOn;
 
   // Enum specifying the type of dependency this task has
   enum DependencyKind {
     WaitingOnTask = 1,
     WaitingOnContinuation,
     WaitingOnTaskGroup,
+
+    EnqueuedOnExecutor,
   } DependencyKind;
 
+  // The task that has this task status record - ie a backpointer from the
+  // record to the task with the record. This is not its own +1, we rely on the
+  // fact that since this status record is linked into a task, the task is
+  // already alive and maintained by someone and we can safely borrow the
+  // reference.
+  AsyncTask *WaitingTask;
+
 public:
-  TaskDependencyStatusRecord(AsyncTask *task) :
+  TaskDependencyStatusRecord(AsyncTask *waitingTask, AsyncTask *task) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(WaitingOnTask) {
-      WaitingOn.Task = task;
+        DependencyKind(WaitingOnTask), WaitingTask(waitingTask) {
+      DependentOn.Task = task;
   }
 
-  TaskDependencyStatusRecord(ContinuationAsyncContext *context) :
+  TaskDependencyStatusRecord(AsyncTask *waitingTask, ContinuationAsyncContext *context) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(WaitingOnContinuation) {
-      WaitingOn.Continuation = context;
+        DependencyKind(WaitingOnContinuation), WaitingTask(waitingTask) {
+      DependentOn.Continuation = context;
   }
 
-  TaskDependencyStatusRecord(TaskGroup *taskGroup) :
+  TaskDependencyStatusRecord(AsyncTask *waitingTask, TaskGroup *taskGroup) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(WaitingOnTaskGroup) {
-      WaitingOn.TaskGroup = taskGroup;
+        DependencyKind(WaitingOnTaskGroup), WaitingTask(waitingTask){
+      DependentOn.TaskGroup = taskGroup;
   }
 
-  void destroy() { }
+  TaskDependencyStatusRecord(AsyncTask *waitingTask, ExecutorRef executor) :
+    TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
+        DependencyKind(EnqueuedOnExecutor), WaitingTask(waitingTask) {
+      DependentOn.Executor = executor;
+  }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::TaskDependency;
+  }
+
+  void updateDependencyToEnqueuedOn(ExecutorRef executor) {
+    DependencyKind = EnqueuedOnExecutor;
+    DependentOn.Executor = executor;
   }
 
   void performEscalationAction(JobPriority newPriority);

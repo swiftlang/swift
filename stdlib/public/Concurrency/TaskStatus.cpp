@@ -479,6 +479,7 @@ void swift::updateStatusRecord(AsyncTask *task, TaskStatusRecord *record,
      ActiveTaskStatus& status,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
 
+  SWIFT_TASK_DEBUG_LOG("Updating status record %p of task %p", record, task);
   withStatusRecordLock(task, status, [&](ActiveTaskStatus lockedStatus) {
 #if NDEBUG
     bool foundRecord = false;
@@ -820,19 +821,29 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
 void TaskDependencyStatusRecord::performEscalationAction(JobPriority newPriority) {
   switch (this->DependencyKind) {
     case WaitingOnTask:
-      swift_task_escalate(this->WaitingOn.Task, newPriority);
+      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent task %p noted in %p record",
+        this->DependentOn.Task, this);
+      swift_task_escalate(this->DependentOn.Task, newPriority);
       break;
     case WaitingOnContinuation:
       // We can't do anything meaningful to escalate this since we don't know
       // who will resume the continuation
+      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent continuation %p noted in %p record -- do nothing",
+        this->DependentOn.Continuation, this);
       break;
-    case WaitingOnTaskGroup: {
+    case WaitingOnTaskGroup:
       // If a task is being escalated while waiting on a task group, the task
       // should also have a TaskGroupTaskStatusRecord and the escalation
       // action on that record should do the needful to propagate the
       // escalation to the child tasks. We can short-circuit here.
+      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent taskgroup %p noted in %p record -- do nothing",
+        this->DependentOn.TaskGroup, this);
       break;
-    }
+    case EnqueuedOnExecutor:
+      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record",
+        this->DependentOn.Executor, this);
+      swift_executor_escalate(this->DependentOn.Executor, this->WaitingTask, newPriority);
+      break;
   }
 }
 
