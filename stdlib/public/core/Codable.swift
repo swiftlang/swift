@@ -2260,113 +2260,113 @@ public protocol UnkeyedEncodingContainer {
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Bool
+  mutating func encode(
+    contentsOf sequence: some Sequence<Bool>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == String
+  mutating func encode(
+    contentsOf sequence: some Sequence<String>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Double
+  mutating func encode(
+    contentsOf sequence: some Sequence<Double>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Float
+  mutating func encode(
+    contentsOf sequence: some Sequence<Float>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Int
+  mutating func encode(
+    contentsOf sequence: some Sequence<Int>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Int8
+  mutating func encode(
+    contentsOf sequence: some Sequence<Int8>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Int16
+  mutating func encode(
+    contentsOf sequence: some Sequence<Int16>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Int32
+  mutating func encode(
+    contentsOf sequence: some Sequence<Int32>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Int64
+  mutating func encode(
+    contentsOf sequence: some Sequence<Int64>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == UInt
+  mutating func encode(
+    contentsOf sequence: some Sequence<UInt>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == UInt8
+  mutating func encode(
+    contentsOf sequence: some Sequence<UInt8>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == UInt16
+  mutating func encode(
+    contentsOf sequence: some Sequence<UInt16>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == UInt32
+  mutating func encode(
+    contentsOf sequence: some Sequence<UInt32>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == UInt64
+  mutating func encode(
+    contentsOf sequence: some Sequence<UInt64>
+  ) throws
 
   /// Encodes the elements of the given sequence.
   ///
@@ -6029,113 +6029,113 @@ extension UnkeyedEncodingContainer {
     try self.encode(object)
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Bool {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<Bool>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == String {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<String>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Double {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<Double>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Float {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<Float>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Int {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<Int>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Int8 {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<Int8>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Int16 {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<Int16>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Int32 {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<Int32>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == Int64 {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<Int64>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == UInt {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<UInt>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == UInt8 {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<UInt8>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == UInt16 {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<UInt16>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == UInt32 {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<UInt32>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
   }
 
-  public mutating func encode<T: Sequence>(
-    contentsOf sequence: T
-  ) throws where T.Element == UInt64 {
+  public mutating func encode(
+    contentsOf sequence: some Sequence<UInt64>
+  ) throws {
     for element in sequence {
       try self.encode(element)
     }
