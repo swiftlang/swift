@@ -108,3 +108,8 @@ func lookupOnAnyObject(object: AnyObject) { // expected-provides {{lookupOnAnyOb
 // expected-member {{ObjectiveC.NSObjectProtocol.someMethodWithUnavailableOptions}}
 // expected-member {{ObjectiveC.NSObjectProtocol.someMethodWithPotentiallyUnavailableOptions}}
 // expected-member {{ObjectiveC.NSObjectProtocol.someMethodWithDeprecatedOptions}}
+
+// expected-member {{Swift.Optional<Wrapped>.deinit}}
+// expected-member {{Swift.Int32.deinit}}
+// expected-member {{Swift.Int.deinit}}
+// expected-member {{Swift.UnsafeMutablePointer<Pointee>.deinit}}

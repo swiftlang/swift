@@ -4011,6 +4011,10 @@ public:
   bool isGlobalActor() const {
     return getGlobalActorInstance() != nullptr;
   }
+  
+  /// Return the `DestructorDecl` for a struct or enum's `deinit` declaration.
+  /// Returns null if the type is a class, or does not have a declared `deinit`.
+  DestructorDecl *getValueTypeDestructor();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

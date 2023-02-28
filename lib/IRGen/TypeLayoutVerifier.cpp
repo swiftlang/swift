@@ -88,9 +88,9 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
                                == FixedPacking::OffsetZero),
              "is-inline bit");
       verifyValues(metadata,
-             emitLoadOfIsPOD(*this, layoutType),
-             getBoolConstant(fixedTI->isPOD(ResilienceExpansion::Maximal)),
-             "is-POD bit");
+             emitLoadOfIsTriviallyDestroyable(*this, layoutType),
+             getBoolConstant(fixedTI->isTriviallyDestroyable(ResilienceExpansion::Maximal)),
+             "is-trivially-destructible bit");
       verifyValues(metadata,
              emitLoadOfIsBitwiseTakable(*this, layoutType),
              getBoolConstant(fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal)),

@@ -173,7 +173,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
-    out.add(valueTy.second.getIsPOD(IGF, valueTy.first));
+    out.add(valueTy.second.getIsTriviallyDestroyable(IGF, valueTy.first));
     return;
   }
 

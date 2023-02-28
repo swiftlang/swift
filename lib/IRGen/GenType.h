@@ -119,8 +119,10 @@ private:
   const LoadableTypeInfo *EmptyTI = nullptr;
   const LoadableTypeInfo *IntegerLiteralTI = nullptr;
 
-  const TypeInfo *AccessibleResilientStructTI = nullptr;
-  const TypeInfo *InaccessibleResilientStructTI = nullptr;
+  const TypeInfo *ResilientStructTI[2][2] = {
+    {nullptr, nullptr},
+    {nullptr, nullptr},
+  };
   
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     OpaqueStorageTypes;
@@ -173,7 +175,8 @@ private:
   const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
-  const TypeInfo *convertResilientStruct(IsABIAccessible_t abiAccessible);
+  const TypeInfo *convertResilientStruct(IsCopyable_t copyable,
+                                         IsABIAccessible_t abiAccessible);
 #define REF_STORAGE(Name, ...) \
   const TypeInfo *convert##Name##StorageType(Name##StorageType *T);
 #include "swift/AST/ReferenceStorage.def"
@@ -205,7 +208,8 @@ public:
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();
   const LoadableTypeInfo &getIntegerLiteralTypeInfo();
-  const TypeInfo &getResilientStructTypeInfo(IsABIAccessible_t abiAccessible);
+  const TypeInfo &getResilientStructTypeInfo(IsCopyable_t copyable,
+                                             IsABIAccessible_t abiAccessible);
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P, ProtocolInfoKind kind);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,
                                                    Alignment storageAlign);

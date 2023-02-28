@@ -678,8 +678,9 @@ namespace {
         bool isOptional) \
       : AddressOnlyClassExistentialTypeInfoBase(protocols, refcounting, \
                                                 ty, size, std::move(spareBits), \
-                                                align, IsNotPOD, \
+                                                align, IsNotTriviallyDestroyable, \
                                                 IsNotBitwiseTakable, \
+                                                IsCopyable, \
                                                 IsFixedSize), \
         IsOptional(isOptional) {} \
     TypeLayoutEntry \
@@ -735,7 +736,10 @@ namespace {
         ReferenceCounting refcounting, \
         bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
-                                      spareBits, align, IsNotPOD, IsFixedSize), \
+                                      spareBits, align, \
+                                      IsNotTriviallyDestroyable, \
+                                      IsCopyable, \
+                                      IsFixedSize), \
         Refcounting(refcounting), ValueType(valueTy), IsOptional(isOptional) { \
       assert(refcounting == ReferenceCounting::Native || \
              refcounting == ReferenceCounting::Unknown); \
@@ -755,7 +759,7 @@ namespace {
         case ReferenceCounting::Unknown: kind = ScalarKind::UnknownReference; break; \
         case ReferenceCounting::Bridge:  kind = ScalarKind::BridgeReference; break; \
         case ReferenceCounting::Error:   kind = ScalarKind::ErrorReference; break; \
-        case ReferenceCounting::None:    kind = ScalarKind::POD; break; \
+        case ReferenceCounting::None:    kind = ScalarKind::TriviallyDestroyable; break; \
         case ReferenceCounting::Custom:  kind = ScalarKind::UnknownReference; break; \
       } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, kind); \
@@ -802,7 +806,8 @@ namespace {
         Size size, Alignment align, \
         bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
-                                      spareBits, align, IsPOD, IsFixedSize) {} \
+                                      spareBits, align, IsTriviallyDestroyable,\
+                                      IsCopyable, IsFixedSize) {} \
     TypeLayoutEntry \
     *buildTypeLayoutEntry(IRGenModule &IGM, \
                           SILType T, \
@@ -810,7 +815,7 @@ namespace {
       if (!useStructLayouts) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, ScalarKind::POD); \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, ScalarKind::TriviallyDestroyable); \
     } \
     const LoadableTypeInfo & \
     getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const { \
@@ -869,7 +874,8 @@ class OpaqueExistentialTypeInfo final :
                             Alignment align)
     : super(protocols, ty, size,
             std::move(spareBits), align,
-            IsNotPOD, IsBitwiseTakable, IsFixedSize) {}
+            IsNotTriviallyDestroyable, IsBitwiseTakable, IsCopyable,
+            IsFixedSize) {}
 
 public:
   OpaqueExistentialLayout getLayout() const {
@@ -1057,7 +1063,7 @@ class ClassExistentialTypeInfo final
           IGM.getWitnessTablePtrTypeInfo(),
           SILType::getBuiltinIntegerType(IGM.getPointerSize().getValue(),
                                          IGM.Context),
-          ScalarKind::POD));
+          ScalarKind::TriviallyDestroyable));
     }
 
     return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(alignedGroup, T, getBestKnownAlignment().getValue());
@@ -1360,7 +1366,9 @@ class ExistentialMetatypeTypeInfo final
                               Alignment align,
                               const LoadableTypeInfo &metatypeTI)
     : ScalarExistentialTypeInfoBase(storedProtocols, ty, size,
-                                    std::move(spareBits), align, IsPOD,
+                                    std::move(spareBits), align,
+                                    IsTriviallyDestroyable,
+                                    IsCopyable,
                                     IsFixedSize),
       MetatypeTI(metatypeTI) {}
 
@@ -1378,7 +1386,7 @@ public:
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                      ScalarKind::POD);
+                                                      ScalarKind::TriviallyDestroyable);
   }
 
   void emitValueRetain(IRGenFunction &IGF, llvm::Value *value,

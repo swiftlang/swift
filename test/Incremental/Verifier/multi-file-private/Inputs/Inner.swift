@@ -1,5 +1,6 @@
 // expected-provides{{Inner}}
 // expected-member{{main.Inner.init}}
+// expected-member{{main.Inner.deinit}}
 public struct Inner {}
 
 // expected-provides{{Foo}}

@@ -370,7 +370,7 @@ ScalarKind swift::irgen::refcountingToScalarKind(ReferenceCounting refCounting) 
   case ReferenceCounting::ObjC:
     return ScalarKind::ObjCReference;
   case ReferenceCounting::None:
-    return ScalarKind::POD;
+    return ScalarKind::TriviallyDestroyable;
   case ReferenceCounting::Custom:
     return ScalarKind::UnknownReference;
   }
@@ -406,7 +406,7 @@ static std::string scalarToString(ScalarKind kind) {
   case ScalarKind::BlockReference: return "BlockReference";
   case ScalarKind::BridgeReference: return "BridgeReference";
   case ScalarKind::ObjCReference: return "ObjCReference";
-  case ScalarKind::POD: return "POD";
+  case ScalarKind::TriviallyDestroyable: return "TriviallyDestroyable";
   case ScalarKind::Immovable: return "Immovable";
   case ScalarKind::BlockStorage: return "BlockStorage";
   case ScalarKind::ThickFunc: return "ThickFunc";
@@ -496,7 +496,7 @@ bool TypeLayoutEntry::isSingleRetainablePointer() const {
   return false;
 }
 
-bool TypeLayoutEntry::isPOD() const {
+bool TypeLayoutEntry::isTriviallyDestroyable() const {
   assert(isEmpty() &&
          "Type isn't empty -- perhaps you forgot to override this function?");
   return true;
@@ -1135,8 +1135,8 @@ llvm::Value *ScalarTypeLayoutEntry::size(IRGenFunction &IGF) const {
 
 bool ScalarTypeLayoutEntry::isFixedSize(IRGenModule &IGM) const { return true; }
 
-bool ScalarTypeLayoutEntry::isPOD() const {
-  return scalarKind == ScalarKind::POD;
+bool ScalarTypeLayoutEntry::isTriviallyDestroyable() const {
+  return scalarKind == ScalarKind::TriviallyDestroyable;
 }
 
 bool ScalarTypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
@@ -1240,7 +1240,7 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
     B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong,
                   IGM.getPointerSize().getValue());
     break;
-  case ScalarKind::POD:
+  case ScalarKind::TriviallyDestroyable:
     B.addSkip(size);
     break;
   case ScalarKind::ExistentialReference:
@@ -1255,7 +1255,7 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
 
 void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   switch (scalarKind) {
-  case ScalarKind::POD:
+  case ScalarKind::TriviallyDestroyable:
     return;
   case ScalarKind::Immovable:
     llvm_unreachable("cannot opaquely manipulate immovable types!");
@@ -1518,9 +1518,9 @@ bool AlignedGroupEntry::isFixedSize(IRGenModule &IGM) const {
   return fixedSize(IGM).has_value();
 }
 
-bool AlignedGroupEntry::isPOD() const {
+bool AlignedGroupEntry::isTriviallyDestroyable() const {
   for (auto *entry : entries) {
-    if (!entry->isPOD()) {
+    if (!entry->isTriviallyDestroyable()) {
       return false;
     }
   }
@@ -1549,7 +1549,7 @@ bool AlignedGroupEntry::canValueWitnessExtraInhabitantsUpTo(
   for (unsigned i = 0; i < entries.size(); i++) {
     if (i == currentMaxXIField)
       continue;
-    if (!entries[i]->isPOD()) {
+    if (!entries[i]->isTriviallyDestroyable()) {
       return false;
     }
   }
@@ -2001,7 +2001,7 @@ llvm::Value *ArchetypeLayoutEntry::size(IRGenFunction &IGF) const {
 
 bool ArchetypeLayoutEntry::isFixedSize(IRGenModule &IGM) const { return false; }
 
-bool ArchetypeLayoutEntry::isPOD() const { return false; }
+bool ArchetypeLayoutEntry::isTriviallyDestroyable() const { return false; }
 
 bool ArchetypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
     IRGenModule &IGM, unsigned index) const {
@@ -2182,7 +2182,7 @@ llvm::Constant *
 EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
                                   GenericSignature genericSig) const {
   switch (copyDestroyKind(IGM)) {
-  case CopyDestroyStrategy::POD:
+  case CopyDestroyStrategy::TriviallyDestroyable:
   case CopyDestroyStrategy::Normal: {
     return nullptr;
   }
@@ -2217,7 +2217,7 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                          LayoutStringBuilder &B,
                                          GenericSignature genericSig) const {
   switch (copyDestroyKind(IGM)) {
-  case CopyDestroyStrategy::POD: {
+  case CopyDestroyStrategy::TriviallyDestroyable: {
     auto size = fixedSize(IGM);
     assert(size && "POD should not have dynamic size");
     B.addSkip(size->getValue());
@@ -2248,8 +2248,8 @@ void EnumTypeLayoutEntry::computeProperties() {
 
 EnumTypeLayoutEntry::CopyDestroyStrategy
 EnumTypeLayoutEntry::copyDestroyKind(IRGenModule &IGM) const {
-  if (isPOD()) {
-    return POD;
+  if (isTriviallyDestroyable()) {
+    return TriviallyDestroyable;
   } else if (isSingleton()) {
     return ForwardToPayload;
   } else if (cases.size() == 1 && numEmptyCases <= 1 &&
@@ -2332,9 +2332,9 @@ bool EnumTypeLayoutEntry::isFixedSize(IRGenModule &IGM) const {
   return fixedSize(IGM).has_value();
 }
 
-bool EnumTypeLayoutEntry::isPOD() const {
+bool EnumTypeLayoutEntry::isTriviallyDestroyable() const {
   for (auto *entry : cases) {
-    if (!entry->isPOD()) {
+    if (!entry->isTriviallyDestroyable()) {
       return false;
     }
   }
@@ -2575,7 +2575,7 @@ void EnumTypeLayoutEntry::initializeSinglePayloadEnum(IRGenFunction &IGF,
   auto &Builder = IGF.Builder;
 
   switch (copyDestroyKind(IGM)) {
-  case POD: {
+  case TriviallyDestroyable: {
     emitMemCpy(IGF, dest, src, size(IGF));
     break;
   }
@@ -2634,7 +2634,7 @@ void EnumTypeLayoutEntry::assignSinglePayloadEnum(IRGenFunction &IGF,
   auto &Builder = IGF.Builder;
 
   switch (copyDestroyKind(IGM)) {
-  case POD: {
+  case TriviallyDestroyable: {
     emitMemCpy(IGF, dest, src, size(IGF));
     break;
   }
@@ -2822,7 +2822,7 @@ void EnumTypeLayoutEntry::initializeMultiPayloadEnum(IRGenFunction &IGF,
 void EnumTypeLayoutEntry::destroySinglePayloadEnum(IRGenFunction &IGF,
                                                    Address addr) const {
   switch (copyDestroyKind(IGF.IGM)) {
-  case POD: {
+  case TriviallyDestroyable: {
     break;
   }
   case ForwardToPayload:
@@ -3354,7 +3354,7 @@ bool ResilientTypeLayoutEntry::isSingleRetainablePointer() const {
   return false;
 }
 
-bool ResilientTypeLayoutEntry::isPOD() const { return false; }
+bool ResilientTypeLayoutEntry::isTriviallyDestroyable() const { return false; }
 
 bool ResilientTypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
     IRGenModule &IGM, unsigned index) const {
@@ -3513,8 +3513,8 @@ TypeInfoBasedTypeLayoutEntry::fixedXICount(IRGenModule &IGM) const {
   return typeInfo.getFixedExtraInhabitantCount(IGM);
 }
 
-bool TypeInfoBasedTypeLayoutEntry::isPOD() const {
-  return typeInfo.isPOD(ResilienceExpansion::Maximal);
+bool TypeInfoBasedTypeLayoutEntry::isTriviallyDestroyable() const {
+  return typeInfo.isTriviallyDestroyable(ResilienceExpansion::Maximal);
 }
 
 bool TypeInfoBasedTypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
