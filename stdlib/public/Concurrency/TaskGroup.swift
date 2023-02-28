@@ -218,15 +218,12 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 /// Tasks added to a task group execute concurrently, and may be scheduled in
 /// any order.
 ///
-/// ### Discarding behavior
-/// A discarding task group eagerly discards and releases its child tasks as
-/// soon as they complete. This allows for the efficient releasing of memory used
-/// by those tasks, which are not retained for future `next()` calls, as would
-/// be the case with a ``TaskGroup``.
-///
 /// ### Cancellation behavior
-/// A task group becomes cancelled in one of two ways: when ``cancelAll()`` is
-/// invoked on it, or when the ``Task`` running this task group is cancelled.
+/// A task group becomes cancelled in one of the following ways:
+///
+/// - when ``cancelAll()`` is invoked on it,
+/// - when an error is thrown out of the `withTaskGroup(...) { }` closure,
+/// - when the ``Task`` running this task group is cancelled.
 ///
 /// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
@@ -558,15 +555,12 @@ extension TaskGroup: Sendable { }
 /// Tasks added to a task group execute concurrently, and may be scheduled in
 /// any order.
 ///
-/// ### Discarding behavior
-/// A discarding task group eagerly discards and releases its child tasks as
-/// soon as they complete. This allows for the efficient releasing of memory used
-/// by those tasks, which are not retained for future `next()` calls, as would
-/// be the case with a ``TaskGroup``.
-///
 /// ### Cancellation behavior
-/// A task group becomes cancelled in one of two ways: when ``cancelAll()`` is
-/// invoked on it, or when the ``Task`` running this task group is cancelled.
+/// A task group becomes cancelled in one of the following ways:
+///
+/// - when ``cancelAll()`` is invoked on it,
+/// - when an error is thrown out of the `withThrowingTaskGroup(...) { }` closure,
+/// - when the ``Task`` running this task group is cancelled.
 ///
 /// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child

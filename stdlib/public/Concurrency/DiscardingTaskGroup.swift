@@ -116,8 +116,11 @@ public func withDiscardingTaskGroup<GroupResult>(
 /// be the case with a ``TaskGroup``.
 ///
 /// ### Cancellation behavior
-/// A task group becomes cancelled in one of two ways: when ``cancelAll()`` is
-/// invoked on it, or when the ``Task`` running this task group is cancelled.
+/// A discarding task group becomes cancelled in one of the following ways:
+///
+/// - when ``cancelAll()`` is invoked on it,
+/// - when an error is thrown out of the `withThrowingDiscardingTaskGroup(...) { }` closure,
+/// - when the ``Task`` running this task group is cancelled.
 ///
 /// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
@@ -431,8 +434,28 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
 /// be the case with a ``TaskGroup``.
 ///
 /// ### Cancellation behavior
-/// A task group becomes cancelled in one of two ways: when ``cancelAll()`` is
-/// invoked on it, or when the ``Task`` running this task group is cancelled.
+/// A throwing discarding task group becomes cancelled in one of the following ways:
+///
+/// - when ``cancelAll()`` is invoked on it,
+/// - when an error is thrown out of the `withThrowingDiscardingTaskGroup(...) { }` closure,
+/// - when the ``Task`` running this task group is cancelled.
+///
+/// But also, and uniquely in *discarding* task groups:
+/// - when *any* of its child tasks throws.
+///
+/// The group becoming cancelled automatically, and cancelling all of its child tasks,
+/// whenever *any* child task throws an error is a behavior unique to discarding task groups,
+/// because achieving such semantics is not possible otherwise, due to the missing `next()` method
+/// on discarding groups. Accumulating task groups can implement this by manually polling `next()`
+/// and deciding to `cancelAll()` when they decide an error should cause the group to become cancelled,
+/// however a discarding group cannot poll child tasks for results and therefore assumes that child
+/// task throws are an indication of a group wide failure. In order to avoid such behavior,
+/// use a ``DiscardingTaskGroup`` instead of a throwing one, or catch specific errors in
+/// operations submitted using `addTask`
+///
+/// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
+/// automatically propagated through all of its child-tasks (and their child
+/// tasks).
 ///
 /// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
@@ -524,6 +547,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
 #endif
   }
 
+  ///
   public var isEmpty: Bool {
     _taskGroupIsEmpty(_group)
   }
