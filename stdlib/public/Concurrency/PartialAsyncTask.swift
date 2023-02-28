@@ -28,10 +28,57 @@ internal func _swiftJobRun(_ job: UnownedJob,
 public struct UnownedJob: Sendable {
   private var context: Builtin.Job
 
+  /// The priority of this job.
+  @available(SwiftStdlib 5.9, *)
+  public var priority: JobPriority {
+    let raw = _swift_concurrency_jobPriority(self)
+    return JobPriority(rawValue: raw)
+  }
+
   @_alwaysEmitIntoClient
   @inlinable
+  @available(*, deprecated, renamed: "runSynchronously")
   public func _runSynchronously(on executor: UnownedSerialExecutor) {
       _swiftJobRun(self, executor)
+  }
+
+  @_alwaysEmitIntoClient
+  @inlinable
+  public func runSynchronously(on executor: UnownedSerialExecutor) {
+      _swiftJobRun(self, executor)
+  }
+}
+
+/// The priority of this job.
+///
+/// The executor determines how priority information affects the way tasks are scheduled.
+/// The behavior varies depending on the executor currently being used.
+/// Typically, executors attempt to run tasks with a higher priority
+/// before tasks with a lower priority.
+/// However, the semantics of how priority is treated are left up to each
+/// platform and `Executor` implementation.
+///
+/// A Job's priority is roughly equivalent to a `TaskPriority`,
+/// however, since not all jobs are tasks, represented as separate type.
+///
+/// Conversions between the two priorities are available as initializers on the respective types.
+@available(SwiftStdlib 5.9, *)
+public struct JobPriority {
+  public typealias RawValue = UInt8
+
+  /// The raw priority value.
+  public var rawValue: RawValue
+}
+
+@available(SwiftStdlib 5.9, *)
+extension TaskPriority {
+  /// Convert a job priority to a task priority.
+  ///
+  /// Most values are directly interchangeable, but this initializer reserves the right to fail for certain values.
+  @available(SwiftStdlib 5.9, *)
+  public init?(_ p: JobPriority) {
+    // currently we always convert, but we could consider mapping over only recognized values etc.
+    self = .init(rawValue: p.rawValue)
   }
 }
 
@@ -291,3 +338,7 @@ public func withUnsafeThrowingContinuation<T>(
 public func _abiEnableAwaitContinuation() {
   fatalError("never use this function")
 }
+
+@available(SwiftStdlib 5.9, *)
+@_silgen_name("swift_concurrency_jobPriority")
+internal func _swift_concurrency_jobPriority(_ job: UnownedJob) -> UInt8
