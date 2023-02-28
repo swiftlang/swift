@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
 import Swift
 
 /// Get the parameter count from a mangled method name.
