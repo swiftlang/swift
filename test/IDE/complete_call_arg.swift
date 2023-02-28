@@ -1231,7 +1231,7 @@ private extension Sequence {
   func SubstitutableBaseTyOfSubscript<T: Comparable>(by keyPath: KeyPath<Element, T>) -> [Element] {
     return sorted { a, b in a[#^GENERICBASE_SUB^#] }
     // GENERICBASE_SUB: Begin completions, 1 item
-    // GENERICBASE_SUB: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<Self.Element, Value>#}[']'][#Value#];
+    // GENERICBASE_SUB: Pattern/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['[']{#keyPath: KeyPath<Self.Element, Value>#}[']'][#Value#];
     // GENERICBASE_SUB: End completions
   }
 }
