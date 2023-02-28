@@ -75,6 +75,7 @@ extension TaskPriority {
   /// Convert a job priority to a task priority.
   ///
   /// Most values are directly interchangeable, but this initializer reserves the right to fail for certain values.
+  @available(SwiftStdlib 5.9, *)
   public init?(_ p: JobPriority) {
     // currently we always convert, but we could consider mapping over only recognized values etc.
     self = .init(rawValue: p.rawValue)
