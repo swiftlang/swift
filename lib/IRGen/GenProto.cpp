@@ -2660,7 +2660,19 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
                                        index);
     return baseWTable;
   }
-  auto &Builder = IGF.Builder;
+
+  llvm::SmallString<40> fnName;
+  llvm::raw_svector_ostream(fnName)
+    << "__swift_relative_protocol_witness_table_parent_"
+    << index.getValue();
+
+  auto helperFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
+    fnName, IGM.WitnessTablePtrTy, {IGM.WitnessTablePtrTy},
+    [&](IRGenFunction &subIGF) {
+
+  auto it = subIGF.CurFn->arg_begin();
+  llvm::Value *wtable =  &*it;
+  auto &Builder = subIGF.Builder;
   auto *ptrVal = Builder.CreatePtrToInt(wtable, IGM.IntPtrTy);
   auto *one = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
   auto *isCond = Builder.CreateAnd(ptrVal, one);
@@ -2674,30 +2686,30 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
   auto *mask = Builder.CreateNot(one);
   auto *wtableAddr = Builder.CreateAnd(ptrVal, mask);
   wtableAddr = Builder.CreateIntToPtr(wtableAddr, IGM.WitnessTablePtrTy);
-  auto addr = slotForLoadOfOpaqueWitness(IGF, wtableAddr, index,
+  auto addr = slotForLoadOfOpaqueWitness(subIGF, wtableAddr, index,
                                          false /*isRelative*/);
   llvm::Value *baseWTable = Builder.CreateLoad(addr);
-  baseWTable = IGF.Builder.CreateBitCast(baseWTable, IGF.IGM.WitnessTablePtrTy);
+  baseWTable = subIGF.Builder.CreateBitCast(baseWTable, IGM.WitnessTablePtrTy);
   Builder.CreateBr(endBB);
 
   Builder.emitBlock(isNotCondBB);
-  if (auto &schema = IGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
-    auto info = PointerAuthInfo::emit(IGF, schema, nullptr,
+  if (auto &schema = subIGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
+    auto info = PointerAuthInfo::emit(subIGF, schema, nullptr,
                                       PointerAuthEntity());
-    wtable = emitPointerAuthAuth(IGF, wtable, info);
+    wtable = emitPointerAuthAuth(subIGF, wtable, info);
   }
   auto baseWTable2 =
-      emitInvariantLoadOfOpaqueWitness(IGF,/*isProtocolWitness*/true, wtable,
+      emitInvariantLoadOfOpaqueWitness(subIGF,/*isProtocolWitness*/true, wtable,
                                        index);
-  baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
-                                          IGF.IGM.WitnessTablePtrTy);
-  if (auto &schema = IGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
-    auto info = PointerAuthInfo::emit(IGF, schema, nullptr,
+  baseWTable2 = subIGF.Builder.CreateBitCast(baseWTable2,
+                                          subIGF.IGM.WitnessTablePtrTy);
+  if (auto &schema = subIGF.getOptions().PointerAuth.RelativeProtocolWitnessTable) {
+    auto info = PointerAuthInfo::emit(subIGF, schema, nullptr,
                                       PointerAuthEntity());
-    baseWTable2 = emitPointerAuthSign(IGF, baseWTable2, info);
+    baseWTable2 = emitPointerAuthSign(subIGF, baseWTable2, info);
 
-    baseWTable2 = IGF.Builder.CreateBitCast(baseWTable2,
-                                            IGF.IGM.WitnessTablePtrTy);
+    baseWTable2 = subIGF.Builder.CreateBitCast(baseWTable2,
+                                            IGM.WitnessTablePtrTy);
   }
 
   Builder.CreateBr(endBB);
@@ -2706,7 +2718,15 @@ llvm::Value *irgen::loadParentProtocolWitnessTable(IRGenFunction &IGF,
   auto *phi = Builder.CreatePHI(wtable->getType(), 2);
   phi->addIncoming(baseWTable, isCondBB);
   phi->addIncoming(baseWTable2, isNotCondBB);
-  return phi;
+  Builder.CreateRet(phi);
+
+  }, true /*noinline*/));
+
+  auto *call = IGF.Builder.CreateCallWithoutDbgLoc(
+    helperFn->getFunctionType(), helperFn, {wtable});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  call->setDoesNotThrow();
+  return call;
 }
 
 llvm::Value *irgen::loadConditionalConformance(IRGenFunction &IGF,
@@ -3827,6 +3847,49 @@ static llvm::Value *emitWTableSlotLoad(IRGenFunction &IGF, llvm::Value *wtable,
   return IGF.emitInvariantLoad(slot);
 }
 
+static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF,
+                                                              WitnessIndex index,
+                                                              llvm::Value *wtable,
+                                                              SILDeclRef member) {
+  auto witnessTableTy = wtable->getType();
+  auto &IGM = IGF.IGM;
+  llvm::SmallString<40> fnName;
+  auto entity = LinkEntity::forMethodDescriptor(member);
+  auto mangled = entity.mangleAsString();
+  llvm::raw_svector_ostream(fnName)
+    << "__swift_relative_protocol_witness_table_access_"
+    << index.forProtocolWitnessTable().getValue()
+    << "_" << mangled;
+
+  auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(
+    IGF.IGM.getMaximalTypeExpansionContext(), member);
+  Signature signature = IGF.IGM.getSignature(fnType);
+
+  auto helperFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
+    fnName, IGM.Int8PtrTy, {witnessTableTy},
+    [&](IRGenFunction &subIGF) {
+
+    auto it = subIGF.CurFn->arg_begin();
+    llvm::Value *wtable =  &*it;
+    wtable = subIGF.optionallyLoadFromConditionalProtocolWitnessTable(wtable);
+    auto slot = slotForLoadOfOpaqueWitness(subIGF, wtable,
+                                           index.forProtocolWitnessTable(),
+                                           true);
+    llvm::Value *witnessFnPtr = emitWTableSlotLoad(subIGF, wtable, member, slot,
+                                                   true);
+
+    subIGF.Builder.CreateRet(witnessFnPtr);
+
+  }, true /*noinline*/));
+
+  auto *call = IGF.Builder.CreateCallWithoutDbgLoc(
+    helperFn->getFunctionType(), helperFn, {wtable});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  call->setDoesNotThrow();
+  auto fn = IGF.Builder.CreateBitCast(call, signature.getType()->getPointerTo());
+  return FunctionPointer::createUnsigned(fnType, fn, signature, true);
+}
+
 FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                                               llvm::Value *wtable,
                                               SILDeclRef member) {
@@ -3839,22 +3902,22 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
   auto index = fnProtoInfo.getFunctionIndex(member);
   auto isRelativeTable = IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables;
+  if (isRelativeTable) {
+    return emitRelativeProtocolWitnessTableAccess(IGF, index, wtable, member);
+  }
+
   wtable = IGF.optionallyLoadFromConditionalProtocolWitnessTable(wtable);
   auto slot =
       slotForLoadOfOpaqueWitness(IGF, wtable, index.forProtocolWitnessTable(),
-                                 isRelativeTable);
+                                 false/*isRelativeTable*/);
   llvm::Value *witnessFnPtr = emitWTableSlotLoad(IGF, wtable, member, slot,
-                                                 isRelativeTable);
+                                                 false/*isRelativeTable*/);
 
   auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(
       IGF.IGM.getMaximalTypeExpansionContext(), member);
   Signature signature = IGF.IGM.getSignature(fnType);
   witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
                                            signature.getType()->getPointerTo());
-  if (isRelativeTable) {
-    return FunctionPointer::createUnsigned(fnType, witnessFnPtr, signature,
-                                           true);
-  }
 
   auto &schema = fnType->isAsync()
                      ? IGF.getOptions().PointerAuth.AsyncProtocolWitnesses
