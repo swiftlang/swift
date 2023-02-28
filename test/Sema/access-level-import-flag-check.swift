@@ -12,6 +12,7 @@
 // RUN: %target-swift-frontend -typecheck %t/ClientWithoutTheFlag.swift -I %t -verify
 // RUN: %target-swift-frontend -typecheck %t/ClientWithoutTheFlag.swift -I %t \
 // RUN:   -enable-experimental-feature AccessLevelOnImport
+// REQUIRES: asserts
 
 //--- PublicLib.swift
 //--- PackageLib.swift
