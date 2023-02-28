@@ -26,6 +26,7 @@
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -299,9 +300,16 @@ bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *cvi) {
     if (cvFnTy->isTrivialNoEscape()) {
       // Erase any `destroy_value`s of this copy, so we don't mistake them for
       // the end of the original value's lifetime after we RAUW.
-      SmallVector<DestroyValueInst *, 2> destroys;
-      for (auto user : cvi->getUsersOfType<DestroyValueInst>()) {
-        destroys.push_back(user);
+      StackList<DestroyValueInst *> destroys(cvi->getFunction());
+      ValueWorklist worklist(cvi->getFunction());
+      worklist.push(cvi);
+      while (auto def = worklist.pop()) {
+        for (auto *mvi : def->getUsersOfType<MoveValueInst>()) {
+          worklist.push(mvi);
+        }
+        for (auto *dvi : def->getUsersOfType<DestroyValueInst>()) {
+          destroys.push_back(dvi);
+        }
       }
       for (auto destroy : destroys) {
         eraseInstruction(destroy);
