@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
 import SwiftShims
 
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED

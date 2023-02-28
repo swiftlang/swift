@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
 import SwiftShims
 
 // Implementation Note: this file intentionally uses very LOW-LEVEL

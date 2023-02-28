@@ -12,6 +12,7 @@
 
 #if _runtime(_ObjC)
 
+import Builtin
 import SwiftShims
 
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the

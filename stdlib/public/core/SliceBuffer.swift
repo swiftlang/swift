@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// Buffer type for `ArraySlice<Element>`.
 @frozen
 @usableFromInline

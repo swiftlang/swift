@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A raw pointer for accessing 
 /// untyped data.
 ///

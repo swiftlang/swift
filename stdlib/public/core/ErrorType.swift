@@ -9,6 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+import Builtin
 import SwiftShims
 
 /// A type representing an error value that can be thrown.

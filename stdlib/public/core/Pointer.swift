@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 #if SWIFT_ENABLE_REFLECTION
 public typealias _CustomReflectableOrNone = CustomReflectable
 #else

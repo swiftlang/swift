@@ -9,6 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 
+import Builtin
+
 /// This type is used as a result of the `_checkSubscript` call to associate the
 /// call with the array access call it guards.
 ///

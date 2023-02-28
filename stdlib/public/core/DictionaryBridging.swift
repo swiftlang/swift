@@ -12,6 +12,7 @@
 
 #if _runtime(_ObjC)
 
+import Builtin
 import SwiftShims
 
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the

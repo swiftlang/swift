@@ -12,6 +12,8 @@
 
 #if $Macros && hasAttribute(attached)
 
+import Builtin
+
 /// Specifies the module and type name for an externally-defined macro, which
 /// must conform to the appropriate set of `Macro` protocols.
 ///

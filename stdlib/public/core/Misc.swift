@@ -12,6 +12,8 @@
 // Extern C functions
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
 /// Returns if `x` is a power of 2.

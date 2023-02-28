@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 //
 // Low-level helper functions and utilities for interpreting Unicode
 //

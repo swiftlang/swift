@@ -19,6 +19,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A string type designed to represent text that is known at compile time.
 ///
 /// Instances of the `StaticString` type are immutable.

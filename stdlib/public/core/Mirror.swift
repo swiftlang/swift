@@ -12,6 +12,8 @@
 // FIXME: ExistentialCollection needs to be supported before this will work
 // without the ObjC Runtime.
 
+import Builtin
+
 #if SWIFT_ENABLE_REFLECTION
 
 /// A representation of the substructure and display style of an instance of

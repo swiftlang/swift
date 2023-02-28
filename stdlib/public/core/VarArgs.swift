@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A type whose instances can be encoded, and appropriately passed, as
 /// elements of a C `va_list`.
 ///

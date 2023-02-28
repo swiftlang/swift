@@ -9,7 +9,11 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
+
+#if SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
+import Builtin
+#endif
+
 //  This file implements the experimental support for collecting the state of
 //  runtime function counters, which are used to determine how many times
 //  a given runtime function was called.

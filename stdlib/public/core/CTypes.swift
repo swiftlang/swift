@@ -12,6 +12,8 @@
 // C Primitive Types
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// The C 'char' type.
 ///
 /// This will be the same as either `CSignedChar` (in the common

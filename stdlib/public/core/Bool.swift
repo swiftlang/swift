@@ -12,6 +12,8 @@
 // Bool Datatype and Supporting Operators
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A value type whose instances are either `true` or `false`.
 ///
 /// `Bool` represents Boolean values in Swift. Create instances of `Bool` by

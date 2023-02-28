@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A unique identifier for a class instance or metatype.
 ///
 /// This unique identifier is only valid for comparisons during the lifetime

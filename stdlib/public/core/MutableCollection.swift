@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A collection that supports subscript assignment.
 ///
 /// Collections that conform to `MutableCollection` gain the ability to

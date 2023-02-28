@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 // This file contains only support for types deprecated from previous versions
 // of Swift
 

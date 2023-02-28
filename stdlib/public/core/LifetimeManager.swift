@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// Evaluates a closure while ensuring that the given instance is not destroyed
 /// before the closure returns.
 ///
