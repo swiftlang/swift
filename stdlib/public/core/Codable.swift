@@ -3189,7 +3189,7 @@ public enum EncodingError: Error {
     public let debugDescription: String
 
     /// The underlying error which caused this error, if any.
-    public let underlyingError: Error?
+    public let underlyingError: (any Error)?
 
     /// Creates a new context with the given path of coding keys and a
     /// description of what went wrong.
@@ -3203,7 +3203,7 @@ public enum EncodingError: Error {
     public init(
       codingPath: [any CodingKey],
       debugDescription: String,
-      underlyingError: Error? = nil
+      underlyingError: (any Error)? = nil
     ) {
       self.codingPath = codingPath
       self.debugDescription = debugDescription
@@ -3272,7 +3272,7 @@ public enum DecodingError: Error {
     public let debugDescription: String
 
     /// The underlying error which caused this error, if any.
-    public let underlyingError: Error?
+    public let underlyingError: (any Error)?
 
     /// Creates a new context with the given path of coding keys and a
     /// description of what went wrong.
@@ -3286,7 +3286,7 @@ public enum DecodingError: Error {
     public init(
       codingPath: [any CodingKey],
       debugDescription: String,
-      underlyingError: Error? = nil
+      underlyingError: (any Error)? = nil
     ) {
       self.codingPath = codingPath
       self.debugDescription = debugDescription
