@@ -12,8 +12,6 @@
 // This file defines derivatives for tgmath functions.
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin.C.tgmath
 #elseif canImport(Musl)

@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
 import SwiftShims
 
 % from SwiftFloatingPointTypes import all_floating_point_types
