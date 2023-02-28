@@ -27,14 +27,10 @@ import Swift
 public struct Backtrace: CustomStringConvertible, Sendable {
   /// The type of an address.
   ///
-  /// This will be `UInt32` or `UInt64` on current platforms.
-  #if arch(x86_64) || arch(arm64)
-  public typealias Address = UInt64
-  #elseif arch(i386) || arch(arm)
-  public typealias Address = UInt32
-  #else
-  #error("You need to fill this in for your architecture.")
-  #endif
+  /// This is intentionally _not_ a pointer, because you shouldn't be
+  /// dereferencing them; they may refer to some other process, for
+  /// example.
+  public typealias Address = UInt
 
   /// The unwind algorithm to use.
   public enum UnwindAlgorithm {
@@ -55,20 +51,27 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
   /// Represents an individual frame in a backtrace.
   public enum Frame: CustomStringConvertible, Sendable {
-    /// An accurate program counter.
+    /// A program counter value.
     ///
     /// This might come from a signal handler, or an exception or some
     /// other situation in which we have captured the actual program counter.
+    ///
+    /// These can be directly symbolicated, as-is, with no adjustment.
     case programCounter(Address)
 
     /// A return address.
     ///
     /// Corresponds to a normal function call.
+    ///
+    /// Requires adjustment when symbolicating for a backtrace, because it
+    /// points at the address after the one that triggered the child frame.
     case returnAddress(Address)
 
     /// An async resume point.
     ///
     /// Corresponds to an `await` in an async task.
+    ///
+    /// Can be directly symbolicated, as-is.
     case asyncResumePoint(Address)
 
     /// Indicates a discontinuity in the backtrace.
@@ -174,7 +177,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   ///
   /// Some backtracing algorithms may require this information, in which case
   /// it will be filled in by the `capture()` method.  Other algorithms may
-  /// not, in which case it will be empty and you can capture an image list
+  /// not, in which case it will be `nil` and you can capture an image list
   /// separately yourself using `captureImages()`.
   public var images: [Image]?
 
@@ -249,7 +252,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
           .dropFirst(offset)
 
         if let limit = limit {
-          if limit == 0 {
+          if limit <= 0 {
             return Backtrace(frames: [.truncated])
           }
 
@@ -356,7 +359,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
     let task = process as! task_t
 
-    withDyldProcessInfo(for: task){ dyldInfo in
+    withDyldProcessInfo(for: task) { dyldInfo in
       _dyld_process_info_for_each_image(dyldInfo) {
         (machHeaderAddress, uuid, path) in
 
@@ -375,7 +378,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
           // Find the end of the __TEXT segment
           var endOfText = machHeaderAddress + 4096
 
-          _dyld_process_info_for_each_segment(dyldInfo, machHeaderAddress){
+          _dyld_process_info_for_each_segment(dyldInfo, machHeaderAddress) {
             address, size, name in
 
             if let name = String(validatingUTF8: name!), name == "__TEXT" {
@@ -386,8 +389,8 @@ public struct Backtrace: CustomStringConvertible, Sendable {
           images.append(Image(name: name,
                               path: pathString,
                               buildID: theUUID,
-                              baseAddress: machHeaderAddress,
-                              endOfText: endOfText))
+                              baseAddress: Address(machHeaderAddress),
+                              endOfText: Address(endOfText)))
         }
       }
     }
@@ -411,15 +414,15 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   public static func captureSharedCacheInfo(for t: Any) -> SharedCacheInfo? {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
     let task = t as! task_t
-    return withDyldProcessInfo(for: task){ dyldInfo in
+    return withDyldProcessInfo(for: task) { dyldInfo in
       var cacheInfo = dyld_process_cache_info()
       _dyld_process_info_get_cache(dyldInfo, &cacheInfo)
-      let theUUID = withUnsafePointer(to: cacheInfo.cacheUUID){
+      let theUUID = withUnsafePointer(to: cacheInfo.cacheUUID) {
         Array(UnsafeRawBufferPointer(start: $0,
                                      count: MemoryLayout<uuid_t>.size))
       }
       return SharedCacheInfo(uuid: theUUID,
-                             baseAddress: cacheInfo.cacheBaseAddress,
+                             baseAddress: Address(cacheInfo.cacheBaseAddress),
                              noCache: cacheInfo.noCache)
     }
     #else // !os(Darwin)
