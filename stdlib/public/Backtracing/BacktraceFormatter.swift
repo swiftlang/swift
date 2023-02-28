@@ -294,11 +294,7 @@ private func measure(_ ch: Unicode.Scalar) -> Int {
     return 1
   }
 
-  if #available(macOS 10.12.2, *) {
-    if ch.properties.isEmoji {
-      return 2
-    }
-  } else if ch.value >= 0x1f100 && ch.value <= 0x1fb00 {
+  if ch.properties.isEmoji {
     return 2
   }
 

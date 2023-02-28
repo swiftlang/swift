@@ -262,15 +262,15 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                           fn: (CSSymbolicatorRef) throws -> T) rethrows -> T {
     let binaryImageList = images.map{ image in
       BinaryImageInformation(
-        base: image.baseAddress,
-        extent: image.endOfText,
+        base: mach_vm_address_t(image.baseAddress),
+        extent: mach_vm_address_t(image.endOfText),
         uuid: uuidBytesFromBuildID(image.buildID!),
         arch: HostContext.coreSymbolicationArchitecture,
         path: image.path,
         relocations: [
           BinaryRelocationInformation(
-            base: image.baseAddress,
-            extent: image.endOfText,
+            base: mach_vm_address_t(image.baseAddress),
+            extent: mach_vm_address_t(image.endOfText),
             name: "__TEXT"
           )
         ],
@@ -333,7 +333,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     let theSymbol = Symbol(imageIndex: imageIndex,
                            imageName: imageName,
                            rawName: rawName,
-                           offset: Int(address - range.location),
+                           offset: Int(address - UInt(range.location)),
                            sourceLocation: location)
     theSymbol.name = name
 
@@ -376,7 +376,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
           case .omittedFrames(_), .truncated:
             frames.append(Frame(captured: frame, symbol: nil))
           default:
-            let address = frame.adjustedProgramCounter
+            let address = mach_vm_address_t(frame.adjustedProgramCounter)
             let owner
               = CSSymbolicatorGetSymbolOwnerWithAddressAtTime(symbolicator,
                                                               address,
@@ -390,7 +390,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
               let pos = frames.count
               var first = true
 
-              _ = CSSymbolOwnerForEachStackFrameAtAddress(owner, address){
+              _ = CSSymbolOwnerForEachStackFrameAtAddress(owner, address) {
                 symbol, sourceInfo in
 
                 frames.insert(buildFrame(from: frame,
