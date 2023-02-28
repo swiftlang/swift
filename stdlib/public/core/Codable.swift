@@ -5544,8 +5544,7 @@ public protocol CodingKeyRepresentable {
 }
 
 @available(SwiftStdlib 5.6, *)
-extension RawRepresentable
-where Self: CodingKeyRepresentable, RawValue == String {
+extension RawRepresentable<String> where Self: CodingKeyRepresentable {
   @available(SwiftStdlib 5.6, *)
   public var codingKey: CodingKey {
     _DictionaryCodingKey(stringValue: rawValue)
@@ -5557,7 +5556,7 @@ where Self: CodingKeyRepresentable, RawValue == String {
 }
 
 @available(SwiftStdlib 5.6, *)
-extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == Int {
+extension RawRepresentable<Int> where Self: CodingKeyRepresentable {
   @available(SwiftStdlib 5.6, *)
   public var codingKey: CodingKey {
     _DictionaryCodingKey(intValue: rawValue)
