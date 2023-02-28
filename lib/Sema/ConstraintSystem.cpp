@@ -1526,22 +1526,27 @@ AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
 /// that declared \p type. This is useful for code completion so we can match
 /// the types we do know instead of bailing out completely because \p type
 /// contains an error type.
-static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value) {
+static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value, bool hasAppliedSelf) {
   if (!type->is<AnyFunctionType>() || !isa<AbstractFunctionDecl>(value)) {
     return type;
   }
   auto funcType = type->castTo<AnyFunctionType>();
   auto funcDecl = cast<AbstractFunctionDecl>(value);
 
-  auto declParams = funcDecl->getParameters();
+  SmallVector<ParamDecl *> declParams;
+  if (hasAppliedSelf) {
+    declParams.append(funcDecl->getParameters()->begin(), funcDecl->getParameters()->end());
+  } else {
+    declParams.push_back(funcDecl->getImplicitSelfDecl());
+  }
   auto typeParams = funcType->getParams();
-  assert(declParams->size() == typeParams.size());
+  assert(declParams.size() == typeParams.size());
   SmallVector<AnyFunctionType::Param, 4> newParams;
-  newParams.reserve(declParams->size());
+  newParams.reserve(declParams.size());
   for (auto i : indices(typeParams)) {
     AnyFunctionType::Param param = typeParams[i];
     if (param.getPlainType()->is<ErrorType>()) {
-      auto paramDecl = declParams->get(i);
+      auto paramDecl = declParams[i];
       auto placeholder =
           PlaceholderType::get(paramDecl->getASTContext(), paramDecl);
       newParams.push_back(param.withType(placeholder));
@@ -1549,7 +1554,7 @@ static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value) {
       newParams.push_back(param);
     }
   }
-  assert(newParams.size() == declParams->size());
+  assert(newParams.size() == declParams.size());
   return FunctionType::get(newParams, funcType->getResult());
 }
 
@@ -1620,7 +1625,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     if (isForCodeCompletion() && openedType->hasError()) {
       // In code completion, replace error types by placeholder types so we can
       // match the types we know instead of bailing out completely.
-      openedType = replaceParamErrorTypeByPlaceholder(openedType, value);
+      openedType = replaceParamErrorTypeByPlaceholder(openedType, value, /*hasAppliedSelf=*/true);
     }
 
     // If we opened up any type variables, record the replacements.
@@ -2288,7 +2293,7 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   if (isForCodeCompletion() && type->hasError()) {
     // In code completion, replace error types by placeholder types so we can
     // match the types we know instead of bailing out completely.
-    type = replaceParamErrorTypeByPlaceholder(type, value);
+    type = replaceParamErrorTypeByPlaceholder(type, value, hasAppliedSelf);
   }
 
   return type;
