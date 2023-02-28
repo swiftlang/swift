@@ -1448,6 +1448,7 @@ void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
 
 void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    const ClangImporterOptions &clangImporterOpts,
     bool suppressRemarks, RequireOSSAModules_t RequireOSSAModules) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
@@ -1544,6 +1545,16 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.getLangOptions().Features.insert(
       Feature::LayoutPrespecialization);
   }
+
+  // Validate Clang modules once perbuild session flags must be consistent
+  // across all module sub-invocations
+  if (clangImporterOpts.ValidateModulesOnce) {
+    genericSubInvocation.getClangImporterOptions().ValidateModulesOnce = true;
+    genericSubInvocation.getClangImporterOptions().BuildSessionFilePath = clangImporterOpts.BuildSessionFilePath;
+    GenericArgs.push_back("-validate-clang-modules-once");
+    GenericArgs.push_back("-clang-build-session-file");
+    GenericArgs.push_back(clangImporterOpts.BuildSessionFilePath);
+  }
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
@@ -1586,6 +1597,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     : SM(SM), Diags(Diags), ArgSaver(Allocator) {
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts,
+                                     clangImporterOpts,
                                      Diags->getSuppressRemarks(),
                                      requireOSSAModules);
   // Configure front-end input.
@@ -1621,6 +1633,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getLangOptions().EnableAppExtensionRestrictions = true;
     GenericArgs.push_back("-application-extension");
   }
+
   // Save the parent invocation's Target Triple
   ParentInvocationTarget = langOpts.Target;
 
