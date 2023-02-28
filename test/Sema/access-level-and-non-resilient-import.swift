@@ -1,5 +1,10 @@
+/// Check diagnostics on a resilient modules importing publicly a
+/// a non-resilient module.
+
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
+
+// REQUIRES: asserts
 
 /// Build the libraries.
 // RUN: %target-swift-frontend -emit-module %t/DefaultLib.swift -o %t
