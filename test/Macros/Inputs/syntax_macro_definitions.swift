@@ -214,8 +214,8 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
         """
 
         struct \(raw: prefix) {
-          func \(context.createUniqueName("method"))() { return 0 }
-          func \(context.createUniqueName("method"))() { return 1 }
+          func \(context.makeUniqueName("method"))() { return 0 }
+          func \(context.makeUniqueName("method"))() { return 1 }
         }
         """
       ]
@@ -225,8 +225,8 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
       """
 
       struct \(raw: prefix)\(raw: String(bitwidth)) {
-        func \(context.createUniqueName("method"))() { }
-        func \(context.createUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
       }
       """
     }
@@ -242,15 +242,15 @@ public struct DefineDeclsWithKnownNamesMacro: DeclarationMacro {
       """
 
       struct A {
-        func \(context.createUniqueName("method"))() { }
-        func \(context.createUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
       }
       """,
       """
 
       struct B {
-        func \(context.createUniqueName("method"))() { }
-        func \(context.createUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
       }
       """,
       """
@@ -780,7 +780,7 @@ public struct WrapInType: PeerMacro {
       funcDecl
       .with(
         \.identifier,
-         "\(context.createUniqueName(funcDecl.identifier.text))"
+         "\(context.makeUniqueName(funcDecl.identifier.text))"
       )
       .with(
         \.signature,
@@ -801,7 +801,7 @@ public struct WrapInType: PeerMacro {
 
     let structType: DeclSyntax =
       """
-      struct \(context.createUniqueName(funcDecl.identifier.text)) {
+      struct \(context.makeUniqueName(funcDecl.identifier.text)) {
         \(method)
       }
       """
