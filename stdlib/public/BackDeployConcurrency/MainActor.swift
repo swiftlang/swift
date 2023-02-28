@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
+import Builtin
 
 /// A singleton actor whose executor is equivalent to the main
 /// dispatch queue.

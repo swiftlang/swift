@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
+import Builtin
 @_implementationOnly import _SwiftConcurrencyShims
 
 // ==== Async Let -------------------------------------------------------------

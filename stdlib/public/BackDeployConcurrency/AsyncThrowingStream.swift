@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 /// An asynchronous sequence generated from an error-throwing closure that
 /// calls a continuation to produce new elements.
 ///

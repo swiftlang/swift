@@ -9,7 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-import Swift
+
+import Builtin
 @_implementationOnly import _SwiftConcurrencyShims
 
 @available(SwiftStdlib 5.1, *)

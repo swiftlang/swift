@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
 /// Common protocol to which all actors conform.

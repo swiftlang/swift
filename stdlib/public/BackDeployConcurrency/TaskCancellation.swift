@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
 // ==== Task Cancellation ------------------------------------------------------

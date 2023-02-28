@@ -13,7 +13,6 @@
 // using earlier versions of the concurrency library to the latest syntax.
 //===----------------------------------------------------------------------===//
 
-import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
 @available(SwiftStdlib 5.1, *)

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
+import Builtin
 
 /// A service that can execute jobs.
 @available(SwiftStdlib 5.1, *)

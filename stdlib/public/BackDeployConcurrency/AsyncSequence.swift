@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 /// A type that provides asynchronous, sequential, iterated access to its
 /// elements.
 ///
