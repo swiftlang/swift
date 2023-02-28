@@ -584,7 +584,7 @@ func expandAttachedMacroIPC(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
     macroRole: macroRole,
     discriminator: discriminator,
-    customAttributeSyntax: customAttributeSyntax,
+    attributeSyntax: customAttributeSyntax,
     declSyntax: declSyntax,
     parentDeclSyntax: parentDeclSyntax)
   do {
