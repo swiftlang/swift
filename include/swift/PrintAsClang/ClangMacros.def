@@ -197,7 +197,7 @@ CLANG_MACRO("SWIFT_DEPRECATED", , "__attribute__((deprecated))")
 CLANG_MACRO("SWIFT_DEPRECATED_MSG", "(...)", "__attribute__((deprecated(__VA_ARGS__)))")
 
 CLANG_MACRO_ALTERNATIVE("SWIFT_DEPRECATED_OBJC", "(Msg)", \
-                        "__has_feature(attribute_diagnost_if_objc)", \
+                        "__has_feature(attribute_diagnose_if_objc)", \
                         "__attribute__((diagnose_if(1, Msg, \"warning\")))", \
                         "SWIFT_DEPRECATED_MSG(Msg)")
 
