@@ -2877,7 +2877,7 @@ function(add_swift_target_executable name)
       set(UNIVERSAL_NAME "${SWIFTLIBEXEC_DIR}/${library_subdir}/${name}")
     endif()
 
-    set(lipo_target "${name}")
+    set(lipo_target "${name}-${sdk}")
     if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
       set(codesign_arg CODESIGN)
     endif()
