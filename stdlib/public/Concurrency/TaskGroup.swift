@@ -259,7 +259,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// Adds a child task to the group.
   ///
   /// - Parameters:
-  ///   - overridingPriority: The priority of the operation task.
+  ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
@@ -333,7 +333,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     fatalError("Unsupported Swift compiler")
 #endif
   }
-#else
+#else // if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(SwiftStdlib 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
   public mutating func addTask(

@@ -122,7 +122,7 @@ public func withDiscardingTaskGroup<GroupResult>(
 /// - when an error is thrown out of the `withThrowingDiscardingTaskGroup(...) { }` closure,
 /// - when the ``Task`` running this task group is cancelled.
 ///
-/// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
+/// Since a `DiscardingTaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
@@ -161,6 +161,13 @@ public struct DiscardingTaskGroup {
     let _: Void? = try await _taskGroupWaitAll(group: _group, bodyError: nil)
   }
 
+  /// Adds a child task to the group.
+  ///
+  /// - Parameters:
+  ///   - priority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
@@ -187,6 +194,15 @@ public struct DiscardingTaskGroup {
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
   }
 
+  /// Adds a child task to the group, unless the group has been canceled.
+  ///
+  /// - Parameters:
+  ///   - priority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
   @_alwaysEmitIntoClient
   #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
@@ -235,6 +251,12 @@ public struct DiscardingTaskGroup {
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
   }
 
+  /// Adds a child task to the group, unless the group has been canceled.
+  ///
+  /// - Parameters:
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
 #endif
@@ -265,14 +287,46 @@ public struct DiscardingTaskGroup {
 #endif
   }
 
+  /// A Boolean value that indicates whether the group has any remaining tasks.
+  ///
+  /// At the start of the body of a `withDiscardingTaskGroup(of:returning:body:)` call,
+  /// the task group is always empty.
+  ///
+  /// It's guaranteed to be empty when returning from that body
+  /// because a task group waits for all child tasks to complete before returning.
+  ///
+  /// - Returns: `true` if the group has no pending tasks; otherwise `false`.
   public var isEmpty: Bool {
     _taskGroupIsEmpty(_group)
   }
 
+  /// Cancel all of the remaining tasks in the group.
+  ///
+  /// If you add a task to a group after canceling the group,
+  /// that task is canceled immediately after being added to the group.
+  ///
+  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// react  to cancellation, e.g. by throwing an `CancellationError` at their
+  /// earliest convenience, or otherwise handling the cancellation.
+  ///
+  /// There are no restrictions on where you can call this method.
+  /// Code inside a child task or even another task can cancel a group,
+  /// however one should be very careful to not keep a reference to the
+  /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
+  ///
+  /// - SeeAlso: `Task.isCancelled`
+  /// - SeeAlso: `DiscardingTaskGroup.isCancelled`
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
   }
 
+  /// A Boolean value that indicates whether the group was canceled.
+  ///
+  /// To cancel a group, call the `DiscardingTaskGroup.cancelAll()` method.
+  ///
+  /// If the task that's currently running this group is canceled,
+  /// the group is also implicitly canceled,
+  /// which is also reflected in this property's value.
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -575,7 +629,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
   /// - SeeAlso: `Task.isCancelled`
-  /// - SeeAlso: `ThrowingTaskGroup.isCancelled`
+  /// - SeeAlso: `ThrowingDiscardingTaskGroup.isCancelled`
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
   }
