@@ -5540,7 +5540,7 @@ public protocol CodingKeyRepresentable {
   @available(SwiftStdlib 5.6, *)
   var codingKey: any CodingKey { get }
   @available(SwiftStdlib 5.6, *)
-  init?<T: CodingKey>(codingKey: T)
+  init?(codingKey: some CodingKey)
 }
 
 @available(SwiftStdlib 5.6, *)
@@ -5550,7 +5550,7 @@ extension RawRepresentable<String> where Self: CodingKeyRepresentable {
     _DictionaryCodingKey(stringValue: rawValue)
   }
   @available(SwiftStdlib 5.6, *)
-  public init?<T: CodingKey>(codingKey: T) {
+  public init?(codingKey: some CodingKey) {
     self.init(rawValue: codingKey.stringValue)
   }
 }
@@ -5562,7 +5562,7 @@ extension RawRepresentable<Int> where Self: CodingKeyRepresentable {
     _DictionaryCodingKey(intValue: rawValue)
   }
   @available(SwiftStdlib 5.6, *)
-  public init?<T: CodingKey>(codingKey: T) {
+  public init?(codingKey: some CodingKey) {
     if let intValue = codingKey.intValue {
       self.init(rawValue: intValue)
     } else {
@@ -5578,7 +5578,7 @@ extension Int: CodingKeyRepresentable {
     _DictionaryCodingKey(intValue: self)
   }
   @available(SwiftStdlib 5.6, *)
-  public init?<T: CodingKey>(codingKey: T) {
+  public init?(codingKey: some CodingKey) {
     if let intValue = codingKey.intValue {
       self = intValue
     } else {
@@ -5594,7 +5594,7 @@ extension String: CodingKeyRepresentable {
     _DictionaryCodingKey(stringValue: self)
   }
   @available(SwiftStdlib 5.6, *)
-  public init?<T: CodingKey>(codingKey: T) {
+  public init?(codingKey: some CodingKey) {
     self = codingKey.stringValue
   }
 }
