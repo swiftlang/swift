@@ -63,6 +63,12 @@ llvm::cl::opt<bool> SILPrintInliningCallerAfter(
     llvm::cl::desc(
         "Print functions into which another function has been inlined."));
 
+llvm::cl::opt<bool> EnableVerifyAfterEachInlining(
+    "sil-inline-verify-after-each-inline", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Run sil verification after inlining each found callee apply "
+        "site into a caller."));
+
 //===----------------------------------------------------------------------===//
 //                           Printing Helpers
 //===----------------------------------------------------------------------===//
@@ -1037,6 +1043,20 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     ++NumFunctionsInlined;
     if (SILPrintInliningCallerAfter) {
       printInliningDetailsCallerAfter(PassName, Caller, Callee);
+    }
+    if (EnableVerifyAfterEachInlining) {
+      deleter.cleanupDeadInstructions();
+
+      // The inliner splits blocks at call sites. Re-merge trivial branches to
+      // reestablish a canonical CFG.
+      mergeBasicBlocks(Caller);
+
+      if (invalidatedStackNesting) {
+        StackNesting::fixNesting(Caller);
+        invalidatedStackNesting = false;
+      }
+
+      Caller->verify();
     }
   }
   deleter.cleanupDeadInstructions();

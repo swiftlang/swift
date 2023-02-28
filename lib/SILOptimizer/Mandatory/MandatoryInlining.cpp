@@ -50,6 +50,8 @@ extern llvm::cl::opt<bool> SILPrintInliningCallerBefore;
 
 extern llvm::cl::opt<bool> SILPrintInliningCallerAfter;
 
+extern llvm::cl::opt<bool> EnableVerifyAfterEachInlining;
+
 extern void printInliningDetailsCallee(StringRef passName, SILFunction *caller,
                                        SILFunction *callee);
 
@@ -971,6 +973,16 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
       // Record that we inlined into this function so that we can invalidate it
       // later.
       changedFunctions.insert(F);
+
+      if (EnableVerifyAfterEachInlining) {
+        if (invalidatedStackNesting) {
+          StackNesting::fixNesting(F);
+          changedFunctions.insert(F);
+          invalidatedStackNesting = false;
+        }
+
+        F->verify();
+      }
 
       // Resume inlining within nextBB, which contains only the inlined
       // instructions and possibly instructions in the original call block that
