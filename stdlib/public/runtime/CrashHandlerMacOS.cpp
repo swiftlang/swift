@@ -153,7 +153,7 @@ suspend_other_threads()
       continue;
 
     // Ignore the results of these two; if they fail there's nothing we can do
-    (void)thread_resume(threads[n]);
+    (void)thread_suspend(threads[n]);
     (void)mach_port_deallocate(mach_task_self(), threads[n]);
   }
 
