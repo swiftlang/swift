@@ -1890,7 +1890,9 @@ enum class GenericRequirementKind : uint8_t {
   /// A "same-conformance" requirement, implied by a same-type or base-class
   /// constraint that binds a parameter with protocol requirements.
   SameConformance = 3,
-  /// A layout constraint.
+  /// A same-shape requirement between generic parameter packs.
+  SameShape = 4,
+  /// A layout requirement.
   Layout = 0x1F,
 };
 

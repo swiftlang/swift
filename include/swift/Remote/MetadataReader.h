@@ -1244,6 +1244,9 @@ public:
       case GenericRequirementKind::Layout:
         return TypeLookupError(
             "Unexpected layout requirement in runtime generic signature");
+      case GenericRequirementKind::SameShape:
+        return TypeLookupError(
+            "Unexpected same-shape requirement in runtime generic signature");
       }
     }
 
@@ -2771,6 +2774,9 @@ private:
             }
             break;
           }
+
+          case GenericRequirementKind::SameShape:
+            llvm_unreachable("Implement me");
           }
         }
 

@@ -235,6 +235,7 @@ public:
     case GenericRequirementKind::Protocol:
     case GenericRequirementKind::SameConformance:
     case GenericRequirementKind::SameType:
+    case GenericRequirementKind::SameShape:
       return true;
     }
 
