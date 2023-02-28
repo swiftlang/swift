@@ -43,6 +43,10 @@ struct SymbolGraphOptions {
   /// Whether to skip docs for symbols with compound, "SYNTHESIZED" USRs.
   bool SkipInheritedDocs = false;
 
+  /// Whether to skip emitting symbols that are implementations of protocol requirements or
+  /// inherited from protocol extensions.
+  bool SkipProtocolImplementations = false;
+
   /// Whether to emit symbols with SPI information.
   bool IncludeSPISymbols = false;
 

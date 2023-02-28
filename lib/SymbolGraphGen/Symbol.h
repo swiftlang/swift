@@ -130,6 +130,19 @@ public:
   /// the symbol has its own doc comments to render.
   const ValueDecl *getDeclInheritingDocs() const;
 
+  /// If this symbol is an implementation of a protocol requirement for a
+  /// protocol declared outside its module, returns the upstream decl for that
+  /// requirement.
+  const ValueDecl *getForeignProtocolRequirement() const;
+
+  /// If this symbol is an implementation of a protocol requirement, returns the
+  /// upstream decl for that requirement.
+  const ValueDecl *getProtocolRequirement() const;
+
+  /// If this symbol is a synthesized symbol or an implementation of a protocol
+  /// requirement, returns the upstream decl.
+  const ValueDecl *getInheritedDecl() const;
+
   static bool supportsKind(DeclKind Kind);
 
   /// Determines the effective access level of the given extension.
