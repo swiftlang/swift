@@ -74,9 +74,9 @@ protected:
     Value : 1
   );
 
-  SWIFT_INLINE_BITFIELD(BindingPattern, Pattern, 1,
-    /// True if this is a let pattern, false if a var pattern.
-    IsLet : 1
+  SWIFT_INLINE_BITFIELD(BindingPattern, Pattern, 2,
+    /// Corresponds to VarDecl::Introducer
+    Introducer : 1
   );
 
   SWIFT_INLINE_BITFIELD(AnyPattern, Pattern, 1,
@@ -701,20 +701,30 @@ public:
 class BindingPattern : public Pattern {
   SourceLoc VarLoc;
   Pattern *SubPattern;
+
 public:
-  BindingPattern(SourceLoc loc, bool isLet, Pattern *sub)
+  BindingPattern(SourceLoc loc, VarDecl::Introducer introducer, Pattern *sub)
       : Pattern(PatternKind::Binding), VarLoc(loc), SubPattern(sub) {
-    Bits.BindingPattern.IsLet = isLet;
+    setIntroducer(introducer);
   }
 
-  static BindingPattern *createImplicit(ASTContext &Ctx, bool isLet,
+  VarDecl::Introducer getIntroducer() const {
+    return VarDecl::Introducer(Bits.BindingPattern.Introducer);
+  }
+
+  void setIntroducer(VarDecl::Introducer introducer) {
+    Bits.BindingPattern.Introducer = uint8_t(introducer);
+  }
+
+  static BindingPattern *createImplicit(ASTContext &Ctx,
+                                        VarDecl::Introducer introducer,
                                         Pattern *sub) {
-    auto *VP = new (Ctx) BindingPattern(SourceLoc(), isLet, sub);
+    auto *VP = new (Ctx) BindingPattern(SourceLoc(), introducer, sub);
     VP->setImplicit();
     return VP;
   }
 
-  bool isLet() const { return Bits.BindingPattern.IsLet; }
+  bool isLet() const { return getIntroducer() == VarDecl::Introducer::Let; }
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {
