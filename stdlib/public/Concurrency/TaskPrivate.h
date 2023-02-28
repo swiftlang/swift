@@ -124,34 +124,6 @@ _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
 
 /*************** Methods for Status records manipulation ******************/
 
-/// Remove the status record from input task which may not be the current task.
-/// This may be called asynchronously from the current task.  After this call
-/// returns, the record's memory can be freely modified or deallocated.  The
-/// record must be registered with the task. If it isn't, this function will
-/// crash.
-///
-/// This function also takes in a function_ref which is given the old
-/// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
-/// that is to be set on the task that we are removing the record from. It may
-/// modify the new ActiveTaskStatus that is to be set on the task. This function
-/// may be called multiple times inside a RMW loop and must be therefore be
-/// idempotent. The new status passed to `fn` is freshly derived from the
-/// current status and does not include modifications made by previous runs
-/// through the loop
-SWIFT_CC(swift)
-void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
-     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn);
-
-/// Remove a status record from the current task.  After this call returns,
-/// the record's memory can be freely modified or deallocated.
-///
-/// This must be called synchronously with the task.
-///
-/// The given record need not be the last record added to
-/// the task, but the operation may be less efficient if not.
-SWIFT_CC(swift)
-void removeStatusRecord(TaskStatusRecord *record);
-
 /// Add a status record to the input task.
 ///
 /// Clients can optionally pass in the status of the task if they have already
@@ -159,6 +131,12 @@ void removeStatusRecord(TaskStatusRecord *record);
 /// prior to the atomic ActiveTaskStatus update that addStatusRecord will
 /// perform. This status will be updated with the last status on the task prior
 /// to updating it with the new status if the input function_ref allows so.
+///
+/// Clients can optionally pass in the status of the task if they have already
+/// done the load on it or if they require the oldStatus on the task prior to
+/// the atomic ActiveTaskStatus update that addStatusRecord will do. This status
+/// will be updated with the last status on the task prior to updating it with
+/// the new status if the input function_ref allows so.
 ///
 /// This function also takes in a function_ref which is given the old
 /// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
@@ -194,6 +172,59 @@ bool addStatusRecordToSelf(TaskStatusRecord *record,
 SWIFT_CC(swift)
 bool addStatusRecordToSelf(TaskStatusRecord *record,  ActiveTaskStatus& taskStatus,
      llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord);
+
+/// Remove the status record from input task which may not be the current task.
+/// This may be called asynchronously from the current task.  After this call
+/// returns, the record's memory can be freely modified or deallocated.  The
+/// record must be registered with the task. If it isn't, this function will
+/// crash.
+///
+/// The given record need not be the last record added to
+/// the task, but the operation may be less efficient if not.
+///
+/// This function also takes in a function_ref which is given the old
+/// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
+/// that is to be set on the task that we are removing the record from. It may
+/// modify the new ActiveTaskStatus that is to be set on the task. This function
+/// may be called multiple times inside a RMW loop and must be therefore be
+/// idempotent. The new status passed to `fn` is freshly derived from the
+/// current status and does not include modifications made by previous runs
+/// through the loop
+SWIFT_CC(swift)
+void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record, ActiveTaskStatus& status,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
+
+SWIFT_CC(swift)
+void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
+
+/// Remove a status record from the current task. This must be called
+/// synchronously with the task.
+SWIFT_CC(swift)
+void removeStatusRecordFromSelf(TaskStatusRecord *record, ActiveTaskStatus &status,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
+
+SWIFT_CC(swift)
+void removeStatusRecordFromSelf(TaskStatusRecord *record,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
+
+/// Update the specified input status record while holding the status record
+/// lock of the task. The status record must already be registered with the
+/// task - if it isn't, this API provides no additional protections.
+///
+/// This function also takes in a function_ref which is given the old
+/// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
+/// that is to be set on the task when we are unlocking the task status record
+/// lock. It may modify the new ActiveTaskStatus that is to be set on the task.
+/// This function may be called multiple times inside a RMW loop and must be
+/// therefore be idempotent. The new status passed to `fn` is freshly derived
+/// from the current status and does not include modifications made by previous
+/// runs through the loop
+SWIFT_CC(swift)
+void updateStatusRecord(AsyncTask *task, TaskStatusRecord *record,
+     llvm::function_ref<void()>updateRecord,
+     ActiveTaskStatus& status,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
 
 /// A helper function for updating a new child task that is created with
 /// information from the parent or the group that it was going to be added to.
@@ -842,7 +873,7 @@ inline void AsyncTask::flagAsRunning() {
     SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsRunning() and remove dependencyRecord %p",
                     this, dependencyRecord);
 
-    removeStatusRecord(this, dependencyRecord, [&](ActiveTaskStatus oldStatus,
+    removeStatusRecord(this, dependencyRecord, oldStatus, [&](ActiveTaskStatus unused,
                        ActiveTaskStatus& newStatus) {
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -863,7 +894,6 @@ inline void AsyncTask::flagAsRunning() {
       newStatus = newStatus.withoutEnqueued();
       newStatus = newStatus.withoutTaskDependency();
     });
-
     this->destroyTaskDependency(dependencyRecord);
 
     adoptTaskVoucher(this);

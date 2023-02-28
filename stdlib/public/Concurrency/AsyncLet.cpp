@@ -334,7 +334,7 @@ static void swift_asyncLet_endImpl(AsyncLet *alet) {
 
   // Remove the child record from the parent task
   auto record = asImpl(alet)->getTaskRecord();
-  removeStatusRecord(record);
+  removeStatusRecordFromSelf(record);
 
   // TODO: we need to implicitly await either before the end or here somehow.
 
@@ -362,7 +362,7 @@ static void asyncLet_finish_after_task_completion(SWIFT_ASYNC_CONTEXT AsyncConte
 
   // Remove the child record from the parent task
   auto record = asImpl(alet)->getTaskRecord();
-  removeStatusRecord(record);
+  removeStatusRecordFromSelf(record);
 
   // and finally, release the task and destroy the async-let
   assert(swift_task_getCurrent() && "async-let must have a parent task");
