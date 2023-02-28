@@ -273,6 +273,26 @@ extension TaskPriority: Comparable {
   }
 }
 
+
+@available(SwiftStdlib 5.9, *)
+extension TaskPriority: CustomStringConvertible {
+  @available(SwiftStdlib 5.9, *)
+  public var description: String {
+    switch self.rawValue {
+    case Self.low.rawValue:
+      return "\(Self.self).low"
+    case Self.medium.rawValue:
+      return "\(Self.self).medium"
+    case Self.high.rawValue:
+      return "\(Self.self).high"
+    case Self.background.rawValue:
+      return "\(Self.self).background"
+    default:
+      return "\(Self.self)(rawValue: \(self.rawValue))"
+    }
+  }
+}
+
 @available(SwiftStdlib 5.1, *)
 extension TaskPriority: Codable { }
 

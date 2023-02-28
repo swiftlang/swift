@@ -20,33 +20,6 @@
 using namespace swift;
 using namespace symbolgraphgen;
 
-namespace {
-const ValueDecl *getForeignProtocolRequirement(const ValueDecl *VD, const ModuleDecl *M) {
-  std::queue<const ValueDecl *> requirements;
-  while (true) {
-    for (auto *req : VD->getSatisfiedProtocolRequirements()) {
-      if (req->getModuleContext()->getNameStr() != M->getNameStr())
-        return req;
-      else
-        requirements.push(req);
-    }
-    if (requirements.empty())
-      return nullptr;
-    VD = requirements.front();
-    requirements.pop();
-  }
-}
-
-const ValueDecl *getProtocolRequirement(const ValueDecl *VD) {
-  auto reqs = VD->getSatisfiedProtocolRequirements();
-
-  if (!reqs.empty())
-    return reqs.front();
-  else
-    return nullptr;
-}
-} // end anonymous namespace
-
 void Edge::serialize(llvm::json::OStream &OS) const {
   OS.object([&](){
     OS.attribute("kind", Kind.Name);
@@ -87,22 +60,7 @@ void Edge::serialize(llvm::json::OStream &OS) const {
       }
     }
     
-    const ValueDecl *InheritingDecl = nullptr;
-    if (const auto *ID = Source.getDeclInheritingDocs())
-      InheritingDecl = ID;
-
-    if (!InheritingDecl && Source.getSynthesizedBaseTypeDecl())
-      InheritingDecl = Source.getSymbolDecl();
-
-    if (!InheritingDecl) {
-      if (const auto *ID = getForeignProtocolRequirement(Source.getSymbolDecl(), &Graph->M))
-        InheritingDecl = ID;
-    }
-
-    if (!InheritingDecl) {
-      if (const auto *ID = getProtocolRequirement(Source.getSymbolDecl()))
-        InheritingDecl = ID;
-    }
+    const ValueDecl *InheritingDecl = Source.getInheritedDecl();
 
     // If our source symbol is a inheriting decl, write in information about
     // where it's inheriting docs from.
