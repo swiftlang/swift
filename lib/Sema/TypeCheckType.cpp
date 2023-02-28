@@ -2303,8 +2303,8 @@ bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
 
   // FIXME: this should be 'borrowing'
   diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
-           "__shared", "for an immutable reference")
-      .fixItInsert(repr->getStartLoc(), "__shared ");
+           "borrowing", "for an immutable reference")
+      .fixItInsert(repr->getStartLoc(), "borrowing ");
 
   diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
            "inout", "for a mutable reference")
@@ -2312,8 +2312,8 @@ bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
 
   // FIXME: this should be 'consuming'
   diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
-           "__owned", "to take the value from callers")
-      .fixItInsert(repr->getStartLoc(), "__owned ");
+           "consuming", "to take the value from the caller")
+      .fixItInsert(repr->getStartLoc(), "consuming ");
 
   // to avoid duplicate diagnostics
   repr->setInvalid();

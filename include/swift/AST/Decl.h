@@ -6342,7 +6342,7 @@ public:
 
   static Specifier
   getParameterSpecifierForValueOwnership(ValueOwnership ownership) {
-  #warning "todo: switch over to consuming/borrowing once they're fully supported"
+    // TODO: switch over to consuming/borrowing once they're fully supported
     switch (ownership) {
     case ValueOwnership::Default:
       return Specifier::Default;
