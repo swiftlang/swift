@@ -4878,6 +4878,8 @@ class TargetPackPointer {
   using PointerType = typename Runtime::template Pointer<const Pointee<Runtime>>;
 
 public:
+  explicit TargetPackPointer(typename Runtime::StoredSize rawPtr) : Ptr(rawPtr) {}
+
   explicit TargetPackPointer(PointerType const *ptr, PackLifetime lifetime)
     : Ptr(reinterpret_cast<typename Runtime::StoredSize>(ptr) |
           (lifetime == PackLifetime::OnHeap ? 1 : 0)) {}
@@ -4889,6 +4891,11 @@ public:
   PointerType *getElements() {
     return reinterpret_cast<PointerType *>(Ptr & ~1);
   }
+
+  const PointerType *getPointer() const {
+    return reinterpret_cast<const PointerType *>(Ptr);
+  }
+
 
   PackLifetime getLifetime() const {
     return (bool)(Ptr & 1) ? PackLifetime::OnHeap : PackLifetime::OnStack;
