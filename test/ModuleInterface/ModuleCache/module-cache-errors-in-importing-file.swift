@@ -10,7 +10,7 @@
 
 // Setup phase 2: build the module.
 //
-// RUN: %target-swift-frontend -I %t -emit-module-interface-path %t/SomeModule.swiftinterface -module-name SomeModule %t/some-module.swift -emit-module -o /dev/null
+// RUN: %target-swift-frontend -I %t -emit-module-interface-path %t/SomeModule.swiftinterface -module-name SomeModule %t/some-module.swift -emit-module -o /dev/null -enable-library-evolution
 
 // Actual test: compile and verify the import succeeds (i.e. we only report the error in this file)
 //

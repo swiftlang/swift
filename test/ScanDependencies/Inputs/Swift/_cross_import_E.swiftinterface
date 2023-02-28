@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name _cross_import_E
+// swift-module-flags: -module-name _cross_import_E -enable-library-evolution
 import Swift
 import E
 import SubE

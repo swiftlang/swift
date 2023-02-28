@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name SystemDependencies
+// swift-module-flags: -module-name SystemDependencies -enable-library-evolution
 
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/mock-sdk %t/mock-sdk

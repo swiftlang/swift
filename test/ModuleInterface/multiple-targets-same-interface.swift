@@ -7,7 +7,7 @@
 
 // 1. Build a .swiftinterface for a dummy module.
 
-// RUN: %target-swift-frontend -typecheck -target x86_64-apple-macosx10.9 -emit-module-interface-path %t/SwiftModule.swiftinterface.tmp -parse-stdlib %s -module-name SwiftModule
+// RUN: %target-swift-frontend -typecheck -target x86_64-apple-macosx10.9 -emit-module-interface-path %t/SwiftModule.swiftinterface.tmp -parse-stdlib %s -module-name SwiftModule -enable-library-evolution
 
 // 2. Remove the -target line from the .swiftinterface. Clients will build using their target.
 

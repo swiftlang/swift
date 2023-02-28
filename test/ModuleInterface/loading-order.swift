@@ -18,7 +18,7 @@
 // RUN: echo 'public func prebuiltModule() {}' > %t/PrebuiltModule.swift
 
 /// Compile this into a module in the SDK.
-// RUN: %target-swift-frontend -emit-module %t/NextToSwiftinterface.swift -o %t/MyModule.swiftmodule/%target-swiftmodule-name -module-name MyModule -parse-stdlib -emit-module-interface-path %t/MyModule.swiftmodule/%target-swiftinterface-name -emit-private-module-interface-path %t/MyModule.swiftmodule/%target-private-swiftinterface-name
+// RUN: %target-swift-frontend -emit-module %t/NextToSwiftinterface.swift -o %t/MyModule.swiftmodule/%target-swiftmodule-name -module-name MyModule -parse-stdlib -emit-module-interface-path %t/MyModule.swiftmodule/%target-swiftinterface-name -emit-private-module-interface-path %t/MyModule.swiftmodule/%target-private-swiftinterface-name -enable-library-evolution
 
 /// Also put a module with a different API into the default prebuilt cache under the same name to detect when its picked.
 // RUN: %target-swift-frontend -emit-module %t/PrebuiltModule.swift -o %t/ResourceDir/%target-sdk-name/prebuilt-modules/MyModule.swiftmodule/%target-swiftmodule-name -module-name MyModule -parse-stdlib

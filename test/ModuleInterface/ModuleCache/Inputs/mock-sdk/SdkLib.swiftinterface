@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -parse-stdlib -module-name SdkLib
+// swift-module-flags: -parse-stdlib -module-name SdkLib -enable-library-evolution
 
 @_exported import ExportedLib
 

@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name SubEWrapper
+// swift-module-flags: -module-name SubEWrapper -enable-library-evolution
 import Swift
 import SubE
 public func funcSubEWrapper() { }

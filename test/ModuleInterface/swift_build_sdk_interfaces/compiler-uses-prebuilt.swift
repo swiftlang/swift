@@ -2,9 +2,9 @@
 // RUN: mkdir -p %t/sdk/usr/lib/swift/Normal.swiftmodule
 // RUN: mkdir -p %t/sdk/System/Library/Frameworks/FMWK.framework/Modules/FMWK.swiftmodule
 
-// RUN: echo 'public func normal() {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/usr/lib/swift/Normal.swiftmodule/%target-swiftinterface-name -emit-module -o /dev/null -module-name Normal
-// RUN: echo 'public func flat() {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/usr/lib/swift/Flat.swiftinterface -emit-module -o /dev/null -module-name Flat
-// RUN: echo 'public func fmwk() {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/System/Library/Frameworks/FMWK.framework/Modules/FMWK.swiftmodule/%target-swiftinterface-name -emit-module -o /dev/null -module-name FMWK
+// RUN: echo 'public func normal() {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/usr/lib/swift/Normal.swiftmodule/%target-swiftinterface-name -emit-module -o /dev/null -module-name Normal -enable-library-evolution
+// RUN: echo 'public func flat() {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/usr/lib/swift/Flat.swiftinterface -emit-module -o /dev/null -module-name Flat -enable-library-evolution
+// RUN: echo 'public func fmwk() {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/System/Library/Frameworks/FMWK.framework/Modules/FMWK.swiftmodule/%target-swiftinterface-name -emit-module -o /dev/null -module-name FMWK -enable-library-evolution
 
 // RUN: %swift_build_sdk_interfaces -sdk %t/sdk -Fsystem %t/sdk/System/Library/Frameworks -v -o %t/prebuilt
 // RUN: ls %t/prebuilt | %FileCheck %s

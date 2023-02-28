@@ -9,7 +9,8 @@
 
 // 2. Build this file and link with StoredProperties
 
-// RUN: %target-build-swift %s -I %t -L %t -lStoredProperties -o %t/stored-properties-client %target-rpath(%t)
+// RUN: env SWIFT_ACCEPT_NON_RESILIENT_INTERFACES=1 \
+// RUN:   %target-build-swift %s -I %t -L %t -lStoredProperties -o %t/stored-properties-client %target-rpath(%t)
 
 // 3. Codesign and run this, and ensure it exits successfully.
 

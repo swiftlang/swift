@@ -18,7 +18,7 @@ import SIMod
 // RUN: touch %t/test-dummy.modulemap
 
 // Step 3: Re-build this file, and ensure we are not re-building SIMod due to a dependency on the dummy file
-// RUN: %target-swift-frontend -emit-module -module-name no-implicit-extra-clang-maps -o %t/no-implicit-extra-clang-maps.swiftmodule %s -I %t -Xcc -fmodule-map-file=%t/test-dummy.modulemap -module-cache-path %t/ModuleCache -Rmodule-interface-rebuild 2>&1 | %FileCheck -allow-empty %s
+// RUN: %target-swift-frontend -emit-module -module-name no-implicit-extra-clang-maps -o %t/no-implicit-extra-clang-maps.swiftmodule %s -I %t -Xcc -fmodule-map-file=%t/test-dummy.modulemap -module-cache-path %t/ModuleCache -Rmodule-interface-rebuild -enable-library-evolution 2>&1 | %FileCheck -allow-empty %s
 
 // Step 4: Ensure that SIMod was not re-built
 // CHECK-NOT: remark: rebuilding module 'SIMod' from interface

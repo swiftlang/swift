@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name CycleThree
+// swift-module-flags: -module-name CycleThree -enable-library-evolution
 import Swift
 import CycleOne
 

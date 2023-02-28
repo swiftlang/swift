@@ -5,7 +5,7 @@
 // RUN: echo 'public func publicFunction() {}' > %t/TestModule.swift
 
 // 2. Create an interface for it
-// RUN: %target-swift-frontend -typecheck %t/TestModule.swift -emit-module-interface-path %t/Build/TestModule.swiftinterface -swift-version 5
+// RUN: %target-swift-frontend -typecheck %t/TestModule.swift -emit-module-interface-path %t/Build/TestModule.swiftinterface -swift-version 5 -enable-library-evolution
 
 // 3. Build the .swiftinterface to a .swiftmodule, which will have a dependency on the interface
 // RUN: %target-swift-frontend -compile-module-from-interface -o %t/Build/TestModule.swiftmodule %t/Build/TestModule.swiftinterface

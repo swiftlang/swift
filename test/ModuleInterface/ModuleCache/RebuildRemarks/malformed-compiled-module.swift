@@ -6,7 +6,7 @@
 // RUN: echo 'public func publicFunction() {}' > %t/TestModule.swift
 
 // 2. Create an interface for it
-// RUN: %target-swift-frontend -typecheck %t/TestModule.swift -emit-module-interface-path %t/Build/TestModule.swiftinterface -swift-version 5
+// RUN: %target-swift-frontend -typecheck %t/TestModule.swift -emit-module-interface-path %t/Build/TestModule.swiftinterface -swift-version 5 -enable-library-evolution
 
 // 3. Create an empty .swiftmodule, which will force recompiling from the interface
 // RUN: touch %t/Build/TestModule.swiftmodule

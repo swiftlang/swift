@@ -10,7 +10,7 @@
 // RUN: echo 'public func publicFunction() {}' > %t/TestModule.swift
 
 // 2. Create an interface for it
-// RUN: %target-swift-frontend -typecheck %t/TestModule.swift -emit-module-interface-path %t/Build/TestModule.swiftinterface -swift-version 5
+// RUN: %target-swift-frontend -typecheck %t/TestModule.swift -emit-module-interface-path %t/Build/TestModule.swiftinterface -swift-version 5 -enable-library-evolution
 
 // 3. Build the .swiftinterface to a .swiftmodule in the prebuilt cache, which will have a dependency on the interface
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Build/TestModule.swiftinterface -o %t/PrebuiltCache/TestModule.swiftmodule

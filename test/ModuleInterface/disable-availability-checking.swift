@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t/inputs)
 // RUN: %empty-directory(%t/modulecache)
 // RUN: echo "// swift-interface-format-version: 1.0" > %t/inputs/Foo.swiftinterface
-// RUN: echo "// swift-module-flags: -module-name Foo" >> %t/inputs/Foo.swiftinterface
+// RUN: echo "// swift-module-flags: -module-name Foo -enable-library-evolution" >> %t/inputs/Foo.swiftinterface
 // RUN: echo "@available(macOS 11, *)" >> %t/inputs/Foo.swiftinterface
 // RUN: echo "public class Foo {}" >> %t/inputs/Foo.swiftinterface
 // RUN: echo "public extension Foo { public func f() {} }" >> %t/inputs/Foo.swiftinterface
