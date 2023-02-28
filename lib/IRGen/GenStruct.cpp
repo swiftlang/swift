@@ -244,6 +244,17 @@ namespace {
 
     bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                    ReferenceCounting *rc) const override {
+      // If the type isn't copyable, it doesn't share representation with
+      // a single-refcounted pointer.
+      //
+      // This is sufficient to rule out types with user-defined deinits today,
+      // since copyable structs are not allowed to define a deinit. If we
+      // ever added user-defined copy constructors to the language, then we'd
+      // have to also check that.
+      if (!this->isCopyable(expansion)) {
+        return false;
+      }
+                                   
       auto fields = asImpl().getFields();
       if (fields.size() != 1)
         return false;
@@ -369,7 +380,10 @@ namespace {
                                 const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
                              fields, explosionSize, storageType, size,
-                             std::move(spareBits), align, IsPOD, IsFixedSize),
+                             std::move(spareBits), align,
+                             IsTriviallyDestroyable,
+                             IsCopyable,
+                             IsFixedSize),
           ClangDecl(clangDecl) {}
 
     TypeLayoutEntry
@@ -468,7 +482,10 @@ namespace {
                              // with user-defined special member functions.
                              SpareBitVector(llvm::Optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
-                             align, IsNotPOD, IsNotBitwiseTakable, IsFixedSize),
+                             align, IsNotTriviallyDestroyable,
+                             IsNotBitwiseTakable,
+                             IsCopyable,
+                             IsFixedSize),
           clangDecl(clangDecl) {
       (void)clangDecl;
     }
@@ -622,7 +639,11 @@ namespace {
                              // with user-defined special member functions.
                              SpareBitVector(llvm::Optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
-                             align, IsNotPOD, IsNotBitwiseTakable, IsFixedSize),
+                             align, IsNotTriviallyDestroyable, IsNotBitwiseTakable,
+                             // TODO: Set this appropriately for the type's
+                             // C++ import behavior.
+                             IsCopyable,
+                             IsFixedSize),
           ClangDecl(clangDecl) {
       (void)ClangDecl;
     }
@@ -805,12 +826,16 @@ namespace {
                            unsigned explosionSize,
                            llvm::Type *storageType, Size size,
                            SpareBitVector &&spareBits,
-                           Alignment align, IsPOD_t isPOD,
+                           Alignment align,
+                           IsTriviallyDestroyable_t isTriviallyDestroyable,
+                           IsCopyable_t isCopyable,
                            IsFixedSize_t alwaysFixedSize)
       : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo,
                            fields, explosionSize,
                            storageType, size, std::move(spareBits),
-                           align, isPOD, alwaysFixedSize)
+                           align, isTriviallyDestroyable,
+                           isCopyable,
+                           alwaysFixedSize)
     {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -892,11 +917,15 @@ namespace {
     // FIXME: Spare bits between struct members.
     FixedStructTypeInfo(ArrayRef<StructFieldInfo> fields, llvm::Type *T,
                         Size size, SpareBitVector &&spareBits,
-                        Alignment align, IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                        Alignment align,
+                        IsTriviallyDestroyable_t isTriviallyDestroyable,
+                        IsBitwiseTakable_t isBT,
+                        IsCopyable_t isCopyable,
                         IsFixedSize_t alwaysFixedSize)
       : StructTypeInfoBase(StructTypeInfoKind::FixedStructTypeInfo,
                            fields, T, size, std::move(spareBits), align,
-                           isPOD, isBT, alwaysFixedSize)
+                           isTriviallyDestroyable, isBT, isCopyable,
+                           alwaysFixedSize)
     {}
 
     TypeLayoutEntry
@@ -984,11 +1013,14 @@ namespace {
                            FieldsAreABIAccessible_t fieldsAccessible,
                            llvm::Type *T,
                            Alignment align,
-                           IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                           IsTriviallyDestroyable_t isTriviallyDestroyable,
+                           IsBitwiseTakable_t isBT,
+                           IsCopyable_t isCopyable,
                            IsABIAccessible_t structAccessible)
       : StructTypeInfoBase(StructTypeInfoKind::NonFixedStructTypeInfo,
                            fields, fieldsAccessible,
-                           T, align, isPOD, isBT, structAccessible) {
+                           T, align, isTriviallyDestroyable, isBT, isCopyable,
+                           structAccessible) {
     }
 
     TypeLayoutEntry
@@ -1115,7 +1147,8 @@ namespace {
                                             layout.getSize(),
                                             std::move(layout.getSpareBits()),
                                             layout.getAlignment(),
-                                            layout.isPOD(),
+                                            layout.isTriviallyDestroyable(),
+                                            layout.isCopyable(),
                                             layout.isAlwaysFixedSize());
     }
 
@@ -1125,8 +1158,9 @@ namespace {
                                          layout.getSize(),
                                          std::move(layout.getSpareBits()),
                                          layout.getAlignment(),
-                                         layout.isPOD(),
+                                         layout.isTriviallyDestroyable(),
                                          layout.isBitwiseTakable(),
+                                         layout.isCopyable(),
                                          layout.isAlwaysFixedSize());
     }
 
@@ -1138,8 +1172,9 @@ namespace {
       return NonFixedStructTypeInfo::create(fields, fieldsAccessible,
                                             layout.getType(),
                                             layout.getAlignment(),
-                                            layout.isPOD(),
+                                            layout.isTriviallyDestroyable(),
                                             layout.isBitwiseTakable(),
+                                            layout.isCopyable(),
                                             structAccessible);
     }
 
@@ -1388,9 +1423,9 @@ private:
     auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
     if (isEmpty)
       layout.completeEmptyTailAllocatedCType(
-          fieldType.isPOD(ResilienceExpansion::Maximal), NextOffset);
+          fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
     else
-      layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
+      layout.completeFixed(fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());
 
     if (isLoadableField)
@@ -1516,8 +1551,10 @@ namespace {
       : public ResilientTypeInfo<ResilientStructTypeInfo>
   {
   public:
-    ResilientStructTypeInfo(llvm::Type *T, IsABIAccessible_t abiAccessible)
-      : ResilientTypeInfo(T, abiAccessible) {
+    ResilientStructTypeInfo(llvm::Type *T,
+                            IsCopyable_t copyable,
+                            IsABIAccessible_t abiAccessible)
+      : ResilientTypeInfo(T, copyable, abiAccessible) {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
     }
 
@@ -1531,9 +1568,10 @@ namespace {
 } // end anonymous namespace
 
 const TypeInfo *
-TypeConverter::convertResilientStruct(IsABIAccessible_t abiAccessible) {
+TypeConverter::convertResilientStruct(IsCopyable_t copyable,
+                                      IsABIAccessible_t abiAccessible) {
   llvm::Type *storageType = IGM.OpaqueTy;
-  return new ResilientStructTypeInfo(storageType, abiAccessible);
+  return new ResilientStructTypeInfo(storageType, copyable, abiAccessible);
 }
 
 const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
@@ -1548,9 +1586,11 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
       || IGM.getSILTypes().getTypeLowering(SILType::getPrimitiveAddressType(type),
                                             TypeExpansionContext::minimal())
             .getRecursiveProperties().isInfinite()) {
+    auto copyable = D->isMoveOnly()
+      ? IsNotCopyable : IsCopyable;
     auto structAccessible =
       IsABIAccessible_t(IGM.getSILModule().isTypeMetadataAccessible(type));
-    return &getResilientStructTypeInfo(structAccessible);
+    return &getResilientStructTypeInfo(copyable, structAccessible);
   }
 
   // Create the struct type.

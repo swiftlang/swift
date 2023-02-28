@@ -4578,6 +4578,18 @@ bool NominalTypeDecl::isResilient() const {
   return getModuleContext()->isResilient();
 }
 
+DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
+  if (!isa<StructDecl>(this) && !isa<EnumDecl>(this)) {
+    return nullptr;
+  }
+  
+  auto found = lookupDirect(DeclBaseName::createDestructor());
+  if (found.size() != 1) {
+    return nullptr;
+  }
+  return cast<DestructorDecl>(found[0]);
+}
+
 static bool isOriginallyDefinedIn(const Decl *D, const ModuleDecl* MD) {
   if (!MD)
     return false;

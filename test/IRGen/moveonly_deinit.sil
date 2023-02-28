@@ -1,4 +1,8 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -emit-ir %s | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %{python} %utils/chex.py < %s > %t/moveonly_deinit.sil
+// RUN: %target-swift-frontend -enable-experimental-move-only -emit-ir %t/moveonly_deinit.sil | %FileCheck %t/moveonly_deinit.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+// UNSUPPORTED: CPU=arm64e
 
 import Builtin
 import Swift
@@ -10,6 +14,10 @@ sil_stage canonical
 
 class C {}
 
+// CHECK-LABEL: @{{.*}}8MOStructVWV" =
+// noncopyable, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x81_0007>
+// CHECK-32-SAME: <i32 0x81_0003>
 @_moveOnly
 struct MOStruct {
   var x: Int
@@ -18,6 +26,10 @@ struct MOStruct {
   deinit
 }
 
+// CHECK-LABEL: @{{.*}}6MOEnumOWV" =
+// noncopyable, enum, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0xA1_0007>
+// CHECK-32-SAME: <i32 0xA1_0003>
 @_moveOnly
 enum MOEnum {
   case x(Int)
@@ -26,6 +38,10 @@ enum MOEnum {
   deinit
 }
 
+// CHECK-LABEL: @{{.*}}13MOComboStructVWV" =
+// noncopyable, non-inline, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x83_0007>
+// CHECK-32-SAME: <i32 0x83_0003>
 @_moveOnly
 struct MOComboStruct {
   var a: MOStruct
@@ -33,6 +49,10 @@ struct MOComboStruct {
   var c: C
 }
 
+// CHECK-LABEL: @{{.*}}11MOComboEnumOWV" =
+// noncopyable, enum, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0xA1_0007>
+// CHECK-32-SAME: <i32 0xA1_0003>
 @_moveOnly
 enum MOComboEnum {
   case a(MOStruct)
@@ -42,6 +62,19 @@ enum MOComboEnum {
 
 // Move-only types should not share value witnesses or box metadata with
 // common layout types.
+
+// CHECK-LABEL: @{{.*}}13MOEmptyStructVWV" =
+// noncopyable, nontrivial deinit, byte aligned
+// CHECK-SAME: <i32 0x81_0000>
+@_moveOnly
+struct MOEmptyStruct {
+  deinit
+}
+
+// CHECK-LABEL: @{{.*}}15MOIntLikeStructVWV" =
+// noncopyable, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x81_0007>
+// CHECK-32-SAME: <i32 0x81_0003>
 @_moveOnly
 struct MOIntLikeStruct {
   var x: Int
@@ -49,6 +82,10 @@ struct MOIntLikeStruct {
   deinit
 }
 
+// CHECK-LABEL: @{{.*}}26MOSingleRefcountLikeStructVWV" =
+// noncopyable, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x81_0007>
+// CHECK-32-SAME: <i32 0x81_0003>
 @_moveOnly
 struct MOSingleRefcountLikeStruct {
   var x: C
@@ -56,6 +93,54 @@ struct MOSingleRefcountLikeStruct {
   deinit
 }
 
+// Even if they don't have deinits, we shouldn't share a vwt.
+
+// CHECK-LABEL: @{{.*}}21MOEmptyStructNoDeinitVWV" =
+// noncopyable, trivial deinit, byte aligned
+// CHECK-SAME: <i32 0x80_0000>
+@_moveOnly
+struct MOEmptyStructNoDeinit {
+}
+
+// CHECK-LABEL: @{{.*}}23MOIntLikeStructNoDeinitVWV" =
+// noncopyable, trivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x80_0007>
+// CHECK-32-SAME: <i32 0x80_0003>
+@_moveOnly
+struct MOIntLikeStructNoDeinit {
+  var x: Int
+}
+
+// CHECK-LABEL: @{{.*}}34MOSingleRefcountLikeStructNoDeinitVWV" =
+// noncopyable, nontrivial deinit, pointer aligned
+// CHECK-64-SAME: <i32 0x81_0007>
+// CHECK-32-SAME: <i32 0x81_0003>
+@_moveOnly
+struct MOSingleRefcountLikeStructNoDeinit {
+  var x: C
+}
+
+// Very large structs will use indirect conventions for their deinit.
+
+@_moveOnly
+struct MOVeryBigStructDeinit {
+  var x: Int, y: Int, z: Int, w: Int, a: Int, b: Int, c: Int, d: Int
+
+  deinit
+}
+
+// Generic structs have equally generic deinits.
+
+protocol P {}
+extension Int: P {}
+
+@_moveOnly
+struct MOGenericDeinit<T: P, U> {
+  var t: T
+  var u: U
+
+  deinit
+}
 
 // CHECK-LABEL: define{{.*}}@destroy_struct_value(
 // CHECK-NEXT:  entry:
@@ -82,12 +167,28 @@ entry(%b : $*MOStruct):
   return undef : $()
 }
 
+// CHECK-LABEL: define{{.*}}@destroy_enum_value(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    trunc
+// CHECK-NEXT:    zext
+// CHECK-NEXT:    call{{.*}}@destroy_enum(
+// CHECK-NEXT:    ret void
 sil @destroy_enum_value : $@convention(thin) (@owned MOEnum) -> () {
 entry(%b : $MOEnum):
   release_value %b : $MOEnum
   return undef : $()
 }
 
+// CHECK-LABEL: define{{.*}}@destroy_enum_value_indirect(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    bitcast
+// CHECK-NEXT:    load
+// CHECK-NEXT:    getelementptr
+// CHECK-NEXT:    bitcast
+// CHECK-NEXT:    load
+// CHECK-NEXT:    zext
+// CHECK-NEXT:    call{{.*}}@destroy_enum(
+// CHECK-NEXT:    ret void
 sil @destroy_enum_value_indirect : $@convention(thin) (@in MOEnum) -> () {
 entry(%b : $*MOEnum):
   destroy_addr %b : $*MOEnum
@@ -106,7 +207,7 @@ entry(%b : $MOComboStruct):
 
 // CHECK: define{{.*}}@[[COMBO_STRUCT_OUTLINED_DESTROY]](
 // CHECK:   call {{.*}} @destroy_struct
-// CH/ECK:   call {{.*}} @destroy_enum
+// CHECK:   call {{.*}} @destroy_enum
 // CHECK:   call {{.*}} @swift_release
 // CHECK:   ret {{.*}} %0
 
@@ -129,16 +230,56 @@ entry(%b : $MOComboEnum):
 // CHECK:      [[STRUCT]]:
 // CHECK:        call {{.*}} @destroy_struct
 // CHECK:      [[ENUM]]:
-// C/HECK:        call {{.*}} @destroy_enum
+// CHECK:        call {{.*}} @destroy_enum
 // CHECK:      [[CLASS]]:
 // CHECK:        call {{.*}} @swift_release
+
+// CHECK-LABEL: define{{.*}}@destroy_very_big_direct(
+// CHECK:         call {{.*}} @destroy_big(
+sil @destroy_very_big_direct : $@convention(thin) (@owned MOVeryBigStructDeinit) -> () {
+entry(%b : $MOVeryBigStructDeinit):
+  release_value %b : $MOVeryBigStructDeinit
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}}@destroy_very_big_indirect(
+// CHECK:         call {{.*}} @destroy_big(
+sil @destroy_very_big_indirect : $@convention(thin) (@in MOVeryBigStructDeinit) -> () {
+entry(%b : $*MOVeryBigStructDeinit):
+  destroy_addr %b : $*MOVeryBigStructDeinit
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}}@destroy_generic_instance_t(
+// CHECK:         call {{.*}} @destroy_generic(
+sil @destroy_generic_instance_t : $@convention(thin) (@owned MOGenericDeinit<Int, Int>) -> () {
+entry(%b : $MOGenericDeinit<Int, Int>):
+  release_value %b : $MOGenericDeinit<Int, Int>
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}}@destroy_generic_instance_nt(
+// CHECK:         call {{.*}} @destroy_generic(
+sil @destroy_generic_instance_nt : $@convention(thin) (@owned MOGenericDeinit<Int, C>) -> () {
+entry(%b : $MOGenericDeinit<Int, C>):
+  release_value %b : $MOGenericDeinit<Int, C>
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}}@destroy_generic_poly(
+// CHECK:         call {{.*}} @destroy_generic(
+sil @destroy_generic_poly : $@convention(thin) <U, T: P> (@in MOGenericDeinit<T, U>) -> () {
+entry(%b : $*MOGenericDeinit<T, U>):
+  destroy_addr %b : $*MOGenericDeinit<T, U>
+  return undef : $()
+}
 
 // CHECK-LABEL: define{{.*}}@box_struct(
 // CHECK:         call {{.*}} @swift_allocObject({{.*}} %swift.full_boxmetadata* @[[BOX_STRUCT_METADATA]],
 
 // CHECK:       define{{.*}}@[[BOX_STRUCT_DESTRUCTOR]](
 // CHECK:        call {{.*}} @destroy_struct
-// C/HECK:        call {{.*}} @destroy_enum
+// CHECK:        call {{.*}} @destroy_enum
 // CHECK:        call {{.*}} @swift_release
 sil @box_struct : $@convention(thin) (@owned MOComboStruct) -> Builtin.NativeObject {
 entry(%0 : $MOComboStruct):
@@ -152,14 +293,21 @@ entry(%0 : $MOComboStruct):
 sil @destroy_struct : $@convention(method) (@owned MOStruct) -> ()
 sil @destroy_enum : $@convention(method) (@owned MOEnum) -> ()
 sil @destroy_intlike_struct : $@convention(method) (@owned MOIntLikeStruct) -> ()
+sil @destroy_empty_struct : $@convention(method) (@owned MOEmptyStruct) -> ()
 sil @destroy_single_refcount_like_struct : $@convention(method) (@owned MOSingleRefcountLikeStruct) -> ()
+
+sil @destroy_big : $@convention(method) (@in MOVeryBigStructDeinit) -> ()
+sil @destroy_generic : $@convention(method) <T: P, U> (@in MOGenericDeinit<T, U>) -> ()
 
 sil_vtable C {}
 
 sil_moveonlydeinit MOStruct { @destroy_struct }
 sil_moveonlydeinit MOEnum { @destroy_enum }
+sil_moveonlydeinit MOEmptyStruct { @destroy_empty_struct }
 sil_moveonlydeinit MOIntLikeStruct { @destroy_intlike_struct }
 sil_moveonlydeinit MOSingleRefcountLikeStruct { @destroy_single_refcount_like_struct }
+sil_moveonlydeinit MOVeryBigStructDeinit { @destroy_big }
+sil_moveonlydeinit MOGenericDeinit { @destroy_generic }
 
 // Check that destroy value witnesses invoke the deinit function, either
 // indirectly or directly.
@@ -167,13 +315,17 @@ sil_moveonlydeinit MOSingleRefcountLikeStruct { @destroy_single_refcount_like_st
 // CHECK-LABEL: define {{.*}} @"{{.*}}8MOStructVwxx"
 // CHECK:         call {{.*}} @destroy_struct(
 // CHECK-LABEL: define {{.*}} @"{{.*}}6MOEnumOwxx"
-// C/HECK:         call {{.*}} @destroy_enum(
+// CHECK:         call {{.*}} @destroy_enum(
 // CHECK-LABEL: define {{.*}} @"{{.*}}13MOComboStructVwxx"
 // CHECK:         call {{.*}} @destroy_struct(
-// C/HECK:         call {{.*}} @destroy_enum(
+// CHECK:         call {{.*}} @destroy_enum(
 // CHECK:         call {{.*}} @swift_retain(
 // CHECK-LABEL: define {{.*}} @"{{.*}}11MOComboEnumOwxx"
 // CHECK:         call {{.*}} @[[COMBO_ENUM_OUTLINED_DESTROY]]
 
-// C/HECK-LABEL: define {{.*}} @"{{.*}}15MOIntLikeStructVwxx"
-// C/HECK-LABEL: define {{.*}} @"{{.*}}26MOSingleRefcountLikeStructVwxx"
+// CHECK-LABEL: define {{.*}} @"{{.*}}13MOEmptyStructVwxx"
+// CHECK:         call {{.*}} @destroy_empty_struct(
+// CHECK-LABEL: define {{.*}} @"{{.*}}15MOIntLikeStructVwxx"
+// CHECK:         call {{.*}} @destroy_intlike_struct(
+// CHECK-LABEL: define {{.*}} @"{{.*}}26MOSingleRefcountLikeStructVwxx"
+// CHECK:         call {{.*}} @destroy_single_refcount_like_struct(
