@@ -37,7 +37,9 @@
 #include "EnumPayload.h"
 #include "LegacyLayoutFormat.h"
 #include "LoadableTypeInfo.h"
+#include "GenCall.h"
 #include "GenMeta.h"
+#include "GenPoly.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -2856,8 +2858,9 @@ void TypeInfo::verify(IRGenTypeVerifierFunction &IGF,
 
 static bool tryEmitDeinitCall(IRGenFunction &IGF,
                           SILType T,
-                          llvm::function_ref<void (CallEmission*)> direct,
-                          llvm::function_ref<void (CallEmission*)> indirect) {
+                          llvm::function_ref<void (Explosion &)> direct,
+                          llvm::function_ref<Address ()> indirect,
+                          llvm::function_ref<void ()> indirectCleanup) {
   auto ty = T.getASTType();
   auto nominal = ty->getAnyNominal();
   // We are only concerned with move-only type deinits here.
@@ -2888,38 +2891,80 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
                                      substitutions,
                                      IGF.IGM.getMaximalTypeExpansionContext()),
                   substitutions);
-  Callee deinitCallee(std::move(info), deinitFP, nullptr);
-  auto callEmission = getCallEmission(IGF, nullptr, std::move(deinitCallee));
-  callEmission->begin();
+                  
+  bool isIndirect;
+  Address indirectArg;
+  Explosion directArg;
   switch (deinitTy->getParameters()[0].getConvention()) {
   case ParameterConvention::Direct_Owned:
-    direct(callEmission.get());
+    isIndirect = false;
+    direct(directArg);
     break;
   case ParameterConvention::Indirect_In:
-    indirect(callEmission.get());
+    isIndirect = true;
+    indirectArg = indirect();
     break;
   default:
     llvm_unreachable("move-only deinit should only have consuming parameter convention");
   }
+                  
+  // If the deinit's convention has a special `self` parameter, then the
+  // (pointer to) the value being destroyed is that parameter.
+  llvm::Value *self = nullptr;
+  if (hasSelfContextParameter(deinitTy)) {
+    self = isIndirect ? indirectArg.getAddress() : directArg.claimNext();
+    assert(directArg.empty()
+           && "direct param (if any) should be a single pointer if "
+              "it's the swiftself param");
+  }
+   
+  GenericContextScope scope(IGF.IGM,
+                        nominal->getGenericSignature().getCanonicalSignature());
+
+  Callee deinitCallee(std::move(info), deinitFP, self);
+  auto callEmission = getCallEmission(IGF, self, std::move(deinitCallee));
+  callEmission->begin();
+  // Pass the parameter if it wasn't already the by-convention self parameter.
+  if (!self) {
+    if (isIndirect) {
+      directArg.add(indirectArg.getAddress());
+    }
+  }
+  if (hasPolymorphicParameters(deinitTy)) {
+    emitPolymorphicArguments(IGF, deinitTy, substitutions, nullptr,
+                             directArg);
+  }
+  callEmission->setArgs(directArg, /*outlined*/ false, /*witness*/nullptr);
   Explosion nothing;
   callEmission->emitToExplosion(nothing, /*isOutlined*/ false);
   callEmission->end();
+  if (isIndirect) {
+    indirectCleanup();
+  }
   return true;
 }
 
 bool irgen::tryEmitConsumeUsingDeinit(IRGenFunction &IGF, Explosion &explosion,
                                       SILType T) {
   const LoadableTypeInfo *ti = cast<LoadableTypeInfo>(&IGF.getTypeInfo(T));
+  StackAddress temporary;
   return tryEmitDeinitCall(IGF, T,
     // Direct parameter case
-    [&](CallEmission *deinitFn) {
-      Explosion arg;
+    [&](Explosion &arg) {
       ti->reexplode(IGF, explosion, arg);
-      deinitFn->setArgs(arg, /*outlined*/ false, nullptr);
     },
-    // Indirect parameter case
-    [&](CallEmission *deinitFn) {
-      llvm_unreachable("todo");
+    // Indirect parameter setup
+    [&]() -> Address {
+      // Allocate stack space to store the indirect argument, and forward our
+      // value into it. The deinit will consume the value in memory.
+      temporary = ti->allocateStack(IGF, T, "deinit.arg");
+      ti->initialize(IGF, explosion, temporary.getAddress(), /*outlined*/false);
+      return temporary.getAddress();
+    },
+    // Indirect parameter teardown
+    [&]{
+      // End the lifetime of the stack allocation.
+      ti->deallocateStack(IGF, temporary, T);
     });
 }
 
@@ -2927,15 +2972,15 @@ bool irgen::tryEmitDestroyUsingDeinit(IRGenFunction &IGF, Address address,
                                       SILType T) {
   return tryEmitDeinitCall(IGF, T,
     // Direct parameter case
-    [&](CallEmission *deinitFn) {
+    [&](Explosion &arg) {
       // Load the value from the address.
       auto *ti = cast<LoadableTypeInfo>(&IGF.getTypeInfo(T));
-      Explosion arg;
       ti->loadAsTake(IGF, address, arg);
-      deinitFn->setArgs(arg, /*outlined*/ false, nullptr);
     },
-    // Indirect parameter case
-    [&](CallEmission *deinitFn) {
-      llvm_unreachable("todo");
-    });
+    // Indirect parameter setup
+    [&]() -> Address {
+      return address;
+    },
+    // Indirect parameter teardown
+    [&]{ /* nothing to do */ });
 }

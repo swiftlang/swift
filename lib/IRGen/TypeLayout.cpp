@@ -406,7 +406,7 @@ static std::string scalarToString(ScalarKind kind) {
   case ScalarKind::BlockReference: return "BlockReference";
   case ScalarKind::BridgeReference: return "BridgeReference";
   case ScalarKind::ObjCReference: return "ObjCReference";
-  case ScalarKind::POD: return "POD";
+  case ScalarKind::TriviallyDestroyable: return "TriviallyDestroyable";
   case ScalarKind::Immovable: return "Immovable";
   case ScalarKind::BlockStorage: return "BlockStorage";
   case ScalarKind::ThickFunc: return "ThickFunc";
@@ -2182,7 +2182,7 @@ llvm::Constant *
 EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
                                   GenericSignature genericSig) const {
   switch (copyDestroyKind(IGM)) {
-  case CopyDestroyStrategy::POD:
+  case CopyDestroyStrategy::TriviallyDestroyable:
   case CopyDestroyStrategy::Normal: {
     return nullptr;
   }
@@ -2217,7 +2217,7 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                          LayoutStringBuilder &B,
                                          GenericSignature genericSig) const {
   switch (copyDestroyKind(IGM)) {
-  case CopyDestroyStrategy::POD: {
+  case CopyDestroyStrategy::TriviallyDestroyable: {
     auto size = fixedSize(IGM);
     assert(size && "POD should not have dynamic size");
     B.addSkip(size->getValue());
@@ -2247,15 +2247,9 @@ void EnumTypeLayoutEntry::computeProperties() {
 }
 
 EnumTypeLayoutEntry::CopyDestroyStrategy
-<<<<<<< HEAD
 EnumTypeLayoutEntry::copyDestroyKind(IRGenModule &IGM) const {
-  if (isPOD()) {
-    return POD;
-=======
-EnumTypeLayoutEntry::copyDestroyKind(IRGenFunction &IGF) const {
   if (isTriviallyDestroyable()) {
     return TriviallyDestroyable;
->>>>>>> eb015805016 (IRGen: Rename internal 'POD' references to 'TriviallyDestroyable'.)
   } else if (isSingleton()) {
     return ForwardToPayload;
   } else if (cases.size() == 1 && numEmptyCases <= 1 &&
@@ -2580,13 +2574,8 @@ void EnumTypeLayoutEntry::initializeSinglePayloadEnum(IRGenFunction &IGF,
   auto &IGM = IGF.IGM;
   auto &Builder = IGF.Builder;
 
-<<<<<<< HEAD
   switch (copyDestroyKind(IGM)) {
-  case POD: {
-=======
-  switch (copyDestroyKind(IGF)) {
   case TriviallyDestroyable: {
->>>>>>> eb015805016 (IRGen: Rename internal 'POD' references to 'TriviallyDestroyable'.)
     emitMemCpy(IGF, dest, src, size(IGF));
     break;
   }
@@ -2644,13 +2633,8 @@ void EnumTypeLayoutEntry::assignSinglePayloadEnum(IRGenFunction &IGF,
   auto &IGM = IGF.IGM;
   auto &Builder = IGF.Builder;
 
-<<<<<<< HEAD
   switch (copyDestroyKind(IGM)) {
-  case POD: {
-=======
-  switch (copyDestroyKind(IGF)) {
   case TriviallyDestroyable: {
->>>>>>> eb015805016 (IRGen: Rename internal 'POD' references to 'TriviallyDestroyable'.)
     emitMemCpy(IGF, dest, src, size(IGF));
     break;
   }
@@ -2837,13 +2821,8 @@ void EnumTypeLayoutEntry::initializeMultiPayloadEnum(IRGenFunction &IGF,
 
 void EnumTypeLayoutEntry::destroySinglePayloadEnum(IRGenFunction &IGF,
                                                    Address addr) const {
-<<<<<<< HEAD
   switch (copyDestroyKind(IGF.IGM)) {
-  case POD: {
-=======
-  switch (copyDestroyKind(IGF)) {
   case TriviallyDestroyable: {
->>>>>>> eb015805016 (IRGen: Rename internal 'POD' references to 'TriviallyDestroyable'.)
     break;
   }
   case ForwardToPayload:

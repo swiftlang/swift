@@ -2,6 +2,8 @@
 // RUN: %{python} %utils/chex.py < %s > %t/moveonly_deinit.sil
 // RUN: %target-swift-frontend -enable-experimental-move-only -emit-ir %t/moveonly_deinit.sil | %FileCheck %t/moveonly_deinit.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
+// UNSUPPORTED: CPU=arm64e
+
 import Builtin
 import Swift
 
@@ -118,6 +120,28 @@ struct MOSingleRefcountLikeStructNoDeinit {
   var x: C
 }
 
+// Very large structs will use indirect conventions for their deinit.
+
+@_moveOnly
+struct MOVeryBigStructDeinit {
+  var x: Int, y: Int, z: Int, w: Int, a: Int, b: Int, c: Int, d: Int
+
+  deinit
+}
+
+// Generic structs have equally generic deinits.
+
+protocol P {}
+extension Int: P {}
+
+@_moveOnly
+struct MOGenericDeinit<T: P, U> {
+  var t: T
+  var u: U
+
+  deinit
+}
+
 // CHECK-LABEL: define{{.*}}@destroy_struct_value(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    call{{.*}}@destroy_struct(
@@ -210,6 +234,46 @@ entry(%b : $MOComboEnum):
 // CHECK:      [[CLASS]]:
 // CHECK:        call {{.*}} @swift_release
 
+// CHECK-LABEL: define{{.*}}@destroy_very_big_direct(
+// CHECK:         call {{.*}} @destroy_big(
+sil @destroy_very_big_direct : $@convention(thin) (@owned MOVeryBigStructDeinit) -> () {
+entry(%b : $MOVeryBigStructDeinit):
+  release_value %b : $MOVeryBigStructDeinit
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}}@destroy_very_big_indirect(
+// CHECK:         call {{.*}} @destroy_big(
+sil @destroy_very_big_indirect : $@convention(thin) (@in MOVeryBigStructDeinit) -> () {
+entry(%b : $*MOVeryBigStructDeinit):
+  destroy_addr %b : $*MOVeryBigStructDeinit
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}}@destroy_generic_instance_t(
+// CHECK:         call {{.*}} @destroy_generic(
+sil @destroy_generic_instance_t : $@convention(thin) (@owned MOGenericDeinit<Int, Int>) -> () {
+entry(%b : $MOGenericDeinit<Int, Int>):
+  release_value %b : $MOGenericDeinit<Int, Int>
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}}@destroy_generic_instance_nt(
+// CHECK:         call {{.*}} @destroy_generic(
+sil @destroy_generic_instance_nt : $@convention(thin) (@owned MOGenericDeinit<Int, C>) -> () {
+entry(%b : $MOGenericDeinit<Int, C>):
+  release_value %b : $MOGenericDeinit<Int, C>
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}}@destroy_generic_poly(
+// CHECK:         call {{.*}} @destroy_generic(
+sil @destroy_generic_poly : $@convention(thin) <U, T: P> (@in MOGenericDeinit<T, U>) -> () {
+entry(%b : $*MOGenericDeinit<T, U>):
+  destroy_addr %b : $*MOGenericDeinit<T, U>
+  return undef : $()
+}
+
 // CHECK-LABEL: define{{.*}}@box_struct(
 // CHECK:         call {{.*}} @swift_allocObject({{.*}} %swift.full_boxmetadata* @[[BOX_STRUCT_METADATA]],
 
@@ -232,6 +296,9 @@ sil @destroy_intlike_struct : $@convention(method) (@owned MOIntLikeStruct) -> (
 sil @destroy_empty_struct : $@convention(method) (@owned MOEmptyStruct) -> ()
 sil @destroy_single_refcount_like_struct : $@convention(method) (@owned MOSingleRefcountLikeStruct) -> ()
 
+sil @destroy_big : $@convention(method) (@in MOVeryBigStructDeinit) -> ()
+sil @destroy_generic : $@convention(method) <T: P, U> (@in MOGenericDeinit<T, U>) -> ()
+
 sil_vtable C {}
 
 sil_moveonlydeinit MOStruct { @destroy_struct }
@@ -239,6 +306,8 @@ sil_moveonlydeinit MOEnum { @destroy_enum }
 sil_moveonlydeinit MOEmptyStruct { @destroy_empty_struct }
 sil_moveonlydeinit MOIntLikeStruct { @destroy_intlike_struct }
 sil_moveonlydeinit MOSingleRefcountLikeStruct { @destroy_single_refcount_like_struct }
+sil_moveonlydeinit MOVeryBigStructDeinit { @destroy_big }
+sil_moveonlydeinit MOGenericDeinit { @destroy_generic }
 
 // Check that destroy value witnesses invoke the deinit function, either
 // indirectly or directly.
