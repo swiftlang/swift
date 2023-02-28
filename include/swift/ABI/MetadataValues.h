@@ -1793,6 +1793,9 @@ enum class GenericParamKind : uint8_t {
   /// A type parameter.
   Type = 0,
 
+  /// A type parameter pack.
+  TypePack = 1,
+
   Max = 0x3F,
 };
 
@@ -1899,11 +1902,13 @@ class GenericRequirementFlags {
 public:
   constexpr GenericRequirementFlags(GenericRequirementKind kind,
                                     bool hasKeyArgument,
-                                    bool hasExtraArgument)
+                                    bool hasExtraArgument,
+                                    bool isPackRequirement)
     : GenericRequirementFlags(GenericRequirementFlags(0)
                          .withKind(kind)
                          .withKeyArgument(hasKeyArgument)
-                         .withExtraArgument(hasExtraArgument))
+                         .withExtraArgument(hasExtraArgument)
+                         .withPackRequirement(isPackRequirement))
   {}
 
   constexpr bool hasKeyArgument() const {
@@ -1912,6 +1917,13 @@ public:
 
   constexpr bool hasExtraArgument() const {
     return (Value & 0x40u) != 0;
+  }
+
+  /// If this is true, the subject type of the requirement is a pack.
+  /// When the requirement is a conformance requirement, the corresponding
+  /// entry in the generic arguments array becomes a TargetWitnessTablePack.
+  constexpr bool isPackRequirement() const {
+    return (Value & 0x20u) != 0;
   }
 
   constexpr GenericRequirementKind getKind() const {
@@ -1928,6 +1940,12 @@ public:
   withExtraArgument(bool hasExtraArgument) const {
     return GenericRequirementFlags((Value & 0xBFu)
       | (hasExtraArgument ? 0x40u : 0));
+  }
+
+  constexpr GenericRequirementFlags
+  withPackRequirement(bool isPackRequirement) const {
+    return GenericRequirementFlags((Value & 0xBFu)
+      | (isPackRequirement ? 0x20u : 0));
   }
 
   constexpr GenericRequirementFlags

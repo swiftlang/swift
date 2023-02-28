@@ -244,6 +244,25 @@ public:
 using GenericRequirementDescriptor =
   TargetGenericRequirementDescriptor<InProcess>;
 
+struct GenericParamPackShapeHeader {
+  /// The number of generic parameters which are packs.
+  ///
+  /// Must equal the number of GenericParamDescriptors whose kind is
+  /// GenericParamKind::TypePack.
+  uint16_t NumTypePacks;
+
+  /// The number of equivalence classes in the same-shape relation.
+  uint16_t NumShapeClasses;
+};
+
+struct GenericParamPackShapeDescriptor {
+  /// The equivalence class of this generic parameter pack under
+  /// the same-shape relation.
+  ///
+  /// Must be less than GenericParamPackShapeHeader::NumShapeClasses.
+  uint16_t ShapeClass;
+};
+
 /// An array of generic parameter descriptors, all
 /// GenericParamDescriptor::implicit(), which is by far
 /// the most common case.  Some generic context storage can
@@ -386,6 +405,8 @@ class TrailingGenericContextObjects<TargetSelf<Runtime>,
       TargetGenericContextHeaderType<Runtime>,
       GenericParamDescriptor,
       TargetGenericRequirementDescriptor<Runtime>,
+      GenericParamPackShapeHeader,
+      GenericParamPackShapeDescriptor,
       FollowingTrailingObjects...>
 {
 protected:
@@ -398,6 +419,8 @@ protected:
     GenericContextHeaderType,
     GenericParamDescriptor,
     GenericRequirementDescriptor,
+    GenericParamPackShapeHeader,
+    GenericParamPackShapeDescriptor,
     FollowingTrailingObjects...>;
   friend TrailingObjects;
 
@@ -451,6 +474,23 @@ public:
     return {this->template getTrailingObjects<GenericRequirementDescriptor>(),
             getGenericContextHeader().NumRequirements};
   }
+  
+  const GenericParamPackShapeHeader *getGenericParamPackShapeHeader() const {
+    if (!asSelf()->isGeneric())
+      return nullptr;
+    if (!getGenericContextHeader().Flags.hasTypePacks())
+      return nullptr;
+    return this->template getTrailingObjects<GenericParamPackShapeHeader>();
+  }
+
+  llvm::ArrayRef<GenericParamPackShapeDescriptor> getGenericParamPackShapeDescriptors() const {
+    auto *header = getGenericParamPackShapeHeader();
+    if (header == nullptr)
+      return {};
+
+    return {this->template getTrailingObjects<GenericParamPackShapeDescriptor>(),
+            header->NumTypePacks};
+  }
 
   /// Return the amount of space that the generic arguments take up in
   /// metadata of this type.
@@ -477,6 +517,23 @@ protected:
 
   size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
     return asSelf()->isGeneric() ? getGenericContextHeader().NumRequirements : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericParamPackShapeHeader>) const {
+    if (!asSelf()->isGeneric())
+      return 0;
+
+    return getGenericContextHeader().Flags.hasTypePacks() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericParamPackShapeDescriptor>) const {
+    if (!asSelf()->isGeneric())
+      return 0;
+
+    if (!getGenericContextHeader().Flags.hasTypePacks())
+      return 0;
+
+    return getGenericParamPackShapeHeader()->NumTypePacks;
   }
 
 #if defined(_MSC_VER) && _MSC_VER < 1920
