@@ -1,7 +1,5 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=INITIALIZER | %FileCheck %s --check-prefix=INITIALIZER
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=METHOD | %FileCheck %s --check-prefix=METHOD
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABILITY | %FileCheck %s --check-prefix=AVAILABILITY
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC | %FileCheck %s --check-prefix=STATIC
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 protocol MyProtocol {
   init(init1: Int)
@@ -88,4 +86,34 @@ func testStaticFunc() {
 // STATIC-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#(self): TestStatic#}[')'][#() -> Void#];
 // STATIC-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#(self): TestStatic#}[')'][#() -> Void#];
 // STATIC: End completions
+}
+
+protocol TestShadowedProtocol {}
+
+extension TestShadowedProtocol {
+  func argOverloaded(arg: String) {}
+  func argOverloaded(arg: Int) {}
+
+  func returnTypeOverloaded() -> String {}
+  func returnTypeOverloaded() -> Int {}
+}
+
+struct TestShadowedStruct: TestShadowedProtocol {
+  func argOverloaded(arg: String) {}
+
+  func returnTypeOverloaded() -> String {}
+
+  func test() {
+    self.argOverloaded(#^ARG_OVERLOADED^#)
+    // ARG_OVERLOADED: Begin completions, 2 items
+    // ARG_OVERLOADED-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#arg: String#}[')'][#Void#]; name=arg:
+    // ARG_OVERLOADED-DAG: Decl[InstanceMethod]/Super/Flair[ArgLabels]: ['(']{#arg: Int#}[')'][#Void#]; name=arg:
+    // ARG_OVERLOADED: End completions
+
+    self.returnTypeOverloaded(#^RETURN_OVERLOADED^#)
+    // RETURN_OVERLOADED: Begin completions, 2 items
+    // RETURN_OVERLOADED-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['('][')'][#String#]; name=
+    // RETURN_OVERLOADED-DAG: Decl[InstanceMethod]/Super/Flair[ArgLabels]: ['('][')'][#Int#]; name=
+    // RETURN_OVERLOADED: End completions
+  }
 }
