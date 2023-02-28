@@ -563,7 +563,7 @@ extension TaskGroup: Sendable { }
 /// - when an error is thrown out of the `withThrowingTaskGroup(...) { }` closure,
 /// - when the ``Task`` running this task group is cancelled.
 ///
-/// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
+/// Since a `ThrowingTaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///

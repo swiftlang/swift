@@ -506,11 +506,7 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
 /// use a ``DiscardingTaskGroup`` instead of a throwing one, or catch specific errors in
 /// operations submitted using `addTask`
 ///
-/// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
-/// automatically propagated through all of its child-tasks (and their child
-/// tasks).
-///
-/// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
+/// Since a `ThrowingDiscardingTaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
