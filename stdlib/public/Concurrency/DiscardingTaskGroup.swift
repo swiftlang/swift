@@ -119,7 +119,6 @@ public func withDiscardingTaskGroup<GroupResult>(
 /// A discarding task group becomes cancelled in one of the following ways:
 ///
 /// - when ``cancelAll()`` is invoked on it,
-/// - when an error is thrown out of the `withThrowingDiscardingTaskGroup(...) { }` closure,
 /// - when the ``Task`` running this task group is cancelled.
 ///
 /// Since a `DiscardingTaskGroup` is a structured concurrency primitive, cancellation is
