@@ -5538,7 +5538,7 @@ internal struct _DictionaryCodingKey: CodingKey {
 @available(SwiftStdlib 5.6, *)
 public protocol CodingKeyRepresentable {
   @available(SwiftStdlib 5.6, *)
-  var codingKey: CodingKey { get }
+  var codingKey: any CodingKey { get }
   @available(SwiftStdlib 5.6, *)
   init?<T: CodingKey>(codingKey: T)
 }
@@ -5546,7 +5546,7 @@ public protocol CodingKeyRepresentable {
 @available(SwiftStdlib 5.6, *)
 extension RawRepresentable<String> where Self: CodingKeyRepresentable {
   @available(SwiftStdlib 5.6, *)
-  public var codingKey: CodingKey {
+  public var codingKey: any CodingKey {
     _DictionaryCodingKey(stringValue: rawValue)
   }
   @available(SwiftStdlib 5.6, *)
@@ -5558,7 +5558,7 @@ extension RawRepresentable<String> where Self: CodingKeyRepresentable {
 @available(SwiftStdlib 5.6, *)
 extension RawRepresentable<Int> where Self: CodingKeyRepresentable {
   @available(SwiftStdlib 5.6, *)
-  public var codingKey: CodingKey {
+  public var codingKey: any CodingKey {
     _DictionaryCodingKey(intValue: rawValue)
   }
   @available(SwiftStdlib 5.6, *)
@@ -5574,7 +5574,7 @@ extension RawRepresentable<Int> where Self: CodingKeyRepresentable {
 @available(SwiftStdlib 5.6, *)
 extension Int: CodingKeyRepresentable {
   @available(SwiftStdlib 5.6, *)
-  public var codingKey: CodingKey {
+  public var codingKey: any CodingKey {
     _DictionaryCodingKey(intValue: self)
   }
   @available(SwiftStdlib 5.6, *)
@@ -5590,7 +5590,7 @@ extension Int: CodingKeyRepresentable {
 @available(SwiftStdlib 5.6, *)
 extension String: CodingKeyRepresentable {
   @available(SwiftStdlib 5.6, *)
-  public var codingKey: CodingKey {
+  public var codingKey: any CodingKey {
     _DictionaryCodingKey(stringValue: self)
   }
   @available(SwiftStdlib 5.6, *)
