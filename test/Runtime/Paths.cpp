@@ -97,7 +97,7 @@ int main(void) {
 
   printf("aux path: %s\n", auxPath ? auxPath : "<NULL>");
 
-  free(auxPath);
+  free((void *)auxPath);
 
   return 0;
 }
