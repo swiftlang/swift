@@ -853,6 +853,7 @@ private:
     HasSuggestedValueWitnesses  = 0x00000400U,
     HasImplicitReqSigParams     = 0x00000800U,
     HasImplicitGenSigParams     = 0x00001000U,
+    HasTypePacks                = 0x00002000U,
   };
   int_type Data;
 
@@ -893,6 +894,12 @@ public:
     return ExtendedExistentialTypeShapeFlags(
       implicit ? (Data | HasImplicitGenSigParams)
                : (Data & ~HasImplicitGenSigParams));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withTypePacks(bool hasTypePacks) const {
+    return ExtendedExistentialTypeShapeFlags(
+      hasTypePacks ? (Data | HasTypePacks)
+                   : (Data & ~HasTypePacks));
   }
 
   /// Is this a special kind of existential?
@@ -937,6 +944,14 @@ public:
   /// they must match GenericParamDescriptor::implicit().
   bool hasImplicitGenSigParams() const {
     return Data & HasImplicitGenSigParams;
+  }
+
+  /// Whether the generic context has type parameter packs. This
+  /// occurs when the existential has a superclass requirement
+  /// whose class declaration has a type parameter pack, eg
+  /// `any P & C<...>` with `class C<each T> {}`.
+  bool hasTypePacks() const {
+    return Data & HasTypePacks;
   }
 
   int_type getIntValue() const {

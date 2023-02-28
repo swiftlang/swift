@@ -299,14 +299,21 @@ class RuntimeGenericSignature {
   TargetGenericContextDescriptorHeader<Runtime> Header;
   const GenericParamDescriptor *Params;
   const TargetGenericRequirementDescriptor<Runtime> *Requirements;
+  GenericParamPackShapeHeader PackShapeHeader;
+  const GenericParamPackShapeDescriptor *PackShapeDescriptors;
+
 public:
   RuntimeGenericSignature()
-    : Header{0, 0, 0, 0}, Params(nullptr), Requirements(nullptr) {}
+    : Header{0, 0, 0, 0}, Params(nullptr), Requirements(nullptr),
+      PackShapeHeader{0, 0}, PackShapeDescriptors(nullptr) {}
 
   RuntimeGenericSignature(const TargetGenericContextDescriptorHeader<Runtime> &header,
                           const GenericParamDescriptor *params,
-                          const TargetGenericRequirementDescriptor<Runtime> *requirements)
-    : Header(header), Params(params), Requirements(requirements) {}
+                          const TargetGenericRequirementDescriptor<Runtime> *requirements,
+                          const GenericParamPackShapeHeader &packShapeHeader,
+                          const GenericParamPackShapeDescriptor *packShapeDescriptors)
+    : Header(header), Params(params), Requirements(requirements),
+      PackShapeHeader(packShapeHeader), PackShapeDescriptors(packShapeDescriptors) {}
 
   llvm::ArrayRef<GenericParamDescriptor> getParams() const {
     return llvm::makeArrayRef(Params, Header.NumParams);
@@ -314,6 +321,10 @@ public:
 
   llvm::ArrayRef<TargetGenericRequirementDescriptor<Runtime>> getRequirements() const {
     return llvm::makeArrayRef(Requirements, Header.NumRequirements);
+  }
+
+  llvm::ArrayRef<GenericParamPackShapeDescriptor> getPackShapeDescriptors() const {
+    return llvm::makeArrayRef(PackShapeDescriptors, PackShapeHeader.NumTypePacks);
   }
 
   size_t getArgumentLayoutSizeInWords() const {
@@ -476,21 +487,21 @@ public:
             getGenericContextHeader().NumRequirements};
   }
   
-  const GenericParamPackShapeHeader *getGenericParamPackShapeHeader() const {
+  GenericParamPackShapeHeader getGenericParamPackShapeHeader() const {
     if (!asSelf()->isGeneric())
-      return nullptr;
+      return {0, 0};
     if (!getGenericContextHeader().Flags.hasTypePacks())
-      return nullptr;
-    return this->template getTrailingObjects<GenericParamPackShapeHeader>();
+      return {0, 0};
+    return *this->template getTrailingObjects<GenericParamPackShapeHeader>();
   }
 
   llvm::ArrayRef<GenericParamPackShapeDescriptor> getGenericParamPackShapeDescriptors() const {
-    auto *header = getGenericParamPackShapeHeader();
-    if (header == nullptr)
+    auto header = getGenericParamPackShapeHeader();
+    if (header.NumTypePacks == 0)
       return {};
 
     return {this->template getTrailingObjects<GenericParamPackShapeDescriptor>(),
-            header->NumTypePacks};
+            header.NumTypePacks};
   }
 
   /// Return the amount of space that the generic arguments take up in
@@ -504,7 +515,9 @@ public:
     if (!asSelf()->isGeneric()) return RuntimeGenericSignature<Runtime>();
     return {getGenericContextHeader(),
             getGenericParams().data(),
-            getGenericRequirements().data()};
+            getGenericRequirements().data(),
+            getGenericParamPackShapeHeader(),
+            getGenericParamPackShapeDescriptors().data()};
   }
 
 protected:
@@ -534,7 +547,7 @@ protected:
     if (!getGenericContextHeader().Flags.hasTypePacks())
       return 0;
 
-    return getGenericParamPackShapeHeader()->NumTypePacks;
+    return getGenericParamPackShapeHeader().NumTypePacks;
   }
 
 #if defined(_MSC_VER) && _MSC_VER < 1920

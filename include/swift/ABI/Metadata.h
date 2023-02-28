@@ -1929,7 +1929,13 @@ struct TargetExtendedExistentialTypeShape
       GenericParamDescriptor,
       // Requirements for requirement signature, followed by requirements
       // for generalization signature
-      TargetGenericRequirementDescriptor<Runtime>> {
+      TargetGenericRequirementDescriptor<Runtime>,
+      // Optional header describing any type packs in the generalization
+      // signature.
+      GenericParamPackShapeHeader,
+      // For each type pack in the generalization signature, a descriptor
+      // storing the shape class.
+      GenericParamPackShapeDescriptor> {
 private:
   using RelativeValueWitnessTablePointer =
     TargetRelativeIndirectablePointer<Runtime,
@@ -1942,7 +1948,9 @@ private:
       TargetExistentialTypeExpression<Runtime>,
       RelativeValueWitnessTablePointer,
       GenericParamDescriptor,
-      TargetGenericRequirementDescriptor<Runtime>>;
+      TargetGenericRequirementDescriptor<Runtime>,
+      GenericParamPackShapeHeader,
+      GenericParamPackShapeDescriptor>;
   friend TrailingObjects;
 
   template<typename T>
@@ -1967,6 +1975,17 @@ private:
 
   size_t numTrailingObjects(OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
     return getNumGenSigRequirements() + getNumReqSigRequirements();
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericParamPackShapeHeader>) const {
+    return (Flags.hasTypePacks() ? 1 : 0);
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericParamPackShapeDescriptor>) const {
+    if (!Flags.hasTypePacks())
+      return 0;
+
+    return getGenSigPackShapeHeader().NumTypePacks;
   }
 
   const TargetGenericContextDescriptorHeader<Runtime> *
@@ -2013,7 +2032,8 @@ public:
   TargetGenericContextDescriptorHeader<Runtime> ReqSigHeader;
 
   RuntimeGenericSignature<Runtime> getRequirementSignature() const {
-    return {ReqSigHeader, getReqSigParams(), getReqSigRequirements()};
+    return {ReqSigHeader, getReqSigParams(), getReqSigRequirements(),
+            {0, 0}, nullptr};
   }
 
   unsigned getNumReqSigParams() const {
@@ -2092,7 +2112,8 @@ public:
 
   RuntimeGenericSignature<Runtime> getGeneralizationSignature() const {
     if (!hasGeneralizationSignature()) return RuntimeGenericSignature<Runtime>();
-    return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements()};
+    return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements(),
+            getGenSigPackShapeHeader(), getGenSigPackShapeDescriptors()};
   }
 
   unsigned getNumGenSigParams() const {
@@ -2119,6 +2140,20 @@ public:
   getGenSigRequirements() const {
     assert(hasGeneralizationSignature());
     return getReqSigRequirements() + ReqSigHeader.NumRequirements;
+  }
+
+  GenericParamPackShapeHeader getGenSigPackShapeHeader() const {
+    assert(hasGeneralizationSignature());
+    if (!Flags.hasTypePacks())
+      return {0, 0};
+    return *this->template getTrailingObjects<GenericParamPackShapeHeader>();
+  }
+
+  const GenericParamPackShapeDescriptor *getGenSigPackShapeDescriptors() const {
+    assert(hasGeneralizationSignature());
+    if (!Flags.hasTypePacks())
+      return nullptr;
+    return this->template getTrailingObjects<GenericParamPackShapeDescriptor>();
   }
 
   /// Return the amount of space used in ExtendedExistentialTypeMetadata
