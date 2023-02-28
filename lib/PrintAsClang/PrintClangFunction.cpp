@@ -1377,6 +1377,7 @@ static StringRef getConstructorName(const AbstractFunctionDecl *FD) {
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
+    DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
     Type resultTy, bool isStatic, bool isDefinition,
@@ -1401,6 +1402,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
       resultTy, FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too");
 
+  declAndTypePrinter.printAvailability(os, FD);
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -1446,6 +1448,7 @@ static std::string remapPropertyName(const AccessorDecl *accessor,
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
+    DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
     Type resultTy, bool isStatic, bool isDefinition,
@@ -1466,6 +1469,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
       accessor, signature, remapPropertyName(accessor, resultTy), resultTy,
       FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -1480,6 +1484,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
+    DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
     Type resultTy, bool isDefinition,
@@ -1494,6 +1499,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
       printFunctionSignature(accessor, signature, "operator []", resultTy,
                              FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
     return;
