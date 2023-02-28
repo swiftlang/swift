@@ -547,15 +547,46 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
 #endif
   }
 
+  /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
+  /// At the start of the body of a `withThrowingDiscardingTaskGroup(of:returning:body:)` call,
+  /// the task group is always empty.
+  ///
+  /// It's guaranteed to be empty when returning from that body
+  /// because a task group waits for all child tasks to complete before returning.
+  ///
+  /// - Returns: `true` if the group has no pending tasks; otherwise `false`.
   public var isEmpty: Bool {
     _taskGroupIsEmpty(_group)
   }
 
+  /// Cancel all of the remaining tasks in the group.
+  ///
+  /// If you add a task to a group after canceling the group,
+  /// that task is canceled immediately after being added to the group.
+  ///
+  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// react  to cancellation, e.g. by throwing an `CancellationError` at their
+  /// earliest convenience, or otherwise handling the cancellation.
+  ///
+  /// There are no restrictions on where you can call this method.
+  /// Code inside a child task or even another task can cancel a group,
+  /// however one should be very careful to not keep a reference to the
+  /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
+  ///
+  /// - SeeAlso: `Task.isCancelled`
+  /// - SeeAlso: `ThrowingTaskGroup.isCancelled`
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
   }
 
+  /// A Boolean value that indicates whether the group was canceled.
+  ///
+  /// To cancel a group, call the `ThrowingDiscardingTaskGroup.cancelAll()` method.
+  ///
+  /// If the task that's currently running this group is canceled,
+  /// the group is also implicitly canceled,
+  /// which is also reflected in this property's value.
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }

@@ -488,15 +488,17 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
   /// Cancel all of the remaining tasks in the group.
   ///
-  /// After cancellation,
-  /// any new results from the tasks in this group
-  /// are silently discarded.
-  ///
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
-  /// This method can only be called by the parent task that created the task
-  /// group.
+  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// react  to cancellation, e.g. by throwing an `CancellationError` at their
+  /// earliest convenience, or otherwise handling the cancellation.
+  ///
+  /// There are no restrictions on where you can call this method.
+  /// Code inside a child task or even another task can cancel a group,
+  /// however one should be very careful to not keep a reference to the
+  /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `TaskGroup.isCancelled`
@@ -900,6 +902,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// At the start of the body of a `withThrowingTaskGroup(of:returning:body:)` call,
   /// the task group is always empty.
+  ///
   /// It's guaranteed to be empty when returning from that body
   /// because a task group waits for all child tasks to complete before returning.
   ///
@@ -910,15 +913,17 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   /// Cancel all of the remaining tasks in the group.
   ///
-  /// After cancellation,
-  /// any new results or errors from the tasks in this group
-  /// are silently discarded.
-  ///
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
+  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// react  to cancellation, e.g. by throwing an `CancellationError` at their
+  /// earliest convenience, or otherwise handling the cancellation.
+  ///
   /// There are no restrictions on where you can call this method.
-  /// Code inside a child task or even another task can cancel a group.
+  /// Code inside a child task or even another task can cancel a group,
+  /// however one should be very careful to not keep a reference to the
+  /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `ThrowingTaskGroup.isCancelled`
