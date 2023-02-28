@@ -1075,6 +1075,11 @@ bool AttributedFuncToTypeConversionFailure::
       return Action::VisitChildrenIf(FnRepr == nullptr);
     }
 
+    /// Walk macro arguments.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
   public:
     FunctionTypeRepr *FnRepr;
     TopLevelFuncReprFinder() : FnRepr(nullptr) {}
@@ -1514,6 +1519,11 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
   DeclContext *DC;
   VarDecl *varDecl;
   int count;
+
+  /// Walk everything in a macro.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
@@ -5629,6 +5639,11 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
           DiagnosticEngine &D;
           ParameterList *Params;
 
+          /// Walk everything in a macro.
+          MacroWalking getMacroWalkingBehavior() const override {
+            return MacroWalking::ArgumentsAndExpansion;
+          }
+
           ParamRefFinder(DiagnosticEngine &diags, ParameterList *params)
               : D(diags), Params(params) {}
 
@@ -6329,6 +6344,11 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
     AssociateMissingParams(ArrayRef<GenericTypeParamType *> params,
                            Callback callback)
         : Params(params.begin(), params.end()), Fn(callback) {}
+
+    /// Walk everything in a macro.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (Params.empty())

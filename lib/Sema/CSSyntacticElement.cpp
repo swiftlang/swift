@@ -58,6 +58,10 @@ public:
       ClosureDCs.push_back(closure);
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
       ClosureDCs.push_back(closure);
@@ -240,6 +244,10 @@ class UnresolvedVarCollector : public ASTWalker {
 
 public:
   UnresolvedVarCollector(ConstraintSystem &cs) : CS(cs) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {

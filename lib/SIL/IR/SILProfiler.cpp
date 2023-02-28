@@ -269,6 +269,10 @@ struct MapRegionCounters : public ASTWalker {
     ++NextCounter;
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] { mapRegion(AFD->getBody()); });
@@ -679,6 +683,10 @@ struct PGOMapping : public ASTWalker {
     return LazyInitializerWalking::InAccessor;
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     unsigned parent = getParentCounter();
     auto parentCount = LoadedCounts.Counts[parent];
@@ -1024,6 +1032,10 @@ public:
     // We want to walk lazy initializers present in the synthesized getter for
     // a lazy variable.
     return LazyInitializerWalking::InAccessor;
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
   }
 
   /// Generate the coverage counter mapping regions from collected

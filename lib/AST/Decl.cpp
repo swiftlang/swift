@@ -7648,6 +7648,11 @@ swift::findWrappedValuePlaceholder(Expr *init) {
   public:
     PropertyWrapperValuePlaceholderExpr *placeholder = nullptr;
 
+    /// Only walk the arguments of a macro, to represent the source as written.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (placeholder)
         return Action::SkipChildren(E);
@@ -8342,6 +8347,11 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
 
   public:
     HashCombiner(StableHasher &hasher) : hasher(hasher) {}
+
+    /// Only walk the arguments of a macro, to represent the source as written.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (D->isImplicit())

@@ -169,6 +169,10 @@ private:
     return getSourceMgr().containsRespectingReplacedRanges(Range, LocToResolve);
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (!rangeContainsLocToResolve(D->getSourceRangeIncludingAttrs())) {
       return PreWalkAction::SkipChildren;

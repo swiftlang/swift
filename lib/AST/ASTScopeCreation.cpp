@@ -141,6 +141,10 @@ public:
       PreWalkAction walkToParameterListPre(ParameterList *PL) override {
         return Action::SkipChildren();
       }
+
+      MacroWalking getMacroWalkingBehavior() const override {
+        return MacroWalking::ArgumentsAndExpansion;
+      }
     };
 
     expr->walk(ClosureFinder(*this, parent));

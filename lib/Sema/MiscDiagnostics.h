@@ -140,6 +140,11 @@ class BaseDiagnosticWalker : public ASTWalker {
     return false;
   }
 
+  // Only emit diagnostics in the expansion of macros.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
 private:
   static bool shouldWalkIntoDeclInClosureContext(Decl *D);
 };

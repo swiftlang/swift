@@ -167,6 +167,12 @@ namespace {
     WalkToVarDecls(const std::function<void(VarDecl*)> &fn)
     : fn(fn) {}
 
+    /// Walk everything that's available; there shouldn't be macro expansions
+    /// that matter anyway.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) override {
       // Handle vars.
       if (auto *Named = dyn_cast<NamedPattern>(P))
