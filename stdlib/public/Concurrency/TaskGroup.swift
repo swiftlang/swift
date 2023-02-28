@@ -218,15 +218,11 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 /// Tasks added to a task group execute concurrently, and may be scheduled in
 /// any order.
 ///
-/// ### Discarding behavior
-/// A discarding task group eagerly discards and releases its child tasks as
-/// soon as they complete. This allows for the efficient releasing of memory used
-/// by those tasks, which are not retained for future `next()` calls, as would
-/// be the case with a ``TaskGroup``.
-///
 /// ### Cancellation behavior
-/// A task group becomes cancelled in one of two ways: when ``cancelAll()`` is
-/// invoked on it, or when the ``Task`` running this task group is cancelled.
+/// A task group becomes cancelled in one of the following ways:
+///
+/// - when ``cancelAll()`` is invoked on it,
+/// - when the ``Task`` running this task group is cancelled.
 ///
 /// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
@@ -262,7 +258,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// Adds a child task to the group.
   ///
   /// - Parameters:
-  ///   - overridingPriority: The priority of the operation task.
+  ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
@@ -336,7 +332,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     fatalError("Unsupported Swift compiler")
 #endif
   }
-#else
+#else // if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(SwiftStdlib 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
   public mutating func addTask(
@@ -491,15 +487,17 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
   /// Cancel all of the remaining tasks in the group.
   ///
-  /// After cancellation,
-  /// any new results from the tasks in this group
-  /// are silently discarded.
-  ///
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
-  /// This method can only be called by the parent task that created the task
-  /// group.
+  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// react  to cancellation, e.g. by throwing an `CancellationError` at their
+  /// earliest convenience, or otherwise handling the cancellation.
+  ///
+  /// There are no restrictions on where you can call this method.
+  /// Code inside a child task or even another task can cancel a group,
+  /// however one should be very careful to not keep a reference to the
+  /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `TaskGroup.isCancelled`
@@ -558,17 +556,14 @@ extension TaskGroup: Sendable { }
 /// Tasks added to a task group execute concurrently, and may be scheduled in
 /// any order.
 ///
-/// ### Discarding behavior
-/// A discarding task group eagerly discards and releases its child tasks as
-/// soon as they complete. This allows for the efficient releasing of memory used
-/// by those tasks, which are not retained for future `next()` calls, as would
-/// be the case with a ``TaskGroup``.
-///
 /// ### Cancellation behavior
-/// A task group becomes cancelled in one of two ways: when ``cancelAll()`` is
-/// invoked on it, or when the ``Task`` running this task group is cancelled.
+/// A task group becomes cancelled in one of the following ways:
 ///
-/// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
+/// - when ``cancelAll()`` is invoked on it,
+/// - when an error is thrown out of the `withThrowingTaskGroup(...) { }` closure,
+/// - when the ``Task`` running this task group is cancelled.
+///
+/// Since a `ThrowingTaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
@@ -616,6 +611,35 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   }
 
   /// Wait for all of the group's remaining tasks to complete.
+  ///
+  /// If any of the tasks throw, the *first* error thrown is captured
+  /// and re-thrown by this method although the task group is *not* cancelled
+  /// when this happens.
+  ///
+  /// ### Cancelling the task group on first error
+  ///
+  /// If you want to cancel the task group, and all "sibling" tasks,
+  /// whenever any of child tasks throws an error, use the following pattern instead:
+  ///
+  /// ```
+  /// while !group.isEmpty {
+  ///     do {
+  ///         try await group.next()
+  ///     } catch is CancellationError {
+  ///         // we decide that cancellation errors thrown by children,
+  ///         // should not cause cancellation of the entire group.
+  ///         continue;
+  ///     } catch {
+  ///         // other errors though we print and cancel the group,
+  ///         // and all of the remaining child tasks within it.
+  ///         group.cancelAll()
+  ///     }
+  /// }
+  /// assert(group.isEmpty())
+  /// ```
+  ///
+  /// - Throws: The *first* error that was thrown by a child task during draining all the tasks.
+  ///           This first error is stored until all other tasks have completed, and is re-thrown afterwards.
   @_alwaysEmitIntoClient
   public mutating func waitForAll() async throws {
     var firstError: Error? = nil
@@ -906,6 +930,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// At the start of the body of a `withThrowingTaskGroup(of:returning:body:)` call,
   /// the task group is always empty.
+  ///
   /// It's guaranteed to be empty when returning from that body
   /// because a task group waits for all child tasks to complete before returning.
   ///
@@ -916,15 +941,17 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   /// Cancel all of the remaining tasks in the group.
   ///
-  /// After cancellation,
-  /// any new results or errors from the tasks in this group
-  /// are silently discarded.
-  ///
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
+  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// react  to cancellation, e.g. by throwing an `CancellationError` at their
+  /// earliest convenience, or otherwise handling the cancellation.
+  ///
   /// There are no restrictions on where you can call this method.
-  /// Code inside a child task or even another task can cancel a group.
+  /// Code inside a child task or even another task can cancel a group,
+  /// however one should be very careful to not keep a reference to the
+  /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `ThrowingTaskGroup.isCancelled`
