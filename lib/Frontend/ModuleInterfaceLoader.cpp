@@ -1546,7 +1546,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
       Feature::LayoutPrespecialization);
   }
 
-  // Validate Clang modules once perbuild session flags must be consistent
+  // Validate Clang modules once per-build session flags must be consistent
   // across all module sub-invocations
   if (clangImporterOpts.ValidateModulesOnce) {
     genericSubInvocation.getClangImporterOptions().ValidateModulesOnce = true;
