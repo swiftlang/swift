@@ -31,9 +31,6 @@ protected:
   void addLinkerInputArgs(InvocationInfo &II,
                           const JobContext &context) const;
 
-  void addArgsToLinkARCLite(llvm::opt::ArgStringList &Arguments,
-                            const JobContext &context) const;
-
   void addSanitizerArgs(llvm::opt::ArgStringList &Arguments,
                         const DynamicLinkJobAction &job,
                         const JobContext &context) const;

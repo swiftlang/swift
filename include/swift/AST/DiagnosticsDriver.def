@@ -162,6 +162,9 @@ ERROR(cannot_find_migration_script, none,
 ERROR(error_darwin_static_stdlib_not_supported, none,
       "-static-stdlib is no longer supported on Apple platforms", ())
 
+WARNING(warn_darwin_link_objc_deprecated, none,
+      "-link-objc-runtime is no longer supported on Apple platforms", ())
+
 ERROR(error_darwin_only_supports_libcxx, none,
       "The only C++ standard library supported on Apple platforms is libc++",
       ())
