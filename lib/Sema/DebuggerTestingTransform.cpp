@@ -73,6 +73,10 @@ public:
         DebuggerTestingCheckExpectName(
             Ctx.getIdentifier("_debuggerTestingCheckExpect")) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     pushLocalDeclContext(D);
 

@@ -325,7 +325,7 @@ public:
   virtual TypeLayoutEntry
   *buildTypeLayoutEntry(IRGenModule &IGM,
                         SILType T,
-                        bool useStructLayouts = false) const = 0;
+                        bool useStructLayouts) const = 0;
 
   /// Allocate a variable of this type on the stack.
   virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,

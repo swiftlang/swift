@@ -1220,6 +1220,15 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   return HadError;
 }
 
+static bool ValidateModulesOnceOptions(const ClangImporterOptions &Opts,
+                                       DiagnosticEngine &Diags) {
+  if (Opts.ValidateModulesOnce && Opts.BuildSessionFilePath.empty()) {
+    Diags.diagnose(SourceLoc(), diag::error_clang_validate_once_requires_session_file);
+    return true;
+  }
+  return false;
+}
+
 static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
                                    ArgList &Args,
                                    DiagnosticEngine &Diags,
@@ -1314,6 +1323,12 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
+  Opts.ValidateModulesOnce |= Args.hasArg(OPT_validate_clang_modules_once);
+  if (auto *A = Args.getLastArg(OPT_clang_build_session_file))
+    Opts.BuildSessionFilePath = A->getValue();
+  if (ValidateModulesOnceOptions(Opts, Diags))
+    return true;
+
   if (Args.hasFlag(options::OPT_warnings_as_errors,
                    options::OPT_no_warnings_as_errors, false))
     Opts.ExtraArgs.push_back("-Werror");
@@ -1339,6 +1354,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.Target = LangOpts.Target;
 
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
+  Opts.SkipProtocolImplementations = Args.hasArg(OPT_skip_protocol_implementations);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
   Opts.EmitExtensionBlockSymbols =
       Args.hasFlag(OPT_emit_extension_block_symbols,

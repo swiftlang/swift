@@ -8364,6 +8364,10 @@ namespace {
     explicit SetExprTypes(const Solution &solution)
         : solution(solution) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       auto &cs = solution.getConstraintSystem();
       auto exprType = cs.getType(expr);
@@ -8481,6 +8485,10 @@ namespace {
       }
 
       return hadError;
+    }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
@@ -8963,6 +8971,10 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
         TryInjector(ASTContext &ctx, const Solution &solution)
             : C(ctx), S(solution) {}
 
+        MacroWalking getMacroWalkingBehavior() const override {
+          return MacroWalking::Expansion;
+        }
+
         PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
           if (ShouldStop)
             return Action::Stop();
@@ -9109,6 +9121,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     case CTP_YieldByValue:
     case CTP_YieldByReference:
     case CTP_ThrowStmt:
+    case CTP_ForgetStmt:
     case CTP_EnumCaseRawValue:
     case CTP_DefaultParameter:
     case CTP_AutoclosureDefaultParameter:

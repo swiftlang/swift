@@ -2133,7 +2133,8 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determines the specifier for a parameter (inout, __owned, etc).
+/// Determines the ownership specifier for a parameter
+/// (inout/consuming/borrowing)
 class ParamSpecifierRequest
     : public SimpleRequest<ParamSpecifierRequest,
                            ParamSpecifier(ParamDecl *),
@@ -3352,6 +3353,27 @@ public:
 /// same file are consistently using \c @_spiOnly.
 class CheckInconsistentSPIOnlyImportsRequest
     : public SimpleRequest<CheckInconsistentSPIOnlyImportsRequest,
+                           evaluator::SideEffect(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Report default imports if other imports of the same target from this
+/// module have an explicitly defined access level. In such a case, all imports
+/// of the target module need an explicit access level or it may be made public
+/// by error. This applies only to pre-Swift 6 mode.
+class CheckInconsistentAccessLevelOnImport
+    : public SimpleRequest<CheckInconsistentAccessLevelOnImport,
                            evaluator::SideEffect(SourceFile *),
                            RequestFlags::Cached> {
 public:

@@ -175,6 +175,7 @@ swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
   if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
     return {Unsupported, UnrepresentableIsolatedInActor};
+  Optional<CanGenericSignature> genericSignature;
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AFD->hasAsync())
       return {Unsupported, UnrepresentableAsync};
@@ -182,7 +183,20 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
     // bodies to be emitted into client.
     if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
       return {Unsupported, UnrepresentableRequiresClientEmission};
+    if (AFD->isGeneric())
+      genericSignature = AFD->getGenericSignature().getCanonicalSignature();
   }
+  if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
+    if (typeDecl->isGeneric()) {
+      if (isa<ClassDecl>(VD))
+        return {Unsupported, UnrepresentableGeneric};
+      genericSignature =
+          typeDecl->getGenericSignature().getCanonicalSignature();
+    }
+  }
+  // Generic requirements are not yet supported in C++.
+  if (genericSignature && !genericSignature->getRequirements().empty())
+    return {Unsupported, UnrepresentableGenericRequirements};
   return {Representable, llvm::None};
 }
 

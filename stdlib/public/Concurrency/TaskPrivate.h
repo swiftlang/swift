@@ -122,35 +122,13 @@ _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
 }
 #endif
 
+// The task listed as argument is escalated to a new priority. Pass that
+// inforamtion along to the executor that it is enqueued into.
+SWIFT_CC(swift)
+void
+swift_executor_escalate(ExecutorRef executor, AsyncTask *task, JobPriority newPriority);
+
 /*************** Methods for Status records manipulation ******************/
-
-/// Remove the status record from input task which may not be the current task.
-/// This may be called asynchronously from the current task.  After this call
-/// returns, the record's memory can be freely modified or deallocated.  The
-/// record must be registered with the task. If it isn't, this function will
-/// crash.
-///
-/// This function also takes in a function_ref which is given the old
-/// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
-/// that is to be set on the task that we are removing the record from. It may
-/// modify the new ActiveTaskStatus that is to be set on the task. This function
-/// may be called multiple times inside a RMW loop and must be therefore be
-/// idempotent. The new status passed to `fn` is freshly derived from the
-/// current status and does not include modifications made by previous runs
-/// through the loop
-SWIFT_CC(swift)
-void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
-     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn);
-
-/// Remove a status record from the current task.  After this call returns,
-/// the record's memory can be freely modified or deallocated.
-///
-/// This must be called synchronously with the task.
-///
-/// The given record need not be the last record added to
-/// the task, but the operation may be less efficient if not.
-SWIFT_CC(swift)
-void removeStatusRecord(TaskStatusRecord *record);
 
 /// Add a status record to the input task.
 ///
@@ -159,6 +137,12 @@ void removeStatusRecord(TaskStatusRecord *record);
 /// prior to the atomic ActiveTaskStatus update that addStatusRecord will
 /// perform. This status will be updated with the last status on the task prior
 /// to updating it with the new status if the input function_ref allows so.
+///
+/// Clients can optionally pass in the status of the task if they have already
+/// done the load on it or if they require the oldStatus on the task prior to
+/// the atomic ActiveTaskStatus update that addStatusRecord will do. This status
+/// will be updated with the last status on the task prior to updating it with
+/// the new status if the input function_ref allows so.
 ///
 /// This function also takes in a function_ref which is given the old
 /// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
@@ -194,6 +178,59 @@ bool addStatusRecordToSelf(TaskStatusRecord *record,
 SWIFT_CC(swift)
 bool addStatusRecordToSelf(TaskStatusRecord *record,  ActiveTaskStatus& taskStatus,
      llvm::function_ref<bool(ActiveTaskStatus, ActiveTaskStatus&)> testAddRecord);
+
+/// Remove the status record from input task which may not be the current task.
+/// This may be called asynchronously from the current task.  After this call
+/// returns, the record's memory can be freely modified or deallocated.  The
+/// record must be registered with the task. If it isn't, this function will
+/// crash.
+///
+/// The given record need not be the last record added to
+/// the task, but the operation may be less efficient if not.
+///
+/// This function also takes in a function_ref which is given the old
+/// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
+/// that is to be set on the task that we are removing the record from. It may
+/// modify the new ActiveTaskStatus that is to be set on the task. This function
+/// may be called multiple times inside a RMW loop and must be therefore be
+/// idempotent. The new status passed to `fn` is freshly derived from the
+/// current status and does not include modifications made by previous runs
+/// through the loop
+SWIFT_CC(swift)
+void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record, ActiveTaskStatus& status,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
+
+SWIFT_CC(swift)
+void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
+
+/// Remove a status record from the current task. This must be called
+/// synchronously with the task.
+SWIFT_CC(swift)
+void removeStatusRecordFromSelf(TaskStatusRecord *record, ActiveTaskStatus &status,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
+
+SWIFT_CC(swift)
+void removeStatusRecordFromSelf(TaskStatusRecord *record,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
+
+/// Update the specified input status record while holding the status record
+/// lock of the task. The status record must already be registered with the
+/// task - if it isn't, this API provides no additional protections.
+///
+/// This function also takes in a function_ref which is given the old
+/// ActiveTaskStatus on the task and a reference to the new ActiveTaskStatus
+/// that is to be set on the task when we are unlocking the task status record
+/// lock. It may modify the new ActiveTaskStatus that is to be set on the task.
+/// This function may be called multiple times inside a RMW loop and must be
+/// therefore be idempotent. The new status passed to `fn` is freshly derived
+/// from the current status and does not include modifications made by previous
+/// runs through the loop
+SWIFT_CC(swift)
+void updateStatusRecord(AsyncTask *task, TaskStatusRecord *record,
+     llvm::function_ref<void()>updateRecord,
+     ActiveTaskStatus& status,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
 
 /// A helper function for updating a new child task that is created with
 /// information from the parent or the group that it was going to be added to.
@@ -808,17 +845,19 @@ inline void AsyncTask::flagAsRunning() {
 
   if (!oldStatus.hasTaskDependency()) {
     SWIFT_TASK_DEBUG_LOG("%p->flagAsRunning() with no task dependency", this);
+    assert(_private().dependencyRecord == nullptr);
+
     while (true) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    // Task's priority is greater than the thread's - do a self escalation
-    qos_class_t maxTaskPriority = (qos_class_t) oldStatus.getStoredPriority();
-    if (threadOverrideInfo.can_override && (maxTaskPriority > overrideFloor)) {
-      SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x",
-          overrideFloor, this, maxTaskPriority);
+      // Task's priority is greater than the thread's - do a self escalation
+      qos_class_t maxTaskPriority = (qos_class_t) oldStatus.getStoredPriority();
+      if (threadOverrideInfo.can_override && (maxTaskPriority > overrideFloor)) {
+        SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x",
+            overrideFloor, this, maxTaskPriority);
 
-      (void) swift_dispatch_thread_override_self(maxTaskPriority);
-      overrideFloor = maxTaskPriority;
-    }
+        (void) swift_dispatch_thread_override_self(maxTaskPriority);
+        overrideFloor = maxTaskPriority;
+      }
 #endif
       // Set self as executor and remove escalation bit if any - the task's
       // priority escalation has already been reflected on the thread.
@@ -842,7 +881,7 @@ inline void AsyncTask::flagAsRunning() {
     SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsRunning() and remove dependencyRecord %p",
                     this, dependencyRecord);
 
-    removeStatusRecord(this, dependencyRecord, [&](ActiveTaskStatus oldStatus,
+    removeStatusRecord(this, dependencyRecord, oldStatus, [&](ActiveTaskStatus unused,
                        ActiveTaskStatus& newStatus) {
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -863,7 +902,6 @@ inline void AsyncTask::flagAsRunning() {
       newStatus = newStatus.withoutEnqueued();
       newStatus = newStatus.withoutTaskDependency();
     });
-
     this->destroyTaskDependency(dependencyRecord);
 
     adoptTaskVoucher(this);
@@ -893,83 +931,75 @@ inline void AsyncTask::flagAsRunning() {
 inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
-#else
+#else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
-  JobPriority priority = JobPriority::Unspecified;
+  assert(!oldStatus.isEnqueued());
 
-  if (oldStatus.isRunning()) {
-    SWIFT_TASK_DEBUG_LOG("%p->flagAsAndEnqueueOnExecutor() running to enqueued", this);
-    // Case 1:
-    //  running -> enqueued
-    //  Most likely due to task running into actor contention
-    //  TODO: Need to record a new task dependency
-    while (true) {
-      // Drop execution lock and any override the thread might have received as
-      // a result of executing it previously. Mark the task as being enqueued
-      auto newStatus = oldStatus.withRunning(false);
-      newStatus = newStatus.withoutStoredPriorityEscalation();
-      newStatus = newStatus.withEnqueued();
-
-      if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
-              /* success */std::memory_order_relaxed,
-              /* failure */std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(this);
-        priority = newStatus.getStoredPriority();
-        break;
-      }
-    }
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    // The thread was previously running the task, now that we aren't, we need
-    // to remove any task escalation on the thread as a result of the task.
-    if (oldStatus.isStoredPriorityEscalated()) {
-      SWIFT_TASK_DEBUG_LOG("[Override] Reset override %#x on thread from task %p",
-        oldStatus.getStoredPriority(), this);
-      swift_dispatch_lock_override_end((qos_class_t) oldStatus.getStoredPriority());
-    }
-#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
-    swift_task_exitThreadLocalContext((char *)&_private().ExclusivityAccessSet[0]);
-    restoreTaskVoucher(this);
-
-  } else if (oldStatus.hasTaskDependency()) {
-    //  Case 2: suspended -> enqueued
-    //  Subcase 2a: Task had a dependency which is now cleared - remove task
-    //  dependency record and destroy it
-    auto dependencyRecord = _private().dependencyRecord;
+  if (!oldStatus.isRunning() && oldStatus.hasTaskDependency()) {
+    // Task went from suspended --> enqueued and has a previous
+    // dependency record.
+    //
+    // Atomically update the existing dependency record with new dependency
+    // information.
+    TaskDependencyStatusRecord *dependencyRecord = _private().dependencyRecord;
     assert(dependencyRecord != nullptr);
-    SWIFT_TASK_DEBUG_LOG("%p->flagAsAndEnqueueOnExecutor() suspended to enqueued and remove dependency %p", this, dependencyRecord);
 
-    removeStatusRecord(this, dependencyRecord, [&](ActiveTaskStatus unused,
-                          ActiveTaskStatus& newStatus) {
+    SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsAndEnqueueOnExecutor() and update dependencyRecord %p",
+      this, dependencyRecord);
+
+    updateStatusRecord(this, dependencyRecord, [&] {
+
+      // Update dependency record to the new dependency
+      dependencyRecord->updateDependencyToEnqueuedOn(newExecutor);
+
+    }, oldStatus, [&](ActiveTaskStatus unused, ActiveTaskStatus &newStatus) {
+
+      // Remove escalation bits + set enqueued bit
       newStatus = newStatus.withoutStoredPriorityEscalation();
       newStatus = newStatus.withEnqueued();
-      newStatus = newStatus.withoutTaskDependency();
-
-      priority = newStatus.getStoredPriority();
+      assert(newStatus.hasTaskDependency());
     });
-    this->destroyTaskDependency(dependencyRecord);
-
   } else {
-    // Case 2:  suspended -> enqueued
-    // Subcase 2b: Task is newly created and enqueued to run - no task
-    // dependency record present
-    SWIFT_TASK_DEBUG_LOG("%p->flagAsAndEnqueueOnExecutor() suspended to enqueued with no dependency", this);
-    auto newStatus = oldStatus;
-    while (true) {
+    // 2 subcases:
+    // * Task went from running on this thread --> enqueued on executor
+    // * Task went from suspended to enqueued on this executor and has no
+    // dependency record (Eg. newly created)
+    assert(_private().dependencyRecord == nullptr);
+
+    void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
+    TaskDependencyStatusRecord *dependencyRecord = _private().dependencyRecord = ::new (allocation) TaskDependencyStatusRecord(this, newExecutor);
+    SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsAndEnqueueOnExecutor() with dependencyRecord %p", this,
+      dependencyRecord);
+
+    addStatusRecord(this, dependencyRecord, oldStatus, [&](ActiveTaskStatus unused,
+                    ActiveTaskStatus &newStatus) {
+
+      newStatus = newStatus.withRunning(false);
       newStatus = newStatus.withoutStoredPriorityEscalation();
       newStatus = newStatus.withEnqueued();
+      newStatus = newStatus.withTaskDependency();
 
-      if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
-              /* success */std::memory_order_relaxed,
-              /* failure */std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(this);
-        priority = newStatus.getStoredPriority();
-        break;
+      return true;
+    });
+
+    if (oldStatus.isRunning()) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+      // The thread was previously running the task, now that we aren't and
+      // we've successfully escalated the thing the task is waiting on. We need
+      // to remove any task escalation on the thread as a result of the task.
+      if (oldStatus.isStoredPriorityEscalated()) {
+        SWIFT_TASK_DEBUG_LOG("[Override] Reset override %#x on thread from task %p",
+          oldStatus.getStoredPriority(), this);
+        swift_dispatch_lock_override_end((qos_class_t) oldStatus.getStoredPriority());
       }
+#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
+      swift_task_exitThreadLocalContext((char *)&_private().ExclusivityAccessSet[0]);
+      restoreTaskVoucher(this);
     }
   }
 
   // Set up task for enqueue to next location by setting the Job priority field
-  Flags.setPriority(priority);
+  Flags.setPriority(oldStatus.getStoredPriority());
   concurrency::trace::task_flags_changed(
       this, static_cast<uint8_t>(Flags.getPriority()), Flags.task_isChildTask(),
       Flags.task_isFuture(), Flags.task_isGroupChildTask(),
@@ -1006,9 +1036,8 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
     // Note that we have to do this escalation while adding the status record
     // and not after - we are not guaranteed to be able to have a valid
     // reference to the dependencyStatusRecord or its contents, once we have
-    // published it in the ActiveTaskStatus.
-    SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate the dependency %p of task %p",
-                  dependencyStatusRecord, this);
+    // published it in the ActiveTaskStatus since someone else could
+    // concurrently made us runnable.
     dependencyStatusRecord->performEscalationAction(newStatus.getStoredPriority());
 
     // Always add the dependency status record
@@ -1032,8 +1061,6 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
 
 inline void AsyncTask::destroyTaskDependency(TaskDependencyStatusRecord *dependencyRecord) {
   assert(_private().dependencyRecord == dependencyRecord);
-
-  dependencyRecord->destroy();
   _swift_task_dealloc_specific(this, dependencyRecord);
 
   _private().dependencyRecord = nullptr;
@@ -1045,7 +1072,7 @@ inline void AsyncTask::flagAsSuspendedOnTask(AsyncTask *task) {
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(task);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(this, task);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on task %p", allocation, task);
   _private().dependencyRecord = record;
 
@@ -1056,7 +1083,7 @@ inline void AsyncTask::flagAsSuspendedOnContinuation(ContinuationAsyncContext *c
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(context);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(this, context);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on continuation %p", allocation, context);
   _private().dependencyRecord = record;
 
@@ -1067,7 +1094,7 @@ inline void AsyncTask::flagAsSuspendedOnTaskGroup(TaskGroup *taskGroup) {
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(taskGroup);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(this, taskGroup);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on taskGroup %p", allocation, taskGroup);
   _private().dependencyRecord = record;
 

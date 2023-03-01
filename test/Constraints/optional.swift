@@ -589,3 +589,13 @@ do {
     // expected-error@-1 {{argument type '(any BinaryInteger)?' does not conform to expected type 'P'}}
   }
 }
+
+// Diagnose extraneous force unwrap in ambiguous context
+do {
+  func test(_: Int) {} // expected-note {{found this candidate}}
+  func test(_: String) {} // expected-note {{found this candidate}}
+
+  var x: Double = 42
+  test(x!) // expected-error {{no exact matches in call to local function 'test'}}
+  // expected-error@-1 {{cannot force unwrap value of non-optional type 'Double'}}
+}

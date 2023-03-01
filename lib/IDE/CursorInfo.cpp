@@ -34,6 +34,9 @@ namespace {
 // MARK: - Utilities
 
 void typeCheckDeclAndParentClosures(ValueDecl *VD) {
+  if (!VD) {
+    return;
+  }
   // We need to type check any parent closures because their types are
   // encoded in the USR of ParentContexts in the cursor info response.
   auto DC = VD->getDeclContext();
@@ -167,6 +170,10 @@ private:
 
   bool rangeContainsLocToResolve(SourceRange Range) const {
     return getSourceMgr().containsRespectingReplacedRanges(Range, LocToResolve);
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {

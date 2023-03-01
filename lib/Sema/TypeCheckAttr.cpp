@@ -970,6 +970,14 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
                             attr);
       return true;
     }
+
+    if (attr->getAccess() != AccessLevel::Public) {
+      if (auto exportedAttr = D->getAttrs().getAttribute<ExportedAttr>()) {
+        diagnoseAndRemoveAttr(attr, diag::access_level_conflict_with_exported,
+                              exportedAttr, attr);
+        return true;
+      }
+    }
   }
 
   return false;
@@ -2007,6 +2015,14 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     case UnrepresentableRequiresClientEmission:
       diagnose(attr->getLocation(),
                diag::expose_unsupported_client_emission_to_cxx,
+               VD->getDescriptiveKind(), VD);
+      break;
+    case UnrepresentableGeneric:
+      diagnose(attr->getLocation(), diag::expose_generic_decl_to_cxx,
+               VD->getDescriptiveKind(), VD);
+      break;
+    case UnrepresentableGenericRequirements:
+      diagnose(attr->getLocation(), diag::expose_generic_requirement_to_cxx,
                VD->getDescriptiveKind(), VD);
       break;
     }

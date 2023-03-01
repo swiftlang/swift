@@ -122,6 +122,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         : IsExprStmt(isExprStmt), HasReachedSemanticsProvidingExpr(false),
           Ctx(DC->getASTContext()), DC(DC) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
       return Action::SkipChildren(P);
     }
@@ -1461,6 +1465,10 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       Expr *subExpr;
       bool isStore = false;
@@ -2712,7 +2720,11 @@ public:
   void markBaseOfStorageUse(Expr *E, bool isMutating);
   
   void markStoredOrInOutExpr(Expr *E, unsigned Flags);
-  
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   // We generally walk into declarations, other than types and nested functions.
   // FIXME: peek into capture lists of nested functions.
   PreWalkAction walkToDeclPre(Decl *D) override {
@@ -3127,6 +3139,10 @@ public:
         conditionalSubstitutions);
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
       auto subMap = underlyingToOpaque->substitutions;
@@ -3263,6 +3279,10 @@ public:
       }
       TypeChecker::notePlaceholderReplacementTypes(writtenType, candidate);
     }
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override { return Action::Continue(E); }
@@ -3784,6 +3804,10 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
     ConservativeDeclMarker(VarDeclUsageChecker &VDUC)
       : VDUC(VDUC), SF(VDUC.DC->getParentSourceFile()) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       // If we see a bound reference to a decl in an inactive #if block, then
       // conservatively mark it read and written.  This will silence "variable
@@ -3830,6 +3854,10 @@ private:
 
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E))
       ValidSingleValueStmtExprs.insert(SVE);
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -4156,6 +4184,10 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<ArgumentList *>
     walkToArgumentListPre(ArgumentList *args) override {
       // Don't walk into an explicit argument list, as trailing closures that
@@ -4281,6 +4313,10 @@ public:
   bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
   bool shouldWalkIntoTapExpression() override { return false; }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
@@ -5139,6 +5175,10 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipChildren(E);
@@ -5216,6 +5256,10 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipChildren(E);
@@ -5285,6 +5329,10 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       }
     }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipChildren(E);
@@ -5330,6 +5378,10 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
       if (VD->isLazyStorageProperty()) {
         C.Diags.diagnose(MRE->getLoc(), diag::lazy_var_storage_access);
       }
+    }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5461,6 +5513,10 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       }
     }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipChildren(E);
@@ -5495,6 +5551,10 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -5652,6 +5712,10 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       const auto *DLE = dyn_cast_or_null<DictionaryExpr>(E);

@@ -221,6 +221,10 @@ ERROR(error_mode_requires_one_sil_multi_sib,none,
       "this mode requires .sil for primary-file and only .sib for other inputs",
       ())
 
+ERROR(error_clang_validate_once_requires_session_file,none,
+      "'-validate-clang-modules-once' also requires a '-clang-build-session-file' argument",
+      ())
+
 ERROR(error_no_output_filename_specified,none,
       "an %0 filename was not specified for a mode which requires an "
       "%0 filename", (StringRef))

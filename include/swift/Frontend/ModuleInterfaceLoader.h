@@ -550,6 +550,7 @@ private:
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
+                                     const ClangImporterOptions &clangImporterOpts,
                                      bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,

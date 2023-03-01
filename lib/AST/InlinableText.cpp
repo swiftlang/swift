@@ -49,6 +49,11 @@ class IsFeatureCheck : public ASTWalker {
 public:
   bool foundFeature = false;
 
+  /// Walk everything that's available.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
       if (unresolved->getName().getBaseName().userFacingName().startswith("$"))
@@ -109,6 +114,11 @@ bool anyClauseIsFeatureCheck(ArrayRef<IfConfigClause> clauses) {
 struct ExtractInactiveRanges : public ASTWalker {
   SmallVector<CharSourceRange, 4> ranges;
   SourceManager &sourceMgr;
+
+  /// Walk everything that's available.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 
   explicit ExtractInactiveRanges(SourceManager &sourceMgr)
     : sourceMgr(sourceMgr) {}

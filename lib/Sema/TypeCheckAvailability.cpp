@@ -471,6 +471,10 @@ public:
   }
 
 private:
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     PrettyStackTraceDecl trace(stackTraceAction(), D);
 
@@ -1414,6 +1418,10 @@ public:
   /// Returns the innermost node containing the target range that matches
   /// the predicate.
   Optional<ASTNode> getInnermostMatchingNode() { return InnermostMatchingNode; }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     return getPreWalkActionFor(E);
@@ -3225,6 +3233,10 @@ public:
 
   bool shouldWalkIntoTapExpression() override { return false; }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     auto *DC = Where.getDeclContext();
 
@@ -3962,6 +3974,10 @@ public:
   TypeReprAvailabilityWalker(const ExportContext &where,
                              DeclAvailabilityFlags flags)
       : where(where), flags(flags) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);

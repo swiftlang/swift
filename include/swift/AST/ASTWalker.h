@@ -79,6 +79,24 @@ enum class LazyInitializerWalking {
   InAccessor
 };
 
+/// Specifies the behavior for walking a macro expansion, whether we want to
+/// see the macro arguments, the expansion, or both.
+enum class MacroWalking {
+  /// Walk into the expansion of the macro, to see the semantic effect of
+  /// the macro expansion.
+  Expansion,
+
+  /// Walk into the arguments of the macro as written in the source code.
+  ///
+  /// The actual arguments walked may not make it into the program itself,
+  /// because they can be translated by the macro in arbitrary ways.
+  Arguments,
+
+  /// Walk into both the arguments of the macro as written in the source code
+  /// and also the macro expansion.
+  ArgumentsAndExpansion
+};
+
 /// An abstract class used to traverse an AST.
 class ASTWalker {
 public:
@@ -504,6 +522,26 @@ public:
     return LazyInitializerWalking::InPatternBinding;
   }
 
+  /// This method configures how the walker should walk into uses of macros.
+  virtual MacroWalking getMacroWalkingBehavior() const {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
+  /// Determine whether we should walk macro arguments (as they appear in
+  /// source) and the expansion (which is semantically part of the program).
+  std::pair<bool, bool> shouldWalkMacroArgumentsAndExpansion() const {
+    switch (getMacroWalkingBehavior()) {
+    case MacroWalking::Expansion:
+      return std::make_pair(false, true);
+
+    case MacroWalking::Arguments:
+      return std::make_pair(true, false);
+
+    case MacroWalking::ArgumentsAndExpansion:
+      return std::make_pair(true, true);
+    }
+  }
+
   /// This method configures whether the walker should visit the body of a
   /// closure that was checked separately from its enclosing expression.
   ///
@@ -540,10 +578,6 @@ public:
   ///
   /// TODO: Consider changing this to false by default.
   virtual bool shouldWalkSerializedTopLevelInternalDecls() { return true; }
-
-  /// Whether we should walk into expanded macros, whether it be from a
-  /// \c MacroExpansionExpr or declarations created by attached macros.
-  virtual bool shouldWalkMacroExpansions() { return true; }
 
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.

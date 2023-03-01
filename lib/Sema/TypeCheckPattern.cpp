@@ -233,7 +233,11 @@ namespace {
     
     UnresolvedPatternFinder(bool &HadUnresolvedPattern)
       : HadUnresolvedPattern(HadUnresolvedPattern) {}
-    
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // If we find an UnresolvedPatternExpr, return true.
       if (isa<UnresolvedPatternExpr>(E)) {

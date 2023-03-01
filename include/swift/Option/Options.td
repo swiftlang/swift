@@ -178,6 +178,15 @@ def no_strict_implicit_module_context :
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable the strict forwarding of compilation context to downstream implicit module dependencies">;
 
+def validate_clang_modules_once :
+  Flag<["-"], "validate-clang-modules-once">,
+  Flags<[FrontendOption]>,
+  HelpText<"Don't verify input files for Clang modules if the module has been successfully validated or loaded during this build session">;
+
+def clang_build_session_file : Separate<["-"], "clang-build-session-file">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Use the last modification time of <file> as the underlying Clang build session timestamp">;
+
 def disallow_forwarding_driver :
   Flag<["-"], "disallow-use-new-driver">, Flags<[]>,
   HelpText<"Disable using new swift-driver">;
@@ -1454,6 +1463,11 @@ def include_spi_symbols : Flag<["-"], "include-spi-symbols">,
   Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
          NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Add symbols with SPI information to the symbol graph">;
+
+def skip_protocol_implementations : Flag<["-"], "skip-protocol-implementations">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Skip emitting symbols that are implementations of protocol requirements or inherited from protocl extensions">;
 
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,

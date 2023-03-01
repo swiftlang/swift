@@ -810,6 +810,11 @@ importer::addCommonInvocationArguments(
   invocationArgStrs.push_back("-Xclang");
   invocationArgStrs.push_back("-no-opaque-pointers");
 
+  if (importerOpts.ValidateModulesOnce) {
+    invocationArgStrs.push_back("-fmodules-validate-once-per-build-session");
+    invocationArgStrs.push_back("-fbuild-session-file=" + importerOpts.BuildSessionFilePath);
+  }
+
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }

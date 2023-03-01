@@ -555,18 +555,20 @@ const void *AsyncTask::getResumeFunctionForLogging() {
   return __ptrauth_swift_runtime_function_entry_strip(result);
 }
 
-JobPriority swift::swift_task_currentPriority(AsyncTask *task)
-{
+JobPriority swift::swift_task_currentPriority(AsyncTask *task) {
   // This is racey but this is to be used in an API is inherently racey anyways.
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   return oldStatus.getStoredPriority();
 }
 
-JobPriority swift::swift_task_basePriority(AsyncTask *task)
-{
+JobPriority swift::swift_task_basePriority(AsyncTask *task) {
   JobPriority pri = task->_private().BasePriority;
   SWIFT_TASK_DEBUG_LOG("Task %p has base priority = %zu", task, pri);
   return pri;
+}
+
+JobPriority swift::swift_concurrency_jobPriority(Job *job) {
+  return job->getPriority();
 }
 
 static inline bool isUnspecified(JobPriority priority) {
@@ -1518,7 +1520,7 @@ swift_task_addCancellationHandlerImpl(
 SWIFT_CC(swift)
 static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
-  removeStatusRecord(record);
+  removeStatusRecordFromSelf(record);
   swift_task_dealloc(record);
 }
 

@@ -67,6 +67,7 @@ class ExecutorRef {
     : Identity(identity), Implementation(implementation) {}
 
 public:
+
   /// A generic execution environment.  When running in a generic
   /// environment, it's presumed to be okay to switch synchronously
   /// to an actor.  As an executor request, this represents a request

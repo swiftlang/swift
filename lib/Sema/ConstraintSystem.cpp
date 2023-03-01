@@ -687,6 +687,10 @@ static void extendDepthMap(
         llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
         : DepthMap(depthMap) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     // For argument lists, bump the depth of the arguments, as they are
     // effectively nested within the argument list. It's debatable whether we
     // should actually do this, as it doesn't reflect the true expression depth,
@@ -1108,7 +1112,9 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
     type = type->getRValueType();
 
   if (auto depMemType = type->getAs<DependentMemberType>()) {
-    if (!depMemType->getBase()->isTypeVariableOrMember()) return type;
+    auto baseTy = depMemType->getBase();
+    if (!baseTy->hasTypeVariable() && !baseTy->hasDependentMember())
+      return type;
 
     // FIXME: Perform a more limited simplification?
     Type newType = simplifyType(type);
@@ -2947,6 +2953,10 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
     DeclContext *DC;
     bool FoundThrow = false;
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // If we've found a 'try', record it and terminate the traversal.
       if (isa<TryExpr>(expr)) {
@@ -3822,7 +3832,7 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
 
   // Replace all type variables (which must come from placeholders) by their
   // generic parameters. Because we call into simplifyTypeImpl
-  Ty = CS.simplifyTypeImpl(Ty, [&CS](TypeVariableType *typeVar) -> Type {
+  Ty = CS.simplifyTypeImpl(Ty, [&CS, this](TypeVariableType *typeVar) -> Type {
     // Code completion depends on generic parameter type being represented in
     // terms of `ArchetypeType` since it's easy to extract protocol requirements
     // from it.
@@ -3837,6 +3847,29 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
 
     if (auto archetype = getTypeVarAsArchetype(typeVar)) {
       return archetype;
+    }
+
+    // Sometimes the type variable itself doesn't have have an originator that
+    // can be replaced by an archetype but one of its equivalent type variable
+    // does.
+    // Search thorough all equivalent type variables, looking for one that can
+    // be replaced by a generic parameter.
+    std::vector<std::pair<TypeVariableType *, Type>> bindings(
+        typeBindings.begin(), typeBindings.end());
+    // Make sure we iterate the bindings in a deterministic order.
+    llvm::sort(bindings, [](const std::pair<TypeVariableType *, Type> &lhs,
+                            const std::pair<TypeVariableType *, Type> &rhs) {
+      return lhs.first->getID() < rhs.first->getID();
+    });
+    for (auto binding : bindings) {
+      if (auto placeholder = binding.second->getAs<PlaceholderType>()) {
+        if (placeholder->getOriginator().dyn_cast<TypeVariableType *>() ==
+            typeVar) {
+          if (auto archetype = getTypeVarAsArchetype(binding.first)) {
+            return archetype;
+          }
+        }
+      }
     }
 
     // When applying the logic below to get contextual types inside result
@@ -5070,6 +5103,10 @@ static void extendPreorderIndexMap(
 
     explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
       : IndexMap(indexMap) { }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       IndexMap[E] = Index;
@@ -6682,6 +6719,7 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   case CTP_YieldByReference:
   case CTP_CaseStmt:
   case CTP_ThrowStmt:
+  case CTP_ForgetStmt:
   case CTP_EnumCaseRawValue:
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:

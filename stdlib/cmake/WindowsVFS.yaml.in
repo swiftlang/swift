@@ -1,0 +1,27 @@
+---
+version: 0
+case-sensitive: false
+use-external-names: false
+roots:
+  - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\um"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winsdk.modulemap"
+  - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\ucrt"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\ucrt.modulemap"
+  - name: "@VCToolsInstallDir@\\include"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\vcruntime.modulemap"
+      - name: vcruntime.apinotes
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\vcruntime.apinotes"
+

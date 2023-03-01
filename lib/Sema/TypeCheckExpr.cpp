@@ -778,6 +778,10 @@ bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
     bool FoundResultReturn = false;
     bool FoundNoResultReturn = false;
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       return Action::SkipChildren(expr);
     }

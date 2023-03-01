@@ -3376,6 +3376,11 @@ private:
     CacheExprTypes(Expr *expr, ConstraintSystem &cs, bool excludeRoot)
         : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
 
+    /// Walk everything in a macro
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       if (ExcludeRoot && expr == RootExpr) {
         assert(!expr->getType() && "Unexpected type in root of expression!");
@@ -6953,6 +6958,10 @@ public:
   OverloadSetCounter(unsigned &overloads)
   : NumOverloads(overloads)
   {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
