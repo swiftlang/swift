@@ -265,6 +265,18 @@ enum class GenericPackKind: uint16_t {
   WitnessTable = 1
 };
 
+/// The GenericPackShapeHeader is followed by an array of these descriptors,
+/// whose length is given by the header's NumPacks field.
+///
+/// The invariant is that all pack descriptors with GenericPackKind::Metadata
+/// must precede those with GenericPackKind::WitnessTable, and for each kind,
+/// the pack descriptors are ordered by their Index.
+///
+/// This allows us to iterate over the generic arguments array in parallel
+/// with the array of pack shape descriptors. We know we have a metadata
+/// or witness table when we reach the generic argument whose index is
+/// stored in the next descriptor; we increment the descriptor pointer in
+/// this case.
 struct GenericPackShapeDescriptor {
   GenericPackKind Kind;
 
