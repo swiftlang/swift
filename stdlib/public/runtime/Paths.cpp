@@ -356,7 +356,7 @@ _swift_win32NameFromNTName(LPWSTR pszFilename) {
 } // namespace
 
 SWIFT_RUNTIME_EXPORT
-const char *
+char *
 swift_copyAuxiliaryExecutablePath(const char *name)
 {
   const char *rootPath = swift_getRootPath();
