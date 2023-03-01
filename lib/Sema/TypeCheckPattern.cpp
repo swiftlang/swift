@@ -662,6 +662,8 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
                                      bool isStmtCondition) {
   P = ResolvePattern(DC).visit(P);
 
+  TypeChecker::diagnoseDuplicateBoundVars(P);
+
   // If the entire pattern is "(pattern_expr (type_expr SomeType))", then this
   // is an invalid pattern.  If it were actually a value comparison (with ~=)
   // then the metatype would have had to be spelled with "SomeType.self".  What

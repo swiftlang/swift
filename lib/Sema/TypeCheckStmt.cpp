@@ -837,8 +837,6 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
   }
   elt.setPattern(pattern);
 
-  TypeChecker::diagnoseDuplicateBoundVars(pattern);
-
   // Check the pattern, it allows unspecified types because the pattern can
   // provide type information.
   auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
@@ -1271,8 +1269,6 @@ public:
     if (TypeChecker::typeCheckForEachBinding(DC, S))
       return nullptr;
 
-    TypeChecker::diagnoseDuplicateBoundVars(S->getPattern());
-
     // Type-check the body of the loop.
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
@@ -1339,13 +1335,11 @@ public:
     }
     labelItem.setPattern(pattern, /*resolved=*/true);
 
-    TypeChecker::diagnoseDuplicateBoundVars(pattern);
-
     // Otherwise for each variable in the pattern, make sure its type is
     // identical to the initial case decl and stash the previous case decl as
     // the parent of the decl.
     pattern->forEachVariable([&](VarDecl *vd) {
-      if (!vd->hasName())
+      if (!vd->hasName() || vd->isInvalid())
         return;
 
       // We know that prev var decls matches the initial var decl. So if we can
