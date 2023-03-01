@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -290,7 +290,7 @@ extension CodingUserInfoKey {
   /// Forgetting to set this key will result in that initializer throwing, because
   /// an actor system is required in order to call ``DistributedActor/resolve(id:using:)`` using it.
   @available(SwiftStdlib 5.7, *)
-  public static let actorSystemKey = CodingUserInfoKey(rawValue: "$distributed_actor_system")!
+  public static let actorSystemKey = CodingUserInfoKey("$distributed_actor_system")
 }
 
 @available(SwiftStdlib 5.7, *)

@@ -3137,6 +3137,14 @@ public struct CodingUserInfoKey: RawRepresentable, Equatable, Hashable, Sendable
     self.rawValue = rawValue
   }
 
+  /// Creates a new instance with the given raw value.
+  ///
+  /// - parameter rawValue: The value of the key.
+  @_alwaysEmitIntoClient
+  public init(_ rawValue: String) {
+    self.init(rawValue: rawValue)!
+  }
+
   /// Returns a Boolean value indicating whether the given keys are equal.
   ///
   /// - parameter lhs: The key to compare against.
