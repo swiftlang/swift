@@ -9847,8 +9847,8 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
 
   // Slots for expression and variable are going to be filled via
   // synthesizing ~= operator application.
-  auto *EP = new (ctx) ExprPattern(pattern->getUnresolvedOriginalExpr(),
-                                   /*matchExpr=*/nullptr, /*matchVar=*/nullptr);
+  auto *EP =
+      ExprPattern::createResolved(ctx, pattern->getUnresolvedOriginalExpr());
 
   auto tildeEqualsApplication =
       TypeChecker::synthesizeTildeEqualsOperatorApplication(EP, DC, enumTy);

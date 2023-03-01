@@ -501,12 +501,18 @@ void IsPattern::setCastType(Type type) {
 
 TypeRepr *IsPattern::getCastTypeRepr() const { return CastType->getTypeRepr(); }
 
-/// Construct an ExprPattern.
-ExprPattern::ExprPattern(Expr *e, bool isResolved, Expr *matchExpr,
-                         VarDecl *matchVar)
-  : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
-    MatchExpr(matchExpr), MatchVar(matchVar) {
-  assert(!matchExpr || e->isImplicit() == matchExpr->isImplicit());
+ExprPattern *ExprPattern::createParsed(ASTContext &ctx, Expr *E) {
+  return new (ctx) ExprPattern(E, /*isResolved*/ false);
+}
+
+ExprPattern *ExprPattern::createResolved(ASTContext &ctx, Expr *E) {
+  return new (ctx) ExprPattern(E, /*isResolved*/ true);
+}
+
+ExprPattern *ExprPattern::createImplicit(ASTContext &ctx, Expr *E) {
+  auto *EP = ExprPattern::createResolved(ctx, E);
+  EP->setImplicit();
+  return EP;
 }
 
 SourceLoc EnumElementPattern::getStartLoc() const {

@@ -277,9 +277,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
   for (auto *elt : elements) {
     auto *litExpr = new (C) StringLiteralExpr(elt->getNameStr(), SourceRange(),
                                               /*Implicit=*/true);
-    auto *litPat = new (C) ExprPattern(litExpr, /*IsResolved=*/true, nullptr,
-                                       nullptr);
-    litPat->setImplicit();
+    auto *litPat = ExprPattern::createImplicit(C, litExpr);
 
     auto labelItem = CaseLabelItem(litPat);
 

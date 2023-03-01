@@ -639,7 +639,6 @@ public:
   }
 };
 
-
 /// A pattern which matches a value obtained by evaluating an expression.
 /// The match will be tested using user-defined '~=' operator function lookup;
 /// the match succeeds if 'patternValue ~= matchedValue' produces a true value.
@@ -649,24 +648,24 @@ class ExprPattern : public Pattern {
   /// An expression constructed during type-checking that produces a call to the
   /// '~=' operator comparing the match expression on the left to the matched
   /// value on the right.
-  Expr *MatchExpr;
+  Expr *MatchExpr = nullptr;
 
   /// An implicit variable used to represent the RHS value of the match.
-  VarDecl *MatchVar;
+  VarDecl *MatchVar = nullptr;
+
+  ExprPattern(Expr *E, bool isResolved)
+      : Pattern(PatternKind::Expr), SubExprAndIsResolved(E, isResolved) {}
 
 public:
-  /// Construct an ExprPattern.
-  ExprPattern(Expr *e, bool isResolved, Expr *matchExpr, VarDecl *matchVar);
+  /// Create a new parsed unresolved ExprPattern.
+  static ExprPattern *createParsed(ASTContext &ctx, Expr *E);
 
-  /// Construct an unresolved ExprPattern.
-  ExprPattern(Expr *e)
-    : ExprPattern(e, false, nullptr, nullptr)
-  {}
+  /// Create a new resolved ExprPattern. This should be used in cases
+  /// where a user-written expression should be treated as an ExprPattern.
+  static ExprPattern *createResolved(ASTContext &ctx, Expr *E);
 
-  /// Construct a resolved ExprPattern.
-  ExprPattern(Expr *e, Expr *matchExpr, VarDecl *matchVar)
-    : ExprPattern(e, true, matchExpr, matchVar)
-  {}
+  /// Create a new implicit resolved ExprPattern.
+  static ExprPattern *createImplicit(ASTContext &ctx, Expr *E);
 
   Expr *getSubExpr() const { return SubExprAndIsResolved.getPointer(); }
   void setSubExpr(Expr *e) { SubExprAndIsResolved.setPointer(e); }

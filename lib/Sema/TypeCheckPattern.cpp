@@ -244,7 +244,7 @@ public:
     if (Pattern *p = visit(E))
       return p;
 
-    return new (Context) ExprPattern(E, nullptr, nullptr);
+    return ExprPattern::createResolved(Context, E);
   }
 
   /// Turn an argument list into a matching tuple or paren pattern.
@@ -1427,8 +1427,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
             // If we have the original expression parse tree, try reinterpreting
             // it as an expr-pattern if enum element lookup failed, since `.foo`
             // could also refer to a static member of the context type.
-            P = new (Context) ExprPattern(EEP->getUnresolvedOriginalExpr(),
-                                          nullptr, nullptr);
+            P = ExprPattern::createResolved(Context,
+                                            EEP->getUnresolvedOriginalExpr());
             return coercePatternToType(
                 pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
                 options);
