@@ -1538,12 +1538,18 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     case SelfAccessKind::Mutating:
       FuncSelfKind = "Mutating";
       break;
-    case SelfAccessKind::Consuming:
+    case SelfAccessKind::LegacyConsuming:
       // FIXME: Stay consistent with earlier digests that had underscores here.
       FuncSelfKind = "__Consuming";
       break;
     case SelfAccessKind::NonMutating:
       FuncSelfKind = "NonMutating";
+      break;
+    case SelfAccessKind::Consuming:
+      FuncSelfKind = "Consuming";
+      break;
+    case SelfAccessKind::Borrowing:
+      FuncSelfKind = "Borrowing";
       break;
     }
   }

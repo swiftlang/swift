@@ -1324,13 +1324,23 @@ public:
     // The 'self' parameter must be owned (aka "consuming").
     if (!diagnosed) {
       bool isConsuming = false;
-      if (auto *funcDecl = dyn_cast<FuncDecl>(fn))
-        isConsuming = funcDecl->isConsuming();
-      else if (auto *accessor = dyn_cast<AccessorDecl>(fn))
-        isConsuming = accessor->isConsuming();
-      else if (isa<ConstructorDecl>(fn))
+      if (auto *funcDecl = dyn_cast<FuncDecl>(fn)) {
+        switch (funcDecl->getSelfAccessKind()) {
+        case SelfAccessKind::LegacyConsuming:
+        case SelfAccessKind::Consuming:
+          isConsuming = true;
+          break;
+          
+        case SelfAccessKind::Borrowing:
+        case SelfAccessKind::NonMutating:
+        case SelfAccessKind::Mutating:
+          isConsuming = false;
+          break;
+        }
+      } else if (isa<ConstructorDecl>(fn)) {
         // constructors are implicitly "consuming" of the self instance.
         isConsuming = true;
+      }
 
       if (!isConsuming) {
         ctx.Diags.diagnose(FS->getForgetLoc(),

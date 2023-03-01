@@ -39,3 +39,11 @@ func argumentLabel(anonBorrowingInClosure: (_ borrowing: Int) -> ()) {}
 func argumentLabel(anonConsumingInClosure: (_ consuming: Int) -> ()) {}
 func argumentLabel(anonSharedInClosure: (_ __shared: Int) -> ()) {}
 func argumentLabel(anonOwnedInClosure: (_ __owned: Int) -> ()) {}
+
+struct MethodModifiers {
+    mutating func mutating() {}
+    borrowing func borrowing() {}
+    consuming func consuming() {}
+    nonmutating func nonmutating() {}
+    __consuming func __consuming() {}
+}

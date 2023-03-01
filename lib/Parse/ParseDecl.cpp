@@ -6765,7 +6765,11 @@ static bool parseAccessorIntroducer(Parser &P,
     } else if (P.Tok.isContextualKeyword("nonmutating")) {
       P.parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
     } else if (P.Tok.isContextualKeyword("__consuming")) {
+      P.parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_LegacyConsuming);
+    } else if (P.Tok.isContextualKeyword("consuming")) {
       P.parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
+    } else if (P.Tok.isContextualKeyword("borrowing")) {
+      P.parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Borrowing);
     }
   }
 

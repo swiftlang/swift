@@ -5098,11 +5098,10 @@ bool SILGenModule::shouldEmitSelfAsRValue(FuncDecl *fn, CanType selfType) {
   switch (fn->getSelfAccessKind()) {
   case SelfAccessKind::Mutating:
     return false;
-  case SelfAccessKind::Consuming:
-    return true;
   case SelfAccessKind::NonMutating:
-    // TODO: borrow 'self' for nonmutating methods on methods on value types.
-    // return selfType->hasReferenceSemantics();
+  case SelfAccessKind::LegacyConsuming:
+  case SelfAccessKind::Consuming:
+  case SelfAccessKind::Borrowing:
     return true;
   }
   llvm_unreachable("bad self-access kind");
@@ -5114,7 +5113,7 @@ bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
     return false;
 
   assert(method->getDeclContext()->isTypeContext());
-  assert(method->isNonMutating() || method->isConsuming());
+  assert(!method->isMutating());
 
   auto fnType = M.Types.getConstantFunctionType(TypeExpansionContext::minimal(),
                                                 methodRef);

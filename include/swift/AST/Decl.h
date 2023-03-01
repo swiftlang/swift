@@ -7174,7 +7174,9 @@ class OperatorDecl;
 enum class SelfAccessKind : uint8_t {
   NonMutating,
   Mutating,
+  LegacyConsuming,
   Consuming,
+  Borrowing,
 };
 
 /// Diagnostic printing of \c SelfAccessKind.
@@ -7292,12 +7294,6 @@ public:
 
   bool isMutating() const {
     return getSelfAccessKind() == SelfAccessKind::Mutating;
-  }
-  bool isNonMutating() const {
-    return getSelfAccessKind() == SelfAccessKind::NonMutating;
-  }
-  bool isConsuming() const {
-    return getSelfAccessKind() == SelfAccessKind::Consuming;
   }
   bool isCallAsFunctionMethod() const;
 
