@@ -2783,6 +2783,25 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   return false;
 }
 
+/// Skip \c \@objcImplementation \c extension member implementations and
+/// overrides. They are already declared in handwritten headers, and they may
+/// have attributes that aren't allowed in a category.
+///
+/// \return true if \p VD should \em not be included in the header.
+static bool excludeForObjCImplementation(const ValueDecl *VD) {
+  // Exclude member implementations; they are declared elsewhere.
+  if (VD->isObjCMemberImplementation())
+    return true;
+  // Exclude overrides in an @_objcImplementation extension; the decl they're
+  // overriding is declared elsewhere.
+  if (VD->isImplicit() && VD->getOverriddenDecl()) {
+    auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+    if (ED && ED->isObjCImplementation())
+      return true;
+  }
+  return false;
+}
+
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return !VD->isInvalid() && (!requiresExposedAttribute || hasExposeAttr(VD)) &&
          (outputLang == OutputLanguageMode::Cxx
@@ -2790,7 +2809,8 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
                     cxx_translation::isExposableToCxx(VD)
               : isVisibleToObjC(VD, minRequiredAccess)) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
-         !isAsyncAlternativeOfOtherDecl(VD);
+         !isAsyncAlternativeOfOtherDecl(VD) &&
+         !excludeForObjCImplementation(VD);
 }
 
 void DeclAndTypePrinter::print(const Decl *D) {
