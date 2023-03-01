@@ -138,6 +138,8 @@ extractFunctionArguments(const ArgumentList *args) {
       if (decl->hasDefaultExpr()) {
         argExpr = decl->getTypeCheckedDefaultExpr();
       }
+    } else if (auto optionalInject = dyn_cast<InjectIntoOptionalExpr>(argExpr)) {
+      argExpr = optionalInject->getSubExpr();
     }
     parameters.push_back({label, type, extractCompileTimeValue(argExpr)});
   }
