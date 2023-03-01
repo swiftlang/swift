@@ -523,7 +523,9 @@ public:
   }
 
   /// This method configures how the walker should walk into uses of macros.
-  virtual MacroWalking getMacroWalkingBehavior() const = 0;
+  virtual MacroWalking getMacroWalkingBehavior() const {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 
   /// Determine whether we should walk macro arguments (as they appear in
   /// source) and the expansion (which is semantically part of the program).
