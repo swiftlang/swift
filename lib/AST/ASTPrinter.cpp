@@ -5176,6 +5176,11 @@ void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
   visit(stmt->getSubExpr());
 }
 
+void PrintAST::visitForgetStmt(ForgetStmt *stmt) {
+  Printer << "_forget" << " ";
+  visit(stmt->getSubExpr());
+}
+
 void PrintAST::visitPoundAssertStmt(PoundAssertStmt *stmt) {
   Printer << tok::pound_assert << " ";
   // FIXME: print expression.
