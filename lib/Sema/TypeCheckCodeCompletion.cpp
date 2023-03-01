@@ -633,23 +633,6 @@ bool TypeChecker::typeCheckForCodeCompletion(
     if (solutions.empty())
       return CompletionResult::Fallback;
 
-    // If code completion expression resides inside of multi-statement
-    // closure body it could either be type-checked together with the context
-    // or not, it's impossible to say without checking.
-    if (contextAnalyzer.locatedInMultiStmtClosure()) {
-      if (!hasTypeForCompletion(solutions.front(), contextAnalyzer)) {
-        // At this point we know the code completion node wasn't checked with
-        // the closure's surrounding context, so can defer to regular
-        // type-checking for the current call to typeCheckExpression. If that
-        // succeeds we will get a second call to typeCheckExpression for the
-        // body of the closure later and can gather completions then. If it
-        // doesn't we rely on the fallback typechecking in the subclasses of
-        // TypeCheckCompletionCallback that considers in isolation a
-        // sub-expression of the closure that contains the completion location.
-        return CompletionResult::NotApplicable;
-      }
-    }
-
     // FIXME: instead of filtering, expose the score and viability to clients.
     // Remove solutions that skipped over/ignored the code completion point
     // or that require fixes and have a score that is worse than the best.

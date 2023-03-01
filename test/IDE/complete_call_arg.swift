@@ -469,7 +469,7 @@ func curry<T1, T2, R>(_ f: @escaping (T1, T2) -> R) -> (T1) -> (T2) -> R {
   // NESTED_CLOSURE: Begin completions
   // FIXME: Should be '/TypeRelation[Invalid]: t2[#T2#]'
   // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2; name=t2
-  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t1[#T1#]; name=t1
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t1; name=t1
 }
 
 func trailingClosureLocal(x: Int, fn: (Int) -> Void) {

@@ -34,6 +34,9 @@ namespace {
 // MARK: - Utilities
 
 void typeCheckDeclAndParentClosures(ValueDecl *VD) {
+  if (!VD) {
+    return;
+  }
   // We need to type check any parent closures because their types are
   // encoded in the USR of ParentContexts in the cursor info response.
   auto DC = VD->getDeclContext();
