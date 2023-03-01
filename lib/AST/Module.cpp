@@ -2944,6 +2944,29 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   return importKind;
 }
 
+ImportAccessLevel
+SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
+  assert(Imports.hasValue());
+
+  // Leave it to the caller to avoid calling this service for a self import.
+  // We want to return AccessLevel::Public, but there's no import site to return.
+  assert(targetModule != getParentModule() &&
+         "getImportAccessLevel doesn't support checking for a self-import");
+
+  auto &imports = getASTContext().getImportCache();
+  ImportAccessLevel restrictiveImport = None;
+
+  for (auto &import : *Imports) {
+    if ((!restrictiveImport.has_value() ||
+         import.accessLevel > restrictiveImport->accessLevel) &&
+        imports.isImportedBy(targetModule, import.module.importedModule)) {
+      restrictiveImport = import;
+    }
+  }
+
+  return restrictiveImport;
+}
+
 bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
   if (module == this) return false;
 
