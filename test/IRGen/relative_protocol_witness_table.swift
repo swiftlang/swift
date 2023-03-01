@@ -204,6 +204,11 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 
 // CHECK: define{{.*}} swiftcc void @"$s1A14requireWitnessyyxAA8FuncOnlyRzlF"(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[PWT:%.*]])
 // CHECK:[[ENTRY:.*]]:
+// CHECK:  [[T4:%.*]] = call i8* @"__swift_relative_protocol_witness_table_access_1_$s1A8FuncOnlyP1ayyFTq"(i8** [[PWT]])
+// CHECK:  [[T5:%.*]] = bitcast i8* [[T4]] to void (%swift.opaque*, %swift.type*, i8**)*
+// CHECK:  call{{.*}} swiftcc void [[T5]]
+
+// CHECK: define{{.*}} hidden i8* @"__swift_relative_protocol_witness_table_access_1_$s1A8FuncOnlyP1ayyFTq"(i8** [[PWT:%.*]])
 // CHECK:   [[T0:%.*]] = ptrtoint i8** [[PWT]] to i64
 // CHECK:   [[T1:%.*]] = and i64 [[T0]], 1
 // CHECK:   [[C:%.*]] = icmp eq i64 [[T1]], 1
@@ -229,12 +234,15 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:   [[T2:%.*]] = ptrtoint i32* [[SLOT]] to i64
 // CHECK:   [[T3:%.*]] = add i64 [[T2]], [[T1]]
 // CHECK:   [[T4:%.*]] = inttoptr i64 [[T3]] to i8*
-// CHECK:   [[T5:%.*]] = bitcast i8* [[T4]] to void (%swift.opaque*, %swift.type*, i8**)*
-// CHECK:   call{{.*}} swiftcc void [[T5]]
+// CHECK:   ret i8* [[T4]]
 
 // Parent witness entry access.
 
 // CHECK: define hidden swiftcc void @"$s1A15requireWitness2yyxAA9InheritedRzlF"(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[T_INHERITED:%.*]])
+// CHECK: [[T_FUNCONLY:%.*]] = call i8** @__swift_relative_protocol_witness_table_parent_1(i8** [[T_INHERITED]])
+// CHECK: call i8* @"__swift_relative_protocol_witness_table_access_1_$s1A8FuncOnlyP1ayyFTq"(i8** [[T_FUNCONLY]])
+
+// CHECK: define{{.*}} hidden i8** @__swift_relative_protocol_witness_table_parent_1(i8** [[T_INHERITED:%.*]])
 // CHECK:  [[T0:%.*]] = ptrtoint i8** [[T_INHERITED]] to i64
 // CHECK:  [[T1:%.*]] = and i64 [[T0]], 1
 // CHECK:  [[T2:%.*]] = icmp eq i64 [[T1]], 1
@@ -323,40 +331,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:   [[T2:%.*]] = bitcast i8** [[C1]] to i8***
 // CHECK:   [[T3:%.*]] = getelementptr inbounds i8**, i8*** [[T2]], i32 0
 // CHECK:   [[T4:%.*]] = load i8**, i8*** [[T3]]
-// CHECK:   [[T5:%.*]] = ptrtoint i8** [[T4]] to i64
-// CHECK:   [[T6:%.*]] = and i64 [[T5]], 1
-// CHECK:   [[T7:%.*]] = icmp eq i64 [[T6]], 1
-// CHECK:   br i1 [[T7]], label %[[T8:.*]], label %[[T14:.*]]
-
-// CHECK: [[T8]]:
-// CHECK:   [[T9:%.*]] = and i64 [[T5]], -2
-// CHECK:   [[T10:%.*]] = inttoptr i64 [[T9]] to i8**
-// CHECK:   [[T11:%.*]] = getelementptr inbounds i8*, i8** [[T10]], i32 1
-// CHECK:   [[T12:%.*]] = load i8*, i8** [[T11]]
-// CHECK:   [[T13:%.*]] = bitcast i8* [[T12]] to i8**
-// CHECK:   br label %[[T23:.*]]
-
-// CHECK: [[T14]]:
-// CHECK-arm64e:  [[P0:%.*]] = ptrtoint i8** [[T4]] to i64
-// CHECK-arm64e:  [[P1:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[P0]], i32 2, i64 47152)
-// CHECK-arm64e:  [[P2:%.*]] = inttoptr i64 [[P1]] to i8**
-// CHECK-arm64e:  [[T15:%.*]] = bitcast i8** [[P2]] to i32*
-// CHECK-x86_64:   [[T15:%.*]] = bitcast i8** [[T4]] to i32*
-// CHECK-arm64:   [[T15:%.*]] = bitcast i8** [[T4]] to i32*
-// CHECK:   [[T16:%.*]] = getelementptr inbounds i32, i32* [[T15]], i32 1
-// CHECK:   [[T17:%.*]] = load i32, i32* [[T16]]
-// CHECK:   [[T18:%.*]] = sext i32 [[T17]] to i64
-// CHECK:   [[T19:%.*]] = ptrtoint i32* [[T16]] to i64
-// CHECK:   [[T20:%.*]] = add i64 [[T19]], [[T18]]
-// CHECK:   [[T21:%.*]] = inttoptr i64 [[T20]] to i8*
-// CHECK:   [[T22:%.*]] = bitcast i8* [[T21]] to i8**
-// CHECK-arm64e:  [[P0:%.*]] = ptrtoint i8** [[T22]] to i64
-// CHECK-arm64e:  [[P1:%.*]] = call i64 @llvm.ptrauth.sign(i64 [[P0]], i32 2, i64 47152)
-// CHECK-arm64e:  [[T22:%.*]] = inttoptr i64 [[P1]] to i8**
-// CHECK:   br label %[[T23]]
-
-// CHECK: [[T23]]:
-// CHECK:   [[TBASE:%.*]] = phi i8** [ [[T13]], %[[T8]] ], [ [[T22]], %[[T14]] ]
+// CHECK:   [[TBASE:%.*]] = call i8** @__swift_relative_protocol_witness_table_parent_1(i8** [[T4]])
 // CHECK:   [[T24:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* [[C2]], i32 0, i32 0
 // CHECK:   [[T25:%.*]] = getelementptr inbounds i8**, i8*** [[T24]], i32 0
 // CHECK:   store i8** [[TBASE]], i8*** [[T25]]
