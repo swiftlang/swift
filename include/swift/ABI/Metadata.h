@@ -1965,7 +1965,7 @@ private:
          + (Flags.hasImplicitGenSigParams() ? 0 : getNumGenSigParams());
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+  size_t numTrailingObjects(OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
     return getNumGenSigRequirements() + getNumReqSigRequirements();
   }
 
