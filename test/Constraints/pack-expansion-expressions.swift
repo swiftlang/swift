@@ -93,3 +93,15 @@ func returnRepeatTuple<T...>(_ t: repeat each T) -> (repeat T) { // expected-err
 func paremeterAsPackTypeWithoutExpansion<T...>(_ t: T) -> repeat each T { // expected-error {{variadic expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
   fatalError()
 }
+
+func tupleExpansion<T..., U...>(
+  _ tuple1: (repeat each T),
+  _ tuple2: (repeat each U)
+) {
+  _ = forward(repeat each tuple1.element)
+
+  _ = zip(repeat each tuple1.element, with: repeat each tuple1.element)
+
+  _ = zip(repeat each tuple1.element, with: repeat each tuple2.element)
+  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'U' and 'T' have the same shape}}
+}

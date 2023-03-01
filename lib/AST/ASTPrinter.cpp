@@ -4959,6 +4959,11 @@ void PrintAST::visitPackExpansionExpr(PackExpansionExpr *expr) {
   visit(expr->getPatternExpr());
 }
 
+void PrintAST::visitMaterializePackExpr(MaterializePackExpr *expr) {
+  visit(expr->getFromExpr());
+  Printer << ".element";
+}
+
 void PrintAST::visitPackElementExpr(PackElementExpr *expr) {
   visit(expr->getPackRefExpr());
 }

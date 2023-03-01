@@ -3088,6 +3088,10 @@ namespace {
       return openPackElement(packType, /*packRepr*/ nullptr);
     }
 
+    Type visitMaterializePackExpr(MaterializePackExpr *expr) {
+      llvm_unreachable("MaterializePackExpr already type-checked");
+    }
+
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_CanBindToNoEscape);

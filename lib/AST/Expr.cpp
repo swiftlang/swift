@@ -398,6 +398,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(VarargExpansion);
   NO_REFERENCE(PackExpansion);
   NO_REFERENCE(PackElement);
+  NO_REFERENCE(MaterializePack);
   NO_REFERENCE(DynamicType);
 
   PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
@@ -757,6 +758,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::VarargExpansion:
   case ExprKind::PackExpansion:
   case ExprKind::PackElement:
+  case ExprKind::MaterializePack:
     return false;
 
   case ExprKind::Call:
@@ -936,6 +938,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::VarargExpansion:
   case ExprKind::PackExpansion:
   case ExprKind::PackElement:
+  case ExprKind::MaterializePack:
   case ExprKind::DynamicType:
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
@@ -1300,6 +1303,12 @@ PackElementExpr *
 PackElementExpr::create(ASTContext &ctx, SourceLoc eachLoc, Expr *packRefExpr,
                         bool implicit, Type type) {
   return new (ctx) PackElementExpr(eachLoc, packRefExpr, implicit, type);
+}
+
+MaterializePackExpr *
+MaterializePackExpr::create(ASTContext &ctx, Expr *fromExpr,
+                            bool implicit, Type type) {
+  return new (ctx) MaterializePackExpr(fromExpr, implicit, type);
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {

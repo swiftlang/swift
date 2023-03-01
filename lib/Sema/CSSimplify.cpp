@@ -154,6 +154,7 @@ static bool areConservativelyCompatibleArgumentLabels(
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
   case OverloadChoiceKind::TupleIndex:
+  case OverloadChoiceKind::MaterializePack:
     return true;
   }
 
@@ -8980,6 +8981,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     if (!memberName.isSpecial()) {
       StringRef nameStr = memberName.getBaseIdentifier().str();
+
+      // Accessing `.element` on an abstract tuple materializes a pack.
+      if (nameStr == "element" && baseTuple->getNumElements() == 1 &&
+          baseTuple->getElementType(0)->is<PackExpansionType>()) {
+        result.ViableCandidates.push_back(
+            OverloadChoice(baseTy, OverloadChoiceKind::MaterializePack));
+        return result;
+      }
+
       int fieldIdx = -1;
       // Resolve a number reference into the tuple type.
       unsigned Value = 0;

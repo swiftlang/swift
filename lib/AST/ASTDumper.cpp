@@ -2529,6 +2529,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitMaterializePackExpr(MaterializePackExpr *E) {
+    printCommon(E, "materialize_pack_expr") << "\n";
+    printRec(E->getFromExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitForceTryExpr(ForceTryExpr *E) {
     printCommon(E, "force_try_expr");
     OS << '\n';

@@ -3414,6 +3414,14 @@ namespace {
                                              nameLoc.getBaseNameLoc(), toType));
       }
 
+      case OverloadChoiceKind::MaterializePack: {
+        auto packType = simplifyType(cs.getType(expr));
+        return cs.cacheType(
+            MaterializePackExpr::create(cs.getASTContext(),
+                                        base, /*implicit=*/false,
+                                        packType));
+      }
+
       case OverloadChoiceKind::KeyPathApplication:
         llvm_unreachable("should only happen in a subscript");
 
@@ -3787,6 +3795,10 @@ namespace {
 
     Expr *visitPackElementExpr(PackElementExpr *expr) {
       return simplifyExprType(expr);
+    }
+
+    Expr *visitMaterializePackExpr(MaterializePackExpr *expr) {
+      llvm_unreachable("MaterializePackExpr already type-checked");
     }
 
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
