@@ -722,22 +722,22 @@ public protocol KeyedDecodingContainerProtocol<Key> {
   /// The path of coding keys taken to get to this point in decoding.
   var codingPath: [any CodingKey] { get }
 
-  /// All the keys the `Decoder` has for this container.
+  /// All the keys the decoder has for this container.
   ///
-  /// Different keyed containers from the same `Decoder` may return different
-  /// keys here; it is possible to encode with multiple key types which are
-  /// not convertible to one another. This should report all keys present
-  /// which are convertible to the requested type.
+  /// Different keyed containers from the same decoder may return different
+  /// keys here, because it is possible to encode with multiple key types
+  /// which are not convertible to one another. This should report all keys
+  /// present which are convertible to the requested type.
   var allKeys: [Key] { get }
 
   /// Returns a Boolean value indicating whether the decoder contains a value
   /// associated with the given key.
   ///
-  /// The value associated with `key` may be a null value as appropriate for
-  /// the data format.
+  /// The value associated with the given key may be a null value as
+  /// appropriate for the data format.
   ///
   /// - parameter key: The key to search for.
-  /// - returns: Whether the `Decoder` has an entry for the given key.
+  /// - returns: Whether the decoder has an entry for the given key.
   func contains(_ key: Key) -> Bool
 
   /// Decodes a null value for the given key.
