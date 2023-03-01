@@ -84,7 +84,7 @@ After creating your Swift package project, follow the steps [Creating a Module t
 
 - In your Package Manifest, you need to configure the Swift target's dependencies and compiler flags
 - In this example the name of the package is `CxxInterop`
-- Swift code will be in `Sources/CxxInterop` called `main.swift`
+- Swift code will be in `Sources/CxxInterop` called CxxInterop.swift
 - C++ source code follows the example shown in [Creating a Module to contain your C++ source code](#creating-a-module-to-contain-your-c-source-code)
 - Under targets, add the name of your C++ module and the directory containing the Swift code as a target.
 - In the target defining your Swift target, add a`dependencies` to the C++ Module, the `path`, `source`, and `swiftSettings` with `unsafeFlags` with the source to the C++ Module, and enable `-enable-experimental-cxx-interop`
@@ -114,7 +114,6 @@ let package = Package(
             name: "CxxInterop",
             dependencies: ["CxxTest"],
             path: "./Sources/CxxInterop",
-            sources: [ "main.swift" ],
             swiftSettings: [.unsafeFlags([
                 "-I", "Sources/CxxTest",
                 "-enable-experimental-cxx-interop",
@@ -128,7 +127,7 @@ let package = Package(
 - We are now able to import our C++ Module into our swift code, and import the package into existing projects
 
 ```
-//In main.swift
+//In CxxInterop.swift
 
 import CxxTest
 
