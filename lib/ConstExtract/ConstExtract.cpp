@@ -306,6 +306,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       return std::make_shared<TypeValue>(dotSelfExpr->getType());
     }
 
+    case ExprKind::UnderlyingToOpaque: {
+      auto underlyingToOpaque = cast<UnderlyingToOpaqueExpr>(expr);
+      return extractCompileTimeValue(underlyingToOpaque->getSubExpr());
+    }
+
     default: {
       break;
     }
