@@ -832,24 +832,26 @@ public:
               ConsumableAndAssignable);
     }
 
-    // Otherwise, if we do not have a no implicit copy variable, just follow
-    // the "normal path": perform a lexical borrow if the lifetime is lexical.
-    if (!vd->isNoImplicitCopy()) {
-      return SGF.B.createBeginBorrow(
-          PrologueLoc, value,
-          /*isLexical=*/SGF.F.getLifetime(vd, value->getType()).isLexical(),
-          /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
-    }
-
     // If we have a no implicit copy lexical, emit the instruction stream so
     // that the move checker knows to check this variable.
-    value =
-        SGF.B.createMoveValue(PrologueLoc, value, /*IisLexical*/ true,
-                              /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
-    value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-    return SGF.B.createMarkUnresolvedNonCopyableValueInst(
+    if (vd->isNoImplicitCopy()) {
+      value = SGF.B.createMoveValue(PrologueLoc, value, /*IisLexical*/ true,
+                                    /*hasPointerEscape=*/false,
+                                    /*fromVarDecl=*/true);
+      value =
+          SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
+      return SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          PrologueLoc, value,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
+    }
+
+    // Otherwise, if we do not have a no implicit copy variable, just follow
+    // the "normal path": perform a lexical borrow if the lifetime is lexical.
+    return SGF.B.createBeginBorrow(
         PrologueLoc, value,
-        MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+        /*isLexical=*/SGF.F.getLifetime(vd, value->getType()).isLexical(),
+        /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
   }
 
   void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne,
