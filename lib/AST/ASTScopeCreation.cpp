@@ -489,6 +489,12 @@ public:
     return p;
   }
 
+  ASTScopeImpl *visitForgetStmt(ForgetStmt *fs, ASTScopeImpl *p,
+                               ScopeCreator &scopeCreator) {
+    visitExpr(fs->getSubExpr(), p, scopeCreator);
+    return p;
+  }
+
   ASTScopeImpl *visitPoundAssertStmt(PoundAssertStmt *pas,
                                      ASTScopeImpl *p,
                                      ScopeCreator &scopeCreator) {

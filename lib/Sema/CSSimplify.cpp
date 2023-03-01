@@ -14616,6 +14616,12 @@ void ConstraintSystem::addContextualConversionConstraint(
     constraintKind = ConstraintKind::Bind;
     break;
 
+  case CTP_ForgetStmt:
+    // For the 'forget X', we always expect the contextual type to be
+    // equal to the type of 'self'.
+    constraintKind = ConstraintKind::Equal;
+    break;
+
   case CTP_ForEachSequence:
     // Sequence expression associated with `for-in` loop has to conform
     // to `Sequence` or `AsyncSequence` protocol depending on the context.

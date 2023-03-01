@@ -1071,6 +1071,10 @@ NOTE(indent_expression_to_silence,none,
 ERROR(expected_expr_throw,PointsToFirstBadToken,
       "expected expression in 'throw' statement", ())
 
+// Forget Statement
+ERROR(expected_expr_forget,PointsToFirstBadToken,
+      "expected expression in 'forget' statement", ())
+
 // Await/Async
 ERROR(expected_await_not_async,none,
       "found 'async' in expression; did you mean 'await'?", ())
