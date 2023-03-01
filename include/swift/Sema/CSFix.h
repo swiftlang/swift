@@ -1100,6 +1100,10 @@ public:
     return {getTrailingObjects<unsigned>(), NumMismatches};
   }
 
+  bool coalesceAndDiagnose(const Solution &solution,
+                           ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
+
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static GenericArgumentsMismatch *create(ConstraintSystem &cs, Type actual,
@@ -1112,6 +1116,9 @@ public:
   }
 
 private:
+  bool diagnose(const Solution &solution, ArrayRef<unsigned> mismatches,
+                bool asNote = false) const;
+
   MutableArrayRef<unsigned> getMismatchesBuf() {
     return {getTrailingObjects<unsigned>(), NumMismatches};
   }

@@ -732,10 +732,31 @@ AllowFunctionTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
       AllowFunctionTypeMismatch(cs, lhs, rhs, locator, index);
 }
 
+bool GenericArgumentsMismatch::coalesceAndDiagnose(
+    const Solution &solution, ArrayRef<ConstraintFix *> secondaryFixes,
+    bool asNote) const {
+  std::set<unsigned> scratch(getMismatches().begin(), getMismatches().end());
+
+  for (auto *fix : secondaryFixes) {
+    auto *genericArgsFix = fix->castTo<GenericArgumentsMismatch>();
+    for (auto mismatchIdx : genericArgsFix->getMismatches())
+      scratch.insert(mismatchIdx);
+  }
+
+  SmallVector<unsigned> mismatches(scratch.begin(), scratch.end());
+  return diagnose(solution, mismatches, asNote);
+}
+
 bool GenericArgumentsMismatch::diagnose(const Solution &solution,
                                         bool asNote) const {
+  return diagnose(solution, getMismatches(), asNote);
+}
+
+bool GenericArgumentsMismatch::diagnose(const Solution &solution,
+                                        ArrayRef<unsigned> mismatches,
+                                        bool asNote) const {
   GenericArgumentsMismatchFailure failure(solution, getFromType(), getToType(),
-                                          getMismatches(), getLocator());
+                                          mismatches, getLocator());
   return failure.diagnose(asNote);
 }
 
