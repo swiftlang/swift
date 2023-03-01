@@ -597,11 +597,11 @@ public:
     }
 
     // If we were given any parameters that apply to this brace block, we insert
-    // log calls for them now (before any of the other statements).
+    // log calls for them now (before any of the other statements). We only log
+    // named parameters (not `{ _ in ... }`, for example).
     if (PL && !HighPerformance) {
       size_t EI = 0;
       for (const auto &PD : *PL) {
-        // Only log named parameters (not `{ _ in }` closures for example.
         if (PD->hasName()) {
           DeclBaseName Name = PD->getName();
           Expr *PVVarRef = new (Context)
