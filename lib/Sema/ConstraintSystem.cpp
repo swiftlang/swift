@@ -622,12 +622,6 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   if (isExpr<ObjectLiteralExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::ConstructorMember);
 
-  if (locator->isLastElement<LocatorPathElt::FunctionArgument>()) {
-    if (auto *CE = getAsExpr<CoerceExpr>(anchor)) {
-      return getConstraintLocator(CE->getSubExpr());
-    }
-  }
-
   return getConstraintLocator(anchor);
 }
 
