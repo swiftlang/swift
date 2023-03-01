@@ -327,7 +327,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     
     // If let or var is being used as an argument label, allow it but
     // generate a warning.
-    if (!isClosure && Tok.isAny(tok::kw_let, tok::kw_var)) {
+    if (!isClosure && Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_inout)) {
       diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
         .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
     }
@@ -1104,7 +1104,7 @@ ParserResult<Pattern> Parser::parsePattern() {
       consumeToken(tok::code_complete);
     }
     return makeParserCodeCompletionStatus();
-    
+  case tok::kw_inout:
   case tok::kw_var:
   case tok::kw_let: {
     auto newBindingState = PatternBindingState(Tok);
@@ -1273,8 +1273,8 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // through the expr parser for ambiguous productions.
 
   // Parse productions that can only be patterns.
-  if (Tok.isAny(tok::kw_var, tok::kw_let)) {
-    assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects var or let");
+  if (Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_inout)) {
+    assert(Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_inout) && "expects var or let");
     auto newPatternBindingState = PatternBindingState(Tok);
     SourceLoc varLoc = consumeToken();
 
@@ -1356,7 +1356,7 @@ Parser::parseMatchingPatternAsBinding(PatternBindingState newState,
 }
 
 bool Parser::isOnlyStartOfMatchingPattern() {
-  return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_is);
+  return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_is, tok::kw_inout);
 }
 
 
@@ -1373,6 +1373,7 @@ static bool canParsePattern(Parser &P) {
   case tok::kw__:
     P.consumeToken();
     return true;
+  case tok::kw_inout:
   case tok::kw_let:
   case tok::kw_var:
     P.consumeToken();

@@ -222,7 +222,7 @@ parse_operator:
       if (Tok.getText() == "&&" &&
           peekToken().isAny(tok::pound_available, tok::pound_unavailable,
                             tok::pound__hasSymbol, tok::kw_let, tok::kw_var,
-                            tok::kw_case))
+                            tok::kw_case, tok::kw_inout))
         goto done;
       
       // Parse the operator.
@@ -1635,8 +1635,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     // will be resolved (or rejected) by sema when the overall refutable pattern
     // it transformed from an expression into a pattern.
     if ((InBindingPattern == PatternBindingState::ImplicitlyImmutable ||
-         InBindingPattern == PatternBindingState::InVar ||
-         InBindingPattern == PatternBindingState::InLet) &&
+         InBindingPattern.getIntroducer().hasValue()) &&
         // If we have "case let x." or "case let x(", we parse x as a normal
         // name, not a binding, because it is the start of an enum pattern or
         // call pattern.

@@ -44,6 +44,11 @@ struct PatternBindingState {
     /// nested let/var patterns are not permitted. This happens when parsing a
     /// 'let' decl or when parsing inside a 'let' pattern.
     InLet,
+
+    /// When InBindingPattern has this value, bound variables are mutable, and
+    /// nested let/var/inout patterns are not permitted. This happens when
+    /// parsing an 'inout' decl or when parsing inside an 'inout' pattern.
+    InInOut,
   };
 
   Kind kind;
@@ -58,6 +63,7 @@ struct PatternBindingState {
     auto kind = llvm::StringSwitch<Kind>(str)
                     .Case("let", Kind::InLet)
                     .Case("var", Kind::InVar)
+                    .Case("inout", Kind::InInOut)
                     .Default(Kind::NotInBinding);
     return PatternBindingState(kind);
   }
@@ -70,6 +76,9 @@ struct PatternBindingState {
       break;
     case tok::kw_var:
       kind = InVar;
+      break;
+    case tok::kw_inout:
+      kind = InInOut;
       break;
     default:
       break;
@@ -86,6 +95,9 @@ struct PatternBindingState {
     case VarDecl::Introducer::Var:
       kind = InVar;
       break;
+    case VarDecl::Introducer::InOut:
+      kind = InInOut;
+      break;
     }
   }
 
@@ -101,6 +113,8 @@ struct PatternBindingState {
       return VarDecl::Introducer::Var;
     case Kind::InLet:
       return VarDecl::Introducer::Let;
+    case Kind::InInOut:
+      return VarDecl::Introducer::InOut;
     }
   }
 
@@ -113,8 +127,10 @@ struct PatternBindingState {
     switch (kind) {
     case Kind::InLet:
       return 0;
-    case Kind::InVar:
+    case Kind::InInOut:
       return 1;
+    case Kind::InVar:
+      return 2;
     default:
       return None;
     }

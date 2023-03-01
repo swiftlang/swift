@@ -77,7 +77,7 @@ protected:
 
   SWIFT_INLINE_BITFIELD(BindingPattern, Pattern, 2,
     /// Corresponds to VarDecl::Introducer
-    Introducer : 1
+    Introducer : 2
   );
 
   SWIFT_INLINE_BITFIELD(AnyPattern, Pattern, 1,
@@ -727,6 +727,17 @@ public:
   }
 
   bool isLet() const { return getIntroducer() == VarDecl::Introducer::Let; }
+
+  StringRef getIntroducerStringRef() const {
+    switch (getIntroducer()) {
+    case VarDecl::Introducer::Let:
+      return "let";
+    case VarDecl::Introducer::Var:
+      return "var";
+    case VarDecl::Introducer::InOut:
+      return "inout";
+    }
+  }
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {

@@ -2547,6 +2547,7 @@ getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
     return swift::VarDecl::Introducer::ID;
   CASE(Let)
   CASE(Var)
+  CASE(InOut)
   }
 #undef CASE
   return None;
