@@ -225,39 +225,7 @@ struct ExprToDeclRefTypeRepr : public ASTVisitor<ExprToDeclRefTypeRepr, bool> {
 };
 } // end anonymous namespace
 
-
 namespace {
-  class UnresolvedPatternFinder : public ASTWalker {
-    bool &HadUnresolvedPattern;
-  public:
-    
-    UnresolvedPatternFinder(bool &HadUnresolvedPattern)
-      : HadUnresolvedPattern(HadUnresolvedPattern) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Arguments;
-    }
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      // If we find an UnresolvedPatternExpr, return true.
-      if (isa<UnresolvedPatternExpr>(E)) {
-        HadUnresolvedPattern = true;
-        return Action::SkipChildren(E);
-      }
-      
-      return Action::Continue(E);
-    }
-    
-    static bool hasAny(Expr *E) {
-      bool HasUnresolvedPattern = false;
-      E->walk(UnresolvedPatternFinder(HasUnresolvedPattern));
-      return HasUnresolvedPattern;
-    }
-  };
-} // end anonymous namespace
-
-namespace {
-  
 class ResolvePattern : public ASTVisitor<ResolvePattern,
                                          /*ExprRetTy=*/Pattern*,
                                          /*StmtRetTy=*/void,
@@ -651,7 +619,6 @@ public:
 };
 
 } // end anonymous namespace
-
 
 /// Perform top-down syntactic disambiguation of a pattern. Where ambiguous
 /// expr/pattern productions occur (tuples, function calls, etc.), favor the
