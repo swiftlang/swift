@@ -2726,6 +2726,10 @@ public:
     return ResultBuilderBodyPreCheck::Okay;
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (SkipPrecheck)
       return Action::SkipChildren(E);

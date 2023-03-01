@@ -116,6 +116,10 @@ public:
   SanitizeExpr(ASTContext &C)
     : C(C) { }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *argList) override {
     // Return the argument list to the state prior to being rewritten. This will

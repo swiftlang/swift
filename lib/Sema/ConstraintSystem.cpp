@@ -687,6 +687,10 @@ static void extendDepthMap(
         llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
         : DepthMap(depthMap) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     // For argument lists, bump the depth of the arguments, as they are
     // effectively nested within the argument list. It's debatable whether we
     // should actually do this, as it doesn't reflect the true expression depth,
@@ -2949,6 +2953,10 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
     DeclContext *DC;
     bool FoundThrow = false;
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // If we've found a 'try', record it and terminate the traversal.
       if (isa<TryExpr>(expr)) {
@@ -5095,6 +5103,10 @@ static void extendPreorderIndexMap(
 
     explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
       : IndexMap(indexMap) { }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       IndexMap[E] = Index;

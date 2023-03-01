@@ -47,6 +47,9 @@ func testFileID(a: Int, b: Int) {
 
 testFileID(a: 1, b: 2)
 
+@freestanding(expression) macro stringifyAndTry<T>(_ value: T) -> (T, String) =
+    #externalMacro(module: "MacroDefinition", type: "StringifyAndTryMacro")
+
 func testStringify(a: Int, b: Int) {
   let s = #stringify(a + b)
   print(s)
@@ -86,6 +89,25 @@ public struct Outer {
 
 // CHECK: (2, "a + b")
 testStringify(a: 1, b: 1)
+
+func maybeThrowing() throws -> Int { 5 }
+
+func testStringifyWithThrows() throws {
+  // Okay, we can put the try inside or outside
+  _ = try #stringify(maybeThrowing())
+  _ = #stringify(try maybeThrowing())
+
+#if TEST_DIAGNOSTICS
+  // FIXME: Lots of duplicate notes here
+  _ = #stringify(maybeThrowing()) // expected-note 4{{in expansion of macro 'stringify' here}}
+
+    // CHECK-DIAGS: @__swiftmacro_9MacroUser23testStringifyWithThrowsyyKF9stringifyfMf1_.swift:1:2: error: call can throw but is not marked with 'try'
+#endif
+  
+  // The macro adds the 'try' for us.
+  _ = #stringifyAndTry(maybeThrowing())
+}
+
 
 @freestanding(expression) macro addBlocker<T>(_ value: T) -> T = #externalMacro(module: "MacroDefinition", type: "AddBlocker")
 

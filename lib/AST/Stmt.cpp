@@ -245,6 +245,11 @@ ASTNode BraceStmt::findAsyncNode() {
   class FindInnerAsync : public ASTWalker {
     ASTNode AsyncNode;
 
+    /// Walk only the macro arguments.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // If we've found an 'await', record it and terminate the traversal.
       if (isa<AwaitExpr>(expr)) {

@@ -475,6 +475,10 @@ private:
     return true;
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (!walkCustomAttributes(D))
       return Action::SkipChildren();
@@ -1349,6 +1353,10 @@ private:
       }
     }
     return true;
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {

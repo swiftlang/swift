@@ -119,6 +119,10 @@ class TypeAccessScopeDiagnoser : private ASTWalker {
   bool treatUsableFromInlineAsPublic;
   const IdentTypeRepr *offendingType = nullptr;
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
     auto ITR = dyn_cast<IdentTypeRepr>(TR);
     if (!ITR)

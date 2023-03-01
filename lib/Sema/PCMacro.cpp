@@ -674,6 +674,10 @@ void swift::performPCMacro(SourceFile &SF) {
   public:
     ExpressionFinder() = default;
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkAction walkToDeclPre(Decl *D) override {
       ASTContext &ctx = D->getASTContext();
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {

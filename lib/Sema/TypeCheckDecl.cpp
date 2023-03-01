@@ -499,6 +499,10 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
                                ASTContext &ctx)
         : Decl(decl), ctx(ctx) { }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkAction walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
       return Action::SkipChildrenIf(isa<NominalTypeDecl>(D));

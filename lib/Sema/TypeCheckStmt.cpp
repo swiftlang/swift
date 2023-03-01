@@ -63,6 +63,10 @@ namespace {
   public:
     ContextualizeClosuresAndMacros(DeclContext *parent) : ParentDC(parent) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
       // Reparenting is required with:
@@ -248,6 +252,10 @@ namespace {
       }
 
       return result;
+    }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -2115,6 +2123,10 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   public:
     ApplyExpr *Found = nullptr;
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto apply = dyn_cast<ApplyExpr>(E)) {
         if (isa<OtherConstructorDeclRefExpr>(apply->getSemanticFn())) {
@@ -2236,6 +2248,10 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       return *FoundNode;
     }
     DeclContext *getDeclContext() const { return DC; }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto *brace = dyn_cast<BraceStmt>(S)) {
@@ -2625,6 +2641,10 @@ class JumpOutOfContextFinder : public ASTWalker {
 
 public:
   JumpOutOfContextFinder(TinyPtrVector<Stmt *> &jumps) : Jumps(jumps) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *LS = dyn_cast<LabeledStmt>(S))

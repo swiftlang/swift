@@ -770,6 +770,10 @@ public:
     : SM(SM), BufferID(BufferID), References(References), Consumer(Consumer) {}
 
   bool walkToNodePre(SyntaxNode Node) override {
+    // Ignore things that don't come from this buffer.
+    if (!SM.getRangeForBuffer(BufferID).contains(Node.Range.getStart()))
+      return false;
+
     unsigned Offset = SM.getLocOffsetInBuffer(Node.Range.getStart(), BufferID);
     unsigned Length = Node.Range.getByteLength();
 
@@ -830,6 +834,11 @@ public:
       auto passAnnotation = [&](UIdent Kind, SourceLoc Loc, Identifier Name) {
         if (Loc.isInvalid())
           return;
+
+        // Ignore things that don't come from this buffer.
+        if (!SM.getRangeForBuffer(BufferID).contains(Loc))
+          return;
+
         unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
         unsigned Length = Name.empty() ? 1 : Name.getLength();
         reportRefsUntil(Offset);
@@ -922,6 +931,10 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
       if (TypeRange.isInvalid())
         continue;
 
+      // Ignore things that don't come from this buffer.
+      if (!SM.getRangeForBuffer(BufferID).contains(TypeRange.Start))
+        continue;
+
       unsigned StartOffs = SM.getLocOffsetInBuffer(TypeRange.Start, BufferID);
       unsigned EndOffs =
         SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
@@ -969,8 +982,9 @@ public:
              llvm::MutableArrayRef<TextEntity*> FuncEnts)
     : SM(SM), BufferID(BufferID), FuncEnts(FuncEnts) {}
 
-  bool shouldWalkMacroExpansions() override {
-    return false;
+  /// Only walk the arguments of a macro, to represent the source as written.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
@@ -982,6 +996,10 @@ public:
 
     if (!isa<AbstractFunctionDecl>(D) && !isa<SubscriptDecl>(D))
       return Action::Continue();
+
+    // Ignore things that don't come from this buffer.
+    if (!SM.getRangeForBuffer(BufferID).contains(D->getLoc()))
+      return Action::SkipChildren();
 
     unsigned Offset = SM.getLocOffsetInBuffer(D->getLoc(), BufferID);
     auto Found = FuncEnts.end();
@@ -1136,6 +1154,11 @@ public:
       return true;
     if (isLocal(D))
       return true;
+
+    // Ignore things that don't come from this buffer.
+    if (!SM.getRangeForBuffer(BufferID).contains(D->getSourceRange().Start))
+      return false;
+
     TextRange TR = getTextRange(D->getSourceRange());
     unsigned LocOffset = getOffset(Range.getStart());
     EntitiesStack.emplace_back(D, TypeOrExtensionDecl(), nullptr, TR, LocOffset,
@@ -1161,6 +1184,10 @@ public:
                           ReferenceMetaData Data) override {
     if (Data.isImplicit || !Range.isValid())
       return true;
+    // Ignore things that don't come from this buffer.
+    if (!SM.getRangeForBuffer(BufferID).contains(Range.getStart()))
+      return false;
+
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
     return true;

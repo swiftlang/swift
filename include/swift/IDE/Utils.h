@@ -368,6 +368,10 @@ class NameMatcher: public ASTWalker {
   bool handleCustomAttrs(Decl *D);
   ArgumentList *getApplicableArgsFor(Expr* E);
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
   PreWalkAction walkToDeclPre(Decl *D) override;

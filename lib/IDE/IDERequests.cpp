@@ -77,6 +77,10 @@ public:
   ResolvedCursorInfoPtr resolve(SourceLoc Loc);
   SourceManager &getSourceMgr() const;
 private:
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   bool walkToExprPre(Expr *E) override;
   bool walkToExprPost(Expr *E) override;
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
@@ -102,11 +106,6 @@ private:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override;
-
-  // We want to be able to resolve symbols within expansions
-  bool shouldWalkMacroExpansions() override {
-    return true;
-  }
 };
 
 SourceManager &CursorInfoResolver::getSourceMgr() const
