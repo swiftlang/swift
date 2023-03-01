@@ -1746,8 +1746,11 @@ private:
       }
     }
 
+    // Note we perform a limited exhaustiveness check if we weren't able to
+    // apply the solution, as the subject and patterns may not be well-formed.
     TypeChecker::checkSwitchExhaustiveness(
-        switchStmt, context.getAsDeclContext(), limitExhaustivityChecks);
+        switchStmt, context.getAsDeclContext(),
+        /*limited*/ limitExhaustivityChecks || hadError);
 
     return switchStmt;
   }
