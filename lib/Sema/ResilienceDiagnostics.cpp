@@ -39,13 +39,28 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (D->getDeclContext()->isLocalContext())
     return false;
 
+  // General check on access-level of the decl.
+  auto declAccessScope = D->getFormalAccessScope(/*useDC=*/nullptr,
+                              fragileKind.allowUsableFromInline);
+
+  // If the decl is imported, check if the import lowers it's access level.
+  auto importAccessLevel = AccessLevel::Public;
+  ImportAccessLevel problematicImport = None;
+
   auto *DC = where.getDeclContext();
+  auto targetModule = D->getDeclContext()->getParentModule();
+  auto file = where.getDeclContext()->getParentSourceFile();
+  if (targetModule != DC->getParentModule() && file) {
+    problematicImport = file->getImportAccessLevel(targetModule);
+    if (problematicImport.has_value())
+      importAccessLevel = problematicImport->accessLevel;
+  }
 
   // Public declarations are OK, even if they're SPI or came from an
   // implementation-only import. We'll diagnose exportability violations
   // from diagnoseDeclRefExportability().
-  if (D->getFormalAccessScope(/*useDC=*/nullptr,
-                              fragileKind.allowUsableFromInline).isPublic())
+  if (declAccessScope.isPublic() &&
+      importAccessLevel == AccessLevel::Public)
     return false;
 
   auto &Context = DC->getASTContext();
@@ -91,8 +106,11 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::resilience_decl_unavailable_warn;
 
+  auto diagAccessLevel = std::min(declAccessScope.accessLevelForDiagnostics(),
+                                  importAccessLevel);
+
   Context.Diags.diagnose(loc, diagID, D->getDescriptiveKind(), diagName,
-                         D->getFormalAccessScope().accessLevelForDiagnostics(),
+                         diagAccessLevel,
                          fragileKind.getSelector(), isAccessor);
 
   if (fragileKind.allowUsableFromInline) {
@@ -101,6 +119,14 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   } else {
     Context.Diags.diagnose(D, diag::resilience_decl_declared_here_public,
                            D->getDescriptiveKind(), diagName, isAccessor);
+  }
+
+  if (problematicImport.has_value() &&
+      diagAccessLevel == importAccessLevel) {
+    Context.Diags.diagnose(problematicImport->accessLevelLoc,
+                           diag::module_imported_here,
+                           problematicImport->module.importedModule->getName(),
+                           problematicImport->accessLevel);
   }
 
   return (downgradeToWarning == DowngradeToWarning::No);
