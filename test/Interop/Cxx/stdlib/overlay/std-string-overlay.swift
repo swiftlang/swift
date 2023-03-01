@@ -90,6 +90,21 @@ StdStringOverlayTestSuite.test("std::string as Swift.CustomDebugStringConvertibl
   expectEqual(cxx3.debugDescription, "std.string(���)")
 }
 
+StdStringOverlayTestSuite.test("std::u16string as Swift.CustomDebugStringConvertible") {
+  let cxx1 = std.u16string()
+  expectEqual(cxx1.debugDescription, "std.u16string()")
+
+  let cxx2 = std.u16string("something123")
+  expectEqual(cxx2.debugDescription, "std.u16string(something123)")
+
+  let scalars: [UInt16] = [97, 55296, 99]
+  var cxx3 = std.u16string()
+  for scalar in scalars {
+    cxx3.push_back(scalar)
+  }
+  expectEqual(cxx3.debugDescription, "std.u16string(a�c)")
+}
+
 StdStringOverlayTestSuite.test("std::string as Swift.Sequence") {
   let cxx1 = std.string()
   var iterated = false
@@ -122,6 +137,21 @@ StdStringOverlayTestSuite.test("std::string as CustomStringConvertible") {
     cxx3.push_back(CChar(bitPattern: byte))
   }
   expectEqual(cxx3.description, "���")
+}
+
+StdStringOverlayTestSuite.test("std::u16string as Swift.CustomStringConvertible") {
+  let cxx1 = std.u16string()
+  expectEqual(cxx1.description, "")
+
+  let cxx2 = std.u16string("something123")
+  expectEqual(cxx2.description, "something123")
+
+  let scalars: [UInt16] = [97, 55296, 99]
+  var cxx3 = std.u16string()
+  for scalar in scalars {
+    cxx3.push_back(scalar)
+  }
+  expectEqual(cxx3.description, "a�c")
 }
 
 runAllTests()

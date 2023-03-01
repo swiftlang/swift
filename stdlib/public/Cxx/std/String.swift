@@ -53,13 +53,27 @@ extension std.u16string: ExpressibleByStringLiteral {
   }
 }
 
+// MARK: Getting a Swift description of a C++ string
+
 extension std.string: CustomDebugStringConvertible {
   public var debugDescription: String {
     return "std.string(\(String(self)))"
   }
 }
 
+extension std.u16string: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return "std.u16string(\(String(self)))"
+  }
+}
+
 extension std.string: CustomStringConvertible {
+  public var description: String {
+    return String(self)
+  }
+}
+
+extension std.u16string: CustomStringConvertible {
   public var description: String {
     return String(self)
   }
