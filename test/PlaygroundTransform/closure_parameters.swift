@@ -13,6 +13,8 @@ import PlaygroundSupport
 
 let foo = [1, 2, 3, 4, 5].filter { $0 % 2 == 1 }.map { x in "\(x)" }
 
+["A", "B", "C"].map { _ in 1 }
+
 // CHECK:      {{.*}} __builtin_log_scope_entry
 // CHECK-NEXT: {{.*}} __builtin_log[$0='1']
 // CHECK-NEXT: {{.*}} __builtin_log[='true']

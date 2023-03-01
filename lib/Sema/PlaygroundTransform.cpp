@@ -601,15 +601,18 @@ public:
     if (PL) {
       size_t EI = 0;
       for (const auto &PD : *PL) {
-        DeclBaseName Name = PD->getName();
-        Expr *PVVarRef =
-            new (Context) DeclRefExpr(PD, DeclNameLoc(), /*implicit=*/true,
-                                      AccessSemantics::Ordinary, PD->getType());
-        Added<Stmt *> Log(buildLoggerCall(PVVarRef, PD->getSourceRange(),
-                                          Name.getIdentifier().str()));
-        if (*Log) {
-          Elements.insert(Elements.begin() + EI, *Log);
-          EI++;
+        // Skip parameters that don't have a name (such as `_` in a closure).
+        if (PD->hasName()) {
+          DeclBaseName Name = PD->getName();
+          Expr *PVVarRef = new (Context)
+              DeclRefExpr(PD, DeclNameLoc(), /*implicit=*/true,
+                          AccessSemantics::Ordinary, PD->getType());
+          Added<Stmt *> Log(buildLoggerCall(PVVarRef, PD->getSourceRange(),
+                                            Name.getIdentifier().str()));
+          if (*Log) {
+            Elements.insert(Elements.begin() + EI, *Log);
+            EI++;
+          }
         }
       }
     }
