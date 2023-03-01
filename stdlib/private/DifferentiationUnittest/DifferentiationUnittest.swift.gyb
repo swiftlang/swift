@@ -108,7 +108,8 @@ public struct Tracked<T> {
   @differentiable(reverse where T: Differentiable, T == T.TangentVector)
   public var value: T {
     get { handle.value }
-    set { handle.value = newValue }
+    // FIXME: Disable setter until https://github.com/apple/swift/issues/55542 is fixed
+    // set { handle.value = newValue }
   }
 }
 
@@ -141,7 +142,8 @@ public struct NonresilientTracked<T> {
   @differentiable(reverse where T: Differentiable, T == T.TangentVector)
   public var value: T {
     get { handle.value }
-    set { handle.value = newValue }
+    // FIXME: Disable setter until https://github.com/apple/swift/issues/55542 is fixed
+    // set { handle.value = newValue }
   }
 }
 

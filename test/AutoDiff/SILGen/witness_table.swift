@@ -114,10 +114,14 @@ struct Struct: Protocol {
 // CHECK-NEXT:   method #Protocol.property!getter.jvp.S.<Self where Self : Protocol>: <Self where Self : Protocol> (Self) -> () -> Float : @AD__$s13witness_table6StructVAA8ProtocolA2aDP8propertySfvgTW_jvp_S
 // CHECK-NEXT:   method #Protocol.property!getter.vjp.S.<Self where Self : Protocol>: <Self where Self : Protocol> (Self) -> () -> Float : @AD__$s13witness_table6StructVAA8ProtocolA2aDP8propertySfvgTW_vjp_S
 // CHECK-NEXT:   method #Protocol.property!setter: <Self where Self : Protocol> (inout Self) -> (Float) -> () : @$s13witness_table6StructVAA8ProtocolA2aDP8propertySfvsTW
+// CHECK-NEXT:   method #Protocol.property!setter.jvp.SS.<Self where Self : Protocol>: <Self where Self : Protocol> (inout Self) -> (Float) -> () : @AD__$s13witness_table6StructVAA8ProtocolA2aDP8propertySfvsTW_jvp_SS
+// CHECK-NEXT:   method #Protocol.property!setter.vjp.SS.<Self where Self : Protocol>: <Self where Self : Protocol> (inout Self) -> (Float) -> () : @AD__$s13witness_table6StructVAA8ProtocolA2aDP8propertySfvsTW_vjp_SS
 // CHECK-NEXT:   method #Protocol.property!modify: <Self where Self : Protocol> (inout Self) -> () -> () : @$s13witness_table6StructVAA8ProtocolA2aDP8propertySfvMTW
 // CHECK-NEXT:   method #Protocol.subscript!getter: <Self where Self : Protocol> (Self) -> (Float, Float) -> Float : @$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftcigTW
 // CHECK-NEXT:   method #Protocol.subscript!getter.jvp.SUU.<Self where Self : Protocol>: <Self where Self : Protocol> (Self) -> (Float, Float) -> Float : @AD__$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftcigTW_jvp_SU
 // CHECK-NEXT:   method #Protocol.subscript!getter.vjp.SUU.<Self where Self : Protocol>: <Self where Self : Protocol> (Self) -> (Float, Float) -> Float : @AD__$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftcigTW_vjp_SUU
 // CHECK-NEXT:   method #Protocol.subscript!setter: <Self where Self : Protocol> (inout Self) -> (Float, Float, Float) -> () : @$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftcisTW
+// CHECK-NEXT:   method #Protocol.subscript!setter.jvp.USUU.<Self where Self : Protocol>: <Self where Self : Protocol> (inout Self) -> (Float, Float, Float) -> () : @AD__$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftcisTW_jvp_USUU
+// CHECK-NEXT:   method #Protocol.subscript!setter.vjp.USUU.<Self where Self : Protocol>: <Self where Self : Protocol> (inout Self) -> (Float, Float, Float) -> () : @AD__$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftcisTW_vjp_USUU
 // CHECK-NEXT:   method #Protocol.subscript!modify: <Self where Self : Protocol> (inout Self) -> (Float, Float) -> () : @$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftciMTW
 // CHECK: }

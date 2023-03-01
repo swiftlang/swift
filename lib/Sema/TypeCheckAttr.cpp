@@ -5148,49 +5148,6 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   return originalType;
 }
 
-/// Given a `@differentiable` attribute, attempts to resolve the original
-/// `AbstractFunctionDecl` for which it is registered, using the declaration
-/// on which it is actually declared. On error, emits diagnostic and returns
-/// `nullptr`.
-AbstractFunctionDecl *
-resolveDifferentiableAttrOriginalFunction(DifferentiableAttr *attr) {
-  auto *D = attr->getOriginalDeclaration();
-  assert(D &&
-         "Original declaration should be resolved by parsing/deserialization");
-  auto *original = dyn_cast<AbstractFunctionDecl>(D);
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
-    // If `@differentiable` attribute is declared directly on a
-    // `AbstractStorageDecl` (a stored/computed property or subscript),
-    // forward the attribute to the storage's getter.
-    // TODO(TF-129): Forward `@differentiable` attributes to setters after
-    // differentiation supports inout parameters.
-    // TODO(TF-1080): Forward `@differentiable` attributes to `read` and
-    // `modify` accessors after differentiation supports `inout` parameters.
-    if (!asd->getDeclContext()->isModuleScopeContext()) {
-      original = asd->getSynthesizedAccessor(AccessorKind::Get);
-    } else {
-      original = nullptr;
-    }
-  }
-  // Non-`get` accessors are not yet supported: `set`, `read`, and `modify`.
-  // TODO(TF-1080): Enable `read` and `modify` when differentiation supports
-  // coroutines.
-  if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
-    if (!accessor->isGetter() && !accessor->isSetter())
-      original = nullptr;
-  // Diagnose if original `AbstractFunctionDecl` could not be resolved.
-  if (!original) {
-    diagnoseAndRemoveAttr(D, attr, diag::invalid_decl_attribute, attr);
-    attr->setInvalid();
-    return nullptr;
-  }
-  // If the original function has an error interface type, return.
-  // A diagnostic should have already been emitted.
-  if (original->getInterfaceType()->hasError())
-    return nullptr;
-  return original;
-}
-
 /// Given a `@differentiable` attribute, attempts to resolve the derivative
 /// generic signature. The derivative generic signature is returned as
 /// `derivativeGenSig`. On error, emits diagnostic, assigns `nullptr` to
@@ -5369,11 +5326,11 @@ bool resolveDifferentiableAttrDifferentiabilityParameters(
 
 /// Checks whether differentiable programming is enabled for the given
 /// differentiation-related attribute. Returns true on error.
-bool checkIfDifferentiableProgrammingEnabled(ASTContext &ctx,
-                                             DeclAttribute *attr,
-                                             DeclContext *DC) {
+static bool checkIfDifferentiableProgrammingEnabled(DeclAttribute *attr,
+                                                    Decl *D) {
+  auto &ctx = D->getASTContext();
   auto &diags = ctx.Diags;
-  auto *SF = DC->getParentSourceFile();
+  auto *SF = D->getDeclContext()->getParentSourceFile();
   assert(SF && "Source file not found");
   // The `Differentiable` protocol must be available.
   // If unavailable, the `_Differentiation` module should be imported.
@@ -5386,31 +5343,36 @@ bool checkIfDifferentiableProgrammingEnabled(ASTContext &ctx,
   return true;
 }
 
-IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
-    Evaluator &evaluator, DifferentiableAttr *attr) const {
-  // Skip type-checking for implicit `@differentiable` attributes. We currently
-  // assume that all implicit `@differentiable` attributes are valid.
-  //
-  // Motivation: some implicit attributes do not have a `where` clause, and this
-  // function assumes that the `where` clauses exist. Propagating `where`
-  // clauses and requirements consistently is a larger problem, to be revisited.
-  if (attr->isImplicit())
+static IndexSubset *
+resolveDiffParamIndices(AbstractFunctionDecl *original,
+                        DifferentiableAttr *attr,
+                        GenericSignature derivativeGenSig) {
+  auto *derivativeGenEnv = derivativeGenSig.getGenericEnvironment();
+
+  // Compute the derivative function type.
+  auto originalFnRemappedTy = original->getInterfaceType()->castTo<AnyFunctionType>();
+  if (derivativeGenEnv)
+    originalFnRemappedTy =
+        derivativeGenEnv->mapTypeIntoContext(originalFnRemappedTy)
+            ->castTo<AnyFunctionType>();
+
+  // Resolve and validate the differentiability parameters.
+  IndexSubset *resolvedDiffParamIndices = nullptr;
+  if (resolveDifferentiableAttrDifferentiabilityParameters(
+        attr, original, originalFnRemappedTy, derivativeGenEnv,
+        resolvedDiffParamIndices))
     return nullptr;
 
-  auto *D = attr->getOriginalDeclaration();
-  auto &ctx = D->getASTContext();
+  return resolvedDiffParamIndices;
+}
+
+
+static IndexSubset *
+typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
+                                   DifferentiableAttr *attr,
+                                   IndexSubset *resolvedDiffParamIndices = nullptr) {
+  auto &ctx = original->getASTContext();
   auto &diags = ctx.Diags;
-  // `@differentiable` attribute requires experimental differentiable
-  // programming to be enabled.
-  if (checkIfDifferentiableProgrammingEnabled(ctx, attr, D->getDeclContext()))
-    return nullptr;
-
-  // Resolve the original `AbstractFunctionDecl`.
-  auto *original = resolveDifferentiableAttrOriginalFunction(attr);
-  if (!original)
-    return nullptr;
-
-  auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
 
   // Diagnose if original function has opaque result types.
   if (auto *opaqueResultTypeDecl = original->getOpaqueResultTypeDecl()) {
@@ -5457,67 +5419,159 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
   }
 
   // Resolve the derivative generic signature.
-  GenericSignature derivativeGenSig = nullptr;
-  if (resolveDifferentiableAttrDerivativeGenericSignature(attr, original,
+  GenericSignature derivativeGenSig = attr->getDerivativeGenericSignature();
+  if (!derivativeGenSig &&
+      resolveDifferentiableAttrDerivativeGenericSignature(attr, original,
                                                           derivativeGenSig))
     return nullptr;
-  auto *derivativeGenEnv = derivativeGenSig.getGenericEnvironment();
-
-  // Compute the derivative function type.
-  auto originalFnRemappedTy = originalFnTy;
-  if (derivativeGenEnv)
-    originalFnRemappedTy =
-        derivativeGenEnv->mapTypeIntoContext(originalFnRemappedTy)
-            ->castTo<AnyFunctionType>();
 
   // Resolve and validate the differentiability parameters.
-  IndexSubset *resolvedDiffParamIndices = nullptr;
-  if (resolveDifferentiableAttrDifferentiabilityParameters(
-          attr, original, originalFnRemappedTy, derivativeGenEnv,
-          resolvedDiffParamIndices))
+  if (!resolvedDiffParamIndices)
+    resolvedDiffParamIndices = resolveDiffParamIndices(original, attr,
+                                                       derivativeGenSig);
+  if (!resolvedDiffParamIndices)
     return nullptr;
 
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
-    // Remove `@differentiable` attribute from storage declaration to prevent
-    // duplicate attribute registration during SILGen.
-    D->getAttrs().removeAttribute(attr);
-    // Transfer `@differentiable` attribute from storage declaration to
-    // getter accessor.
-    auto *getterDecl = asd->getOpaqueAccessor(AccessorKind::Get);
-    auto *newAttr = DifferentiableAttr::create(
-        getterDecl, /*implicit*/ true, attr->AtLoc, attr->getRange(),
-        attr->getDifferentiabilityKind(), resolvedDiffParamIndices,
-        attr->getDerivativeGenericSignature());
-    auto insertion = ctx.DifferentiableAttrs.try_emplace(
-        {getterDecl, resolvedDiffParamIndices}, newAttr);
-    // Reject duplicate `@differentiable` attributes.
-    if (!insertion.second) {
-      diagnoseAndRemoveAttr(D, attr, diag::differentiable_attr_duplicate);
-      diags.diagnose(insertion.first->getSecond()->getLocation(),
-                     diag::differentiable_attr_duplicate_note);
-      return nullptr;
-    }
-    getterDecl->getAttrs().add(newAttr);
-    // Register derivative function configuration.
-    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
-    getterDecl->addDerivativeFunctionConfiguration(
-        {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
-    return resolvedDiffParamIndices;
-  }
   // Reject duplicate `@differentiable` attributes.
   auto insertion =
-      ctx.DifferentiableAttrs.try_emplace({D, resolvedDiffParamIndices}, attr);
+      ctx.DifferentiableAttrs.try_emplace({original, resolvedDiffParamIndices}, attr);
   if (!insertion.second && insertion.first->getSecond() != attr) {
-    diagnoseAndRemoveAttr(D, attr, diag::differentiable_attr_duplicate);
+    diagnoseAndRemoveAttr(original, attr, diag::differentiable_attr_duplicate);
     diags.diagnose(insertion.first->getSecond()->getLocation(),
                    diag::differentiable_attr_duplicate_note);
     return nullptr;
   }
+
   // Register derivative function configuration.
   auto *resultIndices = IndexSubset::get(ctx, 1, {0});
   original->addDerivativeFunctionConfiguration(
       {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
   return resolvedDiffParamIndices;
+}
+
+/// Given a `@differentiable` attribute, attempts to resolve the original
+/// `AbstractFunctionDecl` for which it is registered, using the declaration
+/// on which it is actually declared. On error, emits diagnostic and returns
+/// `nullptr`.
+static AbstractFunctionDecl *
+resolveDifferentiableAttrOriginalFunction(DifferentiableAttr *attr) {
+  auto *D = attr->getOriginalDeclaration();
+  auto *original = dyn_cast<AbstractFunctionDecl>(D);
+
+  // Non-`get`/`set` accessors are not yet supported: `read`, and `modify`.
+  // TODO(TF-1080): Enable `read` and `modify` when differentiation supports
+  // coroutines.
+  if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
+    if (!accessor->isGetter() && !accessor->isSetter())
+      original = nullptr;
+
+  // Diagnose if original `AbstractFunctionDecl` could not be resolved.
+  if (!original) {
+    diagnoseAndRemoveAttr(D, attr, diag::invalid_decl_attribute, attr);
+    attr->setInvalid();
+    return nullptr;
+  }
+
+  // If the original function has an error interface type, return.
+  // A diagnostic should have already been emitted.
+  if (original->getInterfaceType()->hasError())
+    return nullptr;
+
+  return original;
+}
+
+static IndexSubset *
+resolveDifferentiableAccessors(DifferentiableAttr *attr,
+                               AbstractStorageDecl *asd) {
+  auto typecheckAccessor = [&](AccessorDecl *ad) -> IndexSubset* {
+    GenericSignature derivativeGenSig = nullptr;
+    if (resolveDifferentiableAttrDerivativeGenericSignature(attr, ad,
+                                                            derivativeGenSig))
+      return nullptr;
+
+    IndexSubset *resolvedDiffParamIndices = resolveDiffParamIndices(ad, attr,
+                                                                    derivativeGenSig);
+    if (!resolvedDiffParamIndices)
+      return nullptr;
+
+    auto *newAttr = DifferentiableAttr::create(
+      ad, /*implicit*/ true, attr->AtLoc, attr->getRange(),
+      attr->getDifferentiabilityKind(), resolvedDiffParamIndices,
+      attr->getDerivativeGenericSignature());
+    ad->getAttrs().add(newAttr);
+
+    if (!typecheckDifferentiableAttrforDecl(ad, attr,
+                                            resolvedDiffParamIndices))
+      return nullptr;
+
+    return resolvedDiffParamIndices;
+  };
+
+  // No getters / setters for global variables
+  if (asd->getDeclContext()->isModuleScopeContext()) {
+    diagnoseAndRemoveAttr(asd, attr, diag::invalid_decl_attribute, attr);
+    attr->setInvalid();
+    return nullptr;
+  }
+
+  if (!typecheckAccessor(asd->getSynthesizedAccessor(AccessorKind::Get)))
+    return nullptr;
+
+  if (asd->supportsMutation()) {
+    // FIXME: Class-typed values have reference semantics and can be freely
+    // mutated. Thus, they should be treated like inout parameters for the
+    // purposes of @differentiable and @derivative type-checking.  Until
+    // https://github.com/apple/swift/issues/55542 is fixed, check if setter has
+    // computed semantic results and do not typecheck if they are none
+    // (class-typed `self' parameter is not treated as a "semantic result"
+    // currently)
+    if (!asd->getDeclContext()->getSelfClassDecl())
+      if (!typecheckAccessor(asd->getSynthesizedAccessor(AccessorKind::Set)))
+        return nullptr;
+  }
+
+  // Remove `@differentiable` attribute from storage declaration to prevent
+  // duplicate attribute registration during SILGen.
+  asd->getAttrs().removeAttribute(attr);
+
+  // Here we are effectively removing attribute from original decl, therefore no
+  // index subset for us
+  return nullptr;
+}
+
+
+IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
+    Evaluator &evaluator, DifferentiableAttr *attr) const {
+  // Skip type-checking for implicit `@differentiable` attributes. We currently
+  // assume that all implicit `@differentiable` attributes are valid.
+  //
+  // Motivation: some implicit attributes do not have a `where` clause, and this
+  // function assumes that the `where` clauses exist. Propagating `where`
+  // clauses and requirements consistently is a larger problem, to be revisited.
+  if (attr->isImplicit())
+    return nullptr;
+
+  auto *D = attr->getOriginalDeclaration();
+  assert(D &&
+         "Original declaration should be resolved by parsing/deserialization");
+
+  // `@differentiable` attribute requires experimental differentiable
+  // programming to be enabled.
+  if (checkIfDifferentiableProgrammingEnabled(attr, D))
+    return nullptr;
+
+  // If `@differentiable` attribute is declared directly on a
+  // `AbstractStorageDecl` (a stored/computed property or subscript),
+  // forward the attribute to the storage's getter / setter
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D))
+    return resolveDifferentiableAccessors(attr, asd);
+
+  // Resolve the original `AbstractFunctionDecl`.
+  auto *original = resolveDifferentiableAttrOriginalFunction(attr);
+  if (!original)
+    return nullptr;
+
+  return typecheckDifferentiableAttrforDecl(original, attr);
 }
 
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
@@ -5542,7 +5596,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   auto &diags = Ctx.Diags;
   // `@derivative` attribute requires experimental differentiable programming
   // to be enabled.
-  if (checkIfDifferentiableProgrammingEnabled(Ctx, attr, D->getDeclContext()))
+  if (checkIfDifferentiableProgrammingEnabled(attr, D))
     return true;
   auto *derivative = cast<FuncDecl>(D);
   auto originalName = attr->getOriginalFunctionName();

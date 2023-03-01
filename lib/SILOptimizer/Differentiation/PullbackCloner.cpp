@@ -2794,7 +2794,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberSetter() {
   auto adjSelf = getAdjointBuffer(origEntry, origSelf);
   auto *adjSelfElt = builder.createStructElementAddr(pbLoc, adjSelf, tanField);
   // Switch based on the property's value category.
-  switch (origArg->getType().getCategory()) {
+  switch (getTangentValueCategory(origArg)) {
   case SILValueCategory::Object: {
     auto adjArg = builder.emitLoadValueOperation(pbLoc, adjSelfElt,
                                                  LoadOwnershipQualifier::Take);
