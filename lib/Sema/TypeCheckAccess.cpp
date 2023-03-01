@@ -62,7 +62,8 @@ static void forAllRequirementTypes(
 
 /// \see checkTypeAccess
 using CheckTypeAccessCallback =
-    void(AccessScope, const TypeRepr *, DowngradeToWarning);
+    void(AccessScope, const TypeRepr *, DowngradeToWarning,
+         ImportAccessLevel, AccessLevel);
 
 class AccessControlCheckerBase {
 protected:
@@ -187,6 +188,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     return;
 
   AccessScope problematicAccessScope = AccessScope::getPublic();
+  ImportAccessLevel problematicImport = None;
+
   if (type) {
     auto scopeAndImport =
         TypeAccessScopeChecker::getAccessScope(type, useDC,
@@ -198,13 +201,26 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     Optional<AccessScope> typeAccessScope = scopeAndImport.Scope;
     if (!typeAccessScope.has_value())
       return;
+
+    problematicImport = scopeAndImport.Import;
     problematicAccessScope = *typeAccessScope;
   }
 
   auto downgradeToWarning = DowngradeToWarning::No;
 
-  if (contextAccessScope.hasEqualDeclContextWith(problematicAccessScope) ||
-      contextAccessScope.isChildOf(problematicAccessScope)) {
+  AccessLevel importAccessLevel = AccessLevel::Public;
+  if (problematicImport.has_value())
+    importAccessLevel = problematicImport->accessLevel;
+
+  // Check if type can be referenced in this context.
+  // - hasEqualDeclContextWith checks for matching scopes (public to public,
+  // internal to the same module, private to same scope, etc.)
+  // - isChildOf checks for use of public in internal, etc.
+  // - Comparison to importAccessLevel ensures the type access scope isn't
+  //   restricted by an access-level on an import.
+  if ((contextAccessScope.hasEqualDeclContextWith(problematicAccessScope) ||
+      contextAccessScope.isChildOf(problematicAccessScope)) &&
+      contextAccessScope.accessLevelForDiagnostics() <= importAccessLevel) {
 
     // /Also/ check the TypeRepr, if present. This can be important when we're
     // unable to preserve typealias sugar that's present in the TypeRepr.
@@ -218,14 +234,19 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     if (!typeReprAccessScope.has_value())
       return;
 
-    if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
-        contextAccessScope.isChildOf(*typeReprAccessScope)) {
+    if (typeReprAccessScopeAndImport.Import.has_value())
+       importAccessLevel = typeReprAccessScopeAndImport.Import->accessLevel;
+
+    if ((contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
+         contextAccessScope.isChildOf(*typeReprAccessScope)) &&
+        contextAccessScope.accessLevelForDiagnostics() <= importAccessLevel) {
       // Only if both the Type and the TypeRepr follow the access rules can
       // we exit; otherwise we have to emit a diagnostic.
       return;
     }
     problematicAccessScope = *typeReprAccessScope;
-
+    if (typeReprAccessScopeAndImport.Import.has_value())
+      problematicImport = typeReprAccessScopeAndImport.Import;
   } else {
     // The type violates the rules of access control (with or without taking the
     // TypeRepr into account).
@@ -251,10 +272,22 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     }
   }
 
+  // Pick the most restrictive access level to show in diagnostics.
+  AccessLevel diagAccessLevel =
+    problematicAccessScope.accessLevelForDiagnostics();
+  if (problematicImport.has_value() &&
+      problematicImport->accessLevel < diagAccessLevel)
+    diagAccessLevel = problematicImport->accessLevel;
+
+  if (problematicImport.has_value() &&
+      problematicImport->accessLevel == AccessLevel::Public)
+    problematicImport = None;
+
   const TypeRepr *complainRepr = TypeAccessScopeDiagnoser::findTypeWithScope(
       typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
 
-  diagnose(problematicAccessScope, complainRepr, downgradeToWarning);
+  diagnose(problematicAccessScope, complainRepr, downgradeToWarning,
+           problematicImport, diagAccessLevel);
 }
 
 /// Checks if the access scope of the type described by \p TL is valid for the
@@ -303,6 +336,20 @@ static void highlightOffendingType(InFlightDiagnostic &diag,
   }
 }
 
+/// Emit a note on \p limitImport when it restricted the access level
+/// of a type.
+static void noteLimitingImport(ASTContext &ctx,
+                               const ImportAccessLevel limitImport) {
+  if (!limitImport.has_value())
+    return;
+
+  assert(limitImport->accessLevel != AccessLevel::Public &&
+         "a public import shouldn't limit the access level of a decl");
+  ctx.Diags.diagnose(limitImport->accessLevelLoc, diag::module_imported_here,
+                     limitImport->module.importedModule->getName(),
+                     limitImport->accessLevel);
+}
+
 void AccessControlCheckerBase::checkGenericParamAccess(
     const GenericContext *ownerCtx,
     const Decl *ownerDecl,
@@ -319,13 +366,17 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   auto minAccessScope = AccessScope::getPublic();
   const TypeRepr *complainRepr = nullptr;
   auto downgradeToWarning = DowngradeToWarning::Yes;
+  auto minDiagAccessLevel = AccessLevel::Public;
+  ImportAccessLevel minImportLimit = None;
 
   auto callbackACEK = ACEK::Parameter;
 
   auto callback = [&](AccessScope typeAccessScope,
                       const TypeRepr *thisComplainRepr,
-                      DowngradeToWarning thisDowngrade) {
-    if (typeAccessScope.isChildOf(minAccessScope) ||
+                      DowngradeToWarning thisDowngrade,
+                      ImportAccessLevel importLimit,
+                      AccessLevel diagAccessLevel) {
+    if (diagAccessLevel < minDiagAccessLevel ||
         (thisDowngrade == DowngradeToWarning::No &&
          downgradeToWarning == DowngradeToWarning::Yes) ||
         (!complainRepr &&
@@ -334,6 +385,8 @@ void AccessControlCheckerBase::checkGenericParamAccess(
       complainRepr = thisComplainRepr;
       accessControlErrorKind = callbackACEK;
       downgradeToWarning = thisDowngrade;
+      minDiagAccessLevel = diagAccessLevel;
+      minImportLimit = importLimit;
     }
   };
 
@@ -359,7 +412,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
                            accessScope, DC, callback);
   }
 
-  if (minAccessScope.isPublic())
+  if (minDiagAccessLevel == AccessLevel::Public)
     return;
 
   // FIXME: Promote these to an error in the next -swift-version break.
@@ -378,10 +431,9 @@ void AccessControlCheckerBase::checkGenericParamAccess(
         Context.Diags.diagnose(ownerDecl, diagID, ownerDecl->getDescriptiveKind(),
                                accessControlErrorKind == ACEK::Requirement);
     highlightOffendingType(diag, complainRepr);
+    noteLimitingImport(Context, minImportLimit);
     return;
   }
-
-  auto minAccess = minAccessScope.accessLevelForDiagnostics();
 
   bool isExplicit =
     ownerDecl->getAttrs().hasAttribute<AccessControlAttr>() ||
@@ -391,9 +443,10 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     diagID = diag::generic_param_access_warn;
   auto diag = Context.Diags.diagnose(
       ownerDecl, diagID, ownerDecl->getDescriptiveKind(), isExplicit,
-      contextAccess, minAccess, isa<FileUnit>(DC),
+      contextAccess, minDiagAccessLevel, isa<FileUnit>(DC),
       accessControlErrorKind == ACEK::Requirement);
   highlightOffendingType(diag, complainRepr);
+  noteLimitingImport(Context, minImportLimit);
 }
 
 void AccessControlCheckerBase::checkGenericParamAccess(
@@ -420,23 +473,25 @@ void AccessControlCheckerBase::checkGlobalActorAccess(const Decl *D) {
       customAttr->getType(), customAttr->getTypeRepr(), VD,
       /*mayBeInferred*/ false,
       [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
-          DowngradeToWarning downgradeToWarning) {
+          DowngradeToWarning downgradeToWarning, ImportAccessLevel importLimit,
+          AccessLevel diagAccessLevel) {
         if (checkUsableFromInline) {
           auto diag = D->diagnose(diag::global_actor_not_usable_from_inline,
                                   D->getDescriptiveKind(), VD->getName());
           highlightOffendingType(diag, complainRepr);
+          noteLimitingImport(D->getASTContext(), importLimit);
           return;
         }
 
-        auto globalActorAccess = typeAccessScope.accessLevelForDiagnostics();
         bool isExplicit = D->getAttrs().hasAttribute<AccessControlAttr>();
         auto declAccess = isExplicit
                               ? VD->getFormalAccess()
                               : typeAccessScope.requiredAccessForDiagnostics();
         auto diag = D->diagnose(diag::global_actor_access, declAccess,
                                 D->getDescriptiveKind(), VD->getName(),
-                                globalActorAccess, globalActorDecl->getName());
+                                diagAccessLevel, globalActorDecl->getName());
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(D->getASTContext(), importLimit);
       });
 }
 
@@ -505,8 +560,9 @@ public:
                     /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
-                        DowngradeToWarning downgradeToWarning) {
-      auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+                        DowngradeToWarning downgradeToWarning,
+                        ImportAccessLevel importLimit,
+                        AccessLevel diagAccessLevel) {
       bool isExplicit = theVar->getAttrs().hasAttribute<AccessControlAttr>() ||
                         isa<ProtocolDecl>(theVar->getDeclContext());
       auto theVarAccess =
@@ -519,7 +575,9 @@ public:
       auto diag = DE.diagnose(NP->getLoc(), diagID, theVar->isLet(),
                               isTypeContext, isExplicit, theVarAccess,
                               isa<FileUnit>(theVar->getDeclContext()),
-                              typeAccess, theVar->getInterfaceType());
+                              diagAccessLevel, theVar->getInterfaceType());
+      diag.flush();
+      noteLimitingImport(theVar->getASTContext(), importLimit);
     });
   }
 
@@ -537,8 +595,9 @@ public:
                     TP->getTypeRepr(), anyVar, /*mayBeInferred*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
-                        DowngradeToWarning downgradeToWarning) {
-      auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+                        DowngradeToWarning downgradeToWarning,
+                        ImportAccessLevel importLimit,
+                        AccessLevel diagAccessLevel) {
       bool isExplicit = anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
                         isa<ProtocolDecl>(anyVar->getDeclContext());
       auto diagID = diag::pattern_type_access;
@@ -550,8 +609,10 @@ public:
       auto &DE = anyVar->getASTContext().Diags;
       auto diag = DE.diagnose(
           TP->getLoc(), diagID, anyVar->isLet(), isTypeContext, isExplicit,
-          anyVarAccess, isa<FileUnit>(anyVar->getDeclContext()), typeAccess);
+          anyVarAccess, isa<FileUnit>(anyVar->getDeclContext()),
+          diagAccessLevel);
       highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(anyVar->getASTContext(), importLimit);
     });
 
     // Check the property wrapper types.
@@ -560,8 +621,9 @@ public:
                       /*mayBeInferred=*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
-        auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+                          DowngradeToWarning downgradeToWarning,
+                          ImportAccessLevel importLimit,
+                          AccessLevel diagAccessLevel) {
         bool isExplicit =
             anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
             isa<ProtocolDecl>(anyVar->getDeclContext());
@@ -574,8 +636,9 @@ public:
                                      isExplicit,
                                      anyVarAccess,
                                      isa<FileUnit>(anyVar->getDeclContext()),
-                                     typeAccess);
+                                     diagAccessLevel);
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(anyVar->getASTContext(), importLimit);
       });
     }
   }
@@ -609,8 +672,9 @@ public:
                     TAD->getUnderlyingTypeRepr(), TAD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
-                        DowngradeToWarning downgradeToWarning) {
-      auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+                        DowngradeToWarning downgradeToWarning,
+                        ImportAccessLevel importLimit,
+                        AccessLevel diagAccessLevel) {
       bool isExplicit =
         TAD->getAttrs().hasAttribute<AccessControlAttr>() ||
         isa<ProtocolDecl>(TAD->getDeclContext());
@@ -620,9 +684,11 @@ public:
       auto aliasAccess = isExplicit
         ? TAD->getFormalAccess()
         : typeAccessScope.requiredAccessForDiagnostics();
-      auto diag = TAD->diagnose(diagID, isExplicit, aliasAccess, typeAccess,
+      auto diag = TAD->diagnose(diagID, isExplicit, aliasAccess,
+                                diagAccessLevel,
                                 isa<FileUnit>(TAD->getDeclContext()));
       highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(TAD->getASTContext(), importLimit);
     });
   }
 
@@ -640,6 +706,8 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
+    auto minDiagAccessLevel = AccessLevel::Public;
+    ImportAccessLevel minImportLimit = None;
 
     std::for_each(assocType->getInherited().begin(),
                   assocType->getInherited().end(),
@@ -647,14 +715,18 @@ public:
       checkTypeAccess(requirement, assocType, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
-                          DowngradeToWarning downgradeDiag) {
-        if (typeAccessScope.isChildOf(minAccessScope) ||
+                          DowngradeToWarning downgradeDiag,
+                          ImportAccessLevel importLimit,
+                          AccessLevel diagAccessLevel) {
+        if (diagAccessLevel < minDiagAccessLevel ||
             (!complainRepr &&
              typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
           minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
           accessControlErrorKind = ACEK_Requirement;
           downgradeToWarning = downgradeDiag;
+          minDiagAccessLevel = diagAccessLevel;
+          minImportLimit = importLimit;
         }
       });
     });
@@ -663,14 +735,18 @@ public:
                     /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
-                        DowngradeToWarning downgradeDiag) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
+                        DowngradeToWarning downgradeDiag,
+                        ImportAccessLevel importLimit,
+                        AccessLevel diagAccessLevel) {
+      if (diagAccessLevel < minDiagAccessLevel ||
           (!complainRepr &&
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessControlErrorKind = ACEK_DefaultDefinition;
         downgradeToWarning = downgradeDiag;
+        minDiagAccessLevel = diagAccessLevel;
+        minImportLimit = importLimit;
       }
     });
 
@@ -679,14 +755,18 @@ public:
                            assocType->getDeclContext(),
                            [&](AccessScope typeAccessScope,
                                const TypeRepr *thisComplainRepr,
-                               DowngradeToWarning downgradeDiag) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
+                               DowngradeToWarning downgradeDiag,
+                               ImportAccessLevel importLimit,
+                               AccessLevel diagAccessLevel) {
+      if (diagAccessLevel < minDiagAccessLevel ||
           (!complainRepr &&
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessControlErrorKind = ACEK_Requirement;
         downgradeToWarning = downgradeDiag;
+        minDiagAccessLevel = diagAccessLevel;
+        minImportLimit = importLimit;
 
         // Swift versions before 5.0 did not check requirements on the
         // protocol's where clause, so emit a warning.
@@ -695,14 +775,15 @@ public:
       }
     });
 
-    if (!minAccessScope.isPublic()) {
-      auto minAccess = minAccessScope.accessLevelForDiagnostics();
+    if (minDiagAccessLevel < AccessLevel::Public) {
       auto diagID = diag::associated_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::associated_type_access_warn;
       auto diag = assocType->diagnose(diagID, assocType->getFormalAccess(),
-                                      minAccess, accessControlErrorKind);
+                                      minDiagAccessLevel,
+                                      accessControlErrorKind);
       highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(assocType->getASTContext(), minImportLimit);
     }
   }
 
@@ -724,8 +805,9 @@ public:
                       /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
-        auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+                          DowngradeToWarning downgradeToWarning,
+                          ImportAccessLevel importLimit,
+                          AccessLevel diagAccessLevel) {
         bool isExplicit = ED->getAttrs().hasAttribute<AccessControlAttr>();
         auto diagID = diag::enum_raw_type_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
@@ -733,9 +815,11 @@ public:
         auto enumDeclAccess = isExplicit
           ? ED->getFormalAccess()
           : typeAccessScope.requiredAccessForDiagnostics();
-        auto diag = ED->diagnose(diagID, isExplicit, enumDeclAccess, typeAccess,
+        auto diag = ED->diagnose(diagID, isExplicit, enumDeclAccess,
+                                 diagAccessLevel,
                                  isa<FileUnit>(ED->getDeclContext()));
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(ED->getASTContext(), importLimit);
       });
     }
   }
@@ -779,8 +863,9 @@ public:
                       /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
-        auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+                          DowngradeToWarning downgradeToWarning,
+                          ImportAccessLevel importLimit,
+                          AccessLevel diagAccessLevel) {
         bool isExplicit = CD->getAttrs().hasAttribute<AccessControlAttr>();
         auto diagID = diag::class_super_access;
         if (downgradeToWarning == DowngradeToWarning::Yes ||
@@ -791,10 +876,12 @@ public:
           : typeAccessScope.requiredAccessForDiagnostics();
 
         auto diag =
-            CD->diagnose(diagID, isExplicit, classDeclAccess, typeAccess,
+            CD->diagnose(diagID, isExplicit, classDeclAccess,
+                         diagAccessLevel,
                          isa<FileUnit>(CD->getDeclContext()),
                          superclassLocIter->getTypeRepr() != complainRepr);
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(CD->getASTContext(), importLimit);
       });
     }
   }
@@ -809,6 +896,8 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
+    auto minDiagAccessLevel = AccessLevel::Public;
+    ImportAccessLevel minImportLimit = None;
     DescriptiveDeclKind declKind = DescriptiveDeclKind::Protocol;
 
     // FIXME: Hack to ensure that we've computed the types involved here.
@@ -840,14 +929,18 @@ public:
       checkTypeAccess(requirement, proto, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
-                          DowngradeToWarning downgradeDiag) {
-        if (typeAccessScope.isChildOf(minAccessScope) ||
+                          DowngradeToWarning downgradeDiag,
+                          ImportAccessLevel importLimit,
+                          AccessLevel diagAccessLevel) {
+        if (diagAccessLevel < minDiagAccessLevel ||
             (!complainRepr &&
              typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
           minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
           protocolControlErrorKind = PCEK_Refine;
           downgradeToWarning = downgradeDiag;
+          minDiagAccessLevel = diagAccessLevel;
+          minImportLimit = importLimit;
           declKind = declKindForType(requirement.getType());
         }
       });
@@ -858,14 +951,17 @@ public:
           type, typeRepr, proto,
           /*mayBeInferred*/ false,
           [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
-              DowngradeToWarning downgradeDiag) {
-            if (typeAccessScope.isChildOf(minAccessScope) ||
+              DowngradeToWarning downgradeDiag, ImportAccessLevel importLimit,
+              AccessLevel diagAccessLevel) {
+            if (diagAccessLevel < minDiagAccessLevel ||
                 (!complainRepr &&
                  typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
               minAccessScope = typeAccessScope;
               complainRepr = thisComplainRepr;
               protocolControlErrorKind = PCEK_Requirement;
               downgradeToWarning = downgradeDiag;
+              minDiagAccessLevel = diagAccessLevel;
+              minImportLimit = importLimit;
               declKind = declKindForType(type);
               // Swift versions before 5.0 did not check requirements on the
               // protocol's where clause, so emit a warning.
@@ -875,8 +971,7 @@ public:
           });
     });
 
-    if (!minAccessScope.isPublic()) {
-      auto minAccess = minAccessScope.accessLevelForDiagnostics();
+    if (minDiagAccessLevel < AccessLevel::Public) {
       bool isExplicit = proto->getAttrs().hasAttribute<AccessControlAttr>();
       auto protoAccess = isExplicit
           ? proto->getFormalAccess()
@@ -885,9 +980,11 @@ public:
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::protocol_access_warn;
       auto diag = proto->diagnose(
-          diagID, isExplicit, protoAccess, protocolControlErrorKind, minAccess,
+          diagID, isExplicit, protoAccess,
+          protocolControlErrorKind, minDiagAccessLevel,
           isa<FileUnit>(proto->getDeclContext()), declKind);
       highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(proto->getASTContext(), minImportLimit);
     }
   }
 
@@ -897,19 +994,24 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
+    auto minDiagAccessLevel = AccessLevel::Public;
+    ImportAccessLevel minImportLimit = None;
     bool problemIsElement = false;
 
     for (auto &P : *SD->getIndices()) {
       checkTypeAccess(
           P->getInterfaceType(), P->getTypeRepr(), SD, /*mayBeInferred*/ false,
           [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
-              DowngradeToWarning downgradeDiag) {
-            if (typeAccessScope.isChildOf(minAccessScope) ||
+              DowngradeToWarning downgradeDiag, ImportAccessLevel importLimit,
+              AccessLevel diagAccessLevel) {
+            if (diagAccessLevel < minDiagAccessLevel ||
                 (!complainRepr &&
                  typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
               minAccessScope = typeAccessScope;
               complainRepr = thisComplainRepr;
               downgradeToWarning = downgradeDiag;
+              minDiagAccessLevel = diagAccessLevel;
+              minImportLimit = importLimit;
             }
           });
     }
@@ -918,19 +1020,22 @@ public:
                     SD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
-                        DowngradeToWarning downgradeDiag) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
+                        DowngradeToWarning downgradeDiag,
+                        ImportAccessLevel importLimit,
+                        AccessLevel diagAccessLevel) {
+      if (diagAccessLevel < minDiagAccessLevel ||
           (!complainRepr &&
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         downgradeToWarning = downgradeDiag;
         problemIsElement = true;
+        minDiagAccessLevel = diagAccessLevel;
+        minImportLimit = importLimit;
       }
     });
 
-    if (!minAccessScope.isPublic()) {
-      auto minAccess = minAccessScope.accessLevelForDiagnostics();
+    if (minDiagAccessLevel < AccessLevel::Public) {
       bool isExplicit =
         SD->getAttrs().hasAttribute<AccessControlAttr>() ||
         isa<ProtocolDecl>(SD->getDeclContext());
@@ -941,8 +1046,9 @@ public:
         ? SD->getFormalAccess()
         : minAccessScope.requiredAccessForDiagnostics();
       auto diag = SD->diagnose(diagID, isExplicit, subscriptDeclAccess,
-                               minAccess, problemIsElement);
+                               minDiagAccessLevel, problemIsElement);
       highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(SD->getASTContext(), minImportLimit);
     }
   }
 
@@ -961,6 +1067,8 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
+    auto minDiagAccessLevel = AccessLevel::Public;
+    ImportAccessLevel minImportLimit = None;
 
     bool hasInaccessibleParameterWrapper = false;
     for (auto *P : *fn->getParameters()) {
@@ -972,13 +1080,16 @@ public:
           auto wrapperTypeRepr = wrapperAttrs[index]->getTypeRepr();
           checkTypeAccess(wrapperType, wrapperTypeRepr, fn, /*mayBeInferred*/ false,
               [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
-                  DowngradeToWarning downgradeDiag) {
-                if (typeAccessScope.isChildOf(minAccessScope) ||
+                  DowngradeToWarning downgradeDiag,
+                  ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
+                if (diagAccessLevel < minDiagAccessLevel ||
                     (!complainRepr &&
                      typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
                   minAccessScope = typeAccessScope;
                   complainRepr = thisComplainRepr;
                   downgradeToWarning = downgradeDiag;
+                  minDiagAccessLevel = diagAccessLevel;
+                  minImportLimit = importLimit;
                   hasInaccessibleParameterWrapper = true;
                 }
               });
@@ -988,13 +1099,16 @@ public:
       checkTypeAccess(
           P->getInterfaceType(), P->getTypeRepr(), fn, /*mayBeInferred*/ false,
           [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
-              DowngradeToWarning downgradeDiag) {
-            if (typeAccessScope.isChildOf(minAccessScope) ||
+              DowngradeToWarning downgradeDiag, ImportAccessLevel importLimit,
+              AccessLevel diagAccessLevel) {
+            if (diagAccessLevel < minDiagAccessLevel ||
                 (!complainRepr &&
                  typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
               minAccessScope = typeAccessScope;
               complainRepr = thisComplainRepr;
               downgradeToWarning = downgradeDiag;
+              minDiagAccessLevel = diagAccessLevel;
+              minImportLimit = importLimit;
             }
           });
     }
@@ -1005,20 +1119,23 @@ public:
                       FD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
-                          DowngradeToWarning downgradeDiag) {
-        if (typeAccessScope.isChildOf(minAccessScope) ||
+                          DowngradeToWarning downgradeDiag,
+                          ImportAccessLevel importLimit,
+                          AccessLevel diagAccessLevel) {
+        if (diagAccessLevel < minDiagAccessLevel ||
             (!complainRepr &&
              typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
           minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
           downgradeToWarning = downgradeDiag;
+          minDiagAccessLevel = diagAccessLevel;
+          minImportLimit = importLimit;
           problemIsResult = true;
         }
       });
     }
 
-    if (!minAccessScope.isPublic()) {
-      auto minAccess = minAccessScope.accessLevelForDiagnostics();
+    if (minDiagAccessLevel < AccessLevel::Public) {
       auto functionKind = isa<ConstructorDecl>(fn)
         ? FK_Initializer
         : isTypeContext ? FK_Method : FK_Function;
@@ -1033,10 +1150,12 @@ public:
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::function_type_access_warn;
       auto diag = fn->diagnose(diagID, isExplicit, fnAccess,
-                               isa<FileUnit>(fn->getDeclContext()), minAccess,
+                               isa<FileUnit>(fn->getDeclContext()),
+                               minDiagAccessLevel,
                                functionKind, problemIsResult,
                                hasInaccessibleParameterWrapper);
       highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(fn->getASTContext(), minImportLimit);
     }
   }
 
@@ -1047,14 +1166,15 @@ public:
       checkTypeAccess(
           P->getInterfaceType(), P->getTypeRepr(), EED, /*mayBeInferred*/ false,
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
-              DowngradeToWarning downgradeToWarning) {
-            auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+              DowngradeToWarning downgradeToWarning,
+              ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
             auto diagID = diag::enum_case_access;
             if (downgradeToWarning == DowngradeToWarning::Yes)
               diagID = diag::enum_case_access_warn;
             auto diag =
-                EED->diagnose(diagID, EED->getFormalAccess(), typeAccess);
+                EED->diagnose(diagID, EED->getFormalAccess(), diagAccessLevel);
             highlightOffendingType(diag, complainRepr);
+            noteLimitingImport(EED->getASTContext(), importLimit);
           });
     }
   }
@@ -1065,6 +1185,8 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
+    auto minDiagAccessLevel = AccessLevel::Public;
+    ImportAccessLevel minImportLimit = None;
     bool problemIsResult = false;
 
     if (MD->parameterList) {
@@ -1072,13 +1194,16 @@ public:
         checkTypeAccess(
             P->getInterfaceType(), P->getTypeRepr(), MD, /*mayBeInferred*/ false,
             [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
-                DowngradeToWarning downgradeDiag) {
-              if (typeAccessScope.isChildOf(minAccessScope) ||
+                DowngradeToWarning downgradeDiag,
+                ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
+              if (diagAccessLevel < minDiagAccessLevel ||
                   (!complainRepr &&
                    typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
                 minAccessScope = typeAccessScope;
                 complainRepr = thisComplainRepr;
                 downgradeToWarning = downgradeDiag;
+                minDiagAccessLevel = diagAccessLevel;
+                minImportLimit = importLimit;
               }
             });
       }
@@ -1088,19 +1213,22 @@ public:
                     MD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
-                        DowngradeToWarning downgradeDiag) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
+                        DowngradeToWarning downgradeDiag,
+                        ImportAccessLevel importLimit,
+                        AccessLevel diagAccessLevel) {
+      if (diagAccessLevel < minDiagAccessLevel ||
           (!complainRepr &&
            typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         downgradeToWarning = downgradeDiag;
+        minDiagAccessLevel = diagAccessLevel;
+        minImportLimit = importLimit;
         problemIsResult = true;
       }
     });
 
-    if (!minAccessScope.isPublic()) {
-      auto minAccess = minAccessScope.accessLevelForDiagnostics();
+    if (minDiagAccessLevel < AccessLevel::Public) {
       bool isExplicit =
         MD->getAttrs().hasAttribute<AccessControlAttr>();
       auto diagID = diag::macro_type_access;
@@ -1110,8 +1238,9 @@ public:
         ? MD->getFormalAccess()
         : minAccessScope.requiredAccessForDiagnostics();
       auto diag = MD->diagnose(diagID, isExplicit, macroDeclAccess,
-                               minAccess, problemIsResult);
+                               minDiagAccessLevel, problemIsResult);
       highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(MD->getASTContext(), minImportLimit);
     }
   }
 };
@@ -1209,7 +1338,8 @@ public:
         fixedLayoutStructContext ? fixedLayoutStructContext : theVar,
         /*mayBeInferred*/ false,
         [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
-            DowngradeToWarning downgradeToWarning) {
+            DowngradeToWarning downgradeToWarning,
+            ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
           auto &Ctx = theVar->getASTContext();
           auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
           if (fixedLayoutStructContext) {
@@ -1219,6 +1349,7 @@ public:
           }
           Ctx.Diags.diagnose(NP->getLoc(), diagID, theVar->isLet(),
                              isTypeContext, theVar->getInterfaceType());
+          noteLimitingImport(theVar->getASTContext(), importLimit);
         });
   }
 
@@ -1246,7 +1377,8 @@ public:
         fixedLayoutStructContext ? fixedLayoutStructContext : anyVar,
         /*mayBeInferred*/ true,
         [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
-            DowngradeToWarning downgradeToWarning) {
+            DowngradeToWarning downgradeToWarning,
+            ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
           auto &Ctx = anyVar->getASTContext();
           auto diagID = diag::pattern_type_not_usable_from_inline;
           if (fixedLayoutStructContext)
@@ -1256,6 +1388,7 @@ public:
           auto diag = Ctx.Diags.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
                                          isTypeContext);
           highlightOffendingType(diag, complainRepr);
+          noteLimitingImport(anyVar->getASTContext(), importLimit);
         });
 
     for (auto attr : anyVar->getAttachedPropertyWrappers()) {
@@ -1265,11 +1398,13 @@ public:
                       /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
+                          DowngradeToWarning downgradeToWarning,
+                          ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
         auto diag = anyVar->diagnose(
             diag::property_wrapper_type_not_usable_from_inline,
             anyVar->isLet(), isTypeContext);
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(anyVar->getASTContext(), importLimit);
       });
     }
   }
@@ -1301,12 +1436,14 @@ public:
                     TAD->getUnderlyingTypeRepr(), TAD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
-                        DowngradeToWarning downgradeToWarning) {
+                        DowngradeToWarning downgradeToWarning,
+                        ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
       auto diagID = diag::type_alias_underlying_type_not_usable_from_inline;
       if (!TAD->getASTContext().isSwiftVersionAtLeast(5))
         diagID = diag::type_alias_underlying_type_not_usable_from_inline_warn;
       auto diag = TAD->diagnose(diagID);
       highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(TAD->getASTContext(), importLimit);
     });
   }
 
@@ -1323,12 +1460,14 @@ public:
       checkTypeAccess(requirement, assocType, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
             const TypeRepr *complainRepr,
-            DowngradeToWarning downgradeDiag) {
+            DowngradeToWarning downgradeDiag,
+                          ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
         auto diagID = diag::associated_type_not_usable_from_inline;
         if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::associated_type_not_usable_from_inline_warn;
         auto diag = assocType->diagnose(diagID, ACEK_Requirement);
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(assocType->getASTContext(), importLimit);
       });
     });
     checkTypeAccess(assocType->getDefaultDefinitionType(),
@@ -1336,12 +1475,15 @@ public:
                      /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
-                        DowngradeToWarning downgradeDiag) {
+                        DowngradeToWarning downgradeDiag,
+                        ImportAccessLevel importLimit,
+                        AccessLevel diagAccessLevel) {
       auto diagID = diag::associated_type_not_usable_from_inline;
       if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
         diagID = diag::associated_type_not_usable_from_inline_warn;
       auto diag = assocType->diagnose(diagID, ACEK_DefaultDefinition);
       highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(assocType->getASTContext(), importLimit);
     });
 
     if (assocType->getTrailingWhereClause()) {
@@ -1352,12 +1494,15 @@ public:
                              assocType->getDeclContext(),
                              [&](AccessScope typeAccessScope,
                                  const TypeRepr *complainRepr,
-                                 DowngradeToWarning downgradeDiag) {
+                                 DowngradeToWarning downgradeDiag,
+                                 ImportAccessLevel importLimit,
+                                 AccessLevel diagAccessLevel) {
         auto diagID = diag::associated_type_not_usable_from_inline;
         if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::associated_type_not_usable_from_inline_warn;
         auto diag = assocType->diagnose(diagID, ACEK_Requirement);
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(assocType->getASTContext(), importLimit);
       });
     }
   }
@@ -1380,12 +1525,15 @@ public:
                        /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
+                          DowngradeToWarning downgradeToWarning,
+                          ImportAccessLevel importLimit,
+                          AccessLevel diagAccessLevel) {
         auto diagID = diag::enum_raw_type_not_usable_from_inline;
         if (!ED->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::enum_raw_type_not_usable_from_inline_warn;
         auto diag = ED->diagnose(diagID);
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(ED->getASTContext(), importLimit);
       });
     }
   }
@@ -1422,13 +1570,16 @@ public:
                        /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
+                          DowngradeToWarning downgradeToWarning,
+                          ImportAccessLevel importLimit,
+                          AccessLevel diagAccessLevel) {
         auto diagID = diag::class_super_not_usable_from_inline;
         if (!CD->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::class_super_not_usable_from_inline_warn;
         auto diag = CD->diagnose(diagID, superclassLocIter->getTypeRepr() !=
                                              complainRepr);
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(CD->getASTContext(), importLimit);
       });
     }
   }
@@ -1446,12 +1597,15 @@ public:
       checkTypeAccess(requirement, proto, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeDiag) {
+                          DowngradeToWarning downgradeDiag,
+                          ImportAccessLevel importLimit,
+                          AccessLevel diagAccessLevel) {
         auto diagID = diag::protocol_usable_from_inline;
         if (!proto->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::protocol_usable_from_inline_warn;
         auto diag = proto->diagnose(diagID, PCEK_Refine);
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(proto->getASTContext(), importLimit);
       });
     });
 
@@ -1463,12 +1617,15 @@ public:
                              proto->getDeclContext(),
                              [&](AccessScope typeAccessScope,
                                  const TypeRepr *complainRepr,
-                                 DowngradeToWarning downgradeDiag) {
+                                 DowngradeToWarning downgradeDiag,
+                                 ImportAccessLevel importLimit,
+                                 AccessLevel diagAccessLevel) {
         auto diagID = diag::protocol_usable_from_inline;
         if (!proto->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::protocol_usable_from_inline_warn;
         auto diag = proto->diagnose(diagID, PCEK_Requirement);
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(proto->getASTContext(), importLimit);
       });
     }
   }
@@ -1480,12 +1637,15 @@ public:
       checkTypeAccess(
           P->getInterfaceType(), P->getTypeRepr(), SD, /*mayBeInferred*/ false,
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
-              DowngradeToWarning downgradeDiag) {
+              DowngradeToWarning downgradeDiag,
+              ImportAccessLevel importLimit,
+              AccessLevel diagAccessLevel) {
             auto diagID = diag::subscript_type_usable_from_inline;
             if (!SD->getASTContext().isSwiftVersionAtLeast(5))
               diagID = diag::subscript_type_usable_from_inline_warn;
             auto diag = SD->diagnose(diagID, /*problemIsElement=*/false);
             highlightOffendingType(diag, complainRepr);
+            noteLimitingImport(SD->getASTContext(), importLimit);
           });
     }
 
@@ -1493,12 +1653,15 @@ public:
                     SD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
-                        DowngradeToWarning downgradeDiag) {
+                        DowngradeToWarning downgradeDiag,
+                        ImportAccessLevel importLimit,
+                        AccessLevel diagAccessLevel) {
       auto diagID = diag::subscript_type_usable_from_inline;
       if (!SD->getASTContext().isSwiftVersionAtLeast(5))
         diagID = diag::subscript_type_usable_from_inline_warn;
       auto diag = SD->diagnose(diagID, /*problemIsElement=*/true);
       highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(SD->getASTContext(), importLimit);
     });
   }
 
@@ -1527,7 +1690,8 @@ public:
           auto wrapperTypeRepr = wrapperAttrs[index]->getTypeRepr();
           checkTypeAccess(wrapperType, wrapperTypeRepr, fn, /*mayBeInferred*/ false,
               [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
-                  DowngradeToWarning downgradeDiag) {
+                  DowngradeToWarning downgradeDiag,
+                  ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
                 auto diagID = diag::function_type_usable_from_inline;
                 if (!fn->getASTContext().isSwiftVersionAtLeast(5))
                   diagID = diag::function_type_usable_from_inline_warn;
@@ -1535,6 +1699,7 @@ public:
                                          /*problemIsResult=*/false,
                                          /*inaccessibleWrapper=*/true);
                 highlightOffendingType(diag, complainRepr);
+                noteLimitingImport(fn->getASTContext(), importLimit);
               });
         }
       }
@@ -1542,7 +1707,8 @@ public:
       checkTypeAccess(
           P->getInterfaceType(), P->getTypeRepr(), fn, /*mayBeInferred*/ false,
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
-              DowngradeToWarning downgradeDiag) {
+              DowngradeToWarning downgradeDiag,
+              ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
             auto diagID = diag::function_type_usable_from_inline;
             if (!fn->getASTContext().isSwiftVersionAtLeast(5))
               diagID = diag::function_type_usable_from_inline_warn;
@@ -1550,6 +1716,7 @@ public:
                                      /*problemIsResult=*/false,
                                      /*inaccessibleWrapper=*/false);
             highlightOffendingType(diag, complainRepr);
+            noteLimitingImport(fn->getASTContext(), importLimit);
           });
     }
 
@@ -1558,7 +1725,8 @@ public:
                       FD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeDiag) {
+                          DowngradeToWarning downgradeDiag,
+                          ImportAccessLevel importLimit, AccessLevel diagAccessLevel) {
         auto diagID = diag::function_type_usable_from_inline;
         if (!fn->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::function_type_usable_from_inline_warn;
@@ -1566,6 +1734,7 @@ public:
                                  /*problemIsResult=*/true,
                                  /*inaccessibleWrapper=*/false);
         highlightOffendingType(diag, complainRepr);
+        noteLimitingImport(fn->getASTContext(), importLimit);
       });
     }
   }
@@ -1581,12 +1750,15 @@ public:
       checkTypeAccess(
           P->getInterfaceType(), P->getTypeRepr(), EED, /*mayBeInferred*/ false,
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
-              DowngradeToWarning downgradeToWarning) {
+              DowngradeToWarning downgradeToWarning,
+              ImportAccessLevel importLimit,
+              AccessLevel diagAccessLevel) {
             auto diagID = diag::enum_case_usable_from_inline;
             if (!EED->getASTContext().isSwiftVersionAtLeast(5))
               diagID = diag::enum_case_usable_from_inline_warn;
             auto diag = EED->diagnose(diagID);
             highlightOffendingType(diag, complainRepr);
+            noteLimitingImport(EED->getASTContext(), importLimit);
           });
     }
   }
