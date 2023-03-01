@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "ImageInspection.h"
 #include "Private.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
@@ -27,6 +26,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/ImageInspection.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Strings.h"
 #include "swift/Threading/Mutex.h"

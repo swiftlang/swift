@@ -18,7 +18,7 @@
 
 #ifdef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 
-#include "../runtime/ImageInspection.h"
+#include "swift/Runtime/ImageInspection.h"
 #include "swift/Runtime/Once.h"
 #include <assert.h>
 #include <atomic>

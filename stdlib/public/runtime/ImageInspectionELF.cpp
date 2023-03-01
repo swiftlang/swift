@@ -20,6 +20,6 @@
 
 #if defined(__ELF__)
 
-#include "ImageInspection.h"
+#include "swift/Runtime/ImageInspection.h"
 
 #endif // defined(__ELF__)

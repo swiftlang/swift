@@ -24,11 +24,11 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/ImageInspection.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Basic/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "ImageInspection.h"
 #include "Private.h"
 
 #include <new>

@@ -32,9 +32,9 @@
 #endif
 #include <stdarg.h>
 
-#include "ImageInspection.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/ImageInspection.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Runtime/Win32.h"
 #include "swift/Threading/Errors.h"

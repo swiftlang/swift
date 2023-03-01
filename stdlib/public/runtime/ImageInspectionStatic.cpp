@@ -19,8 +19,8 @@
 
 #if defined(__MACH__) && defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)
 
-#include "ImageInspection.h"
-#include "ImageInspectionCommon.h"
+#include "swift/Runtime/ImageInspection.h"
+#include "swift/Runtime/ImageInspectionCommon.h"
 
 extern "C" const char __dso_handle[];
 

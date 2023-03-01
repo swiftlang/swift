@@ -12,7 +12,6 @@
 
 #ifdef SWIFT_ENABLE_REFLECTION
 
-#include "ImageInspection.h"
 #include "Private.h"
 #include "WeakReference.h"
 #include "swift/Basic/Lazy.h"
@@ -23,6 +22,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/ImageInspection.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Runtime/Reflection.h"

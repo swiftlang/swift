@@ -12,7 +12,7 @@
 
 #if !defined(__ELF__) && !defined(__MACH__)
 
-#include "ImageInspection.h"
+#include "swift/Runtime/ImageInspection.h"
 
 #if defined(__CYGWIN__)
 #include <dlfcn.h>

@@ -23,9 +23,9 @@
 
 #include "swift/shims/Visibility.h"
 #include "swift/shims/MetadataSections.h"
-#include "ImageInspection.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/ImageInspection.h"
 
 #include <algorithm>
 #include <atomic>

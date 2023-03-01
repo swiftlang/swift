@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SymbolInfo.h"
-
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -21,9 +19,9 @@
 #include <dlfcn.h>
 #endif
 
+#include "swift/Runtime/ImageInspection.h"
+#include "swift/Runtime/SymbolInfo.h"
 #include "swift/Runtime/Win32.h"
-
-#include "ImageInspection.h"
 
 using namespace swift;
 

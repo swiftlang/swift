@@ -22,6 +22,7 @@
 #define SWIFT_RUNTIME_IMAGEINSPECTION_H
 
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/SymbolInfo.h"
 
 #include <cstdint>
 #include <cstddef>
@@ -34,8 +35,6 @@
 #define NOMINMAX
 #include <Windows.h>
 #endif
-
-#include "SymbolInfo.h"
 
 namespace swift {
 

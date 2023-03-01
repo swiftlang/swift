@@ -14,12 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ImageInspection.h"
 #include "Private.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/ImageInspection.h"
 #include "swift/Runtime/Metadata.h"
 
 #include <cstdint>
