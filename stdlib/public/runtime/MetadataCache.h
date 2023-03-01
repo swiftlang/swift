@@ -437,6 +437,16 @@ struct GenericSignatureLayout {
                          const GenericSignatureLayout<Runtime> &rhs) {
     return !(lhs == rhs);
   }
+
+  int compare(const GenericSignatureLayout<Runtime> &rhs) const {
+    if (auto result = compareIntegers(NumKeyParameters, rhs.NumKeyParameters))
+      return result;
+
+    if (auto result = compareIntegers(NumWitnessTables, rhs.NumWitnessTables))
+      return result;
+
+    return 0;
+  }
 };
 
 /// A key value as provided to the concurrent map.
@@ -521,7 +531,7 @@ public:
     // Compare the hashes.
     if (hash() != rhs.hash()) return false;
 
-    // Compare the sizes.
+    // Compare the layouts.
     if (Layout != rhs.Layout) return false;
 
     // Compare the content.
@@ -530,23 +540,12 @@ public:
 
   int compare(const MetadataCacheKey &rhs) const {
     // Compare the hashes.
-    if (auto hashComparison = compareIntegers(Hash, rhs.Hash)) {
-      return hashComparison;
-    }
+    if (auto result = compareIntegers(Hash, rhs.Hash))
+      return result;
 
-    // Compare the # of key parameters.
-    if (auto keyParamsComparison =
-            compareIntegers(Layout.NumKeyParameters,
-                            rhs.Layout.NumKeyParameters)) {
-      return keyParamsComparison;
-    }
-
-    // Compare the # of witness tables.
-    if (auto witnessTablesComparison =
-            compareIntegers(Layout.NumWitnessTables,
-                            rhs.Layout.NumWitnessTables)) {
-      return witnessTablesComparison;
-    }
+    // Compare the layouts.
+    if (auto result = Layout.compare(rhs.Layout))
+      return result;
 
     // Compare the content.
     return compareContent(begin(), rhs.begin(), Layout);
