@@ -1061,9 +1061,8 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
 ///   pattern ::= 'let' pattern
 ///
 ParserResult<Pattern> Parser::parsePattern() {
-  auto introducer = (InVarOrLetPattern != IVOLP_InVar
-                     ? VarDecl::Introducer::Let
-                     : VarDecl::Introducer::Var);
+  auto introducer =
+      InBindingPattern.getIntroducer().getValueOr(VarDecl::Introducer::Let);
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple();
@@ -1108,21 +1107,25 @@ ParserResult<Pattern> Parser::parsePattern() {
     
   case tok::kw_var:
   case tok::kw_let: {
-    bool isLet = Tok.is(tok::kw_let);
+    auto newBindingState = PatternBindingState(Tok);
     SourceLoc varLoc = consumeToken();
-    
-    // 'var' and 'let' patterns shouldn't nest.
-    if (InVarOrLetPattern == IVOLP_InLet ||
-        InVarOrLetPattern == IVOLP_InVar)
-      diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
-    
+
+    // 'var', 'let', 'inout' patterns shouldn't nest.
+    if (InBindingPattern.getIntroducer().hasValue())
+      diagnose(varLoc, diag::var_pattern_in_var,
+               *newBindingState.getSelectIndexForIntroducer());
+
     // 'let' isn't valid inside an implicitly immutable context, but var is.
-    if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
+    if (newBindingState.isLet() &&
+        InBindingPattern == PatternBindingState::ImplicitlyImmutable)
       diagnose(varLoc, diag::let_pattern_in_immutable_context);
-    
-    // In our recursive parse, remember that we're in a var/let pattern.
-    llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+
+    // In our recursive parse, remember that we're in a let/var/inout
+    // pattern. We default to var if we don't have an immediate pattern bidning
+    // state.
+    llvm::SaveAndRestore<decltype(InBindingPattern)> T(
+        InBindingPattern, newBindingState.getPatternBindingStateForIntroducer(
+                              VarDecl::Introducer::Var));
 
     // Reset async attribute in parser context.
     llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
@@ -1133,7 +1136,8 @@ ParserResult<Pattern> Parser::parsePattern() {
     if (subPattern.isNull())
       return nullptr;
     return makeParserResult(new (Context) BindingPattern(
-        varLoc, isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
+        varLoc,
+        newBindingState.getIntroducer().getValueOr(VarDecl::Introducer::Var),
         subPattern.get()));
   }
       
@@ -1271,12 +1275,13 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // Parse productions that can only be patterns.
   if (Tok.isAny(tok::kw_var, tok::kw_let)) {
     assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects var or let");
-    bool isLet = Tok.is(tok::kw_let);
+    auto newPatternBindingState = PatternBindingState(Tok);
     SourceLoc varLoc = consumeToken();
-    
-    return parseMatchingPatternAsLetOrVar(isLet, varLoc, isExprBasic);
+
+    return parseMatchingPatternAsBinding(newPatternBindingState, varLoc,
+                                         isExprBasic);
   }
-  
+
   // matching-pattern ::= 'is' type
   if (Tok.is(tok::kw_is)) {
     SourceLoc isLoc = consumeToken(tok::kw_is);
@@ -1320,21 +1325,23 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   return makeParserResult(status, EP);
 }
 
-ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
-                                                             SourceLoc varLoc,
-                                                             bool isExprBasic) {
-  // 'var' and 'let' patterns shouldn't nest.
-  if (InVarOrLetPattern == IVOLP_InLet ||
-      InVarOrLetPattern == IVOLP_InVar)
-    diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
-  
+ParserResult<Pattern>
+Parser::parseMatchingPatternAsBinding(PatternBindingState newState,
+                                      SourceLoc varLoc, bool isExprBasic) {
+  // 'var', 'let', 'inout' patterns shouldn't nest.
+  if (InBindingPattern.getIntroducer().hasValue())
+    diagnose(varLoc, diag::var_pattern_in_var,
+             *newState.getSelectIndexForIntroducer());
+
   // 'let' isn't valid inside an implicitly immutable context, but var is.
-  if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
+  if (newState.isLet() &&
+      InBindingPattern == PatternBindingState::ImplicitlyImmutable)
     diagnose(varLoc, diag::let_pattern_in_immutable_context);
 
   // In our recursive parse, remember that we're in a var/let pattern.
-  llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+  llvm::SaveAndRestore<decltype(InBindingPattern)> T(
+      InBindingPattern,
+      newState.getPatternBindingStateForIntroducer(VarDecl::Introducer::Var));
 
   // Reset async attribute in parser context.
   llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
@@ -1343,11 +1350,10 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   if (subPattern.isNull())
     return nullptr;
   auto *varP = new (Context) BindingPattern(
-      varLoc, isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
+      varLoc, newState.getIntroducer().getValueOr(VarDecl::Introducer::Var),
       subPattern.get());
   return makeParserResult(ParserStatus(subPattern), varP);
 }
-
 
 bool Parser::isOnlyStartOfMatchingPattern() {
   return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_is);

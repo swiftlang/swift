@@ -1132,8 +1132,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   // Okay, if the special code-completion didn't kick in, parse a
   // matching pattern.
   if (patternResult.isNull()) {
-    llvm::SaveAndRestore<decltype(P.InVarOrLetPattern)>
-      T(P.InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
+    llvm::SaveAndRestore<decltype(P.InBindingPattern)> T(
+        P.InBindingPattern, PatternBindingState::InMatchingPattern);
     patternResult = P.parseMatchingPattern(isExprBasic);
   }
 
@@ -1622,8 +1622,8 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     
   if (BindingKindStr == "case") {
     // In our recursive parse, remember that we're in a matching pattern.
-    llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-      T(InVarOrLetPattern, IVOLP_InMatchingPattern);
+    llvm::SaveAndRestore<decltype(InBindingPattern)> T(
+        InBindingPattern, PatternBindingState::InMatchingPattern);
 
     // Reset async attribute in parser context.
     llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
@@ -1638,13 +1638,14 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     .fixItInsertAfter(Tok.getLoc(), " " + BindingKindStr.str());
 
     consumeToken(tok::kw_case);
-    
-    bool wasLet = BindingKindStr == "let";
+
+    auto newPatternBindingState = PatternBindingState::get(BindingKindStr)
+      .getValueOr(PatternBindingState(PatternBindingState::InVar));
     BindingKindStr = "case";
     
     // In our recursive parse, remember that we're in a var/let pattern.
-    llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-      T(InVarOrLetPattern, wasLet ? IVOLP_InLet : IVOLP_InVar);
+    llvm::SaveAndRestore<decltype(InBindingPattern)> T(InBindingPattern,
+                                                       newPatternBindingState);
 
     // Reset async attribute in parser context.
     llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
@@ -1652,10 +1653,9 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
     
     if (ThePattern.isNonNull()) {
-      auto *P = new (Context) BindingPattern(IntroducerLoc,
-                                             wasLet ? VarDecl::Introducer::Let
-                                                    : VarDecl::Introducer::Var,
-                                             ThePattern.get());
+      auto *P = new (Context)
+          BindingPattern(IntroducerLoc, *newPatternBindingState.getIntroducer(),
+                         ThePattern.get());
       ThePattern = makeParserResult(Status, P);
     }
 
@@ -1668,9 +1668,11 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     consumeToken(tok::code_complete);
   } else {
     // Otherwise, this is an implicit optional binding "if let".
-    ThePattern = parseMatchingPatternAsLetOrVar(BindingKindStr == "let",
-                                                IntroducerLoc,
-                                                /*isExprBasic*/ true);
+    ThePattern = parseMatchingPatternAsBinding(
+        PatternBindingState::get(BindingKindStr)
+            .getValueOr(PatternBindingState(PatternBindingState::InVar)),
+        IntroducerLoc,
+        /*isExprBasic*/ true);
     // The let/var pattern is part of the statement.
     if (Pattern *P = ThePattern.getPtrOrNull())
       P->setImplicit();
@@ -2273,8 +2275,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   // Parse the pattern.  This is either 'case <refutable pattern>' or just a
   // normal pattern.
   if (consumeIf(tok::kw_case)) {
-    llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-      T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
+    llvm::SaveAndRestore<decltype(InBindingPattern)> T(
+        InBindingPattern, PatternBindingState::InMatchingPattern);
 
     // Reset async attribute in parser context.
     llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
@@ -2285,12 +2287,12 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     // Change the parser state to know that the pattern we're about to parse is
     // implicitly mutable.  Bound variables can be changed to mutable explicitly
     // if desired by using a 'var' pattern.
-    assert(InVarOrLetPattern == IVOLP_NotInVarOrLet &&
+    assert(InBindingPattern == PatternBindingState::NotInBinding &&
            "for-each loops cannot exist inside other patterns");
-    InVarOrLetPattern = IVOLP_ImplicitlyImmutable;
+    InBindingPattern = PatternBindingState::ImplicitlyImmutable;
     pattern = parseTypedPattern();
-    assert(InVarOrLetPattern == IVOLP_ImplicitlyImmutable);
-    InVarOrLetPattern = IVOLP_NotInVarOrLet;
+    assert(InBindingPattern == PatternBindingState::ImplicitlyImmutable);
+    InBindingPattern = PatternBindingState::NotInBinding;
   }
   
   SourceLoc InLoc;

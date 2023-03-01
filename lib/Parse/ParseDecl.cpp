@@ -7505,8 +7505,9 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     Pattern *pattern;
     {
       // In our recursive parse, remember that we're in a var/let pattern.
-      llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-      T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+      llvm::SaveAndRestore<decltype(InBindingPattern)> T(
+          InBindingPattern,
+          isLet ? PatternBindingState::InLet : PatternBindingState::InVar);
 
       // Track whether we are parsing an 'async let' pattern.
       const auto hasAsyncAttr = Attributes.hasAttribute<AsyncAttr>();
@@ -8193,8 +8194,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       // "case" label.
       {
         CancellableBacktrackingScope backtrack(*this);
-        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-        T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
+        llvm::SaveAndRestore<decltype(InBindingPattern)> T(
+            InBindingPattern, PatternBindingState::InMatchingPattern);
         parseMatchingPattern(/*isExprBasic*/false);
 
         // Reset async attribute in parser context.

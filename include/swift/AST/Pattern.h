@@ -53,6 +53,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
 /// Pattern - Base class for all patterns in Swift.
 class alignas(8) Pattern : public ASTAllocated<Pattern> {
 protected:
+  // clang-format off
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(Pattern, bitmax(NumPatternKindBits,8)+1+1,
@@ -84,6 +85,7 @@ protected:
                         IsAsyncLet : 1);
 
   } Bits;
+  // clang-format on
 
   Pattern(PatternKind kind) {
     Bits.OpaqueBits = 0;
