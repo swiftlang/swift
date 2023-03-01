@@ -53,7 +53,12 @@ extension Metadata {
   public var `enum`: EnumMetadata {
     EnumMetadata(ptr)
   }
-  
+
+  @inlinable
+  public var existential: ExistentialMetadata {
+    ExistentialMetadata(ptr)
+  }
+
   @inlinable
   public var extendedExistential: ExtendedExistentialMetadata {
     ExtendedExistentialMetadata(ptr)

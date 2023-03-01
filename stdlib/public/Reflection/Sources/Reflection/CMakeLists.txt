@@ -17,6 +17,7 @@ list(APPEND SWIFT_REFLECTION_SWIFT_FLAGS
 
 add_swift_target_library(swiftReflection ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Case.swift
+  Conformances.swift
   Field.swift
   GenericArguments.swift
   KeyPath.swift

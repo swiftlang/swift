@@ -64,6 +64,7 @@ add_swift_target_library(swift_Runtime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_ST
   Utils/RelativePointer.swift
   Utils/TypeCache.swift
 
+  Caches.cpp
   ConformanceDescriptor.swift
   ExistentialContainer.swift
   Functions.swift
