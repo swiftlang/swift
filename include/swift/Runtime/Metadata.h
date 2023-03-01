@@ -444,6 +444,36 @@ bool swift_compareProtocolConformanceDescriptors(
     const ProtocolConformanceDescriptor *lhs,
     const ProtocolConformanceDescriptor *rhs);
 
+/// Allocate a metadata pack on the heap, unless this pack is already on the
+/// heap.
+///
+/// Metadata packs are uniqued by pointer equality on their elements.
+///
+/// \param ptr A pack pointer, where the least significant bit indicates if
+/// it is already on the heap.
+/// \param count The number of metadata pointers in the pack.
+///
+/// \returns a metadata pack allocated on the heap, with the least significant
+/// bit set to true.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+const Metadata * const *
+swift_allocateMetadataPack(const Metadata * const *ptr, unsigned count);
+
+/// Allocate a witness table pack on the heap, unless this pack is already on
+/// the heap.
+///
+/// Witness table packs are not uniqued.
+///
+/// \param ptr A pack pointer, where the least significant bit indicates if
+/// it is already on the heap.
+/// \param count The number of witness table pointers in the pack.
+///
+/// \returns a witness table pack allocated on the heap, with the least
+/// significant bit set to true.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+const WitnessTable * const *
+swift_allocateWitnessTablePack(const WitnessTable * const *ptr, unsigned count);
+
 /// Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *

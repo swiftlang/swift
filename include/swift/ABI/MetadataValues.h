@@ -861,6 +861,7 @@ private:
     HasSuggestedValueWitnesses  = 0x00000400U,
     HasImplicitReqSigParams     = 0x00000800U,
     HasImplicitGenSigParams     = 0x00001000U,
+    HasTypePacks                = 0x00002000U,
   };
   int_type Data;
 
@@ -901,6 +902,12 @@ public:
     return ExtendedExistentialTypeShapeFlags(
       implicit ? (Data | HasImplicitGenSigParams)
                : (Data & ~HasImplicitGenSigParams));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withTypePacks(bool hasTypePacks) const {
+    return ExtendedExistentialTypeShapeFlags(
+      hasTypePacks ? (Data | HasTypePacks)
+                   : (Data & ~HasTypePacks));
   }
 
   /// Is this a special kind of existential?
@@ -945,6 +952,14 @@ public:
   /// they must match GenericParamDescriptor::implicit().
   bool hasImplicitGenSigParams() const {
     return Data & HasImplicitGenSigParams;
+  }
+
+  /// Whether the generic context has type parameter packs. This
+  /// occurs when the existential has a superclass requirement
+  /// whose class declaration has a type parameter pack, eg
+  /// `any P & C<...>` with `class C<each T> {}`.
+  bool hasTypePacks() const {
+    return Data & HasTypePacks;
   }
 
   int_type getIntValue() const {
@@ -1801,6 +1816,9 @@ enum class GenericParamKind : uint8_t {
   /// A type parameter.
   Type = 0,
 
+  /// A type parameter pack.
+  TypePack = 1,
+
   Max = 0x3F,
 };
 
@@ -1895,7 +1913,9 @@ enum class GenericRequirementKind : uint8_t {
   /// A "same-conformance" requirement, implied by a same-type or base-class
   /// constraint that binds a parameter with protocol requirements.
   SameConformance = 3,
-  /// A layout constraint.
+  /// A same-shape requirement between generic parameter packs.
+  SameShape = 4,
+  /// A layout requirement.
   Layout = 0x1F,
 };
 
@@ -1907,11 +1927,13 @@ class GenericRequirementFlags {
 public:
   constexpr GenericRequirementFlags(GenericRequirementKind kind,
                                     bool hasKeyArgument,
-                                    bool hasExtraArgument)
+                                    bool hasExtraArgument,
+                                    bool isPackRequirement)
     : GenericRequirementFlags(GenericRequirementFlags(0)
                          .withKind(kind)
                          .withKeyArgument(hasKeyArgument)
-                         .withExtraArgument(hasExtraArgument))
+                         .withExtraArgument(hasExtraArgument)
+                         .withPackRequirement(isPackRequirement))
   {}
 
   constexpr bool hasKeyArgument() const {
@@ -1920,6 +1942,13 @@ public:
 
   constexpr bool hasExtraArgument() const {
     return (Value & 0x40u) != 0;
+  }
+
+  /// If this is true, the subject type of the requirement is a pack.
+  /// When the requirement is a conformance requirement, the corresponding
+  /// entry in the generic arguments array becomes a TargetWitnessTablePack.
+  constexpr bool isPackRequirement() const {
+    return (Value & 0x20u) != 0;
   }
 
   constexpr GenericRequirementKind getKind() const {
@@ -1936,6 +1965,12 @@ public:
   withExtraArgument(bool hasExtraArgument) const {
     return GenericRequirementFlags((Value & 0xBFu)
       | (hasExtraArgument ? 0x40u : 0));
+  }
+
+  constexpr GenericRequirementFlags
+  withPackRequirement(bool isPackRequirement) const {
+    return GenericRequirementFlags((Value & 0xBFu)
+      | (isPackRequirement ? 0x20u : 0));
   }
 
   constexpr GenericRequirementFlags
