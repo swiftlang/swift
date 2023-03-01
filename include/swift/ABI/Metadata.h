@@ -1932,10 +1932,10 @@ struct TargetExtendedExistentialTypeShape
       TargetGenericRequirementDescriptor<Runtime>,
       // Optional header describing any type packs in the generalization
       // signature.
-      GenericParamPackShapeHeader,
+      GenericPackShapeHeader,
       // For each type pack in the generalization signature, a descriptor
       // storing the shape class.
-      GenericParamPackShapeDescriptor> {
+      GenericPackShapeDescriptor> {
 private:
   using RelativeValueWitnessTablePointer =
     TargetRelativeIndirectablePointer<Runtime,
@@ -1949,8 +1949,8 @@ private:
       RelativeValueWitnessTablePointer,
       GenericParamDescriptor,
       TargetGenericRequirementDescriptor<Runtime>,
-      GenericParamPackShapeHeader,
-      GenericParamPackShapeDescriptor>;
+      GenericPackShapeHeader,
+      GenericPackShapeDescriptor>;
   friend TrailingObjects;
 
   template<typename T>
@@ -1977,11 +1977,11 @@ private:
     return getNumGenSigRequirements() + getNumReqSigRequirements();
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericParamPackShapeHeader>) const {
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeHeader>) const {
     return (Flags.hasTypePacks() ? 1 : 0);
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericParamPackShapeDescriptor>) const {
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeDescriptor>) const {
     if (!Flags.hasTypePacks())
       return 0;
 
@@ -2142,18 +2142,18 @@ public:
     return getReqSigRequirements() + ReqSigHeader.NumRequirements;
   }
 
-  GenericParamPackShapeHeader getGenSigPackShapeHeader() const {
+  GenericPackShapeHeader getGenSigPackShapeHeader() const {
     assert(hasGeneralizationSignature());
     if (!Flags.hasTypePacks())
       return {0, 0};
-    return *this->template getTrailingObjects<GenericParamPackShapeHeader>();
+    return *this->template getTrailingObjects<GenericPackShapeHeader>();
   }
 
-  const GenericParamPackShapeDescriptor *getGenSigPackShapeDescriptors() const {
+  const GenericPackShapeDescriptor *getGenSigPackShapeDescriptors() const {
     assert(hasGeneralizationSignature());
     if (!Flags.hasTypePacks())
       return nullptr;
-    return this->template getTrailingObjects<GenericParamPackShapeDescriptor>();
+    return this->template getTrailingObjects<GenericPackShapeDescriptor>();
   }
 
   /// Return the amount of space used in ExtendedExistentialTypeMetadata
