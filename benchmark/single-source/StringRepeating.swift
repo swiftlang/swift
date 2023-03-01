@@ -29,25 +29,25 @@ public let benchmarks = [
 
 @inline(never)
 public func run_singleAsciiCharacterCount100(N: Int) {
-  let string = getString("x")
+  let string = "x"
   for _ in 1...5000*N {
-    blackHole(String(repeating: string, count: 100))
+    blackHole(String(repeating: getString(string), count: 100))
   }
 }
 
 @inline(never)
 public func run_26AsciiCharactersCount2(N: Int) {
-  let string = getString("abcdefghijklmnopqrstuvwxyz")
+  let string = "abcdefghijklmnopqrstuvwxyz"
   for _ in 1...5000*N {
-    blackHole(String(repeating: string, count: 2))
+    blackHole(String(repeating: getString(string), count: 2))
   }
 }
 
 @inline(never)
 public func run_33CyrillicCharactersCount2(N: Int) {
-  let string = getString("абвгґдеєжзиіїйклмнопрстуфхцчшщьюя")
+  let string = "абвгґдеєжзиіїйклмнопрстуфхцчшщьюя"
   for _ in 1...5000*N {
-    blackHole(String(repeating: string, count: 2))
+    blackHole(String(repeating: getString(string), count: 2))
   }
 }
 
@@ -71,6 +71,6 @@ public func run_longMixedStringCount100(N: Int) {
     🦩
     """
   for _ in 1...5000*N {
-    blackHole(String(repeating: string, count: 100))
+    blackHole(String(repeating: getString(string), count: 100))
   }
 }
