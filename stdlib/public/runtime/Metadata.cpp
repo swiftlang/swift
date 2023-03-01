@@ -1147,6 +1147,120 @@ swift::swift_getObjCClassFromMetadataConditional(const Metadata *theMetadata) {
 #endif
 
 /***************************************************************************/
+/*** Metadata and witness table packs **************************************/
+/***************************************************************************/
+
+namespace {
+
+class MetadataPackCacheEntry {
+public:
+  unsigned Count;
+
+  const Metadata * const * getElements() const {
+    return reinterpret_cast<const Metadata * const *>(this + 1);
+  }
+
+  const Metadata ** getElements() {
+    return reinterpret_cast<const Metadata **>(this + 1);
+  }
+
+  struct Key {
+    const Metadata *const *Data;
+    const unsigned Count;
+
+    unsigned getCount() const {
+      return Count;
+    }
+
+    const Metadata *getElement(unsigned index) const {
+      assert(index < Count);
+      return Data[index];
+    }
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      llvm::hash_code hash = 0;
+      for (unsigned i = 0; i != key.getCount(); ++i)
+        hash = llvm::hash_combine(hash, key.getElement(i));
+      return hash;
+    }
+  };
+
+  MetadataPackCacheEntry(const Key &key);
+
+  intptr_t getKeyIntValueForDump() {
+    return 0; // No single meaningful value here.
+  }
+
+  bool matchesKey(const Key &key) const {
+    if (key.getCount() != Count)
+      return false;
+    for (unsigned i = 0; i != Count; ++i) {
+      if (key.getElement(i) != getElements()[i])
+        return false;
+    }
+    return true;
+  }
+
+  friend llvm::hash_code hash_value(const MetadataPackCacheEntry &value) {
+    return hash_value(value.getElements());
+  }
+
+  static size_t getExtraAllocationSize(const Key &key) {
+    return getExtraAllocationSize(key.Count);
+  }
+
+  size_t getExtraAllocationSize() const {
+    return getExtraAllocationSize(Count);
+  }
+
+  static size_t getExtraAllocationSize(unsigned count) {
+    return count * sizeof(const Metadata * const *);
+  }
+};
+
+MetadataPackCacheEntry::MetadataPackCacheEntry(const Key &key) {
+  auto count = key.getCount();
+
+  for (unsigned i = 0; i < count; ++i)
+    getElements()[i] = key.getElement(i);
+}
+
+} // end anonymous namespace
+
+/// The uniquing structure for metadata packs.
+static SimpleGlobalCache<MetadataPackCacheEntry, MetadataPackTag> MetadataPacks;
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+const Metadata * const *
+swift_allocateMetadataPack(const Metadata * const *ptr, unsigned count) {
+  if (MetadataPackPointer(reinterpret_cast<uintptr_t>(ptr)).getLifetime()
+        == PackLifetime::OnHeap)
+    return ptr;
+
+  MetadataPackCacheEntry::Key key{ptr, count};
+  auto bytes = MetadataPacks.getOrInsert(key).first->getElements();
+
+  return MetadataPackPointer(bytes, PackLifetime::OnHeap).getPointer();
+}
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+const WitnessTable * const *
+swift_allocateWitnessTablePack(const WitnessTable * const *ptr, unsigned count) {
+  if (WitnessTablePackPointer(reinterpret_cast<uintptr_t>(ptr)).getLifetime()
+        == PackLifetime::OnHeap)
+    return ptr;
+
+  size_t totalSize = (size_t) count * sizeof(const WitnessTable *);
+
+  auto bytes = (const WitnessTable **)
+    MetadataAllocator(WitnessTablePackTag)
+      .Allocate(totalSize, alignof(const WitnessTable *));
+  memcpy((char*) bytes, ptr, totalSize);
+
+  return WitnessTablePackPointer(bytes, PackLifetime::OnHeap).getPointer();
+}
+
+/***************************************************************************/
 /*** Functions *************************************************************/
 /***************************************************************************/
 

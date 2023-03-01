@@ -30,6 +30,38 @@ struct TargetProtocolConformanceDescriptor;
 template <typename Runtime>
 struct TargetGenericContext;
 
+class GenericContextDescriptorFlags {
+  uint16_t Value;
+
+public:
+  constexpr GenericContextDescriptorFlags() : Value(0) {}
+
+  explicit constexpr GenericContextDescriptorFlags(uint16_t value)
+    : Value(value) {}
+
+  constexpr GenericContextDescriptorFlags(bool hasTypePacks)
+    : GenericContextDescriptorFlags(
+        GenericContextDescriptorFlags((uint16_t)0)
+          .withHasTypePacks(hasTypePacks)) {}
+
+  /// Whether this generic context has at least one type parameter
+  /// pack, in which case the generic context will have a trailing
+  /// GenericParamPackShapeHeader.
+  constexpr bool hasTypePacks() const {
+    return (Value & 0x1) != 0;
+  }
+
+  constexpr GenericContextDescriptorFlags
+  withHasTypePacks(bool hasTypePacks) const {
+    return GenericContextDescriptorFlags((uint16_t)(
+      (Value & ~0x1) | (hasTypePacks ? 0x1 : 0)));
+  }
+
+  constexpr uint16_t getIntValue() const {
+    return Value;
+  }
+};
+
 template <typename Runtime>
 struct TargetGenericContextDescriptorHeader {
   /// The number of (source-written) generic parameters, and thus
@@ -39,8 +71,8 @@ struct TargetGenericContextDescriptorHeader {
   ///
   /// A GenericParamDescriptor corresponds to a type metadata pointer
   /// in the arguments layout when isKeyArgument() is true.
-  /// isKeyArgument() will be false if the parameter has been unified
-  /// unified with a different parameter or an associated type.
+  /// isKeyArgument() will be false if the parameter has been made
+  /// equivalent to a different parameter or a concrete type.
   uint16_t NumParams;
 
   /// The number of GenericRequirementDescriptors in this generic
@@ -66,18 +98,22 @@ struct TargetGenericContextDescriptorHeader {
   /// hasKeyArgument()).
   uint16_t NumKeyArguments;
 
-  /// In principle, the size of the "extra" area of the argument
+  /// Originally this was the size of the "extra" area of the argument
   /// layout, in words.  The idea was that extra arguments would
   /// include generic parameters and conformances that are not part
   /// of the identity of the context; however, it's unclear why we
-  /// would ever want such a thing.  As a result, this section is
-  /// unused, and this field is always zero.  It can be repurposed
-  /// as long as it remains zero in code which must be compatible
-  /// with existing Swift runtimes.
-  uint16_t NumExtraArguments;
+  /// would ever want such a thing.  As a result, in pre-5.8 runtimes
+  /// this field is always zero.  New flags can only be added as long
+  /// as they remains zero in code which must be compatible with
+  /// older Swift runtimes.
+  GenericContextDescriptorFlags Flags;
   
   uint32_t getNumArguments() const {
-    return NumKeyArguments + NumExtraArguments;
+    // Note: this used to be NumKeyArguments + NumExtraArguments,
+    // and flags was named NumExtraArguments, which is why Flags
+    // must remain zero when backward deploying to Swift 5.7 or
+    // earlier.
+    return NumKeyArguments;
   }
 
   /// Return the total size of the argument layout, in words.
@@ -163,7 +199,7 @@ public:
     return offsetof(typename std::remove_reference<decltype(*this)>::type, Type);
   }
 
-  /// Retreive the offset to the Type field
+  /// Retreive the offset to the Param field
   constexpr inline auto
   getParamOffset() const -> typename Runtime::StoredSize {
     return offsetof(typename std::remove_reference<decltype(*this)>::type, Param);
@@ -199,6 +235,7 @@ public:
     case GenericRequirementKind::Protocol:
     case GenericRequirementKind::SameConformance:
     case GenericRequirementKind::SameType:
+    case GenericRequirementKind::SameShape:
       return true;
     }
 
@@ -207,6 +244,25 @@ public:
 };
 using GenericRequirementDescriptor =
   TargetGenericRequirementDescriptor<InProcess>;
+
+struct GenericParamPackShapeHeader {
+  /// The number of generic parameters which are packs.
+  ///
+  /// Must equal the number of GenericParamDescriptors whose kind is
+  /// GenericParamKind::TypePack.
+  uint16_t NumTypePacks;
+
+  /// The number of equivalence classes in the same-shape relation.
+  uint16_t NumShapeClasses;
+};
+
+struct GenericParamPackShapeDescriptor {
+  /// The equivalence class of this generic parameter pack under
+  /// the same-shape relation.
+  ///
+  /// Must be less than GenericParamPackShapeHeader::NumShapeClasses.
+  uint16_t ShapeClass;
+};
 
 /// An array of generic parameter descriptors, all
 /// GenericParamDescriptor::implicit(), which is by far
@@ -243,14 +299,21 @@ class RuntimeGenericSignature {
   TargetGenericContextDescriptorHeader<Runtime> Header;
   const GenericParamDescriptor *Params;
   const TargetGenericRequirementDescriptor<Runtime> *Requirements;
+  GenericParamPackShapeHeader PackShapeHeader;
+  const GenericParamPackShapeDescriptor *PackShapeDescriptors;
+
 public:
   RuntimeGenericSignature()
-    : Header{0, 0, 0, 0}, Params(nullptr), Requirements(nullptr) {}
+    : Header{0, 0, 0, 0}, Params(nullptr), Requirements(nullptr),
+      PackShapeHeader{0, 0}, PackShapeDescriptors(nullptr) {}
 
   RuntimeGenericSignature(const TargetGenericContextDescriptorHeader<Runtime> &header,
                           const GenericParamDescriptor *params,
-                          const TargetGenericRequirementDescriptor<Runtime> *requirements)
-    : Header(header), Params(params), Requirements(requirements) {}
+                          const TargetGenericRequirementDescriptor<Runtime> *requirements,
+                          const GenericParamPackShapeHeader &packShapeHeader,
+                          const GenericParamPackShapeDescriptor *packShapeDescriptors)
+    : Header(header), Params(params), Requirements(requirements),
+      PackShapeHeader(packShapeHeader), PackShapeDescriptors(packShapeDescriptors) {}
 
   llvm::ArrayRef<GenericParamDescriptor> getParams() const {
     return llvm::makeArrayRef(Params, Header.NumParams);
@@ -258,6 +321,10 @@ public:
 
   llvm::ArrayRef<TargetGenericRequirementDescriptor<Runtime>> getRequirements() const {
     return llvm::makeArrayRef(Requirements, Header.NumRequirements);
+  }
+
+  llvm::ArrayRef<GenericParamPackShapeDescriptor> getPackShapeDescriptors() const {
+    return llvm::makeArrayRef(PackShapeDescriptors, PackShapeHeader.NumTypePacks);
   }
 
   size_t getArgumentLayoutSizeInWords() const {
@@ -350,6 +417,8 @@ class TrailingGenericContextObjects<TargetSelf<Runtime>,
       TargetGenericContextHeaderType<Runtime>,
       GenericParamDescriptor,
       TargetGenericRequirementDescriptor<Runtime>,
+      GenericParamPackShapeHeader,
+      GenericParamPackShapeDescriptor,
       FollowingTrailingObjects...>
 {
 protected:
@@ -362,6 +431,8 @@ protected:
     GenericContextHeaderType,
     GenericParamDescriptor,
     GenericRequirementDescriptor,
+    GenericParamPackShapeHeader,
+    GenericParamPackShapeDescriptor,
     FollowingTrailingObjects...>;
   friend TrailingObjects;
 
@@ -415,6 +486,23 @@ public:
     return {this->template getTrailingObjects<GenericRequirementDescriptor>(),
             getGenericContextHeader().NumRequirements};
   }
+  
+  GenericParamPackShapeHeader getGenericParamPackShapeHeader() const {
+    if (!asSelf()->isGeneric())
+      return {0, 0};
+    if (!getGenericContextHeader().Flags.hasTypePacks())
+      return {0, 0};
+    return *this->template getTrailingObjects<GenericParamPackShapeHeader>();
+  }
+
+  llvm::ArrayRef<GenericParamPackShapeDescriptor> getGenericParamPackShapeDescriptors() const {
+    auto header = getGenericParamPackShapeHeader();
+    if (header.NumTypePacks == 0)
+      return {};
+
+    return {this->template getTrailingObjects<GenericParamPackShapeDescriptor>(),
+            header.NumTypePacks};
+  }
 
   /// Return the amount of space that the generic arguments take up in
   /// metadata of this type.
@@ -427,7 +515,9 @@ public:
     if (!asSelf()->isGeneric()) return RuntimeGenericSignature<Runtime>();
     return {getGenericContextHeader(),
             getGenericParams().data(),
-            getGenericRequirements().data()};
+            getGenericRequirements().data(),
+            getGenericParamPackShapeHeader(),
+            getGenericParamPackShapeDescriptors().data()};
   }
 
 protected:
@@ -441,6 +531,23 @@ protected:
 
   size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
     return asSelf()->isGeneric() ? getGenericContextHeader().NumRequirements : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericParamPackShapeHeader>) const {
+    if (!asSelf()->isGeneric())
+      return 0;
+
+    return getGenericContextHeader().Flags.hasTypePacks() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericParamPackShapeDescriptor>) const {
+    if (!asSelf()->isGeneric())
+      return 0;
+
+    if (!getGenericContextHeader().Flags.hasTypePacks())
+      return 0;
+
+    return getGenericParamPackShapeHeader().NumTypePacks;
   }
 
 #if defined(_MSC_VER) && _MSC_VER < 1920

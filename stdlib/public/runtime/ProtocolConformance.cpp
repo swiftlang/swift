@@ -1387,6 +1387,10 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
       // FIXME: Implement this check.
       continue;
     }
+
+    case GenericRequirementKind::SameShape: {
+      llvm_unreachable("Implement me");
+    }
     }
 
     // Unknown generic requirement kind.
