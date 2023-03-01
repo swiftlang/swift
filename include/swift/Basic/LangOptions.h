@@ -783,6 +783,14 @@ namespace swift {
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;
 
+    /// Don't verify input files for Clang modules if the module has been
+    /// successfully validated or loaded during this build session.
+    bool ValidateModulesOnce = false;
+
+    /// Use the last modification time of this file as the underlying Clang
+    /// build session timestamp.
+    std::string BuildSessionFilePath;
+
     /// \see Mode
     enum class Modes : uint8_t {
       /// Set up Clang for importing modules into Swift and generating IR from
