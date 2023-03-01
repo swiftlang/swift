@@ -1887,11 +1887,14 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   if (!Imports)
     return;
 
+  bool moduleIsResilient = getParentModule()->getResilienceStrategy() ==
+                             ResilienceStrategy::Resilient;
   for (auto desc : *Imports) {
     ModuleDecl::ImportFilter requiredFilter;
     if (desc.options.contains(ImportFlags::Exported))
       requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
-    else if (desc.options.contains(ImportFlags::ImplementationOnly))
+    else if (desc.options.contains(ImportFlags::ImplementationOnly) ||
+             (desc.accessLevel <= AccessLevel::Package && moduleIsResilient))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
     else if (desc.options.contains(ImportFlags::SPIOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
