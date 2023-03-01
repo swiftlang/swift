@@ -1256,14 +1256,33 @@ public:
     if (!diagnosed) {
       Type nominalType =
           fn->getDeclContext()->getSelfNominalTypeDecl()->getDeclaredType();
-      if (nominalType->isPureMoveOnly()) {
-        // Set the contextual type for the sub-expression before we typecheck.
-        contextualInfo = {nominalType, CTP_ForgetStmt};
-      } else {
+      if (!nominalType->isPureMoveOnly()) {
         ctx.Diags.diagnose(FS->getForgetLoc(),
                            diag::forget_wrong_context_copyable,
                            fn->getDescriptiveKind());
         diagnosed = true;
+      } else {
+        // Set the contextual type for the sub-expression before we typecheck.
+        contextualInfo = {nominalType, CTP_ForgetStmt};
+
+        // Now verify that we're not forgetting a type from another module.
+        //
+        // NOTE: We could do a proper resilience check instead of just asking
+        // if the modules differ, so that you can forget a @frozen type from a
+        // resilient module. But for now the proposal simply says that it has to
+        // be the same module, which is probably better for everyone.
+        auto *typeDecl = nominalType->getAnyNominal();
+        auto *fnModule = fn->getModuleContext();
+        auto *typeModule = typeDecl->getModuleContext();
+        if (fnModule != typeModule) {
+          ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_module,
+                             nominalType);
+          diagnosed = true;
+        } else {
+          assert(
+              !typeDecl->isResilient(fnModule, ResilienceExpansion::Maximal) &&
+              "trying to forget a type resilient to us!");
+        }
       }
     }
 

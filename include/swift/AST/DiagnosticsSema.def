@@ -4518,7 +4518,9 @@ ERROR(forget_wrong_context_nonconsuming,none,
       (DescriptiveDeclKind))
 ERROR(forget_wrong_not_self,none,
       "you can only forget 'self'", ())
-
+ERROR(forget_wrong_module,none,
+      "can only 'forget' from the same module defining type %0",
+      (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Patterns
