@@ -77,6 +77,10 @@ public:
   ResolvedCursorInfoPtr resolve(SourceLoc Loc);
   SourceManager &getSourceMgr() const;
 private:
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   bool walkToExprPre(Expr *E) override;
   bool walkToExprPost(Expr *E) override;
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
