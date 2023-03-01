@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only) | %FileCheck %s
 
+// REQUIRES: executable_test
+
 @_moveOnly
 struct Butt {
     var value: Int
