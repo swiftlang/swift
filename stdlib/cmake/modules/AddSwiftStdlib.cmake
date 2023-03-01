@@ -2772,7 +2772,7 @@ function(add_swift_target_executable name)
       # Swift compiles depend on swift modules, while links depend on
       # linked libraries.  Find targets for both of these here.
       set(swiftexe_module_dependency_targets)
-      set(swiftexe_link_libraries_targets ${SWIFTEXE_TARGET_LINK_LIBRARIES})
+      set(swiftexe_link_libraries_targets)
       foreach(mod ${swiftexe_module_depends_flattened})
         if(DEFINED maccatalyst_build_flavor)
           if(maccatalyst_build_flavor STREQUAL "zippered")
