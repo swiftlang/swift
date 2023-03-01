@@ -353,6 +353,8 @@ optimizeInst(SILInstruction *inst, SILOptFunctionBuilder &funcBuilder,
     // If the de-virtualized callee is a transparent function, inline it.
     SILInliner::inlineFullApply(fas, SILInliner::InlineKind::MandatoryInline,
                                 funcBuilder, deleter);
+    if (callee->hasOwnership() && !inst->getFunction()->hasOwnership())
+      invalidatedStackNesting = true;
     return true;
   }
   if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
