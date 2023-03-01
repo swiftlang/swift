@@ -5177,7 +5177,7 @@ void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
 }
 
 void PrintAST::visitForgetStmt(ForgetStmt *stmt) {
-  Printer << tok::kw_forget << " ";
+  Printer << "_forget" << " ";
   visit(stmt->getSubExpr());
 }
 
