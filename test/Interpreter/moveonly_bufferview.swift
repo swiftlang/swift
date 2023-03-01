@@ -31,7 +31,7 @@ extension Array {
 }
 
 func testBufferView(_ x: __owned [Int]) {
-    var y = _move x
+    var y = consume x
     // CHECK: 1
     // CHECK: 2
     // CHECK: 3
@@ -46,7 +46,7 @@ func testBufferView(_ x: __owned [Int]) {
 func getBool() -> Bool { return true }
 
 func testConditionalBufferView(_ x: __owned [Int]) {
-    (_move x).withUnsafeBufferPointer {
+    (consume x).withUnsafeBufferPointer {
         let y = BufferView(ptr: $0)
         // CHECK: 4
         // CHECK: 5

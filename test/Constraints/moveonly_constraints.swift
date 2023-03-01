@@ -101,7 +101,7 @@ func testBasic(_ mo: __shared MO) {
 func checkBasicBoxes() {
   let mo = MO()
 
-  let vb = ValBox(_move mo) // expected-error 2{{move-only type 'MO' cannot be used with generics yet}}
+  let vb = ValBox(consume mo) // expected-error 2{{move-only type 'MO' cannot be used with generics yet}}
   _ = vb.get()
   _ = vb.val
 
