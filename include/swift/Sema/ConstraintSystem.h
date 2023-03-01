@@ -2347,13 +2347,18 @@ public:
     expression.convertType = type;
   }
 
+  /// Whether this target is for an initialization expression and pattern.
+  bool isForInitialization() const {
+    return kind == Kind::expression &&
+           expression.contextualPurpose == CTP_Initialization;
+  }
+
   /// For a pattern initialization target, retrieve the pattern.
   Pattern *getInitializationPattern() const {
     if (kind == Kind::uninitializedVar)
       return uninitializedVar.declaration.get<Pattern *>();
 
-    assert(kind == Kind::expression);
-    assert(expression.contextualPurpose == CTP_Initialization);
+    assert(isForInitialization());
     return expression.pattern;
   }
 
@@ -2378,16 +2383,14 @@ public:
 
   /// Whether this is an initialization for an Optional.Some pattern.
   bool isOptionalSomePatternInit() const {
-    return kind == Kind::expression &&
-        expression.contextualPurpose == CTP_Initialization &&
-        dyn_cast_or_null<OptionalSomePattern>(expression.pattern) &&
-        !expression.pattern->isImplicit();
+    return isForInitialization() &&
+           dyn_cast_or_null<OptionalSomePattern>(expression.pattern) &&
+           !expression.pattern->isImplicit();
   }
 
   /// Check whether this is an initialization for `async let` pattern.
   bool isAsyncLetInitializer() const {
-    if (!(kind == Kind::expression &&
-          expression.contextualPurpose == CTP_Initialization))
+    if (!isForInitialization())
       return false;
 
     if (auto *PBD = getInitializationPatternBindingDecl())
@@ -2411,8 +2414,7 @@ public:
   /// first \c wrappedValue argument of an apply expression so the initializer
   /// expression can be turned into a property wrapper generator function.
   bool shouldInjectWrappedValuePlaceholder(ApplyExpr *apply) const {
-    if (kind != Kind::expression ||
-        expression.contextualPurpose != CTP_Initialization)
+    if (!isForInitialization())
       return false;
 
     auto *wrappedVar = expression.propertyWrapper.wrappedVar;
@@ -2439,20 +2441,17 @@ public:
   /// Retrieve the wrapped variable when initializing a pattern with a
   /// property wrapper.
   VarDecl *getInitializationWrappedVar() const {
-    assert(kind == Kind::expression);
-    assert(expression.contextualPurpose == CTP_Initialization);
+    assert(isForInitialization());
     return expression.propertyWrapper.wrappedVar;
   }
 
   PatternBindingDecl *getInitializationPatternBindingDecl() const {
-    assert(kind == Kind::expression);
-    assert(expression.contextualPurpose == CTP_Initialization);
+    assert(isForInitialization());
     return expression.initialization.patternBinding;
   }
 
   unsigned getInitializationPatternBindingIndex() const {
-    assert(kind == Kind::expression);
-    assert(expression.contextualPurpose == CTP_Initialization);
+    assert(isForInitialization());
     return expression.initialization.patternBindingIndex;
   }
 

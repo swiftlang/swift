@@ -1314,8 +1314,9 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // UnresolvedPatternExpr.  Transform this now to simplify later code.
   if (auto *UPE = dyn_cast<UnresolvedPatternExpr>(subExpr.get()))
     return makeParserResult(status, UPE->getSubPattern());
-  
-  return makeParserResult(status, new (Context) ExprPattern(subExpr.get()));
+
+  auto *EP = ExprPattern::createParsed(Context, subExpr.get());
+  return makeParserResult(status, EP);
 }
 
 ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
