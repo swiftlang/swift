@@ -5735,9 +5735,15 @@ bool ExtraneousArgumentsFailure::diagnoseAsNote() {
 
   auto *decl = overload->choice.getDecl();
   auto numArgs = getTotalNumArguments();
-  emitDiagnosticAt(decl, diag::candidate_with_extraneous_args, ContextualType,
-                   ContextualType->getNumParams(), numArgs, (numArgs == 1),
-                   isExpr<ClosureExpr>(getAnchor()));
+  if (isExpr<ClosureExpr>(getAnchor())) {
+    emitDiagnosticAt(decl, diag::candidate_with_extraneous_args_closure,
+                    ContextualType, ContextualType->getNumParams(), numArgs,
+                    (numArgs == 1));
+  } else {
+    emitDiagnosticAt(decl, diag::candidate_with_extraneous_args,
+                     decl->getInterfaceType(), numArgs, ContextualType,
+                     ContextualType->getNumParams());
+  }
   return true;
 }
 
