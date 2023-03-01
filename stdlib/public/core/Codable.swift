@@ -506,166 +506,70 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     _box = container
   }
 
-  /// The path of coding keys taken to get to this point in encoding.
   public var codingPath: [any CodingKey] {
     return _box.codingPath
   }
 
-  /// Encodes a null value for the given key.
-  ///
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if a null value is invalid in the
-  ///   current context for this format.
   public mutating func encodeNil(forKey key: Key) throws {
     try _box.encodeNil(forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: Bool, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: String, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: Double, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: Float, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: Int, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: Int8, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: Int16, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: Int32, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: Int64, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: UInt, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: UInt8, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: UInt16, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: UInt32, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode(_ value: UInt64, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encode<T: Encodable>(
     _ value: T,
     forKey key: Key
@@ -673,16 +577,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encode(value, forKey: key)
   }
 
-  /// Encodes a reference to the given object only if it is encoded
-  /// unconditionally elsewhere in the payload (previously, or in the future).
-  ///
-  /// For encoders which don't support this feature, the default implementation
-  /// encodes the given object unconditionally.
-  ///
-  /// - parameter object: The object to encode.
-  /// - parameter key: The key to associate the object with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeConditional<T: AnyObject & Encodable>(
     _ object: T,
     forKey key: Key
@@ -690,12 +584,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeConditional(object, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: Bool?,
     forKey key: Key
@@ -703,12 +591,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: String?,
     forKey key: Key
@@ -716,12 +598,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: Double?,
     forKey key: Key
@@ -729,12 +605,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: Float?,
     forKey key: Key
@@ -742,12 +612,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: Int?,
     forKey key: Key
@@ -755,12 +619,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: Int8?,
     forKey key: Key
@@ -768,12 +626,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: Int16?,
     forKey key: Key
@@ -781,12 +633,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: Int32?,
     forKey key: Key
@@ -794,12 +640,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: Int64?,
     forKey key: Key
@@ -807,12 +647,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: UInt?,
     forKey key: Key
@@ -820,12 +654,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: UInt8?,
     forKey key: Key
@@ -833,12 +661,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: UInt16?,
     forKey key: Key
@@ -846,12 +668,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: UInt32?,
     forKey key: Key
@@ -859,12 +675,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent(
     _ value: UInt64?,
     forKey key: Key
@@ -872,12 +682,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Encodes the given value for the given key if it is not `nil`.
-  ///
-  /// - parameter value: The value to encode.
-  /// - parameter key: The key to associate the value with.
-  /// - throws: `EncodingError.invalidValue` if the given value is invalid in
-  ///   the current context for this format.
   public mutating func encodeIfPresent<T: Encodable>(
     _ value: T?,
     forKey key: Key
@@ -885,11 +689,6 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     try _box.encodeIfPresent(value, forKey: key)
   }
 
-  /// Stores a keyed encoding container for the given key and returns it.
-  ///
-  /// - parameter keyType: The key type to use for the container.
-  /// - parameter key: The key to encode the container for.
-  /// - returns: A new keyed encoding container.
   public mutating func nestedContainer<NestedKey>(
     keyedBy keyType: NestedKey.Type,
     forKey key: Key
@@ -897,32 +696,16 @@ public struct KeyedEncodingContainer<K: CodingKey> :
     return _box.nestedContainer(keyedBy: NestedKey.self, forKey: key)
   }
 
-  /// Stores an unkeyed encoding container for the given key and returns it.
-  ///
-  /// - parameter key: The key to encode the container for.
-  /// - returns: A new unkeyed encoding container.
   public mutating func nestedUnkeyedContainer(
     forKey key: Key
   ) -> any UnkeyedEncodingContainer {
     return _box.nestedUnkeyedContainer(forKey: key)
   }
 
-  /// Stores a new nested container for the default `super` key and returns a
-  /// new encoder instance for encoding `super` into that container.
-  ///
-  /// Equivalent to calling `superEncoder(forKey:)` with
-  /// `Key(stringValue: "super", intValue: 0)`.
-  ///
-  /// - returns: A new encoder to pass to `super.encode(to:)`.
   public mutating func superEncoder() -> any Encoder {
     return _box.superEncoder()
   }
 
-  /// Stores a new nested container for the given key and returns a new encoder
-  /// instance for encoding `super` into that container.
-  ///
-  /// - parameter key: The key to encode `super` for.
-  /// - returns: A new encoder to pass to `super.encode(to:)`.
   public mutating func superEncoder(forKey key: Key) -> any Encoder {
     return _box.superEncoder(forKey: key)
   }
@@ -1469,279 +1252,78 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     _box = container
   }
 
-  /// The path of coding keys taken to get to this point in decoding.
   public var codingPath: [any CodingKey] {
     return _box.codingPath
   }
 
-  /// All the keys the decoder has for this container.
-  ///
-  /// Different keyed containers from the same decoder may return different
-  /// keys here, because it is possible to encode with multiple key types
-  /// which are not convertible to one another. This should report all keys
-  /// present which are convertible to the requested type.
   public var allKeys: [Key] {
     return _box.allKeys
   }
 
-  /// Returns a Boolean value indicating whether the decoder contains a value
-  /// associated with the given key.
-  ///
-  /// The value associated with the given key may be a null value as
-  /// appropriate for the data format.
-  ///
-  /// - parameter key: The key to search for.
-  /// - returns: Whether the `Decoder` has an entry for the given key.
   public func contains(_ key: Key) -> Bool {
     return _box.contains(key)
   }
 
-  /// Decodes a null value for the given key.
-  ///
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: Whether the encountered value was null.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
   public func decodeNil(forKey key: Key) throws -> Bool {
     return try _box.decodeNil(forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: Bool.Type, forKey key: Key) throws -> Bool {
     return try _box.decode(Bool.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: String.Type, forKey key: Key) throws -> String {
     return try _box.decode(String.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: Double.Type, forKey key: Key) throws -> Double {
     return try _box.decode(Double.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: Float.Type, forKey key: Key) throws -> Float {
     return try _box.decode(Float.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: Int.Type, forKey key: Key) throws -> Int {
     return try _box.decode(Int.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: Int8.Type, forKey key: Key) throws -> Int8 {
     return try _box.decode(Int8.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: Int16.Type, forKey key: Key) throws -> Int16 {
     return try _box.decode(Int16.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: Int32.Type, forKey key: Key) throws -> Int32 {
     return try _box.decode(Int32.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: Int64.Type, forKey key: Key) throws -> Int64 {
     return try _box.decode(Int64.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: UInt.Type, forKey key: Key) throws -> UInt {
     return try _box.decode(UInt.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: UInt8.Type, forKey key: Key) throws -> UInt8 {
     return try _box.decode(UInt8.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: UInt16.Type, forKey key: Key) throws -> UInt16 {
     return try _box.decode(UInt16.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: UInt32.Type, forKey key: Key) throws -> UInt32 {
     return try _box.decode(UInt32.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 {
     return try _box.decode(UInt64.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A value of the requested type, if present for the given key
-  ///   and convertible to the requested type.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func decode<T: Decodable>(
     _ type: T.Type,
     forKey key: Key
@@ -1749,19 +1331,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decode(T.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: Bool.Type,
     forKey key: Key
@@ -1769,19 +1338,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(Bool.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: String.Type,
     forKey key: Key
@@ -1789,19 +1345,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(String.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: Double.Type,
     forKey key: Key
@@ -1809,19 +1352,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(Double.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: Float.Type,
     forKey key: Key
@@ -1829,19 +1359,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(Float.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: Int.Type,
     forKey key: Key
@@ -1849,19 +1366,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(Int.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: Int8.Type,
     forKey key: Key
@@ -1869,19 +1373,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(Int8.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: Int16.Type,
     forKey key: Key
@@ -1889,19 +1380,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(Int16.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: Int32.Type,
     forKey key: Key
@@ -1909,19 +1387,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(Int32.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: Int64.Type,
     forKey key: Key
@@ -1929,19 +1394,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(Int64.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: UInt.Type,
     forKey key: Key
@@ -1949,19 +1401,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(UInt.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: UInt8.Type,
     forKey key: Key
@@ -1969,19 +1408,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(UInt8.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: UInt16.Type,
     forKey key: Key
@@ -1989,19 +1415,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(UInt16.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: UInt32.Type,
     forKey key: Key
@@ -2009,19 +1422,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(UInt32.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent(
     _ type: UInt64.Type,
     forKey key: Key
@@ -2029,19 +1429,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(UInt64.self, forKey: key)
   }
 
-  /// Decodes a value of the given type for the given key, if present.
-  ///
-  /// This method returns `nil` if the container does not have a value
-  /// associated with `key`, or if the value is null. The difference between
-  /// these states can be distinguished with a `contains(_:)` call.
-  ///
-  /// - parameter type: The type of value to decode.
-  /// - parameter key: The key that the decoded value is associated with.
-  /// - returns: A decoded value of the requested type, or `nil` if the
-  ///   `Decoder` does not have an entry associated with the given key, or if
-  ///   the value is a null value.
-  /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
-  ///   is not convertible to the requested type.
   public func decodeIfPresent<T: Decodable>(
     _ type: T.Type,
     forKey key: Key
@@ -2049,14 +1436,6 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.decodeIfPresent(T.self, forKey: key)
   }
 
-  /// Returns the data stored for the given key as represented in a container
-  /// keyed by the given key type.
-  ///
-  /// - parameter type: The key type to use for the container.
-  /// - parameter key: The key that the nested container is associated with.
-  /// - returns: A keyed decoding container view into `self`.
-  /// - throws: `DecodingError.typeMismatch` if the encountered stored value is
-  ///   not a keyed container.
   public func nestedContainer<NestedKey>(
     keyedBy type: NestedKey.Type,
     forKey key: Key
@@ -2064,42 +1443,16 @@ public struct KeyedDecodingContainer<K: CodingKey> :
     return try _box.nestedContainer(keyedBy: NestedKey.self, forKey: key)
   }
 
-  /// Returns the data stored for the given key as represented in an unkeyed
-  /// container.
-  ///
-  /// - parameter key: The key that the nested container is associated with.
-  /// - returns: An unkeyed decoding container view into `self`.
-  /// - throws: `DecodingError.typeMismatch` if the encountered stored value is
-  ///   not an unkeyed container.
   public func nestedUnkeyedContainer(
     forKey key: Key
   ) throws -> any UnkeyedDecodingContainer {
     return try _box.nestedUnkeyedContainer(forKey: key)
   }
 
-  /// Returns a `Decoder` instance for decoding `super` from the container
-  /// associated with the default `super` key.
-  ///
-  /// Equivalent to calling `superDecoder(forKey:)` with
-  /// `Key(stringValue: "super", intValue: 0)`.
-  ///
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the default `super` key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the default `super` key.
   public func superDecoder() throws -> any Decoder {
     return try _box.superDecoder()
   }
 
-  /// Returns a `Decoder` instance for decoding `super` from the container
-  /// associated with the given key.
-  ///
-  /// - parameter key: The key to decode `super` for.
-  /// - returns: A new `Decoder` to pass to `super.init(from:)`.
-  /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
-  ///   for the given key.
-  /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
-  ///   the given key.
   public func superDecoder(forKey key: Key) throws -> any Decoder {
     return try _box.superDecoder(forKey: key)
   }
