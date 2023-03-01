@@ -194,8 +194,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (typeDecl->isGeneric()) {
     genericSignature = typeDecl->getGenericSignature().getCanonicalSignature();
     // FIXME: Support generic requirements.
-    if (!genericSignature->getRequirements().empty())
-      return;
+    assert(genericSignature->getRequirements().empty());
     // FIXME: Can we make some better layout than opaque layout for generic
     // types.
   } else if (!typeDecl->isResilient()) {
