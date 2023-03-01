@@ -1,0 +1,3539 @@
+{
+  "ABIRoot": {
+    "kind": "Root",
+    "name": "TopLevel",
+    "printedName": "TopLevel",
+    "children": [
+      {
+        "kind": "Import",
+        "name": "Darwin",
+        "printedName": "Darwin",
+        "declKind": "Import",
+        "moduleName": "Distributed"
+      },
+      {
+        "kind": "Import",
+        "name": "_Concurrency",
+        "printedName": "_Concurrency",
+        "declKind": "Import",
+        "moduleName": "Distributed"
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "DistributedActor",
+        "printedName": "DistributedActor",
+        "children": [
+          {
+            "kind": "AssociatedType",
+            "name": "ActorSystem",
+            "printedName": "ActorSystem",
+            "declKind": "AssociatedType",
+            "usr": "s:11Distributed0A5ActorP0B6SystemQa",
+            "mangledName": "$s11Distributed0A5ActorP0B6SystemQa",
+            "moduleName": "Distributed",
+            "protocolReq": true
+          },
+          {
+            "kind": "AssociatedType",
+            "name": "SerializationRequirement",
+            "printedName": "SerializationRequirement",
+            "declKind": "AssociatedType",
+            "usr": "s:11Distributed0A5ActorP24SerializationRequirementQa",
+            "mangledName": "$s11Distributed0A5ActorP24SerializationRequirementQa",
+            "moduleName": "Distributed",
+            "protocolReq": true
+          },
+          {
+            "kind": "Var",
+            "name": "id",
+            "printedName": "id",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.ID"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed0A5ActorP2id2IDQzvp",
+            "mangledName": "$s11Distributed0A5ActorP2id2IDQzvp",
+            "moduleName": "Distributed",
+            "protocolReq": true,
+            "overriding": true,
+            "declAttributes": [
+              "Nonisolated",
+              "Override"
+            ],
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "DependentMember",
+                    "printedName": "Self.ID"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed0A5ActorP2id2IDQzvg",
+                "mangledName": "$s11Distributed0A5ActorP2id2IDQzvg",
+                "moduleName": "Distributed",
+                "genericSig": "<Self where Self : Distributed.DistributedActor>",
+                "protocolReq": true,
+                "overriding": true,
+                "declAttributes": [
+                  "Override"
+                ],
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "actorSystem",
+            "printedName": "actorSystem",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.ActorSystem"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed0A5ActorP11actorSystem0bD0Qzvp",
+            "mangledName": "$s11Distributed0A5ActorP11actorSystem0bD0Qzvp",
+            "moduleName": "Distributed",
+            "protocolReq": true,
+            "declAttributes": [
+              "Nonisolated"
+            ],
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "DependentMember",
+                    "printedName": "Self.ActorSystem"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed0A5ActorP11actorSystem0bD0Qzvg",
+                "mangledName": "$s11Distributed0A5ActorP11actorSystem0bD0Qzvg",
+                "moduleName": "Distributed",
+                "genericSig": "<Self where Self : Distributed.DistributedActor>",
+                "protocolReq": true,
+                "reqNewWitnessTableEntry": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Function",
+            "name": "resolve",
+            "printedName": "resolve(id:using:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Self"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.ID"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.ActorSystem"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A5ActorP7resolve2id5usingx2IDQz_0B6SystemQztKFZ",
+            "mangledName": "$s11Distributed0A5ActorP7resolve2id5usingx2IDQz_0B6SystemQztKFZ",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedActor>",
+            "static": true,
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "hash",
+            "printedName": "hash(into:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Hasher",
+                "printedName": "Swift.Hasher",
+                "paramValueOwnership": "InOut",
+                "usr": "s:s6HasherV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A5ActorPAAE4hash4intoys6HasherVz_tF",
+            "mangledName": "$s11Distributed0A5ActorPAAE4hash4intoys6HasherVz_tF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedActor>",
+            "declAttributes": [
+              "Nonisolated"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "==",
+            "printedName": "==(_:_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Self"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Self"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A5ActorPAAE2eeoiySbx_xtFZ",
+            "mangledName": "$s11Distributed0A5ActorPAAE2eeoiySbx_xtFZ",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedActor>",
+            "static": true,
+            "declAttributes": [
+              "Nonisolated"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(from:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Self"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Decoder",
+                "printedName": "Swift.Decoder",
+                "usr": "s:s7DecoderP"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:11Distributed0A5ActorPAASe2IDRpzrlE4fromxs7Decoder_p_tKcfc",
+            "mangledName": "$s11Distributed0A5ActorPAASe2IDRpzrlE4fromxs7Decoder_p_tKcfc",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedActor, Self.ID : Swift.Decodable>",
+            "declAttributes": [
+              "Nonisolated"
+            ],
+            "isFromExtension": true,
+            "throwing": true,
+            "init_kind": "Convenience"
+          },
+          {
+            "kind": "Function",
+            "name": "encode",
+            "printedName": "encode(to:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Encoder",
+                "printedName": "Swift.Encoder",
+                "usr": "s:s7EncoderP"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A5ActorPAASE2IDRpzrlE6encode2toys7Encoder_p_tKF",
+            "mangledName": "$s11Distributed0A5ActorPAASE2IDRpzrlE6encode2toys7Encoder_p_tKF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedActor, Self.ID : Swift.Encodable>",
+            "declAttributes": [
+              "Nonisolated"
+            ],
+            "isFromExtension": true,
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "whenLocal",
+            "printedName": "whenLocal(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "T?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "T"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(isolated Self) async throws -> T",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "T"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Paren",
+                    "printedName": "(isolated Self)",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "GenericTypeParam",
+                        "printedName": "Self"
+                      }
+                    ]
+                  }
+                ],
+                "typeAttributes": [
+                  "noescape"
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A5ActorPAAE9whenLocalyqd__Sgqd__xYiYaYbKXEYaKs8SendableRd__lF",
+            "mangledName": "$s11Distributed0A5ActorPAAE9whenLocalyqd__Sgqd__xYiYaYbKXEYaKs8SendableRd__lF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self, T where Self : Distributed.DistributedActor, T : Swift.Sendable>",
+            "declAttributes": [
+              "Rethrows",
+              "Nonisolated"
+            ],
+            "isFromExtension": true,
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Protocol",
+        "usr": "s:11Distributed0A5ActorP",
+        "mangledName": "$s11Distributed0A5ActorP",
+        "moduleName": "Distributed",
+        "genericSig": "<Self : Swift.Hashable, Self : Swift.Identifiable, Self : _Concurrency.AnyActor, Self.ActorSystem : Distributed.DistributedActorSystem, Self.ID == Self.ActorSystem.ActorID, Self.SerializationRequirement == Self.ActorSystem.SerializationRequirement>",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Hashable",
+            "printedName": "Hashable",
+            "usr": "s:SH",
+            "mangledName": "$sSH"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Identifiable",
+            "printedName": "Identifiable",
+            "usr": "s:s12IdentifiableP",
+            "mangledName": "$ss12IdentifiableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "AnyActor",
+            "printedName": "AnyActor",
+            "usr": "s:12_Concurrency8AnyActorP",
+            "mangledName": "$ss8AnyActorP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Equatable",
+            "printedName": "Equatable",
+            "usr": "s:SQ",
+            "mangledName": "$sSQ"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "DistributedActorSystem",
+        "printedName": "DistributedActorSystem",
+        "children": [
+          {
+            "kind": "AssociatedType",
+            "name": "ActorID",
+            "printedName": "ActorID",
+            "declKind": "AssociatedType",
+            "usr": "s:11Distributed0A11ActorSystemP0B2IDQa",
+            "mangledName": "$s11Distributed0A11ActorSystemP0B2IDQa",
+            "moduleName": "Distributed",
+            "protocolReq": true
+          },
+          {
+            "kind": "AssociatedType",
+            "name": "InvocationEncoder",
+            "printedName": "InvocationEncoder",
+            "declKind": "AssociatedType",
+            "usr": "s:11Distributed0A11ActorSystemP17InvocationEncoderQa",
+            "mangledName": "$s11Distributed0A11ActorSystemP17InvocationEncoderQa",
+            "moduleName": "Distributed",
+            "protocolReq": true
+          },
+          {
+            "kind": "AssociatedType",
+            "name": "InvocationDecoder",
+            "printedName": "InvocationDecoder",
+            "declKind": "AssociatedType",
+            "usr": "s:11Distributed0A11ActorSystemP17InvocationDecoderQa",
+            "mangledName": "$s11Distributed0A11ActorSystemP17InvocationDecoderQa",
+            "moduleName": "Distributed",
+            "protocolReq": true
+          },
+          {
+            "kind": "AssociatedType",
+            "name": "ResultHandler",
+            "printedName": "ResultHandler",
+            "declKind": "AssociatedType",
+            "usr": "s:11Distributed0A11ActorSystemP13ResultHandlerQa",
+            "mangledName": "$s11Distributed0A11ActorSystemP13ResultHandlerQa",
+            "moduleName": "Distributed",
+            "protocolReq": true
+          },
+          {
+            "kind": "AssociatedType",
+            "name": "SerializationRequirement",
+            "printedName": "SerializationRequirement",
+            "declKind": "AssociatedType",
+            "usr": "s:11Distributed0A11ActorSystemP24SerializationRequirementQa",
+            "mangledName": "$s11Distributed0A11ActorSystemP24SerializationRequirementQa",
+            "moduleName": "Distributed",
+            "protocolReq": true
+          },
+          {
+            "kind": "Function",
+            "name": "resolve",
+            "printedName": "resolve(id:as:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Act?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Act"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.ActorID"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "Act.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Act"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A11ActorSystemP7resolve2id2asqd__Sg0B2IDQz_qd__mtKAA0aB0Rd__0G0Qyd__AIRSlF",
+            "mangledName": "$s11Distributed0A11ActorSystemP7resolve2id2asqd__Sg0B2IDQz_qd__mtKAA0aB0Rd__0G0Qyd__AIRSlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self, Act where Self : Distributed.DistributedActorSystem, Act : Distributed.DistributedActor, Self.ActorID == Act.ID>",
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "assignID",
+            "printedName": "assignID(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.ActorID"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "Act.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Act"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A11ActorSystemP8assignIDy0bE0Qzqd__mAA0aB0Rd__0E0Qyd__AFRSlF",
+            "mangledName": "$s11Distributed0A11ActorSystemP8assignIDy0bE0Qzqd__mAA0aB0Rd__0E0Qyd__AFRSlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self, Act where Self : Distributed.DistributedActorSystem, Act : Distributed.DistributedActor, Self.ActorID == Act.ID>",
+            "protocolReq": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "actorReady",
+            "printedName": "actorReady(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Act"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A11ActorSystemP10actorReadyyyqd__AA0aB0Rd__2IDQyd__0bF0RtzlF",
+            "mangledName": "$s11Distributed0A11ActorSystemP10actorReadyyyqd__AA0aB0Rd__2IDQyd__0bF0RtzlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self, Act where Self : Distributed.DistributedActorSystem, Act : Distributed.DistributedActor, Self.ActorID == Act.ID>",
+            "protocolReq": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "resignID",
+            "printedName": "resignID(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.ActorID"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A11ActorSystemP8resignIDyy0bE0QzF",
+            "mangledName": "$s11Distributed0A11ActorSystemP8resignIDyy0bE0QzF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedActorSystem>",
+            "protocolReq": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "makeInvocationEncoder",
+            "printedName": "makeInvocationEncoder()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.InvocationEncoder"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A11ActorSystemP21makeInvocationEncoder0eF0QzyF",
+            "mangledName": "$s11Distributed0A11ActorSystemP21makeInvocationEncoder0eF0QzyF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedActorSystem>",
+            "protocolReq": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "invokeHandlerOnReturn",
+            "printedName": "invokeHandlerOnReturn(handler:resultBuffer:metatype:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.ResultHandler"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "UnsafeRawPointer",
+                "printedName": "Swift.UnsafeRawPointer",
+                "usr": "s:SV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ExistentialMetatype",
+                "printedName": "Any.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ProtocolComposition",
+                    "printedName": "Any"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A11ActorSystemP21invokeHandlerOnReturn7handler12resultBuffer8metatypey06ResultE0Qz_SVypXptYaKF",
+            "mangledName": "$s11Distributed0A11ActorSystemP21invokeHandlerOnReturn7handler12resultBuffer8metatypey06ResultE0Qz_SVypXptYaKF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedActorSystem>",
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "executeDistributedTarget",
+            "printedName": "executeDistributedTarget(on:target:invocationDecoder:handler:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Act"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "RemoteCallTarget",
+                "printedName": "Distributed.RemoteCallTarget",
+                "usr": "s:11Distributed16RemoteCallTargetV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.InvocationDecoder",
+                "paramValueOwnership": "InOut"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "DependentMember",
+                "printedName": "Self.ResultHandler"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A11ActorSystemPAAE07executeA6Target2on6target17invocationDecoder7handleryqd___AA010RemoteCallE0V010InvocationI0Qzz13ResultHandlerQztYaKAA0aB0Rd__lF",
+            "mangledName": "$s11Distributed0A11ActorSystemPAAE07executeA6Target2on6target17invocationDecoder7handleryqd___AA010RemoteCallE0V010InvocationI0Qzz13ResultHandlerQztYaKAA0aB0Rd__lF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self, Act where Self : Distributed.DistributedActorSystem, Act : Distributed.DistributedActor>",
+            "isFromExtension": true,
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Protocol",
+        "usr": "s:11Distributed0A11ActorSystemP",
+        "mangledName": "$s11Distributed0A11ActorSystemP",
+        "moduleName": "Distributed",
+        "genericSig": "<Self : Swift.Sendable, Self.ActorID : Swift.Hashable, Self.ActorID : Swift.Sendable, Self.InvocationDecoder : Distributed.DistributedTargetInvocationDecoder, Self.InvocationEncoder : Distributed.DistributedTargetInvocationEncoder, Self.ResultHandler : Distributed.DistributedTargetInvocationResultHandler, Self.SerializationRequirement == Self.InvocationDecoder.SerializationRequirement, Self.InvocationDecoder.SerializationRequirement == Self.InvocationEncoder.SerializationRequirement, Self.InvocationEncoder.SerializationRequirement == Self.ResultHandler.SerializationRequirement>",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "RemoteCallTarget",
+        "printedName": "RemoteCallTarget",
+        "children": [
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "RemoteCallTarget",
+                "printedName": "Distributed.RemoteCallTarget",
+                "usr": "s:11Distributed16RemoteCallTargetV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:11Distributed16RemoteCallTargetVyACSScfc",
+            "mangledName": "$s11Distributed16RemoteCallTargetVyACSScfc",
+            "moduleName": "Distributed",
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Var",
+            "name": "identifier",
+            "printedName": "identifier",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed16RemoteCallTargetV10identifierSSvp",
+            "mangledName": "$s11Distributed16RemoteCallTargetV10identifierSSvp",
+            "moduleName": "Distributed",
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed16RemoteCallTargetV10identifierSSvg",
+                "mangledName": "$s11Distributed16RemoteCallTargetV10identifierSSvg",
+                "moduleName": "Distributed",
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "description",
+            "printedName": "description",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed16RemoteCallTargetV11descriptionSSvp",
+            "mangledName": "$s11Distributed16RemoteCallTargetV11descriptionSSvp",
+            "moduleName": "Distributed",
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed16RemoteCallTargetV11descriptionSSvg",
+                "mangledName": "$s11Distributed16RemoteCallTargetV11descriptionSSvg",
+                "moduleName": "Distributed",
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Function",
+            "name": "hash",
+            "printedName": "hash(into:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Hasher",
+                "printedName": "Swift.Hasher",
+                "paramValueOwnership": "InOut",
+                "usr": "s:s6HasherV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed16RemoteCallTargetV4hash4intoys6HasherVz_tF",
+            "mangledName": "$s11Distributed16RemoteCallTargetV4hash4intoys6HasherVz_tF",
+            "moduleName": "Distributed",
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "==",
+            "printedName": "==(_:_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "RemoteCallTarget",
+                "printedName": "Distributed.RemoteCallTarget",
+                "usr": "s:11Distributed16RemoteCallTargetV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "RemoteCallTarget",
+                "printedName": "Distributed.RemoteCallTarget",
+                "usr": "s:11Distributed16RemoteCallTargetV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed16RemoteCallTargetV2eeoiySbAC_ACtFZ",
+            "mangledName": "$s11Distributed16RemoteCallTargetV2eeoiySbAC_ACtFZ",
+            "moduleName": "Distributed",
+            "static": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Var",
+            "name": "hashValue",
+            "printedName": "hashValue",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Int",
+                "printedName": "Swift.Int",
+                "usr": "s:Si"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed16RemoteCallTargetV9hashValueSivp",
+            "mangledName": "$s11Distributed16RemoteCallTargetV9hashValueSivp",
+            "moduleName": "Distributed",
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Int",
+                    "printedName": "Swift.Int",
+                    "usr": "s:Si"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed16RemoteCallTargetV9hashValueSivg",
+                "mangledName": "$s11Distributed16RemoteCallTargetV9hashValueSivg",
+                "moduleName": "Distributed",
+                "accessorKind": "get"
+              }
+            ]
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:11Distributed16RemoteCallTargetV",
+        "mangledName": "$s11Distributed16RemoteCallTargetV",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "CustomStringConvertible",
+            "printedName": "CustomStringConvertible",
+            "usr": "s:s23CustomStringConvertibleP",
+            "mangledName": "$ss23CustomStringConvertibleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Hashable",
+            "printedName": "Hashable",
+            "usr": "s:SH",
+            "mangledName": "$sSH"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Equatable",
+            "printedName": "Equatable",
+            "usr": "s:SQ",
+            "mangledName": "$sSQ"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "DistributedTargetInvocationEncoder",
+        "printedName": "DistributedTargetInvocationEncoder",
+        "children": [
+          {
+            "kind": "AssociatedType",
+            "name": "SerializationRequirement",
+            "printedName": "SerializationRequirement",
+            "declKind": "AssociatedType",
+            "usr": "s:11Distributed0A23TargetInvocationEncoderP24SerializationRequirementQa",
+            "mangledName": "$s11Distributed0A23TargetInvocationEncoderP24SerializationRequirementQa",
+            "moduleName": "Distributed",
+            "protocolReq": true
+          },
+          {
+            "kind": "Function",
+            "name": "recordGenericSubstitution",
+            "printedName": "recordGenericSubstitution(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "T.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "T"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A23TargetInvocationEncoderP25recordGenericSubstitutionyyqd__mKlF",
+            "mangledName": "$s11Distributed0A23TargetInvocationEncoderP25recordGenericSubstitutionyyqd__mKlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self, T where Self : Distributed.DistributedTargetInvocationEncoder>",
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "Mutating"
+          },
+          {
+            "kind": "Function",
+            "name": "recordErrorType",
+            "printedName": "recordErrorType(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "E.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "E"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A23TargetInvocationEncoderP15recordErrorTypeyyqd__mKs0F0Rd__lF",
+            "mangledName": "$s11Distributed0A23TargetInvocationEncoderP15recordErrorTypeyyqd__mKs0F0Rd__lF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self, E where Self : Distributed.DistributedTargetInvocationEncoder, E : Swift.Error>",
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "Mutating"
+          },
+          {
+            "kind": "Function",
+            "name": "doneRecording",
+            "printedName": "doneRecording()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A23TargetInvocationEncoderP13doneRecordingyyKF",
+            "mangledName": "$s11Distributed0A23TargetInvocationEncoderP13doneRecordingyyKF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedTargetInvocationEncoder>",
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "Mutating"
+          }
+        ],
+        "declKind": "Protocol",
+        "usr": "s:11Distributed0A23TargetInvocationEncoderP",
+        "mangledName": "$s11Distributed0A23TargetInvocationEncoderP",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "RemoteCallArgument",
+        "printedName": "RemoteCallArgument",
+        "children": [
+          {
+            "kind": "Var",
+            "name": "label",
+            "printedName": "label",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed18RemoteCallArgumentV5labelSSSgvp",
+            "mangledName": "$s11Distributed18RemoteCallArgumentV5labelSSSgvp",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "HasStorage"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Optional",
+                    "printedName": "Swift.String?",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "String",
+                        "printedName": "Swift.String",
+                        "usr": "s:SS"
+                      }
+                    ],
+                    "usr": "s:Sq"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed18RemoteCallArgumentV5labelSSSgvg",
+                "mangledName": "$s11Distributed18RemoteCallArgumentV5labelSSSgvg",
+                "moduleName": "Distributed",
+                "genericSig": "<Value>",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "effectiveLabel",
+            "printedName": "effectiveLabel",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed18RemoteCallArgumentV14effectiveLabelSSvp",
+            "mangledName": "$s11Distributed18RemoteCallArgumentV14effectiveLabelSSvp",
+            "moduleName": "Distributed",
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed18RemoteCallArgumentV14effectiveLabelSSvg",
+                "mangledName": "$s11Distributed18RemoteCallArgumentV14effectiveLabelSSvg",
+                "moduleName": "Distributed",
+                "genericSig": "<Value>",
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "name",
+            "printedName": "name",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed18RemoteCallArgumentV4nameSSvp",
+            "mangledName": "$s11Distributed18RemoteCallArgumentV4nameSSvp",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "HasStorage"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed18RemoteCallArgumentV4nameSSvg",
+                "mangledName": "$s11Distributed18RemoteCallArgumentV4nameSSvg",
+                "moduleName": "Distributed",
+                "genericSig": "<Value>",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "value",
+            "printedName": "value",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Value"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed18RemoteCallArgumentV5valuexvp",
+            "mangledName": "$s11Distributed18RemoteCallArgumentV5valuexvp",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "HasStorage"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Value"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed18RemoteCallArgumentV5valuexvg",
+                "mangledName": "$s11Distributed18RemoteCallArgumentV5valuexvg",
+                "moduleName": "Distributed",
+                "genericSig": "<Value>",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(label:name:value:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "RemoteCallArgument",
+                "printedName": "Distributed.RemoteCallArgument<Value>",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Value"
+                  }
+                ],
+                "usr": "s:11Distributed18RemoteCallArgumentV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Value"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:11Distributed18RemoteCallArgumentV5label4name5valueACyxGSSSg_SSxtcfc",
+            "mangledName": "$s11Distributed18RemoteCallArgumentV5label4name5valueACyxGSSSg_SSxtcfc",
+            "moduleName": "Distributed",
+            "genericSig": "<Value>",
+            "init_kind": "Designated"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:11Distributed18RemoteCallArgumentV",
+        "mangledName": "$s11Distributed18RemoteCallArgumentV",
+        "moduleName": "Distributed",
+        "genericSig": "<Value>",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "DistributedTargetInvocationDecoder",
+        "printedName": "DistributedTargetInvocationDecoder",
+        "children": [
+          {
+            "kind": "AssociatedType",
+            "name": "SerializationRequirement",
+            "printedName": "SerializationRequirement",
+            "declKind": "AssociatedType",
+            "usr": "s:11Distributed0A23TargetInvocationDecoderP24SerializationRequirementQa",
+            "mangledName": "$s11Distributed0A23TargetInvocationDecoderP24SerializationRequirementQa",
+            "moduleName": "Distributed",
+            "protocolReq": true
+          },
+          {
+            "kind": "Function",
+            "name": "decodeGenericSubstitutions",
+            "printedName": "decodeGenericSubstitutions()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Array",
+                "printedName": "[Any.Type]",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ExistentialMetatype",
+                    "printedName": "Any.Type",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "ProtocolComposition",
+                        "printedName": "Any"
+                      }
+                    ]
+                  }
+                ],
+                "usr": "s:Sa"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A23TargetInvocationDecoderP26decodeGenericSubstitutionsSayypXpGyKF",
+            "mangledName": "$s11Distributed0A23TargetInvocationDecoderP26decodeGenericSubstitutionsSayypXpGyKF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedTargetInvocationDecoder>",
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "Mutating"
+          },
+          {
+            "kind": "Function",
+            "name": "decodeErrorType",
+            "printedName": "decodeErrorType()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Any.Type?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ExistentialMetatype",
+                    "printedName": "Any.Type",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "ProtocolComposition",
+                        "printedName": "Any"
+                      }
+                    ]
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A23TargetInvocationDecoderP15decodeErrorTypeypXpSgyKF",
+            "mangledName": "$s11Distributed0A23TargetInvocationDecoderP15decodeErrorTypeypXpSgyKF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedTargetInvocationDecoder>",
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "Mutating"
+          },
+          {
+            "kind": "Function",
+            "name": "decodeReturnType",
+            "printedName": "decodeReturnType()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Any.Type?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ExistentialMetatype",
+                    "printedName": "Any.Type",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "ProtocolComposition",
+                        "printedName": "Any"
+                      }
+                    ]
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A23TargetInvocationDecoderP16decodeReturnTypeypXpSgyKF",
+            "mangledName": "$s11Distributed0A23TargetInvocationDecoderP16decodeReturnTypeypXpSgyKF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedTargetInvocationDecoder>",
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "Mutating"
+          }
+        ],
+        "declKind": "Protocol",
+        "usr": "s:11Distributed0A23TargetInvocationDecoderP",
+        "mangledName": "$s11Distributed0A23TargetInvocationDecoderP",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "DistributedTargetInvocationResultHandler",
+        "printedName": "DistributedTargetInvocationResultHandler",
+        "children": [
+          {
+            "kind": "AssociatedType",
+            "name": "SerializationRequirement",
+            "printedName": "SerializationRequirement",
+            "declKind": "AssociatedType",
+            "usr": "s:11Distributed0A29TargetInvocationResultHandlerP24SerializationRequirementQa",
+            "mangledName": "$s11Distributed0A29TargetInvocationResultHandlerP24SerializationRequirementQa",
+            "moduleName": "Distributed",
+            "protocolReq": true
+          },
+          {
+            "kind": "Function",
+            "name": "onReturnVoid",
+            "printedName": "onReturnVoid()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A29TargetInvocationResultHandlerP12onReturnVoidyyYaKF",
+            "mangledName": "$s11Distributed0A29TargetInvocationResultHandlerP12onReturnVoidyyYaKF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self where Self : Distributed.DistributedTargetInvocationResultHandler>",
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "onThrow",
+            "printedName": "onThrow(error:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Err"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A29TargetInvocationResultHandlerP7onThrow5erroryqd___tYaKs5ErrorRd__lF",
+            "mangledName": "$s11Distributed0A29TargetInvocationResultHandlerP7onThrow5erroryqd___tYaKs5ErrorRd__lF",
+            "moduleName": "Distributed",
+            "genericSig": "<Self, Err where Self : Distributed.DistributedTargetInvocationResultHandler, Err : Swift.Error>",
+            "protocolReq": true,
+            "throwing": true,
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Protocol",
+        "usr": "s:11Distributed0A29TargetInvocationResultHandlerP",
+        "mangledName": "$s11Distributed0A29TargetInvocationResultHandlerP",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "DistributedActorSystemError",
+        "printedName": "DistributedActorSystemError",
+        "declKind": "Protocol",
+        "usr": "s:11Distributed0A16ActorSystemErrorP",
+        "mangledName": "$s11Distributed0A16ActorSystemErrorP",
+        "moduleName": "Distributed",
+        "genericSig": "<Self : Swift.Error>",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Error",
+            "printedName": "Error",
+            "usr": "s:s5ErrorP",
+            "mangledName": "$ss5ErrorP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "ExecuteDistributedTargetError",
+        "printedName": "ExecuteDistributedTargetError",
+        "children": [
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(message:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "ExecuteDistributedTargetError",
+                "printedName": "Distributed.ExecuteDistributedTargetError",
+                "usr": "s:11Distributed07ExecuteA11TargetErrorV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:11Distributed07ExecuteA11TargetErrorV7messageACSS_tcfc",
+            "mangledName": "$s11Distributed07ExecuteA11TargetErrorV7messageACSS_tcfc",
+            "moduleName": "Distributed",
+            "init_kind": "Designated"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:11Distributed07ExecuteA11TargetErrorV",
+        "mangledName": "$s11Distributed07ExecuteA11TargetErrorV",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "DistributedActorSystemError",
+            "printedName": "DistributedActorSystemError",
+            "usr": "s:11Distributed0A16ActorSystemErrorP",
+            "mangledName": "$s11Distributed0A16ActorSystemErrorP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Error",
+            "printedName": "Error",
+            "usr": "s:s5ErrorP",
+            "mangledName": "$ss5ErrorP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "DistributedActorCodingError",
+        "printedName": "DistributedActorCodingError",
+        "children": [
+          {
+            "kind": "Var",
+            "name": "message",
+            "printedName": "message",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed0A16ActorCodingErrorV7messageSSvp",
+            "mangledName": "$s11Distributed0A16ActorCodingErrorV7messageSSvp",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "HasStorage"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed0A16ActorCodingErrorV7messageSSvg",
+                "mangledName": "$s11Distributed0A16ActorCodingErrorV7messageSSvg",
+                "moduleName": "Distributed",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(message:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "DistributedActorCodingError",
+                "printedName": "Distributed.DistributedActorCodingError",
+                "usr": "s:11Distributed0A16ActorCodingErrorV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:11Distributed0A16ActorCodingErrorV7messageACSS_tcfc",
+            "mangledName": "$s11Distributed0A16ActorCodingErrorV7messageACSS_tcfc",
+            "moduleName": "Distributed",
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "missingActorSystemUserInfo",
+            "printedName": "missingActorSystemUserInfo(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "DistributedActorCodingError",
+                "printedName": "Distributed.DistributedActorCodingError",
+                "usr": "s:11Distributed0A16ActorCodingErrorV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "Act.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Act"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed0A16ActorCodingErrorV07missingB14SystemUserInfoyACxmAA0aB0RzlFZ",
+            "mangledName": "$s11Distributed0A16ActorCodingErrorV07missingB14SystemUserInfoyACxmAA0aB0RzlFZ",
+            "moduleName": "Distributed",
+            "genericSig": "<Act where Act : Distributed.DistributedActor>",
+            "static": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:11Distributed0A16ActorCodingErrorV",
+        "mangledName": "$s11Distributed0A16ActorCodingErrorV",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "DistributedActorSystemError",
+            "printedName": "DistributedActorSystemError",
+            "usr": "s:11Distributed0A16ActorSystemErrorP",
+            "mangledName": "$s11Distributed0A16ActorSystemErrorP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Error",
+            "printedName": "Error",
+            "usr": "s:s5ErrorP",
+            "mangledName": "$ss5ErrorP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "LocalTestingDistributedActorSystem",
+        "printedName": "LocalTestingDistributedActorSystem",
+        "children": [
+          {
+            "kind": "TypeAlias",
+            "name": "ActorID",
+            "printedName": "ActorID",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingActorID",
+                "printedName": "Distributed.LocalTestingActorID",
+                "usr": "s:11Distributed19LocalTestingActorIDV"
+              }
+            ],
+            "declKind": "TypeAlias",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC0D2IDa",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC0D2IDa",
+            "moduleName": "Distributed"
+          },
+          {
+            "kind": "TypeAlias",
+            "name": "ResultHandler",
+            "printedName": "ResultHandler",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingInvocationResultHandler",
+                "printedName": "Distributed.LocalTestingInvocationResultHandler",
+                "usr": "s:11Distributed35LocalTestingInvocationResultHandlerV"
+              }
+            ],
+            "declKind": "TypeAlias",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC13ResultHandlera",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC13ResultHandlera",
+            "moduleName": "Distributed"
+          },
+          {
+            "kind": "TypeAlias",
+            "name": "InvocationEncoder",
+            "printedName": "InvocationEncoder",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingInvocationEncoder",
+                "printedName": "Distributed.LocalTestingInvocationEncoder",
+                "usr": "s:11Distributed29LocalTestingInvocationEncoderV"
+              }
+            ],
+            "declKind": "TypeAlias",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC17InvocationEncodera",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC17InvocationEncodera",
+            "moduleName": "Distributed"
+          },
+          {
+            "kind": "TypeAlias",
+            "name": "InvocationDecoder",
+            "printedName": "InvocationDecoder",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingInvocationDecoder",
+                "printedName": "Distributed.LocalTestingInvocationDecoder",
+                "usr": "s:11Distributed29LocalTestingInvocationDecoderC"
+              }
+            ],
+            "declKind": "TypeAlias",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC17InvocationDecodera",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC17InvocationDecodera",
+            "moduleName": "Distributed"
+          },
+          {
+            "kind": "TypeAlias",
+            "name": "SerializationRequirement",
+            "printedName": "SerializationRequirement",
+            "children": [
+              {
+                "kind": "TypeNameAlias",
+                "name": "Codable",
+                "printedName": "Swift.Codable",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ProtocolComposition",
+                    "printedName": "Swift.Decodable & Swift.Encodable"
+                  }
+                ]
+              }
+            ],
+            "declKind": "TypeAlias",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC24SerializationRequirementa",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC24SerializationRequirementa",
+            "moduleName": "Distributed"
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingDistributedActorSystem",
+                "printedName": "Distributed.LocalTestingDistributedActorSystem",
+                "usr": "s:11Distributed012LocalTestingA11ActorSystemC"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemCACycfc",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemCACycfc",
+            "moduleName": "Distributed",
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "resolve",
+            "printedName": "resolve(id:as:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Act?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Act"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNameAlias",
+                "name": "ActorID",
+                "printedName": "Distributed.LocalTestingDistributedActorSystem.ActorID",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "LocalTestingActorID",
+                    "printedName": "Distributed.LocalTestingActorID",
+                    "usr": "s:11Distributed19LocalTestingActorIDV"
+                  }
+                ]
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "Act.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Act"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC7resolve2id2asxSgAA0bcD2IDV_xmtKAA0aD0RzlF",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC7resolve2id2asxSgAA0bcD2IDV_xmtKAA0aD0RzlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Act where Act : Distributed.DistributedActor>",
+            "declAttributes": [
+              "Final"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "assignID",
+            "printedName": "assignID(_:)",
+            "children": [
+              {
+                "kind": "TypeNameAlias",
+                "name": "ActorID",
+                "printedName": "Distributed.LocalTestingDistributedActorSystem.ActorID",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "LocalTestingActorID",
+                    "printedName": "Distributed.LocalTestingActorID",
+                    "usr": "s:11Distributed19LocalTestingActorIDV"
+                  }
+                ]
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "Act.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Act"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC8assignIDyAA0bcdG0VxmAA0aD0RzlF",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC8assignIDyAA0bcdG0VxmAA0aD0RzlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Act where Act : Distributed.DistributedActor>",
+            "declAttributes": [
+              "Final"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "actorReady",
+            "printedName": "actorReady(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Act"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC10actorReadyyyxAA0aD0RzAA0bcD2IDV0H0RtzlF",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC10actorReadyyyxAA0aD0RzAA0bcD2IDV0H0RtzlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Act where Act : Distributed.DistributedActor, Act.ID == Distributed.LocalTestingActorID>",
+            "declAttributes": [
+              "Final"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "resignID",
+            "printedName": "resignID(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNameAlias",
+                "name": "ActorID",
+                "printedName": "Distributed.LocalTestingDistributedActorSystem.ActorID",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "LocalTestingActorID",
+                    "printedName": "Distributed.LocalTestingActorID",
+                    "usr": "s:11Distributed19LocalTestingActorIDV"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC8resignIDyyAA0bcdG0VF",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC8resignIDyyAA0bcdG0VF",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "Final"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "makeInvocationEncoder",
+            "printedName": "makeInvocationEncoder()",
+            "children": [
+              {
+                "kind": "TypeNameAlias",
+                "name": "InvocationEncoder",
+                "printedName": "Distributed.LocalTestingDistributedActorSystem.InvocationEncoder",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "LocalTestingInvocationEncoder",
+                    "printedName": "Distributed.LocalTestingInvocationEncoder",
+                    "usr": "s:11Distributed29LocalTestingInvocationEncoderV"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC21makeInvocationEncoderAA0bcgH0VyF",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC21makeInvocationEncoderAA0bcgH0VyF",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "Final"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "remoteCall",
+            "printedName": "remoteCall(on:target:invocation:throwing:returning:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Res"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Act"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "RemoteCallTarget",
+                "printedName": "Distributed.RemoteCallTarget",
+                "usr": "s:11Distributed16RemoteCallTargetV"
+              },
+              {
+                "kind": "TypeNameAlias",
+                "name": "InvocationEncoder",
+                "printedName": "Distributed.LocalTestingDistributedActorSystem.InvocationEncoder",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "LocalTestingInvocationEncoder",
+                    "printedName": "Distributed.LocalTestingInvocationEncoder",
+                    "usr": "s:11Distributed29LocalTestingInvocationEncoderV"
+                  }
+                ],
+                "paramValueOwnership": "InOut"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "Err.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Err"
+                  }
+                ]
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "Res.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Res"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC10remoteCall2on6target10invocation8throwing9returningq0_x_AA06RemoteG6TargetVAA0bC17InvocationEncoderVzq_mq0_mtYaKAA0aD0Rzs5ErrorR_SeR0_SER0_AA0bcD2IDV0R0Rtzr1_lF",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC10remoteCall2on6target10invocation8throwing9returningq0_x_AA06RemoteG6TargetVAA0bC17InvocationEncoderVzq_mq0_mtYaKAA0aD0Rzs5ErrorR_SeR0_SER0_AA0bcD2IDV0R0Rtzr1_lF",
+            "moduleName": "Distributed",
+            "genericSig": "<Act, Err, Res where Act : Distributed.DistributedActor, Err : Swift.Error, Res : Swift.Decodable, Res : Swift.Encodable, Act.ID == Distributed.LocalTestingActorID>",
+            "declAttributes": [
+              "Final"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "remoteCallVoid",
+            "printedName": "remoteCallVoid(on:target:invocation:throwing:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Act"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "RemoteCallTarget",
+                "printedName": "Distributed.RemoteCallTarget",
+                "usr": "s:11Distributed16RemoteCallTargetV"
+              },
+              {
+                "kind": "TypeNameAlias",
+                "name": "InvocationEncoder",
+                "printedName": "Distributed.LocalTestingDistributedActorSystem.InvocationEncoder",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "LocalTestingInvocationEncoder",
+                    "printedName": "Distributed.LocalTestingInvocationEncoder",
+                    "usr": "s:11Distributed29LocalTestingInvocationEncoderV"
+                  }
+                ],
+                "paramValueOwnership": "InOut"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "Err.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Err"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC14remoteCallVoid2on6target10invocation8throwingyx_AA06RemoteG6TargetVAA0bC17InvocationEncoderVzq_mtYaKAA0aD0Rzs5ErrorR_AA0bcD2IDV0R0Rtzr0_lF",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC14remoteCallVoid2on6target10invocation8throwingyx_AA06RemoteG6TargetVAA0bC17InvocationEncoderVzq_mtYaKAA0aD0Rzs5ErrorR_AA0bcD2IDV0R0Rtzr0_lF",
+            "moduleName": "Distributed",
+            "genericSig": "<Act, Err where Act : Distributed.DistributedActor, Err : Swift.Error, Act.ID == Distributed.LocalTestingActorID>",
+            "declAttributes": [
+              "Final"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "invokeHandlerOnReturn",
+            "printedName": "invokeHandlerOnReturn(handler:resultBuffer:metatype:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingInvocationResultHandler",
+                "printedName": "Distributed.LocalTestingInvocationResultHandler",
+                "usr": "s:11Distributed35LocalTestingInvocationResultHandlerV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "UnsafeRawPointer",
+                "printedName": "Swift.UnsafeRawPointer",
+                "usr": "s:SV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ExistentialMetatype",
+                "printedName": "Any.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ProtocolComposition",
+                    "printedName": "Any"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed012LocalTestingA11ActorSystemC21invokeHandlerOnReturn7handler12resultBuffer8metatypeyAA0bc16InvocationResultG0V_SVypXptYaKF",
+            "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC21invokeHandlerOnReturn7handler12resultBuffer8metatypeyAA0bc16InvocationResultG0V_SVypXptYaKF",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "Final"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Class",
+        "usr": "s:11Distributed012LocalTestingA11ActorSystemC",
+        "mangledName": "$s11Distributed012LocalTestingA11ActorSystemC",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Final",
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "DistributedActorSystem",
+            "printedName": "DistributedActorSystem",
+            "children": [
+              {
+                "kind": "TypeWitness",
+                "name": "ActorID",
+                "printedName": "ActorID",
+                "children": [
+                  {
+                    "kind": "TypeNameAlias",
+                    "name": "ActorID",
+                    "printedName": "Distributed.LocalTestingDistributedActorSystem.ActorID",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "LocalTestingActorID",
+                        "printedName": "Distributed.LocalTestingActorID",
+                        "usr": "s:11Distributed19LocalTestingActorIDV"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "TypeWitness",
+                "name": "InvocationEncoder",
+                "printedName": "InvocationEncoder",
+                "children": [
+                  {
+                    "kind": "TypeNameAlias",
+                    "name": "InvocationEncoder",
+                    "printedName": "Distributed.LocalTestingDistributedActorSystem.InvocationEncoder",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "LocalTestingInvocationEncoder",
+                        "printedName": "Distributed.LocalTestingInvocationEncoder",
+                        "usr": "s:11Distributed29LocalTestingInvocationEncoderV"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "TypeWitness",
+                "name": "InvocationDecoder",
+                "printedName": "InvocationDecoder",
+                "children": [
+                  {
+                    "kind": "TypeNameAlias",
+                    "name": "InvocationDecoder",
+                    "printedName": "Distributed.LocalTestingDistributedActorSystem.InvocationDecoder",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "LocalTestingInvocationDecoder",
+                        "printedName": "Distributed.LocalTestingInvocationDecoder",
+                        "usr": "s:11Distributed29LocalTestingInvocationDecoderC"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "TypeWitness",
+                "name": "ResultHandler",
+                "printedName": "ResultHandler",
+                "children": [
+                  {
+                    "kind": "TypeNameAlias",
+                    "name": "ResultHandler",
+                    "printedName": "Distributed.LocalTestingDistributedActorSystem.ResultHandler",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "LocalTestingInvocationResultHandler",
+                        "printedName": "Distributed.LocalTestingInvocationResultHandler",
+                        "usr": "s:11Distributed35LocalTestingInvocationResultHandlerV"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "TypeWitness",
+                "name": "SerializationRequirement",
+                "printedName": "SerializationRequirement",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "SerializationRequirement",
+                    "printedName": "Distributed.LocalTestingDistributedActorSystem.SerializationRequirement"
+                  }
+                ]
+              }
+            ],
+            "usr": "s:11Distributed0A11ActorSystemP",
+            "mangledName": "$s11Distributed0A11ActorSystemP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeAlias",
+        "name": "LocalTestingActorAddress",
+        "printedName": "LocalTestingActorAddress",
+        "children": [
+          {
+            "kind": "TypeNominal",
+            "name": "LocalTestingActorID",
+            "printedName": "Distributed.LocalTestingActorID",
+            "usr": "s:11Distributed19LocalTestingActorIDV"
+          }
+        ],
+        "declKind": "TypeAlias",
+        "usr": "s:11Distributed24LocalTestingActorAddressa",
+        "mangledName": "$s11Distributed24LocalTestingActorAddressa",
+        "moduleName": "Distributed",
+        "deprecated": true,
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "LocalTestingActorID",
+        "printedName": "LocalTestingActorID",
+        "children": [
+          {
+            "kind": "Var",
+            "name": "address",
+            "printedName": "address",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed19LocalTestingActorIDV7addressSSvp",
+            "mangledName": "$s11Distributed19LocalTestingActorIDV7addressSSvp",
+            "moduleName": "Distributed",
+            "deprecated": true,
+            "declAttributes": [
+              "Available"
+            ],
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed19LocalTestingActorIDV7addressSSvg",
+                "mangledName": "$s11Distributed19LocalTestingActorIDV7addressSSvg",
+                "moduleName": "Distributed",
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "id",
+            "printedName": "id",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed19LocalTestingActorIDV2idSSvp",
+            "mangledName": "$s11Distributed19LocalTestingActorIDV2idSSvp",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "HasStorage"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed19LocalTestingActorIDV2idSSvg",
+                "mangledName": "$s11Distributed19LocalTestingActorIDV2idSSvg",
+                "moduleName": "Distributed",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(parse:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingActorID",
+                "printedName": "Distributed.LocalTestingActorID",
+                "usr": "s:11Distributed19LocalTestingActorIDV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:11Distributed19LocalTestingActorIDV5parseACSS_tcfc",
+            "mangledName": "$s11Distributed19LocalTestingActorIDV5parseACSS_tcfc",
+            "moduleName": "Distributed",
+            "deprecated": true,
+            "declAttributes": [
+              "Available"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(id:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingActorID",
+                "printedName": "Distributed.LocalTestingActorID",
+                "usr": "s:11Distributed19LocalTestingActorIDV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:11Distributed19LocalTestingActorIDV2idACSS_tcfc",
+            "mangledName": "$s11Distributed19LocalTestingActorIDV2idACSS_tcfc",
+            "moduleName": "Distributed",
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(from:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingActorID",
+                "printedName": "Distributed.LocalTestingActorID",
+                "usr": "s:11Distributed19LocalTestingActorIDV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Decoder",
+                "printedName": "Swift.Decoder",
+                "usr": "s:s7DecoderP"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:11Distributed19LocalTestingActorIDV4fromACs7Decoder_p_tKcfc",
+            "mangledName": "$s11Distributed19LocalTestingActorIDV4fromACs7Decoder_p_tKcfc",
+            "moduleName": "Distributed",
+            "throwing": true,
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "encode",
+            "printedName": "encode(to:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Encoder",
+                "printedName": "Swift.Encoder",
+                "usr": "s:s7EncoderP"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed19LocalTestingActorIDV6encode2toys7Encoder_p_tKF",
+            "mangledName": "$s11Distributed19LocalTestingActorIDV6encode2toys7Encoder_p_tKF",
+            "moduleName": "Distributed",
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "hash",
+            "printedName": "hash(into:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Hasher",
+                "printedName": "Swift.Hasher",
+                "paramValueOwnership": "InOut",
+                "usr": "s:s6HasherV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed19LocalTestingActorIDV4hash4intoys6HasherVz_tF",
+            "mangledName": "$s11Distributed19LocalTestingActorIDV4hash4intoys6HasherVz_tF",
+            "moduleName": "Distributed",
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "==",
+            "printedName": "==(_:_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingActorID",
+                "printedName": "Distributed.LocalTestingActorID",
+                "usr": "s:11Distributed19LocalTestingActorIDV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingActorID",
+                "printedName": "Distributed.LocalTestingActorID",
+                "usr": "s:11Distributed19LocalTestingActorIDV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed19LocalTestingActorIDV2eeoiySbAC_ACtFZ",
+            "mangledName": "$s11Distributed19LocalTestingActorIDV2eeoiySbAC_ACtFZ",
+            "moduleName": "Distributed",
+            "static": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Var",
+            "name": "hashValue",
+            "printedName": "hashValue",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Int",
+                "printedName": "Swift.Int",
+                "usr": "s:Si"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed19LocalTestingActorIDV9hashValueSivp",
+            "mangledName": "$s11Distributed19LocalTestingActorIDV9hashValueSivp",
+            "moduleName": "Distributed",
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Int",
+                    "printedName": "Swift.Int",
+                    "usr": "s:Si"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed19LocalTestingActorIDV9hashValueSivg",
+                "mangledName": "$s11Distributed19LocalTestingActorIDV9hashValueSivg",
+                "moduleName": "Distributed",
+                "accessorKind": "get"
+              }
+            ]
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:11Distributed19LocalTestingActorIDV",
+        "mangledName": "$s11Distributed19LocalTestingActorIDV",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Hashable",
+            "printedName": "Hashable",
+            "usr": "s:SH",
+            "mangledName": "$sSH"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Decodable",
+            "printedName": "Decodable",
+            "usr": "s:Se",
+            "mangledName": "$sSe"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Encodable",
+            "printedName": "Encodable",
+            "usr": "s:SE",
+            "mangledName": "$sSE"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Equatable",
+            "printedName": "Equatable",
+            "usr": "s:SQ",
+            "mangledName": "$sSQ"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "LocalTestingInvocationEncoder",
+        "printedName": "LocalTestingInvocationEncoder",
+        "children": [
+          {
+            "kind": "TypeAlias",
+            "name": "SerializationRequirement",
+            "printedName": "SerializationRequirement",
+            "children": [
+              {
+                "kind": "TypeNameAlias",
+                "name": "Codable",
+                "printedName": "Swift.Codable",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ProtocolComposition",
+                    "printedName": "Swift.Decodable & Swift.Encodable"
+                  }
+                ]
+              }
+            ],
+            "declKind": "TypeAlias",
+            "usr": "s:11Distributed29LocalTestingInvocationEncoderV24SerializationRequirementa",
+            "mangledName": "$s11Distributed29LocalTestingInvocationEncoderV24SerializationRequirementa",
+            "moduleName": "Distributed"
+          },
+          {
+            "kind": "Function",
+            "name": "recordGenericSubstitution",
+            "printedName": "recordGenericSubstitution(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "T.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "T"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed29LocalTestingInvocationEncoderV25recordGenericSubstitutionyyxmKlF",
+            "mangledName": "$s11Distributed29LocalTestingInvocationEncoderV25recordGenericSubstitutionyyxmKlF",
+            "moduleName": "Distributed",
+            "genericSig": "<T>",
+            "throwing": true,
+            "funcSelfKind": "Mutating"
+          },
+          {
+            "kind": "Function",
+            "name": "recordArgument",
+            "printedName": "recordArgument(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "RemoteCallArgument",
+                "printedName": "Distributed.RemoteCallArgument<Value>",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "Value"
+                  }
+                ],
+                "usr": "s:11Distributed18RemoteCallArgumentV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed29LocalTestingInvocationEncoderV14recordArgumentyyAA010RemoteCallG0VyxGKSeRzSERzlF",
+            "mangledName": "$s11Distributed29LocalTestingInvocationEncoderV14recordArgumentyyAA010RemoteCallG0VyxGKSeRzSERzlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Value where Value : Swift.Decodable, Value : Swift.Encodable>",
+            "throwing": true,
+            "funcSelfKind": "Mutating"
+          },
+          {
+            "kind": "Function",
+            "name": "recordErrorType",
+            "printedName": "recordErrorType(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "E.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "E"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed29LocalTestingInvocationEncoderV15recordErrorTypeyyxmKs0G0RzlF",
+            "mangledName": "$s11Distributed29LocalTestingInvocationEncoderV15recordErrorTypeyyxmKs0G0RzlF",
+            "moduleName": "Distributed",
+            "genericSig": "<E where E : Swift.Error>",
+            "throwing": true,
+            "funcSelfKind": "Mutating"
+          },
+          {
+            "kind": "Function",
+            "name": "recordReturnType",
+            "printedName": "recordReturnType(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Metatype",
+                "printedName": "R.Type",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "R"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed29LocalTestingInvocationEncoderV16recordReturnTypeyyxmKSeRzSERzlF",
+            "mangledName": "$s11Distributed29LocalTestingInvocationEncoderV16recordReturnTypeyyxmKSeRzSERzlF",
+            "moduleName": "Distributed",
+            "genericSig": "<R where R : Swift.Decodable, R : Swift.Encodable>",
+            "throwing": true,
+            "funcSelfKind": "Mutating"
+          },
+          {
+            "kind": "Function",
+            "name": "doneRecording",
+            "printedName": "doneRecording()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed29LocalTestingInvocationEncoderV13doneRecordingyyKF",
+            "mangledName": "$s11Distributed29LocalTestingInvocationEncoderV13doneRecordingyyKF",
+            "moduleName": "Distributed",
+            "throwing": true,
+            "funcSelfKind": "Mutating"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:11Distributed29LocalTestingInvocationEncoderV",
+        "mangledName": "$s11Distributed29LocalTestingInvocationEncoderV",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "DistributedTargetInvocationEncoder",
+            "printedName": "DistributedTargetInvocationEncoder",
+            "children": [
+              {
+                "kind": "TypeWitness",
+                "name": "SerializationRequirement",
+                "printedName": "SerializationRequirement",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "SerializationRequirement",
+                    "printedName": "Distributed.LocalTestingInvocationEncoder.SerializationRequirement"
+                  }
+                ]
+              }
+            ],
+            "usr": "s:11Distributed0A23TargetInvocationEncoderP",
+            "mangledName": "$s11Distributed0A23TargetInvocationEncoderP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "LocalTestingInvocationDecoder",
+        "printedName": "LocalTestingInvocationDecoder",
+        "children": [
+          {
+            "kind": "TypeAlias",
+            "name": "SerializationRequirement",
+            "printedName": "SerializationRequirement",
+            "children": [
+              {
+                "kind": "TypeNameAlias",
+                "name": "Codable",
+                "printedName": "Swift.Codable",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ProtocolComposition",
+                    "printedName": "Swift.Decodable & Swift.Encodable"
+                  }
+                ]
+              }
+            ],
+            "declKind": "TypeAlias",
+            "usr": "s:11Distributed29LocalTestingInvocationDecoderC24SerializationRequirementa",
+            "mangledName": "$s11Distributed29LocalTestingInvocationDecoderC24SerializationRequirementa",
+            "moduleName": "Distributed"
+          },
+          {
+            "kind": "Function",
+            "name": "decodeGenericSubstitutions",
+            "printedName": "decodeGenericSubstitutions()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Array",
+                "printedName": "[Any.Type]",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ExistentialMetatype",
+                    "printedName": "Any.Type",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "ProtocolComposition",
+                        "printedName": "Any"
+                      }
+                    ]
+                  }
+                ],
+                "usr": "s:Sa"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed29LocalTestingInvocationDecoderC26decodeGenericSubstitutionsSayypXpGyKF",
+            "mangledName": "$s11Distributed29LocalTestingInvocationDecoderC26decodeGenericSubstitutionsSayypXpGyKF",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "Final"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "decodeNextArgument",
+            "printedName": "decodeNextArgument()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Argument"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed29LocalTestingInvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF",
+            "mangledName": "$s11Distributed29LocalTestingInvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Argument where Argument : Swift.Decodable, Argument : Swift.Encodable>",
+            "declAttributes": [
+              "Final"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "decodeErrorType",
+            "printedName": "decodeErrorType()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Any.Type?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ExistentialMetatype",
+                    "printedName": "Any.Type",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "ProtocolComposition",
+                        "printedName": "Any"
+                      }
+                    ]
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed29LocalTestingInvocationDecoderC15decodeErrorTypeypXpSgyKF",
+            "mangledName": "$s11Distributed29LocalTestingInvocationDecoderC15decodeErrorTypeypXpSgyKF",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "Final"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "decodeReturnType",
+            "printedName": "decodeReturnType()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Any.Type?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ExistentialMetatype",
+                    "printedName": "Any.Type",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "ProtocolComposition",
+                        "printedName": "Any"
+                      }
+                    ]
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed29LocalTestingInvocationDecoderC16decodeReturnTypeypXpSgyKF",
+            "mangledName": "$s11Distributed29LocalTestingInvocationDecoderC16decodeReturnTypeypXpSgyKF",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "Final"
+            ],
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Class",
+        "usr": "s:11Distributed29LocalTestingInvocationDecoderC",
+        "mangledName": "$s11Distributed29LocalTestingInvocationDecoderC",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Final",
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "hasMissingDesignatedInitializers": true,
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "DistributedTargetInvocationDecoder",
+            "printedName": "DistributedTargetInvocationDecoder",
+            "children": [
+              {
+                "kind": "TypeWitness",
+                "name": "SerializationRequirement",
+                "printedName": "SerializationRequirement",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "SerializationRequirement",
+                    "printedName": "Distributed.LocalTestingInvocationDecoder.SerializationRequirement"
+                  }
+                ]
+              }
+            ],
+            "usr": "s:11Distributed0A23TargetInvocationDecoderP",
+            "mangledName": "$s11Distributed0A23TargetInvocationDecoderP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "LocalTestingInvocationResultHandler",
+        "printedName": "LocalTestingInvocationResultHandler",
+        "children": [
+          {
+            "kind": "TypeAlias",
+            "name": "SerializationRequirement",
+            "printedName": "SerializationRequirement",
+            "children": [
+              {
+                "kind": "TypeNameAlias",
+                "name": "Codable",
+                "printedName": "Swift.Codable",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ProtocolComposition",
+                    "printedName": "Swift.Decodable & Swift.Encodable"
+                  }
+                ]
+              }
+            ],
+            "declKind": "TypeAlias",
+            "usr": "s:11Distributed35LocalTestingInvocationResultHandlerV24SerializationRequirementa",
+            "mangledName": "$s11Distributed35LocalTestingInvocationResultHandlerV24SerializationRequirementa",
+            "moduleName": "Distributed"
+          },
+          {
+            "kind": "Function",
+            "name": "onReturn",
+            "printedName": "onReturn(value:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Success"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed35LocalTestingInvocationResultHandlerV8onReturn5valueyx_tYaKSeRzSERzlF",
+            "mangledName": "$s11Distributed35LocalTestingInvocationResultHandlerV8onReturn5valueyx_tYaKSeRzSERzlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Success where Success : Swift.Decodable, Success : Swift.Encodable>",
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "onReturnVoid",
+            "printedName": "onReturnVoid()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed35LocalTestingInvocationResultHandlerV12onReturnVoidyyYaKF",
+            "mangledName": "$s11Distributed35LocalTestingInvocationResultHandlerV12onReturnVoidyyYaKF",
+            "moduleName": "Distributed",
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "onThrow",
+            "printedName": "onThrow(error:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "GenericTypeParam",
+                "printedName": "Err"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:11Distributed35LocalTestingInvocationResultHandlerV7onThrow5erroryx_tYaKs5ErrorRzlF",
+            "mangledName": "$s11Distributed35LocalTestingInvocationResultHandlerV7onThrow5erroryx_tYaKs5ErrorRzlF",
+            "moduleName": "Distributed",
+            "genericSig": "<Err where Err : Swift.Error>",
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:11Distributed35LocalTestingInvocationResultHandlerV",
+        "mangledName": "$s11Distributed35LocalTestingInvocationResultHandlerV",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "DistributedTargetInvocationResultHandler",
+            "printedName": "DistributedTargetInvocationResultHandler",
+            "children": [
+              {
+                "kind": "TypeWitness",
+                "name": "SerializationRequirement",
+                "printedName": "SerializationRequirement",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "SerializationRequirement",
+                    "printedName": "Distributed.LocalTestingInvocationResultHandler.SerializationRequirement"
+                  }
+                ]
+              }
+            ],
+            "usr": "s:11Distributed0A29TargetInvocationResultHandlerP",
+            "mangledName": "$s11Distributed0A29TargetInvocationResultHandlerP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "LocalTestingDistributedActorSystemError",
+        "printedName": "LocalTestingDistributedActorSystemError",
+        "children": [
+          {
+            "kind": "Var",
+            "name": "message",
+            "printedName": "message",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:11Distributed012LocalTestingA16ActorSystemErrorV7messageSSvp",
+            "mangledName": "$s11Distributed012LocalTestingA16ActorSystemErrorV7messageSSvp",
+            "moduleName": "Distributed",
+            "declAttributes": [
+              "HasStorage"
+            ],
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:11Distributed012LocalTestingA16ActorSystemErrorV7messageSSvg",
+                "mangledName": "$s11Distributed012LocalTestingA16ActorSystemErrorV7messageSSvg",
+                "moduleName": "Distributed",
+                "implicit": true,
+                "accessorKind": "get"
+              }
+            ]
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(message:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "LocalTestingDistributedActorSystemError",
+                "printedName": "Distributed.LocalTestingDistributedActorSystemError",
+                "usr": "s:11Distributed012LocalTestingA16ActorSystemErrorV"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:11Distributed012LocalTestingA16ActorSystemErrorV7messageACSS_tcfc",
+            "mangledName": "$s11Distributed012LocalTestingA16ActorSystemErrorV7messageACSS_tcfc",
+            "moduleName": "Distributed",
+            "init_kind": "Designated"
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:11Distributed012LocalTestingA16ActorSystemErrorV",
+        "mangledName": "$s11Distributed012LocalTestingA16ActorSystemErrorV",
+        "moduleName": "Distributed",
+        "intro_Macosx": "13.0",
+        "intro_iOS": "16.0",
+        "intro_tvOS": "16.0",
+        "intro_watchOS": "9.0",
+        "declAttributes": [
+          "Available",
+          "Available",
+          "Available",
+          "Available"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "DistributedActorSystemError",
+            "printedName": "DistributedActorSystemError",
+            "usr": "s:11Distributed0A16ActorSystemErrorP",
+            "mangledName": "$s11Distributed0A16ActorSystemErrorP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Error",
+            "printedName": "Error",
+            "usr": "s:s5ErrorP",
+            "mangledName": "$ss5ErrorP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "CodingUserInfoKey",
+        "printedName": "CodingUserInfoKey",
+        "children": [
+          {
+            "kind": "Var",
+            "name": "actorSystemKey",
+            "printedName": "actorSystemKey",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "CodingUserInfoKey",
+                "printedName": "Swift.CodingUserInfoKey",
+                "usr": "s:s17CodingUserInfoKeyV"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:s17CodingUserInfoKeyV11DistributedE011actorSystemD0ABvpZ",
+            "mangledName": "$ss17CodingUserInfoKeyV11DistributedE011actorSystemD0ABvpZ",
+            "moduleName": "Distributed",
+            "static": true,
+            "intro_Macosx": "13.0",
+            "intro_iOS": "16.0",
+            "intro_tvOS": "16.0",
+            "intro_watchOS": "9.0",
+            "declAttributes": [
+              "Available",
+              "Available",
+              "Available",
+              "Available",
+              "HasStorage"
+            ],
+            "isFromExtension": true,
+            "isLet": true,
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "CodingUserInfoKey",
+                    "printedName": "Swift.CodingUserInfoKey",
+                    "usr": "s:s17CodingUserInfoKeyV"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:s17CodingUserInfoKeyV11DistributedE011actorSystemD0ABvgZ",
+                "mangledName": "$ss17CodingUserInfoKeyV11DistributedE011actorSystemD0ABvgZ",
+                "moduleName": "Distributed",
+                "static": true,
+                "implicit": true,
+                "isFromExtension": true,
+                "accessorKind": "get"
+              }
+            ]
+          }
+        ],
+        "declKind": "Struct",
+        "usr": "s:s17CodingUserInfoKeyV",
+        "mangledName": "$ss17CodingUserInfoKeyV",
+        "moduleName": "Swift",
+        "isExternal": true,
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "RawRepresentable",
+            "printedName": "RawRepresentable",
+            "children": [
+              {
+                "kind": "TypeWitness",
+                "name": "RawValue",
+                "printedName": "RawValue",
+                "children": [
+                  {
+                    "kind": "TypeNameAlias",
+                    "name": "RawValue",
+                    "printedName": "Swift.CodingUserInfoKey.RawValue",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "String",
+                        "printedName": "Swift.String",
+                        "usr": "s:SS"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "usr": "s:SY",
+            "mangledName": "$sSY"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Equatable",
+            "printedName": "Equatable",
+            "usr": "s:SQ",
+            "mangledName": "$sSQ"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Hashable",
+            "printedName": "Hashable",
+            "usr": "s:SH",
+            "mangledName": "$sSH"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          }
+        ]
+      }
+    ],
+    "json_format_version": 8,
+    "tool_arguments": [
+      "-dump-sdk",
+      "-module",
+      "Distributed",
+      "-o",
+      "out.txt",
+      "-sdk",
+      "\/Applications\/Xcode-14-Seed-Latest-e.app\/Contents\/Developer\/Platforms\/MacOSX.platform\/Developer\/SDKs\/MacOSX13.0.sdk",
+      "Distributed",
+      "-sdk-version",
+      "22A5321d"
+    ]
+  }
+}
