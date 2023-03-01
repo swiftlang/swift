@@ -122,11 +122,11 @@ enum class ValueOwnership : uint8_t {
   /// the context-dependent default ownership (sometimes shared,
   /// sometimes owned)
   Default,
-  /// an 'inout' mutating pointer-like value
+  /// an 'inout' exclusive, mutating borrow
   InOut,
-  /// a '__shared' non-mutating pointer-like value
+  /// a 'borrowing' nonexclusive, usually nonmutating borrow
   Shared,
-  /// an '__owned' value
+  /// a 'consuming' ownership transfer
   Owned,
 
   Last_Kind = Owned

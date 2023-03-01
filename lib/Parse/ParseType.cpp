@@ -41,23 +41,12 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
     ty = new (Context) AttributedTypeRepr(attrs, ty);
   }
 
-  // Apply 'inout' or '__shared' or '__owned'
-  if (specifierLoc.isValid()) {
-    switch (specifier) {
-    case ParamDecl::Specifier::Owned:
-      ty = new (Context) OwnedTypeRepr(ty, specifierLoc);
-      break;
-    case ParamDecl::Specifier::InOut:
-      ty = new (Context) InOutTypeRepr(ty, specifierLoc);
-      break;
-    case ParamDecl::Specifier::Shared:
-      ty = new (Context) SharedTypeRepr(ty, specifierLoc);
-      break;
-    case ParamDecl::Specifier::Default:
-      break;
-    }
+  // Apply 'inout', 'consuming', or 'borrowing' modifiers.
+  if (specifierLoc.isValid() &&
+      specifier != ParamDecl::Specifier::Default) {
+    ty = new (Context) OwnershipTypeRepr(ty, specifier, specifierLoc);
   }
-
+  
   // Apply 'isolated'.
   if (isolatedLoc.isValid()) {
     ty = new (Context) IsolatedTypeRepr(ty, isolatedLoc);
@@ -165,9 +154,12 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
-  if (Tok.is(tok::kw_inout) ||
-      (Tok.is(tok::identifier) && (Tok.getRawText().equals("__shared") ||
-                                   Tok.getRawText().equals("__owned")))) {
+  if (Tok.is(tok::kw_inout)
+      || (canHaveParameterSpecifierContextualKeyword()
+          && (Tok.getRawText().equals("__shared")
+              || Tok.getRawText().equals("__owned")
+              || Tok.getRawText().equals("consuming")
+              || Tok.getRawText().equals("borrowing")))) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
@@ -370,7 +362,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
                                      LBraceLoc, Fields, RBraceLoc,
                                      LAngleLoc, Args, RAngleLoc);
   return makeParserResult(applyAttributeToType(repr, attrs,
-                                               ParamDecl::Specifier::Owned,
+                                               ParamDecl::Specifier::LegacyOwned,
                                                SourceLoc(), SourceLoc(),
                                                SourceLoc()));
 }
@@ -1190,7 +1182,9 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
         // Build inout type. Note that we bury the inout locator within the
         // named locator. This is weird but required by Sema apparently.
         element.Type =
-            new (Context) InOutTypeRepr(element.Type, ObsoletedInOutLoc);
+            new (Context) OwnershipTypeRepr(element.Type,
+                                            ParamSpecifier::InOut,
+                                            ObsoletedInOutLoc);
       }
     }
 

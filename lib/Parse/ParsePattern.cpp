@@ -159,22 +159,26 @@ bool Parser::startsParameterName(bool isClosure) {
 
   // If the next token can be an argument label, we might have a name.
   if (nextTok.canBeArgumentLabel()) {
-    // If the first name wasn't "isolated", we're done.
+    // If the first name wasn't a contextual keyword, we're done.
     if (!Tok.isContextualKeyword("isolated") &&
         !Tok.isContextualKeyword("some") &&
         !Tok.isContextualKeyword("any") &&
         !Tok.isContextualKeyword("each") &&
+        !Tok.isContextualKeyword("__shared") &&
+        !Tok.isContextualKeyword("__owned") &&
+        !Tok.isContextualKeyword("borrowing") &&
+        !Tok.isContextualKeyword("consuming") &&
         !Tok.is(tok::kw_repeat))
       return true;
 
-    // "isolated" can be an argument label, but it's also a contextual keyword,
-    // so look ahead one more token (two total) see if we have a ':' that would
+    // Parameter specifiers can be an argument label, but they're also
+    // contextual keywords, so look ahead one more token (two total) and see
+    // if we have a ':' that would
     // indicate that this is an argument label.
     return lookahead<bool>(2, [&](CancellableBacktrackingScope &) {
       if (Tok.is(tok::colon))
         return true; // isolated :
 
-      // isolated x :
       return Tok.canBeArgumentLabel() && nextTok.is(tok::colon);
     });
   }
@@ -250,11 +254,28 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     {
       // ('inout' | '__shared' | '__owned' | isolated)?
       bool hasSpecifier = false;
-      while (Tok.is(tok::kw_inout) ||
-             Tok.isContextualKeyword("__shared") ||
-             Tok.isContextualKeyword("__owned") ||
-             Tok.isContextualKeyword("isolated") ||
-             Tok.isContextualKeyword("_const")) {
+      while (Tok.is(tok::kw_inout)
+             || (canHaveParameterSpecifierContextualKeyword()
+                 && (Tok.isContextualKeyword("__shared")
+                     || Tok.isContextualKeyword("__owned")
+                     || Tok.isContextualKeyword("borrowing")
+                     || Tok.isContextualKeyword("consuming")
+                     || Tok.isContextualKeyword("isolated")
+                     || Tok.isContextualKeyword("_const")))) {
+        // is this token the identifier of an argument label? `inout` is a
+        // reserved keyword but the other modifiers are not.
+        if (!Tok.is(tok::kw_inout)) {
+          bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+            if (Tok.is(tok::colon))
+              return true;  // isolated :
+
+            return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
+          });
+
+          if (partOfArgumentLabel)
+            break;
+        }
+        
         if (Tok.isContextualKeyword("isolated")) {
           // did we already find an 'isolated' type modifier?
           if (param.IsolatedLoc.isValid()) {
@@ -263,18 +284,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             consumeToken();
             continue;
           }
-
-          // is this 'isolated' token the identifier of an argument label?
-          bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
-            if (Tok.is(tok::colon))
-              return true;  // isolated :
-
-            // isolated x :
-            return Tok.canBeArgumentLabel() && peekToken().is(tok::colon);
-          });
-
-          if (partOfArgumentLabel)
-            break;
 
           // consume 'isolated' as type modifier
           param.IsolatedLoc = consumeToken();
@@ -287,20 +296,22 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
 
         if (!hasSpecifier) {
+          // These cases are handled later when mapping to ParamDecls for
+          // better fixits.
           if (Tok.is(tok::kw_inout)) {
-            // This case is handled later when mapping to ParamDecls for
-            // better fixits.
             param.SpecifierKind = ParamDecl::Specifier::InOut;
             param.SpecifierLoc = consumeToken();
+          } else if (Tok.isContextualKeyword("borrowing")) {
+            param.SpecifierKind = ParamDecl::Specifier::Borrowing;
+            param.SpecifierLoc = consumeToken();
+          } else if (Tok.isContextualKeyword("consuming")) {
+            param.SpecifierKind = ParamDecl::Specifier::Consuming;
+            param.SpecifierLoc = consumeToken();
           } else if (Tok.isContextualKeyword("__shared")) {
-            // This case is handled later when mapping to ParamDecls for
-            // better fixits.
-            param.SpecifierKind = ParamDecl::Specifier::Shared;
+            param.SpecifierKind = ParamDecl::Specifier::LegacyShared;
             param.SpecifierLoc = consumeToken();
           } else if (Tok.isContextualKeyword("__owned")) {
-            // This case is handled later when mapping to ParamDecls for
-            // better fixits.
-            param.SpecifierKind = ParamDecl::Specifier::Owned;
+            param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
             param.SpecifierLoc = consumeToken();
           }
           hasSpecifier = true;
@@ -486,11 +497,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     return status;
   });
 }
-template <typename T>
+
 static TypeRepr *
-validateParameterWithSpecifier(Parser &parser,
+validateParameterWithOwnership(Parser &parser,
                                Parser::ParsedParameter &paramInfo,
-                               StringRef specifierName,
+                               ParamSpecifier specifier,
                                bool parsingEnumElt) {
   auto type = paramInfo.Type;
   auto loc = paramInfo.SpecifierLoc;
@@ -498,12 +509,13 @@ validateParameterWithSpecifier(Parser &parser,
   // at all - Sema will catch this for us.  In all other contexts, we
   // assume the user put 'inout' in the wrong place and offer a fixit.
   if (parsingEnumElt) {
-    return new (parser.Context) T(type, loc);
+    return new (parser.Context) OwnershipTypeRepr(type, specifier, loc);
   }
   
   if (isa<SpecifierTypeRepr>(type)) {
     parser.diagnose(loc, diag::parameter_specifier_repeated).fixItRemove(loc);
   } else {
+    auto specifierName = ParamDecl::getSpecifierSpelling(specifier);
     llvm::SmallString<128> replacement(specifierName);
     replacement += " ";
     parser
@@ -511,7 +523,7 @@ validateParameterWithSpecifier(Parser &parser,
                   specifierName)
         .fixItRemove(loc)
         .fixItInsert(type->getStartLoc(), replacement);
-    type = new (parser.Context) T(type, loc);
+    type = new (parser.Context) OwnershipTypeRepr(type, specifier, loc);
   }
 
   return type;
@@ -558,18 +570,10 @@ mapParsedParameters(Parser &parser,
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
-      if (paramInfo.SpecifierKind == ParamDecl::Specifier::InOut) {
-        type = validateParameterWithSpecifier<InOutTypeRepr>(parser, paramInfo,
-                                                             "inout",
-                                                             parsingEnumElt);
-      } else if (paramInfo.SpecifierKind == ParamDecl::Specifier::Shared) {
-        type = validateParameterWithSpecifier<SharedTypeRepr>(parser, paramInfo,
-                                                              "__shared",
-                                                              parsingEnumElt);
-      } else if (paramInfo.SpecifierKind == ParamDecl::Specifier::Owned) {
-        type = validateParameterWithSpecifier<OwnedTypeRepr>(parser, paramInfo,
-                                                             "__owned",
-                                                             parsingEnumElt);
+      if (paramInfo.SpecifierKind != ParamDecl::Specifier::Default) {
+        type = validateParameterWithOwnership(parser, paramInfo,
+                                              paramInfo.SpecifierKind,
+                                              parsingEnumElt);
       }
 
       if (paramInfo.IsolatedLoc.isValid()) {
@@ -618,20 +622,12 @@ mapParsedParameters(Parser &parser,
         }
       }
     } else if (paramInfo.SpecifierLoc.isValid()) {
-      StringRef specifier;
-      switch (paramInfo.SpecifierKind) {
-      case ParamDecl::Specifier::InOut:
-        specifier = "'inout'";
-        break;
-      case ParamDecl::Specifier::Shared:
-        specifier = "'shared'";
-        break;
-      case ParamDecl::Specifier::Owned:
-        specifier = "'owned'";
-        break;
-      case ParamDecl::Specifier::Default:
-        llvm_unreachable("can't have default here");
-        break;
+      llvm::SmallString<16> specifier;
+      {
+        llvm::raw_svector_ostream ss(specifier);
+        
+        ss << '\'' << ParamDecl::getSpecifierSpelling(paramInfo.SpecifierKind)
+           << '\'';
       }
       parser.diagnose(paramInfo.SpecifierLoc, diag::specifier_must_have_type,
                       specifier);

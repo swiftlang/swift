@@ -376,9 +376,19 @@ struct ArgumentInitHelper {
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
-      auto kind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
-      if (pd->isOwned())
+      MarkMustCheckInst::CheckKind kind;
+      switch (pd->getValueOwnership()) {
+      case ValueOwnership::Default:
+      case ValueOwnership::Shared:
+      case ValueOwnership::InOut:
+        kind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
+        break;
+
+      case ValueOwnership::Owned:
         kind = MarkMustCheckInst::CheckKind::ConsumableAndAssignable;
+        break;
+      }
+
       value = SGF.B.createMarkMustCheckInst(loc, value, kind);
       SGF.emitManagedRValueWithCleanup(value);
       return completeUpdate(value);
@@ -429,16 +439,21 @@ struct ArgumentInitHelper {
     ManagedValue argrv = makeArgument(ty, pd->isInOut(), isNoImplicitCopy,
                                       lifetimeAnnotation, parent, loc);
 
+    SILValue value = argrv.getValue();
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
-    } else {
-      assert(pd->isImmutable() && "expected parameter to be immutable!");
-      // If the variable is immutable, we can bind the value as is.
-      // Leave the cleanup on the argument, if any, in place to consume the
-      // argument if we're responsible for it.
+    } else if (!pd->isImmutableInFunctionBody()) {
+      // If it's a locally mutable parameter, then we need to move the argument
+      // value into a local box to hold the mutated value.
+      auto mutableBox = SGF.emitLocalVariableWithCleanup(pd,
+                                                    MarkUninitializedInst::Var);
+      argrv.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, mutableBox.get());
+      return;
     }
-    SILValue value = argrv.getValue();
-    SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
+    // If the variable is immutable, we can bind the value as is.
+    // Leave the cleanup on the argument, if any, in place to consume the
+    // argument if we're responsible for it.
+    SILDebugVariable varinfo(pd->isImmutableInFunctionBody(), ArgNo);
     if (!argrv.getType().isAddress()) {
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
       updateArgumentValueForBinding(argrv, loc, pd, value, varinfo);

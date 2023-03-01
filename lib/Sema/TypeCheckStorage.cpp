@@ -3358,9 +3358,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
   if (auto *param = dyn_cast<ParamDecl>(storage)) {
     return StorageImplInfo::getSimpleStored(
-      param->isInOut()
-      ? StorageIsMutable
-      : StorageIsNotMutable);
+      param->isImmutableInFunctionBody()
+        ? StorageIsNotMutable
+        : StorageIsMutable);
   }
 
   if (auto *var = dyn_cast<VarDecl>(storage)) {

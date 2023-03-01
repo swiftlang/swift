@@ -3573,7 +3573,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     if (AdopterIsClass || !isa<AbstractStorageDecl>(Requirement))
       Options.ExcludeAttrList.push_back(DAK_NonMutating);
 
-    // FIXME: Once we support move-only types, remove this if the
+    // FIXME: Once we support move-only types in generics, remove this if the
     //        conforming type is move-only. Until then, don't suggest printing
     //        __consuming on a protocol requirement.
     Options.ExcludeAttrList.push_back(DAK_Consuming);
