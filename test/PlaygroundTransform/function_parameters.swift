@@ -11,6 +11,7 @@
 
 import PlaygroundSupport
 
+// Labeled, unlabeled, and multi-value parameters are logged.
 func f(x: Int, _ y: Float = 7.62, z: String...) -> Int {
     func g(w: (Int, Int)) -> Int {
         func h(v: Int) -> Int {
@@ -20,8 +21,13 @@ func f(x: Int, _ y: Float = 7.62, z: String...) -> Int {
     }
     return x + z.count + g(w: (1, 2))
 }
-
 let foo = f(x: 42, z: "hello", "world")
+
+// Unnamed parameters do are not logged.
+func f(_: Int) -> Int {
+    return 42
+}
+let bar = f(21)
 
 // CHECK:      {{.*}} __builtin_log_scope_entry
 // CHECK-NEXT: {{.*}} __builtin_log[x='42']

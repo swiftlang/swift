@@ -601,7 +601,7 @@ public:
     if (PL && !HighPerformance) {
       size_t EI = 0;
       for (const auto &PD : *PL) {
-        // Skip parameters that don't have a name (such as `_` in a closure).
+        // Only log named parameters (not `{ _ in }` closures for example.
         if (PD->hasName()) {
           DeclBaseName Name = PD->getName();
           Expr *PVVarRef = new (Context)
