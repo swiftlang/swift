@@ -1517,6 +1517,10 @@ class DiscriminatorFinder : public ASTWalker {
   unsigned NextDiscriminator = 0;
 
 public:
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
 
   // Get the next available closure discriminator.

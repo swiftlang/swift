@@ -8364,6 +8364,10 @@ namespace {
     explicit SetExprTypes(const Solution &solution)
         : solution(solution) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       auto &cs = solution.getConstraintSystem();
       auto exprType = cs.getType(expr);
@@ -8481,6 +8485,10 @@ namespace {
       }
 
       return hadError;
+    }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
@@ -8962,6 +8970,10 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
 
         TryInjector(ASTContext &ctx, const Solution &solution)
             : C(ctx), S(solution) {}
+
+        MacroWalking getMacroWalkingBehavior() const override {
+          return MacroWalking::Expansion;
+        }
 
         PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
           if (ShouldStop)

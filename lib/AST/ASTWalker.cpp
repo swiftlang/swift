@@ -430,9 +430,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
-    if (MED->getArgs() && doIt(MED->getArgs()))
+    bool shouldWalkArguments, shouldWalkExpansion;
+    std::tie(shouldWalkArguments, shouldWalkExpansion) =
+        Walker.shouldWalkMacroArgumentsAndExpansion();
+    if (shouldWalkArguments && MED->getArgs() && doIt(MED->getArgs()))
       return true;
-    if (Walker.shouldWalkMacroExpansions()) {
+
+    if (shouldWalkExpansion) {
       for (auto *decl : MED->getRewritten())
         if (doIt(decl))
           return true;
@@ -1297,12 +1301,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
-    ArgumentList *args = nullptr;
-    if (E->getArgs()) {
-      args = doIt(E->getArgs());
+    bool shouldWalkArguments, shouldWalkExpansion;
+    std::tie(shouldWalkArguments, shouldWalkExpansion) =
+        Walker.shouldWalkMacroArgumentsAndExpansion();
+
+    if (shouldWalkArguments && E->getArgs()) {
+      ArgumentList *args = doIt(E->getArgs());
       if (!args) return nullptr;
+      E->setArgs(args);
     }
-    if (Walker.shouldWalkMacroExpansions()) {
+
+    if (shouldWalkExpansion) {
       Expr *rewritten = nullptr;
       if (E->getRewritten()) {
         rewritten = doIt(E->getRewritten());
@@ -1310,7 +1319,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
       E->setRewritten(rewritten);
     }
-    E->setArgs(args);
     return E;
   }
 
@@ -1425,7 +1433,8 @@ public:
   }
   
   bool shouldSkip(Decl *D) {
-    if (!Walker.shouldWalkMacroExpansions() && D->isInGeneratedBuffer())
+    if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
+        D->isInGeneratedBuffer())
       return true;
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {

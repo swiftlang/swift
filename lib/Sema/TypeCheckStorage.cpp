@@ -1369,6 +1369,10 @@ namespace {
   public:
     RecontextualizeClosures(DeclContext *NewDC) : NewDC(NewDC) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
@@ -3523,6 +3527,11 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
 
   public:
     OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
 
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E)

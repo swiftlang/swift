@@ -544,6 +544,10 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     // Forget any generic parameters we saw in the type.
     class EraseTypeParamWalker : public ASTWalker {
     public:
+      MacroWalking getMacroWalkingBehavior() const override {
+        return MacroWalking::Arguments;
+      }
+
       PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
         if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {

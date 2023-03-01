@@ -47,6 +47,10 @@ public:
       std::vector<NominalTypeDecl *> &ConformanceDecls)
       : Protocols(Protocols), ConformanceTypeDecls(ConformanceDecls) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *NTD = llvm::dyn_cast<NominalTypeDecl>(D))
       if (!isa<ProtocolDecl>(NTD))

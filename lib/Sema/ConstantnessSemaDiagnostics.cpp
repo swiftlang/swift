@@ -339,6 +339,10 @@ void swift::diagnoseConstantArgumentRequirement(
   public:
     ConstantReqCallWalker(DeclContext *DC) : DC(DC), insideClosure(false) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     // Descend until we find a call expressions. Note that the input expression
     // could be an assign expression or another expression that contains the
     // call.

@@ -2558,6 +2558,10 @@ struct FallthroughFinder : ASTWalker {
 
   FallthroughFinder() : result(nullptr) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   // We walk through statements.  If we find a fallthrough, then we got what
   // we came for.
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *s) override {

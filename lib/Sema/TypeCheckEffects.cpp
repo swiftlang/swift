@@ -399,6 +399,11 @@ template <class Impl>
 class EffectsHandlingWalker : public ASTWalker {
   Impl &asImpl() { return *static_cast<Impl*>(this); }
 public:
+  /// Only look at the expansions for effects checking.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     ShouldRecurse_t recurse = ShouldRecurse;
     // Skip the implementations of all local declarations... except
@@ -2596,7 +2601,11 @@ private:
     struct ConservativeThrowChecker : public ASTWalker {
       CheckEffectsCoverage &CEC;
       ConservativeThrowChecker(CheckEffectsCoverage &CEC) : CEC(CEC) {}
-      
+
+      MacroWalking getMacroWalkingBehavior() const override {
+        return MacroWalking::Arguments;
+      }
+
       PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
         if (isa<TryExpr>(E))
           CEC.Flags.set(ContextFlags::HasAnyThrowSite);
@@ -2932,6 +2941,10 @@ private:
 
 // Find nested functions and perform effects checking on them.
 struct LocalFunctionEffectsChecker : ASTWalker {
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
       if (func->getDeclContext()->isLocalContext())

@@ -61,6 +61,12 @@ protected:
 
   public:
     ClosureFinder(InstrumenterBase &Inst) : I(Inst) {}
+
+    /// Walk only the expansion of the macro.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (isa<BraceStmt>(S)) {
         return Action::SkipChildren(S); // don't walk into brace statements; we

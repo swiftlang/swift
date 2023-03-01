@@ -372,6 +372,10 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   public:
     DerivativeFinder() {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
         for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
@@ -449,6 +453,10 @@ namespace {
     BindGenericParamsWalker(DeclContext *dc,
                             GenericParamList *params)
         : dc(dc), params(params) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {

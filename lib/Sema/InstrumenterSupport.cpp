@@ -54,6 +54,11 @@ class ErrorFinder : public ASTWalker {
 
 public:
   ErrorFinder() {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->hasError())
       error = true;

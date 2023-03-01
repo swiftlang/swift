@@ -58,8 +58,8 @@ private:
     return false;
   }
 
-  bool shouldWalkMacroExpansions() override {
-    return SEWalker.shouldWalkMacroExpansions();
+  MacroWalking getMacroWalkingBehavior() const override {
+    return SEWalker.getMacroWalkingBehavior();
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override;
@@ -687,7 +687,7 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
   // FIXME: This should be getSemanticAttrs if we want to walk macro
   // expansions. We've just already typechecked and this list is mutable so...
   for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
-    if (!shouldWalkMacroExpansions() &&
+    if (!shouldWalkMacroArgumentsAndExpansion().second &&
         D->getModuleContext()->isInGeneratedBuffer(customAttr->getLocation()))
       continue;
 

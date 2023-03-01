@@ -1940,6 +1940,10 @@ namespace {
 
     bool shouldWalkIntoTapExpression() override { return true; }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkAction walkToDeclPre(Decl *decl) override {
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         contextStack.push_back(func);

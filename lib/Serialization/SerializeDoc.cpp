@@ -414,6 +414,10 @@ static void writeDeclCommentTable(
                          SourceOrder++ });
     }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/true))
         return Action::SkipChildren();
@@ -706,6 +710,10 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
   }
   PreWalkAction walkToParameterListPre(ParameterList *PL) override {
     return Action::SkipChildren();
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
   }
 
   Optional<uint32_t> calculateNewUSRId(Decl *D) {

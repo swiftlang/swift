@@ -861,6 +861,10 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
     // FIXME: Remove this
     bool shouldWalkAccessorsTheOldWay() override { return true; }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {

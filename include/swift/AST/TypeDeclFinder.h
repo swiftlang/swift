@@ -67,6 +67,10 @@ class TypeReprIdentFinder : public ASTWalker {
   /// The function to call when a \c IdentTypeRepr is seen.
   llvm::function_ref<bool(const IdentTypeRepr *)> Callback;
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   PostWalkAction walkToTypeReprPost(TypeRepr *TR) override;
 
 public:
