@@ -154,6 +154,7 @@ class Categories(object):
             ['@objc thunk', re.compile(r'@objc')],
             ['@nonobjc thunk', re.compile(r'@nonobjc')],
             ['Value witness', re.compile(r'.*value witness for')],
+            ['Type layout string', re.compile(r'.*type_layout_string')],
             ['Block copy helper', re.compile(r'_block_copy_helper')],
             ['Block destroy helper', re.compile(r'_block_destroy_helper')],
             ['Block literal global', re.compile(r'___block_literal_global')],

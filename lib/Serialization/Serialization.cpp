@@ -2426,10 +2426,14 @@ static uint8_t getRawStableParamDeclSpecifier(swift::ParamDecl::Specifier sf) {
     return uint8_t(serialization::ParamDeclSpecifier::Default);
   case swift::ParamDecl::Specifier::InOut:
     return uint8_t(serialization::ParamDeclSpecifier::InOut);
-  case swift::ParamDecl::Specifier::Shared:
-    return uint8_t(serialization::ParamDeclSpecifier::Shared);
-  case swift::ParamDecl::Specifier::Owned:
-    return uint8_t(serialization::ParamDeclSpecifier::Owned);
+  case swift::ParamDecl::Specifier::Borrowing:
+    return uint8_t(serialization::ParamDeclSpecifier::Borrowing);
+  case swift::ParamDecl::Specifier::Consuming:
+    return uint8_t(serialization::ParamDeclSpecifier::Consuming);
+  case swift::ParamDecl::Specifier::LegacyShared:
+    return uint8_t(serialization::ParamDeclSpecifier::LegacyShared);
+  case swift::ParamDecl::Specifier::LegacyOwned:
+    return uint8_t(serialization::ParamDeclSpecifier::LegacyOwned);
   }
   llvm_unreachable("bad param decl specifier kind");
 }

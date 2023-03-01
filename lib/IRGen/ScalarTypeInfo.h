@@ -254,7 +254,7 @@ public:
   TypeLayoutEntry *
   buildTypeLayoutEntry(IRGenModule &IGM,
                        SILType T,
-                       bool useStructLayouts = false) const override {
+                       bool useStructLayouts) const override {
     if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }

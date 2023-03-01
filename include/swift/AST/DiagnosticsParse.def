@@ -986,7 +986,7 @@ ERROR(parameter_specifier_as_attr_disallowed,none,
       "'%0' before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
 ERROR(parameter_specifier_repeated,none,
-      "parameter must not have multiple '__owned', 'inout', or '__shared' specifiers", ())
+      "parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers", ())
 WARNING(parameter_let_var_as_attr,none,
       "'%0' in this position is interpreted as an argument label",
       (StringRef))
@@ -1070,6 +1070,10 @@ NOTE(indent_expression_to_silence,none,
 // Throw Statement
 ERROR(expected_expr_throw,PointsToFirstBadToken,
       "expected expression in 'throw' statement", ())
+
+// Forget Statement
+ERROR(expected_expr_forget,PointsToFirstBadToken,
+      "expected expression in 'forget' statement", ())
 
 // Await/Async
 ERROR(expected_await_not_async,none,

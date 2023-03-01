@@ -58,6 +58,10 @@ public:
       ClosureDCs.push_back(closure);
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
       ClosureDCs.push_back(closure);
@@ -240,6 +244,10 @@ class UnresolvedVarCollector : public ASTWalker {
 
 public:
   UnresolvedVarCollector(ConstraintSystem &cs) : CS(cs) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
@@ -876,6 +884,32 @@ private:
             cs.getConstraintLocator(
                 locator, LocatorPathElt::SyntacticElement(errorExpr)),
             {errType, CTP_ThrowStmt})},
+        locator);
+  }
+
+  void visitForgetStmt(ForgetStmt *forgetStmt) {
+    auto *fn = forgetStmt->getInnermostMethodContext();
+    if (!fn) {
+      hadError = true;
+      return;
+    }
+
+    auto nominalType =
+        fn->getDeclContext()->getSelfNominalTypeDecl()->getDeclaredType();
+    if (!nominalType) {
+      hadError = true;
+      return;
+    }
+
+    auto *selfExpr = forgetStmt->getSubExpr();
+
+    createConjunction(
+        cs,
+        {makeElement(
+            selfExpr,
+            cs.getConstraintLocator(
+                locator, LocatorPathElt::SyntacticElement(selfExpr)),
+            {nominalType, CTP_ForgetStmt})},
         locator);
   }
 
@@ -1678,6 +1712,19 @@ private:
       hadError = true;
 
     return throwStmt;
+  }
+
+  ASTNode visitForgetStmt(ForgetStmt *forgetStmt) {
+    auto &cs = solution.getConstraintSystem();
+
+    // Rewrite the `forget` expression.
+    auto target = *cs.getSolutionApplicationTarget(forgetStmt->getSubExpr());
+    if (auto result = rewriteTarget(target))
+      forgetStmt->setSubExpr(result->getAsExpr());
+    else
+      hadError = true;
+
+    return forgetStmt;
   }
 
   ASTNode visitForEachStmt(ForEachStmt *forEachStmt) {

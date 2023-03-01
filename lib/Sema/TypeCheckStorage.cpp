@@ -1369,6 +1369,10 @@ namespace {
   public:
     RecontextualizeClosures(DeclContext *NewDC) : NewDC(NewDC) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
@@ -3358,9 +3362,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
   if (auto *param = dyn_cast<ParamDecl>(storage)) {
     return StorageImplInfo::getSimpleStored(
-      param->isInOut()
-      ? StorageIsMutable
-      : StorageIsNotMutable);
+      param->isImmutableInFunctionBody()
+        ? StorageIsNotMutable
+        : StorageIsMutable);
   }
 
   if (auto *var = dyn_cast<VarDecl>(storage)) {
@@ -3523,6 +3527,11 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
 
   public:
     OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
 
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E)

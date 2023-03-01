@@ -3227,6 +3227,10 @@ public:
   ASTTypePrinter(SourceManager &SM, const PrintOptions &Options)
       : OS(llvm::outs()), SM(SM), Options(Options) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       OS.indent(IndentLevel * 2);
@@ -3309,6 +3313,10 @@ class ASTDocCommentDumper : public ASTWalker {
   raw_ostream &OS;
 public:
   ASTDocCommentDumper() : OS(llvm::outs()) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
@@ -3462,6 +3470,10 @@ public:
       OS << " CommentXMLInvalid=[libxml error]";
       break;
     }
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {

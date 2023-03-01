@@ -1015,7 +1015,7 @@ public:
                                            CanSILFunctionType funcTy);
 
   const TypeLayoutEntry
-  &getTypeLayoutEntry(SILType T, bool useStructLayouts = false);
+  &getTypeLayoutEntry(SILType T, bool useStructLayouts);
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&

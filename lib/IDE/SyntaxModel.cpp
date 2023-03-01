@@ -394,7 +394,10 @@ public:
   // FIXME: Remove this
   bool shouldWalkAccessorsTheOldWay() override { return true; }
 
-  bool shouldWalkMacroExpansions() override { return false; }
+  /// Only walk the arguments of a macro, to represent the source as written.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
 
   void visitSourceFile(SourceFile &SrcFile, ArrayRef<SyntaxNode> Tokens);
 
@@ -1201,6 +1204,10 @@ class IdRefWalker : public ASTWalker {
 
 public:
   IdRefWalker(const FnTy &Fn) : Fn(Fn) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto DRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {

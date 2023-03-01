@@ -119,6 +119,10 @@ public:
 
   Expr *get() const { return FoundExpr; }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (TargetRange == E->getSourceRange() && !shouldIgnore(E)) {
       assert(!FoundExpr && "non-nullptr for found expr");
@@ -162,6 +166,10 @@ public:
   bool Removed = false;
 
   CCExprRemover(ASTContext &Ctx) : Ctx(Ctx) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 
   Expr *visitCallExpr(CallExpr *E) {
     auto *args = E->getArgs()->getOriginalArgs();
@@ -301,6 +309,10 @@ public:
   ExprParentFinder(Expr *ChildExpr,
                    std::function<bool(ParentTy, ParentTy)> Predicate)
       : ChildExpr(ChildExpr), Predicate(Predicate) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     // Finish if we found the target. 'ChildExpr' might have been replaced

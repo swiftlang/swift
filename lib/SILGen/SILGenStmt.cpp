@@ -634,6 +634,24 @@ void StmtEmitter::visitThrowStmt(ThrowStmt *S) {
   SGF.emitThrow(S, exn, /* emit a call to willThrow */ true);
 }
 
+void StmtEmitter::visitForgetStmt(ForgetStmt *S) {
+  // A 'forget' simply triggers the memberwise, consuming destruction of 'self'.
+  ManagedValue selfValue = SGF.emitRValueAsSingleValue(S->getSubExpr());
+  CleanupLocation loc(S);
+
+  // \c fn could only be null if the type checker failed to call its 'set', or
+  // we somehow got to SILGen when errors were emitted!
+  auto *fn = S->getInnermostMethodContext();
+  if (!fn)
+    llvm_unreachable("internal compiler error with forget statement");
+
+  auto *nominal = fn->getDeclContext()->getSelfNominalTypeDecl();
+  assert(nominal);
+
+  SGF.emitMoveOnlyMemberDestruction(selfValue.forward(SGF), nominal, loc,
+                                    nullptr);
+}
+
 void StmtEmitter::visitYieldStmt(YieldStmt *S) {
   SGF.CurrentSILLoc = S;
 

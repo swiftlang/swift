@@ -2628,13 +2628,11 @@ directReferencesForTypeRepr(Evaluator &evaluator,
 
   case TypeReprKind::Error:
   case TypeReprKind::Function:
-  case TypeReprKind::InOut:
+  case TypeReprKind::Ownership:
   case TypeReprKind::Isolated:
   case TypeReprKind::CompileTimeConst:
   case TypeReprKind::Metatype:
-  case TypeReprKind::Owned:
   case TypeReprKind::Protocol:
-  case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
   case TypeReprKind::Pack:
@@ -2919,6 +2917,11 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
 
   public:
     explicit Walker(CollectedOpaqueReprs &reprs, ASTContext &ctx, DeclContext *d) : Reprs(reprs), Ctx(ctx), dc(d) {}
+
+    /// Walk everything that's available.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *repr) override {
 

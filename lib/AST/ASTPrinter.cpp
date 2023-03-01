@@ -1182,7 +1182,7 @@ void PrintAST::printAttributes(const Decl *D) {
     }
   }
 
-  // We will handle 'mutating' and 'nonmutating' separately.
+  // We will handle ownership specifiers separately.
   if (isa<FuncDecl>(D)) {
     Options.ExcludeAttrList.push_back(DAK_Mutating);
     Options.ExcludeAttrList.push_back(DAK_NonMutating);
@@ -5173,6 +5173,11 @@ void PrintAST::visitYieldStmt(YieldStmt *stmt) {
 
 void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
   Printer << tok::kw_throw << " ";
+  visit(stmt->getSubExpr());
+}
+
+void PrintAST::visitForgetStmt(ForgetStmt *stmt) {
+  Printer << "_forget" << " ";
   visit(stmt->getSubExpr());
 }
 

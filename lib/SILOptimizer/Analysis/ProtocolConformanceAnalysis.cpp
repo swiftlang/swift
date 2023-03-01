@@ -34,6 +34,11 @@ public:
                     &ProtocolConformanceCache)
       : ProtocolConformanceCache(ProtocolConformanceCache) {}
 
+  /// Walk everything in a macro
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     /// (1) Walk over all NominalTypeDecls to determine conformances.
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {

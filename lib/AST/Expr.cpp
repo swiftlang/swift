@@ -488,7 +488,12 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
     llvm::function_ref<Expr *(Expr *)> callback;
     Expr *ThisNode;
-    
+
+    /// Only walk the arguments of a macro, to represent the source as written.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     ChildWalker(llvm::function_ref<Expr *(Expr *)> callback, Expr *ThisNode)
       : callback(callback), ThisNode(ThisNode) {}
     
@@ -532,6 +537,11 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
 void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
     llvm::function_ref<Expr *(Expr *)> callback;
+
+    /// Only walk the arguments of a macro, to represent the source as written.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
 
     ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
     : callback(callback) {}
@@ -852,6 +862,11 @@ llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
   class RecordingTraversal : public ASTWalker {
   public:
     llvm::DenseMap<Expr *, Expr *> &ParentMap;
+
+    /// Walk everything that's available.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
 
     explicit RecordingTraversal(llvm::DenseMap<Expr *, Expr *> &parentMap)
       : ParentMap(parentMap) { }
@@ -1264,6 +1279,11 @@ PackExpansionExpr::create(ASTContext &ctx, SourceLoc repeatLoc,
 void PackExpansionExpr::getExpandedPacks(SmallVectorImpl<ASTNode> &packs) {
   struct PackCollector : public ASTWalker {
     llvm::SmallVector<ASTNode, 2> packs;
+
+    /// Walk everything that's available.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
 
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Don't walk into nested pack expansions

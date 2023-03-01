@@ -1808,17 +1808,19 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
     return swift_task_enqueueGlobal(job);
 
   if (executor.isDefaultActor()) {
-#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-    assert(false && "Should not enqueue tasks on actors in actors as locks model");
-#else
-    return asImpl(executor.getDefaultActor())->enqueue(job, job->getPriority());
-#endif
+    return swift_defaultActor_enqueue(job, executor.getDefaultActor());
   }
 
+  // For main actor or actors with custom executors
   auto wtable = executor.getSerialExecutorWitnessTable();
   auto executorObject = executor.getIdentity();
   auto executorType = swift_getObjectType(executorObject);
   _swift_task_enqueueOnExecutor(job, executorObject, executorType, wtable);
+}
+
+SWIFT_CC(swift)
+void swift::swift_executor_escalate(ExecutorRef executor, AsyncTask *task,
+  JobPriority newPriority) {
 }
 
 #define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE

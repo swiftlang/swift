@@ -313,6 +313,13 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       CheckInconsistentSPIOnlyImportsRequest{SF},
       {});
 
+  if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+    evaluateOrDefault(
+      Ctx.evaluator,
+      CheckInconsistentAccessLevelOnImport{SF},
+      {});
+  }
+
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
@@ -364,6 +371,10 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   class DerivativeFinder : public ASTWalker {
   public:
     DerivativeFinder() {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
@@ -442,6 +453,10 @@ namespace {
     BindGenericParamsWalker(DeclContext *dc,
                             GenericParamList *params)
         : dc(dc), params(params) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {

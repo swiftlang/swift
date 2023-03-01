@@ -2303,8 +2303,8 @@ bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
 
   // FIXME: this should be 'borrowing'
   diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
-           "__shared", "for an immutable reference")
-      .fixItInsert(repr->getStartLoc(), "__shared ");
+           "borrowing", "for an immutable reference")
+      .fixItInsert(repr->getStartLoc(), "borrowing ");
 
   diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
            "inout", "for a mutable reference")
@@ -2312,8 +2312,8 @@ bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
 
   // FIXME: this should be 'consuming'
   diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
-           "__owned", "to take the value from callers")
-      .fixItInsert(repr->getStartLoc(), "__owned ");
+           "consuming", "to take the value from the caller")
+      .fixItInsert(repr->getStartLoc(), "consuming ");
 
   // to avoid duplicate diagnostics
   repr->setInvalid();
@@ -2352,11 +2352,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Attributed:
     return resolveAttributedType(cast<AttributedTypeRepr>(repr), options);
-  case TypeReprKind::InOut:
-  case TypeReprKind::Shared:
-  case TypeReprKind::Owned:
+  case TypeReprKind::Ownership:
     return resolveOwnershipTypeRepr(cast<OwnershipTypeRepr>(repr), options);
-
   case TypeReprKind::Isolated:
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
   case TypeReprKind::CompileTimeConst:
@@ -3362,16 +3359,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
-        case TypeReprKind::Shared:
-          ownership = ValueOwnership::Shared;
-          nestedRepr = specifierRepr->getBase();
-          continue;
-        case TypeReprKind::InOut:
-          ownership = ValueOwnership::InOut;
-          nestedRepr = specifierRepr->getBase();
-            continue;
-        case TypeReprKind::Owned:
-          ownership = ValueOwnership::Owned;
+        case TypeReprKind::Ownership:
+          ownership = cast<OwnershipTypeRepr>(specifierRepr)->getValueOwnership();
           nestedRepr = specifierRepr->getBase();
           continue;
         case TypeReprKind::Isolated:
@@ -4232,6 +4221,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
                                        TypeResolutionOptions options) {
+  auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr);
   // ownership is only valid for (non-Subscript and non-EnumCaseDecl)
   // function parameters.
   if (!options.is(TypeResolverContext::FunctionInput) ||
@@ -4247,24 +4237,14 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
       diagID = diag::attr_only_on_parameters;
     }
     StringRef name;
-    switch (repr->getKind()) {
-    case TypeReprKind::InOut:
-      name = "inout";
-      break;
-    case TypeReprKind::Shared:
-      name = "__shared"; // FIXME: use 'borrowing'
-      break;
-    case TypeReprKind::Owned:
-      name = "__owned";  // FIXME: use 'consuming'
-      break;
-    default:
-      llvm_unreachable("unknown SpecifierTypeRepr kind");
+    if (ownershipRepr) {
+      name = ownershipRepr->getSpecifierSpelling();
     }
     diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
     return ErrorType::get(getASTContext());
   }
 
-  if (isa<InOutTypeRepr>(repr)
+  if (ownershipRepr && ownershipRepr->getSpecifier() == ParamSpecifier::InOut
       && !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr->getBase())) {
     // Anything within an inout isn't a parameter anymore.
     options.setContext(TypeResolverContext::InoutFunctionInput);
@@ -5035,6 +5015,10 @@ public:
   ExistentialTypeVisitor(ASTContext &ctx, bool checkStatements)
     : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) { }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     reprStack.push_back(T);
 
@@ -5099,7 +5083,7 @@ public:
     case TypeReprKind::Attributed:
     case TypeReprKind::Error:
     case TypeReprKind::Function:
-    case TypeReprKind::InOut:
+    case TypeReprKind::Ownership:
     case TypeReprKind::Composition:
     case TypeReprKind::OpaqueReturn:
     case TypeReprKind::NamedOpaqueReturn:
@@ -5113,8 +5097,6 @@ public:
     case TypeReprKind::Fixed:
     case TypeReprKind::Array:
     case TypeReprKind::SILBox:
-    case TypeReprKind::Shared:
-    case TypeReprKind::Owned:
     case TypeReprKind::Isolated:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:

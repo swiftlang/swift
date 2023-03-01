@@ -187,6 +187,11 @@ bool swift::ide::canDeclContextHandleAsync(const DeclContext *DC) {
       const ClosureExpr *Target;
       bool Result = false;
 
+      /// Walk everything in a macro.
+      MacroWalking getMacroWalkingBehavior() const override {
+        return MacroWalking::ArgumentsAndExpansion;
+      }
+
       AsyncClosureChecker(const ClosureExpr *Target) : Target(Target) {}
 
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -3229,6 +3234,11 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
 
   public:
     SmallVector<Identifier, 2> Result;
+
+    /// Walk only the arguments of a macro.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
 
     LabelFinder(SourceManager &SM, SourceLoc TargetLoc, bool IsContinue)
         : SM(SM), TargetLoc(TargetLoc), IsContinue(IsContinue) {}

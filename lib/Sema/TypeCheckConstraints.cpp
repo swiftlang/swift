@@ -290,6 +290,10 @@ class FunctionSyntacticDiagnosticWalker : public ASTWalker {
 public:
   FunctionSyntacticDiagnosticWalker(DeclContext *dc) { dcStack.push_back(dc); }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
 
@@ -1156,6 +1160,10 @@ TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
         setType(E, ParenType::get(Ctx, getType(PE->getSubExpr())));
 
       return Action::Continue(E);
+    }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
     }
 
   private:
@@ -2307,6 +2315,10 @@ void ConstraintSystem::forEachExpr(
     ChildWalker(ConstraintSystem &CS,
                 llvm::function_ref<Expr *(Expr *)> callback)
         : CS(CS), callback(callback) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       auto *NewE = callback(E);

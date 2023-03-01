@@ -85,6 +85,15 @@ if (SWIFT_SWIFT_PARSER)
     endforeach()
   endfunction()
 
+  # Workaround to touch the library and its objects so that we don't continually rebuild (again, see
+  # corresponding change in swift-syntax).
+  add_custom_command(
+      TARGET swiftASTGen
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:swiftASTGen> $<TARGET_OBJECTS:swiftASTGen>
+      COMMAND_EXPAND_LISTS
+      COMMENT "Update mtime of library outputs workaround")
+
   set(SWIFT_SYNTAX_MODULES
     SwiftBasicFormat
     SwiftParser

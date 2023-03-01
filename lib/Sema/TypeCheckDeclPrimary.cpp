@@ -1959,6 +1959,7 @@ public:
       if (target &&
           !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
           !ID->getAttrs().hasAttribute<SPIOnlyAttr>() &&
+          ID->getAccessLevel() == AccessLevel::Public &&
           target->getLibraryLevel() == LibraryLevel::SPI) {
 
         auto &diags = ID->getASTContext().Diags;

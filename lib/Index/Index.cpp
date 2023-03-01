@@ -586,10 +586,9 @@ public:
     assert(Cancelled || Containers.empty());
   }
 
-  // FIXME: The index should walk expansions but give locations to the
-  // expansion site instead.
-  bool shouldWalkMacroExpansions() override {
-    return true;
+  /// Walk both the arguments and expansion of the macro, so we index both.Only walk the arguments of a macro, to represent the source as written.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
   }
 
   void visitModule(ModuleDecl &Mod);

@@ -81,6 +81,8 @@ StringRef Stmt::getDescriptiveKindName(StmtKind K) {
     return "return";
   case StmtKind::Throw:
     return "throw";
+  case StmtKind::Forget:
+    return "forget";
   case StmtKind::PoundAssert:
     return "#assert";
   }
@@ -245,6 +247,11 @@ ASTNode BraceStmt::findAsyncNode() {
   class FindInnerAsync : public ASTWalker {
     ASTNode AsyncNode;
 
+    /// Walk only the macro arguments.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // If we've found an 'await', record it and terminate the traversal.
       if (isa<AwaitExpr>(expr)) {
@@ -333,6 +340,7 @@ SourceLoc YieldStmt::getEndLoc() const {
 
 SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
+SourceLoc ForgetStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
 SourceLoc DeferStmt::getEndLoc() const {
   return tempDecl->getBody()->getEndLoc();

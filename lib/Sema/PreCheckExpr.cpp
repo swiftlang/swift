@@ -993,6 +993,10 @@ namespace {
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     VarDecl *getImplicitSelfDeclForSuperContext(SourceLoc Loc) ;
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
@@ -1537,6 +1541,10 @@ bool PreCheckExpression::correctInterpolationIfStrange(
 
   public:
     StrangeInterpolationRewriter(ASTContext &Ctx) : Context(Ctx) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     virtual PreWalkAction walkToDeclPre(Decl *D) override {
       // We don't want to look inside decls.

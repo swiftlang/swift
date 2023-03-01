@@ -459,7 +459,7 @@ public:
   virtual TypeLayoutEntry
   *buildTypeLayoutEntry(IRGenModule &IGM,
                         SILType T,
-                        bool useStructLayouts = false) const = 0;
+                        bool useStructLayouts) const = 0;
 
   virtual bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                          ReferenceCounting *rc) const {

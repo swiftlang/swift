@@ -2232,7 +2232,7 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
   case CopyDestroyStrategy::ForwardToPayload:
     return cases[0]->refCountString(IGM, B, genericSig);
   case CopyDestroyStrategy::Normal: {
-    if (genericSig || !isFixedSize(IGM)) {
+    if (!isFixedSize(IGM)) {
       //      B.addResilientRefCount(accessor);
       return false;
     }

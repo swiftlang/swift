@@ -1367,6 +1367,11 @@ void SILParser::bindSILGenericParams(TypeRepr *TyR) {
   public:
     HandleSILGenericParamsWalker(SourceFile *SF) : SF(SF) {}
 
+    /// Walk everything in a macro
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (auto fnType = dyn_cast<FunctionTypeRepr>(T)) {
         if (auto *genericParams = fnType->getGenericParams()) {

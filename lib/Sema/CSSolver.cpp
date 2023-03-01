@@ -976,6 +976,10 @@ void ConstraintSystem::shrink(Expr *expr) {
     ExprCollector(Expr *expr, ConstraintSystem &cs, DomainMap &domains)
         : PrimaryExpr(expr), CS(cs), Domains(domains) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // A dictionary expression is just a set of tuples; try to solve ones
       // that have overload sets.
