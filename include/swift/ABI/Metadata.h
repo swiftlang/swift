@@ -4915,22 +4915,27 @@ class TargetPackPointer {
 public:
   explicit TargetPackPointer(typename Runtime::StoredSize rawPtr) : Ptr(rawPtr) {}
 
+  explicit TargetPackPointer(const void *rawPtr)
+    : Ptr(reinterpret_cast<typename Runtime::StoredSize>(rawPtr)) {}
+
   explicit TargetPackPointer(PointerType const *ptr, PackLifetime lifetime)
     : Ptr(reinterpret_cast<typename Runtime::StoredSize>(ptr) |
           (lifetime == PackLifetime::OnHeap ? 1 : 0)) {}
 
+  // Strips off the LSB.
   const PointerType *getElements() const {
     return reinterpret_cast<const PointerType *>(Ptr & ~1);
   }
 
+  // Strips off the LSB.
   PointerType *getElements() {
     return reinterpret_cast<PointerType *>(Ptr & ~1);
   }
 
+  // Leaves the LSB.
   const PointerType *getPointer() const {
     return reinterpret_cast<const PointerType *>(Ptr);
   }
-
 
   PackLifetime getLifetime() const {
     return (bool)(Ptr & 1) ? PackLifetime::OnHeap : PackLifetime::OnStack;
