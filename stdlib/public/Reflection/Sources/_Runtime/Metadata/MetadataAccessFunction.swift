@@ -37,7 +37,8 @@ extension Metadata {
     @available(SwiftStdlib 5.9, *)
     @inlinable
     public func callAsFunction(_ request: Request) -> Metadata {
-      let fn = unsafeBitCast(ptr, to: AccessFn0.self)
+      let signedPtr = PtrAuth.signAccessFn0(ptr)
+      let fn = unsafeBitCast(signedPtr, to: AccessFn0.self)
 
       return fn(request).metadata
     }
@@ -76,7 +77,8 @@ extension Metadata {
       _ request: Request,
       _ arg0: UnsafeRawPointer
     ) -> Metadata {
-      let fn = unsafeBitCast(ptr, to: AccessFn1.self)
+      let signedPtr = PtrAuth.signAccessFn1(ptr)
+      let fn = unsafeBitCast(signedPtr, to: AccessFn1.self)
 
       return fn(request, arg0).metadata
     }
@@ -119,7 +121,8 @@ extension Metadata {
       _ arg0: UnsafeRawPointer,
       _ arg1: UnsafeRawPointer
     ) -> Metadata {
-      let fn = unsafeBitCast(ptr, to: AccessFn2.self)
+      let signedPtr = PtrAuth.signAccessFn2(ptr)
+      let fn = unsafeBitCast(signedPtr, to: AccessFn2.self)
 
       return fn(request, arg0, arg1).metadata
     }
@@ -166,7 +169,8 @@ extension Metadata {
       _ arg1: UnsafeRawPointer,
       _ arg2: UnsafeRawPointer
     ) -> Metadata {
-      let fn = unsafeBitCast(ptr, to: AccessFn3.self)
+      let signedPtr = PtrAuth.signAccessFn3(ptr)
+      let fn = unsafeBitCast(signedPtr, to: AccessFn3.self)
 
       return fn(request, arg0, arg1, arg2).metadata
     }
@@ -187,7 +191,8 @@ extension Metadata {
       _ request: Request,
       _ args: [any Any.Type]
     ) -> Metadata {
-      let fn = unsafeBitCast(ptr, to: AccessFnMany.self)
+      let signedPtr = PtrAuth.signAccessFnMany(ptr)
+      let fn = unsafeBitCast(signedPtr, to: AccessFnMany.self)
 
       return args.withUnsafeBufferPointer {
         fn(
@@ -205,7 +210,8 @@ extension Metadata {
       _ request: Request,
       _ args: [Metadata]
     ) -> Metadata {
-      let fn = unsafeBitCast(ptr, to: AccessFnMany.self)
+      let signedPtr = PtrAuth.signAccessFnMany(ptr)
+      let fn = unsafeBitCast(signedPtr, to: AccessFnMany.self)
       
       return args.withUnsafeBufferPointer {
         fn(
@@ -234,7 +240,8 @@ extension Metadata {
       _ request: Request,
       _ args: UnsafeBufferPointer<UnsafeRawPointer>
     ) -> Metadata {
-      let fn = unsafeBitCast(ptr, to: AccessFnMany.self)
+      let signedPtr = PtrAuth.signAccessFnMany(ptr)
+      let fn = unsafeBitCast(signedPtr, to: AccessFnMany.self)
 
       return fn(request, args.baseAddress.unsafelyUnwrapped).metadata
     }

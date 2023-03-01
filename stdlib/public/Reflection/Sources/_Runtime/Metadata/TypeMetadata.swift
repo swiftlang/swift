@@ -42,7 +42,7 @@ extension TypeMetadata {
 
     address = address.unprotectedLoad(as: UnsafeRawPointer.self)
 
-    return TypeDescriptor(address)
+    return PtrAuth.signDescriptor(TypeDescriptor(address))
   }
 
   @inlinable
