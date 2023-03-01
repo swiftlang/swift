@@ -2210,23 +2210,18 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   if (auto isolated = dyn_cast<IsolatedTypeRepr>(nestedRepr))
     nestedRepr = isolated->getBase();
   
-  if (isa<InOutTypeRepr>(nestedRepr) &&
-      param->isDefaultArgument()) {
-    auto &ctx = param->getASTContext();
-    ctx.Diags.diagnose(param->getStructuralDefaultExpr()->getLoc(),
-                       swift::diag::cannot_provide_default_value_inout,
-                       param->getName());
-    return ParamSpecifier::Default;
+  if (auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(nestedRepr)) {
+    if (ownershipRepr->getSpecifier() == ParamSpecifier::InOut
+        && param->isDefaultArgument()) {
+      auto &ctx = param->getASTContext();
+      ctx.Diags.diagnose(param->getStructuralDefaultExpr()->getLoc(),
+                         swift::diag::cannot_provide_default_value_inout,
+                         param->getName());
+      return ParamSpecifier::Default;
+    }
+    return ownershipRepr->getSpecifier();
   }
-
-  if (isa<InOutTypeRepr>(nestedRepr)) {
-    return ParamSpecifier::InOut;
-  } else if (isa<SharedTypeRepr>(nestedRepr)) {
-    return ParamSpecifier::Shared;
-  } else if (isa<OwnedTypeRepr>(nestedRepr)) {
-    return ParamSpecifier::Owned;
-  }
-
+  
   return ParamSpecifier::Default;
 }
 

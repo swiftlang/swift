@@ -7,16 +7,6 @@ func test2(inout let x : Int) {}  // expected-warning {{'let' in this position i
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{12-17=}} {{26-26=inout }}
 func test3(f : (inout _ x : Int) -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
 
-func test1s(__shared var x : Int) {}  // expected-warning {{'var' in this position is interpreted as an argument label}} {{22-25=`var`}}
-// expected-error @-1 {{'__shared' before a parameter name is not allowed, place it before the parameter type instead}} {{13-21=}} {{30-30=__shared }}
-func test2s(__shared let x : Int) {}  // expected-warning {{'let' in this position is interpreted as an argument label}} {{22-25=`let`}}
-// expected-error @-1 {{'__shared' before a parameter name is not allowed, place it before the parameter type instead}} {{13-21=}} {{30-30=__shared }}
-
-func test1o(__owned var x : Int) {}  // expected-warning {{'var' in this position is interpreted as an argument label}} {{21-24=`var`}}
-// expected-error @-1 {{'__owned' before a parameter name is not allowed, place it before the parameter type instead}} {{13-20=}}
-func test2o(__owned let x : Int) {}  // expected-warning {{'let' in this position is interpreted as an argument label}} {{21-24=`let`}}
-// expected-error @-1 {{'__owned' before a parameter name is not allowed, place it before the parameter type instead}} {{13-20=}}
-
 func test3() {
   undeclared_func( // expected-error {{cannot find 'undeclared_func' in scope}}
 } // expected-error {{expected expression in list of expressions}}
@@ -94,15 +84,15 @@ do {
 // https://github.com/apple/swift/issues/43591
 // Two inout crash compiler
 
-func f1_43591(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{19-25=}}
+func f1_43591(a : inout inout Int) {}  // expected-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} {{19-25=}}
 func f2_43591(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{15-20=}} {{30-30=inout }}
-// expected-error@-1 {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{21-27=}}
+// expected-error@-1 {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} {{21-27=}}
 func f3_43591(let let a: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{15-18=`let`}}
 // expected-error @-1 {{expected ',' separator}} {{22-22=,}}
 // expected-error @-2 {{expected ':' following argument label and parameter name}}
 // expected-warning @-3 {{extraneous duplicate parameter name; 'let' already has an argument label}} {{15-19=}}
-func f4_43591(inout x: inout String) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{15-20=}}
-func f5_43591(inout i: inout Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{15-20=}}
+func f4_43591(inout x: inout String) {} // expected-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}}
+func f5_43591(inout i: inout Int) {} // expected-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} {{15-20=}}
 
 func repeat() {}
 // expected-error @-1 {{keyword 'repeat' cannot be used as an identifier here}}

@@ -1015,19 +1015,8 @@ namespace {
       }
 
       if (auto specifier = P->getCachedSpecifier()) {
-        switch (*specifier) {
-        case ParamDecl::Specifier::Default:
-          /* nothing */
-          break;
-        case ParamDecl::Specifier::InOut:
-          OS << " inout";
-          break;
-        case ParamDecl::Specifier::Shared:
-          OS << " shared";
-          break;
-        case ParamDecl::Specifier::Owned:
-          OS << " owned";
-          break;
+        if (*specifier != ParamDecl::Specifier::Default) {
+          OS << ' ' << ParamDecl::getSpecifierSpelling(*specifier);
         }
       }
 
@@ -3260,24 +3249,15 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitInOutTypeRepr(InOutTypeRepr *T) {
-    printCommon("type_inout") << '\n';
+  void visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
+    printCommon("type_ownership")
+      << ' '
+      << T->getSpecifierSpelling()
+      << '\n';
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   
-  void visitSharedTypeRepr(SharedTypeRepr *T) {
-    printCommon("type_shared") << '\n';
-    printRec(T->getBase());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
-  void visitOwnedTypeRepr(OwnedTypeRepr *T) {
-    printCommon("type_owned") << '\n';
-    printRec(T->getBase());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
   void visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
     printCommon("isolated") << '\n';
     printRec(T->getBase());

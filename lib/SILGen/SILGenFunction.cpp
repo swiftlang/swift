@@ -1140,7 +1140,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                      SourceLoc(),
                                      ctx.getIdentifier("$input_value"),
                                      dc);
-    param->setSpecifier(ParamSpecifier::Owned);
+    param->setSpecifier(ParamSpecifier::LegacyOwned);
     param->setImplicit();
     auto vd = cast<VarDecl>(function.getDecl());
     if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {

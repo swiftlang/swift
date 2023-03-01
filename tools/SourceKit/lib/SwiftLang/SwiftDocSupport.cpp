@@ -917,8 +917,8 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
 
     if (auto typeRepr = param->getTypeRepr()) {
       SourceRange TypeRange = typeRepr->getSourceRange();
-      if (auto InOutTyR = dyn_cast_or_null<InOutTypeRepr>(typeRepr))
-        TypeRange = InOutTyR->getBase()->getSourceRange();
+      if (auto OwnTyR = dyn_cast_or_null<OwnershipTypeRepr>(typeRepr))
+        TypeRange = OwnTyR->getBase()->getSourceRange();
       if (TypeRange.isInvalid())
         continue;
 

@@ -149,15 +149,7 @@ public:
     return visit(T->getTypeRepr());
   }
 
-  FoundResult visitInOutTypeRepr(InOutTypeRepr *T) {
-    return visit(T->getBase());
-  }
-
-  FoundResult visitSharedTypeRepr(SharedTypeRepr *T) {
-    return visit(T->getBase());
-  }
-
-  FoundResult visitOwnedTypeRepr(OwnedTypeRepr *T) {
+  FoundResult visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
     return visit(T->getBase());
   }
 

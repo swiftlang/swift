@@ -40,6 +40,8 @@ namespace swift {
   class TupleTypeRepr;
   class TypeDecl;
 
+enum class ParamSpecifier : uint8_t;
+
 enum class TypeReprKind : uint8_t {
 #define TYPEREPR(ID, PARENT) ID,
 #define LAST_TYPEREPR(ID) Last_TypeRepr = ID,
@@ -1062,9 +1064,7 @@ public:
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
   
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::InOut ||
-           T->getKind() == TypeReprKind::Shared ||
-           T->getKind() == TypeReprKind::Owned ||
+    return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
            T->getKind() == TypeReprKind::CompileTimeConst;
   }
@@ -1077,71 +1077,36 @@ private:
   friend class TypeRepr;
 };
 
-// This repr holds types that are associated with some ownership specifier
-// like 'inout', '__shared', etc. It's a simple grouping of those specifiers.
-class OwnershipTypeRepr : public SpecifierTypeRepr {
-public:
-  OwnershipTypeRepr(TypeReprKind Kind, TypeRepr *Base, SourceLoc OwnershipLoc)
-      : SpecifierTypeRepr(Kind, Base, OwnershipLoc) {
-    assert(OwnershipTypeRepr::classof(cast<TypeRepr>(this)));
-  }
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::InOut ||
-           T->getKind() == TypeReprKind::Shared ||
-           T->getKind() == TypeReprKind::Owned;
-  }
-  static bool classof(const OwnershipTypeRepr *T) { return true; }
-  friend class SpecifierTypeRepr;
-};
-  
-/// An 'inout' type.
+/// A parameter type with an ownership specifier, such as `inout`, `borrowing`,
+/// or `consuming`.
 /// \code
 ///   x : inout Int
+///   y : consuming Int
+///   z : borrowing Int
 /// \endcode
-class InOutTypeRepr : public OwnershipTypeRepr {
+
+class OwnershipTypeRepr : public SpecifierTypeRepr {
+  ParamSpecifier Specifier;
 public:
-  InOutTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-    : OwnershipTypeRepr(TypeReprKind::InOut, Base, InOutLoc) {}
+  OwnershipTypeRepr(TypeRepr *Base, ParamSpecifier Specifier,
+                    SourceLoc ModifierLoc)
+    : SpecifierTypeRepr(TypeReprKind::Ownership, Base, ModifierLoc),
+      Specifier(Specifier) {}
   
+  ParamSpecifier getSpecifier() const { return Specifier; }
+  
+  /// Return the \c ValueOwnership kind that corresponds to the specifier.
+  ValueOwnership getValueOwnership() const;
+  
+  /// Return the spelling of the ownership specifier as a string.
+  StringRef getSpecifierSpelling() const;
+
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::InOut;
+    return T->getKind() == TypeReprKind::Ownership;
   }
-  static bool classof(const InOutTypeRepr *T) { return true; }
+  static bool classof(const OwnershipTypeRepr *T) { return true; }
 };
   
-/// A 'borrowing' parameter type.
-/// \code
-///   x : borrowing Int
-/// \endcode
-/// Historically, this attribute was spelled '__shared'.
-class SharedTypeRepr : public OwnershipTypeRepr {
-public:
-  SharedTypeRepr(TypeRepr *Base, SourceLoc SharedLoc)
-    : OwnershipTypeRepr(TypeReprKind::Shared, Base, SharedLoc) {}
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Shared;
-  }
-  static bool classof(const SharedTypeRepr *T) { return true; }
-};
-
-/// A 'consuming' parameter type.
-/// \code
-///   x : consuming Int
-/// \endcode
-/// Historically, this attribute was spelled '__owned'.
-class OwnedTypeRepr : public OwnershipTypeRepr {
-public:
-  OwnedTypeRepr(TypeRepr *Base, SourceLoc OwnedLoc)
-      : OwnershipTypeRepr(TypeReprKind::Owned, Base, OwnedLoc) {}
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Owned;
-  }
-  static bool classof(const OwnedTypeRepr *T) { return true; }
-};
-
 /// An 'isolated' type.
 /// \code
 ///   x : isolated Actor
@@ -1449,7 +1414,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Attributed:
   case TypeReprKind::Error:
   case TypeReprKind::Function:
-  case TypeReprKind::InOut:
+  case TypeReprKind::Ownership:
   case TypeReprKind::Composition:
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
@@ -1471,8 +1436,6 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:
   case TypeReprKind::SILBox:
-  case TypeReprKind::Shared:
-  case TypeReprKind::Owned:
   case TypeReprKind::Isolated:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:

@@ -2628,13 +2628,11 @@ directReferencesForTypeRepr(Evaluator &evaluator,
 
   case TypeReprKind::Error:
   case TypeReprKind::Function:
-  case TypeReprKind::InOut:
+  case TypeReprKind::Ownership:
   case TypeReprKind::Isolated:
   case TypeReprKind::CompileTimeConst:
   case TypeReprKind::Metatype:
-  case TypeReprKind::Owned:
   case TypeReprKind::Protocol:
-  case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
   case TypeReprKind::Pack:
