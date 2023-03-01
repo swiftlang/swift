@@ -6,7 +6,10 @@
 
 protocol MyProto {}
 protocol Bird {}
+
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 struct UnderlyingToOpaquePropertyStruct : MyProto {
+    @available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
     var warbler: some Bird {
         Warbler("blue")
     }

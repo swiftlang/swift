@@ -311,6 +311,25 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       return extractCompileTimeValue(underlyingToOpaque->getSubExpr());
     }
 
+    case ExprKind::DefaultArgument: {
+      auto defaultArgExpr = cast<DefaultArgumentExpr>(expr);
+      auto *decl = defaultArgExpr->getParamDecl();
+      // If there is a default expr, we should have looked through to it
+      assert(!decl->hasDefaultExpr());
+      switch (decl->getDefaultArgumentKind()) {
+      case DefaultArgumentKind::NilLiteral:
+        return std::make_shared<RawLiteralValue>("nil");
+      case DefaultArgumentKind::EmptyArray:
+        return std::make_shared<ArrayValue>(
+            std::vector<std::shared_ptr<CompileTimeValue>>());
+      case DefaultArgumentKind::EmptyDictionary:
+        return std::make_shared<DictionaryValue>(
+            std::vector<std::shared_ptr<TupleValue>>());
+      default:
+        break;
+      }
+    } break;
+
     default: {
       break;
     }
