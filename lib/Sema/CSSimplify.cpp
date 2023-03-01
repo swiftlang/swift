@@ -4843,7 +4843,7 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
 /// \return true if at least some of the failures has been repaired
 /// successfully, which allows type matcher to continue.
 bool ConstraintSystem::repairFailures(
-    Type lhs, Type rhs, ConstraintKind matchKind,
+    Type lhs, Type rhs, ConstraintKind matchKind, TypeMatchOptions flags,
     SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
     ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
@@ -5344,7 +5344,7 @@ bool ConstraintSystem::repairFailures(
       // let's re-attempt to repair without l-value conversion in the
       // locator to fix underlying type mismatch.
       if (path.back().is<LocatorPathElt::FunctionResult>()) {
-        return repairFailures(lhs, rhs, matchKind, conversionsOrFixes,
+        return repairFailures(lhs, rhs, matchKind, flags, conversionsOrFixes,
                               getConstraintLocator(anchor, path));
       }
 
@@ -6133,7 +6133,7 @@ bool ConstraintSystem::repairFailures(
     if (!path.empty() && path.back().is<LocatorPathElt::PackType>())
       path.pop_back();
 
-    return repairFailures(lhs, rhs, matchKind, conversionsOrFixes,
+    return repairFailures(lhs, rhs, matchKind, flags, conversionsOrFixes,
                           getConstraintLocator(anchor, path));
   }
 
@@ -6377,7 +6377,7 @@ bool ConstraintSystem::repairFailures(
       path.pop_back();
 
     if (!path.empty() && path.back().is<LocatorPathElt::AnyRequirement>()) {
-      return repairFailures(lhs, rhs, matchKind, conversionsOrFixes,
+      return repairFailures(lhs, rhs, matchKind, flags, conversionsOrFixes,
                             getConstraintLocator(anchor, path));
     }
 
@@ -7479,7 +7479,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Attempt fixes iff it's allowed, both types are concrete and
   // we are not in the middle of attempting one already.
   if (shouldAttemptFixes() && !flags.contains(TMF_ApplyingFix)) {
-    if (repairFailures(type1, type2, kind, conversionsOrFixes, locator)) {
+    if (repairFailures(type1, type2, kind, flags, conversionsOrFixes,
+                       locator)) {
       if (conversionsOrFixes.empty())
         return getTypeMatchSuccess();
     }

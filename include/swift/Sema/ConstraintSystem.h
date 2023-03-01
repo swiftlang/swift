@@ -5257,6 +5257,7 @@ public:
   /// \return true if at least some of the failures has been repaired
   /// successfully, which allows type matcher to continue.
   bool repairFailures(Type lhs, Type rhs, ConstraintKind matchKind,
+                      TypeMatchOptions flags,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
 
