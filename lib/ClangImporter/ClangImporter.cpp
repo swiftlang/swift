@@ -6584,6 +6584,35 @@ void ClangImporter::withSymbolicFeatureEnabled(
       oldImportSymbolicCXXDecls.get());
 }
 
+const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(
+    const clang::Decl *candidateDecl) {
+
+  if (!Impl.SwiftContext.LangOpts.EnableCXXInterop)
+    return nullptr;
+
+  auto enumDecl = dyn_cast<clang::EnumDecl>(candidateDecl);
+  if (!enumDecl)
+    return nullptr;
+
+  if (!enumDecl->getDeclName().isEmpty())
+    return nullptr;
+
+  if (auto typedefType = dyn_cast<clang::TypedefType>(
+          enumDecl->getIntegerType().getTypePtr())) {
+    if (auto enumExtensibilityAttr =
+            typedefType->getDecl()->getAttr<clang::EnumExtensibilityAttr>();
+        enumExtensibilityAttr &&
+        enumExtensibilityAttr->getExtensibility() ==
+            clang::EnumExtensibilityAttr::Open &&
+        typedefType->getDecl()->hasAttr<clang::FlagEnumAttr>()) {
+      return Impl.isUnavailableInSwift(typedefType->getDecl()) ? typedefType
+                                                               : nullptr;
+    }
+  }
+
+  return nullptr;
+}
+
 bool importer::requiresCPlusPlus(const clang::Module *module) {
   // The libc++ modulemap doesn't currently declare the requirement.
   if (module->getTopLevelModuleName() == "std")
