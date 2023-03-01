@@ -2700,9 +2700,9 @@ function(add_swift_target_executable name)
   # All Swift executables depend on the swiftSwiftOnoneSupport library.
   list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
 
-  set(THIN_INPUT_TARGETS)
-
   foreach(sdk ${SWIFT_SDKS})
+    set(THIN_INPUT_TARGETS)
+
     # Collect architecture agnostic SDK module dependencies
     set(swiftexe_module_depends_flattened ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS})
     if(${sdk} STREQUAL OSX)
