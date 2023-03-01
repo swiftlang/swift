@@ -50,6 +50,8 @@ extern llvm::cl::opt<bool> SILPrintInliningCallerBefore;
 
 extern llvm::cl::opt<bool> SILPrintInliningCallerAfter;
 
+extern llvm::cl::opt<bool> EnableVerifyAfterEachInlining;
+
 extern void printInliningDetailsCallee(StringRef passName, SILFunction *caller,
                                        SILFunction *callee);
 
@@ -954,6 +956,14 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
       // nextBB will point to the last inlined block
       SILBasicBlock *lastBB =
           Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
+
+      // When inlining an OSSA function into a non-OSSA function, ownership of
+      // nonescaping closures is lowered.  At that point, they are recognized
+      // as stack users.  Since they weren't recognized as such before, they
+      // may not satisfy stack discipline.  Fix that up now.
+      invalidatedStackNesting |=
+          (CalleeFunction->hasOwnership() && !F->hasOwnership());
+
       if (SILPrintInliningCallerAfter) {
         printInliningDetailsCallerAfter("MandatoryInlining", F, CalleeFunction);
       }
@@ -971,6 +981,16 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
       // Record that we inlined into this function so that we can invalidate it
       // later.
       changedFunctions.insert(F);
+
+      if (EnableVerifyAfterEachInlining) {
+        if (invalidatedStackNesting) {
+          StackNesting::fixNesting(F);
+          changedFunctions.insert(F);
+          invalidatedStackNesting = false;
+        }
+
+        F->verify();
+      }
 
       // Resume inlining within nextBB, which contains only the inlined
       // instructions and possibly instructions in the original call block that
