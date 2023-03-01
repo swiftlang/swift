@@ -598,7 +598,7 @@ public:
 
     // If we were given any parameters that apply to this brace block, we insert
     // log calls for them now (before any of the other statements).
-    if (PL) {
+    if (PL && !HighPerformance) {
       size_t EI = 0;
       for (const auto &PD : *PL) {
         // Skip parameters that don't have a name (such as `_` in a closure).
