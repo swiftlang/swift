@@ -3415,10 +3415,10 @@ namespace {
       }
 
       case OverloadChoiceKind::MaterializePack: {
-        auto packType = simplifyType(cs.getType(expr));
+        auto packType = solution.getResolvedType(expr);
         return cs.cacheType(
             MaterializePackExpr::create(cs.getASTContext(),
-                                        base, /*implicit=*/false,
+                                        base, expr->getEndLoc(),
                                         packType));
       }
 

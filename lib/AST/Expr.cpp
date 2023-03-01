@@ -1307,8 +1307,10 @@ PackElementExpr::create(ASTContext &ctx, SourceLoc eachLoc, Expr *packRefExpr,
 
 MaterializePackExpr *
 MaterializePackExpr::create(ASTContext &ctx, Expr *fromExpr,
-                            bool implicit, Type type) {
-  return new (ctx) MaterializePackExpr(fromExpr, implicit, type);
+                            SourceLoc elementLoc,
+                            Type type, bool implicit) {
+  return new (ctx) MaterializePackExpr(fromExpr, elementLoc,
+                                       type, implicit);
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {

@@ -3659,14 +3659,18 @@ class MaterializePackExpr final : public Expr {
   /// The expression from which to materialize a pack.
   Expr *FromExpr;
 
-  MaterializePackExpr(Expr *fromExpr, bool implicit, Type type)
+  /// The source location of \c .element
+  SourceLoc ElementLoc;
+
+  MaterializePackExpr(Expr *fromExpr, SourceLoc elementLoc,
+                      Type type, bool implicit)
       : Expr(ExprKind::MaterializePack, implicit, type),
-        FromExpr(fromExpr) {}
+        FromExpr(fromExpr), ElementLoc(elementLoc) {}
 
 public:
   static MaterializePackExpr *create(ASTContext &ctx, Expr *fromExpr,
-                                     bool implicit = false,
-                                     Type type = Type());
+                                     SourceLoc elementLoc, Type type,
+                                     bool implicit = false);
 
   Expr *getFromExpr() const { return FromExpr; }
 
@@ -3679,7 +3683,7 @@ public:
   }
 
   SourceLoc getEndLoc() const {
-    return FromExpr->getEndLoc();
+    return ElementLoc;
   }
 
   static bool classof(const Expr *E) {
