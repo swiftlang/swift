@@ -1011,10 +1011,10 @@ ERROR(import_restriction_conflict,none,
       "%select{implementation-only|SPI only|exported}2 ",
       (Identifier, unsigned, unsigned))
 
-WARNING(module_not_compiled_with_library_evolution,none,
-        "module %0 was not compiled with library evolution support; "
-        "using it means binary compatibility for %1 can't be guaranteed",
-        (Identifier, Identifier))
+ERROR(module_not_compiled_with_library_evolution,none,
+      "module %0 was not compiled with library evolution support; "
+      "using it means binary compatibility for %1 can't be guaranteed",
+      (Identifier, Identifier))
 
 ERROR(module_allowable_client_violation,none,
       "module %0 doesn't allow importation from module %1",
@@ -2061,6 +2061,9 @@ ERROR(access_level_on_import_unsupported, none,
       "only 'public', 'package', 'internal', 'fileprivate' and 'private' "
       "are unsupported",
       (DeclAttribute))
+ERROR(access_level_conflict_with_exported,none,
+      "'%0' is incompatible with %1; it can only be applied to public imports",
+      (DeclAttribute, DeclAttribute))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -3163,6 +3166,18 @@ NOTE(spi_only_import_conflict_here,none,
 ERROR(error_public_import_of_private_module,none,
       "private module %0 is imported publicly from the public module %1",
       (Identifier, Identifier))
+
+ERROR(inconsistent_implicit_access_level_on_import,none,
+      "ambiguous implicit access level for import of %0; it is imported as "
+      "'%select{private|fileprivate|internal|package|public|%error}1' elsewhere",
+      (Identifier, AccessLevel))
+NOTE(inconsistent_implicit_access_level_on_import_here,none,
+     "imported "
+     "'%select{private|fileprivate|internal|package|public|%error}0' here",
+     (AccessLevel))
+FIXIT(inconsistent_implicit_access_level_on_import_fixit,
+     "%select{private|fileprivate|internal|package|public|%error}0 ",
+     (AccessLevel))
 
 ERROR(implementation_only_decl_non_override,none,
       "'@_implementationOnly' can only be used on overrides", ())
