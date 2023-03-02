@@ -50,7 +50,7 @@ void _swift_initRuntimePath(void *);
 void _swift_initRootPath(void *);
 const char *_swift_getDefaultRootPath();
 char *_swift_getAuxExePathIn(const char *path, const char *name);
-const char *_swift_tryAuxExePath(const char *name, const char *path, ...);
+char *_swift_tryAuxExePath(const char *name, const char *path, ...);
 
 bool _swift_isPathSep(char ch) {
 #ifdef _WIN32
@@ -443,7 +443,7 @@ _swift_getAuxExePathIn(const char *path, const char *name)
   return fullPath;
 }
 
-const char *
+char *
 _swift_tryAuxExePath(const char *name, const char *path, ...)
 {
   va_list val;
