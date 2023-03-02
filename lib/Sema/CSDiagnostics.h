@@ -224,11 +224,6 @@ protected:
       llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
           [](GenericTypeParamType *, Type) {});
 
-  bool isArrayType(Type type) const {
-    auto &cs = getConstraintSystem();
-    return bool(cs.isArrayType(type));
-  }
-
   bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol) const;
 };
 
