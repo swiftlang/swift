@@ -268,7 +268,12 @@ extension arm_gprs {
   }
   #endif
 
-  #if arch(x86_64)
+  #if os(Windows)
+  struct NotYetImplemented: Error {}
+  public static func withCurrentContext<T>(fn: (X86_64Context) throws -> T) throws -> T {
+    throw NotYetImplemented()
+  }
+  #elseif arch(x86_64)
   @_silgen_name("_swift_get_cpu_context")
   static func _swift_get_cpu_context() -> X86_64Context
 
@@ -418,7 +423,12 @@ extension arm_gprs {
 
   public static var registerCount: Int { return 50 }
 
-  #if arch(i386)
+  #if os(Windows)
+  struct NotYetImplemented: Error {}
+  public static func withCurrentContext<T>(fn: (I386Context) throws -> T) throws -> T {
+    throw NotYetImplemented()
+  }
+  #elseif arch(i386)
   @_silgen_name("_swift_get_cpu_context")
   static func _swift_get_cpu_context() -> I386Context
 
@@ -614,7 +624,12 @@ extension arm_gprs {
   }
 #endif
 
-  #if arch(arm64)
+  #if os(Windows)
+  struct NotYetImplemented: Error {}
+  public static func withCurrentContext<T>(fn: (ARM64Context) throws -> T) throws -> T {
+    throw NotYetImplemented()
+  }
+  #elseif arch(arm64)
   @_silgen_name("_swift_get_cpu_context")
   static func _swift_get_cpu_context() -> ARM64Context
 
@@ -748,14 +763,19 @@ extension arm_gprs {
 
   public static var registerCount: Int { return 16 }
 
-#if arch(arm)
+  #if os(Windows)
+  struct NotYetImplemented: Error {}
+  public static func withCurrentContext<T>(fn: (ARMContext) throws -> T) throws -> T {
+    throw NotYetImplemented()
+  }
+  #elseif arch(arm)
   @_silgen_name("_swift_get_cpu_context")
   static func _swift_get_cpu_context() -> ARMContext
 
   public static func withCurrentContext<T>(fn: (ARMContext) throws -> T) rethrows -> T {
     return try fn(_swift_get_cpu_context())
   }
-#endif
+  #endif
 
   private func isValid(_ register: Register) -> Bool {
     if register.rawValue < 16 {

@@ -2567,6 +2567,11 @@ function(_add_swift_target_executable_single name)
 
   string(MAKE_C_IDENTIFIER "${name}" module_name)
 
+  if(SWIFTEXE_SINGLE_SDK STREQUAL WINDOWS)
+    list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}")
+  endif()
+
   handle_swift_sources(
       dependency_target
       unused_module_dependency_target
@@ -2602,7 +2607,6 @@ function(_add_swift_target_executable_single name)
       ${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE)
     target_include_directories(${name} SYSTEM PRIVATE
       ${${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE})
-
     if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
       # MSVC doesn't support -Xclang. We don't need to manually specify
       # the dependent libraries as `cl` does so.
@@ -2612,6 +2616,7 @@ function(_add_swift_target_executable_single name)
         "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
     endif()
   endif()
+
   target_compile_options(${name} PRIVATE
     ${c_compile_flags})
   target_link_directories(${name} PRIVATE

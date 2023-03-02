@@ -51,6 +51,8 @@ internal func parseUInt64<S: StringProtocol>(_ s: S) -> UInt64? {
   }
 }
 
+#if os(macOS)
+
 struct PosixError: Error {
   var errno: Int32
 
@@ -137,3 +139,4 @@ internal func spawn(_ path: String, args: [String]) throws {
   }
 }
 
+#endif // os(macOS)
