@@ -2068,6 +2068,9 @@ ERROR(access_level_on_import_unsupported, none,
 ERROR(access_level_conflict_with_exported,none,
       "'%0' is incompatible with %1; it can only be applied to public imports",
       (DeclAttribute, DeclAttribute))
+NOTE(module_imported_here,none,
+     "module %0 imported as '%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' here",
+     (Identifier, AccessLevel))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,

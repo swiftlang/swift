@@ -198,9 +198,9 @@ extension PtrAuth {
     let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
       fnPtr.bitPattern._value,
       Key.processIndependentCode._value,
-      UInt64(Builtin.typePtrAuthDiscriminator(
+      Builtin.typePtrAuthDiscriminator(
         Metadata.AccessFunction.AccessFn0.self
-      ))
+      )
     ))
 
     return signedBitPattern.rawPointer
@@ -212,9 +212,9 @@ extension PtrAuth {
     let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
       fnPtr.bitPattern._value,
       Key.processIndependentCode._value,
-      UInt64(Builtin.typePtrAuthDiscriminator(
+      Builtin.typePtrAuthDiscriminator(
         Metadata.AccessFunction.AccessFn1.self
-      ))
+      )
     ))
 
     return signedBitPattern.rawPointer
@@ -226,9 +226,9 @@ extension PtrAuth {
     let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
       fnPtr.bitPattern._value,
       Key.processIndependentCode._value,
-      UInt64(Builtin.typePtrAuthDiscriminator(
+      Builtin.typePtrAuthDiscriminator(
         Metadata.AccessFunction.AccessFn2.self
-      ))
+      )
     ))
 
     return signedBitPattern.rawPointer
@@ -240,9 +240,9 @@ extension PtrAuth {
     let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
       fnPtr.bitPattern._value,
       Key.processIndependentCode._value,
-      UInt64(Builtin.typePtrAuthDiscriminator(
+      Builtin.typePtrAuthDiscriminator(
         Metadata.AccessFunction.AccessFn3.self
-      ))
+      )
     ))
 
     return signedBitPattern.rawPointer
@@ -254,9 +254,9 @@ extension PtrAuth {
     let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
       fnPtr.bitPattern._value,
       Key.processIndependentCode._value,
-      UInt64(Builtin.typePtrAuthDiscriminator(
+      Builtin.typePtrAuthDiscriminator(
         Metadata.AccessFunction.AccessFnMany.self
-      ))
+      )
     ))
 
     return signedBitPattern.rawPointer
