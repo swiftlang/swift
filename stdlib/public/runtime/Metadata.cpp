@@ -6372,7 +6372,7 @@ bool swift::swift_compareProtocolConformanceDescriptors(
   rhs = swift_auth_data_non_address(
       rhs, SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor);
 
-  return MetadataCacheKey::compareProtocolConformanceDescriptors(lhs, rhs) == 0;
+  return MetadataCacheKey::areConformanceDescriptorsEqual(lhs, rhs);
 }
 
 /***************************************************************************/
