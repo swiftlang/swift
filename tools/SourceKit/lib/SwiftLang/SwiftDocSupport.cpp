@@ -510,6 +510,7 @@ static bool initDocEntityInfo(const Decl *D,
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::MacroDecl:
     case DeclContextKind::Package:
+    case DeclContextKind::Root:
       break;
 
     // We report sub-module information only for top-level decls.

@@ -3772,7 +3772,11 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     return AccessLevel::Public;
   }
 
+
   if (useDC) {
+//    if (useDC->getContextKind() == DeclContextKind::Package)
+//      return AccessLevel::Package;
+
     // Check whether we need to modify the access level based on
     // @testable/@_private import attributes.
     auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
@@ -3925,8 +3929,11 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
                                      : AccessLimitKind::None);
   case AccessLevel::Internal:
     return AccessScope(resultDC->getParentModule());
-  case AccessLevel::Package:
-    return AccessScope::getPackage();
+  case AccessLevel::Package: {
+    auto pkg = resultDC->getPackageContext(true);
+    assert(pkg && "decl has package access level but there's no associated package!");
+    return AccessScope(pkg);
+  }
   case AccessLevel::Public:
   case AccessLevel::Open:
     return AccessScope::getPublic();
@@ -3959,6 +3966,8 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
   AccessScope accessScope = getAccessScopeForFormalAccess(
       VD, access, useDC,
       /*treatUsableFromInlineAsPublic*/ includeInlineable);
+  // This check has to be done first, e.g. fileprivate decl in a source file has
+  // the same decl context as its use site. ES TODO: add a !isPackage() == isModuleScope check?
   if (accessScope.getDeclContext() == useDC) return true;
   if (!AccessScope(useDC).isChildOf(accessScope)) return false;
 
@@ -3966,8 +3975,8 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
   if (!useDC) return true;
 
   // Check package access; accessing package decl should not be allowed if package names are different
-  if (accessScope.isPackage())
-    return VD->getDeclContext()->getParentModule()->getPackageName() == useDC->getParentModule()->getPackageName();
+//  if (accessScope.isPackage()) // ES TODO: move this to isChildOf?
+//    return VD->getDeclContext()->getPackageContext()->getName() == useDC->getPackageContext()->getName();
 
   // Check SPI access
   if (!VD->isSPI()) return true;
@@ -4028,8 +4037,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   if (VD->getASTContext().isAccessControlDisabled())
     return true;
 
-  auto access = getAccessLevel();
-  auto *sourceDC = VD->getDeclContext();
+  auto access = getAccessLevel(); // public
+  auto *sourceDC = VD->getDeclContext(); // 
 
   // Preserve "fast path" behavior for everything inside
   // protocol extensions and operators, otherwise allow access
@@ -4083,7 +4092,13 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     auto *useSF = dyn_cast<SourceFile>(useFile);
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
-  case AccessLevel::Package:
+  case AccessLevel::Package: {
+    const PackageUnit *sourcePkg = sourceDC->getPackageContext(true);
+    const PackageUnit *usePkg = useDC->getPackageContext(true);
+    if (usePkg->getName() == sourcePkg->getName())
+      return true;
+    return false;
+  }
   case AccessLevel::Public:
   case AccessLevel::Open:
     return true;

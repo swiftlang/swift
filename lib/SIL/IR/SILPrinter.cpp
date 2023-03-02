@@ -186,7 +186,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   if (!Context)
     return;
   switch (Context->getContextKind()) {
-  case swift::DeclContextKind::Package:
+  case DeclContextKind::Root:
+  case DeclContextKind::Package:
     return;
   case DeclContextKind::Module:
     if (Context == cast<ModuleDecl>(Context)->getASTContext().TheBuiltinModule)

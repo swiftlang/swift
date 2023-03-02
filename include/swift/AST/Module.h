@@ -159,6 +159,22 @@ class OverlayFile;
 /// location.
 class ModuleSourceFileLocationMap;
 
+class RootUnit: public DeclContext {
+  RootUnit(): DeclContext(DeclContextKind::Root, nullptr) {
+  }
+public:
+  static RootUnit *create(ASTContext &ctx) {
+    return new (ctx) RootUnit();
+  }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::Root;
+  }
+
+  static bool classof(const RootUnit *RU) {
+    return true;
+  }
+};
+
 /// Package unit used to allow grouping of modules by a package name.
 /// ModuleDecl can set PackageUnit as a parent in its DeclContext
 /// See \c ModuleDecl
@@ -166,12 +182,12 @@ class PackageUnit: public DeclContext {
 
   Identifier PackageName;
 
-  PackageUnit(Identifier name);
+  PackageUnit(Identifier name, DeclContext* parent);
 
 public:
   static PackageUnit *
-  create(Identifier name, ASTContext &ctx) {
-    return new (ctx) PackageUnit(name);
+  create(Identifier name, ASTContext &ctx, DeclContext* parent = nullptr) {
+    return new (ctx) PackageUnit(name, parent);
   }
 
   static bool classof(const DeclContext *DC) {
@@ -179,13 +195,14 @@ public:
   }
 
   static bool classof(const PackageUnit *PU) {
-    // FIXME: add a correct check
     return true;
   }
 
   Identifier getName() const {
     return PackageName;
   }
+
+  ModuleDecl &getSourceModule() const;
 };
 
 /// The minimum unit of compilation.
@@ -313,7 +330,7 @@ private:
   /// Used by the debugger to bypass resilient access to fields.
   bool BypassResilience = false;
 
-  ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo, PackageUnit *pkg);
+  ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo, DeclContext *parent);
 
 public:
   /// Creates a new module with a given \p name.
@@ -323,13 +340,13 @@ public:
   static ModuleDecl *
   create(Identifier name, ASTContext &ctx,
          ImplicitImportInfo importInfo = ImplicitImportInfo(),
-         PackageUnit *pkg = nullptr) {
-    return new (ctx) ModuleDecl(name, ctx, importInfo, pkg);
+         DeclContext *parent = nullptr) {
+    return new (ctx) ModuleDecl(name, ctx, importInfo, parent);
   }
 
   static ModuleDecl *
-  createMainModule(ASTContext &ctx, Identifier name, ImplicitImportInfo iinfo, PackageUnit *pkg = nullptr) {
-    auto *Mod = ModuleDecl::create(name, ctx, iinfo, pkg);
+  createMainModule(ASTContext &ctx, Identifier name, ImplicitImportInfo iinfo, DeclContext *parent = nullptr) {
+    auto *Mod = ModuleDecl::create(name, ctx, iinfo, parent);
     Mod->Bits.ModuleDecl.IsMainModule = true;
     return Mod;
   }
@@ -444,13 +461,7 @@ public:
   Identifier getPackageName() const { return PackageName; }
 
   /// Set the name of the package this module belongs to
-  void setPackageName(Identifier name) {
-    PackageName = name;
-    // TODO: uncomment when PackageUnit gets passed to constructor
-//    PackageUnit *pkgUnit = PackageUnit::create(name, getASTContext());
-//    DeclContext newContext = DeclContext(DeclContextKind::Module, pkgUnit);
-//    setDeclContext(&newContext);
-  }
+  void setPackageName(Identifier name);
 
   Identifier getExportAsName() const { return ExportAsName; }
 
@@ -550,7 +561,7 @@ public:
     DebugClient = R;
   }
 
-  /// Returns true if this module is compiled as static library.
+      /// Returns true if this const module is compiled as static library.
   bool isStaticLibrary() const {
     return Bits.ModuleDecl.StaticLibrary;
   }
@@ -1065,6 +1076,9 @@ inline bool DeclContext::isModuleContext() const {
 }
 
 inline bool DeclContext::isModuleScopeContext() const {
+  if (ParentAndKind.getInt() == ASTHierarchy::Package) {
+    return false;
+  }
   if (ParentAndKind.getInt() == ASTHierarchy::FileUnit)
     return true;
   return isModuleContext();

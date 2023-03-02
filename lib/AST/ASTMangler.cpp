@@ -2275,6 +2275,7 @@ static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
 
 void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) {
   switch (ctx->getContextKind()) {
+  case DeclContextKind::Root:
   case DeclContextKind::Package:
     return;
   case DeclContextKind::Module:
@@ -2432,7 +2433,11 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
 
 void ASTMangler::appendModule(const ModuleDecl *module,
                               StringRef useModuleName) {
-  assert(!module->getParent() && "cannot mangle nested modules!");
+  // \c PackageUnit is used as a way to group modules via a package name.
+  // It is set as a parent of the \c ModuleDecl DeclContext.
+  // If PackageUnit is non-null, the module is part of a module group.
+  // See \c PackageUnit
+  assert(!module->getParent() && "cannot mangle nested modules or package!");
 
   // Use the module real name in mangling; this is the physical name
   // of the module on-disk, which can be different if -module-alias is

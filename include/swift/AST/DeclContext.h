@@ -97,6 +97,7 @@ enum class DeclContextKind : unsigned {
   SerializedLocal,
   MacroDecl,
   Last_LocalDeclContextKind = MacroDecl,
+  Root,
   Package,
   Module,
   FileUnit,
@@ -274,6 +275,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
     case DeclContextKind::FileUnit:
       return ASTHierarchy::FileUnit;
     case DeclContextKind::Package:
+    case DeclContextKind::Root:
       return ASTHierarchy::Package;
     case DeclContextKind::Module:
     case DeclContextKind::TopLevelCodeDecl:
@@ -301,7 +303,7 @@ public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
       : ParentAndKind(Parent, getASTHierarchyFromKind(Kind)) {
     // if Module kind, it may (or may not) have Package as its parent
-    if (Kind != DeclContextKind::Package && Kind != DeclContextKind::Module)
+    if (Kind != DeclContextKind::Root && Kind != DeclContextKind::Package && Kind != DeclContextKind::Module)
       assert(Parent != nullptr && "DeclContext must have a parent context");
   }
 
@@ -514,7 +516,7 @@ public:
 
   /// Returns the package context of the parent module.
   LLVM_READONLY
-  PackageUnit *getParentModulePackage() const;
+  PackageUnit *getPackageContext(bool lookupIfNotCurrent = false) const;
 
   /// Returns the module context that contains this context.
   LLVM_READONLY

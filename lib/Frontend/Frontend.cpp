@@ -1118,6 +1118,7 @@ bool CompilerInstance::createFilesForMainModule(
 ModuleDecl *CompilerInstance::getMainModule() const {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
+
     MainModule = ModuleDecl::createMainModule(*Context, ID,
                                               getImplicitImportInfo());
     if (Invocation.getFrontendOptions().EnableTesting)
@@ -1130,9 +1131,10 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setABIName(getASTContext().getIdentifier(
           Invocation.getFrontendOptions().ModuleABIName));
     }
+    // Set a package for the main module
     if (!Invocation.getLangOptions().PackageName.empty()) {
-      MainModule->setPackageName(getASTContext().getIdentifier(
-          Invocation.getLangOptions().PackageName));
+      Identifier pkgID = Context->getIdentifier(Invocation.getLangOptions().PackageName);
+      MainModule->setPackageName(pkgID);
     }
     if (!Invocation.getFrontendOptions().ExportAsName.empty()) {
       MainModule->setExportAsName(getASTContext().getIdentifier(

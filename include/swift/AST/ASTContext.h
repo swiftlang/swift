@@ -385,6 +385,9 @@ private:
   /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
   mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
 
+  mutable llvm::DenseMap<PackageUnit *, ModuleDecl *> PackageToModuleMap;
+  mutable llvm::DenseMap<ModuleDecl *, PackageUnit *> ModuleToPackageMap;
+
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
@@ -515,6 +518,10 @@ public:
   /// the names of the imported or referenced modules in source files in the main module, and X and Y
   /// are the real (physical) module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
+
+  bool setPackageToModule(PackageUnit *pkgUnit, ModuleDecl *moduleDecl);
+  ModuleDecl *getModuleForPackage(const PackageUnit *pkgUnit) const;
+  PackageUnit *getPackageForModule(const ModuleDecl *mdecl) const;
 
   /// Look up option used in \c getRealModuleName when module aliasing is applied.
   enum class ModuleAliasLookupOption {

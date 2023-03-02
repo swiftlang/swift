@@ -1163,6 +1163,9 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
 
           while (!dc->isModuleContext()) {
             switch (dc->getContextKind()) {
+            case DeclContextKind::Root:
+              llvm_unreachable("Not in a root context!");
+              break;
             case DeclContextKind::Package:
               llvm_unreachable("Not in a package context!");
               break;

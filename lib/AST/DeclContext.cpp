@@ -274,11 +274,17 @@ DeclContext *DeclContext::getParentForLookup() const {
   return getParent();
 }
 
-PackageUnit *DeclContext::getParentModulePackage() const {
-  auto parentModule = getParentModule();
-  auto pkg = parentModule->getParent();
-  if (pkg)
-    return const_cast<PackageUnit *>(cast<PackageUnit>(pkg));
+PackageUnit *DeclContext::getPackageContext(bool lookupIfNotCurrent) const {
+  if (ParentAndKind.getInt() == ASTHierarchy::Package) {
+    return const_cast<PackageUnit *>(cast<PackageUnit>(this));
+  }
+
+  if (lookupIfNotCurrent) {
+    auto mdecl = getParentModule();
+    ASTContext &ctx = getASTContext();
+    auto pkg = ctx.getPackageForModule(mdecl);
+    return pkg;
+  }
   return nullptr;
 }
 
@@ -286,6 +292,7 @@ ModuleDecl *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())
     DC = DC->getParent();
+  assert(DC->getContextKind() == DeclContextKind::Module && "decl context is not module or file unit!");
   return const_cast<ModuleDecl *>(cast<ModuleDecl>(DC));
 }
 
@@ -315,11 +322,11 @@ SourceFile *DeclContext::getParentSourceFile() const {
       case DeclContextKind::FileUnit:
       case DeclContextKind::Module:
       case DeclContextKind::Package:
+      case DeclContextKind::Root:
       case DeclContextKind::SerializedLocal:
         break;
       }
     }
-
     DC = DC->getParent();
   }
 
@@ -346,7 +353,6 @@ SourceFile *DeclContext::getOutermostParentSourceFile() const {
 
 DeclContext *DeclContext::getModuleScopeContext() const {
   auto DC = const_cast<DeclContext*>(this);
-
   while (true) {
     if (DC->ParentAndKind.getInt() == ASTHierarchy::FileUnit)
       return DC;
@@ -568,6 +574,7 @@ bool DeclContext::canBeParentOfExtension() const {
 
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
+  case DeclContextKind::Root:
   case DeclContextKind::Package:
     return false;
   case DeclContextKind::Module:
@@ -663,6 +670,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
 
   const char *Kind;
   switch (getContextKind()) {
+  case DeclContextKind::Root: break;
   case DeclContextKind::Package:          Kind = "Package"; break;
   case DeclContextKind::Module:           Kind = "Module"; break;
   case DeclContextKind::FileUnit:         Kind = "FileUnit"; break;
@@ -690,6 +698,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
   OS.indent(Depth*2 + indent) << (void*)this << " " << Kind;
 
   switch (getContextKind()) {
+  case DeclContextKind::Root:
+    break;
   case DeclContextKind::Package:
     OS << " name=" << cast<PackageUnit>(this)->getName();
     break;
@@ -1235,6 +1245,11 @@ bool AccessScope::isInternal() const {
   return DC && isa<ModuleDecl>(DC);
 }
 
+bool AccessScope::isPackage() const {
+  auto DC = getDeclContext();
+  return DC && isa<PackageUnit>(DC);
+}
+
 AccessLevel AccessScope::accessLevelForDiagnostics() const {
   if (isPublic())
     return AccessLevel::Public;
@@ -1250,9 +1265,18 @@ AccessLevel AccessScope::accessLevelForDiagnostics() const {
 }
 
 bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC) {
+  // ES TODO: add a comparison for package name??
   // Check the lexical scope.
   if (useDC->isChildContextOf(sourceDC))
     return true;
+
+  // ES TODO: add if package check here??
+  if (auto srcPkg = sourceDC->getPackageContext()) {
+    auto usePkg = useDC->getPackageContext(true);
+    if (usePkg && usePkg->getName() == srcPkg->getName()) {
+      return true;
+    }
+  }
 
   // Do not allow access if the sourceDC is in a different file
   auto useSF = useDC->getParentSourceFile();
@@ -1351,6 +1375,7 @@ bool DeclContext::isAsyncContext() const {
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::SerializedLocal:
+  case DeclContextKind::Root:
   case DeclContextKind::Package:
   case DeclContextKind::Module:
   case DeclContextKind::GenericTypeDecl:
@@ -1379,6 +1404,7 @@ bool DeclContext::isAsyncContext() const {
 
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   switch (dc->getContextKind()) {
+  case DeclContextKind::Root:
   case DeclContextKind::Package:
   case DeclContextKind::Module:
     return SourceLoc();

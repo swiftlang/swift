@@ -893,8 +893,10 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
             ConstantReference::Direct};
   }
       
+  case DeclContextKind::Root:
+    assert(false && "root context kind should not have been reached");
   case DeclContextKind::Package:
-    assert(false && "package decl context kind should not have been reached");
+    assert(false && "package context kind should not have been reached");
   case DeclContextKind::FileUnit:
   case DeclContextKind::MacroDecl:
     parent = parent->getParentModule();

@@ -115,6 +115,8 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   case DeclContextKind::SubscriptDecl:
   case DeclContextKind::EnumElementDecl:
     return AccessLevel::Private;
+  case DeclContextKind::Root:
+    return AccessLevel::Public;
   case DeclContextKind::Package:
     return AccessLevel::Package;
   case DeclContextKind::Module:

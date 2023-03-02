@@ -543,9 +543,13 @@ void SourceLookupCache::invalidate() {
   (void)SameSizeSmallVector{std::move(AllVisibleValues)};
 }
 
-PackageUnit::PackageUnit(Identifier name)
-  : DeclContext(DeclContextKind::Package, nullptr) {
-    PackageName = name;
+
+PackageUnit::PackageUnit(Identifier name, DeclContext* parent)
+  : DeclContext(DeclContextKind::Package, parent), PackageName(name) {}
+
+ModuleDecl &PackageUnit::getSourceModule() const {
+  auto mdecl = getASTContext().getModuleForPackage(this);
+  return *mdecl;
 }
 
 //===----------------------------------------------------------------------===//
@@ -554,8 +558,8 @@ PackageUnit::PackageUnit(Identifier name)
 
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
                        ImplicitImportInfo importInfo,
-                       PackageUnit *pkg = nullptr)
-    : DeclContext(DeclContextKind::Module, pkg),
+                       DeclContext *parent)
+    : DeclContext(DeclContextKind::Module, parent),
       TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), {}),
       ImportInfo(importInfo) {
 
@@ -2123,6 +2127,16 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
 Identifier ModuleDecl::getRealName() const {
   // This will return the real name for an alias (if used) or getName()
   return getASTContext().getRealModuleName(getName());
+}
+
+// ES TODO: rename setPackage
+void ModuleDecl::setPackageName(Identifier name) {
+  auto &ctx = getASTContext();
+  PackageName = name;
+  PackageUnit *pkgUnit = PackageUnit::create(name, ctx, nullptr);
+//  DeclContext newContext = DeclContext(DeclContextKind::Module, pkgUnit);
+//  setDeclContext(&newContext);
+  ctx.setPackageToModule(pkgUnit, this);
 }
 
 bool ModuleDecl::allowImportedBy(ModuleDecl *importer) const {

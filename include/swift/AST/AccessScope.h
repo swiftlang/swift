@@ -51,9 +51,6 @@ public:
   static AccessScope getPublic() {
     return AccessScope(nullptr, AccessLimitKind::None);
   }
-  static AccessScope getPackage() {
-    return AccessScope(nullptr, AccessLimitKind::Package);
-  }
 
   /// Check if private access is allowed. This is a lexical scope check in Swift
   /// 3 mode. In Swift 4 mode, declarations and extensions of the same type will
@@ -66,10 +63,6 @@ public:
   bool operator==(AccessScope RHS) const { return Value == RHS.Value; }
   bool operator!=(AccessScope RHS) const { return !(*this == RHS); }
   bool hasEqualDeclContextWith(AccessScope RHS) const {
-    if (isPublic())
-      return RHS.isPublic();
-    if (isPackage())
-      return RHS.isPackage();
     return getDeclContext() == RHS.getDeclContext();
   }
 
@@ -81,26 +74,18 @@ public:
   }
   bool isFileScope() const;
   bool isInternal() const;
-  bool isPackage() const {
-    return !Value.getPointer() && Value.getInt() == AccessLimitKind::Package;
-  }
-
+  bool isPackage() const;
+  
   /// Returns true if the context of this (use site) is more restrictive than
   /// the argument context (decl site). This function does _not_ check the
   /// restrictiveness of the access level between this and the argument. \see
   /// AccessScope::isInContext
   bool isChildOf(AccessScope AS) const {
-    if (isInContext()) {
-      if (AS.isInContext())
-        return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
-      else
-        return AS.isPackage() || AS.isPublic();
-    }
-    if (isPackage())
-      return AS.isPublic();
-    // If this is public, it can't be less than access level of AS
-    // so return false
-    return false;
+    if (!isPublic() && !AS.isPublic())
+      return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
+    if (isPublic() && AS.isPublic())
+      return false;
+    return AS.isPublic();
   }
 
   /// Result depends on whether it's called at a use site or a decl site:

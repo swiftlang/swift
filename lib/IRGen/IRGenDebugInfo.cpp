@@ -611,7 +611,10 @@ private:
     case DeclContextKind::EnumElementDecl:
     case DeclContextKind::TopLevelCodeDecl:
       return getOrCreateContext(DC->getParent());
-
+    case DeclContextKind::Root: {
+      auto *root = cast<RootUnit>(DC);
+      return getOrCreateContext(root);
+    }
     case DeclContextKind::Package: {
       auto *pkg = cast<PackageUnit>(DC);
       return getOrCreateContext(pkg);

@@ -1851,6 +1851,32 @@ void ASTContext::addModuleInterfaceChecker(
   getImpl().InterfaceChecker = std::move(checker);
 }
 
+bool ASTContext::setPackageToModule(PackageUnit *pkgUnit, ModuleDecl *moduleDecl) {
+  if (!pkgUnit || !moduleDecl)
+    return false;
+  PackageToModuleMap[pkgUnit] = moduleDecl;
+  ModuleToPackageMap[moduleDecl] = pkgUnit;
+  return true;
+}
+
+ModuleDecl *ASTContext::getModuleForPackage(const PackageUnit *pkgUnit) const {
+  if (pkgUnit) {
+    auto found = PackageToModuleMap.find(pkgUnit);
+    if (found != PackageToModuleMap.end())
+      return found->second;
+  }
+  return nullptr;
+}
+
+PackageUnit *ASTContext::getPackageForModule(const ModuleDecl *mdecl) const {
+  if (mdecl) {
+    auto found = ModuleToPackageMap.find(mdecl);
+    if (found != ModuleToPackageMap.end())
+      return found->second;
+  }
+  return nullptr;
+}
+
 void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
   // This setter should be called only once after ASTContext has been initialized
   assert(ModuleAliasMap.empty());
