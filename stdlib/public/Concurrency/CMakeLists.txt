@@ -87,6 +87,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   Errors.swift
   Error.cpp
   Executor.swift
+  AssumeActorExecutor.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
   AsyncDropWhileSequence.swift
