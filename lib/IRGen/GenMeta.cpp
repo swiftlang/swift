@@ -2854,23 +2854,77 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
   IGF.Builder.CreateLifetimeEnd(fields, IGM.getPointerSize() * numFields);
 }
 
+static void emitInitializeFieldOffsetVectorWithLayoutString(
+    IRGenFunction &IGF, SILType T, llvm::Value *metadata, bool isVWTMutable) {
+  auto &IGM = IGF.IGM;
+
+  auto *target = T.getStructOrBoundGenericStruct();
+
+  llvm::Value *fieldVector =
+      emitAddressOfFieldOffsetVector(IGF, metadata, target).getAddress();
+
+  // Collect the stored properties of the type.
+  unsigned numFields = getNumFields(target);
+
+  // Ask the runtime to lay out the struct or class.
+  auto numFieldsV = IGM.getSize(Size(numFields));
+
+  // Fill out an array with the field type metadata records.
+  Address fields =
+      IGF.createAlloca(llvm::ArrayType::get(IGM.TypeMetadataPtrTy, numFields),
+                       IGM.getPointerAlignment(), "fieldsMetadata");
+  IGF.Builder.CreateLifetimeStart(fields, IGM.getPointerSize() * numFields);
+  fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
+
+  unsigned index = 0;
+  forEachField(IGM, target, [&](Field field) {
+    assert(field.isConcrete() &&
+           "initializing offset vector for type with missing member?");
+    SILType propTy = field.getType(IGM, T);
+    llvm::Value *fieldMetatype = IGF.emitTypeMetadataRef(propTy.getASTType());
+    Address fieldMetatypeAddr =
+        IGF.Builder.CreateConstArrayGEP(fields, index, IGM.getPointerSize());
+    IGF.Builder.CreateStore(fieldMetatype, fieldMetatypeAddr);
+    ++index;
+  });
+  assert(index == numFields);
+
+  // Compute struct layout flags.
+  StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;
+  if (isVWTMutable)
+    flags |= StructLayoutFlags::IsVWTMutable;
+
+  // Call swift_initStructMetadataWithLayoutString().
+  IGF.Builder.CreateCall(
+      IGM.getInitStructMetadataWithLayoutStringFunctionPointer(),
+      {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
+       fields.getAddress(), fieldVector});
+
+  IGF.Builder.CreateLifetimeEnd(fields, IGM.getPointerSize() * numFields);
+}
+
 static void emitInitializeValueMetadata(IRGenFunction &IGF,
                                         NominalTypeDecl *nominalDecl,
                                         llvm::Value *metadata,
                                         bool isVWTMutable,
                                         MetadataDependencyCollector *collector) {
-  auto loweredTy =
-    IGF.IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
+  auto &IGM = IGF.IGM;
+  auto loweredTy = IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
 
   if (isa<StructDecl>(nominalDecl)) {
-    auto &fixedTI = IGF.IGM.getTypeInfo(loweredTy);
+    auto &fixedTI = IGM.getTypeInfo(loweredTy);
     if (isa<FixedTypeInfo>(fixedTI)) return;
 
-    emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable,
-                                    collector);
+    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+      emitInitializeFieldOffsetVectorWithLayoutString(IGF, loweredTy, metadata,
+                                                      isVWTMutable);
+    } else {
+      emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable,
+                                      collector);
+    }
   } else {
     assert(isa<EnumDecl>(nominalDecl));
-    auto &strategy = getEnumImplStrategy(IGF.IGM, loweredTy);
+    auto &strategy = getEnumImplStrategy(IGM, loweredTy);
     strategy.initializeMetadata(IGF, metadata, isVWTMutable, loweredTy,
                                 collector);
   }
@@ -4825,11 +4879,19 @@ namespace {
       B.addInt(IGM.MetadataKindTy, unsigned(getMetadataKind(Target)));
     }
 
+    bool hasLayoutString() {
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+        return false;
+      }
+      auto lowered = getLoweredType();
+      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered, /*useStructLayouts*/true);
+      return !!getLayoutString() || !typeLayoutEntry.isFixedSize(IGM);
+    }
+
     llvm::Constant *emitNominalTypeDescriptor() {
-      auto hasLayoutString = !!getLayoutString();
       auto descriptor =
         StructContextDescriptorBuilder(IGM, Target, RequireMetadata,
-                                       hasLayoutString).emit();
+                                       hasLayoutString()).emit();
       return descriptor;
     }
 
@@ -5004,8 +5066,9 @@ namespace {
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
+      bool hasLayoutString = IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses);
       return StructContextDescriptorBuilder(IGM, Target, RequireMetadata,
-                                            /*hasLayoutString*/ false).emit();
+                                            /*hasLayoutString*/ hasLayoutString).emit();
     }
 
     GenericMetadataPatternFlags getPatternFlags() {

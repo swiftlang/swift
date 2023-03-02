@@ -474,6 +474,10 @@ const EnumTypeLayoutEntry *TypeLayoutEntry::getAsEnum() const {
   return nullptr;
 }
 
+bool TypeLayoutEntry::isAlignedGroup() const {
+  return getKind() == TypeLayoutEntryKind::AlignedGroup;
+}
+
 llvm::Value *TypeLayoutEntry::alignmentMask(IRGenFunction &IGF) const {
   assert(isEmpty());
   return IGF.IGM.getSize(Size(0));

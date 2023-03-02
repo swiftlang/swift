@@ -915,7 +915,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                                             /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
-        if (typeLayoutEntry->layoutString(IGM, genericSig)) {
+        if (typeLayoutEntry->layoutString(IGM, genericSig) ||
+            (typeLayoutEntry->isAlignedGroup() && !typeLayoutEntry->isFixedSize(IGM))) {
           return addFunction(IGM.getGenericDestroyFn());
         }
       }
@@ -941,7 +942,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                                             /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
-        if (typeLayoutEntry->layoutString(IGM, genericSig)) {
+        if (typeLayoutEntry->layoutString(IGM, genericSig) ||
+            (typeLayoutEntry->isAlignedGroup() && !typeLayoutEntry->isFixedSize(IGM))) {
           return addFunction(IGM.getGenericInitWithTakeFn());
         }
       }
@@ -959,7 +961,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                                             /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
-        if (typeLayoutEntry->layoutString(IGM, genericSig)) {
+        if (typeLayoutEntry->layoutString(IGM, genericSig) ||
+            (typeLayoutEntry->isAlignedGroup() && !typeLayoutEntry->isFixedSize(IGM))) {
           return addFunction(IGM.getGenericAssignWithCopyFn());
         }
       }
@@ -977,7 +980,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                                             /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
-        if (typeLayoutEntry->layoutString(IGM, genericSig)) {
+        if (typeLayoutEntry->layoutString(IGM, genericSig) ||
+            (typeLayoutEntry->isAlignedGroup() && !typeLayoutEntry->isFixedSize(IGM))) {
           return addFunction(IGM.getGenericAssignWithTakeFn());
         }
       }
@@ -995,7 +999,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                                             /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
-        if (typeLayoutEntry->layoutString(IGM, genericSig)) {
+        if (typeLayoutEntry->layoutString(IGM, genericSig) ||
+            (typeLayoutEntry->isAlignedGroup() && !typeLayoutEntry->isFixedSize(IGM))) {
           return addFunction(IGM.getGenericInitWithCopyFn());
         }
       }
