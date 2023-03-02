@@ -3170,6 +3170,10 @@ static bool usesFeatureBuiltinMacros(Decl *decl) {
 
 static bool usesFeatureImportSymbolicCXXDecls(Decl *decl) { return false; }
 
+static bool usesFeatureGenerateBindingsForThrowingFunctionsInCXX(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
   auto macro = dyn_cast<MacroDecl>(decl);
   if (!macro)

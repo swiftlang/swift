@@ -179,6 +179,10 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AFD->hasAsync())
       return {Unsupported, UnrepresentableAsync};
+    if (AFD->hasThrows() &&
+        !AFD->getASTContext().LangOpts.hasFeature(
+            Feature::GenerateBindingsForThrowingFunctionsInCXX))
+      return {Unsupported, UnrepresentableThrows};
     // Don't expose @_alwaysEmitIntoClient functions as they require their
     // bodies to be emitted into client.
     if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
@@ -192,6 +196,13 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
         return {Unsupported, UnrepresentableGeneric};
       genericSignature =
           typeDecl->getGenericSignature().getCanonicalSignature();
+    }
+  }
+  if (const auto *varDecl = dyn_cast<VarDecl>(VD)) {
+    // Check if any property accessor throws, do not expose it in that case.
+    for (const auto *accessor : varDecl->getAllAccessors()) {
+      if (accessor->hasThrows())
+        return {Unsupported, UnrepresentableThrows};
     }
   }
   // Generic requirements are not yet supported in C++.

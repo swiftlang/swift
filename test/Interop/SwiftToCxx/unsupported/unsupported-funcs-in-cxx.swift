@@ -6,6 +6,7 @@
 // RUN: %FileCheck %s < %t/header.h
 
 // CHECK-NOT: unsupported
+// CHECK: HasMethods
 // CHECK: supported
 
 public func supported() {}
@@ -13,3 +14,26 @@ public func supported() {}
 @_expose(Cxx) // expected-error {{global function 'unsupportedAEIC()' can not be exposed to C++ as it requires code to be emitted into client}}
 @_alwaysEmitIntoClient
 public func unsupportedAEIC() {}
+
+@_expose(Cxx) // expected-error {{global function 'unsupportedThrows()' can not yet be represented in C++ as it may throw an error}}
+public func unsupportedThrows() throws {}
+
+@_expose(Cxx)
+public struct HasMethods {
+    let x: Int
+
+    @_expose(Cxx) // expected-error {{instance method 'unsupportedThrowsMethod()' can not yet be represented in C++ as it may throw an error}}
+    public func unsupportedThrowsMethod() throws {}
+
+    @_expose(Cxx) // expected-error {{initializer 'init()' can not yet be represented in C++ as it may throw an error}}
+    public init() throws {
+        self.x = 0
+    }
+
+    @_expose(Cxx) // expected-error {{property 'unsupportedProp' can not yet be represented in C++ as it may throw an error}}
+    public var unsupportedProp: Int {
+        get throws {
+            return 42
+        }
+    }
+}
