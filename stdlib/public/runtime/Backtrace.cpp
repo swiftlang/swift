@@ -289,7 +289,7 @@ BacktraceInitializer::BacktraceInitializer() {
   if (_swift_backtraceSettings.enabled == OnOffTty::On
       && !_swift_backtraceSettings.swiftBacktracePath) {
     _swift_backtraceSettings.swiftBacktracePath
-      = swift_getAuxiliaryExecutablePath("swift-backtrace");
+      = swift_copyAuxiliaryExecutablePath("swift-backtrace");
 
     if (!_swift_backtraceSettings.swiftBacktracePath) {
       swift::warning(0,
