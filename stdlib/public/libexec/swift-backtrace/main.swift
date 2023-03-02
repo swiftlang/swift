@@ -16,8 +16,8 @@
 import Darwin.C
 #elseif canImport(Glibc)
 import Glibc
-#elseif canImport(MSVCRT)
-import MSVCRT
+#elseif canImport(CRT)
+import CRT
 #endif
 
 @_spi(Formatting) import _Backtracing
