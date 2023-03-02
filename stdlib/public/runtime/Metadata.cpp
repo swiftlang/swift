@@ -5393,8 +5393,9 @@ instantiateWitnessTable(const Metadata *Type,
           : conformance->getConditionalRequirements()) {
       if (conditionalRequirement.Flags.hasKeyArgument())
         copyNextInstantiationArg();
-      if (conditionalRequirement.Flags.hasExtraArgument())
-        copyNextInstantiationArg();
+
+      assert(!conditionalRequirement.Flags.isPackRequirement() &&
+             "Packs not supported here yet");
     }
   }
 
@@ -6512,20 +6513,13 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
 
   // Generic types require their type arguments to be transitively complete.
   if (description->isGeneric()) {
-    auto &generics = description->getFullGenericContextHeader();
-
     auto keyArguments = description->getGenericArguments(type);
-    auto extraArguments = keyArguments + generics.Base.NumKeyArguments;
-
     for (auto &param : description->getGenericParams()) {
       if (param.hasKeyArgument()) {
         if (predicate(*keyArguments++))
           return true;
-      } else if (param.hasExtraArgument()) {
-        if (predicate(*extraArguments++))
-          return true;
       }
-      // Ignore parameters that don't have a key or an extra argument.
+      // Ignore parameters that don't have a key argument.
     }
   }
 

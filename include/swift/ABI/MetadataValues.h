@@ -1855,26 +1855,21 @@ enum class GenericParamKind : uint8_t {
 };
 
 class GenericParamDescriptor {
+  /// Don't set 0x40 for compatibility with pre-Swift 5.8 runtimes
   uint8_t Value;
 
   explicit constexpr GenericParamDescriptor(uint8_t Value)
     : Value(Value) {}
 public:
   constexpr GenericParamDescriptor(GenericParamKind kind,
-                                   bool hasKeyArgument,
-                                   bool hasExtraArgument)
+                                   bool hasKeyArgument)
     : GenericParamDescriptor(GenericParamDescriptor(0)
                          .withKind(kind)
-                         .withKeyArgument(hasKeyArgument)
-                         .withExtraArgument(hasExtraArgument))
+                         .withKeyArgument(hasKeyArgument))
   {}
 
   constexpr bool hasKeyArgument() const {
     return (Value & 0x80u) != 0;
-  }
-
-  constexpr bool hasExtraArgument() const {
-    return (Value & 0x40u) != 0;
   }
 
   constexpr GenericParamKind getKind() const {
@@ -1885,12 +1880,6 @@ public:
   withKeyArgument(bool hasKeyArgument) const {
     return GenericParamDescriptor((Value & 0x7Fu)
       | (hasKeyArgument ? 0x80u : 0));
-  }
-
-  constexpr GenericParamDescriptor
-  withExtraArgument(bool hasExtraArgument) const {
-    return GenericParamDescriptor((Value & 0xBFu)
-      | (hasExtraArgument ? 0x40u : 0));
   }
 
   constexpr GenericParamDescriptor withKind(GenericParamKind kind) const {
@@ -1914,8 +1903,7 @@ public:
   /// The default parameter descriptor for an implicit parameter.
   static constexpr GenericParamDescriptor implicit() {
     return GenericParamDescriptor(GenericParamKind::Type,
-                                  /*key argument*/ true,
-                                  /*extra argument*/ false);
+                                  /*key argument*/ true);
   }
 };
 
@@ -1952,6 +1940,7 @@ enum class GenericRequirementKind : uint8_t {
 };
 
 class GenericRequirementFlags {
+  /// Don't set 0x40 for compatibility with pre-Swift 5.8 runtimes
   uint32_t Value;
 
   explicit constexpr GenericRequirementFlags(uint32_t Value)
@@ -1959,21 +1948,15 @@ class GenericRequirementFlags {
 public:
   constexpr GenericRequirementFlags(GenericRequirementKind kind,
                                     bool hasKeyArgument,
-                                    bool hasExtraArgument,
                                     bool isPackRequirement)
     : GenericRequirementFlags(GenericRequirementFlags(0)
                          .withKind(kind)
                          .withKeyArgument(hasKeyArgument)
-                         .withExtraArgument(hasExtraArgument)
                          .withPackRequirement(isPackRequirement))
   {}
 
   constexpr bool hasKeyArgument() const {
     return (Value & 0x80u) != 0;
-  }
-
-  constexpr bool hasExtraArgument() const {
-    return (Value & 0x40u) != 0;
   }
 
   /// If this is true, the subject type of the requirement is a pack.
@@ -1991,12 +1974,6 @@ public:
   withKeyArgument(bool hasKeyArgument) const {
     return GenericRequirementFlags((Value & 0x7Fu)
       | (hasKeyArgument ? 0x80u : 0));
-  }
-
-  constexpr GenericRequirementFlags
-  withExtraArgument(bool hasExtraArgument) const {
-    return GenericRequirementFlags((Value & 0xBFu)
-      | (hasExtraArgument ? 0x40u : 0));
   }
 
   constexpr GenericRequirementFlags
