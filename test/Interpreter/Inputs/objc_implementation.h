@@ -7,6 +7,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)init;
 
 @property (assign) NSInteger implProperty;
+@property (assign) NSInteger defaultIntProperty;
 
 + (void)runTests;
 - (nonnull NSString *)someMethod;

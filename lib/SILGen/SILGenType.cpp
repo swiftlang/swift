@@ -1332,8 +1332,13 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
     for (auto i : range(pd->getNumPatternEntries())) {
-      if (pd->getExecutableInit(i) && pd->isStatic()) {
-        SGM.emitGlobalInitialization(pd, i);
+      if (pd->getExecutableInit(i)) {
+        if (pd->isStatic())
+          SGM.emitGlobalInitialization(pd, i);
+        else if (isa<ExtensionDecl>(pd->getDeclContext()) &&
+                 cast<ExtensionDecl>(pd->getDeclContext())
+                     ->isObjCImplementation())
+          SGM.emitStoredPropertyInitialization(pd, i);
       }
     }
   }
