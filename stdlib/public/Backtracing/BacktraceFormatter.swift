@@ -20,7 +20,7 @@ import Swift
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 @_implementationOnly import Darwin
 #elseif os(Windows)
-@_implementationOnly import MSVCRT
+@_implementationOnly import CRT
 #elseif os(Linux)
 @_implementationOnly import Glibc
 #endif
