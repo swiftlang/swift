@@ -2578,6 +2578,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::TupleIndex:
+  case OverloadChoiceKind::MaterializePack:
     return Type();
   }
 
@@ -3262,6 +3263,7 @@ void ConstraintSystem::bindOverloadType(
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::TupleIndex:
+  case OverloadChoiceKind::MaterializePack:
   case OverloadChoiceKind::KeyPathApplication:
     bindTypeOrIUO(openedType);
     return;
@@ -3502,6 +3504,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
     refType = adjustedRefType;
     break;
+
+  case OverloadChoiceKind::MaterializePack: {
+    auto *tuple = choice.getBaseType()->castTo<TupleType>();
+    auto *expansion = tuple->getElementType(0)->castTo<PackExpansionType>();
+    adjustedRefType = expansion->getPatternType();
+    refType = adjustedRefType;
+    break;
+  }
 
   case OverloadChoiceKind::KeyPathApplication: {
     // Key path application looks like a subscript(keyPath: KeyPath<Base, T>).
@@ -3965,6 +3975,7 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       return DeclName(DynamicMember.getPointer());
 
+    case OverloadChoiceKind::MaterializePack:
     case OverloadChoiceKind::TupleIndex:
       llvm_unreachable("no name!");
   }
@@ -5261,6 +5272,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
         break;
 
       case OverloadChoiceKind::TupleIndex:
+      case OverloadChoiceKind::MaterializePack:
         // FIXME: Actually diagnose something here.
         break;
       }

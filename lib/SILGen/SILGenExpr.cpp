@@ -446,6 +446,7 @@ namespace {
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitPackElementExpr(PackElementExpr *E, SGFContext C);
+    RValue visitMaterializePackExpr(MaterializePackExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
                                               SGFContext C);
@@ -1531,6 +1532,11 @@ RValueEmitter::visitPackExpansionExpr(PackExpansionExpr *E,
 RValue
 RValueEmitter::visitPackElementExpr(PackElementExpr *E, SGFContext C) {
   llvm_unreachable("not implemented for PackElementExpr");
+}
+
+RValue
+RValueEmitter::visitMaterializePackExpr(MaterializePackExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented for MaterializePackExpr");
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
