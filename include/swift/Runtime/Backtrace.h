@@ -24,6 +24,16 @@
 
 #include <inttypes.h>
 
+#ifdef _WIN32
+// For DWORD
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
+// For wchar_t
+#include <cwchar>
+#endif
+
 #ifdef __cplusplus
 namespace swift {
 namespace runtime {
