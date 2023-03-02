@@ -45,6 +45,12 @@ struct S3 {
   }
 }
 
+@attached(conformance)
+macro Hashable() = #externalMacro(module: "MacroDefinition", type: "HashableMacro")
+
+@Hashable
+struct S4 { }
+
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
@@ -162,7 +168,7 @@ struct S3 {
 // ACCESSOR2_EXPAND-NEXT: source.edit.kind.active:
 // ACCESSOR2_EXPAND-NEXT: 33:3-33:20 ""
 
-//##-- Refactoring expanding the second accessor macro
+//##-- Refactoring expanding the addCompletionHandler macro.
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=42:5 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=PEER_EXPAND %s
 // PEER_EXPAND: source.edit.kind.active:
 // PEER_EXPAND-NEXT: 45:4-45:4 (@__swiftmacro_9MacroUser2S3V1f1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_.swift) "
@@ -175,6 +181,16 @@ struct S3 {
 // PEER_EXPAND-NEXT: "
 // PEER_EXPAND-NEXT: source.edit.kind.active:
 // PEER_EXPAND-NEXT: 42:3-42:24 ""
+
+//##-- Refactoring expanding a conformance macro.
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=51:5 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CONFORMANCE_EXPAND %s
+// CONFORMANCE_EXPAND: source.edit.kind.active:
+// CONFORMANCE_EXPAND-NEXT: 52:14-52:14 (@__swiftmacro_9MacroUser2S4V8HashablefMc_.swift) "
+// CONFORMANCE_EXPAND-EMPTY:
+// CONFORMANCE_EXPAND-NEXT: extension S4 : Hashable {}
+// CONFORMANCE_EXPAND-NEXT: "
+// CONFORMANCE_EXPAND-NEXT: source.edit.kind.active:
+// CONFORMANCE_EXPAND-NEXT: 51:1-51:10 ""
 
 //##-- Doc info, mostly just checking we don't crash because of the separate buffers
 // RUN: %sourcekitd-test -req=doc-info %s -- ${COMPILER_ARGS_WITHOUT_SOURCE[@]} | %FileCheck -check-prefix=DOCINFO %s
