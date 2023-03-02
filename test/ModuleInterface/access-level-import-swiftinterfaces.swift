@@ -19,7 +19,7 @@
 /// Build client and generate swiftinterfaces.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name TestPackage \
-// RUN:   -enable-library-evolution \
+// RUN:   -enable-library-evolution -swift-version 5 \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface \
 // RUN:   -enable-experimental-feature AccessLevelOnImport
@@ -28,13 +28,13 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) -I %t \
 // RUN:   -module-name Client
 
-// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/Client.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/Client.private.swiftinterface
+// RUN: %FileCheck %s < %t/Client.swiftinterface
+// RUN: %FileCheck %s < %t/Client.private.swiftinterface
 
 /// Build a client composed of many files.
 // RUN: %target-swift-frontend -typecheck %t/MultiFiles?.swift -I %t \
 // RUN:   -package-name TestPackage \
-// RUN:   -enable-library-evolution \
+// RUN:   -enable-library-evolution -swift-version 5 \
 // RUN:   -emit-module-interface-path %t/MultiFiles.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/MultiFiles.private.swiftinterface \
 // RUN:   -enable-experimental-feature AccessLevelOnImport
@@ -43,8 +43,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/MultiFiles.private.swiftinterface) -I %t \
 // RUN:   -module-name MultiFiles
 
-// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/MultiFiles.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/MultiFiles.private.swiftinterface
+// RUN: %FileCheck %s < %t/MultiFiles.swiftinterface
+// RUN: %FileCheck %s < %t/MultiFiles.private.swiftinterface
 
 //--- PublicLib.swift
 //--- PackageLib.swift
@@ -53,21 +53,20 @@
 //--- PrivateLib.swift
 
 //--- Client.swift
+public import PublicLib
+// CHECK: PublicLib
+
 package import PackageLib
-// CHECK-PUBLIC-NOT: PackageLib
-// CHECK-PRIVATE-NOT: PackageLib
+// CHECK-NOT: PackageLib
 
 internal import InternalLib
-// CHECK-PUBLIC-NOT: InternalLib
-// CHECK-PRIVATE-NOT: InternalLib
+// CHECK-NOT: InternalLib
 
 fileprivate import FileprivateLib
-// CHECK-PUBLIC-NOT: FileprivateLib
-// CHECK-PRIVATE-NOT: FileprivateLib
+// CHECK-NOT: FileprivateLib
 
 private import PrivateLib
-// CHECK-PUBLIC-NOT: PrivateLib
-// CHECK-PRIVATE-NOT: PrivateLib
+// CHECK-NOT: PrivateLib
 
 //--- MultiFilesA.swift
 public import PublicLib
