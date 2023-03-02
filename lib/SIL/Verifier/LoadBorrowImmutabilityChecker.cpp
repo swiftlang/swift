@@ -307,7 +307,7 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 //===----------------------------------------------------------------------===//
 
 LoadBorrowImmutabilityAnalysis::LoadBorrowImmutabilityAnalysis(
-    DeadEndBlocks &deadEndBlocks, const SILFunction *f)
+  DeadEndBlocks *deadEndBlocks, const SILFunction *f)
     : cache(GatherWrites(f)), deadEndBlocks(deadEndBlocks) {}
 
 // \p address may be an address, pointer, or box type.
@@ -333,7 +333,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
   for (auto *op : *writes) {
     auto *write = op->getUser();
     // First see if the write is a dead end block. In such a case, just skip it.
-    if (deadEndBlocks.isDeadEnd(write->getParent())) {
+    if (deadEndBlocks && deadEndBlocks->isDeadEnd(write->getParent())) {
       continue;
     }
 

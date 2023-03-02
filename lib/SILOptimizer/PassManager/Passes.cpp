@@ -1,3 +1,4 @@
+
 //===--- Passes.cpp - Swift Compiler SIL Pass Entrypoints -----------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -46,13 +47,21 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   auto &opts = Module.getOptions();
 
   // Verify the module, if required.
+  // OSSA lifetimes are incomplete until the SILGenCleanup pass runs.
   if (opts.VerifyAll)
-    Module.verify();
+    Module.verifyIncompleteOSSA();
 
   // If we parsed a .sil file that is already in canonical form, don't rerun
   // the diagnostic passes.
   if (Module.getStage() != SILStage::Raw)
     return false;
+
+  executePassPipelinePlan(&Module,
+                          SILPassPipelinePlan::getSILGenPassPipeline(opts),
+                          /*isMandatory*/ true);
+
+  if (opts.VerifyAll && opts.OSSACompleteLifetimes)
+    Module.verifyOwnership();
 
   executePassPipelinePlan(&Module,
                           SILPassPipelinePlan::getDiagnosticPassPipeline(opts),

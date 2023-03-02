@@ -1,0 +1,47 @@
+// RUN: %target-sil-opt -enable-ossa-complete-lifetimes -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+class C {}
+
+// CHECK-LABEL: begin running test 1 of 1 on eagerConsumneOwnedArg: ossa-lifetime-completion with: @argument
+// CHECK-LABEL: OSSA lifetime completion: %0 = argument of bb0 : $C
+// CHECK: sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
+// CHECK: bb0(%0 : @_eagerMove @owned $C):
+// CHECK-NEXT:   destroy_value %0 : $C
+// CHECK-LABEL: end running test 1 of 1 on eagerConsumneOwnedArg: ossa-lifetime-completion with: @argument
+sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
+entry(%0 : @_eagerMove @owned $C):
+  test_specification "ossa-lifetime-completion @argument"
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on lexicalOwnedArg: ossa-lifetime-completion with: @argument
+// CHECK: OSSA lifetime completion: %0 = argument of bb0 : $C                         // user: %4
+// CHECK: sil [ossa] @lexicalOwnedArg : $@convention(thin) (@owned C) -> () {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK:   cond_br undef, bb1, bb2
+// CHECK: bb2:
+// CHECK-NEXT:   destroy_value %0 : $C
+// CHECK-NEXT:   unreachable
+// CHECK: } // end sil function 'lexicalOwnedArg'
+// CHECK-LABEL: end running test 1 of 1 on lexicalOwnedArg: ossa-lifetime-completion with: @argument
+sil [ossa] @lexicalOwnedArg : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  test_specification "ossa-lifetime-completion @argument"
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  unreachable
+bb3:
+  destroy_value %0 : $C
+  %r = tuple ()
+  return %r : $()
+}

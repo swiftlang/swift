@@ -1165,4 +1165,8 @@ def enable_emit_generic_class_ro_t_list :
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;
+
+def enable_ossa_complete_lifetimes :
+  Flag<["-"], "enable-ossa-complete-lifetimes">,
+  HelpText<"Require linear OSSA lifetimes after SILGen">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
