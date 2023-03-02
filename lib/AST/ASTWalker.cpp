@@ -878,6 +878,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
 
+  Expr *visitMaterializePackExpr(MaterializePackExpr *E) {
+    if (Expr *fromExpr = doIt(E->getFromExpr())) {
+      E->setFromExpr(fromExpr);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitSequenceExpr(SequenceExpr *E) {
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       if (Expr *Elt = doIt(E->getElement(i)))

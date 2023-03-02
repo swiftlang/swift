@@ -1295,6 +1295,10 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
     out << "tuple " << getBaseType()->getString(PO) << " index "
         << getTupleIndex();
     break;
+
+  case OverloadChoiceKind::MaterializePack:
+    out << "materialize pack from tuple " << getBaseType()->getString(PO);
+    break;
   }
 }
 
@@ -1595,6 +1599,11 @@ void ConstraintSystem::print(raw_ostream &out) const {
       case OverloadChoiceKind::TupleIndex:
         out << "tuple " << choice.getBaseType()->getString(PO) << " index "
             << choice.getTupleIndex();
+        break;
+
+      case OverloadChoiceKind::MaterializePack:
+        out << "materialize pack from tuple "
+            << choice.getBaseType()->getString(PO);
         break;
       }
       out << " for ";
