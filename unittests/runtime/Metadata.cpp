@@ -144,30 +144,6 @@ TEST(StaticObjects, ini) {
   EXPECT_EQ(swift_retainCount(&StaticTestObj.obj), 1u);
 }
 
-TEST(Concurrent, ConcurrentList) {
-  const int numElem = 100;
-  const int elemVal = 1;
-
-  ConcurrentList<int> List;
-  auto results = RaceTest<int*>(
-    [&]() -> int* {
-        for (int i = 0; i < numElem; i++)
-          List.push_front(elemVal);
-        return nullptr;
-    }
-  );
-
-  size_t ListLen = std::distance(List.begin(), List.end());
-  // Check that all of the values are initialized properly.
-  for (auto A : List) {
-    EXPECT_EQ(elemVal, A);
-  }
-
-  // Check that the length of the list is correct.
-  EXPECT_EQ(ListLen, results.size() * numElem);
-}
-
-
 TEST(Concurrent, ConcurrentMap) {
   const int numElem = 100;
 
