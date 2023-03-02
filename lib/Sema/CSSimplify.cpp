@@ -3748,15 +3748,23 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Match up the generic arguments, exactly.
 
   if (shouldAttemptFixes()) {
+    auto *baseLoc =
+      getConstraintLocator(locator, {LocatorPathElt::GenericType(bound1),
+          LocatorPathElt::GenericType(bound2)});
+
+    auto argMatchingFlags =
+      subflags | TMF_ApplyingFix | TMF_MatchingGenericArguments;
+
     // Optionals have a lot of special diagnostics and only one
     // generic argument so if we' re dealing with one, don't produce generic
     // arguments mismatch fixes.
     if (bound1->getDecl()->isOptionalDecl())
-      return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
+      return matchDeepTypeArguments(*this, argMatchingFlags, args1, args2,
+                                    baseLoc);
 
     SmallVector<unsigned, 4> mismatches;
     auto result = matchDeepTypeArguments(
-        *this, subflags | TMF_ApplyingFix, args1, args2, locator,
+        *this, argMatchingFlags, args1, args2, baseLoc,
         [&mismatches](unsigned position) { mismatches.push_back(position); });
 
     if (mismatches.empty())
@@ -6369,7 +6377,8 @@ bool ConstraintSystem::repairFailures(
     // failure e.g. `String bind T.Element`, so let's drop the generic argument
     // path element and recurse in repairFailures to check and potentially
     // record the requirement failure fix.
-    path.pop_back();
+    auto genericArgElt =
+        path.pop_back_val().castTo<LocatorPathElt::GenericArgument>();
 
     // If we have something like ... -> type req # -> pack element #, we're
     // solving a requirement of the form T : P where T is a type parameter pack
@@ -6381,7 +6390,57 @@ bool ConstraintSystem::repairFailures(
                             getConstraintLocator(anchor, path));
     }
 
-    break;
+    // When the solver sets `TMF_MatchingGenericArguments` it means
+    // that it's matching generic argument pairs to identify any mismatches
+    // as part of larger matching of two generic types. Letting this
+    // fail results in a single fix that aggregates all mismatch locations.
+    //
+    // Types are not always resolved enough to enable that which means
+    // that the comparison should be delayed, which brings us here - a
+    // standalone constraint that represents such a match, in such cases
+    // we create a fix per mismatch location and coalesce them during
+    // diagnostics.
+    if (flags.contains(TMF_MatchingGenericArguments))
+      break;
+
+    Type fromType;
+    Type toType;
+
+    if (path.size() >= 2) {
+      if (path[path.size() - 2].is<LocatorPathElt::GenericType>()) {
+        fromType = path[path.size() - 2]
+                       .castTo<LocatorPathElt::GenericType>()
+                       .getType();
+      }
+
+      if (path[path.size() - 1].is<LocatorPathElt::GenericType>()) {
+        toType = path[path.size() - 1]
+                     .castTo<LocatorPathElt::GenericType>()
+                     .getType();
+      }
+    }
+
+    if (!fromType || !toType)
+      break;
+
+    // Drop both `GenericType` elements.
+    path.pop_back();
+    path.pop_back();
+
+    ConstraintFix *fix = nullptr;
+    if (!path.empty() && path.back().is<LocatorPathElt::AnyRequirement>()) {
+      fix = fixRequirementFailure(*this, fromType, toType, anchor, path);
+    } else {
+      fix = GenericArgumentsMismatch::create(
+          *this, fromType, toType, {genericArgElt.getIndex()},
+          getConstraintLocator(anchor, path));
+    }
+
+    if (!fix)
+      break;
+
+    conversionsOrFixes.push_back(fix);
+    return true;
   }
 
   case ConstraintLocator::ResultBuilderBodyResult: {
@@ -14023,7 +14082,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RenameConflictingPatternVariables:
   case FixKind::MustBeCopyable:
   case FixKind::MacroMissingPound:
-  case FixKind::AllowGlobalActorMismatch: {
+  case FixKind::AllowGlobalActorMismatch:
+  case FixKind::GenericArgumentsMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {
@@ -14243,7 +14303,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::DefaultGenericArgument:
-  case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
   case FixKind::AllowNonClassTypeToConvertToAnyObject:

@@ -4655,6 +4655,10 @@ public:
     /// Indicates that we are attempting a possible type for
     /// a type variable.
     TMF_BindingTypeVariable = 0x04,
+
+    /// Indicates that the solver is matching one of the
+    /// generic argument pairs as part of matching two generic types.
+    TMF_MatchingGenericArguments = 0x08,
   };
 
   /// Options that govern how type matching should proceed.
