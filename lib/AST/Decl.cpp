@@ -4865,13 +4865,15 @@ Type TypeAliasDecl::getStructuralType() const {
   return ErrorType::get(ctx);
 }
 
-GenericTypeParamDecl::GenericTypeParamDecl(
-    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc ellipsisLoc,
-    unsigned depth, unsigned index, bool isParameterPack, bool isOpaqueType,
-    TypeRepr *opaqueTypeRepr)
-    : TypeDecl(DeclKind::GenericTypeParam, dc, name, nameLoc, { }) {
-  assert(!(ellipsisLoc && !isParameterPack) &&
-         "Ellipsis always means type parameter pack");
+GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
+                                           SourceLoc nameLoc, SourceLoc eachLoc,
+                                           unsigned depth, unsigned index,
+                                           bool isParameterPack,
+                                           bool isOpaqueType,
+                                           TypeRepr *opaqueTypeRepr)
+    : TypeDecl(DeclKind::GenericTypeParam, dc, name, nameLoc, {}) {
+  assert(!(eachLoc && !isParameterPack) &&
+         "'each' keyword always means type parameter pack");
 
   Bits.GenericTypeParamDecl.Depth = depth;
   assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
@@ -4883,7 +4885,7 @@ GenericTypeParamDecl::GenericTypeParamDecl(
   if (isOpaqueType)
     *getTrailingObjects<TypeRepr *>() = opaqueTypeRepr;
   if (isParameterPack)
-    *getTrailingObjects<SourceLoc>() = ellipsisLoc;
+    *getTrailingObjects<SourceLoc>() = eachLoc;
 
   auto &ctx = dc->getASTContext();
   RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
@@ -4894,7 +4896,7 @@ GenericTypeParamDecl::GenericTypeParamDecl(
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::create(
-    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc ellipsisLoc,
+    DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc eachLoc,
     unsigned depth, unsigned index, bool isParameterPack, bool isOpaqueType,
     TypeRepr *opaqueTypeRepr) {
   auto &ctx = dc->getASTContext();
@@ -4902,7 +4904,7 @@ GenericTypeParamDecl *GenericTypeParamDecl::create(
       isOpaqueType ? 1 : 0, isParameterPack ? 1 : 0);
   auto mem = ctx.Allocate(allocSize, alignof(GenericTypeParamDecl));
   return new (mem)
-      GenericTypeParamDecl(dc, name, nameLoc, ellipsisLoc, depth, index,
+      GenericTypeParamDecl(dc, name, nameLoc, eachLoc, depth, index,
                            isParameterPack, isOpaqueType, opaqueTypeRepr);
 }
 
@@ -4916,37 +4918,38 @@ GenericTypeParamDecl *GenericTypeParamDecl::createDeserialized(
 
 GenericTypeParamDecl *
 GenericTypeParamDecl::createParsed(DeclContext *dc, Identifier name,
-                                   SourceLoc nameLoc, SourceLoc ellipsisLoc,
+                                   SourceLoc nameLoc, SourceLoc eachLoc,
                                    unsigned index, bool isParameterPack) {
   // We always create generic type parameters with an invalid depth.
   // Semantic analysis fills in the depth when it processes the generic
   // parameter list.
   return GenericTypeParamDecl::create(
-      dc, name, nameLoc, ellipsisLoc, GenericTypeParamDecl::InvalidDepth, index,
+      dc, name, nameLoc, eachLoc, GenericTypeParamDecl::InvalidDepth, index,
       isParameterPack, /*isOpaqueType*/ false, /*opaqueTypeRepr*/ nullptr);
 }
 
 GenericTypeParamDecl *GenericTypeParamDecl::createImplicit(
     DeclContext *dc, Identifier name, unsigned depth, unsigned index,
     bool isParameterPack, bool isOpaqueType, TypeRepr *opaqueTypeRepr,
-    SourceLoc nameLoc, SourceLoc ellipsisLoc) {
-  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, ellipsisLoc,
-                                             depth, index, isParameterPack,
+    SourceLoc nameLoc, SourceLoc eachLoc) {
+  auto *param = GenericTypeParamDecl::create(dc, name, nameLoc, eachLoc, depth,
+                                             index, isParameterPack,
                                              isOpaqueType, opaqueTypeRepr);
   param->setImplicit();
   return param;
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
-  SourceLoc endLoc = getNameLoc();
+  auto startLoc = getNameLoc();
+  auto endLoc = getNameLoc();
 
-  if (auto ellipsisLoc = getEllipsisLoc())
-    endLoc = ellipsisLoc;
+  if (const auto eachLoc = getEachLoc())
+    startLoc = eachLoc;
 
   if (!getInherited().empty())
     endLoc = getInherited().back().getSourceRange().End;
 
-  return SourceRange(getNameLoc(), endLoc);
+  return {startLoc, endLoc};
 }
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,

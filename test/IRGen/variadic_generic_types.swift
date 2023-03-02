@@ -5,7 +5,7 @@
 
 // REQUIRES: PTRSIZE=64
 
-struct G<T...> {
+struct G<each T> {
   // CHECK-LABEL: define hidden swiftcc void @"$s22variadic_generic_types1GV6calleeyyF"(i64 %0, %swift.type** %T)
   // CHECK: ret void
   func callee() {}

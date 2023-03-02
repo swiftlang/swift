@@ -269,7 +269,7 @@ void *GenericParamList_create(void *ctx, void *lAngleLoc,
                               BridgedArrayRef reqs, void *rAngleLoc);
 void *GenericTypeParamDecl_create(void *ctx, void *declContext,
                                   BridgedIdentifier name, void *nameLoc,
-                                  void *_Nullable ellipsisLoc, long index,
+                                  void *_Nullable eachLoc, long index,
                                   _Bool isParameterPack);
 void GenericTypeParamDecl_setInheritedType(void *ctx, void *Param, void *ty);
 

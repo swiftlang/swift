@@ -2,28 +2,28 @@
 
 // REQUIRES: asserts
 
-func returnTuple1<T...>() -> (repeat each T) { fatalError() }
+func returnTuple1<each T>() -> (repeat each T) { fatalError() }
 // expected-note@-1 3 {{in call to function 'returnTuple1()'}}
 
-func returnTuple2<T...>() -> (Int, repeat each T) { fatalError() }
+func returnTuple2<each T>() -> (Int, repeat each T) { fatalError() }
 // expected-note@-1 3 {{in call to function 'returnTuple2()'}}
 
-func returnTupleLabel1<T...>() -> (x: repeat each T) { fatalError() }
+func returnTupleLabel1<each T>() -> (x: repeat each T) { fatalError() }
 // expected-note@-1 2 {{in call to function 'returnTupleLabel1()'}}
 
-func returnTupleLabel2<T...>() -> (Int, x: repeat each T) { fatalError() }
+func returnTupleLabel2<each T>() -> (Int, x: repeat each T) { fatalError() }
 // expected-note@-1 2 {{in call to function 'returnTupleLabel2()'}}
 
-func returnTupleLabel3<T...>() -> (Int, repeat each T, y: Float) { fatalError() }
+func returnTupleLabel3<each T>() -> (Int, repeat each T, y: Float) { fatalError() }
 // expected-note@-1 3 {{in call to function 'returnTupleLabel3()'}}
 
-func returnTupleLabel4<T...>() -> (Int, x: repeat each T, y: Float) { fatalError() }
+func returnTupleLabel4<each T>() -> (Int, x: repeat each T, y: Float) { fatalError() }
 // expected-note@-1 2 {{in call to function 'returnTupleLabel4()'}}
 
-func returnTupleLabel5<T..., U...>() -> (Int, repeat each T, y: repeat each U) { fatalError() }
+func returnTupleLabel5<each T, each U>() -> (Int, repeat each T, y: repeat each U) { fatalError() }
 // expected-note@-1 3 {{in call to function 'returnTupleLabel5()'}}
 
-func returnTupleLabel6<T..., U...>() -> (Int, x: repeat each T, y: repeat each U) { fatalError() }
+func returnTupleLabel6<each T, each U>() -> (Int, x: repeat each T, y: repeat each U) { fatalError() }
 // expected-note@-1 {{in call to function 'returnTupleLabel6()'}}
 
 func concreteReturnTupleValid() {
@@ -89,7 +89,7 @@ func concreteReturnTypeInvalid() {
   // expected-error@-3 {{generic parameter 'U' could not be inferred}}
 }
 
-func genericReturnTupleValid<T...>(_: repeat each T) {
+func genericReturnTupleValid<each T>(_: repeat each T) {
   let _: (repeat each T) = returnTuple1()
   let _: (Int, repeat each T) = returnTuple1()
 
@@ -115,7 +115,7 @@ func genericReturnTupleValid<T...>(_: repeat each T) {
   let _: (Int, x: String, repeat each T, y: Float, repeat each T) = returnTupleLabel6()
 }
 
-func genericReturnTupleInvalid<T...>(_: repeat each T) {
+func genericReturnTupleInvalid<each T>(_: repeat each T) {
   let _: (x: repeat each T) = returnTuple1()
   // expected-error@-1 {{cannot convert value of type '(repeat each T)' to specified type '(x: repeat each T)'}}
   // expected-error@-2 {{generic parameter 'T' could not be inferred}}
@@ -176,13 +176,13 @@ func genericReturnTupleInvalid<T...>(_: repeat each T) {
   // expected-error@-2 {{generic parameter 'U' could not be inferred}}
 }
 
-func returnFunction1<T...>() -> (repeat each T) -> () {}
+func returnFunction1<each T>() -> (repeat each T) -> () {}
 
-func returnFunction2<T...>() -> (Int, repeat each T) -> () {} // expected-note {{in call to function 'returnFunction2()'}}
+func returnFunction2<each T>() -> (Int, repeat each T) -> () {} // expected-note {{in call to function 'returnFunction2()'}}
 
-func returnFunction3<T...>() -> (repeat each T, Float) -> () {} // expected-note {{in call to function 'returnFunction3()'}}
+func returnFunction3<each T>() -> (repeat each T, Float) -> () {} // expected-note {{in call to function 'returnFunction3()'}}
 
-func returnFunction4<T...>() -> (Int, repeat each T, Float) -> () {} // expected-note 2{{in call to function 'returnFunction4()'}}
+func returnFunction4<each T>() -> (Int, repeat each T, Float) -> () {} // expected-note 2{{in call to function 'returnFunction4()'}}
 
 func concreteReturnFunctionValid() {
   let _: () -> () = returnFunction1()
@@ -224,11 +224,11 @@ func concreteReturnFunctionInvalid() {
   let _: (Float, Int) -> () = returnFunction4() // expected-error {{cannot convert value of type '(Int, Float) -> ()' to specified type '(Float, Int) -> ()'}}
 }
 
-func patternInstantiationTupleTest1<T...>() -> (repeat Array<each T>) {} // expected-note {{in call to function 'patternInstantiationTupleTest1()'}}
-func patternInstantiationTupleTest2<T..., U...>() -> (repeat Dictionary<each T, each U>) {}
+func patternInstantiationTupleTest1<each T>() -> (repeat Array<each T>) {} // expected-note {{in call to function 'patternInstantiationTupleTest1()'}}
+func patternInstantiationTupleTest2<each T, each U>() -> (repeat Dictionary<each T, each U>) {}
 
-func patternInstantiationFunctionTest1<T...>() -> (repeat Array<each T>) -> () {}
-func patternInstantiationFunctionTest2<T..., U...>() -> (repeat Dictionary<each T, each U>) -> () {}
+func patternInstantiationFunctionTest1<each T>() -> (repeat Array<each T>) -> () {}
+func patternInstantiationFunctionTest2<each T, each U>() -> (repeat Dictionary<each T, each U>) -> () {}
 
 func patternInstantiationConcreteValid() {
   let _: () = patternInstantiationTupleTest1()
@@ -257,7 +257,7 @@ func patternInstantiationConcreteInvalid() {
   let _: (Array<Int>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{type of expression is ambiguous without more context}}
 }
 
-func patternInstantiationGenericValid<T..., U...>(t: repeat each T, u: repeat each U) where (repeat (each T, each U)): Any, each T: Hashable {
+func patternInstantiationGenericValid<each T, each U>(t: repeat each T, u: repeat each U) where (repeat (each T, each U)): Any, each T: Hashable {
   let _: (repeat Array<each T>) = patternInstantiationTupleTest1()
   let _: (repeat Array<each T>, Array<String>) = patternInstantiationTupleTest1()
   let _: (Array<String>, repeat Array<each T>) = patternInstantiationTupleTest1()
@@ -279,7 +279,7 @@ func patternInstantiationGenericValid<T..., U...>(t: repeat each T, u: repeat ea
   let _: (Dictionary<Int, String>, repeat Dictionary<each T, each U>, Dictionary<Double, Character>) -> () = patternInstantiationFunctionTest2()
 }
 
-func patternInstantiationGenericInvalid<T...>(t: repeat each T) where each T: Hashable {
+func patternInstantiationGenericInvalid<each T>(t: repeat each T) where each T: Hashable {
   let _: (repeat Set<each T>) = patternInstantiationTupleTest1() // expected-error {{cannot convert value of type '(repeat Array<each T>)' to specified type '(repeat Set<each T>)}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 

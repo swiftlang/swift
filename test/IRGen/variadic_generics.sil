@@ -8,7 +8,7 @@ import Swift
 
 // CHECK-LABEL: define{{.*}} @test_dynamic_1(
 // CHECK:         ret [[INT]] 4
-sil @test_dynamic_1 : $<T...> () -> Builtin.PackIndex {
+sil @test_dynamic_1 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %intIndex = integer_literal $Builtin.Word, 4
   %index = dynamic_pack_index %intIndex of $Pack{repeat each T}
@@ -17,7 +17,7 @@ bb0:
 
 // CHECK-LABEL: define{{.*}} @test_scalar_1(
 // CHECK:         ret [[INT]] 0
-sil @test_scalar_1 : $<T...> () -> Builtin.PackIndex {
+sil @test_scalar_1 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %index = scalar_pack_index 0 of $Pack{Int, repeat each T}
   return %index : $Builtin.PackIndex
@@ -26,7 +26,7 @@ bb0:
 // CHECK-LABEL: define{{.*}} @test_scalar_2(
 // CHECK:         [[INDEX:%.*]] = add [[INT]] %0, 1
 // CHECK:         ret [[INT]] [[INDEX]]
-sil @test_scalar_2 : $<T...> () -> Builtin.PackIndex {
+sil @test_scalar_2 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %index = scalar_pack_index 2 of $Pack{Int, repeat each T, Int}
   return %index : $Builtin.PackIndex
@@ -36,7 +36,7 @@ bb0:
 // CHECK:         [[T0:%.*]] = add [[INT]] %0, %0
 // CHECK:         [[INDEX:%.*]] = add [[INT]] [[T0]], 2
 // CHECK:         ret [[INT]] [[INDEX]]
-sil @test_scalar_3 : $<T...> () -> Builtin.PackIndex {
+sil @test_scalar_3 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %index = scalar_pack_index 4 of $Pack{Int, repeat each T, Int, repeat each T, Int}
   return %index : $Builtin.PackIndex
@@ -44,7 +44,7 @@ bb0:
 
 // CHECK-LABEL: define{{.*}} @test_pack_1(
 // CHECK:         ret [[INT]] 7
-sil @test_pack_1 : $<T...> () -> Builtin.PackIndex {
+sil @test_pack_1 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %intIndex = integer_literal $Builtin.Word, 7
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T}
@@ -54,7 +54,7 @@ bb0:
 
 // CHECK-LABEL: define{{.*}} @test_pack_2(
 // CHECK:         ret [[INT]] 8
-sil @test_pack_2 : $<T...> () -> Builtin.PackIndex {
+sil @test_pack_2 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %intIndex = integer_literal $Builtin.Word, 7
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T}
@@ -66,7 +66,7 @@ bb0:
 // CHECK:         [[T0:%.*]] = add [[INT]] %0, 1
 // CHECK:         [[INDEX:%.*]] = add [[INT]] [[T0]], 7
 // CHECK:         ret [[INT]] [[INDEX]]
-sil @test_pack_3 : $<T...> () -> Builtin.PackIndex {
+sil @test_pack_3 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %intIndex = integer_literal $Builtin.Word, 7
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T}
@@ -82,7 +82,7 @@ bb0:
 // CHECK: [[VALUE_ADDR:%.*]] = getelementptr inbounds %TSi, %TSi* [[ELT_ADDR]], i32 0, i32 0
 // CHECK: [[RET:%.*]] = load [[INT]], [[INT]]* [[VALUE_ADDR]], align
 // CHECK: ret [[INT]] [[RET]]
-sil @test_pack_element_get_1 : $<T...> (@pack_owned Pack{Int, repeat each T, Int}) -> Int {
+sil @test_pack_element_get_1 : $<each T> (@pack_owned Pack{Int, repeat each T, Int}) -> Int {
 bb0(%pack : $*Pack{Int, repeat each T, Int}):
   %index = scalar_pack_index 2 of $Pack{Int, repeat each T, Int}
   %elementAddr = pack_element_get %index of %pack : $*Pack{Int, repeat each T, Int} as $*Int
@@ -98,7 +98,7 @@ bb0(%pack : $*Pack{Int, repeat each T, Int}):
 // CHECK: [[VALUE_ADDR:%.*]] = getelementptr inbounds %TSi, %TSi* [[ELT_ADDR]], i32 0, i32 0
 // CHECK: store [[INT]] %1, [[INT]]* [[VALUE_ADDR]], align
 // CHECK: ret void
-sil @test_pack_element_set_1 : $<T...> (@pack_owned Pack{Int, repeat each T, Int}, Int) -> () {
+sil @test_pack_element_set_1 : $<each T> (@pack_owned Pack{Int, repeat each T, Int}, Int) -> () {
 bb0(%pack : $*Pack{Int, repeat each T, Int}, %value : $Int):
   %index = scalar_pack_index 2 of $Pack{Int, repeat each T, Int}
   %elementAddr = pack_element_get %index of %pack : $*Pack{Int, repeat each T, Int} as $*Int
@@ -113,7 +113,7 @@ bb0(%pack : $*Pack{Int, repeat each T, Int}, %value : $Int):
 // CHECK:        [[SP_SAVE:%[^,]+]] = call i8* @llvm.stacksave()
 // CHECK:        alloca %swift.opaque*, [[INT]] [[SIZE]]
 // CHECK:        call void @llvm.stackrestore(i8* [[SP_SAVE]])
-sil @test_pack_alloc_1_dynamic : $<T...> () -> () {
+sil @test_pack_alloc_1_dynamic : $<each T> () -> () {
 // Control flow so that stack saving/restoring is emitted
 entry:
   cond_br undef, left, right
@@ -132,7 +132,7 @@ exit:
 // CHECK:         [[STACK:%[^,]+]] = alloca [2 x %swift.opaque*]
 // CHECK:         call void @llvm.lifetime.start.p0i8
 // CHECK:         call void @llvm.lifetime.end.p0i8
-sil @test_pack_alloc_2_static : $<T...> () -> () {
+sil @test_pack_alloc_2_static : $<each T> () -> () {
   %addr = alloc_pack $Pack{Int, Int}
   dealloc_pack %addr : $*Pack{Int, Int}
   %ret = tuple ()
@@ -159,7 +159,7 @@ entry(%addr : $*T):
 sil @test_tuple_pack_element_addr_1 :  $<T, U> (@inout (String, T, U, Int), Builtin.Word) -> () {
 bb0(%tuple : $*(String, T, U, Int), %i : $Builtin.Word):
   %index = dynamic_pack_index %i of $Pack{Float, T, U, Float}
-  %0 = open_pack_element %index of <U_1...> at <Pack{String, T, U, Int}>, shape $U_1, uuid "01234567-89AB-CDEF-0123-000000000004"
+  %0 = open_pack_element %index of <each U_1> at <Pack{String, T, U, Int}>, shape $U_1, uuid "01234567-89AB-CDEF-0123-000000000004"
   %elt = tuple_pack_element_addr %index of %tuple : $*(String, T, U, Int) as $*@pack_element("01234567-89AB-CDEF-0123-000000000004") U_1
   %blackhole = function_ref @borrow : $@convention(thin) <T> (@in_guaranteed T) -> ()
   apply %blackhole<(@pack_element("01234567-89AB-CDEF-0123-000000000004") U_1)>(%elt) : $@convention(thin) <T> (@in_guaranteed T) -> ()
@@ -169,7 +169,7 @@ bb0(%tuple : $*(String, T, U, Int), %i : $Builtin.Word):
 
 // CHECK-LABEL: define{{.*}} @test_pack_length_1
 // CHECK:         ret [[INT]] %0
-sil @test_pack_length_1 : $<T...> () -> Builtin.Word {
+sil @test_pack_length_1 : $<each T> () -> Builtin.Word {
 bb0:
   %len = pack_length $Pack{repeat each T}
   return %len : $Builtin.Word
@@ -179,7 +179,7 @@ bb0:
 // CHECK:         [[T0:%.*]] = add [[INT]] %0, %0
 // CHECK:         [[T1:%.*]] = add [[INT]] [[T0]], 3
 // CHECK:         ret [[INT]] [[T1]]
-sil @test_pack_length_2 : $<T...> () -> Builtin.Word {
+sil @test_pack_length_2 : $<each T> () -> Builtin.Word {
 bb0:
   %len = pack_length $Pack{repeat each T, repeat each T, Int, Float, String}
   return %len : $Builtin.Word

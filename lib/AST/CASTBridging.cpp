@@ -579,12 +579,12 @@ void *GenericParamList_create(void *ctx, void *lAngleLoc,
 
 void *GenericTypeParamDecl_create(void *ctx, void *declContext,
                                   BridgedIdentifier name, void *nameLoc,
-                                  void *_Nullable ellipsisLoc, long index,
+                                  void *_Nullable eachLoc, long index,
                                   bool isParameterPack) {
   return GenericTypeParamDecl::createParsed(
       static_cast<DeclContext *>(declContext),
       Identifier::getFromOpaquePointer(name), getSourceLocFromPointer(nameLoc),
-      getSourceLocFromPointer(ellipsisLoc),
+      getSourceLocFromPointer(eachLoc),
       /*index*/ index, isParameterPack);
 }
 

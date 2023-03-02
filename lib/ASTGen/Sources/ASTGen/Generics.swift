@@ -21,12 +21,12 @@ extension ASTGenVisitor {
       return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
     }
     let nameLoc = self.base.advanced(by: node.name.position.utf8Offset).raw
-    let ellipsisLoc = node.ellipsis.map { self.base.advanced(by: $0.position.utf8Offset).raw }
+    let eachLoc = node.each.map { self.base.advanced(by: $0.position.utf8Offset).raw }
 
     return .decl(
       GenericTypeParamDecl_create(
-        self.ctx, self.declContext, name, nameLoc, ellipsisLoc, node.indexInParent / 2,
-        ellipsisLoc != nil))
+        self.ctx, self.declContext, name, nameLoc, eachLoc, node.indexInParent / 2,
+        eachLoc != nil))
   }
 }
 

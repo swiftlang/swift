@@ -5,7 +5,7 @@
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
 
-struct G<T...> {
+struct G<each T> {
   func makeTuple() {
     print((repeat (Array<each T>)).self)
   }
