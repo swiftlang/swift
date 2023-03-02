@@ -25,7 +25,12 @@ set(BACKTRACING_SOURCES
   SymbolicatedBacktrace.swift
   Utils.swift
 
+  get-cpu-context.${SWIFT_ASM_EXT}
+)
+
+set(LLVM_OPTIONAL_SOURCES
   get-cpu-context.S
+  get-cpu-context.asm
 )
 
 add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
