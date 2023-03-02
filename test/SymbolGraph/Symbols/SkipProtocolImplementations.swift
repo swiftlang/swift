@@ -2,11 +2,13 @@
 // RUN: %target-swift-frontend %s -module-name SkipProtocolImplementations -emit-module -emit-module-path %t/SkipProtocolImplementations.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t/ -skip-protocol-implementations
 // RUN: %{python} -m json.tool %t/SkipProtocolImplementations.symbols.json %t/SkipProtocolImplementations.formatted.symbols.json
 // RUN: %FileCheck %s --input-file %t/SkipProtocolImplementations.formatted.symbols.json
+// RUN: %FileCheck %s --input-file %t/SkipProtocolImplementations.formatted.symbols.json --check-prefix COUNT
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name SkipProtocolImplementations -emit-module -emit-module-path %t/SkipProtocolImplementations.swiftmodule -emit-module-doc-path %t/SkipProtocolImplementations.swiftdoc
 // RUN: %target-swift-symbolgraph-extract -module-name SkipProtocolImplementations -I %t -skip-protocol-implementations -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/SkipProtocolImplementations.symbols.json
+// RUN: %FileCheck %s --input-file %t/SkipProtocolImplementations.symbols.json --check-prefix COUNT
 
 // make sure that using `-skip-protocol-implementations` removes the functions from `SomeProtocol` on `SomeStruct`
 // CHECK-NOT: s:27SkipProtocolImplementations04SomeB0PAAE9bonusFuncyyF::SYNTHESIZED::s:27SkipProtocolImplementations10SomeStructV
@@ -23,7 +25,7 @@
 // CHECK-DAG: conformsTo
 
 // SomeStruct.otherFunc() should be the only one with sourceOrigin information
-// CHECK-COUNT-1: sourceOrigin
+// COUNT-COUNT-1: sourceOrigin
 
 public protocol SomeProtocol {
     /// Base docs
