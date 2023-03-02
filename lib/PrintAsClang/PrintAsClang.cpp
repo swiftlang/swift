@@ -563,13 +563,16 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
     ClangSyntaxPrinter(os).printIncludeForShimHeader(
         "_SwiftCxxInteroperability.h");
 
+    // Explicit @expose attribute is required only when the user specifies
+    // -clang-header-expose-decls flag.
+    // FIXME: should we detect any presence of @expose and require it then?
     bool requiresExplicitExpose =
-        !frontendOpts.ClangHeaderExposedDecls.has_value() ||
-        *frontendOpts.ClangHeaderExposedDecls ==
-            FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr ||
-        *frontendOpts.ClangHeaderExposedDecls ==
-            FrontendOptions::ClangHeaderExposeBehavior::
-                HasExposeAttrOrImplicitDeps;
+        frontendOpts.ClangHeaderExposedDecls.has_value() &&
+        (*frontendOpts.ClangHeaderExposedDecls ==
+             FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr ||
+         *frontendOpts.ClangHeaderExposedDecls ==
+             FrontendOptions::ClangHeaderExposeBehavior::
+                 HasExposeAttrOrImplicitDeps);
     // Swift stdlib dependencies are emitted into the same header when
     // -clang-header-expose-decls flag is not specified, or when it allows
     // implicit dependency emission.
