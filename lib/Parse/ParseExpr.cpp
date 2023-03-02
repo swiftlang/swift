@@ -406,10 +406,27 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
    return sub;
   }
 
+  if (Tok.isContextualKeyword("consume")
+      && peekToken().isAny(tok::identifier, tok::kw_self)
+      && !peekToken().isAtStartOfLine()) {
+    Tok.setKind(tok::contextual_keyword);
+
+    SourceLoc consumeLoc = consumeToken();
+    ParserResult<Expr> sub =
+        parseExprSequenceElement(diag::expected_expr_after_move, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      sub = makeParserResult(new (Context) MoveExpr(consumeLoc, sub.get()));
+    }
+    return sub;
+  }
+
   if (Context.LangOpts.hasFeature(Feature::MoveOnly)) {
     if (Tok.isContextualKeyword("_move")) {
       Tok.setKind(tok::contextual_keyword);
       SourceLoc awaitLoc = consumeToken();
+      diagnose(Tok, diag::move_consume_final_spelling)
+        .fixItReplace(awaitLoc, "consume");
+
       ParserResult<Expr> sub =
           parseExprSequenceElement(diag::expected_expr_after_move, isExprBasic);
       if (!sub.hasCodeCompletion() && !sub.isNull()) {

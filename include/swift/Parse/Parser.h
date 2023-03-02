@@ -631,7 +631,8 @@ public:
       return false;
 
     // followed by either an identifier, `self`, or `Self`.
-    return peekToken().isAny(tok::identifier, tok::kw_self, tok::kw_Self);
+    return !peekToken().isAtStartOfLine()
+      && peekToken().isAny(tok::identifier, tok::kw_self, tok::kw_Self);
   }
   
   /// Read tokens until we get to one of the specified tokens, then

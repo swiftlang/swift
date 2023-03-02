@@ -1360,9 +1360,12 @@ ERROR(expected_expr_after_try, none,
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
 ERROR(expected_expr_after_move, none,
-      "expected expression after '_move'", ())
+      "expected expression after 'consume'", ())
 ERROR(expected_expr_after_borrow, none,
       "expected expression after '_borrow'", ())
+
+WARNING(move_consume_final_spelling, none,
+        "'_move' has been renamed to 'consume', and the '_move' spelling will be removed shortly", ())
 
 // Cast expressions
 ERROR(expected_type_after_is,none,

@@ -796,15 +796,15 @@ ERROR(sil_moveonlychecker_missed_copy, none,
 
 // move kills copyable values checker diagnostics
 ERROR(sil_movekillscopyablevalue_value_consumed_more_than_once, none,
-      "'%0' used after being moved", (StringRef))
+      "'%0' used after being consumed", (StringRef))
 NOTE(sil_movekillscopyablevalue_move_here, none,
-     "move here", ())
+     "consume here", ())
 NOTE(sil_movekillscopyablevalue_use_here, none,
      "use here", ())
 NOTE(sil_movekillscopyablevalue_value_consumed_in_loop, none,
-     "cyclic move here. move will occur multiple times in the loop", ())
+     "consume here would occur multiple times in loop", ())
 ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
-      "_move applied to value that the compiler does not support checking",
+      "'consume' applied to value that the compiler does not support checking",
       ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

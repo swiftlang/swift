@@ -14,7 +14,7 @@ public class Klass {
 public func copyableVarArgTestCCFlowReinitOutOfBlockTest(_ k: inout Klass) {
     k.doSomething()
     if booleanValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
     }
     k = Klass()

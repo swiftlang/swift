@@ -6805,7 +6805,7 @@ ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
 ERROR(moveOnly_not_allowed_here,none,
       "'moveOnly' only applies to structs or enums", ())
 ERROR(move_expression_not_passed_lvalue,none,
-      "'move' can only be applied to lvalues", ())
+      "'consume' can only be applied to lvalues", ())
 ERROR(borrow_expression_not_passed_lvalue,none,
       "'borrow' can only be applied to lvalues", ())
 
