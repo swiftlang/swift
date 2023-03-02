@@ -3591,8 +3591,10 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
 
     // FIXME: Once we support move-only types in generics, remove this if the
     //        conforming type is move-only. Until then, don't suggest printing
-    //        __consuming on a protocol requirement.
+    //        ownership modifiers on a protocol requirement.
+    Options.ExcludeAttrList.push_back(DAK_LegacyConsuming);
     Options.ExcludeAttrList.push_back(DAK_Consuming);
+    Options.ExcludeAttrList.push_back(DAK_Borrowing);
 
     Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
       Printer << " {";

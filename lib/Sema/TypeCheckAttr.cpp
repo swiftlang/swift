@@ -200,7 +200,9 @@ public:
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
   void visitNonMutatingAttr(NonMutatingAttr *attr) { visitMutationAttr(attr); }
+  void visitBorrowingAttr(BorrowingAttr *attr) { visitMutationAttr(attr); }
   void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
+  void visitLegacyConsumingAttr(LegacyConsumingAttr *attr) { visitMutationAttr(attr); }
   void visitDynamicAttr(DynamicAttr *attr);
 
   void visitIndirectAttr(IndirectAttr *attr) {
@@ -443,14 +445,20 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
 
   SelfAccessKind attrModifier;
   switch (attr->getKind()) {
-  case DeclAttrKind::DAK_Consuming:
-    attrModifier = SelfAccessKind::Consuming;
+  case DeclAttrKind::DAK_LegacyConsuming:
+    attrModifier = SelfAccessKind::LegacyConsuming;
     break;
   case DeclAttrKind::DAK_Mutating:
     attrModifier = SelfAccessKind::Mutating;
     break;
   case DeclAttrKind::DAK_NonMutating:
     attrModifier = SelfAccessKind::NonMutating;
+    break;
+  case DeclAttrKind::DAK_Consuming:
+    attrModifier = SelfAccessKind::Consuming;
+    break;
+  case DeclAttrKind::DAK_Borrowing:
+    attrModifier = SelfAccessKind::Borrowing;
     break;
   default:
     llvm_unreachable("unhandled attribute kind");
@@ -462,10 +470,20 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
     // 'mutating' and 'nonmutating' are not valid on types
     // with reference semantics.
     if (contextTy->hasReferenceSemantics()) {
-      if (attrModifier != SelfAccessKind::Consuming) {
+      switch (attrModifier) {
+      case SelfAccessKind::Consuming:
+      case SelfAccessKind::LegacyConsuming:
+      case SelfAccessKind::Borrowing:
+        // It's still OK to specify the ownership convention of methods in
+        // classes.
+        break;
+        
+      case SelfAccessKind::Mutating:
+      case SelfAccessKind::NonMutating:
         diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
                               attrModifier, FD->getDescriptiveKind(),
                               DC->getSelfProtocolDecl() != nullptr);
+        break;
       }
     }
   } else {
@@ -473,11 +491,12 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
                           attrModifier);
   }
 
-  // Verify we don't have more than one of mutating, nonmutating,
-  // and __consuming.
+  // Verify we don't have more than one ownership specifier.
   if ((FD->getAttrs().hasAttribute<MutatingAttr>() +
           FD->getAttrs().hasAttribute<NonMutatingAttr>() +
-          FD->getAttrs().hasAttribute<ConsumingAttr>()) > 1) {
+          FD->getAttrs().hasAttribute<LegacyConsumingAttr>() +
+          FD->getAttrs().hasAttribute<ConsumingAttr>() +
+          FD->getAttrs().hasAttribute<BorrowingAttr>()) > 1) {
     if (auto *NMA = FD->getAttrs().getAttribute<NonMutatingAttr>()) {
       if (attrModifier != SelfAccessKind::NonMutating) {
         diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not,
@@ -492,10 +511,24 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
       }
     }
 
+    if (auto *CSA = FD->getAttrs().getAttribute<LegacyConsumingAttr>()) {
+      if (attrModifier != SelfAccessKind::LegacyConsuming) {
+        diagnoseAndRemoveAttr(CSA, diag::functions_mutating_and_not,
+                              SelfAccessKind::LegacyConsuming, attrModifier);
+      }
+    }
+
     if (auto *CSA = FD->getAttrs().getAttribute<ConsumingAttr>()) {
       if (attrModifier != SelfAccessKind::Consuming) {
         diagnoseAndRemoveAttr(CSA, diag::functions_mutating_and_not,
                               SelfAccessKind::Consuming, attrModifier);
+      }
+    }
+
+    if (auto *BSA = FD->getAttrs().getAttribute<BorrowingAttr>()) {
+      if (attrModifier != SelfAccessKind::Borrowing) {
+        diagnoseAndRemoveAttr(BSA, diag::functions_mutating_and_not,
+                              SelfAccessKind::Borrowing, attrModifier);
       }
     }
   }

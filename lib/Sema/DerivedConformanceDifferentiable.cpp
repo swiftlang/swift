@@ -55,7 +55,7 @@ static bool canInvokeMoveByOnProperty(
   if (!witness)
     return false;
   auto *decl = cast<FuncDecl>(witness.getDecl());
-  return decl->isNonMutating();
+  return !decl->isMutating();
 }
 
 /// Get the stored properties of a nominal type that are relevant for
