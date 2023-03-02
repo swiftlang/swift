@@ -426,6 +426,10 @@ llvm::ErrorOr<ModuleDependencyInfo> SerializedModuleLoaderBase::scanModuleFile(
     if (dependency.isImplementationOnly())
       continue;
 
+    if (dependency.isPackageOnly() &&
+        Ctx.LangOpts.PackageName != loadedModuleFile->getModulePackageName())
+      continue;
+
     // Find the top-level module name.
     auto modulePathStr = dependency.getPrettyPrintedPath();
     StringRef moduleName = modulePathStr;

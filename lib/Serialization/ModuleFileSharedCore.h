@@ -150,6 +150,9 @@ public:
     bool isImplementationOnly() const {
       return getImportControl() == ImportFilterKind::ImplementationOnly;
     }
+    bool isPackageOnly() const {
+      return getImportControl() == ImportFilterKind::PackageOnly;
+    }
 
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }
@@ -555,6 +558,10 @@ public:
   /// The name of the module.
   StringRef getName() const {
     return Name;
+  }
+
+  StringRef getModulePackageName() const {
+    return ModulePackageName;
   }
 
   /// Returns the list of modules this module depends on.
