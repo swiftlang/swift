@@ -640,7 +640,7 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
 
   auto foundSourceFile = *found;
   auto foundRange = sourceMgr.getRangeForBuffer(*foundSourceFile->getBufferID());
-  if (!foundRange.contains(adjustedLoc))
+  if (!foundRange.contains(adjustedLoc) && adjustedLoc != foundRange.getStart())
     return nullptr;
 
   // Update the last source file.
