@@ -556,7 +556,6 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
     bool enableCxx = frontendOpts.ClangHeaderExposedDecls.has_value() ||
-                     frontendOpts.EnableExperimentalCxxInteropInClangHeader ||
                      M->DeclContext::getASTContext().LangOpts.EnableCXXInterop;
     if (!enableCxx)
       return;

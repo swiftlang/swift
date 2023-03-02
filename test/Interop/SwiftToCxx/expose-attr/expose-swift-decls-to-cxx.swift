@@ -4,9 +4,6 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/expose.h -Wno-error=unused-function)
 
-// RUN: %target-swift-frontend %s -typecheck -module-name Expose -enable-experimental-cxx-interop-in-clang-header -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/expose.h
-// RUN: %FileCheck %s < %t/expose.h
-
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -module-name Expose -o %t
 // RUN: %target-swift-frontend -parse-as-library %t/Expose.swiftmodule -typecheck -module-name Expose -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/expose.h
