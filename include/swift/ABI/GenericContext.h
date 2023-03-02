@@ -30,38 +30,6 @@ struct TargetProtocolConformanceDescriptor;
 template <typename Runtime>
 struct TargetGenericContext;
 
-class GenericContextDescriptorFlags {
-  uint16_t Value;
-
-public:
-  constexpr GenericContextDescriptorFlags() : Value(0) {}
-
-  explicit constexpr GenericContextDescriptorFlags(uint16_t value)
-    : Value(value) {}
-
-  constexpr GenericContextDescriptorFlags(bool hasTypePacks)
-    : GenericContextDescriptorFlags(
-        GenericContextDescriptorFlags((uint16_t)0)
-          .withHasTypePacks(hasTypePacks)) {}
-
-  /// Whether this generic context has at least one type parameter
-  /// pack, in which case the generic context will have a trailing
-  /// GenericPackShapeHeader.
-  constexpr bool hasTypePacks() const {
-    return (Value & 0x1) != 0;
-  }
-
-  constexpr GenericContextDescriptorFlags
-  withHasTypePacks(bool hasTypePacks) const {
-    return GenericContextDescriptorFlags((uint16_t)(
-      (Value & ~0x1) | (hasTypePacks ? 0x1 : 0)));
-  }
-
-  constexpr uint16_t getIntValue() const {
-    return Value;
-  }
-};
-
 template <typename Runtime>
 struct TargetGenericContextDescriptorHeader {
   /// The number of (source-written) generic parameters, and thus
@@ -258,11 +226,6 @@ struct GenericPackShapeHeader {
 
   /// The number of equivalence classes in the same-shape relation.
   uint16_t NumShapeClasses;
-};
-
-enum class GenericPackKind: uint16_t {
-  Metadata = 0,
-  WitnessTable = 1
 };
 
 /// The GenericPackShapeHeader is followed by an array of these descriptors,

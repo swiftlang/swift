@@ -1812,6 +1812,38 @@ public:
                                 setHasMangledName)
 };
 
+class GenericContextDescriptorFlags {
+  uint16_t Value;
+
+public:
+  constexpr GenericContextDescriptorFlags() : Value(0) {}
+
+  explicit constexpr GenericContextDescriptorFlags(uint16_t value)
+    : Value(value) {}
+
+  constexpr GenericContextDescriptorFlags(bool hasTypePacks)
+    : GenericContextDescriptorFlags(
+        GenericContextDescriptorFlags((uint16_t)0)
+          .withHasTypePacks(hasTypePacks)) {}
+
+  /// Whether this generic context has at least one type parameter
+  /// pack, in which case the generic context will have a trailing
+  /// GenericPackShapeHeader.
+  constexpr bool hasTypePacks() const {
+    return (Value & 0x1) != 0;
+  }
+
+  constexpr GenericContextDescriptorFlags
+  withHasTypePacks(bool hasTypePacks) const {
+    return GenericContextDescriptorFlags((uint16_t)(
+      (Value & ~0x1) | (hasTypePacks ? 0x1 : 0)));
+  }
+
+  constexpr uint16_t getIntValue() const {
+    return Value;
+  }
+};
+
 enum class GenericParamKind : uint8_t {
   /// A type parameter.
   Type = 0,
@@ -1987,6 +2019,11 @@ public:
 enum class GenericRequirementLayoutKind : uint32_t {
   // A class constraint.
   Class = 0,
+};
+
+enum class GenericPackKind : uint16_t {
+  Metadata = 0,
+  WitnessTable = 1
 };
 
 class GenericEnvironmentFlags {
