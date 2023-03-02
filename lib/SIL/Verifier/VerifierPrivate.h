@@ -28,10 +28,11 @@ namespace silverifier {
 
 class LoadBorrowImmutabilityAnalysis {
   SmallMultiMapCache<AccessPath, Operand *> cache;
-  DeadEndBlocks &deadEndBlocks;
+  DeadEndBlocks *deadEndBlocks = nullptr;
 
 public:
-  LoadBorrowImmutabilityAnalysis(DeadEndBlocks &deadEndBlocks,
+  /// \p deadEndBlocks should be nullptr to enforce complete OSSA lifetimes.
+  LoadBorrowImmutabilityAnalysis(DeadEndBlocks *deadEndBlocks,
                                  const SILFunction *f);
 
   /// Returns true if exhaustively lbi is guaranteed to never be invalidated by
