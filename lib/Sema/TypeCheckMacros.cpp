@@ -1276,34 +1276,14 @@ swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
     if (!extension)
       continue;
 
-    auto &extensionCtx = extension->getASTContext();
-
     // Bind the extension to the original nominal type.
     extension->setExtendedNominal(nominal);
+    nominal->addExtension(extension);
 
-    // Resolve the protocol type.
-    assert(extension->getInherited().size() == 1);
-    auto inheritedType = evaluateOrDefault(
-        extensionCtx.evaluator,
-        InheritedTypeRequest{extension, 0, TypeResolutionStage::Interface},
-        Type());
-
-    if (!inheritedType || inheritedType->hasError())
-      continue;
-
-    auto protocolType = inheritedType->getAs<ProtocolType>();
-    if (!protocolType)
-      continue;
-
-    // Create a synthesized conformance and register it with the nominal type.
-    auto conformance = extensionCtx.getConformance(
-        nominal->getDeclaredInterfaceType(), protocolType->getDecl(),
-        nominal->getLoc(), extension, ProtocolConformanceState::Incomplete,
-        /*isUnchecked=*/false);
-    conformance->setSourceKindAndImplyingConformance(
-        ConformanceEntryKind::Synthesized, nullptr);
-
-    nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
+    // Make it accessible to getTopLevelDecls()
+    if (auto file = dyn_cast<FileUnit>(
+            decl->getDeclContext()->getModuleScopeContext()))
+      file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
   }
 
   return macroSourceFile->getBufferID();
