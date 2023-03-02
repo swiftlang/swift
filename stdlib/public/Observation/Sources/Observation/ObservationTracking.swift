@@ -2,109 +2,91 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
-@available(SwiftStdlib 5.9, *)
-protocol ObservationTrackingEntry {
-  mutating func addAccess(_ keyPath: AnyKeyPath)
-  mutating func addObserver<TransactionModel: ObservationTransactionModel>(using transactionModel: TransactionModel, _ changed: @Sendable @escaping () -> Void)
-  mutating func removeObserver()
-}
-
 @available(SwiftStdlib 5.9, *)
 public struct ObservationTracking {
-  struct EntryObserver<Subject: Observable>: Observer {
-    let changed: @Sendable () -> Void
+  struct Entry: @unchecked Sendable {
+    let emit: @Sendable (Set<AnyKeyPath>, @Sendable @escaping () -> Void) -> Int
+    let remove: @Sendable (Int) -> Void
+    var rawKeyPaths = Set<AnyKeyPath>()
     
-    init(_ changed: @Sendable @escaping () -> Void) {
-      self.changed = changed
-    }
-    
-    func changes(_ subject: Subject, to members: MemberKeyPaths<Subject>) {
-      changed()
-    }
-  }
-  
-  struct Entry<Subject: Observable>: ObservationTrackingEntry {
-    let subject: Subject
-    var members: MemberKeyPaths<Subject>
-    var token: Subject.Token?
-    
-    init(_ subject: Subject) {
-      self.subject = subject
-      self.members = MemberKeyPaths()
-    }
-    
-    mutating func addAccess(_ keyPath: AnyKeyPath) {
-      if let keyPath = keyPath as? PartialKeyPath<Subject> {
-        members.insert(keyPath)
+    init<Subject: Observable>(_ context: ObservationRegistrar<Subject>.Context) {
+      emit = { rawKeyPaths, observer in
+        context.nextTracking(for: TrackedProperties(raw: rawKeyPaths), observer)
+      }
+      remove = { generation in
+        context.cancel(generation)
       }
     }
     
-    mutating func addObserver<TransactionModel: ObservationTransactionModel>(using transactionModel: TransactionModel, _ changed: @Sendable @escaping () -> Void) {
-      if let token {
-        subject.removeObserver(token)
-      }
-      token = subject.addObserver(EntryObserver(changed), for: members, using: transactionModel)
+    func addObserver(_ changed: @Sendable @escaping () -> Void) -> Int {
+      return emit(rawKeyPaths, changed)
     }
     
-    mutating func removeObserver() {
-      if let token {
-        subject.removeObserver(token)
-      }
-      token = nil
+    func removeObserver(_ token: Int) {
+      remove(token)
     }
-  }
-  
-  var entries: [any ObservationTrackingEntry]
-  
-  init(accessList: AccessList) {
-    self.entries = Array(accessList.entries.values)
-  }
-  
-  public mutating func addObserver<TransactionModel: ObservationTransactionModel>(using transactionModel: TransactionModel, _ changed: @Sendable @escaping () -> Void) {
-    for idx in 0..<entries.count {
-      entries[idx].addObserver(using: transactionModel, changed)
-    }
-  }
-  
-  public mutating func removeObserver() {
-    for idx in 0..<entries.count {
-      entries[idx].removeObserver()
+    
+    mutating func insert(_ keyPath: AnyKeyPath) {
+      rawKeyPaths.insert(keyPath)
     }
   }
   
   struct AccessList {
-    var entries = [AnyHashable: any ObservationTrackingEntry]()
+    var entries = [ObjectIdentifier : Entry]()
     
-    mutating func addAccess<Subject: Observable>(propertyKeyPath: PartialKeyPath<Subject>, subject: Subject) {
-      entries[subject.id, default: Entry(subject)].addAccess(propertyKeyPath)
+    mutating func addAccess<Subject: Observable>(
+      keyPath: PartialKeyPath<Subject>, 
+      context: ObservationRegistrar<Subject>.Context
+    ) {
+      entries[context.id, default: Entry(context)].insert(keyPath)
     }
   }
   
-  public static func registerAccess<Subject: Observable>(propertyKeyPath: PartialKeyPath<Subject>, subject: Subject) {
-    if let trackingPtr = ThreadLocal[.trackingKey]?.assumingMemoryBound(to: AccessList?.self) {
-      if trackingPtr.pointee == nil {
-        trackingPtr.pointee = AccessList()
-      }
-      trackingPtr.pointee?.addAccess(propertyKeyPath: propertyKeyPath, subject: subject)
+  public static func withTracking<T>(
+    _ apply: () -> T, 
+    onChange: @autoclosure () -> @Sendable () -> Void
+  ) -> T {
+    var accessList: AccessList?
+    let result = withUnsafeMutablePointer(to: &accessList) { ptr in
+      _ThreadLocal.value = UnsafeMutableRawPointer(ptr)
+      defer { _ThreadLocal.value = nil }
+      return apply()
     }
+    if let list = accessList {
+      let state = _ManagedCriticalState([ObjectIdentifier: Int]())
+      let onChange = onChange()
+      let values = list.entries.mapValues { $0.addObserver {
+        onChange()
+        let values = state.withCriticalRegion { $0 }
+        for (id, token) in values {
+          list.entries[id]?.removeObserver(token)
+        }
+      }}
+      state.withCriticalRegion { $0 = values }
+    }
+    return result
   }
 
-  public static func withTracking(_ apply: () -> Void) -> ObservationTracking? {
-    var accessList: AccessList?
-    withUnsafeMutablePointer(to: &accessList) { ptr in
-      ThreadLocal[.trackingKey] = UnsafeMutableRawPointer(ptr)
-      apply()
-      ThreadLocal[.trackingKey] = nil
-    }
-    return accessList.map { ObservationTracking(accessList: $0) }
+  public static func _installTracking(
+    _ storage: UnsafeRawPointer, 
+    onChange: @escaping @Sendable () -> Void
+  ) {
+    let list = unsafeBitCast(storage, to: AccessList.self)
+    let state = _ManagedCriticalState([ObjectIdentifier: Int]())
+    let values = list.entries.mapValues { $0.addObserver {
+      onChange()
+      let values = state.withCriticalRegion { $0 }
+      for (id, token) in values {
+        list.entries[id]?.removeObserver(token)
+      }
+    }}
+    state.withCriticalRegion { $0 = values }
   }
 }

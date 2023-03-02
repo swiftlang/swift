@@ -12,47 +12,53 @@
 import _Concurrency
 
 @available(SwiftStdlib 5.9, *)
-public struct ObservedChanges<Subject: Observable, Element: Sendable> {
+public struct ObservedTransactions<Subject: Observable, Delivery: Actor> {
   let context: ObservationRegistrar<Subject>.Context
-  let keyPath: KeyPath<Subject, Element>
+  let properties: TrackedProperties<Subject>
+  let isolation: Delivery
   
   init(
     _ context: ObservationRegistrar<Subject>.Context, 
-    keyPath: KeyPath<Subject, Element>
+    properties: TrackedProperties<Subject>, 
+    isolation: Delivery
   ) {
     self.context = context
-    self.keyPath = keyPath
+    self.properties = properties
+    self.isolation = isolation
   }
 }
 
 @available(SwiftStdlib 5.9, *)
-extension ObservedChanges: AsyncSequence {
+extension ObservedTransactions: AsyncSequence {
+  public typealias Element = TrackedProperties<Subject>
+  
   public struct Iterator: AsyncIteratorProtocol {
     let context: ObservationRegistrar<Subject>.Context
-    let keyPath: KeyPath<Subject, Element>
     let properties: TrackedProperties<Subject>
+    let isolation: Delivery
     
     init(
       _ context: ObservationRegistrar<Subject>.Context, 
-      keyPath: KeyPath<Subject, Element>
+      properties: TrackedProperties<Subject>, 
+      isolation: Delivery
     ) {
       self.context = context
-      self.keyPath = keyPath
-      properties = Subject.dependencies(of: keyPath)
+      self.properties = properties
+      self.isolation = isolation
     }
     
     public mutating func next() async -> Element? {
-      await context.nextChange(to: keyPath, properties: properties)
+      await context.nextTransaction(for: properties, isolation: isolation)
     }
   }
   
   public func makeAsyncIterator() -> Iterator {
-    Iterator(context, keyPath: keyPath)
+    Iterator(context, properties: properties, isolation: isolation)
   }
 }
 
 @available(SwiftStdlib 5.9, *)
-extension ObservedChanges: @unchecked Sendable where Subject: Sendable { }
+extension ObservedTransactions: @unchecked Sendable { }
 
 @available(*, unavailable)
-extension ObservedChanges.Iterator: Sendable { }
+extension ObservedTransactions.Iterator: Sendable { }

@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: observation
+// REQUIRES: objc_interop
 // UNSUPPORTED: freestanding
 
 import StdlibUnittest

@@ -9,11 +9,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
+@_silgen_name("_swift_observation_tls_get")
+func _tlsGet() -> UnsafeMutableRawPointer?
+
+@_silgen_name("_swift_observation_tls_set")
+func _tlsSet(_ value: UnsafeMutableRawPointer?)
 
 @available(SwiftStdlib 5.9, *)
-public protocol Observer<Subject> {
-  associatedtype Subject: Observable
-  
-  func changes(_ subject: Subject, to members: MemberKeyPaths<Subject>)
+struct _ThreadLocal {
+  static var value: UnsafeMutableRawPointer? {
+    get {
+      return _tlsGet()
+    }
+    set {
+      _tlsSet(newValue)
+    }
+  }
 }

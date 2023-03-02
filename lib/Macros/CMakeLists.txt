@@ -1,4 +1,4 @@
-#===--- CMakeLists.txt - Observation support library ---------------------===#
+#===--- CMakeLists.txt - Macro support libraries ------------------------===#
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,4 +10,4 @@
 #
 #===----------------------------------------------------------------------===#
 
-add_subdirectory(Sources/Observation)
+add_subdirectory(Sources/ObservationMacros)

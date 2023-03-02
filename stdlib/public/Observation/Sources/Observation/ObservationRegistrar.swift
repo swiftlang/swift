@@ -2,259 +2,454 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-@_implementationOnly import _ObservationRuntime
+import _Concurrency
 
 @available(SwiftStdlib 5.9, *)
-public struct ObservationRegistar<Subject: Observable>: @unchecked Sendable {
-  fileprivate
-  struct Entry: Hashable {
-    let members: MemberKeyPaths<Subject>
-    let token: ObservationToken
-    
-    let _will: (inout ObservationTransaction<Subject>, Subject, UnsafeRawPointer, UnsafeRawPointer) -> Bool
-    let _did: (inout ObservationTransaction<Subject>, Subject, UnsafeRawPointer) -> Bool
-    let _commit: (inout ObservationTransaction<Subject>, Subject) -> Bool
-    let _invalidate: () -> Void
-    
-    func hash(into hasher: inout Hasher) {
-      hasher.combine(token)
-    }
-    
-    static func == (_ lhs: Entry, _ rhs: Entry) -> Bool {
-      return lhs.token == rhs.token
-    }
-    
-    init<O: Observer, Model: ObservationTransactionModel>(observer: O, members: MemberKeyPaths<Subject>, token: ObservationToken, model: Model) where O.Subject == Subject {
-      self.members = members
-      self.token = token
-      _will = { transaction, observable, raw, newValuePtr in
-        let keyPath = Unmanaged<PartialKeyPath<Subject>>.fromOpaque(raw).takeUnretainedValue()
-        func apply<Member>(_ type: Member.Type) -> Bool {
-          model.register(transaction: &transaction, observer: observer, observable: observable, willSet: keyPath as! KeyPath<Subject, Member>, to: newValuePtr.assumingMemoryBound(to: Member.self).pointee)
-        }
-        return _openExistential(type(of: keyPath).valueType, do: apply)
-      }
-      
-      _did = { transaction, observable, raw in
-        let keyPath = Unmanaged<PartialKeyPath<Subject>>.fromOpaque(raw).takeUnretainedValue()
-        func apply<Member>(_ type: Member.Type) -> Bool {
-          model.register(transaction: &transaction, observer: observer, observable: observable, didSet: keyPath as! KeyPath<Subject, Member>)
-        }
-        return _openExistential(type(of: keyPath).valueType, do: apply)
-      }
-      _commit = model.commit(transaction:observable:)
-      _invalidate = model.invalidate
-    }
-    
-    @_effects(releasenone)
-    func register<Member>(transaction: inout ObservationTransaction<Subject>, observable: Subject, willSet keyPath: UnsafeRawPointer, to newValue: Member) -> Bool {
-      withUnsafePointer(to: newValue) { ptr in
-        _will(&transaction, observable, keyPath, UnsafeRawPointer(ptr))
-      }
-    }
-    
-    @_effects(releasenone)
-    func register(transaction: inout ObservationTransaction<Subject>, observable: Subject, didSet keyPath: UnsafeRawPointer) -> Bool {
-      _did(&transaction, observable, keyPath)
-    }
-    
-    @_effects(releasenone)
-    func commit(transaction: inout ObservationTransaction<Subject>, observable: Subject) -> Bool {
-      _commit(&transaction, observable)
-    }
-    
-    @_effects(releasenone)
-    func invalidate() {
-      _invalidate()
-    }
-  }
+public struct ObservationRegistrar<Subject: Observable>: Sendable {
+  fileprivate let context = Context()
+  private let lifetime: Lifetime
   
-  struct State: Deinitializable {
-    // Registered observer + transaction model by token
-    fileprivate var observers = [ObservationToken : Entry]()
-    // Key path to entry back references for fast lookup
-    fileprivate var registrations = [UnsafeRawPointer: Set<Entry>]()
-    
-    func deinitialize() {
-      for entry in observers.values {
-        entry.invalidate()
-      }
-    }
-  }
-  
-  let state = ManagedCriticalState(managing: State())
-  
-  public init() { }
-  
-  public func addObserver<Model: ObservationTransactionModel>(_ observer: some Observer<Subject>, for members: MemberKeyPaths<Subject>, using transactionModel: Model) -> ObservationToken {
-    let token = ObservationToken()
-    state.withCriticalRegion { state in
-      let entry = Entry(observer: observer, members: members, token: token, model: transactionModel)
-      state.observers[token] = entry
-      for keyPath in members.raw {
-        state.registrations[keyPath, default: []].insert(entry)
-      }
-    }
-    return token
-  }
-  
-  public func removeObserver(_ observation: ObservationToken) {
-    let entry = state.withCriticalRegion { state -> Any? in
-      guard let entry = state.observers.removeValue(forKey: observation) else {
-        return nil
-      }
-      for keyPath in entry.members.raw {
-        state.registrations[keyPath]?.remove(entry)
-        if state.registrations[keyPath]?.isEmpty == true {
-          state.registrations.removeValue(forKey: keyPath)
-        }
-      }
-      return entry
-    }
-    _fixLifetime(entry)
-  }
-  
-  func remove(_ tokens: Set<ObservationToken>) {
-    if tokens.isEmpty { return }
-    state.withCriticalRegion { state in
-      for token in tokens {
-        if let entry = state.observers.removeValue(forKey: token) {
-          for keyPath in entry.members.raw {
-            state.registrations[keyPath]?.remove(entry)
-          }
-        }
-      }
-    }
-  }
-  
-  public func beginAccess(_ observable: Subject) {
-    if ThreadLocal[.transactionKey]?.assumingMemoryBound(to: ObservationTransaction<Subject>.self) == nil {
-      let ptr = UnsafeMutablePointer<ObservationTransaction<Subject>>.allocate(capacity: 1)
-      ptr.initialize(to: ObservationTransaction<Subject>(allocated: true))
-      ThreadLocal[.transactionKey] = UnsafeMutableRawPointer(ptr)
-    }
-  }
-  
-  public func endAccess(_ observable: Subject) {
-    if let container = ThreadLocal[.transactionKey]?.assumingMemoryBound(to: ObservationTransaction<Subject>.self) {
-      container.pointee.notifyObservers(observable)
-      if container.pointee.allocated == true {
-        container.deinitialize(count: 1)
-        container.deallocate()
-      }
-      ThreadLocal[.transactionKey] = nil
-    }
-  }
-  
-  public func withAccess<T>(_ observable: Subject, keyPath: PartialKeyPath<Subject>, _ apply: () throws -> T) rethrows -> T {
-    ObservationTracking.registerAccess(propertyKeyPath: keyPath, subject: observable)
-    return try apply()
-  }
-  
-  func _withMutation<T, Member>(_ observable: Subject, raw: UnsafeRawPointer, to newValue: Member, container: UnsafeMutablePointer<ObservationTransaction<Subject>>, topLevel: Bool, _ apply: () throws -> T) rethrows -> T {
-    let entries = state.withCriticalRegion { state in
-      state.registrations[raw] ?? Set()
-    }
-    if entries.isEmpty {
-      return try apply()
-    } else {
-      container.pointee.members._insert(raw)
-      var toRemove = Set<ObservationToken>(minimumCapacity: entries.count)
-    
-      for entry in entries {
-        if !entry.register(transaction: &container.pointee, observable: observable, willSet: raw, to: newValue) {
-          toRemove.insert(entry.token)
-        }
-      }
-      
-      let result = try apply()
-      
-      for entry in entries {
-        if toRemove.contains(entry.token) { continue }
-        if !entry.register(transaction: &container.pointee, observable: observable, didSet: raw) {
-          toRemove.insert(entry.token)
-        } else if topLevel {
-          if !entry.commit(transaction: &container.pointee, observable: observable) {
-            toRemove.insert(entry.token)
-          }
-        }
-      }
-      _fixLifetime(entries)
-      remove(toRemove)
-      return result
-    }
+  public init() {
+    lifetime = Lifetime(state: context.state)
   }
 
-  public func withMutation<T, Member>(_ observable: Subject, keyPath: __owned KeyPath<Subject, Member>, to newValue: Member, _ apply: () throws -> T) rethrows -> T {
-    ObservationTracking.registerAccess(propertyKeyPath: keyPath, subject: observable)
-    let raw = Unmanaged.passUnretained(keyPath).toOpaque()
-    if let container = ThreadLocal[.transactionKey]?.assumingMemoryBound(to: ObservationTransaction<Subject>.self) {
-      return try _withMutation(observable, raw: raw, to: newValue, container: container, topLevel: false, apply)
+  internal struct Context: Identifiable {
+    fileprivate let state = _ManagedCriticalState(managing: State())
+    
+    internal var id: ObjectIdentifier { state.id }
+
+    fileprivate init() { }
+  }
+  
+  private final class Lifetime: @unchecked Sendable {
+    private let state: _ManagedCriticalState<State>
+    
+    fileprivate init(state: _ManagedCriticalState<State>) {
+      self.state = state
+    }
+    
+    deinit {
+      state.withCriticalRegion { $0.deinitialize() }
+    }
+  }
+  
+  fileprivate enum Phase {
+    case willSet
+    case didSet
+    case complete
+  }
+  
+  fileprivate enum ResumeAction {
+    case resumeAndRemove(UnsafeContinuation<Subject?, Never>)
+    case informAndRemove(@Sendable () -> Void)
+  }
+  
+  fileprivate struct Next {
+    enum Kind {
+      case transaction(TrackedProperties<Subject>)
+      case change(TrackedProperties<Subject>, UnsafeContinuation<Subject?, Never>)
+      case tracking(TrackedProperties<Subject>, @Sendable () -> Void)
+      case cancelled
+    }
+    
+    fileprivate let kind: Kind
+    fileprivate var collected: TrackedProperties<Subject>?
+  }
+  
+  fileprivate struct State: @unchecked Sendable {
+    fileprivate var generation = 0
+    fileprivate var nexts = [Int: Next]()
+    fileprivate var lookups = [PartialKeyPath<Subject>: Set<Int>]()
+    fileprivate var terminal = false
+
+    fileprivate init() { }
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension ObservationRegistrar {
+  public func access<Member>(
+    _ subject: Subject, 
+    keyPath: KeyPath<Subject, Member>
+  ) {
+    if let trackingPtr = _ThreadLocal.value?
+      .assumingMemoryBound(to: ObservationTracking.AccessList?.self) {
+      if trackingPtr.pointee == nil {
+        trackingPtr.pointee = ObservationTracking.AccessList()
+      }
+      trackingPtr.pointee?.addAccess(keyPath: keyPath, context: context)
+    }
+  }
+  
+  public func willSet<Member>(
+    _ subject: Subject, 
+    keyPath: KeyPath<Subject, Member>
+  ) {
+    let observers = context.state.withCriticalRegion { state in
+      state.willSet(subject, keyPath: keyPath)
+    }
+    for observer in observers {
+      observer()
+    }
+  }
+  
+  public func didSet<Member>(
+    _ subject: Subject, 
+    keyPath: KeyPath<Subject, Member>
+  ) {
+    context.state.withCriticalRegion { state in
+      state.didSet(subject, keyPath: keyPath)
+    }
+  }
+  
+  public func withMutation<Member, T>(
+    of subject: Subject, 
+    keyPath: KeyPath<Subject, Member>, 
+    _ mutation: () throws -> T
+  ) rethrows -> T {
+    willSet(subject, keyPath: keyPath)
+    defer { didSet(subject, keyPath: keyPath) }
+    return try mutation()
+  }
+  
+  public func transactions<Delivery: Actor>(
+    for properties: TrackedProperties<Subject>, 
+    isolation: Delivery
+  ) -> ObservedTransactions<Subject, Delivery> {
+    ObservedTransactions(context, properties: properties, isolation: isolation)
+  }
+  
+  public func changes<Member: Sendable>(
+    for keyPath: KeyPath<Subject, Member>
+  ) -> ObservedChanges<Subject, Member> {
+    ObservedChanges(context, keyPath: keyPath)
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension ObservationRegistrar.Context {
+  internal func schedule<Delivery: Actor>(
+    _ generation: Int, 
+    isolation: isolated Delivery
+  ) async -> TrackedProperties<Subject>? {
+    return state.withCriticalRegion { state in
+      state.complete(generation)
+    }
+  }
+  
+  internal func nextTransaction<Delivery: Actor>(
+    for properties: TrackedProperties<Subject>, 
+    isolation: Delivery
+  ) async -> TrackedProperties<Subject>? {
+    let generation = state.withCriticalRegion { state in
+      let generation = state.nextGeneration()
+      state.insert(transaction: properties, generation: generation)
+      return generation
+    }
+    return await withTaskCancellationHandler {
+      return await schedule(generation, isolation: isolation)
+    } onCancel: {
+      state.withCriticalRegion { $0.cancel(generation) }
+    }
+  }
+  
+  internal func nextChange<Member: Sendable>(
+    to keyPath: KeyPath<Subject, Member>, 
+    properties: TrackedProperties<Subject>
+  ) async -> Member? {
+    let generation = state.withCriticalRegion { $0.nextGeneration() }
+    let subject: Subject? = await withTaskCancellationHandler {
+      await withUnsafeContinuation { continuation in
+        state.withCriticalRegion { state in
+          state.insert(change: properties, 
+                       continuation: continuation, generation: generation)
+        }
+      }
+    } onCancel: {
+      state.withCriticalRegion { $0.cancel(generation) }
+    }
+    return subject.map { $0[keyPath: keyPath] }
+  }
+  
+  internal func nextTracking(
+    for properties: TrackedProperties<Subject>, 
+    _ observer: @Sendable @escaping () -> Void
+  ) -> Int {
+    return state.withCriticalRegion { state in
+      let generation = state.nextGeneration()
+      state.insert(properties: properties, 
+                   tracking: observer, generation: generation)
+      return generation
+    }
+  }
+  
+  internal func cancel(_ generation: Int) {
+    state.withCriticalRegion { $0.cancel(generation) }
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension ObservationRegistrar.Next {
+  fileprivate mutating func resume(
+    keyPath: PartialKeyPath<Subject>, 
+    phase: ObservationRegistrar.Phase
+  ) -> ObservationRegistrar.ResumeAction? {
+    kind.resume(keyPath: keyPath, phase: phase, collected: &collected)
+  }
+  
+  fileprivate func remove(
+    from lookup: inout [PartialKeyPath<Subject>: Set<Int>], 
+    generation: Int
+  ) {
+    kind.remove(from: &lookup, generation: generation)
+  }
+  
+  fileprivate func deinitialize() {
+    kind.deinitialize()
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension ObservationRegistrar.Next.Kind {
+  fileprivate func resume(
+    keyPath: PartialKeyPath<Subject>, 
+    phase: ObservationRegistrar.Phase, 
+    collected: inout TrackedProperties<Subject>?
+  ) -> ObservationRegistrar.ResumeAction? {
+    switch (self, phase) {
+    case (.transaction(let observedTrackedProperties), .willSet):
+      if observedTrackedProperties.contains(keyPath) {
+        if var properties = collected {
+          properties.insert(keyPath)
+          collected = properties
+        } else {
+          var properties = TrackedProperties<Subject>()
+          properties.insert(keyPath)
+          collected = properties
+        }
+      }
+      return nil
+    case (.change(let observedTrackedProperties, let continuation), .didSet):
+      if observedTrackedProperties.contains(keyPath) {
+        if var properties = collected {
+          properties.insert(keyPath)
+          collected = properties
+        } else {
+          var properties = TrackedProperties<Subject>()
+          properties.insert(keyPath)
+          collected = properties
+        }
+        return .resumeAndRemove(continuation)
+      }
+      return nil
+    case (.tracking(let observedTrackedProperties, let observer), .willSet):
+      if observedTrackedProperties.contains(keyPath) {
+        if var properties = collected {
+          properties.insert(keyPath)
+          collected = properties
+        } else {
+          var properties = TrackedProperties<Subject>()
+          properties.insert(keyPath)
+          collected = properties
+        }
+        return .informAndRemove(observer)
+      } else {
+        return nil
+      }
+    default:
+      return nil
+    }
+  }
+  
+  fileprivate func invalidate(
+    properties: TrackedProperties<Subject>, 
+    from lookup: inout [PartialKeyPath<Subject>: Set<Int>], 
+    generation: Int
+  ) {
+    for raw in properties.raw {
+      if var members = lookup[raw] {
+        members.remove(generation)
+        if members.isEmpty {
+          lookup.removeValue(forKey: raw)
+        } else {
+          lookup[raw] = members
+        }
+      }
+    }
+  }
+  
+  fileprivate func remove(
+    from lookup: inout [PartialKeyPath<Subject>: Set<Int>], 
+    generation: Int
+  ) {
+    switch self {
+    case .transaction(let properties):
+      invalidate(properties: properties, from: &lookup, generation: generation)
+    case .change(let properties, _):
+      invalidate(properties: properties, from: &lookup, generation: generation)
+    case .tracking(let properties, _):
+      invalidate(properties: properties, from: &lookup, generation: generation)
+    default:
+      break
+    }
+  }
+  
+  fileprivate func deinitialize() {
+    switch self {
+    case .change(_, let continuation):
+      continuation.resume(returning: nil)
+    default:
+      break
+    }
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension ObservationRegistrar.State {
+  fileprivate mutating func nextGeneration() -> Int {
+    defer { generation &+= 1 }
+    return generation
+  }
+  
+  fileprivate mutating func cancel(_ generation: Int) {
+    if let existing = nexts.removeValue(forKey: generation) {
+      existing.remove(from: &lookups, generation: generation)
+      existing.deinitialize()
     } else {
-      var container = ObservationTransaction<Subject>()
-      return try withUnsafeMutablePointer(to: &container) { ptr in
-        ThreadLocal[.transactionKey] = UnsafeMutableRawPointer(ptr)
-        defer {
-          ThreadLocal[.transactionKey] = nil
-        }
-        return try _withMutation(observable, raw: raw, to: newValue, container: ptr, topLevel: true, apply)
-      }
+      nexts[generation] = ObservationRegistrar.Next(kind: .cancelled)
     }
   }
   
-  public func register<Member>(
-    observable: Subject,
-    willSet keyPath: KeyPath<Subject, Member>,
-    to newValue: Member
+  fileprivate mutating func insert(
+    transaction properties: TrackedProperties<Subject>, 
+    generation: Int
   ) {
-    let raw = Unmanaged.passUnretained(keyPath).toOpaque()
-    if let container = ThreadLocal[.transactionKey]?.assumingMemoryBound(to: ObservationTransaction<Subject>.self) {
-      let entries = state.withCriticalRegion { state in
-        return state.registrations[raw] ?? Set()
-      }
-      if entries.isEmpty {
+    if let existing = nexts.removeValue(forKey: generation) {
+      switch existing.kind {
+      case .cancelled:
         return
+      default:
+        existing.remove(from: &lookups, generation: generation)
       }
-      container.pointee.members.insert(keyPath)
-      var toRemove = Set<ObservationToken>()
-      for entry in entries {
-        if !entry.register(transaction: &container.pointee, observable: observable, willSet: raw, to: newValue) {
-          toRemove.insert(entry.token)
-        }
-      }
-      remove(toRemove)
+    }
+    nexts[generation] = ObservationRegistrar.Next(kind: .transaction(properties))
+    for raw in properties.raw {
+      lookups[raw, default: []].insert(generation)
     }
   }
   
-  public func register<Member>(
-    observable: Subject,
-    didSet keyPath: KeyPath<Subject, Member>
+  fileprivate mutating func insert(
+    change properties: TrackedProperties<Subject>, 
+    continuation: UnsafeContinuation<Subject?, Never>, 
+    generation: Int
   ) {
-    let raw = Unmanaged.passUnretained(keyPath).toOpaque()
-    if let container = ThreadLocal[.transactionKey]?.assumingMemoryBound(to: ObservationTransaction<Subject>.self) {
-      container.pointee.members.insert(keyPath)
-      let entries = state.withCriticalRegion { state in
-        return state.registrations[raw] ?? Set()
-      }
-      if entries.isEmpty {
+    guard !terminal else {
+      continuation.resume(returning: nil)
+      return
+    }
+    if let existing = nexts.removeValue(forKey: generation) {
+      switch existing.kind {
+      case .cancelled:
+        continuation.resume(returning: nil)
         return
+      default:
+        existing.remove(from: &lookups, generation: generation)
       }
-      container.pointee.members.insert(keyPath)
-      var toRemove = Set<ObservationToken>()
-      for entry in entries {
-        if !entry.register(transaction: &container.pointee, observable: observable, didSet: raw) {
-          toRemove.insert(entry.token)
+    }
+    nexts[generation] = 
+      ObservationRegistrar.Next(kind: .change(properties, continuation))
+    for raw in properties.raw {
+      lookups[raw, default: []].insert(generation)
+    }
+  }
+  
+  fileprivate mutating func insert(
+    properties: TrackedProperties<Subject>, 
+    tracking: @Sendable @escaping () -> Void, 
+    generation: Int
+  ) {
+    nexts[generation] = 
+      ObservationRegistrar.Next(kind: .tracking(properties, tracking))
+    for raw in properties.raw {
+      lookups[raw, default: []].insert(generation)
+    }
+  }
+  
+  fileprivate mutating func complete(
+    _ generation: Int
+  ) -> TrackedProperties<Subject>? {
+    if let existing = nexts.removeValue(forKey: generation) {
+      switch existing.kind {
+      case .transaction:
+        return existing.collected
+      default:
+        return nil
+      }
+    }
+    return nil
+  }
+  
+  fileprivate mutating func willSet<Member>(
+    _ subject: Subject, 
+    keyPath: KeyPath<Subject, Member>
+  ) -> [() -> Void] {
+    let raw = keyPath
+    var observers = [() -> Void]()
+    for generation in lookups[raw] ?? [] {
+      if let resume = nexts[generation]?.resume(keyPath: raw, phase: .willSet) {
+        switch resume {
+        case .resumeAndRemove(let continuation):
+          continuation.resume(returning: subject)
+        case .informAndRemove(let observer):
+          observers.append(observer)
+        }
+        if let existing = nexts.removeValue(forKey: generation) {
+          existing.remove(from: &lookups, generation: generation)
         }
       }
-      remove(toRemove)
     }
+    return observers
+  }
+  
+  fileprivate mutating func didSet<Member>(
+    _ subject: Subject, 
+    keyPath: KeyPath<Subject, Member>
+  ) {
+    let raw = keyPath
+    guard let generations = lookups[raw] else {
+      return
+    }
+    for generation in generations {
+      if let resume = nexts[generation]?.resume(keyPath: raw, phase: .didSet) {
+        switch resume {
+        case .resumeAndRemove(let continuation):
+          continuation.resume(returning: subject)
+        default:
+          break
+        }
+        if let existing = nexts.removeValue(forKey: generation) {
+          existing.remove(from: &lookups, generation: generation)
+        }
+      }
+    }
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension ObservationRegistrar.State: _Deinitializable {
+  fileprivate mutating func deinitialize() {
+    terminal = true
+    for next in nexts.values {
+      next.deinitialize()
+    }
+    nexts.removeAll()
+    lookups.removeAll()
   }
 }
