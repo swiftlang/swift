@@ -8,7 +8,7 @@
 // Build the plugin
 // RUN: %target-build-swift %S/../../Macros/Inputs/syntax_macro_definitions.swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-build-swift %s -module-name Macro -emit-module -emit-module-path %t -swift-version 5 -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir
+// RUN: %target-build-swift %s -module-name Macro -emit-module -emit-module-path %t -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir
 // RUN: %target-swift-symbolgraph-extract -module-name Macro -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/Macro.symbols.json
 // RUN: %FileCheck %s --input-file %t/Macro.symbols.json --check-prefix MISSING

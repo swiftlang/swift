@@ -296,13 +296,7 @@ Parser::parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
                                  bool suppressDiagnostics) {
 #if SWIFT_SWIFT_PARSER
   Optional<DiagnosticTransaction> existingParsingTransaction;
-  if ((Context.LangOpts.hasFeature(Feature::Macros) ||
-       Context.LangOpts.hasFeature(Feature::BuiltinMacros) ||
-       Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
-       Context.LangOpts.hasFeature(Feature::ParserDiagnostics) ||
-       Context.LangOpts.hasFeature(Feature::ParserValidation) ||
-       Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&
-      !SourceMgr.hasIDEInspectionTargetBuffer() &&
+  if (!SourceMgr.hasIDEInspectionTargetBuffer() &&
       SF.Kind != SourceFileKind::SIL) {
     StringRef contents =
         SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));

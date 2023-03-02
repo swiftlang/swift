@@ -13,7 +13,7 @@
 
 // RUN: %swift-target-frontend \
 // RUN:   -typecheck -verify \
-// RUN:   -swift-version 5 -enable-experimental-feature Macros \
+// RUN:   -swift-version 5 \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -dump-macro-expansions \
 // RUN:   %t/test.swift \

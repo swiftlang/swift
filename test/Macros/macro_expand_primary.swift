@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t-scratch)
 // RUN: %target-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir
-// RUN: %target-swift-frontend -swift-version 5 -typecheck -I%t -verify -primary-file %s %S/Inputs/macro_expand_other.swift -verify-ignore-unknown  -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -dump-macro-expansions > %t/expansions-dump.txt 2>&1
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir
+// RUN: %target-swift-frontend -swift-version 5 -typecheck -I%t -verify -primary-file %s %S/Inputs/macro_expand_other.swift -verify-ignore-unknown  -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -dump-macro-expansions > %t/expansions-dump.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-DUMP %s < %t/expansions-dump.txt
 
 // REQUIRES: asserts

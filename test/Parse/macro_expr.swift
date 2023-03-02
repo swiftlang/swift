@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -enable-experimental-feature Macros -verify %s
+// RUN: %target-swift-frontend -parse -verify %s
 
 #macro
 

@@ -2788,7 +2788,23 @@ static bool usesFeatureActors(Decl *decl) {
 }
 
 static bool usesFeatureMacros(Decl *decl) {
-  return isa<MacroExpansionDecl>(decl) || isa<MacroDecl>(decl);
+  return isa<MacroDecl>(decl);
+}
+
+static bool usesFeatureFreestandingMacros(Decl *decl) {
+  auto macro = dyn_cast<MacroDecl>(decl);
+  if (!macro)
+    return false;
+
+  return macro->getMacroRoles().contains(MacroRole::Declaration);
+}
+
+static bool usesFeatureAttachedMacros(Decl *decl) {
+  auto macro = dyn_cast<MacroDecl>(decl);
+  if (!macro)
+    return false;
+
+  return static_cast<bool>(macro->getMacroRoles() & getAttachedMacroRoles());
 }
 
 static bool usesFeatureConcurrentFunctions(Decl *decl) {

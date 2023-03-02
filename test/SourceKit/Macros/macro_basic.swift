@@ -65,7 +65,6 @@ struct S4 { }
 
 // RUN: COMPILER_ARGS_WITHOUT_SOURCE=( \
 // RUN:   -swift-version 5 \
-// RUN:   -enable-experimental-feature Macros \
 // RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
 // RUN:   -I %swift-host-lib-dir \
 // RUN:   -module-name MacroUser \
