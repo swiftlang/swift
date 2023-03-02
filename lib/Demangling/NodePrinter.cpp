@@ -3407,6 +3407,11 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
       case Node::Kind::Subscript: {
         std::string subscriptText = "subscript(";
         std::vector<std::string> argumentTypeNames;
+        auto getArgumentTypeName = [&argumentTypeNames](size_t i) {
+          if (i < argumentTypeNames.size())
+            return argumentTypeNames[i];
+          return std::string("<unknown>");
+        };
         // Multiple arguments case
         NodePointer argList = matchSequenceOfKinds(
             child, {
@@ -3454,27 +3459,27 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
           if (child->getKind() == Node::Kind::LabelList) {
             size_t numChildren = child->getNumChildren();
             if (numChildren == 0) {
-              subscriptText += unlabelledArg + argumentTypeNames[0];
+              subscriptText += unlabelledArg + getArgumentTypeName(0);
             } else {
               while (idx < numChildren) {
                 Node *argChild = child->getChild(idx);
                 idx += 1;
                 if (argChild->getKind() == Node::Kind::Identifier) {
                   subscriptText += std::string(argChild->getText()) + ": " +
-                                   argumentTypeNames[idx - 1];
+                                   getArgumentTypeName(idx - 1);
                   if (idx != numChildren) {
                     subscriptText += ", ";
                   }
                 } else if (argChild->getKind() ==
                                Node::Kind::FirstElementMarker ||
                            argChild->getKind() == Node::Kind::VariadicMarker) {
-                  subscriptText += unlabelledArg + argumentTypeNames[idx - 1];
+                  subscriptText += unlabelledArg + getArgumentTypeName(idx - 1);
                 }
               }
             }
           }
         } else {
-          subscriptText += unlabelledArg + argumentTypeNames[0];
+          subscriptText += unlabelledArg + getArgumentTypeName(0);
         }
         return subscriptText + ")";
       }

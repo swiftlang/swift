@@ -415,8 +415,10 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
 
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
-    auto result =
-        BindingPattern::createImplicit(getContext(), isLet, subPattern);
+    auto result = BindingPattern::createImplicit(
+        getContext(),
+        isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
+        subPattern);
     if (Type interfaceType = subPattern->getDelayedInterfaceType())
       result->setDelayedInterfaceType(interfaceType, owningDC);
     else
@@ -2545,6 +2547,7 @@ getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
     return swift::VarDecl::Introducer::ID;
   CASE(Let)
   CASE(Var)
+  CASE(InOut)
   }
 #undef CASE
   return None;

@@ -854,8 +854,8 @@ Pattern *DerivedConformance::enumElementPayloadSubpattern(
 
       auto namedPattern = new (C) NamedPattern(payloadVar);
       namedPattern->setImplicit();
-      auto letPattern =
-          BindingPattern::createImplicit(C, /*isLet*/ true, namedPattern);
+      auto letPattern = BindingPattern::createImplicit(
+          C, VarDecl::Introducer::Let, namedPattern);
       elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
                                                 SourceLoc(), letPattern));
     }
@@ -874,8 +874,8 @@ Pattern *DerivedConformance::enumElementPayloadSubpattern(
 
   auto namedPattern = new (C) NamedPattern(payloadVar);
   namedPattern->setImplicit();
-  auto letPattern =
-      new (C) BindingPattern(SourceLoc(), /*isLet*/ true, namedPattern);
+  auto letPattern = new (C)
+      BindingPattern(SourceLoc(), VarDecl::Introducer::Let, namedPattern);
   return ParenPattern::createImplicit(C, letPattern);
 }
 

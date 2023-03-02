@@ -47,7 +47,7 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
   // Only do this if we're parsing a pattern, to improve QoI on malformed
   // expressions followed by (e.g.) let/var decls.
   //
-  if (InVarOrLetPattern && isOnlyStartOfMatchingPattern()) {
+  if (InBindingPattern && isOnlyStartOfMatchingPattern()) {
     ParserResult<Pattern> pattern = parseMatchingPattern(/*isExprBasic*/false);
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
@@ -55,7 +55,7 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
       return nullptr;
     return makeParserResult(new (Context) UnresolvedPatternExpr(pattern.get()));
   }
-  
+
   return parseExprSequence(Message, isExprBasic,
                                 /*forConditionalDirective*/false);
 }
@@ -222,7 +222,7 @@ parse_operator:
       if (Tok.getText() == "&&" &&
           peekToken().isAny(tok::pound_available, tok::pound_unavailable,
                             tok::pound__hasSymbol, tok::kw_let, tok::kw_var,
-                            tok::kw_case))
+                            tok::kw_case, tok::kw_inout))
         goto done;
       
       // Parse the operator.
@@ -275,7 +275,7 @@ parse_operator:
       // pattern, then an assignment doesn't make sense.  In a "if let"
       // statement the equals is the start of the condition, so don't parse it
       // as a binary operator.
-      if (InVarOrLetPattern)
+      if (InBindingPattern)
         goto done;
       SourceLoc equalsLoc = consumeToken();
       auto *assign = new (Context) AssignExpr(equalsLoc);
@@ -1651,18 +1651,18 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     // Parse and return this as an UnresolvedPatternExpr around a binding.  This
     // will be resolved (or rejected) by sema when the overall refutable pattern
     // it transformed from an expression into a pattern.
-    if ((InVarOrLetPattern == IVOLP_ImplicitlyImmutable ||
-         InVarOrLetPattern == IVOLP_InVar ||
-         InVarOrLetPattern == IVOLP_InLet) &&
+    if ((InBindingPattern == PatternBindingState::ImplicitlyImmutable ||
+         InBindingPattern.getIntroducer().hasValue()) &&
         // If we have "case let x." or "case let x(", we parse x as a normal
         // name, not a binding, because it is the start of an enum pattern or
         // call pattern.
         peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
       Identifier name;
       SourceLoc loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
-      auto introducer = (InVarOrLetPattern != IVOLP_InVar
-                         ? VarDecl::Introducer::Let
-                         : VarDecl::Introducer::Var);
+      // If we have an inout/let/var, set that as our introducer. otherwise
+      // default to Let.
+      auto introducer =
+          InBindingPattern.getIntroducer().getValueOr(VarDecl::Introducer::Let);
       auto pattern = createBindingFromPattern(loc, name, introducer);
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
@@ -1816,7 +1816,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     Result.setHasCodeCompletionAndIsError();
     if (IDECallbacks &&
         // We cannot code complete anything after var/let.
-        (!InVarOrLetPattern || InVarOrLetPattern == IVOLP_InMatchingPattern)) {
+        (!InBindingPattern ||
+         InBindingPattern == PatternBindingState::InMatchingPattern)) {
       if (InPoundIfEnvironment) {
         IDECallbacks->completePlatformCondition();
       } else {
@@ -2802,8 +2803,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
   ParserStatus Status;
   // We may be parsing this closure expr in a matching pattern context.  If so,
   // reset our state to not be in a pattern for any recursive pattern parses.
-  llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-  T(InVarOrLetPattern, IVOLP_NotInVarOrLet);
+  llvm::SaveAndRestore<decltype(InBindingPattern)> T(
+      InBindingPattern, PatternBindingState::NotInBinding);
 
   // Reset async attribute in parser context.
   llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);

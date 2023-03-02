@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 747; // `consuming` and `borrowing` decl modifiers
+const uint16_t SWIFTMODULE_VERSION_MINOR = 748; // inout binding
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -346,9 +346,10 @@ using ParamDeclSpecifierField = BCFixed<3>;
 // the module version.
 enum class VarDeclIntroducer : uint8_t {
   Let = 0,
-  Var = 1
+  Var = 1,
+  InOut = 2,
 };
-using VarDeclIntroducerField = BCFixed<1>;
+using VarDeclIntroducerField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.

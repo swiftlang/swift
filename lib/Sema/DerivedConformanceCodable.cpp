@@ -1650,7 +1650,8 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
           C, UnresolvedDotExpr::createImplicit(C, allKeysExpr, C.Id_popFirst));
 
       auto *theKeyPattern = BindingPattern::createImplicit(
-          C, /*isLet=*/true, NamedPattern::createImplicit(C, theKeyDecl));
+          C, VarDecl::Introducer::Let,
+          NamedPattern::createImplicit(C, theKeyDecl));
 
       guardElements.emplace_back(SourceLoc(), theKeyPattern,
                                  allKeysPopFirstCallExpr);
