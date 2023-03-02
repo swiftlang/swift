@@ -30,7 +30,7 @@ public let benchmarks = [
 @inline(never)
 public func run_singleAsciiCharacterCount100(N: Int) {
   let string = "x"
-  for _ in 1...5000*N {
+  for _ in 1...200*N {
     blackHole(String(repeating: getString(string), count: 100))
   }
 }
@@ -38,7 +38,7 @@ public func run_singleAsciiCharacterCount100(N: Int) {
 @inline(never)
 public func run_26AsciiCharactersCount2(N: Int) {
   let string = "abcdefghijklmnopqrstuvwxyz"
-  for _ in 1...5000*N {
+  for _ in 1...200*N {
     blackHole(String(repeating: getString(string), count: 2))
   }
 }
@@ -46,7 +46,7 @@ public func run_26AsciiCharactersCount2(N: Int) {
 @inline(never)
 public func run_33CyrillicCharactersCount2(N: Int) {
   let string = "абвгґдеєжзиіїйклмнопрстуфхцчшщьюя"
-  for _ in 1...5000*N {
+  for _ in 1...200*N {
     blackHole(String(repeating: getString(string), count: 2))
   }
 }
@@ -70,7 +70,7 @@ public func run_longMixedStringCount100(N: Int) {
     著作権が切れた小説などが利用されることもある。
     🦩
     """
-  for _ in 1...5000*N {
+  for _ in 1...200*N {
     blackHole(String(repeating: getString(string), count: 100))
   }
 }
