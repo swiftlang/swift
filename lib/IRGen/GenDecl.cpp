@@ -5979,7 +5979,7 @@ void IRGenModule::setColocateTypeDescriptorSection(llvm::GlobalVariable *v) {
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
     if (IRGen.Opts.ColocateTypeDescriptors)
-      v->setSection("__TEXT,__textg_swiftt,regular");
+      v->setSection("__TEXT,__constg_swiftt");
     else
       setTrueConstGlobal(v);
     break;
