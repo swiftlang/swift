@@ -406,7 +406,10 @@ public:
     /// Expose all public declarations in the generated header.
     AllPublic,
     /// Expose declarations only when they have expose attribute.
-    HasExposeAttr
+    HasExposeAttr,
+    /// Expose declarations only when they have expose attribute or are the
+    /// implicitly exposed Stdlib declarations.
+    HasExposeAttrOrImplicitDeps
   };
 
   /// Indicates which declarations should be exposed in the generated clang
