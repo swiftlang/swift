@@ -46,7 +46,7 @@ public:
 
   /// Whether this generic context has at least one type parameter
   /// pack, in which case the generic context will have a trailing
-  /// GenericParamPackShapeHeader.
+  /// GenericPackShapeHeader.
   constexpr bool hasTypePacks() const {
     return (Value & 0x1) != 0;
   }
@@ -245,23 +245,51 @@ public:
 using GenericRequirementDescriptor =
   TargetGenericRequirementDescriptor<InProcess>;
 
-struct GenericParamPackShapeHeader {
-  /// The number of generic parameters which are packs.
+struct GenericPackShapeHeader {
+  /// The number of generic parameters and conformance requirements
+  /// which are packs.
   ///
-  /// Must equal the number of GenericParamDescriptors whose kind is
-  /// GenericParamKind::TypePack.
-  uint16_t NumTypePacks;
+  /// Must equal the sum of:
+  /// - the number of GenericParamDescriptors whose kind is
+  ///   GenericParamKind::TypePack and isKeyArgument bits set;
+  /// - the number of GenericRequirementDescriptors with the
+  ///   isPackRequirement and isKeyArgument bits set
+  uint16_t NumPacks;
 
   /// The number of equivalence classes in the same-shape relation.
   uint16_t NumShapeClasses;
 };
 
-struct GenericParamPackShapeDescriptor {
-  /// The equivalence class of this generic parameter pack under
-  /// the same-shape relation.
+enum class GenericPackKind: uint16_t {
+  Metadata = 0,
+  WitnessTable = 1
+};
+
+/// The GenericPackShapeHeader is followed by an array of these descriptors,
+/// whose length is given by the header's NumPacks field.
+///
+/// The invariant is that all pack descriptors with GenericPackKind::Metadata
+/// must precede those with GenericPackKind::WitnessTable, and for each kind,
+/// the pack descriptors are ordered by their Index.
+///
+/// This allows us to iterate over the generic arguments array in parallel
+/// with the array of pack shape descriptors. We know we have a metadata
+/// or witness table when we reach the generic argument whose index is
+/// stored in the next descriptor; we increment the descriptor pointer in
+/// this case.
+struct GenericPackShapeDescriptor {
+  GenericPackKind Kind;
+
+  /// The index of this metadata pack or witness table pack in the
+  /// generic arguments array.
+  uint16_t Index;
+
+  /// The equivalence class of this pack under the same-shape relation.
   ///
-  /// Must be less than GenericParamPackShapeHeader::NumShapeClasses.
+  /// Must be less than GenericPackShapeHeader::NumShapeClasses.
   uint16_t ShapeClass;
+
+  uint16_t Unused;
 };
 
 /// An array of generic parameter descriptors, all
@@ -299,8 +327,8 @@ class RuntimeGenericSignature {
   TargetGenericContextDescriptorHeader<Runtime> Header;
   const GenericParamDescriptor *Params;
   const TargetGenericRequirementDescriptor<Runtime> *Requirements;
-  GenericParamPackShapeHeader PackShapeHeader;
-  const GenericParamPackShapeDescriptor *PackShapeDescriptors;
+  GenericPackShapeHeader PackShapeHeader;
+  const GenericPackShapeDescriptor *PackShapeDescriptors;
 
 public:
   RuntimeGenericSignature()
@@ -310,8 +338,8 @@ public:
   RuntimeGenericSignature(const TargetGenericContextDescriptorHeader<Runtime> &header,
                           const GenericParamDescriptor *params,
                           const TargetGenericRequirementDescriptor<Runtime> *requirements,
-                          const GenericParamPackShapeHeader &packShapeHeader,
-                          const GenericParamPackShapeDescriptor *packShapeDescriptors)
+                          const GenericPackShapeHeader &packShapeHeader,
+                          const GenericPackShapeDescriptor *packShapeDescriptors)
     : Header(header), Params(params), Requirements(requirements),
       PackShapeHeader(packShapeHeader), PackShapeDescriptors(packShapeDescriptors) {}
 
@@ -323,8 +351,12 @@ public:
     return llvm::makeArrayRef(Requirements, Header.NumRequirements);
   }
 
-  llvm::ArrayRef<GenericParamPackShapeDescriptor> getPackShapeDescriptors() const {
-    return llvm::makeArrayRef(PackShapeDescriptors, PackShapeHeader.NumTypePacks);
+  const GenericPackShapeHeader &getGenericPackShapeHeader() const {
+    return PackShapeHeader;
+  }
+
+  llvm::ArrayRef<GenericPackShapeDescriptor> getGenericPackShapeDescriptors() const {
+    return llvm::makeArrayRef(PackShapeDescriptors, PackShapeHeader.NumPacks);
   }
 
   size_t getArgumentLayoutSizeInWords() const {
@@ -417,8 +449,8 @@ class TrailingGenericContextObjects<TargetSelf<Runtime>,
       TargetGenericContextHeaderType<Runtime>,
       GenericParamDescriptor,
       TargetGenericRequirementDescriptor<Runtime>,
-      GenericParamPackShapeHeader,
-      GenericParamPackShapeDescriptor,
+      GenericPackShapeHeader,
+      GenericPackShapeDescriptor,
       FollowingTrailingObjects...>
 {
 protected:
@@ -431,8 +463,8 @@ protected:
     GenericContextHeaderType,
     GenericParamDescriptor,
     GenericRequirementDescriptor,
-    GenericParamPackShapeHeader,
-    GenericParamPackShapeDescriptor,
+    GenericPackShapeHeader,
+    GenericPackShapeDescriptor,
     FollowingTrailingObjects...>;
   friend TrailingObjects;
 
@@ -487,21 +519,21 @@ public:
             getGenericContextHeader().NumRequirements};
   }
   
-  GenericParamPackShapeHeader getGenericParamPackShapeHeader() const {
+  GenericPackShapeHeader getGenericPackShapeHeader() const {
     if (!asSelf()->isGeneric())
       return {0, 0};
     if (!getGenericContextHeader().Flags.hasTypePacks())
       return {0, 0};
-    return *this->template getTrailingObjects<GenericParamPackShapeHeader>();
+    return *this->template getTrailingObjects<GenericPackShapeHeader>();
   }
 
-  llvm::ArrayRef<GenericParamPackShapeDescriptor> getGenericParamPackShapeDescriptors() const {
-    auto header = getGenericParamPackShapeHeader();
-    if (header.NumTypePacks == 0)
+  llvm::ArrayRef<GenericPackShapeDescriptor> getGenericPackShapeDescriptors() const {
+    auto header = getGenericPackShapeHeader();
+    if (header.NumPacks == 0)
       return {};
 
-    return {this->template getTrailingObjects<GenericParamPackShapeDescriptor>(),
-            header.NumTypePacks};
+    return {this->template getTrailingObjects<GenericPackShapeDescriptor>(),
+            header.NumPacks};
   }
 
   /// Return the amount of space that the generic arguments take up in
@@ -516,8 +548,8 @@ public:
     return {getGenericContextHeader(),
             getGenericParams().data(),
             getGenericRequirements().data(),
-            getGenericParamPackShapeHeader(),
-            getGenericParamPackShapeDescriptors().data()};
+            getGenericPackShapeHeader(),
+            getGenericPackShapeDescriptors().data()};
   }
 
 protected:
@@ -533,21 +565,21 @@ protected:
     return asSelf()->isGeneric() ? getGenericContextHeader().NumRequirements : 0;
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericParamPackShapeHeader>) const {
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeHeader>) const {
     if (!asSelf()->isGeneric())
       return 0;
 
     return getGenericContextHeader().Flags.hasTypePacks() ? 1 : 0;
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericParamPackShapeDescriptor>) const {
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeDescriptor>) const {
     if (!asSelf()->isGeneric())
       return 0;
 
     if (!getGenericContextHeader().Flags.hasTypePacks())
       return 0;
 
-    return getGenericParamPackShapeHeader().NumTypePacks;
+    return getGenericPackShapeHeader().NumPacks;
   }
 
 #if defined(_MSC_VER) && _MSC_VER < 1920

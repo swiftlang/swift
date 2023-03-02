@@ -411,31 +411,116 @@ template<typename Runtime>
 struct GenericSignatureLayout {
   uint16_t NumKeyParameters = 0;
   uint16_t NumWitnessTables = 0;
+  uint16_t NumPacks = 0;
+  uint16_t NumShapeClasses = 0;
+  const GenericPackShapeDescriptor *PackShapeDescriptors = nullptr;
 
-  GenericSignatureLayout(const RuntimeGenericSignature<Runtime> &sig) {
+  GenericSignatureLayout(const RuntimeGenericSignature<Runtime> &sig)
+    : NumPacks(sig.getGenericPackShapeHeader().NumPacks),
+      NumShapeClasses(sig.getGenericPackShapeHeader().NumShapeClasses),
+      PackShapeDescriptors(sig.getGenericPackShapeDescriptors().data()) {
+
+#ifndef NDEBUG
+    unsigned numPacks = 0;
+#endif
+
     for (const auto &gp : sig.getParams()) {
-      if (gp.hasKeyArgument())
+      if (gp.hasKeyArgument()) {
         ++NumKeyParameters;
+
+#ifndef NDEBUG
+        if (gp.getKind() == GenericParamKind::TypePack) {
+          assert(PackShapeDescriptors[numPacks].Kind
+                 == GenericPackKind::Metadata);
+          assert(PackShapeDescriptors[numPacks].Index
+                 == NumKeyParameters);
+          assert(PackShapeDescriptors[numPacks].ShapeClass
+                 < NumShapeClasses);
+          ++numPacks;
+        }
+#endif
+      }
     }
     for (const auto &reqt : sig.getRequirements()) {
       if (reqt.Flags.hasKeyArgument() &&
-          reqt.getKind() == GenericRequirementKind::Protocol)
+          reqt.getKind() == GenericRequirementKind::Protocol) {
+#ifndef NDEBUG
+        if (reqt.getFlags().isPackRequirement()) {
+          assert(PackShapeDescriptors[numPacks].Kind
+                 == GenericPackKind::WitnessTable);
+          assert(PackShapeDescriptors[numPacks].Index
+                 == NumKeyParameters + NumWitnessTables);
+          assert(PackShapeDescriptors[numPacks].ShapeClass
+                 < NumShapeClasses);
+          ++numPacks;
+        }
+#endif
+
         ++NumWitnessTables;
+      }
     }
+
+    assert(numPacks == NumPacks);
   }
 
   size_t sizeInWords() const {
-    return NumKeyParameters + NumWitnessTables;
+    return NumShapeClasses + NumKeyParameters + NumWitnessTables;
   }
 
   friend bool operator==(const GenericSignatureLayout<Runtime> &lhs,
                          const GenericSignatureLayout<Runtime> &rhs) {
-    return lhs.NumKeyParameters == rhs.NumKeyParameters &&
-           lhs.NumWitnessTables == rhs.NumWitnessTables;
+    if (lhs.NumKeyParameters != rhs.NumKeyParameters ||
+        lhs.NumWitnessTables != rhs.NumWitnessTables ||
+        lhs.NumShapeClasses != rhs.NumShapeClasses ||
+        lhs.NumPacks != rhs.NumPacks) {
+      return false;
+    }
+
+    for (unsigned i = 0; i < lhs.NumPacks; ++i) {
+      const auto &lhsElt = lhs.PackShapeDescriptors[i];
+      const auto &rhsElt = rhs.PackShapeDescriptors[i];
+      if (lhsElt.Kind != rhsElt.Kind ||
+          lhsElt.Index != rhsElt.Index ||
+          lhsElt.ShapeClass != rhsElt.ShapeClass)
+        return false;
+    }
+
+    return true;
   }
+
   friend bool operator!=(const GenericSignatureLayout<Runtime> &lhs,
                          const GenericSignatureLayout<Runtime> &rhs) {
     return !(lhs == rhs);
+  }
+
+  int compare(const GenericSignatureLayout<Runtime> &rhs) const {
+    if (auto result = compareIntegers(NumKeyParameters, rhs.NumKeyParameters))
+      return result;
+
+    if (auto result = compareIntegers(NumWitnessTables, rhs.NumWitnessTables))
+      return result;
+
+    if (auto result = compareIntegers(NumShapeClasses, rhs.NumShapeClasses))
+      return result;
+
+    if (auto result = compareIntegers(NumPacks, rhs.NumPacks))
+      return result;
+
+    for (unsigned i = 0; i < NumPacks; ++i) {
+      const auto &lhsElt = PackShapeDescriptors[i];
+      const auto &rhsElt = rhs.PackShapeDescriptors[i];
+
+      if (auto result = compareIntegers(lhsElt.Kind, rhsElt.Kind))
+        return result;
+
+      if (auto result = compareIntegers(lhsElt.Index, rhsElt.Index))
+        return result;
+
+      if (auto result = compareIntegers(lhsElt.ShapeClass, rhsElt.ShapeClass))
+        return result;
+    }
+
+    return 0;
   }
 };
 
@@ -488,23 +573,106 @@ public:
   }
 
 private:
+  static int compareMetadataPacks(const void *lhsPtr,
+                                  const void *rhsPtr,
+                                  uintptr_t count) {
+    MetadataPackPointer lhs(lhsPtr);
+    MetadataPackPointer rhs(rhsPtr);
+
+    assert(lhs.getLifetime() == PackLifetime::OnHeap);
+    assert(rhs.getLifetime() == PackLifetime::OnHeap);
+
+    auto *lhsElt = lhs.getElements();
+    auto *rhsElt = rhs.getElements();
+
+    for (uintptr_t i = 0; i < count; ++i) {
+      if (auto result = comparePointers(lhsElt[i], rhsElt[i]))
+        return result;
+    }
+
+    return 0;
+  }
+
+  static int compareWitnessTablePacks(const void *lhsPtr,
+                                      const void *rhsPtr,
+                                      uintptr_t count) {
+    WitnessTablePackPointer lhs(lhsPtr);
+    WitnessTablePackPointer rhs(rhsPtr);
+
+    assert(lhs.getLifetime() == PackLifetime::OnHeap);
+    assert(rhs.getLifetime() == PackLifetime::OnHeap);
+
+    auto *lhsElt = lhs.getElements();
+    auto *rhsElt = rhs.getElements();
+
+    for (uintptr_t i = 0; i < count; ++i) {
+      if (auto result = compareWitnessTables(lhsElt[i], rhsElt[i]))
+        return result;
+    }
+
+    return 0;
+  }
+
   /// Compare the content from two keys.
   static int compareContent(const void *const *adata, const void *const *bdata,
                             const GenericSignatureLayout<InProcess> &layout) {
+    const uintptr_t *packCounts = reinterpret_cast<const uintptr_t *>(adata);
+
+    // Compare pack lengths for shape classes.
+    for (unsigned i = 0; i != layout.NumShapeClasses; ++i) {
+      if (auto result = compareIntegers(reinterpret_cast<uintptr_t>(*adata++),
+                                        reinterpret_cast<uintptr_t>(*bdata++)))
+        return result;
+    }
+
+    auto *nextPack = layout.PackShapeDescriptors;
+    unsigned numPacks = 0;
+
     // Compare generic arguments for key parameters.
     for (unsigned i = 0; i != layout.NumKeyParameters; ++i) {
+      // Is this entry a metadata pack?
+      if (numPacks < layout.NumPacks &&
+          nextPack->Kind == GenericPackKind::Metadata &&
+          i == nextPack->Index) {
+        assert(nextPack->ShapeClass < layout.NumShapeClasses);
+        uintptr_t count = packCounts[nextPack->ShapeClass];
+        ++numPacks;
+        ++nextPack;
+
+        if (auto result = compareMetadataPacks(*adata++, *bdata++, count))
+          return result;
+
+        continue;
+      }
+
       if (auto result = comparePointers(*adata++, *bdata++))
         return result;
     }
 
     // Compare witness tables.
     for (unsigned i = 0; i != layout.NumWitnessTables; ++i) {
+      // Is this entry a witness table pack?
+      if (numPacks < layout.NumPacks &&
+          nextPack->Kind == GenericPackKind::WitnessTable &&
+          i == nextPack->Index) {
+        assert(nextPack->ShapeClass < layout.NumShapeClasses);
+        uintptr_t count = packCounts[nextPack->ShapeClass];
+        ++numPacks;
+        ++nextPack;
+
+        if (auto result = compareWitnessTablePacks(*adata++, *bdata++, count))
+          return result;
+
+        continue;
+      }
+
       if (auto result =
               compareWitnessTables((const WitnessTable *)*adata++,
                                    (const WitnessTable *)*bdata++))
         return result;
     }
 
+    assert(numPacks == layout.NumPacks && "Missed a pack");
     return 0;
   }
 
@@ -521,7 +689,7 @@ public:
     // Compare the hashes.
     if (hash() != rhs.hash()) return false;
 
-    // Compare the sizes.
+    // Compare the layouts.
     if (Layout != rhs.Layout) return false;
 
     // Compare the content.
@@ -530,23 +698,12 @@ public:
 
   int compare(const MetadataCacheKey &rhs) const {
     // Compare the hashes.
-    if (auto hashComparison = compareIntegers(Hash, rhs.Hash)) {
-      return hashComparison;
-    }
+    if (auto result = compareIntegers(Hash, rhs.Hash))
+      return result;
 
-    // Compare the # of key parameters.
-    if (auto keyParamsComparison =
-            compareIntegers(Layout.NumKeyParameters,
-                            rhs.Layout.NumKeyParameters)) {
-      return keyParamsComparison;
-    }
-
-    // Compare the # of witness tables.
-    if (auto witnessTablesComparison =
-            compareIntegers(Layout.NumWitnessTables,
-                            rhs.Layout.NumWitnessTables)) {
-      return witnessTablesComparison;
-    }
+    // Compare the layouts.
+    if (auto result = Layout.compare(rhs.Layout))
+      return result;
 
     // Compare the content.
     return compareContent(begin(), rhs.begin(), Layout);
@@ -574,16 +731,41 @@ public:
 private:
   uint32_t computeHash() const {
     size_t H = 0x56ba80d1u * Layout.NumKeyParameters;
-    for (unsigned index = 0; index != Layout.NumKeyParameters; ++index) {
-      H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
-      H ^= (reinterpret_cast<size_t>(Data[index])
-            ^ (reinterpret_cast<size_t>(Data[index]) >> 19));
+
+    auto *nextPack = Layout.PackShapeDescriptors;
+    unsigned numPacks = 0;
+
+    auto update = [&H](uintptr_t value) {
+      H = (H >> 10) | (H << ((sizeof(uintptr_t) * 8) - 10));
+      H ^= (value ^ (value >> 19));
+    };
+
+    // FIXME: Incorporate NumShapeClasses into the hash
+
+    for (unsigned i = 0; i != Layout.NumKeyParameters; ++i) {
+      // Is this entry a metadata pack?
+      if (numPacks < Layout.NumPacks &&
+          nextPack->Kind == GenericPackKind::Metadata &&
+          i == nextPack->Index) {
+        assert(nextPack->ShapeClass < Layout.NumShapeClasses);
+        auto count = reinterpret_cast<uintptr_t>(Data[nextPack->ShapeClass]);
+        ++numPacks;
+        ++nextPack;
+
+        MetadataPackPointer pack(Data[i]);
+        for (unsigned j = 0; j < count; ++j)
+          update(reinterpret_cast<uintptr_t>(pack.getElements()[j]));
+
+        continue;
+      }
+
+      update(reinterpret_cast<uintptr_t>(Data[i]));
     }
 
     H *= 0x27d4eb2d;
 
     // Rotate right by 10 and then truncate to 32 bits.
-    return uint32_t((H >> 10) | (H << ((sizeof(size_t) * 8) - 10)));
+    return uint32_t((H >> 10) | (H << ((sizeof(uintptr_t) * 8) - 10)));
   }
 };
 
