@@ -37,6 +37,7 @@
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopedHashTable.h"
@@ -665,7 +666,7 @@ public:
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
 
-  bool processLazyPropertyGetters();
+  bool processLazyPropertyGetters(SILFunction &F);
 
   bool canHandle(SILInstruction *Inst);
 
@@ -779,8 +780,9 @@ bool CSE::processFunction(SILFunction &Fm, DominanceInfo *DT) {
 
 /// Replace lazy property getters (which are dominated by the same getter)
 /// by a direct load of the value.
-bool CSE::processLazyPropertyGetters() {
+bool CSE::processLazyPropertyGetters(SILFunction &F) {
   bool changed = false;
+  bool invalidatedStackNesting = false;
   for (ApplyInst *ai : lazyPropertyGetters) {
     SILFunction *getter = ai->getReferencedFunctionOrNull();
     assert(getter && getter->isLazyPropertyGetter());
@@ -807,8 +809,18 @@ bool CSE::processLazyPropertyGetters() {
         builder.createUncheckedEnumData(sei->getLoc(), enumVal, someDecl, ty);
     builder.createBranch(sei->getLoc(), someDest, { ued });
     sei->eraseFromParent();
+    // When inlining an OSSA function into a non-OSSA function, ownership of
+    // nonescaping closures is lowered.  At that point, they are recognized as
+    // stack users.  Since they weren't recognized as such before, they may not
+    // satisfy stack discipline.  Fix that up now.
+    if (getter->hasOwnership() && !ai->getFunction()->hasOwnership()) {
+      invalidatedStackNesting = true;
+    }
     changed = true;
     ++NumCSE;
+  }
+  if (invalidatedStackNesting) {
+    StackNesting::fixNesting(&F);
   }
   return changed;
 }
@@ -1475,7 +1487,7 @@ class SILCSE : public SILFunctionTransform {
 
     // Handle calls to lazy property getters, which are collected in
     // processFunction().
-    if (C.processLazyPropertyGetters()) {
+    if (C.processLazyPropertyGetters(*Fn)) {
       // Cleanup the dead blocks from the inlined lazy property getters.
       removeUnreachableBlocks(*Fn);
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
