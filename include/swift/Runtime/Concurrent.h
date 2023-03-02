@@ -33,20 +33,6 @@
 
 namespace swift {
 
-/// A utility function for ordering two integers, which is useful
-/// for implementing compareWithKey.
-template <class T>
-static inline int compareIntegers(T left, T right) {
-  return (left == right ? 0 : left < right ? -1 : 1);
-}
-
-/// A utility function for ordering two pointers, which is useful
-/// for implementing compareWithKey.
-template <class T>
-static inline int comparePointers(const T *left, const T *right) {
-  return (left == right ? 0 : std::less<const T *>()(left, right) ? -1 : 1);
-}
-
 /// A simple linked list representing pointers that need to be freed. This is
 /// not a concurrent data structure, just a bit of support used in the types
 /// below.
