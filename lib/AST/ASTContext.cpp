@@ -3912,7 +3912,7 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
   properties |= result->getRecursiveProperties();
   if (globalActor)
     properties |= globalActor->getRecursiveProperties();
-  properties &= ~RecursiveTypeProperties::IsLValue;
+  properties &= ~RecursiveTypeProperties::IsLValueMask;
   return properties;
 }
 
@@ -3937,7 +3937,7 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 15,
+  static_assert(RecursiveTypeProperties::BitWidth == 16,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -4583,7 +4583,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 15,
+  static_assert(RecursiveTypeProperties::BitWidth == 16,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
@@ -4716,12 +4716,13 @@ BuiltinTupleType::BuiltinTupleType(BuiltinTupleDecl *TheDecl,
   : NominalType(TypeKind::BuiltinTuple, &Ctx, TheDecl, Type(),
                 RecursiveTypeProperties()) { }
 
-LValueType *LValueType::get(Type objectTy) {
+LValueType *LValueType::get(Type objectTy, bool isMutable) {
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
          "cannot have 'inout' or @lvalue wrapped inside an @lvalue");
 
-  auto properties = objectTy->getRecursiveProperties()
-                    | RecursiveTypeProperties::IsLValue;
+  auto properties = objectTy->getRecursiveProperties() |
+                    (isMutable ? RecursiveTypeProperties::IsMutableLValue
+                               : RecursiveTypeProperties::IsImmutableLValue);
   auto arena = getArena(properties);
 
   auto &C = objectTy->getASTContext();
@@ -4740,7 +4741,7 @@ InOutType *InOutType::get(Type objectTy) {
 
   auto properties = objectTy->getRecursiveProperties();
 
-  properties &= ~RecursiveTypeProperties::IsLValue;
+  properties &= ~RecursiveTypeProperties::IsLValueMask;
   auto arena = getArena(properties);
 
   auto &C = objectTy->getASTContext();
