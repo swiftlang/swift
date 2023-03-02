@@ -22,7 +22,7 @@ public let benchmarks = [
   BenchmarkInfo(name: "String.initRepeating.33CyrillicChar.Count2",
                 runFunction: run_33CyrillicCharactersCount2,
                 tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "String.initRepeating.longMixedString.Count100",
+  BenchmarkInfo(name: "String.initRepeating.longMixStr.Count100",
                 runFunction: run_longMixedStringCount100,
                 tags: [.validation, .api, .String])
 ]
