@@ -418,9 +418,14 @@ TypeChecker::typeCheckTarget(SolutionApplicationTarget &target,
 
   // First, pre-check the target, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckTarget(
-          target, /*replaceInvalidRefsWithErrors=*/true,
-          options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
+  auto preCheckOptions = ConstraintSystem::PreCheckOptions();
+  preCheckOptions |=
+      ConstraintSystem::PreCheckFlags::ReplaceInvalidRefsWithErrors;
+  if (options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked)) {
+    preCheckOptions |=
+        ConstraintSystem::PreCheckFlags::LeaveClosureBodiesUnchecked;
+  }
+  if (ConstraintSystem::preCheckTarget(target, preCheckOptions)) {
     return None;
   }
 
