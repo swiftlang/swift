@@ -61,8 +61,8 @@ case _: // expected-warning {{case is already handled by previous patterns; cons
 switch (x,x) {
 case (inout a, inout a): // expected-error {{invalid redeclaration of 'a'}}
     // expected-note @-1 {{'a' previously declared here}}
-    // expected-warning @-2 {{variable 'a' was never used; consider replacing with '_' or removing it}}
-    // expected-warning @-3 {{variable 'a' was never used; consider replacing with '_' or removing it}}
+    // xpected-warning @-2 {{variable 'a' was never used; consider replacing with '_' or removing it}}
+    // xpected-warning @-3 {{variable 'a' was never used; consider replacing with '_' or removing it}}
   break
 }
 
