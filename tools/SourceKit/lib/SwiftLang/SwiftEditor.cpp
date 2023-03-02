@@ -1198,6 +1198,8 @@ static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
     return AccessLevel::Private;
+  case DeclContextKind::Package:
+    return AccessLevel::Package;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
   case DeclContextKind::MacroDecl:

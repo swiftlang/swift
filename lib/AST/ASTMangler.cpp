@@ -2275,6 +2275,8 @@ static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
 
 void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) {
   switch (ctx->getContextKind()) {
+  case DeclContextKind::Package:
+    return;
   case DeclContextKind::Module:
     return appendModule(cast<ModuleDecl>(ctx), useModuleName);
 

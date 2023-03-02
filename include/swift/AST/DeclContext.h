@@ -66,6 +66,7 @@ namespace swift {
   class SourceFile;
   class Type;
   class ModuleDecl;
+  class PackageUnit;
   class GenericTypeDecl;
   class NominalTypeDecl;
   class PrecedenceGroupLookupResult;
@@ -96,7 +97,7 @@ enum class DeclContextKind : unsigned {
   SerializedLocal,
   MacroDecl,
   Last_LocalDeclContextKind = MacroDecl,
-
+  Package,
   Module,
   FileUnit,
   GenericTypeDecl,
@@ -234,6 +235,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
     Decl,
     Expr,
     FileUnit,
+    Package,
     Initializer,
     SerializedLocal,
     // If you add a new AST hierarchies, then update the static_assert() below.
@@ -271,6 +273,8 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
       return ASTHierarchy::SerializedLocal;
     case DeclContextKind::FileUnit:
       return ASTHierarchy::FileUnit;
+    case DeclContextKind::Package:
+      return ASTHierarchy::Package;
     case DeclContextKind::Module:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
@@ -296,7 +300,8 @@ public:
 
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
       : ParentAndKind(Parent, getASTHierarchyFromKind(Kind)) {
-    if (Kind != DeclContextKind::Module)
+    // if Module kind, it may (or may not) have Package as its parent
+    if (Kind != DeclContextKind::Package && Kind != DeclContextKind::Module)
       assert(Parent != nullptr && "DeclContext must have a parent context");
   }
 
@@ -319,6 +324,14 @@ public:
     return getContextKind() <= DeclContextKind::Last_LocalDeclContextKind;
   }
   
+  /// \returns true if this is a context with package-wide scope, e.g. a package,
+  /// a module, or a source file.
+  LLVM_READONLY
+  bool isPackageScopeContext() const; // see swift/AST/Module.h
+
+  LLVM_READONLY
+  bool isPackageContext() const; // see swift/AST/Module.h
+
   /// isModuleContext - Return true if this is a subclass of Module.
   LLVM_READONLY
   bool isModuleContext() const; // see swift/AST/Module.h
@@ -498,6 +511,10 @@ public:
         return true;
     return false;
   }
+
+  /// Returns the package context of the parent module.
+  LLVM_READONLY
+  PackageUnit *getParentModulePackage() const;
 
   /// Returns the module context that contains this context.
   LLVM_READONLY

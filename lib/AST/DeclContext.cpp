@@ -274,6 +274,14 @@ DeclContext *DeclContext::getParentForLookup() const {
   return getParent();
 }
 
+PackageUnit *DeclContext::getParentModulePackage() const {
+  auto parentModule = getParentModule();
+  auto pkg = parentModule->getParent();
+  if (pkg)
+    return const_cast<PackageUnit *>(cast<PackageUnit>(pkg));
+  return nullptr;
+}
+
 ModuleDecl *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())
@@ -306,6 +314,7 @@ SourceFile *DeclContext::getParentSourceFile() const {
       case DeclContextKind::Initializer:
       case DeclContextKind::FileUnit:
       case DeclContextKind::Module:
+      case DeclContextKind::Package:
       case DeclContextKind::SerializedLocal:
         break;
       }
@@ -559,6 +568,8 @@ bool DeclContext::canBeParentOfExtension() const {
 
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
+  case DeclContextKind::Package:
+    return false;
   case DeclContextKind::Module:
     return cast<ModuleDecl>(this)->walk(Walker);
   case DeclContextKind::FileUnit:
@@ -652,6 +663,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
 
   const char *Kind;
   switch (getContextKind()) {
+  case DeclContextKind::Package:          Kind = "Package"; break;
   case DeclContextKind::Module:           Kind = "Module"; break;
   case DeclContextKind::FileUnit:         Kind = "FileUnit"; break;
   case DeclContextKind::SerializedLocal:  Kind = "Serialized Local"; break;
@@ -678,6 +690,9 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
   OS.indent(Depth*2 + indent) << (void*)this << " " << Kind;
 
   switch (getContextKind()) {
+  case DeclContextKind::Package:
+    OS << " name=" << cast<PackageUnit>(this)->getName();
+    break;
   case DeclContextKind::Module:
     OS << " name=" << cast<ModuleDecl>(this)->getName();
     break;
@@ -1206,7 +1221,7 @@ AccessScope::AccessScope(const DeclContext *DC, AccessLimitKind limitKind)
     Value.setPointer(DC);
     isPrivate = true;
   }
-  if (!DC || isa<ModuleDecl>(DC))
+  if (!DC || isa<ModuleDecl>(DC) || isa<PackageUnit>(DC))
     assert(!isPrivate && "public, package, or internal scope can't be private");
 }
 
@@ -1285,6 +1300,8 @@ DeclContextKind DeclContext::getContextKind() const {
     return DeclContextKind::SerializedLocal;
   case ASTHierarchy::FileUnit:
     return DeclContextKind::FileUnit;
+  case ASTHierarchy::Package:
+    return DeclContextKind::Package;
   case ASTHierarchy::Decl: {
     auto decl = reinterpret_cast<const Decl*>(this + 1);
     if (isa<AbstractFunctionDecl>(decl))
@@ -1334,6 +1351,7 @@ bool DeclContext::isAsyncContext() const {
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::SerializedLocal:
+  case DeclContextKind::Package:
   case DeclContextKind::Module:
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::MacroDecl:
@@ -1361,6 +1379,7 @@ bool DeclContext::isAsyncContext() const {
 
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   switch (dc->getContextKind()) {
+  case DeclContextKind::Package:
   case DeclContextKind::Module:
     return SourceLoc();
   case DeclContextKind::AbstractFunctionDecl:
