@@ -648,6 +648,20 @@ struct RelatedIdentsInfo {
   ArrayRef<std::pair<unsigned, unsigned>> Ranges;
 };
 
+/// Represent one branch of an if config.
+/// Either `#if`, `#else` or `#elseif`.
+struct IfConfigInfo {
+  unsigned Offset;
+  bool IsActive;
+
+  IfConfigInfo(unsigned Offset, bool IsActive)
+      : Offset(Offset), IsActive(IsActive) {}
+};
+
+struct ActiveRegionsInfo {
+  ArrayRef<IfConfigInfo> Configs;
+};
+
 /// Filled out by LangSupport::findInterfaceDocument().
 struct InterfaceDocInfo {
   /// Non-empty if a generated interface editor document has previously been
@@ -997,6 +1011,12 @@ public:
       StringRef Filename, unsigned Offset, bool CancelOnSubsequentRequest,
       ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<RelatedIdentsInfo> &)>
+          Receiver) = 0;
+
+  virtual void findActiveRegionsInFile(
+      StringRef Filename, ArrayRef<const char *> Args,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<ActiveRegionsInfo> &)>
           Receiver) = 0;
 
   virtual llvm::Optional<std::pair<unsigned, unsigned>>
