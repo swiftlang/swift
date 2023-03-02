@@ -14,13 +14,13 @@ sil hidden [ossa] @$s4test3fooyyAA5KlassCnF : $@convention(thin) (@owned Klass) 
 bb0(%0 : @owned $Klass):
   %1 = begin_borrow [lexical] %0 : $Klass
   debug_value %1 : $Klass, let, name "k", argno 1
-  %3 = alloc_stack [lexical] $Klass, var, name "k2" // expected-error {{'k2' used after being moved}}
+  %3 = alloc_stack [lexical] $Klass, var, name "k2" // expected-error {{'k2' used after being consumed}}
   %4 = copy_value %1 : $Klass
   %5 = move_value [allows_diagnostics] %4 : $Klass
   store %5 to [init] %3 : $*Klass
   %7 = begin_access [modify] [static] %3 : $*Klass
   %8 = alloc_stack $Klass
-  mark_unresolved_move_addr %7 to %8 : $*Klass // expected-note {{move here}}
+  mark_unresolved_move_addr %7 to %8 : $*Klass // expected-note {{consume here}}
   %10 = load [copy] %8 : $*Klass
   destroy_addr %8 : $*Klass
   end_access %7 : $*Klass
