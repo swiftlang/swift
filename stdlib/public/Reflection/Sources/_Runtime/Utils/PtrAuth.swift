@@ -191,6 +191,76 @@ extension PtrAuth {
     
     return Metadata(signedBitPattern.rawPointer)
   }
+
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  static func signAccessFn0(_ fnPtr: UnsafeRawPointer) -> UnsafeRawPointer {
+    let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
+      fnPtr.bitPattern._value,
+      Key.processIndependentCode._value,
+      UInt64(Builtin.typePtrAuthDiscriminator(
+        Metadata.AccessFunction.AccessFn0.self
+      ))
+    ))
+
+    return signedBitPattern.rawPointer
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  static func signAccessFn1(_ fnPtr: UnsafeRawPointer) -> UnsafeRawPointer {
+    let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
+      fnPtr.bitPattern._value,
+      Key.processIndependentCode._value,
+      UInt64(Builtin.typePtrAuthDiscriminator(
+        Metadata.AccessFunction.AccessFn1.self
+      ))
+    ))
+
+    return signedBitPattern.rawPointer
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  static func signAccessFn2(_ fnPtr: UnsafeRawPointer) -> UnsafeRawPointer {
+    let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
+      fnPtr.bitPattern._value,
+      Key.processIndependentCode._value,
+      UInt64(Builtin.typePtrAuthDiscriminator(
+        Metadata.AccessFunction.AccessFn2.self
+      ))
+    ))
+
+    return signedBitPattern.rawPointer
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  static func signAccessFn3(_ fnPtr: UnsafeRawPointer) -> UnsafeRawPointer {
+    let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
+      fnPtr.bitPattern._value,
+      Key.processIndependentCode._value,
+      UInt64(Builtin.typePtrAuthDiscriminator(
+        Metadata.AccessFunction.AccessFn3.self
+      ))
+    ))
+
+    return signedBitPattern.rawPointer
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  static func signAccessFnMany(_ fnPtr: UnsafeRawPointer) -> UnsafeRawPointer {
+    let signedBitPattern = UInt64(Builtin.int_ptrauth_sign(
+      fnPtr.bitPattern._value,
+      Key.processIndependentCode._value,
+      UInt64(Builtin.typePtrAuthDiscriminator(
+        Metadata.AccessFunction.AccessFnMany.self
+      ))
+    ))
+
+    return signedBitPattern.rawPointer
+  }
 #else
   @available(SwiftStdlib 5.9, *)
   @inlinable
@@ -216,6 +286,36 @@ extension PtrAuth {
   @inlinable
   static func signSuperclass(_ superclass: Metadata) -> Metadata {
     superclass
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  static func signAccessFn0(_ fnPtr: UnsafeRawPointer) -> UnsafeRawPointer {
+    fnPtr
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  static func signAccessFn1(_ fnPtr: UnsafeRawPointer) -> UnsafeRawPointer {
+    fnPtr
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  static func signAccessFn2(_ fnPtr: UnsafeRawPointer) -> UnsafeRawPointer {
+    fnPtr
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  static func signAccessFn3(_ fnPtr: UnsafeRawPointer) -> UnsafeRawPointer {
+    fnPtr
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  static func signAccessFnMany(_ fnPtr: UnsafeRawPointer) -> UnsafeRawPointer {
+    fnPtr
   }
 #endif
 }
