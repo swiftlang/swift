@@ -365,50 +365,50 @@ swift_copyAuxiliaryExecutablePath(const char *name)
   const char *archName = SWIFT_ARCH;
 
   // <rootPath>/libexec/swift/<platformName>
-  if (const char *result = _swift_tryAuxExePath(name,
-                                                rootPath,
-                                                "libexec", "swift",
-                                                platformName, nullptr)) {
+  if (char *result = _swift_tryAuxExePath(name,
+                                          rootPath,
+                                          "libexec", "swift",
+                                          platformName, nullptr)) {
     return result;
   }
 
   // <rootPath>/libexec/swift/<platformName>/<arch>
-  if (const char *result = _swift_tryAuxExePath(name,
-                                                rootPath,
-                                                "libexec", "swift",
-                                                platformName,
-                                                archName, nullptr)) {
+  if (char *result = _swift_tryAuxExePath(name,
+                                          rootPath,
+                                          "libexec", "swift",
+                                          platformName,
+                                          archName, nullptr)) {
     return result;
   }
 
   // <rootPath>/libexec/swift
-  if (const char *result = _swift_tryAuxExePath(name,
-                                                rootPath,
-                                                "libexec", "swift",
-                                                nullptr)) {
+  if (char *result = _swift_tryAuxExePath(name,
+                                          rootPath,
+                                          "libexec", "swift",
+                                          nullptr)) {
     return result;
   }
 
   // <rootPath>/libexec/swift/<arch>
-  if (const char *result = _swift_tryAuxExePath(name,
-                                                rootPath,
-                                                "libexec", "swift",
-                                                archName, nullptr)) {
+  if (char *result = _swift_tryAuxExePath(name,
+                                          rootPath,
+                                          "libexec", "swift",
+                                          archName, nullptr)) {
     return result;
   }
 
   // <rootPath>/bin
-  if (const char *result = _swift_tryAuxExePath(name,
-                                                rootPath,
-                                                "bin", nullptr)) {
+  if (char *result = _swift_tryAuxExePath(name,
+                                          rootPath,
+                                          "bin", nullptr)) {
     return result;
   }
 
   // <rootPath>/bin/<arch>
-  if (const char *result = _swift_tryAuxExePath(name,
-                                                rootPath,
-                                                "bin",
-                                                archName, nullptr)) {
+  if (char *result = _swift_tryAuxExePath(name,
+                                          rootPath,
+                                          "bin",
+                                          archName, nullptr)) {
     return result;
   }
 
