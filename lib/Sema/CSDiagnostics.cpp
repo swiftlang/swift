@@ -1758,8 +1758,8 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       auto argType = getType(inoutExpr)->getWithoutSpecifierType();
 
       PointerTypeKind ptr;
-      if (isArrayType(argType) && paramType->getAnyPointerElementType(ptr) &&
-          (ptr == PTK_UnsafePointer || ptr == PTK_UnsafeRawPointer)) {
+      if (argType->isArrayType() && paramType->getAnyPointerElementType(ptr)
+          && (ptr == PTK_UnsafePointer || ptr == PTK_UnsafeRawPointer)) {
         emitDiagnosticAt(inoutExpr->getLoc(),
                          diag::extra_address_of_unsafepointer, paramType)
             .highlight(inoutExpr->getSourceRange())
