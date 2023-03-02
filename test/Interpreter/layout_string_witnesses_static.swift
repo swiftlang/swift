@@ -9,6 +9,8 @@
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: back_deployment_runtime
+
 import Swift
 import layout_string_witnesses_types
 import layout_string_witnesses_types_resilient
