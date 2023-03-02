@@ -49,6 +49,11 @@ set(SWIFTLIB_DIR
 set(SWIFTSTATICLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift_static")
 
+# SWIFTLIBEXEC_DIR is the directory in the build tree where Swift auxiliary
+# executables should be placed.
+set(SWIFTLIBEXEC_DIR
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/libexec/swift")
+
 function(_compute_lto_flag option out_var)
   string(TOLOWER "${option}" lowercase_option)
   if (lowercase_option STREQUAL "full")
