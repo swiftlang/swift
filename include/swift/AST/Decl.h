@@ -388,9 +388,9 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
-    Introducer : 1,
+    Introducer : 2,
 
     /// Whether this declaration captures the 'self' param under the same name.
     IsSelfParamCapture : 1,
@@ -5498,7 +5498,8 @@ class VarDecl : public AbstractStorageDecl {
 public:
   enum class Introducer : uint8_t {
     Let = 0,
-    Var = 1
+    Var = 1,
+    InOut = 2,
   };
 
 protected:

@@ -53,6 +53,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
 /// Pattern - Base class for all patterns in Swift.
 class alignas(8) Pattern : public ASTAllocated<Pattern> {
 protected:
+  // clang-format off
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(Pattern, bitmax(NumPatternKindBits,8)+1+1,
@@ -74,9 +75,9 @@ protected:
     Value : 1
   );
 
-  SWIFT_INLINE_BITFIELD(BindingPattern, Pattern, 1,
-    /// True if this is a let pattern, false if a var pattern.
-    IsLet : 1
+  SWIFT_INLINE_BITFIELD(BindingPattern, Pattern, 2,
+    /// Corresponds to VarDecl::Introducer
+    Introducer : 2
   );
 
   SWIFT_INLINE_BITFIELD(AnyPattern, Pattern, 1,
@@ -84,6 +85,7 @@ protected:
                         IsAsyncLet : 1);
 
   } Bits;
+  // clang-format on
 
   Pattern(PatternKind kind) {
     Bits.OpaqueBits = 0;
@@ -701,20 +703,41 @@ public:
 class BindingPattern : public Pattern {
   SourceLoc VarLoc;
   Pattern *SubPattern;
+
 public:
-  BindingPattern(SourceLoc loc, bool isLet, Pattern *sub)
+  BindingPattern(SourceLoc loc, VarDecl::Introducer introducer, Pattern *sub)
       : Pattern(PatternKind::Binding), VarLoc(loc), SubPattern(sub) {
-    Bits.BindingPattern.IsLet = isLet;
+    setIntroducer(introducer);
   }
 
-  static BindingPattern *createImplicit(ASTContext &Ctx, bool isLet,
+  VarDecl::Introducer getIntroducer() const {
+    return VarDecl::Introducer(Bits.BindingPattern.Introducer);
+  }
+
+  void setIntroducer(VarDecl::Introducer introducer) {
+    Bits.BindingPattern.Introducer = uint8_t(introducer);
+  }
+
+  static BindingPattern *createImplicit(ASTContext &Ctx,
+                                        VarDecl::Introducer introducer,
                                         Pattern *sub) {
-    auto *VP = new (Ctx) BindingPattern(SourceLoc(), isLet, sub);
+    auto *VP = new (Ctx) BindingPattern(SourceLoc(), introducer, sub);
     VP->setImplicit();
     return VP;
   }
 
-  bool isLet() const { return Bits.BindingPattern.IsLet; }
+  bool isLet() const { return getIntroducer() == VarDecl::Introducer::Let; }
+
+  StringRef getIntroducerStringRef() const {
+    switch (getIntroducer()) {
+    case VarDecl::Introducer::Let:
+      return "let";
+    case VarDecl::Introducer::Var:
+      return "var";
+    case VarDecl::Introducer::InOut:
+      return "inout";
+    }
+  }
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {

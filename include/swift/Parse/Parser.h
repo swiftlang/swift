@@ -19,19 +19,20 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/PersistentParserState.h"
-#include "swift/Parse/Token.h"
 #include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/ParserResult.h"
-#include "swift/Config.h"
+#include "swift/Parse/PatternBindingState.h"
+#include "swift/Parse/PersistentParserState.h"
+#include "swift/Parse/Token.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 
 namespace llvm {
@@ -142,30 +143,7 @@ public:
 
   void recordTokenHash(StringRef token);
 
-  enum {
-    /// InVarOrLetPattern has this value when not parsing a pattern.
-    IVOLP_NotInVarOrLet,
-    
-    /// InVarOrLetPattern has this value when we're in a matching pattern, but
-    /// not within a var/let pattern.  In this phase, identifiers are references
-    /// to the enclosing scopes, not a variable binding.
-    IVOLP_InMatchingPattern,
-    
-    /// InVarOrLetPattern has this value when parsing a pattern in which bound
-    /// variables are implicitly immutable, but allowed to be marked mutable by
-    /// using a 'var' pattern.  This happens in for-each loop patterns.
-    IVOLP_ImplicitlyImmutable,
-    
-    /// When InVarOrLetPattern has this value, bound variables are mutable, and
-    /// nested let/var patterns are not permitted. This happens when parsing a
-    /// 'var' decl or when parsing inside a 'var' pattern.
-    IVOLP_InVar,
-
-    /// When InVarOrLetPattern has this value, bound variables are immutable,and
-    /// nested let/var patterns are not permitted. This happens when parsing a
-    /// 'let' decl or when parsing inside a 'let' pattern.
-    IVOLP_InLet
-  } InVarOrLetPattern = IVOLP_NotInVarOrLet;
+  PatternBindingState InBindingPattern = PatternBindingState::NotInBinding;
 
   /// Whether this context has an async attribute.
   bool InPatternWithAsyncAttribute = false;
@@ -1609,10 +1587,9 @@ public:
   ParserResult<Pattern>
   parseOptionalPatternTypeAnnotation(ParserResult<Pattern> P);
   ParserResult<Pattern> parseMatchingPattern(bool isExprBasic);
-  ParserResult<Pattern> parseMatchingPatternAsLetOrVar(bool isLet,
-                                                       SourceLoc VarLoc,
-                                                       bool isExprBasic);
-  
+  ParserResult<Pattern>
+  parseMatchingPatternAsBinding(PatternBindingState newState, SourceLoc VarLoc,
+                                bool isExprBasic);
 
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name,
                                     VarDecl::Introducer introducer);

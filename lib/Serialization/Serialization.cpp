@@ -2450,6 +2450,8 @@ static uint8_t getRawStableVarDeclIntroducer(swift::VarDecl::Introducer intr) {
     return uint8_t(serialization::VarDeclIntroducer::Let);
   case swift::VarDecl::Introducer::Var:
     return uint8_t(serialization::VarDeclIntroducer::Var);
+  case swift::VarDecl::Introducer::InOut:
+    return uint8_t(serialization::VarDeclIntroducer::InOut);
   }
   llvm_unreachable("bad variable decl introducer kind");
 }
