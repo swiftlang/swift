@@ -290,7 +290,7 @@ public:
       if (!HasVariable) {
         Context.Diags
             .diagnose(P->getLoc(), diag::var_pattern_didnt_bind_variables,
-                      P->isLet() ? "let" : "var")
+                      P->getIntroducerStringRef())
             .highlight(P->getSubPattern()->getSourceRange())
             .fixItRemove(P->getLoc());
       }
