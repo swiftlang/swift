@@ -46,3 +46,16 @@ func argumentLabel(anonBorrowingInClosure: (_ borrowing: Int) -> ()) {}
 func argumentLabel(anonConsumingInClosure: (_ consuming: Int) -> ()) {}
 func argumentLabel(anonSharedInClosure: (_ __shared: Int) -> ()) {}
 func argumentLabel(anonOwnedInClosure: (_ __owned: Int) -> ()) {}
+
+struct MethodModifiers {
+    mutating func mutating() {}
+    borrowing func borrowing() {}
+    consuming func consuming() {}
+    nonmutating func nonmutating() {}
+    __consuming func __consuming() {}
+
+    mutating borrowing func tooManyA() {} // expected-error{{method must not be declared both 'mutating' and 'borrowing'}}
+    nonmutating borrowing func tooManyB() {} // expected-error{{method must not be declared both 'nonmutating' and 'borrowing'}}
+    borrowing consuming func tooManyC() {} // expected-error{{method must not be declared both 'borrowing' and 'consuming'}}
+    borrowing mutating consuming func tooManyD() {} // expected-error 2 {{method must not be declared both }}
+}
