@@ -1481,6 +1481,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::DestroyValueInst:
@@ -1546,6 +1547,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              (unsigned(MVI->isLexical() << 1));
     } else if (auto *I = dyn_cast<MarkMustCheckInst>(&SI)) {
       Attr = unsigned(I->getCheckKind());
+    } else if (auto *I = dyn_cast<MarkUnresolvedReferenceBindingInst>(&SI)) {
+      Attr = unsigned(I->getKind());
     } else if (auto *I = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(&SI)) {
       Attr = I->getForwardingOwnershipKind() == OwnershipKind::Owned ? true
                                                                      : false;

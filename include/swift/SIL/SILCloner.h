@@ -1890,6 +1890,16 @@ void SILCloner<ImplClass>::visitMarkMustCheckInst(MarkMustCheckInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitMarkUnresolvedReferenceBindingInst(
+    MarkUnresolvedReferenceBindingInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto *MVI = getBuilder().createMarkUnresolvedReferenceBindingInst(
+      getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+      Inst->getKind());
+  recordClonedInstruction(Inst, MVI);
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitMoveOnlyWrapperToCopyableValueInst(
     MoveOnlyWrapperToCopyableValueInst *inst) {
   getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));

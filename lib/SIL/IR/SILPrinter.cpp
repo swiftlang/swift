@@ -2007,6 +2007,19 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitMarkUnresolvedReferenceBindingInst(
+      MarkUnresolvedReferenceBindingInst *I) {
+    using Kind = MarkUnresolvedReferenceBindingInst::Kind;
+    switch (I->getKind()) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::InOut:
+      *this << "[inout] ";
+      break;
+    }
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitCopyableToMoveOnlyWrapperValueInst(
       CopyableToMoveOnlyWrapperValueInst *I) {
     switch (I->getInitialKind()) {

@@ -2080,5 +2080,11 @@ ERROR(parser_new_parser_errors,none,
       "new Swift parser generated errors for code that C++ parser accepted",
        ())
 
+// MARK: Reference Binding Diagnostics
+ERROR(sil_markuncheckedreferencebinding_requires_attribute,none,
+      "mark_unchecked_reference_binding requires an attribute like [inout]", ())
+ERROR(sil_markuncheckedreferencebinding_invalid_attribute,none,
+      "Attribute '[%0]' can not be applied to mark_unchecked_reference_binding", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -2206,6 +2206,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst: {
+    using Kind = MarkUnresolvedReferenceBindingInst::Kind;
+    auto ty = MF->getType(TyID);
+    auto kind = Kind(Attr);
+    ResultInst = Builder.createMarkUnresolvedReferenceBindingInst(
+        Loc,
+        getLocalValue(ValID, getSILType(ty, (SILValueCategory)TyCategory, Fn)),
+        kind);
+    break;
+  }
+
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst: {
     auto Ty = MF->getType(TyID);
     bool isOwned = bool(Attr);

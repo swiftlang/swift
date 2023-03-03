@@ -877,6 +877,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::RebindMemoryInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::TestSpecificationInst:

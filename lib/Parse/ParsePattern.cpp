@@ -1391,6 +1391,9 @@ static bool canParsePattern(Parser &P) {
     P.consumeToken();
     return true;
   case tok::kw_inout:
+    if (!P.Context.LangOpts.hasFeature(Feature::ReferenceBindings))
+      return false;
+    LLVM_FALLTHROUGH;
   case tok::kw_let:
   case tok::kw_var:
     P.consumeToken();

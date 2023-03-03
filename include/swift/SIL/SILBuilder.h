@@ -1330,6 +1330,13 @@ public:
                       MarkMustCheckInst(getSILDebugLocation(loc), src, kind));
   }
 
+  MarkUnresolvedReferenceBindingInst *createMarkUnresolvedReferenceBindingInst(
+      SILLocation loc, SILValue src,
+      MarkUnresolvedReferenceBindingInst::Kind kind) {
+    return insert(new (getModule()) MarkUnresolvedReferenceBindingInst(
+        getSILDebugLocation(loc), src, kind));
+  }
+
   CopyableToMoveOnlyWrapperValueInst *
   createOwnedCopyableToMoveOnlyWrapperValue(SILLocation loc, SILValue src) {
     return insert(new (getModule()) CopyableToMoveOnlyWrapperValueInst(
