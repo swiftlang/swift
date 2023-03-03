@@ -31,6 +31,12 @@ function(add_swift_macro_library name)
   # Add the library.
   add_pure_swift_host_library(${name} SHARED ${ASML_SOURCES})
 
+  # If we don't have the Swift swift parser, bail out, because the above
+  # add_pure_swift_host_library did nothing.
+  if (NOT SWIFT_SWIFT_PARSER)
+    return()
+  endif()
+
   # Install into the plugin directory.
   set_target_properties(${name}
     PROPERTIES
