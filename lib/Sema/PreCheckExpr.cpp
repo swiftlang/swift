@@ -993,7 +993,7 @@ namespace {
 
     VarDecl *getImplicitSelfDeclForSuperContext(SourceLoc Loc) ;
 
-    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override __attribute__((optnone)) {
       // FIXME(diagnostics): `InOutType` could appear here as a result
       // of successful re-typecheck of the one of the sub-expressions e.g.
       // `let _: Int = { (s: inout S) in s.bar() }`. On the first
@@ -1118,6 +1118,12 @@ namespace {
                 diag::cannot_pass_inout_arg_to_subscript);
             return finish(false, nullptr);
           }
+        }
+
+        // If we are checking an inout binding, let it through.
+        if (Options.contains(
+                ConstraintSystem::PreCheckFlags::CheckingLocalInOutBinding)) {
+          return finish(true, expr);
         }
 
         getASTContext().Diags.diagnose(expr->getStartLoc(),

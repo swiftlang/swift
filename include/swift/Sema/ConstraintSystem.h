@@ -5865,6 +5865,8 @@ public:
     ReplaceInvalidRefsWithErrors = 0x1,
 
     LeaveClosureBodiesUnchecked = 0x2,
+
+    CheckingLocalInOutBinding = 0x4,
   };
   using PreCheckOptions = OptionSet<PreCheckFlags>;
 

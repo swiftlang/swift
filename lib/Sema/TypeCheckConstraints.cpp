@@ -425,6 +425,9 @@ TypeChecker::typeCheckTarget(SolutionApplicationTarget &target,
     preCheckOptions |=
         ConstraintSystem::PreCheckFlags::LeaveClosureBodiesUnchecked;
   }
+  if (options.contains(TypeCheckExprFlags::IsLocalInOutBinding))
+    preCheckOptions |=
+        ConstraintSystem::PreCheckFlags::CheckingLocalInOutBinding;
   if (ConstraintSystem::preCheckTarget(target, preCheckOptions)) {
     return None;
   }
@@ -792,6 +795,17 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     }
   }
 
+  // TODO: Put in an error if we do not have a single var and we have an inout
+  // binding.
+  if (PBD) {
+    if (auto *singleVar = PBD->getSingleVar()) {
+      VarDecl::Introducer intro = singleVar->getIntroducer();
+      if (intro == VarDecl::Introducer::InOut) {
+        options |= TypeCheckExprFlags::IsLocalInOutBinding;
+      }
+    }
+  }
+  
   // Type-check the initializer.
   auto resultTarget = typeCheckExpression(target, options);
 
