@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,6 +11,48 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
+
+
+// ==== -----------------------------------------------------------------------
+// MARK: Executor Assertions
+
+/// Chec
+///
+/// - Parameter executor: the expected current executor
+@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+public
+func preconditionTaskOnExecutor(
+    _ executor: some SerialExecutor,
+    file: StaticString = #fileID, line: UInt = #line
+) {
+  guard _taskIsCurrentExecutor(executor.asUnownedSerialExecutor().executor) else {
+    // TODO: offer information which executor we actually got
+    let message = "Incorrect actor executor assumption; Expected '\(executor)' executor."
+    precondition(false, message, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
+    return
+  }
+}
+
+/// Chec
+///
+/// - Parameter executor: the expected current executor
+@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+public
+func preconditionTaskOnActorExecutor(
+    _ actor: some Actor,
+    file: StaticString = #fileID, line: UInt = #line
+) {
+  guard _taskIsCurrentExecutor(actor.unownedExecutor.executor) else {
+    // TODO: offer information which executor we actually got
+    // TODO: figure out a way to get the typed repr out of the unowned executor
+    let message = "Incorrect actor executor assumption; Expected '\(actor.unownedExecutor)' executor."
+    precondition(false, message, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
+    return
+  }
+}
+
+// ==== -----------------------------------------------------------------------
+// MARK: Assume Executor
 
 /// A safe way to synchronously assume that the current execution context belongs to the MainActor.
 ///
