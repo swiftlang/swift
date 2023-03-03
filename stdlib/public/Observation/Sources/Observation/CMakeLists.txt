@@ -10,19 +10,9 @@
 #
 #===----------------------------------------------------------------------===#
 
-# Linux and windows hosts are disabled for now; it is dependent upon earlyswiftsyntax
-# which does not build in the same way just yet
-if (${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+# We can only build when earlyswiftsyntax is enabled.
+if (SWIFT_SWIFT_PARSER)
   list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include -I${SWIFT_SOURCE_DIR}/include)
-
-  set(SWIFT_OBSERVATION_SWIFT_FLAGS)
-  set(SWIFT_OBSERVATION_DEPENDS)
-
-  list(APPEND SWIFT_OBSERVATION_SWIFT_FLAGS
-    "-enable-experimental-feature" "Macros"
-    "-DSWIFT_OBSERVATION_MACROS"
-  )
-  list(APPEND SWIFT_OBSERVATION_DEPENDS ObservationMacros)
 
   add_swift_target_library(swiftObservation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
     Locking.cpp
@@ -37,15 +27,11 @@ if (${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
     ThreadLocal.swift
     TrackedProperties.swift
 
-    DEPENDS ${SWIFT_OBSERVATION_DEPENDS}
-
     SWIFT_COMPILE_FLAGS
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-      ${SWIFT_OBSERVATION_SWIFT_FLAGS}
     SWIFT_MODULE_DEPENDS _Concurrency
     INSTALL_IN_COMPONENT stdlib
 
     MACCATALYST_BUILD_FLAVOR "zippered"
   )
-
 endif()

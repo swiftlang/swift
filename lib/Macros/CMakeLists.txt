@@ -45,6 +45,9 @@ function(add_swift_macro_library name)
     ARCHIVE
       DESTINATION "${SWIFT_HOST_PLUGINS_DEST_DIR}"
       COMPONENT compiler)
+
+  # Export this macro plugin target.
+  set_property(GLOBAL APPEND PROPERTY SWIFT_MACRO_PLUGINS ${name})
 endfunction()
 
 add_subdirectory(Sources/ObservationMacros)

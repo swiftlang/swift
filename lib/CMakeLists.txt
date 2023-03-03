@@ -83,16 +83,26 @@ if (SWIFT_SWIFT_PARSER)
   list(TRANSFORM SWIFT_SYNTAX_MODULES APPEND ".swiftmodule"
        OUTPUT_VARIABLE SWIFT_SYNTAX_MODULE_DIRS)
   foreach(module_dir ${SWIFT_SYNTAX_MODULE_DIRS})
+    # Find all of the source module files.
     file(GLOB module_files
          "${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${module_dir}/*.swiftinterface")
+
+    # Determine the destination module files.
+    set(dest_module_files)
+    foreach(full_module_file ${module_files})
+        get_filename_component(module_file ${full_module_file} NAME)
+        list(APPEND dest_module_files
+            "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${module_dir}/${module_file}")
+    endforeach()
+
     add_custom_command(
-      OUTPUT ${module_files}
+      OUTPUT ${dest_module_files}
       COMMAND ${CMAKE_COMMAND} -E make_directory ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${module_dir}
       COMMAND ${CMAKE_COMMAND} -E copy_if_different ${module_files} ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${module_dir}/
       COMMENT "Copying ${module_dir}"
     )
 
-    list(APPEND SWIFT_SYNTAX_DEST_FILES ${module_files})
+    list(APPEND SWIFT_SYNTAX_DEST_FILES ${dest_module_files})
   endforeach()
 
   # Add a custom target to copy over the SwiftSyntax build products into
