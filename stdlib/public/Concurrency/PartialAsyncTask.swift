@@ -293,13 +293,30 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 
 #endif
 
-/// Suspends the current task,
-/// then calls the given closure with an unsafe continuation for the current task.
+
+/// Invokes the passed in closure with a unsafe continuation for the current task.
+///
+/// The body of the closure executes synchronously on the calling task, and once it returns
+/// the calling task is suspended. It is possible to immediately resume the task, or escape the
+/// continuation in order to complete it afterwards, which will them resume suspended task.
+///
+/// You must invoke the continuation's `resume` method exactly once.
+///
+/// Missing to invoke it (eventually) will cause the calling task to remain suspended
+/// indefinitely which will result in the task "hanging" as well as being leaked with
+/// no possibility to destroy it.
+///
+/// Unlike the "checked" continuation variant, the `UnsafeContinuation` does not
+/// detect or diagnose any kind of misuse, so you need to be extra careful to avoid
+/// calling `resume` twice or forgetting to call resume before letting go of the
+/// continuation object.
 ///
 /// - Parameter fn: A closure that takes an `UnsafeContinuation` parameter.
-/// You must resume the continuation exactly once.
+/// - Returns: The value continuation is resumed with.
 ///
-/// - Returns: The value passed to the continuation by the closure.
+/// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
+/// - SeeAlso: `withCheckedContinuation(function:_:)`
+/// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor
 @_alwaysEmitIntoClient
@@ -311,16 +328,31 @@ public func withUnsafeContinuation<T>(
   }
 }
 
-/// Suspends the current task,
-/// then calls the given closure with an unsafe throwing continuation for the current task.
+/// Invokes the passed in closure with a unsafe continuation for the current task.
+///
+/// The body of the closure executes synchronously on the calling task, and once it returns
+/// the calling task is suspended. It is possible to immediately resume the task, or escape the
+/// continuation in order to complete it afterwards, which will them resume suspended task.
+///
+/// If `resume(throwing:)` is called on the continuation, this function throws that error.
+///
+/// You must invoke the continuation's `resume` method exactly once.
+///
+/// Missing to invoke it (eventually) will cause the calling task to remain suspended
+/// indefinitely which will result in the task "hanging" as well as being leaked with
+/// no possibility to destroy it.
+///
+/// Unlike the "checked" continuation variant, the `UnsafeContinuation` does not
+/// detect or diagnose any kind of misuse, so you need to be extra careful to avoid
+/// calling `resume` twice or forgetting to call resume before letting go of the
+/// continuation object.
 ///
 /// - Parameter fn: A closure that takes an `UnsafeContinuation` parameter.
-/// You must resume the continuation exactly once.
+/// - Returns: The value continuation is resumed with.
 ///
-/// - Returns: The value passed to the continuation by the closure.
-///
-/// If `resume(throwing:)` is called on the continuation,
-/// this function throws that error.
+/// - SeeAlso: `withUnsafeContinuation(function:_:)`
+/// - SeeAlso: `withCheckedContinuation(function:_:)`
+/// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor
 @_alwaysEmitIntoClient
