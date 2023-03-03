@@ -524,17 +524,20 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 static void setRefactoringFields(sourcekitd_object_t &Req, TestOptions Opts,
                                  sourcekitd_uid_t RefactoringKind,
                                  llvm::MemoryBuffer *SourceBuf) {
-  if (Opts.Offset && !Opts.Line && !Opts.Col) {
-    auto LineCol = resolveToLineCol(Opts.Offset, SourceBuf);
-    Opts.Line = LineCol.first;
-    Opts.Col = LineCol.second;
+  unsigned line = Opts.Line;
+  unsigned col = Opts.Col;
+  if (SourceBuf && Opts.Offset && line == 0) {
+    std::tie(line, col) = resolveToLineCol(*Opts.Offset, SourceBuf);
   }
+
   sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                         RequestSemanticRefactoring);
   sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, RefactoringKind);
+  sourcekitd_request_dictionary_set_string(Req, KeyPrimaryFile,
+                                           Opts.PrimaryFile.c_str());
   sourcekitd_request_dictionary_set_string(Req, KeyName, Opts.Name.c_str());
-  sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);
-  sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);
+  sourcekitd_request_dictionary_set_int64(Req, KeyLine, line);
+  sourcekitd_request_dictionary_set_int64(Req, KeyColumn, col);
   sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
 }
 
@@ -572,15 +575,20 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
       Opts.Request == SourceKitRequest::MangleSimpleClasses)
     Opts.SourceFile.clear();
 
-  std::string SourceFile = Opts.SourceFile;
-  if (!SourceFile.empty()) {
+  if (!Opts.SourceFile.empty() && Opts.PrimaryFile.empty()) {
+    // Only canonicalize if primary file isn't set (since we expect sourcefile
+    // to be a relative name otherwise).
     llvm::SmallString<64> AbsSourceFile;
-    AbsSourceFile += SourceFile;
+    AbsSourceFile += Opts.SourceFile;
     llvm::sys::fs::make_absolute(AbsSourceFile);
     llvm::sys::path::native(AbsSourceFile);
-    SourceFile = std::string(AbsSourceFile.str());
+    Opts.SourceFile = std::string(AbsSourceFile.str());
+    if (Opts.PrimaryFile.empty()) {
+      Opts.PrimaryFile = Opts.SourceFile;
+    }
   }
-  std::string SemaName = !Opts.Name.empty() ? Opts.Name : SourceFile;
+  // FIXME: It's super confusing that we use name for the file sometimes.
+  std::string SemaName = !Opts.Name.empty() ? Opts.Name : Opts.SourceFile;
 
   if (!Opts.TextInputFile.empty()) {
     auto Buf = getBufferForFilename(Opts.TextInputFile, Opts.VFSFiles);
@@ -590,21 +598,29 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   std::unique_ptr<llvm::MemoryBuffer> SourceBuf;
   if (Opts.SourceText.has_value()) {
     SourceBuf = llvm::MemoryBuffer::getMemBuffer(*Opts.SourceText, Opts.SourceFile);
-  } else if (!SourceFile.empty()) {
+  } else if (!Opts.SourceFile.empty() && Opts.PrimaryFile == Opts.SourceFile) {
+    // If we have a primary file, that implies that the source file is actually
+    // a generated buffer. In that case we can't get the text.
     SourceBuf = llvm::MemoryBuffer::getMemBuffer(
-        getBufferForFilename(SourceFile, Opts.VFSFiles)->getBuffer(),
-        SourceFile);
+        getBufferForFilename(Opts.SourceFile, Opts.VFSFiles)->getBuffer(),
+        Opts.SourceFile);
   }
 
-  // FIXME: we should detect if offset is required but not set.
-  unsigned ByteOffset = Opts.Offset;
-  if (Opts.Line != 0) {
-    ByteOffset = resolveFromLineCol(Opts.Line, Opts.Col, SourceBuf.get());
-  }
+  unsigned ByteOffset = Opts.Offset.value_or(0);
+  if (SourceBuf) {
+    // Fill in offset/length if we're able to, ie. we have access to the
+    // underlying sourcefile. Ideally we would error here if any of these
+    // are needed but not (or cannot) be set.
 
-  if (Opts.EndLine != 0) {
-    Opts.Length = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceBuf.get()) -
-      ByteOffset;
+    if (!Opts.Offset && Opts.Line > 0) {
+      ByteOffset = resolveFromLineCol(Opts.Line, Opts.Col, SourceBuf.get());
+    }
+
+    if (Opts.Length == 0 && Opts.EndLine > 0) {
+      Opts.Length =
+          resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceBuf.get()) -
+          ByteOffset;
+    }
   }
 
   bool compilerArgsAreClang = false;
@@ -782,8 +798,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     auto Length = Opts.Length;
     if (Opts.Length == 0 && Opts.EndLine > 0) {
-      auto EndOff = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceFile,
-                                       Opts.VFSFiles);
+      auto EndOff = resolveFromLineCol(Opts.EndLine, Opts.EndCol,
+                                       Opts.SourceFile, Opts.VFSFiles);
       Length = EndOff - ByteOffset;
     }
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Length);
@@ -1095,14 +1111,14 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
-  if (!SourceFile.empty()) {
+  if (!Opts.SourceFile.empty()) {
     if (Opts.PassAsSourceText) {
-      auto Buf = getBufferForFilename(SourceFile, Opts.VFSFiles);
+      auto Buf = getBufferForFilename(Opts.SourceFile, Opts.VFSFiles);
       sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                                Buf->getBufferStart());
     }
     sourcekitd_request_dictionary_set_string(Req, KeySourceFile,
-                                             SourceFile.c_str());
+                                             Opts.SourceFile.c_str());
   }
 
   if (Opts.SourceText) {
@@ -2707,7 +2723,10 @@ static llvm::MemoryBuffer *
 getBufferForFilename(StringRef Filename,
                      const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                      bool ExitOnError) {
-  auto VFSFileIt = VFSFiles.find(Filename);
+  llvm::SmallString<128> nativeName;
+  llvm::sys::path::native(Filename, nativeName);
+
+  auto VFSFileIt = VFSFiles.find(nativeName);
   auto MappedFilename =
       VFSFileIt == VFSFiles.end() ? Filename : StringRef(VFSFileIt->second.path);
 

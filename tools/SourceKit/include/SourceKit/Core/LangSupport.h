@@ -637,6 +637,10 @@ enum class SemanticRefactoringKind {
 
 struct SemanticRefactoringInfo {
   SemanticRefactoringKind Kind;
+  // The name of the source file to start the refactoring in. Empty if it is
+  // the primary file (in which case the primary file from the AST is used).
+  // This must match the buffer identifier stored in the source manager.
+  StringRef SourceFile;
   unsigned Line;
   unsigned Column;
   unsigned Length;
@@ -1045,7 +1049,7 @@ public:
                         SourceKitCancellationToken CancellationToken,
                         CategorizedRenameRangesReceiver Receiver) = 0;
 
-  virtual void semanticRefactoring(StringRef Filename,
+  virtual void semanticRefactoring(StringRef PrimaryFile,
                                    SemanticRefactoringInfo Info,
                                    ArrayRef<const char *> Args,
                                    SourceKitCancellationToken CancellationToken,

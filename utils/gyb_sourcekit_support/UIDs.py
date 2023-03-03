@@ -50,6 +50,7 @@ UID_KEYS = [
     KEY('Length', 'key.length'),
     KEY('SourceFile', 'key.sourcefile'),
     KEY('SourceText', 'key.sourcetext'),
+    KEY('PrimaryFile', 'key.primary_file'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
     KEY('EnableStructure', 'key.enablesubstructure'),
     KEY('ID', 'key.id'),

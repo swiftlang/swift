@@ -892,8 +892,8 @@ public:
 
   /// Retrieve the discriminator for the given custom attribute that names
   /// an attached macro.
-  unsigned getAttachedMacroDiscriminator(
-      MacroRole role, const CustomAttr *attr) const;
+  unsigned getAttachedMacroDiscriminator(DeclBaseName macroName, MacroRole role,
+                                         const CustomAttr *attr) const;
 
   /// Returns the innermost enclosing decl with an availability annotation.
   const Decl *getInnermostDeclWithAvailability() const;
@@ -8323,24 +8323,23 @@ public:
 /// is used for parser recovery, e.g. when parsing a floating
 /// attribute list.
 class MissingDecl: public Decl {
-  MissingDecl(DeclContext *DC) : Decl(DeclKind::Missing, DC) {
+  /// The location that the decl would be if it wasn't missing.
+  SourceLoc Loc;
+
+  MissingDecl(DeclContext *DC, SourceLoc loc)
+      : Decl(DeclKind::Missing, DC), Loc(loc) {
     setImplicit();
   }
 
   friend class Decl;
-  SourceLoc getLocFromSource() const {
-    return SourceLoc();
-  }
+  SourceLoc getLocFromSource() const { return Loc; }
 
 public:
-  static MissingDecl *
-  create(ASTContext &ctx, DeclContext *DC) {
-    return new (ctx) MissingDecl(DC);
+  static MissingDecl *create(ASTContext &ctx, DeclContext *DC, SourceLoc loc) {
+    return new (ctx) MissingDecl(DC, loc);
   }
 
-  SourceRange getSourceRange() const {
-    return SourceRange();
-  }
+  SourceRange getSourceRange() const { return SourceRange(Loc); }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Missing;

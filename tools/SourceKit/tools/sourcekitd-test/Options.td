@@ -20,6 +20,9 @@ def id : Separate<["-"], "id">,
   HelpText<"If this is an async request, an ID that can be used to cancel the request">;
 def id_EQ : Joined<["-"], "id=">, Alias<id>;
 
+def primary_file : Separate<["-"], "primary-file">,
+  HelpText<"Primary file path">;
+
 def offset : Separate<["-"], "offset">,
   HelpText<"byte offset">;
 def offset_EQ : Joined<["-"], "offset=">, Alias<offset>;

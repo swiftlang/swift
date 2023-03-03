@@ -264,7 +264,7 @@ RangeConfig getRange(unsigned BufferID, SourceManager &SM,
     RangeConfig Range;
     SourceLoc EndLoc = SM.getLocForLineCol(BufferID, End.Line,
                                            End.Column);
-    Range.BufferId = BufferID;
+    Range.BufferID = BufferID;
     Range.Line = Start.Line;
     Range.Column = Start.Column;
     Range.Length = SM.getByteDistance(Range.getStart(SM), EndLoc);

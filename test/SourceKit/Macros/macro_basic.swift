@@ -137,13 +137,24 @@ struct S4 { }
 // ATTACHED_EXPAND: source.edit.kind.active:
 // ATTACHED_EXPAND-NEXT: 23:3-23:3 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMA_.swift) "@accessViaStorage "
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
-// ATTACHED_EXPAND-NEXT: 24:3-24:3 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMA_.swift) "@accessViaStorage "
+// ATTACHED_EXPAND-NEXT: 24:3-24:3 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMA0_.swift) "@accessViaStorage "
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
 // ATTACHED_EXPAND-NEXT: 22:11-22:11 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMm_.swift) "
 // ATTACHED_EXPAND-NEXT: private var _storage = _Storage()
 // ATTACHED_EXPAND-NEXT: "
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
 // ATTACHED_EXPAND-NEXT: 21:1-21:15 ""
+
+//##-- Refactoring expanding the attribute expanded by @myTypeWrapper
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=1:2 @__swiftmacro_9MacroUser1SV13myTypeWrapperfMA_.swift -primary-file %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=NESTED_ATTACHED_EXPAND %s
+// NESTED_ATTACHED_EXPAND: source.edit.kind.active:
+// NESTED_ATTACHED_EXPAND-NEXT: Macros/macro_basic.swift 23:13-23:13 (@__swiftmacro_9MacroUser1SV1xSivp16accessViaStoragefMa_.swift) "{
+// NESTED_ATTACHED_EXPAND-NEXT:  get { _storage.x }
+// NESTED_ATTACHED_EXPAND-EMPTY:
+// NESTED_ATTACHED_EXPAND-NEXT:  set { _storage.x = newValue }
+// NESTED_ATTACHED_EXPAND-NEXT: }"
+// NESTED_ATTACHED_EXPAND-NEXT: source.edit.kind.active:
+// NESTED_ATTACHED_EXPAND-NEXT: 1:1-1:18 ""
 
 //##-- Refactoring expanding the first accessor macro
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=30:4 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ACCESSOR1_EXPAND %s

@@ -7132,7 +7132,8 @@ void Parser::parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items) {
 
   // Create a `MissingDecl` as a placeholder for the declaration the
   // macro will attach the attribute list to.
-  MissingDecl *missing = MissingDecl::create(Context, CurDeclContext);
+  MissingDecl *missing =
+      MissingDecl::create(Context, CurDeclContext, Tok.getLoc());
   missing->getAttrs() = attributes;
 
   items.push_back(ASTNode(missing));
