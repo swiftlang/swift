@@ -1594,6 +1594,17 @@ void (*swift::swift_task_asyncMainDrainQueue_hook)(
     swift_task_asyncMainDrainQueue_original original,
     swift_task_asyncMainDrainQueue_override compatOverride) = nullptr;
 
+SWIFT_CC(swift)
+static void swift_task_startOnMainActorImpl(AsyncTask* task) {
+  AsyncTask * originalTask = _swift_task_clearCurrent();
+  ExecutorRef mainExecutor = swift_task_getMainExecutor();
+  if (swift_task_getCurrentExecutor() != swift_task_getMainExecutor())
+    swift_Concurrency_fatalError(0, "Not on the main executor");
+  swift_retain(task);
+  swift_job_run(task, mainExecutor);
+  _swift_task_setCurrent(originalTask);
+}
+
 #define OVERRIDE_TASK COMPATIBILITY_OVERRIDE
 
 #ifdef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
