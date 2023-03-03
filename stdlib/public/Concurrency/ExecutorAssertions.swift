@@ -40,6 +40,10 @@ func preconditionTaskOnExecutor(
     message: @autoclosure () -> String = String(),
     file: StaticString = #fileID, line: UInt = #line
 ) {
+  guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
+    return
+  }
+
   let expectationCheck = _taskIsCurrentExecutor(executor.asUnownedSerialExecutor().executor)
 
   /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
