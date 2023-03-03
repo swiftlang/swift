@@ -254,30 +254,40 @@ func expandFreestandingMacroIPC(
 
   let macro = macroPtr.assumingMemoryBound(to: ExportedExecutableMacro.self).pointee
 
+  // Send the message.
   let message = HostToPluginMessage.expandFreestandingMacro(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
     discriminator: discriminator,
     syntax: PluginMessage.Syntax(syntax: macroSyntax, in: sourceFilePtr)!)
-
   do {
     let result = try macro.plugin.sendMessageAndWait(message)
-    switch result {
-    case .expandFreestandingMacroResult(var expandedSource, let diagnostics):
-      if !diagnostics.isEmpty {
-        let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: diagEnginePtr)
-        diagEngine.add(exportedSourceFile: sourceFilePtr)
-
-        for diagnostic in diagnostics {
-          diagEngine.emit(diagnostic, messageSuffix: " (from macro '\(macroName)')")
-        }
-      }
-      return expandedSource
-
-    default:
-      fatalError("unexpected result")
+    guard
+      case .expandFreestandingMacroResult(let expandedSource, let diagnostics) = result
+    else {
+      throw PluginError.invalidReponseKind
     }
+
+    // Process the result.
+    if !diagnostics.isEmpty {
+      let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: diagEnginePtr)
+      diagEngine.add(exportedSourceFile: sourceFilePtr)
+      diagEngine.emit(diagnostics, messageSuffix: " (from macro '\(macroName)')")
+    }
+    return expandedSource
+
   } catch let error {
-    fatalError("\(error)")
+    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+    srcMgr.insert(sourceFilePtr)
+    srcMgr.diagnose(
+      diagnostic: .init(
+        node: macroSyntax,
+        // FIXME: This is probably a plugin communication error.
+        // The error might not be relevant as the diagnostic message.
+        message: ThrownErrorDiagnostic(message: String(describing: error))
+      ),
+      messageSuffix: " (from macro '\(macroName)')"
+    )
+    return nil
   }
 }
 
@@ -580,6 +590,7 @@ func expandAttachedMacroIPC(
     parentDeclSyntax = nil
   }
 
+  // Send the message.
   let message = HostToPluginMessage.expandAttachedMacro(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
     macroRole: macroRole,
@@ -589,30 +600,42 @@ func expandAttachedMacroIPC(
     parentDeclSyntax: parentDeclSyntax)
   do {
     let result = try macro.plugin.sendMessageAndWait(message)
-    switch result {
-    case .expandAttachedMacroResult(let expandedSources, let diagnostics):
-      // Form the result buffer for our caller.
-
-      if !diagnostics.isEmpty {
-        let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: diagEnginePtr)
-        diagEngine.add(exportedSourceFile: customAttrSourceFilePtr)
-        diagEngine.add(exportedSourceFile: declarationSourceFilePtr)
-        if let parentDeclSourceFilePtr = parentDeclSourceFilePtr {
-          diagEngine.add(exportedSourceFile: parentDeclSourceFilePtr)
-        }
-
-        for diagnostic in diagnostics {
-          diagEngine.emit(diagnostic, messageSuffix: " (from macro '\(macroName)')")
-        }
-
-      }
-      return expandedSources
-
-    default:
-      fatalError("unexpected result")
+    guard
+      case .expandAttachedMacroResult(let expandedSources, let diagnostics) = result
+    else {
+      throw PluginError.invalidReponseKind
     }
+
+    // Process the result.
+    if !diagnostics.isEmpty {
+      let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: diagEnginePtr)
+      diagEngine.add(exportedSourceFile: customAttrSourceFilePtr)
+      diagEngine.add(exportedSourceFile: declarationSourceFilePtr)
+      if let parentDeclSourceFilePtr = parentDeclSourceFilePtr {
+        diagEngine.add(exportedSourceFile: parentDeclSourceFilePtr)
+      }
+      diagEngine.emit(diagnostics, messageSuffix: " (from macro '\(macroName)')")
+    }
+    return expandedSources
+
   } catch let error {
-    fatalError("\(error)")
+    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+    srcMgr.insert(customAttrSourceFilePtr)
+    srcMgr.insert(declarationSourceFilePtr)
+    if let parentDeclSourceFilePtr = parentDeclSourceFilePtr {
+      srcMgr.insert(parentDeclSourceFilePtr)
+    }
+    // FIXME: Need to decide where to diagnose the error:
+    srcMgr.diagnose(
+      diagnostic: .init(
+        node: Syntax(declarationNode),
+        // FIXME: This is probably a plugin communication error.
+        // The error might not be relevant as the diagnostic message.
+        message: ThrownErrorDiagnostic(message: String(describing: error))
+      ),
+      messageSuffix: " (from macro '\(macroName)')"
+    )
+    return nil
   }
 }
 

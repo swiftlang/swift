@@ -12,6 +12,7 @@
 
 #include "swift/AST/PluginRegistry.h"
 
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/Sandbox.h"
@@ -21,6 +22,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Config/config.h"
 
+#include <signal.h>
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -119,7 +121,6 @@ LoadedExecutablePlugin::LoadedExecutablePlugin(
       outputFileDescriptor(outputFileDescriptor) {}
 
 LoadedExecutablePlugin::~LoadedExecutablePlugin() {
-  // Close the pipes.
   close(inputFileDescriptor);
   close(outputFileDescriptor);
 
@@ -131,10 +132,18 @@ ssize_t LoadedExecutablePlugin::read(void *buf, size_t nbyte) const {
   ssize_t bytesToRead = nbyte;
   void *ptr = buf;
 
+#if defined(SIGPIPE)
+  /// Ignore SIGPIPE while reading.
+  auto *old_handler = signal(SIGPIPE, SIG_IGN);
+  SWIFT_DEFER { signal(SIGPIPE, old_handler); };
+#endif
+
   while (bytesToRead > 0) {
     ssize_t readingSize = std::min(ssize_t(INT32_MAX), bytesToRead);
     ssize_t readSize = ::read(inputFileDescriptor, ptr, readingSize);
-    if (readSize == 0) {
+    if (readSize <= 0) {
+      // 0: EOF (the plugin exited?), -1: error (e.g. broken pipe.)
+      // FIXME: Mark the plugin 'stale' and relaunch later.
       break;
     }
     ptr = static_cast<char *>(ptr) + readSize;
@@ -148,10 +157,18 @@ ssize_t LoadedExecutablePlugin::write(const void *buf, size_t nbyte) const {
   ssize_t bytesToWrite = nbyte;
   const void *ptr = buf;
 
+#if defined(SIGPIPE)
+  /// Ignore SIGPIPE while writing.
+  auto *old_handler = signal(SIGPIPE, SIG_IGN);
+  SWIFT_DEFER { signal(SIGPIPE, old_handler); };
+#endif
+
   while (bytesToWrite > 0) {
     ssize_t writingSize = std::min(ssize_t(INT32_MAX), bytesToWrite);
     ssize_t writtenSize = ::write(outputFileDescriptor, ptr, writingSize);
-    if (writtenSize == 0) {
+    if (writtenSize <= 0) {
+      // -1: error (e.g. broken pipe,)
+      // FIXME: Mark the plugin 'stale' and relaunch later.
       break;
     }
     ptr = static_cast<const char *>(ptr) + writtenSize;
@@ -170,12 +187,17 @@ llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
   uint64_t header = llvm::support::endian::byte_swap(
       uint64_t(size), llvm::support::endianness::little);
   writtenSize = write(&header, sizeof(header));
-  assert(writtenSize == sizeof(header) &&
-         "failed to write plugin message header");
+  if (writtenSize != sizeof(header)) {
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "failed to write plugin message header");
+  }
 
   // Write message.
   writtenSize = write(data, size);
-  assert(writtenSize == ssize_t(size) && "failed to write plugin message data");
+  if (writtenSize != ssize_t(size)) {
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "failed to write plugin message data");
+  }
 
   return llvm::Error::success();
 }
@@ -187,8 +209,10 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
   uint64_t header;
   readSize = read(&header, sizeof(header));
 
-  // FIXME: Error handling. Disconnection, etc.
-  assert(readSize == sizeof(header) && "failed to read plugin message header");
+  if (readSize != sizeof(header)) {
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "failed to read plugin message header");
+  }
 
   size_t size = llvm::support::endian::read<uint64_t>(
       &header, llvm::support::endianness::little);
@@ -200,6 +224,10 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
   while (sizeToRead > 0) {
     char buffer[4096];
     readSize = read(buffer, std::min(sizeof(buffer), sizeToRead));
+    if (readSize == 0) {
+      return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                     "failed to read plugin message data");
+    }
     sizeToRead -= readSize;
     message.append(buffer, readSize);
   }
