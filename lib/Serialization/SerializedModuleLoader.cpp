@@ -846,11 +846,13 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
         loadedModuleFile->mayHaveDiagnosticsPointingAtBuffer())
       OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
   } else {
-    // Report non-fatal compiler tag mismatch.
+    // Report non-fatal compiler tag mismatch on stderr only to avoid
+    // polluting the IDE UI.
     if (!loadInfo.problematicRevision.empty()) {
-      Ctx.Diags.diagnose(*diagLoc,
-                         diag::serialization_module_problematic_revision,
-                         loadInfo.problematicRevision, moduleBufferID);
+      llvm::errs() << "remark: compiled module was created by a different " <<
+                      "version of the compiler '" <<
+                      loadInfo.problematicRevision <<
+                      "': " << moduleBufferID << "\n";
     }
   }
 
