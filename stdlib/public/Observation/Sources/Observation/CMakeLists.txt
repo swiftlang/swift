@@ -10,28 +10,25 @@
 #
 #===----------------------------------------------------------------------===#
 
-# We can only build when earlyswiftsyntax is enabled.
-if (SWIFT_SWIFT_PARSER)
-  list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include -I${SWIFT_SOURCE_DIR}/include)
+list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include -I${SWIFT_SOURCE_DIR}/include)
 
-  add_swift_target_library(swiftObservation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
-    Locking.cpp
-    Locking.swift
-    Macros.swift
-    Observable.swift
-    ObservationRegistrar.swift
-    ObservationTracking.swift
-    ObservedChanges.swift
-    ObservedTransactions.swift
-    ThreadLocal.cpp
-    ThreadLocal.swift
-    TrackedProperties.swift
+add_swift_target_library(swiftObservation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  Locking.cpp
+  Locking.swift
+  Macros.swift
+  Observable.swift
+  ObservationRegistrar.swift
+  ObservationTracking.swift
+  ObservedChanges.swift
+  ObservedTransactions.swift
+  ThreadLocal.cpp
+  ThreadLocal.swift
+  TrackedProperties.swift
 
-    SWIFT_COMPILE_FLAGS
-      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    SWIFT_MODULE_DEPENDS _Concurrency
-    INSTALL_IN_COMPONENT stdlib
+  SWIFT_COMPILE_FLAGS
+    ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+  SWIFT_MODULE_DEPENDS _Concurrency
+  INSTALL_IN_COMPONENT stdlib
 
-    MACCATALYST_BUILD_FLAVOR "zippered"
-  )
-endif()
+  MACCATALYST_BUILD_FLAVOR "zippered"
+)
