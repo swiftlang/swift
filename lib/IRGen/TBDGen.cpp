@@ -583,7 +583,6 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
   file.setInstallName(opts.InstallName);
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
-  file.setInstallAPI(opts.IsInstallAPI);
 
   if (auto packed = parsePackedVersion(CurrentVersion,
                                        opts.CurrentVersion, ctx)) {
