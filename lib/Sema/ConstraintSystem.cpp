@@ -1118,6 +1118,16 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
     return getFixedTypeRecursive(newType, flags, wantRValue);
   }
 
+  // Tuple types can lose their tuple structure under substitution
+  // when a parameter pack is substituted with one element.
+  if (auto tuple = type->getAs<TupleType>()) {
+    auto simplified = simplifyType(type);
+    if (simplified.getPointer() == type.getPointer())
+      return type;
+
+    return getFixedTypeRecursive(simplified, flags, wantRValue);
+  }
+
   if (auto typeVar = type->getAs<TypeVariableType>()) {
     if (auto fixed = getFixedType(typeVar))
       return getFixedTypeRecursive(fixed, flags, wantRValue);
@@ -3701,6 +3711,20 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
   return type.transform([&](Type type) -> Type {
     if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer()))
       return getFixedTypeFn(tvt);
+
+    if (auto tuple = dyn_cast<TupleType>(type.getPointer())) {
+      if (tuple->getNumElements() == 1) {
+        auto element = tuple->getElement(0);
+        auto elementType = simplifyTypeImpl(element.getType(), getFixedTypeFn);
+
+        // Flatten single-element tuples containing type variables that cannot
+        // bind to packs.
+        auto typeVar = elementType->getAs<TypeVariableType>();
+        if (!element.hasName() && typeVar && !typeVar->getImpl().canBindToPack()) {
+          return typeVar;
+        }
+      }
+    }
 
     // If this is a dependent member type for which we end up simplifying
     // the base to a non-type-variable, perform lookup.
