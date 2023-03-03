@@ -159,6 +159,35 @@ class OverlayFile;
 /// location.
 class ModuleSourceFileLocationMap;
 
+/// Package unit used to allow grouping of modules by a package name.
+/// ModuleDecl can set PackageUnit as a parent in its DeclContext
+/// See \c ModuleDecl
+class PackageUnit: public DeclContext {
+
+  Identifier PackageName;
+
+  PackageUnit(Identifier name);
+
+public:
+  static PackageUnit *
+  create(Identifier name, ASTContext &ctx) {
+    return new (ctx) PackageUnit(name);
+  }
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::Package;
+  }
+
+  static bool classof(const PackageUnit *PU) {
+    // FIXME: add a correct check
+    return true;
+  }
+
+  Identifier getName() const {
+    return PackageName;
+  }
+};
+
 /// The minimum unit of compilation.
 ///
 /// A module is made up of several file-units, which are all part of the same
@@ -284,7 +313,7 @@ private:
   /// Used by the debugger to bypass resilient access to fields.
   bool BypassResilience = false;
 
-  ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo);
+  ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo, PackageUnit *pkg);
 
 public:
   /// Creates a new module with a given \p name.
@@ -293,13 +322,14 @@ public:
   /// imported by each file of this module.
   static ModuleDecl *
   create(Identifier name, ASTContext &ctx,
-         ImplicitImportInfo importInfo = ImplicitImportInfo()) {
-    return new (ctx) ModuleDecl(name, ctx, importInfo);
+         ImplicitImportInfo importInfo = ImplicitImportInfo(),
+         PackageUnit *pkg = nullptr) {
+    return new (ctx) ModuleDecl(name, ctx, importInfo, pkg);
   }
 
   static ModuleDecl *
-  createMainModule(ASTContext &ctx, Identifier name, ImplicitImportInfo iinfo) {
-    auto *Mod = ModuleDecl::create(name, ctx, iinfo);
+  createMainModule(ASTContext &ctx, Identifier name, ImplicitImportInfo iinfo, PackageUnit *pkg = nullptr) {
+    auto *Mod = ModuleDecl::create(name, ctx, iinfo, pkg);
     Mod->Bits.ModuleDecl.IsMainModule = true;
     return Mod;
   }
@@ -416,6 +446,10 @@ public:
   /// Set the name of the package this module belongs to
   void setPackageName(Identifier name) {
     PackageName = name;
+    // TODO: uncomment when PackageUnit gets passed to constructor
+//    PackageUnit *pkgUnit = PackageUnit::create(name, getASTContext());
+//    DeclContext newContext = DeclContext(DeclContextKind::Module, pkgUnit);
+//    setDeclContext(&newContext);
   }
 
   Identifier getExportAsName() const { return ExportAsName; }
@@ -1034,6 +1068,10 @@ inline bool DeclContext::isModuleScopeContext() const {
   if (ParentAndKind.getInt() == ASTHierarchy::FileUnit)
     return true;
   return isModuleContext();
+}
+
+inline bool DeclContext::isPackageScopeContext() const {
+  return ParentAndKind.getInt() == ASTHierarchy::Package;
 }
 
 /// Extract the source location from the given module declaration.

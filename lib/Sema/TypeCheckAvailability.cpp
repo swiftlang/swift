@@ -140,6 +140,7 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
     case DeclContextKind::AbstractClosureExpr:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::SerializedLocal:
+    case DeclContextKind::Package:
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:
     case DeclContextKind::MacroDecl:

@@ -888,6 +888,7 @@ static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Initializer:
   case DeclContextKind::SerializedLocal:
+  case DeclContextKind::Package:
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
   case DeclContextKind::MacroDecl:
@@ -1085,6 +1086,7 @@ ExtractCheckResult checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
     break;
 
   case swift::DeclContextKind::SerializedLocal:
+  case swift::DeclContextKind::Package:
   case swift::DeclContextKind::Module:
   case swift::DeclContextKind::FileUnit:
   case swift::DeclContextKind::GenericTypeDecl:

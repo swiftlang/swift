@@ -463,13 +463,19 @@ void SourceLookupCache::invalidate() {
   (void)SameSizeSmallVector{std::move(AllVisibleValues)};
 }
 
+PackageUnit::PackageUnit(Identifier name)
+  : DeclContext(DeclContextKind::Package, nullptr) {
+    PackageName = name;
+}
+
 //===----------------------------------------------------------------------===//
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
-                       ImplicitImportInfo importInfo)
-    : DeclContext(DeclContextKind::Module, nullptr),
+                       ImplicitImportInfo importInfo,
+                       PackageUnit *pkg = nullptr)
+    : DeclContext(DeclContextKind::Module, pkg),
       TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), {}),
       ImportInfo(importInfo) {
 
