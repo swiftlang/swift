@@ -477,8 +477,12 @@ unsigned Decl::getAttachedMacroDiscriminator(
 }
 
 const Decl *Decl::getInnermostDeclWithAvailability() const {
-  if (auto attrAndDecl = getSemanticAvailableRangeAttr())
-    return attrAndDecl.value().second;
+  if (getAttrs().hasAttribute<AvailableAttr>())
+    return this;
+
+  if (auto parent =
+          AvailabilityInference::parentDeclForInferredAvailability(this))
+    return parent->getInnermostDeclWithAvailability();
 
   return nullptr;
 }
