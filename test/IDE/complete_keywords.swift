@@ -180,10 +180,6 @@
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_DECL_STMT_TOPLEVEL-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[#function]/None{{(/TypeRelation\[Convertible\])?}}: #function[#String#]{{; name=.+$}}
-// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[#file]/None{{(/TypeRelation\[Convertible\])?}}: #file[#String#]{{; name=.+$}}
-// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[#line]/None{{(/TypeRelation\[Convertible\])?}}: #line[#Int#]{{; name=.+$}}
-// KW_DECL_STMT_TOPLEVEL-DAG: Keyword[#column]/None{{(/TypeRelation\[Convertible\])?}}: #column[#Int#]{{; name=.+$}}
 //
 // Literals
 //
@@ -252,10 +248,6 @@
 // KW_DECL_STMT-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#function]/None{{(/TypeRelation\[Convertible\])?}}: #function[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#file]/None{{(/TypeRelation\[Convertible\])?}}: #file[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#line]/None{{(/TypeRelation\[Convertible\])?}}: #line[#Int#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#column]/None{{(/TypeRelation\[Convertible\])?}}: #column[#Int#]{{; name=.+$}}
 //
 // Literals
 //
@@ -272,10 +264,6 @@
 // KW_EXPR-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#function]/None{{(/TypeRelation\[Convertible\])?}}: #function[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#file]/None{{(/TypeRelation\[Convertible\])?}}: #file[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#line]/None{{(/TypeRelation\[Convertible\])?}}: #line[#Int#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#column]/None{{(/TypeRelation\[Convertible\])?}}: #column[#Int#]{{; name=.+$}}
 //
 // let and var
 //
@@ -484,20 +472,10 @@ func inSwitch(val: Int) {
 func testContextualType() {
   let _: UInt32 = #^CONTEXT_UINT32^#
 // CONTEXT_UINT32: Begin completions
-// CONTEXT_UINT32-DAG: Keyword[#function]/None:            #function[#String#]; name=#function
-// CONTEXT_UINT32-DAG: Keyword[#file]/None:                #file[#String#]; name=#file
-// CONTEXT_UINT32-DAG: Keyword[#line]/None/TypeRelation[Convertible]: #line[#UInt32#]; name=#line
-// CONTEXT_UINT32-DAG: Keyword[#column]/None/TypeRelation[Convertible]: #column[#UInt32#]; name=#column
-// CONTEXT_UINT32-DAG: Keyword[#dsohandle]/None:           #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
 // CONTEXT_UINT32: End completions
 
   let _: StaticString = #^CONTEXT_STATICSTRING^#
 // CONTEXT_STATICSTRING: Begin completions
-// CONTEXT_STATICSTRING-DAG: Keyword[#function]/None/TypeRelation[Convertible]: #function[#StaticString#]; name=#function
-// CONTEXT_STATICSTRING-DAG: Keyword[#file]/None/TypeRelation[Convertible]: #file[#StaticString#]; name=#file
-// CONTEXT_STATICSTRING-DAG: Keyword[#line]/None:                #line[#Int#]; name=#line
-// CONTEXT_STATICSTRING-DAG: Keyword[#column]/None:              #column[#Int#]; name=#column
-// CONTEXT_STATICSTRING-DAG: Keyword[#dsohandle]/None:           #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
 // CONTEXT_STATICSTRING: End completions
 }
 
