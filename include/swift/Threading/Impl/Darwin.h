@@ -238,6 +238,8 @@ inline tls_key_t tls_get_key(tls_key k) {
     return __PTK_FRAMEWORK_SWIFT_KEY4;
   case tls_key::concurrency_fallback:
     return __PTK_FRAMEWORK_SWIFT_KEY5;
+  case tls_key::observation_transaction:
+    return __PTK_FRAMEWORK_SWIFT_KEY6;
   }
 }
 

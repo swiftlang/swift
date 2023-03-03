@@ -102,13 +102,21 @@ static AvailableAttr *createAvailableAttr(PlatformKind Platform,
                                           StringRef Rename,
                                           ValueDecl *RenameDecl,
                                           ASTContext &Context) {
-
   llvm::VersionTuple Introduced =
       Inferred.Introduced.value_or(llvm::VersionTuple());
   llvm::VersionTuple Deprecated =
       Inferred.Deprecated.value_or(llvm::VersionTuple());
   llvm::VersionTuple Obsoleted =
       Inferred.Obsoleted.value_or(llvm::VersionTuple());
+
+  // If a decl is unavailable then it cannot have any introduced, deprecated, or
+  // obsoleted version.
+  if (Inferred.PlatformAgnostic ==
+      PlatformAgnosticAvailabilityKind::Unavailable) {
+    Introduced = llvm::VersionTuple();
+    Deprecated = llvm::VersionTuple();
+    Obsoleted = llvm::VersionTuple();
+  }
 
   return new (Context)
       AvailableAttr(SourceLoc(), SourceRange(), Platform,
@@ -165,7 +173,8 @@ void AvailabilityInference::applyInferredAvailableAttrs(
 
 /// Returns the decl that should be considered the parent decl of the given decl
 /// when looking for inherited availability annotations.
-static Decl *parentDeclForAvailability(const Decl *D) {
+const Decl *
+AvailabilityInference::parentDeclForInferredAvailability(const Decl *D) {
   if (auto *AD = dyn_cast<AccessorDecl>(D))
     return AD->getStorage();
 
@@ -230,7 +239,8 @@ SemanticAvailableRangeAttrRequest::evaluate(Evaluator &evaluator,
           decl, decl->getASTContext()))
     return std::make_pair(attr, decl);
 
-  if (auto *parent = parentDeclForAvailability(decl))
+  if (auto *parent =
+          AvailabilityInference::parentDeclForInferredAvailability(decl))
     return parent->getSemanticAvailableRangeAttr();
 
   return None;
@@ -262,7 +272,8 @@ SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator,
   if (auto attr = decl->getAttrs().getUnavailable(decl->getASTContext()))
     return std::make_pair(attr, decl);
 
-  if (auto *parent = parentDeclForAvailability(decl))
+  if (auto *parent =
+          AvailabilityInference::parentDeclForInferredAvailability(decl))
     return parent->getSemanticUnavailableAttr();
 
   return None;
