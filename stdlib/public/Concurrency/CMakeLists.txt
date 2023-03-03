@@ -148,6 +148,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
+    -diagnostic-style swift
     ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
   ${swift_concurrency_options}
   INSTALL_IN_COMPONENT ${swift_concurrency_install_component}
