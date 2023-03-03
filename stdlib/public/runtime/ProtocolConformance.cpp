@@ -1291,6 +1291,9 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
     if (!req.hasKnownKind())
       return TypeLookupError("unknown kind");
 
+    if (req.getFlags().isPackRequirement())
+      return TypeLookupError("Packs not supported here yet");
+
     // Resolve the subject generic parameter.
     auto result = swift_getTypeByMangledName(
         MetadataState::Abstract, req.getParam(), extraArguments.data(),
@@ -1329,8 +1332,6 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
       if (result.getError())
         return *result.getError();
       auto otherType = result.getType().getMetadata();
-
-      assert(!req.getFlags().hasExtraArgument());
 
       // Check that the types are equivalent.
       if (subjectType != otherType)

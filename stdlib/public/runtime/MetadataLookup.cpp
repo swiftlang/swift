@@ -1220,13 +1220,6 @@ _gatherGenericParameters(const ContextDescriptor *context,
                    std::to_string(static_cast<uint8_t>(param.getKind()));
           });
         }
-        if (param.hasExtraArgument()) {
-          auto commonString = makeCommonErrorStringGetter();
-          return TypeLookupError([=] {
-            return commonString() + "param " + std::to_string(i) +
-                   "has extra argument";
-          });
-        }
         if (param.hasKeyArgument())
           allGenericArgsVec.push_back(allGenericArgs[i]);
       }
@@ -2724,12 +2717,6 @@ void swift::gatherWrittenGenericArgs(
         missingWrittenArguments = true;
       }
 
-      // We don't know about type parameters with extra arguments. Leave
-      // a hole for it.
-      if (param.hasExtraArgument()) {
-        allGenericArgs.push_back(nullptr);
-        ++genericArgs;
-      }
       break;
 
     default:
@@ -2740,10 +2727,6 @@ void swift::gatherWrittenGenericArgs(
         ++genericArgs;
       }
 
-      if (param.hasExtraArgument()) {
-        allGenericArgs.push_back(nullptr);
-        ++genericArgs;
-      }
       break;
     }
   }

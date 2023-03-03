@@ -421,24 +421,25 @@ struct GenericSignatureLayout {
       PackShapeDescriptors(sig.getGenericPackShapeDescriptors().data()) {
 
 #ifndef NDEBUG
-    unsigned numPacks = 0;
+    unsigned packIdx = 0;
 #endif
 
     for (const auto &gp : sig.getParams()) {
       if (gp.hasKeyArgument()) {
-        ++NumKeyParameters;
-
 #ifndef NDEBUG
         if (gp.getKind() == GenericParamKind::TypePack) {
-          assert(PackShapeDescriptors[numPacks].Kind
+          assert(packIdx < NumPacks);
+          assert(PackShapeDescriptors[packIdx].Kind
                  == GenericPackKind::Metadata);
-          assert(PackShapeDescriptors[numPacks].Index
-                 == NumKeyParameters);
-          assert(PackShapeDescriptors[numPacks].ShapeClass
+          assert(PackShapeDescriptors[packIdx].Index
+                 == NumShapeClasses + NumKeyParameters);
+          assert(PackShapeDescriptors[packIdx].ShapeClass
                  < NumShapeClasses);
-          ++numPacks;
+          ++packIdx;
         }
 #endif
+
+        ++NumKeyParameters;
       }
     }
     for (const auto &reqt : sig.getRequirements()) {
@@ -446,13 +447,14 @@ struct GenericSignatureLayout {
           reqt.getKind() == GenericRequirementKind::Protocol) {
 #ifndef NDEBUG
         if (reqt.getFlags().isPackRequirement()) {
-          assert(PackShapeDescriptors[numPacks].Kind
+          assert(packIdx < NumPacks);
+          assert(PackShapeDescriptors[packIdx].Kind
                  == GenericPackKind::WitnessTable);
-          assert(PackShapeDescriptors[numPacks].Index
-                 == NumKeyParameters + NumWitnessTables);
-          assert(PackShapeDescriptors[numPacks].ShapeClass
+          assert(PackShapeDescriptors[packIdx].Index
+                 == NumShapeClasses + NumKeyParameters + NumWitnessTables);
+          assert(PackShapeDescriptors[packIdx].ShapeClass
                  < NumShapeClasses);
-          ++numPacks;
+          ++packIdx;
         }
 #endif
 
@@ -460,7 +462,7 @@ struct GenericSignatureLayout {
       }
     }
 
-    assert(numPacks == NumPacks);
+    assert(packIdx == NumPacks);
   }
 
   size_t sizeInWords() const {
@@ -601,59 +603,67 @@ public:
     auto *bdata = rhs.begin();
     const uintptr_t *packCounts = reinterpret_cast<const uintptr_t *>(adata);
 
+    unsigned argIdx = 0;
+
     // Compare pack lengths for shape classes.
     for (unsigned i = 0; i != Layout.NumShapeClasses; ++i) {
-      if (*adata++ != *bdata++)
+      if (adata[argIdx] != bdata[argIdx])
         return false;
+
+      ++argIdx;
     }
 
-    auto *nextPack = Layout.PackShapeDescriptors;
-    unsigned numPacks = 0;
+    auto *packs = Layout.PackShapeDescriptors;
+    unsigned packIdx = 0;
 
     // Compare generic arguments for key parameters.
     for (unsigned i = 0; i != Layout.NumKeyParameters; ++i) {
       // Is this entry a metadata pack?
-      if (numPacks < Layout.NumPacks &&
-          nextPack->Kind == GenericPackKind::Metadata &&
-          i == nextPack->Index) {
-        assert(nextPack->ShapeClass < Layout.NumShapeClasses);
-        uintptr_t count = packCounts[nextPack->ShapeClass];
-        ++numPacks;
-        ++nextPack;
+      if (packIdx < Layout.NumPacks &&
+          packs[packIdx].Kind == GenericPackKind::Metadata &&
+          argIdx == packs[packIdx].Index) {
+        assert(packs[packIdx].ShapeClass < Layout.NumShapeClasses);
+        uintptr_t count = packCounts[packs[packIdx].ShapeClass];
 
         if (!areMetadataPacksEqual(*adata++, *bdata++, count))
           return false;
 
+        ++packIdx;
+        ++argIdx;
         continue;
       }
 
-      if (*adata++ != *bdata++)
+      if (adata[argIdx] != bdata[argIdx])
         return false;
+
+      ++argIdx;
     }
 
     // Compare witness tables.
     for (unsigned i = 0; i != Layout.NumWitnessTables; ++i) {
       // Is this entry a witness table pack?
-      if (numPacks < Layout.NumPacks &&
-          nextPack->Kind == GenericPackKind::WitnessTable &&
-          i == nextPack->Index) {
-        assert(nextPack->ShapeClass < Layout.NumShapeClasses);
-        uintptr_t count = packCounts[nextPack->ShapeClass];
-        ++numPacks;
-        ++nextPack;
+      if (packIdx < Layout.NumPacks &&
+          packs[packIdx].Kind == GenericPackKind::WitnessTable &&
+          argIdx == packs[packIdx].Index) {
+        assert(packs[packIdx].ShapeClass < Layout.NumShapeClasses);
+        uintptr_t count = packCounts[packs[packIdx].ShapeClass];
 
         if (!areWitnessTablePacksEqual(*adata++, *bdata++, count))
           return false;
 
+        ++packIdx;
+        ++argIdx;
         continue;
       }
 
-      if (!areWitnessTablesEqual((const WitnessTable *)*adata++,
-                                 (const WitnessTable *)*bdata++))
+      if (!areWitnessTablesEqual((const WitnessTable *)adata[argIdx],
+                                 (const WitnessTable *)bdata[argIdx]))
         return false;
+
+      ++argIdx;
     }
 
-    assert(numPacks == Layout.NumPacks && "Missed a pack");
+    assert(packIdx == Layout.NumPacks && "Missed a pack");
     return true;
   }
 
@@ -680,25 +690,26 @@ private:
   uint32_t computeHash() const {
     size_t H = 0x56ba80d1u * Layout.NumKeyParameters;
 
-    auto *nextPack = Layout.PackShapeDescriptors;
-    unsigned numPacks = 0;
+    auto *packs = Layout.PackShapeDescriptors;
+    unsigned packIdx = 0;
 
     auto update = [&H](uintptr_t value) {
       H = (H >> 10) | (H << ((sizeof(uintptr_t) * 8) - 10));
       H ^= (value ^ (value >> 19));
     };
 
-    // FIXME: Incorporate NumShapeClasses into the hash
-
-    for (unsigned i = 0; i != Layout.NumKeyParameters; ++i) {
+    // FIXME: The first NumShapeClasses entries are pack counts;
+    // incorporate them into the hash
+    for (unsigned i = Layout.NumShapeClasses,
+                  e = Layout.NumShapeClasses + Layout.NumKeyParameters;
+         i != e; ++i) {
       // Is this entry a metadata pack?
-      if (numPacks < Layout.NumPacks &&
-          nextPack->Kind == GenericPackKind::Metadata &&
-          i == nextPack->Index) {
-        assert(nextPack->ShapeClass < Layout.NumShapeClasses);
-        auto count = reinterpret_cast<uintptr_t>(Data[nextPack->ShapeClass]);
-        ++numPacks;
-        ++nextPack;
+      if (packIdx < Layout.NumPacks &&
+          packs[packIdx].Kind == GenericPackKind::Metadata &&
+          i == packs[packIdx].Index) {
+        assert(packs[packIdx].ShapeClass < Layout.NumShapeClasses);
+        auto count = reinterpret_cast<uintptr_t>(Data[packs[packIdx].ShapeClass]);
+        ++packIdx;
 
         MetadataPackPointer pack(Data[i]);
         for (unsigned j = 0; j < count; ++j)

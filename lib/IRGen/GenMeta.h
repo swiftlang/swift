@@ -171,10 +171,20 @@ namespace irgen {
 
   /// Description of the metadata emitted by adding generic requirements.
   struct GenericRequirementsMetadata {
+    unsigned NumParams = 0;
+    unsigned NumParamsEmitted = 0;
     unsigned NumRequirements = 0;
     unsigned NumGenericKeyArguments = 0;
-    unsigned NumGenericExtraArguments = 0;
   };
+
+  /// Add generic parameters to the given constant struct builder.
+  ///
+  /// \param sig The generic signature whose parameters we wish to emit.
+  GenericRequirementsMetadata addGenericParameters(
+                                          IRGenModule &IGM,
+                                          ConstantStructBuilder &B,
+                                          GenericSignature sig,
+                                          bool implicit);
 
   /// Add generic requirements to the given constant struct builder.
   ///

@@ -457,7 +457,7 @@ bool swift_compareProtocolConformanceDescriptors(
 /// bit set to true.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 const Metadata * const *
-swift_allocateMetadataPack(const Metadata * const *ptr, unsigned count);
+swift_allocateMetadataPack(const Metadata * const *ptr, size_t count);
 
 /// Allocate a witness table pack on the heap, unless this pack is already on
 /// the heap.
@@ -472,7 +472,7 @@ swift_allocateMetadataPack(const Metadata * const *ptr, unsigned count);
 /// significant bit set to true.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 const WitnessTable * const *
-swift_allocateWitnessTablePack(const WitnessTable * const *ptr, unsigned count);
+swift_allocateWitnessTablePack(const WitnessTable * const *ptr, size_t count);
 
 /// Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
