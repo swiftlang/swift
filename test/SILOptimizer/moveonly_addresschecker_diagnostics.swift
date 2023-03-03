@@ -2147,8 +2147,8 @@ func moveOperatorTest(_ k: __owned Klass) {
     // expected-error @-2 {{'k2' consumed more than once}}
     // expected-error @-3 {{'k2' consumed more than once}}
     k2 = Klass()
-    let k3 = _move k2 // expected-note {{consuming use here}}
-    let _ = _move k2
+    let k3 = consume k2 // expected-note {{consuming use here}}
+    let _ = consume k2
     // expected-note @-1 {{consuming use here}}
     // expected-note @-2 {{consuming use here}}
     _ = k2

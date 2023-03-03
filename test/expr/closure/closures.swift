@@ -331,7 +331,6 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   let v2 : SomeClass = ptr
 
   doStuff { [weak v1] in v1!.foo() }
-  // expected-warning @+2 {{variable 'v1' was written to, but never read}}
   doStuff { [weak v1,                 // expected-note {{previous}}
              weak v1] in v1!.foo() }  // expected-error {{invalid redeclaration of 'v1'}}
   doStuff { [unowned v2] in v2.foo() }
@@ -340,7 +339,6 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   doStuff { [weak v1, weak v2] in v1!.foo() + v2!.foo() }
 
   let i = 42
-  // expected-warning @+1 {{variable 'i' was never mutated}}
   doStuff { [weak i] in i! }   // expected-error {{'weak' may only be applied to class and class-bound protocol types, not 'Int'}}
 }
 

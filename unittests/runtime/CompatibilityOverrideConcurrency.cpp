@@ -18,6 +18,12 @@
 #include "swift/Runtime/Concurrency.h"
 #include "gtest/gtest.h"
 
+#if __has_include("pthread.h")
+
+#define RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST 1
+#include <pthread.h>
+#endif // HAVE_PTHREAD_H
+
 #include <stdio.h>
 
 using namespace swift;
@@ -44,6 +50,15 @@ ExecutorRef getEmptyValue() {
     Ran = true;                                                                \
     return getEmptyValue<ret>();                                               \
   }
+#define OVERRIDE_TASK_NORETURN(name, attrs, ccAttrs, namespace, typedArgs,     \
+                               namedArgs)                                      \
+  static ccAttrs void name##Override(COMPATIBILITY_UNPAREN_WITH_COMMA(         \
+      typedArgs) Original_##name originalImpl) {                               \
+    if (!EnableOverride)                                                       \
+      originalImpl COMPATIBILITY_PAREN(namedArgs);                             \
+    Ran = true;                                                                \
+  }
+
 #include "../../stdlib/public/CompatibilityOverride/CompatibilityOverrideConcurrency.def"
 
 struct OverrideSection {
@@ -82,6 +97,16 @@ static void swift_task_enqueueMainExecutor_override(
   Ran = true;
 }
 
+#ifdef RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
+[[noreturn]] SWIFT_CC(swift)
+static void swift_task_asyncMainDrainQueue_override_fn(
+    swift_task_asyncMainDrainQueue_original original,
+    swift_task_asyncMainDrainQueue_override compatOverride) {
+  Ran = true;
+  pthread_exit(nullptr); // noreturn function
+}
+#endif
+
 class CompatibilityOverrideConcurrencyTest : public ::testing::Test {
 protected:
   virtual void SetUp() {
@@ -100,6 +125,10 @@ protected:
         swift_task_enqueueGlobalWithDelay_override;
     swift_task_enqueueMainExecutor_hook =
         swift_task_enqueueMainExecutor_override;
+#ifdef RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
+    swift_task_asyncMainDrainQueue_hook =
+        swift_task_asyncMainDrainQueue_override_fn;
+#endif
   }
 
   virtual void TearDown() {
@@ -254,5 +283,28 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_cancel_group_child_
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_escalate) {
   swift_task_escalate(nullptr, {});
 }
+
+#if RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_asyncMainDrainQueue) {
+
+  auto runner = [](void *) -> void * {
+    swift_task_asyncMainDrainQueue();
+    return nullptr;
+  };
+
+  int ret = 0;
+  pthread_t thread;
+  pthread_attr_t attrs;
+  ret = pthread_attr_init(&attrs);
+  ASSERT_EQ(ret, 0);
+  ret = pthread_create(&thread, &attrs, runner, nullptr);
+  ASSERT_EQ(ret, 0);
+  void * result = nullptr;
+  ret = pthread_join(thread, &result);
+  ASSERT_EQ(ret, 0);
+  pthread_attr_destroy(&attrs);
+  ASSERT_EQ(ret, 0);
+}
+#endif
 
 #endif

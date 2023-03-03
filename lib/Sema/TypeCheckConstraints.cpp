@@ -1295,6 +1295,10 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
     out << "tuple " << getBaseType()->getString(PO) << " index "
         << getTupleIndex();
     break;
+
+  case OverloadChoiceKind::MaterializePack:
+    out << "materialize pack from tuple " << getBaseType()->getString(PO);
+    break;
   }
 }
 
@@ -1596,6 +1600,11 @@ void ConstraintSystem::print(raw_ostream &out) const {
         out << "tuple " << choice.getBaseType()->getString(PO) << " index "
             << choice.getTupleIndex();
         break;
+
+      case OverloadChoiceKind::MaterializePack:
+        out << "materialize pack from tuple "
+            << choice.getBaseType()->getString(PO);
+        break;
       }
       out << " for ";
       elt.first->dump(&getASTContext().SourceMgr, out);
@@ -1807,9 +1816,9 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   };
 
   // Check for casts between specific concrete types that cannot succeed.
-  if (auto toElementType = ConstraintSystem::isArrayType(toType)) {
-    if (auto fromElementType = ConstraintSystem::isArrayType(fromType)) {
-      return checkElementCast(*fromElementType, *toElementType,
+  if (auto toElementType = toType->isArrayType()) {
+    if (auto fromElementType = fromType->isArrayType()) {
+      return checkElementCast(fromElementType, toElementType,
                               CheckedCastKind::ArrayDowncast);
     }
   }

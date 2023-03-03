@@ -76,6 +76,9 @@ static void printSemanticInfo();
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
                                const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                                llvm::raw_ostream &OS);
+static void printActiveRegions(sourcekitd_variant_t Info, StringRef Filename,
+                               const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
+                               llvm::raw_ostream &OS);
 static void printFoundInterface(sourcekitd_variant_t Info,
                                 llvm::raw_ostream &OS);
 static void printFoundUSR(sourcekitd_variant_t Info,
@@ -879,6 +882,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestRelatedIdents);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     break;
+      
+  case SourceKitRequest::ActiveRegions:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestActiveRegions);
+    break;
 
   case SourceKitRequest::SyntaxMap:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
@@ -1337,6 +1344,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
     case SourceKitRequest::RelatedIdents:
       printRelatedIdents(Info, SourceFile, Opts.VFSFiles, llvm::outs());
+      break;
+
+    case SourceKitRequest::ActiveRegions:
+      printActiveRegions(Info, SourceFile, Opts.VFSFiles, llvm::outs());
       break;
 
     case SourceKitRequest::CursorInfo:
@@ -2350,6 +2361,22 @@ static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
     OS << LineCol.first << ':' << LineCol.second << " - " << Length << '\n';
   }
   OS << "END RANGES\n";
+}
+
+static void printActiveRegions(sourcekitd_variant_t Info, StringRef Filename,
+                               const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
+                               llvm::raw_ostream &OS) {
+  OS << "START IF CONFIGS\n";
+  sourcekitd_variant_t Res =
+      sourcekitd_variant_dictionary_get_value(Info, KeyResults);
+  for (unsigned i=0, e = sourcekitd_variant_array_get_count(Res); i != e; ++i) {
+    sourcekitd_variant_t IfConfig = sourcekitd_variant_array_get_value(Res, i);
+    int64_t Offset = sourcekitd_variant_dictionary_get_int64(IfConfig, KeyOffset);
+    auto LineCol = resolveToLineCol(Offset, Filename, VFSFiles);
+    bool IsActive = sourcekitd_variant_dictionary_get_bool(IfConfig, KeyIsActive);
+    OS << LineCol.first << ':' << LineCol.second << " - " << (IsActive ? "active" : "inactive") << '\n';
+  }
+  OS << "END IF CONFIGS\n";
 }
 
 static void prepareDemangleRequest(sourcekitd_object_t Req,

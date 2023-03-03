@@ -69,6 +69,7 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
@@ -602,6 +603,21 @@ struct ExtendedLinearLivenessTest : UnitTest {
   }
 };
 
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+struct OSSALifetimeCompletionTest : UnitTest {
+  OSSALifetimeCompletionTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    SILValue value = arguments.takeValue();
+    llvm::dbgs() << "OSSA lifetime completion: " << value;
+    OSSALifetimeCompletion completion(getFunction(), /*domInfo*/nullptr);
+    completion.completeOSSALifetime(value);
+    getFunction()->dump();    
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // MARK: SimplifyCFG Unit Tests
 //===----------------------------------------------------------------------===//
@@ -778,6 +794,7 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("is-lexical", IsLexicalTest)
     ADD_UNIT_TEST_SUBCLASS("linear-liveness", LinearLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("multidef-liveness", MultiDefLivenessTest)
+    ADD_UNIT_TEST_SUBCLASS("ossa-lifetime-completion", OSSALifetimeCompletionTest)
     ADD_UNIT_TEST_SUBCLASS("pruned-liveness-boundary-with-list-of-last-users-insertion-points", PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
     ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
 

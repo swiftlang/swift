@@ -110,6 +110,10 @@ EnableSILOpaqueValues("enable-sil-opaque-values",
                       llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
 
 static llvm::cl::opt<bool>
+EnableOSSACompleteLifetimes("enable-ossa-complete-lifetimes",
+                      llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
+
+static llvm::cl::opt<bool>
 EnableObjCInterop("enable-objc-interop",
                   llvm::cl::desc("Enable Objective-C interoperability."));
 
@@ -659,6 +663,7 @@ int main(int argc, char **argv) {
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = EnableSILOpaqueValues;
+  SILOpts.OSSACompleteLifetimes = EnableOSSACompleteLifetimes;
 
   if (CopyPropagationState) {
     SILOpts.CopyPropagation = *CopyPropagationState;

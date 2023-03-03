@@ -3414,6 +3414,14 @@ namespace {
                                              nameLoc.getBaseNameLoc(), toType));
       }
 
+      case OverloadChoiceKind::MaterializePack: {
+        auto packType = solution.getResolvedType(expr);
+        return cs.cacheType(
+            MaterializePackExpr::create(cs.getASTContext(),
+                                        base, expr->getEndLoc(),
+                                        packType));
+      }
+
       case OverloadChoiceKind::KeyPathApplication:
         llvm_unreachable("should only happen in a subscript");
 
@@ -3787,6 +3795,10 @@ namespace {
 
     Expr *visitPackElementExpr(PackElementExpr *expr) {
       return simplifyExprType(expr);
+    }
+
+    Expr *visitMaterializePackExpr(MaterializePackExpr *expr) {
+      llvm_unreachable("MaterializePackExpr already type-checked");
     }
 
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -6453,8 +6465,8 @@ bool ExprRewriter::peepholeCollectionUpcast(Expr *expr, Type toType,
 
   // Array literals.
   if (auto arrayLiteral = dyn_cast<ArrayExpr>(expr)) {
-    if (Optional<Type> elementType = ConstraintSystem::isArrayType(toType)) {
-      peepholeArrayUpcast(arrayLiteral, toType, bridged, *elementType, locator);
+    if (Type elementType = toType->isArrayType()) {
+      peepholeArrayUpcast(arrayLiteral, toType, bridged, elementType, locator);
       return true;
     }
 
@@ -6498,8 +6510,7 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
                                  bridged, locator, 0);
 
   // For single-parameter collections, form the upcast.
-  if (ConstraintSystem::isArrayType(toType) ||
-      ConstraintSystem::isSetType(toType)) {
+  if (toType->isArrayType() || ConstraintSystem::isSetType(toType)) {
     return cs.cacheType(
               new (ctx) CollectionUpcastConversionExpr(expr, toType, {}, conv));
   }
@@ -6524,12 +6535,11 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
 
   // Bridged collection casts always succeed, so we treat them as
   // collection "upcasts".
-  if ((ConstraintSystem::isArrayType(fromType) &&
-       ConstraintSystem::isArrayType(toType)) ||
-      (ConstraintSystem::isDictionaryType(fromType) &&
-       ConstraintSystem::isDictionaryType(toType)) ||
-      (ConstraintSystem::isSetType(fromType) &&
-       ConstraintSystem::isSetType(toType))) {
+  if ((fromType->isArrayType() && toType->isArrayType())
+      || (ConstraintSystem::isDictionaryType(fromType)
+          && ConstraintSystem::isDictionaryType(toType))
+      || (ConstraintSystem::isSetType(fromType)
+          && ConstraintSystem::isSetType(toType))) {
     return buildCollectionUpcastExpr(expr, toType, /*bridged=*/true, locator);
   }
 

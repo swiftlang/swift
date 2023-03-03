@@ -640,7 +640,7 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
 
   auto foundSourceFile = *found;
   auto foundRange = sourceMgr.getRangeForBuffer(*foundSourceFile->getBufferID());
-  if (!foundRange.contains(adjustedLoc))
+  if (!foundRange.contains(adjustedLoc) && adjustedLoc != foundRange.getStart())
     return nullptr;
 
   // Update the last source file.
@@ -1887,11 +1887,14 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   if (!Imports)
     return;
 
+  bool moduleIsResilient = getParentModule()->getResilienceStrategy() ==
+                             ResilienceStrategy::Resilient;
   for (auto desc : *Imports) {
     ModuleDecl::ImportFilter requiredFilter;
     if (desc.options.contains(ImportFlags::Exported))
       requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
-    else if (desc.options.contains(ImportFlags::ImplementationOnly))
+    else if (desc.options.contains(ImportFlags::ImplementationOnly) ||
+             (desc.accessLevel <= AccessLevel::Package && moduleIsResilient))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
     else if (desc.options.contains(ImportFlags::SPIOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
@@ -2939,6 +2942,29 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   }
 
   return importKind;
+}
+
+ImportAccessLevel
+SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
+  assert(Imports.hasValue());
+
+  // Leave it to the caller to avoid calling this service for a self import.
+  // We want to return AccessLevel::Public, but there's no import site to return.
+  assert(targetModule != getParentModule() &&
+         "getImportAccessLevel doesn't support checking for a self-import");
+
+  auto &imports = getASTContext().getImportCache();
+  ImportAccessLevel restrictiveImport = None;
+
+  for (auto &import : *Imports) {
+    if ((!restrictiveImport.has_value() ||
+         import.accessLevel > restrictiveImport->accessLevel) &&
+        imports.isImportedBy(targetModule, import.module.importedModule)) {
+      restrictiveImport = import;
+    }
+  }
+
+  return restrictiveImport;
 }
 
 bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {

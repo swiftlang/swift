@@ -334,6 +334,10 @@ public:
 
 class AvailabilityInference {
 public:
+  /// Returns the decl that should be considered the parent decl of the given
+  /// decl when looking for inherited availability annotations.
+  static const Decl *parentDeclForInferredAvailability(const Decl *D);
+
   /// Infers the common availability required to access an array of
   /// declarations and adds attributes reflecting that availability
   /// to ToDecl.

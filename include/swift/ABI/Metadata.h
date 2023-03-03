@@ -1929,7 +1929,13 @@ struct TargetExtendedExistentialTypeShape
       GenericParamDescriptor,
       // Requirements for requirement signature, followed by requirements
       // for generalization signature
-      TargetGenericRequirementDescriptor<Runtime>> {
+      TargetGenericRequirementDescriptor<Runtime>,
+      // Optional header describing any type packs in the generalization
+      // signature.
+      GenericPackShapeHeader,
+      // For each type pack in the generalization signature, a descriptor
+      // storing the shape class.
+      GenericPackShapeDescriptor> {
 private:
   using RelativeValueWitnessTablePointer =
     TargetRelativeIndirectablePointer<Runtime,
@@ -1942,7 +1948,9 @@ private:
       TargetExistentialTypeExpression<Runtime>,
       RelativeValueWitnessTablePointer,
       GenericParamDescriptor,
-      TargetGenericRequirementDescriptor<Runtime>>;
+      TargetGenericRequirementDescriptor<Runtime>,
+      GenericPackShapeHeader,
+      GenericPackShapeDescriptor>;
   friend TrailingObjects;
 
   template<typename T>
@@ -1965,8 +1973,19 @@ private:
          + (Flags.hasImplicitGenSigParams() ? 0 : getNumGenSigParams());
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+  size_t numTrailingObjects(OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
     return getNumGenSigRequirements() + getNumReqSigRequirements();
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeHeader>) const {
+    return (Flags.hasTypePacks() ? 1 : 0);
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeDescriptor>) const {
+    if (!Flags.hasTypePacks())
+      return 0;
+
+    return getGenSigPackShapeHeader().NumTypePacks;
   }
 
   const TargetGenericContextDescriptorHeader<Runtime> *
@@ -2013,7 +2032,8 @@ public:
   TargetGenericContextDescriptorHeader<Runtime> ReqSigHeader;
 
   RuntimeGenericSignature<Runtime> getRequirementSignature() const {
-    return {ReqSigHeader, getReqSigParams(), getReqSigRequirements()};
+    return {ReqSigHeader, getReqSigParams(), getReqSigRequirements(),
+            {0, 0}, nullptr};
   }
 
   unsigned getNumReqSigParams() const {
@@ -2092,7 +2112,8 @@ public:
 
   RuntimeGenericSignature<Runtime> getGeneralizationSignature() const {
     if (!hasGeneralizationSignature()) return RuntimeGenericSignature<Runtime>();
-    return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements()};
+    return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements(),
+            getGenSigPackShapeHeader(), getGenSigPackShapeDescriptors()};
   }
 
   unsigned getNumGenSigParams() const {
@@ -2119,6 +2140,20 @@ public:
   getGenSigRequirements() const {
     assert(hasGeneralizationSignature());
     return getReqSigRequirements() + ReqSigHeader.NumRequirements;
+  }
+
+  GenericPackShapeHeader getGenSigPackShapeHeader() const {
+    assert(hasGeneralizationSignature());
+    if (!Flags.hasTypePacks())
+      return {0, 0};
+    return *this->template getTrailingObjects<GenericPackShapeHeader>();
+  }
+
+  const GenericPackShapeDescriptor *getGenSigPackShapeDescriptors() const {
+    assert(hasGeneralizationSignature());
+    if (!Flags.hasTypePacks())
+      return nullptr;
+    return this->template getTrailingObjects<GenericPackShapeDescriptor>();
   }
 
   /// Return the amount of space used in ExtendedExistentialTypeMetadata
@@ -4862,6 +4897,62 @@ public:
             numEntries};
   }
 };
+
+enum class PackLifetime : uint8_t {
+  OnStack = 0,
+  OnHeap = 1
+};
+
+/// A pointer to a metadata or witness table pack. If the LSB is set,
+/// the pack is allocated on the heap; otherwise, it is allocated on
+/// the stack.
+template<typename Runtime, template <typename> class Pointee>
+class TargetPackPointer {
+  typename Runtime::StoredSize Ptr;
+
+  using PointerType = typename Runtime::template Pointer<const Pointee<Runtime>>;
+
+public:
+  explicit TargetPackPointer(typename Runtime::StoredSize rawPtr) : Ptr(rawPtr) {}
+
+  explicit TargetPackPointer(const void *rawPtr)
+    : Ptr(reinterpret_cast<typename Runtime::StoredSize>(rawPtr)) {}
+
+  explicit TargetPackPointer(PointerType const *ptr, PackLifetime lifetime)
+    : Ptr(reinterpret_cast<typename Runtime::StoredSize>(ptr) |
+          (lifetime == PackLifetime::OnHeap ? 1 : 0)) {}
+
+  // Strips off the LSB.
+  const PointerType *getElements() const {
+    return reinterpret_cast<const PointerType *>(Ptr & ~1);
+  }
+
+  // Strips off the LSB.
+  PointerType *getElements() {
+    return reinterpret_cast<PointerType *>(Ptr & ~1);
+  }
+
+  // Leaves the LSB.
+  const PointerType *getPointer() const {
+    return reinterpret_cast<const PointerType *>(Ptr);
+  }
+
+  PackLifetime getLifetime() const {
+    return (bool)(Ptr & 1) ? PackLifetime::OnHeap : PackLifetime::OnStack;
+  }
+};
+
+/// A pointer to a metadata pack.
+template<typename Runtime>
+using TargetMetadataPackPointer = TargetPackPointer<Runtime, TargetMetadata>;
+
+using MetadataPackPointer = TargetMetadataPackPointer<InProcess>;
+
+/// A pointer to a witness table pack.
+template<typename Runtime>
+using TargetWitnessTablePackPointer = TargetPackPointer<Runtime, TargetWitnessTable>;
+
+using WitnessTablePackPointer = TargetWitnessTablePackPointer<InProcess>;
 
 } // end namespace swift
 

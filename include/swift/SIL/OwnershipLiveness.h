@@ -241,6 +241,11 @@ public:
   void compute(const DominanceInfo *domInfo,
                InnerScopeHandlerRef handleInnerScope = InnerScopeHandlerRef());
 
+  /// Compute the boundary from the blocks discovered during liveness analysis.
+  void computeBoundary(PrunedLivenessBoundary &boundary) const {
+    liveness.computeBoundary(boundary);
+  }
+
   AddressUseKind getAddressUseKind() const { return addressUseKind; }
 
   ArrayRef<SILValue> getUnenclosedPhis() const { return unenclosedPhis; }

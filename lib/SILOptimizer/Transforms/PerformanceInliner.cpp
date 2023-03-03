@@ -63,6 +63,12 @@ llvm::cl::opt<bool> SILPrintInliningCallerAfter(
     llvm::cl::desc(
         "Print functions into which another function has been inlined."));
 
+llvm::cl::opt<bool> EnableVerifyAfterEachInlining(
+    "sil-inline-verify-after-each-inline", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Run sil verification after inlining each found callee apply "
+        "site into a caller."));
+
 //===----------------------------------------------------------------------===//
 //                           Printing Helpers
 //===----------------------------------------------------------------------===//
@@ -1034,9 +1040,29 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // will assert, so we are safe making this assumption.
     SILInliner::inlineFullApply(AI, SILInliner::InlineKind::PerformanceInline,
                                 FuncBuilder, deleter);
+    // When inlining an OSSA function into a non-OSSA function, ownership of
+    // nonescaping closures is lowered.  At that point, they are recognized as
+    // stack users.  Since they weren't recognized as such before, they may not
+    // satisfy stack discipline.  Fix that up now.
+    invalidatedStackNesting |=
+        Callee->hasOwnership() && !Caller->hasOwnership();
     ++NumFunctionsInlined;
     if (SILPrintInliningCallerAfter) {
       printInliningDetailsCallerAfter(PassName, Caller, Callee);
+    }
+    if (EnableVerifyAfterEachInlining) {
+      deleter.cleanupDeadInstructions();
+
+      // The inliner splits blocks at call sites. Re-merge trivial branches to
+      // reestablish a canonical CFG.
+      mergeBasicBlocks(Caller);
+
+      if (invalidatedStackNesting) {
+        StackNesting::fixNesting(Caller);
+        invalidatedStackNesting = false;
+      }
+
+      Caller->verify();
     }
   }
   deleter.cleanupDeadInstructions();

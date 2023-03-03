@@ -964,8 +964,8 @@ ERROR(no_default_arg_closure,none,
 ERROR(no_default_arg_curried,none,
       "default arguments are not allowed in curried parameter lists", ())
 ERROR(var_pattern_in_var,none,
-      "'%select{var|let}0' cannot appear nested inside another 'var' or "
-      "'let' pattern", (unsigned))
+      "'%select{let|inout|var}0' cannot appear nested inside another 'var', "
+      "'let', or 'inout' pattern", (unsigned))
 ERROR(extra_var_in_multiple_pattern_list,none,
       "%0 must be bound in every pattern", (Identifier))
 ERROR(let_pattern_in_immutable_context,none,
@@ -1360,9 +1360,12 @@ ERROR(expected_expr_after_try, none,
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
 ERROR(expected_expr_after_move, none,
-      "expected expression after '_move'", ())
+      "expected expression after 'consume'", ())
 ERROR(expected_expr_after_borrow, none,
       "expected expression after '_borrow'", ())
+
+WARNING(move_consume_final_spelling, none,
+        "'_move' has been renamed to 'consume', and the '_move' spelling will be removed shortly", ())
 
 // Cast expressions
 ERROR(expected_type_after_is,none,

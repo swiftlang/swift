@@ -1676,7 +1676,10 @@ bool Parser::canParseOldStyleProtocolComposition() {
 
 bool Parser::canParseTypeTupleBody() {
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
-      Tok.isNotEllipsis() && !isStartOfSwiftDecl()) {
+      Tok.isNotEllipsis() &&
+      // In types, we do not allow for an inout binding to be declared in a
+      // tuple type.
+      (Tok.is(tok::kw_inout) || !isStartOfSwiftDecl())) {
     do {
       // The contextual inout marker is part of argument lists.
       consumeIf(tok::kw_inout);

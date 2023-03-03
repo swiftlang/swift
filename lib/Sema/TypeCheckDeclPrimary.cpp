@@ -438,7 +438,7 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
 }
 
 template<typename T>
-static void diagnoseDuplicateDecls(const T &decls) {
+static void diagnoseDuplicateDecls(T &&decls) {
   llvm::SmallDenseMap<DeclBaseName, const ValueDecl *> names;
   for (auto *current : decls) {
     if (!current->hasName() || current->isImplicit())
@@ -453,6 +453,14 @@ static void diagnoseDuplicateDecls(const T &decls) {
                           current->getName()), [&]() {
         other->diagnose(diag::invalid_redecl_prev, other->getName());
       });
+
+      // Mark the decl as invalid, unless it's a GenericTypeParamDecl, which is
+      // expected to maintain its type of GenericTypeParamType.
+      // This is needed to avoid emitting a duplicate diagnostic when running
+      // redeclaration checking in the case where the VarDecl is part of the
+      // enclosing context, e.g `let (x, x) = (0, 0)`.
+      if (!isa<GenericTypeParamDecl>(current))
+        current->setInvalid();
     }
   }
 }

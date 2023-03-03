@@ -1037,6 +1037,17 @@ public struct EquatableMacro: ConformanceMacro {
   }
 }
 
+public struct HashableMacro: ConformanceMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingConformancesOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
+    let protocolName: TypeSyntax = "Hashable"
+    return [(protocolName, nil)]
+  }
+}
+
 public struct DelegatedConformanceMacro: ConformanceMacro, MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,

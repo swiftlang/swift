@@ -194,8 +194,8 @@ for (var x) in 0...100 {} // expected-warning{{variable 'x' was never used; cons
 for var x in 0...100 {}  // rdar://20167543 expected-warning{{variable 'x' was never used; consider replacing with '_' or removing it}}
 for (let x) in 0...100 { _ = x} // expected-error {{'let' pattern cannot appear nested in an already immutable context}}
 
-var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
-let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
+var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var', 'let', or 'inout' pattern}}
+let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 'var', 'let', or 'inout' pattern}}
 
 
 // Crash when re-typechecking EnumElementPattern.

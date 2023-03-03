@@ -13,18 +13,31 @@
 @attached(conformance)
 macro Equatable() = #externalMacro(module: "MacroDefinition", type: "EquatableMacro")
 
+@attached(conformance)
+macro Hashable() = #externalMacro(module: "MacroDefinition", type: "HashableMacro")
+
 func requireEquatable(_ value: some Equatable) {
   print(value == value)
 }
 
+func requireHashable(_ value: some Hashable) {
+  print(value.hashValue)
+}
+
 @Equatable
 struct S {}
+
+@Hashable
+struct S2 {}
 
 // CHECK-DUMP: @__swiftmacro_25macro_expand_conformances1SV9EquatablefMc_.swift
 // CHECK-DUMP: extension S : Equatable  {}
 
 // CHECK: true
 requireEquatable(S())
+
+requireEquatable(S2())
+requireHashable(S2())
 
 @attached(conformance)
 @attached(member)

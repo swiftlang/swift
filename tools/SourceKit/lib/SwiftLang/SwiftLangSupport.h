@@ -673,6 +673,12 @@ public:
       std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver)
       override;
 
+  void findActiveRegionsInFile(
+      StringRef Filename, ArrayRef<const char *> Args,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<ActiveRegionsInfo> &)> Receiver)
+      override;
+
   void syntacticRename(llvm::MemoryBuffer *InputBuf,
                        ArrayRef<RenameLocations> RenameLocations,
                        ArrayRef<const char*> Args,

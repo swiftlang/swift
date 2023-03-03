@@ -477,8 +477,12 @@ unsigned Decl::getAttachedMacroDiscriminator(
 }
 
 const Decl *Decl::getInnermostDeclWithAvailability() const {
-  if (auto attrAndDecl = getSemanticAvailableRangeAttr())
-    return attrAndDecl.value().second;
+  if (getAttrs().hasAttribute<AvailableAttr>())
+    return this;
+
+  if (auto parent =
+          AvailabilityInference::parentDeclForInferredAvailability(this))
+    return parent->getInnermostDeclWithAvailability();
 
   return nullptr;
 }
@@ -547,7 +551,9 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   switch (SAK) {
   case SelfAccessKind::NonMutating: return OS << "'nonmutating'";
   case SelfAccessKind::Mutating: return OS << "'mutating'";
-  case SelfAccessKind::Consuming: return OS << "'__consuming'";
+  case SelfAccessKind::LegacyConsuming: return OS << "'__consuming'";
+  case SelfAccessKind::Consuming: return OS << "'consuming'";
+  case SelfAccessKind::Borrowing: return OS << "'borrowing'";
   }
   llvm_unreachable("Unknown SelfAccessKind");
 }

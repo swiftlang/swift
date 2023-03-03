@@ -702,6 +702,10 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILFunction &F;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
+
+  bool SingleFunction = true;
+  bool checkLinearLifetime = false;
+
   SmallVector<std::pair<StringRef, SILType>, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
@@ -709,10 +713,10 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
 
   // Used for dominance checking within a basic block.
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
-  
-  DeadEndBlocks DEBlocks;
+
+  std::unique_ptr<DeadEndBlocks> DEBlocks;
+
   LoadBorrowImmutabilityAnalysis loadBorrowImmutabilityAnalysis;
-  bool SingleFunction = true;
 
   /// A cache of the isOperandInValueUse check. When we process an operand, we
   /// fix this for each of its uses.
@@ -968,13 +972,13 @@ public:
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
+        SingleFunction(SingleFunction),
         Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)), DEBlocks(&F),
-        loadBorrowImmutabilityAnalysis(DEBlocks, &F),
-        SingleFunction(SingleFunction) {
+        InstNumbers(numInstsInFunction(F)),
+        loadBorrowImmutabilityAnalysis(DEBlocks.get(), &F) {
     if (F.isExternalDeclaration())
       return;
-      
+
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
     unsigned InstIdx = 0;
@@ -1067,7 +1071,9 @@ public:
   void visitSILArgument(SILArgument *arg) {
     CurArgument = arg;
     checkLegalType(arg->getFunction(), arg, nullptr);
-    checkValueBaseOwnership(arg);
+    if (checkLinearLifetime) {
+      checkValueBaseOwnership(arg);
+    }
     if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
       if (phiArg->isPhi())
         visitSILPhiArgument(phiArg);
@@ -1107,7 +1113,9 @@ public:
 
     for (auto result : I->getResults()) {
       checkLegalType(F, result, I);
-      checkValueBaseOwnership(result);
+      if (checkLinearLifetime) {
+        checkValueBaseOwnership(result);
+      }
     }
   }
 
@@ -1125,7 +1133,7 @@ public:
               "Once ownership is gone, all values should have none ownership");
       return;
     }
-    SILValue(V).verifyOwnership(&DEBlocks);
+    SILValue(V).verifyOwnership(DEBlocks.get());
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -2551,11 +2559,11 @@ public:
     bool success = useKind == AddressUseKind::NonEscaping;
 
     require(!success || checkScopedAddressUses(
-                            scopedAddress, &scopedAddressLiveness, &DEBlocks),
+              scopedAddress, &scopedAddressLiveness, DEBlocks.get()),
             "Ill formed store_borrow scope");
 
     require(!success || !hasOtherStoreBorrowsInLifetime(
-                            SI, &scopedAddressLiveness, &DEBlocks),
+              SI, &scopedAddressLiveness, DEBlocks.get()),
             "A store_borrow cannot be nested within another "
             "store_borrow to its destination");
 
@@ -6408,7 +6416,10 @@ public:
     }
   }
 
-  void verify() {
+  void verify(bool isCompleteOSSA, bool checkLinearLifetimes) {
+    if (!isCompleteOSSA || !F.getModule().getOptions().OSSACompleteLifetimes) {
+      DEBlocks = std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&F));
+    }
     visitSILFunction(const_cast<SILFunction*>(&F));
   }
 };
@@ -6441,14 +6452,15 @@ static bool verificationEnabled(const SILModule &M) {
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify(bool SingleFunction) const {
+void SILFunction::verify(bool SingleFunction, bool isCompleteOSSA,
+                         bool checkLinearLifetime) const {
   if (!verificationEnabled(getModule()))
     return;
 
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier(*this, SingleFunction).verify();
+  SILVerifier(*this, SingleFunction).verify(isCompleteOSSA, checkLinearLifetime);
 }
 
 void SILFunction::verifyCriticalEdges() const {
@@ -6717,7 +6729,7 @@ void SILGlobalVariable::verify() const {
 }
 
 /// Verify the module.
-void SILModule::verify() const {
+void SILModule::verify(bool isCompleteOSSA, bool checkLinearLifetime) const {
   if (!verificationEnabled(*this))
     return;
 
@@ -6732,7 +6744,7 @@ void SILModule::verify() const {
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(/*singleFunction*/ false);
+    f.verify(/*singleFunction*/ false, isCompleteOSSA, checkLinearLifetime);
   }
 
   // Check all globals.

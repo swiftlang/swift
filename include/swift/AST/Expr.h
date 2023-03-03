@@ -3650,6 +3650,47 @@ public:
   }
 };
 
+/// An expression to materialize a pack from a tuple containing a pack
+/// expansion, spelled \c tuple.element.
+///
+/// These nodes are created by CSApply and should only appear in a
+/// type-checked AST in the context of a \c PackExpansionExpr .
+class MaterializePackExpr final : public Expr {
+  /// The expression from which to materialize a pack.
+  Expr *FromExpr;
+
+  /// The source location of \c .element
+  SourceLoc ElementLoc;
+
+  MaterializePackExpr(Expr *fromExpr, SourceLoc elementLoc,
+                      Type type, bool implicit)
+      : Expr(ExprKind::MaterializePack, implicit, type),
+        FromExpr(fromExpr), ElementLoc(elementLoc) {}
+
+public:
+  static MaterializePackExpr *create(ASTContext &ctx, Expr *fromExpr,
+                                     SourceLoc elementLoc, Type type,
+                                     bool implicit = false);
+
+  Expr *getFromExpr() const { return FromExpr; }
+
+  void setFromExpr(Expr *fromExpr) {
+    FromExpr = fromExpr;
+  }
+
+  SourceLoc getStartLoc() const {
+    return FromExpr->getStartLoc();
+  }
+
+  SourceLoc getEndLoc() const {
+    return ElementLoc;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MaterializePack;
+  }
+};
+
 /// SequenceExpr - A list of binary operations which has not yet been
 /// folded into a tree.  The operands all have even indices, while the
 /// subexpressions with odd indices are all (potentially overloaded)

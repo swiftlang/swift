@@ -5983,6 +5983,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::SIMD:
   case KnownProtocolKind::SIMDScalar:
   case KnownProtocolKind::BinaryInteger:
+  case KnownProtocolKind::FixedWidthInteger:
   case KnownProtocolKind::ObjectiveCBridgeable:
   case KnownProtocolKind::DestructorSafeContainer:
   case KnownProtocolKind::SwiftNewtypeWrapper:
@@ -6126,6 +6127,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
   assert(sig);
   GenericRequirementsMetadata metadata;
   for (auto &requirement : requirements) {
+    bool isPackRequirement = requirement.getFirstType()->isParameterPack();
+
     switch (auto kind = requirement.getKind()) {
     case RequirementKind::SameShape:
       llvm_unreachable("Same-shape requirement not supported here");
@@ -6139,7 +6142,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
         // Encode the class constraint.
         auto flags = GenericRequirementFlags(GenericRequirementKind::Layout,
                                              /*key argument*/ false,
-                                             /*extra argument*/ false);
+                                             /*extra argument*/ false,
+                                             isPackRequirement);
         addGenericRequirement(IGM, B, metadata, sig, flags,
                               requirement.getFirstType(),
          [&]{ B.addInt32((uint32_t)GenericRequirementLayoutKind::Class); });
@@ -6165,7 +6169,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
       auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
                                            /*key argument*/needsWitnessTable,
-                                           /*extra argument*/false);
+                                           /*extra argument*/false,
+                                           isPackRequirement);
       auto descriptorRef =
         IGM.getConstantReferenceForProtocolDescriptor(protocol);
       addGenericRequirement(IGM, B, metadata, sig, flags,
@@ -6189,7 +6194,10 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
         ? GenericRequirementKind::SameType
         : GenericRequirementKind::BaseClass;
 
-      auto flags = GenericRequirementFlags(abiKind, false, false);
+      auto flags = GenericRequirementFlags(abiKind,
+                                           /*key argument*/false,
+                                           /*extra argument*/false,
+                                           isPackRequirement);
       auto typeName =
           IGM.getTypeRef(requirement.getSecondType(), nullptr,
                          MangledTypeRefRole::Metadata).first;

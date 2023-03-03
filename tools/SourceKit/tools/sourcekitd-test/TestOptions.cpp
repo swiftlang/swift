@@ -120,6 +120,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("conformingmethods", SourceKitRequest::ConformingMethodList)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
+        .Case("active-regions", SourceKitRequest::ActiveRegions)
         .Case("syntax-map", SourceKitRequest::SyntaxMap)
         .Case("structure", SourceKitRequest::Structure)
         .Case("format", SourceKitRequest::Format)

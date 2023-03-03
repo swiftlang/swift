@@ -415,8 +415,10 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
 
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
-    auto result =
-        BindingPattern::createImplicit(getContext(), isLet, subPattern);
+    auto result = BindingPattern::createImplicit(
+        getContext(),
+        isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
+        subPattern);
     if (Type interfaceType = subPattern->getDelayedInterfaceType())
       result->setDelayedInterfaceType(interfaceType, owningDC);
     else
@@ -2508,8 +2510,12 @@ getActualSelfAccessKind(uint8_t raw) {
     return swift::SelfAccessKind::NonMutating;
   case serialization::SelfAccessKind::Mutating:
     return swift::SelfAccessKind::Mutating;
+  case serialization::SelfAccessKind::LegacyConsuming:
+    return swift::SelfAccessKind::LegacyConsuming;
   case serialization::SelfAccessKind::Consuming:
     return swift::SelfAccessKind::Consuming;
+  case serialization::SelfAccessKind::Borrowing:
+    return swift::SelfAccessKind::Borrowing;
   }
   return None;
 }
@@ -2541,6 +2547,7 @@ getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
     return swift::VarDecl::Introducer::ID;
   CASE(Let)
   CASE(Var)
+  CASE(InOut)
   }
 #undef CASE
   return None;
