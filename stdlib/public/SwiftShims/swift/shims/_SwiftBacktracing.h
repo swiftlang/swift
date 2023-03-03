@@ -29,10 +29,19 @@
 
 #include <CoreFoundation/CFUUID.h>
 #include <CoreFoundation/CFString.h>
+
+#if __has_include(<libproc.h>)
+#include <libproc.h>
+#else
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern int proc_name(int pid, void * buffer, uint32_t buffersize);
+#ifdef __cplusplus
+}
+#endif
 #endif
 
-#if TARGET_OS_OSX
-#include <libproc.h>
 #endif
 
 #ifdef __cplusplus
