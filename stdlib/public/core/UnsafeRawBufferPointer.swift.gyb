@@ -350,7 +350,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     let word7f = UInt64(0x7f7f_7f7f_7f7f_7f7f)
 
     while true {
-      let index = i &- stride + 1
+      let index = i &- stride &+ 1
       guard index >= startIndex else { break }
       let word = ptr.load(fromByteOffset: index, as: UInt64.self)
       let input = word ^ mask
