@@ -17,14 +17,6 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_implementationOnly import Darwin
-#elseif os(Windows)
-@_implementationOnly import CRT
-#elseif os(Linux)
-@_implementationOnly import Glibc
-#endif
-
 @_implementationOnly import _SwiftBacktracingShims
 
 /// A backtrace formatting theme.
@@ -621,9 +613,11 @@ public struct BacktraceFormatter {
   /// with the point at which the program crashed highlighted.
   private func formattedSourceLines(from sourceLocation: SymbolicatedBacktrace.SourceLocation,
                                     indent theIndent: Int = 2) -> String? {
-    guard let fp = fopen(sourceLocation.path, "rt") else { return nil }
+    guard let fp = _swift_backtrace_fopen(sourceLocation.path, "rt") else {
+      return nil
+    }
     defer {
-      fclose(fp)
+      _swift_backtrace_fclose(fp)
     }
 
     let indent = String(repeating: " ", count: theIndent)
@@ -690,8 +684,8 @@ public struct BacktraceFormatter {
       }
     }
 
-    while feof(fp) == 0 && ferror(fp) == 0 {
-      guard let result = fgets(buffer.baseAddress,
+    while _swift_backtrace_feof(fp) == 0 && _swift_backtrace_ferror(fp) == 0 {
+      guard let result = _swift_backtrace_fgets(buffer.baseAddress,
                                CInt(buffer.count), fp) else {
         break
       }

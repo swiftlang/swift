@@ -5,6 +5,7 @@
 // RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Overflow || true) | %FileCheck %s --check-prefix FRIENDLY
 
 // REQUIRES: executable_test
+// REQUIRES: backtracing
 // REQUIRES: OS=macosx
 var x: UInt = 0
 

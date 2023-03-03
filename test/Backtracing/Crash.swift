@@ -14,6 +14,7 @@
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOptNoDebug || true) | %FileCheck %s --check-prefix OPTNODEBUG
 
 // REQUIRES: executable_test
+// REQUIRES: backtracing
 // REQUIRES: OS=macosx
 
 func level1() {

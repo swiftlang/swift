@@ -205,6 +205,7 @@ normalize_boolean_spelling(SWIFT_STDLIB_STATIC_PRINT)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
 normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
+normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
@@ -388,6 +389,10 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
           list(APPEND LIT_ARGS "--param" "string_processing")
+        endif()
+
+        if(SWIFT_ENABLE_BACKTRACING)
+          list(APPEND LIT_ARGS "--param" "backtracing")
         endif()
 
         if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)

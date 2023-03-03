@@ -1,6 +1,7 @@
 set(sources
   AssertionReporting.h
   CoreFoundationShims.h
+  CrashInfo.h
   FoundationShims.h
   GlobalObjects.h
   HeapObject.h

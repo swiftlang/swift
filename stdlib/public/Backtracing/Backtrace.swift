@@ -18,7 +18,6 @@ import Swift
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 
-@_implementationOnly import Darwin.Mach
 @_implementationOnly import _SwiftBacktracingShims
 
 #endif
@@ -327,20 +326,20 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// @returns A list of `Image`s.
   public static func captureImages() -> [Image] {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    return captureImages(for: mach_task_self_)
+    return captureImages(for: _swift_backtrace_task_self())
     #else
     return []
     #endif
   }
 
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  private static func withDyldProcessInfo<T>(for task: task_t,
+  private static func withDyldProcessInfo<T>(for task: __swift_task_t,
                                              fn: (OpaquePointer?) throws -> T)
     rethrows -> T {
-    var kret: kern_return_t = KERN_SUCCESS
+    var kret = __swift_kern_return_t(_SWIFT_KERN_SUCCESS)
     let dyldInfo = _dyld_process_info_create(task, 0, &kret)
 
-    if kret != KERN_SUCCESS {
+    if kret != _SWIFT_KERN_SUCCESS {
       fatalError("error: cannot create dyld process info")
     }
 
@@ -357,7 +356,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     var images: [Image] = []
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    let task = process as! task_t
+    let task = process as! __swift_task_t
 
     withDyldProcessInfo(for: task) { dyldInfo in
       _dyld_process_info_for_each_image(dyldInfo) {
@@ -366,7 +365,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
         if let path = path, let uuid = uuid {
           let pathString = String(cString: path)
           let theUUID = Array(UnsafeBufferPointer(start: uuid,
-                                                count: MemoryLayout<uuid_t>.size))
+                                                  count: MemoryLayout<__swift_uuid_t>.size))
           let name: String
           if let slashIndex = pathString.lastIndex(of: "/") {
             name = String(pathString.suffix(from:
@@ -404,7 +403,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// @returns A `SharedCacheInfo`.
   public static func captureSharedCacheInfo() -> SharedCacheInfo? {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    return captureSharedCacheInfo(for: mach_task_self_)
+    return captureSharedCacheInfo(for: _swift_backtrace_task_self())
     #else
     return nil
     #endif
@@ -413,13 +412,13 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   @_spi(Internal)
   public static func captureSharedCacheInfo(for t: Any) -> SharedCacheInfo? {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    let task = t as! task_t
+    let task = t as! __swift_task_t
     return withDyldProcessInfo(for: task) { dyldInfo in
       var cacheInfo = dyld_process_cache_info()
       _dyld_process_info_get_cache(dyldInfo, &cacheInfo)
       let theUUID = withUnsafePointer(to: cacheInfo.cacheUUID) {
         Array(UnsafeRawBufferPointer(start: $0,
-                                     count: MemoryLayout<uuid_t>.size))
+                                     count: MemoryLayout<__swift_uuid_t>.size))
       }
       return SharedCacheInfo(uuid: theUUID,
                              baseAddress: Address(cacheInfo.cacheBaseAddress),

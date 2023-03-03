@@ -6,6 +6,7 @@
 // RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/StackOverflow || true) | %FileCheck %s --check-prefix FRIENDLY
 
 // REQUIRES: executable_test
+// REQUIRES: backtracing
 // REQUIRES: OS=macosx
 
 func recurse(_ level: Int) {

@@ -4,6 +4,8 @@
 // Windows chokes on the parens in the above expression
 // UNSUPPORTED: OS=windows-msvc
 
+// REQUIRES: backtracing
+
 let backtrace = try! Backtrace.capture()
 
 // CHECK: error: cannot find 'Backtrace' in scope

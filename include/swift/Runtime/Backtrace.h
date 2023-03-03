@@ -20,7 +20,7 @@
 #include "swift/Runtime/Config.h"
 
 #include "swift/shims/Visibility.h"
-#include "swift/shims/_SwiftBacktracing.h"
+#include "swift/shims/CrashInfo.h"
 
 #include <inttypes.h>
 

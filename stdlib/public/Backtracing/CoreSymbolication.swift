@@ -19,24 +19,29 @@
 
 import Swift
 
-@_implementationOnly import Darwin
-@_implementationOnly import CoreFoundation
-
 @_implementationOnly import _SwiftBacktracingShims
 
 // .. Dynamic binding ..........................................................
 
+private let coreFoundationPath =
+  "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
+
+private let coreFoundationHandle =
+  _swift_backtrace_dlopen_lazy(coreFoundationPath)!
+
 private let coreSymbolicationPath =
   "/System/Library/PrivateFrameworks/CoreSymbolication.framework/CoreSymbolication"
-private let coreSymbolicationHandle = dlopen(coreSymbolicationPath, RTLD_LAZY)!
+private let coreSymbolicationHandle =
+  _swift_backtrace_dlopen_lazy(coreSymbolicationPath)!
 
 private let crashReporterSupportPath =
   "/System/Library/PrivateFrameworks/CrashReporterSupport.framework/CrashReporterSupport"
 
-private let crashReporterSupportHandle = dlopen(crashReporterSupportPath, RTLD_LAZY)!
+private let crashReporterSupportHandle
+  = _swift_backtrace_dlopen_lazy(crashReporterSupportPath)!
 
 private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
-  guard let result = dlsym(handle, name) else {
+  guard let result = _swift_backtrace_dlsym(handle, name) else {
     fatalError("Unable to look up \(name) in CoreSymbolication")
   }
   return unsafeBitCast(result, to: T.self)
@@ -44,7 +49,7 @@ private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
 
 private enum Sym {
   // CRCopySanitizedPath
-  static let CRCopySanitizedPath: @convention(c) (CFString, CFIndex) -> CFString =
+  static let CRCopySanitizedPath: @convention(c) (CFStringRef, CFIndex) -> CFStringRef =
     symbol(crashReporterSupportHandle, "CRCopySanitizedPath")
 
   // Base functionality
@@ -64,7 +69,7 @@ private enum Sym {
     symbol(coreSymbolicationHandle, "CSSymbolicatorCreateWithBinaryImageList")
 
   static let CSSymbolicatorGetSymbolOwnerWithAddressAtTime:
-    @convention(c) (CSSymbolicatorRef, mach_vm_address_t,
+    @convention(c) (CSSymbolicatorRef, __swift_vm_address_t,
                     CSMachineTime) -> CSSymbolOwnerRef =
     symbol(coreSymbolicationHandle, "CSSymbolicatorGetSymbolOwnerWithAddressAtTime")
   static let CSSymbolicatorForeachSymbolOwnerAtTime:
@@ -76,16 +81,16 @@ private enum Sym {
     @convention(c) (CSSymbolOwnerRef) -> UnsafePointer<CChar>? =
     symbol(coreSymbolicationHandle, "CSSymbolOwnerGetName")
   static let CSSymbolOwnerGetSymbolWithAddress:
-    @convention(c) (CSSymbolOwnerRef, mach_vm_address_t) -> CSSymbolRef =
+    @convention(c) (CSSymbolOwnerRef, __swift_vm_address_t) -> CSSymbolRef =
     symbol(coreSymbolicationHandle, "CSSymbolOwnerGetSymbolWithAddress")
   static let CSSymbolOwnerGetSourceInfoWithAddress:
-    @convention(c) (CSSymbolOwnerRef, mach_vm_address_t) -> CSSourceInfoRef =
+    @convention(c) (CSSymbolOwnerRef, __swift_vm_address_t) -> CSSourceInfoRef =
     symbol(coreSymbolicationHandle, "CSSymbolOwnerGetSourceInfoWithAddress")
   static let CSSymbolOwnerForEachStackFrameAtAddress:
-    @convention(c) (CSSymbolOwnerRef, mach_vm_address_t, CSStackFrameIterator) -> UInt =
+    @convention(c) (CSSymbolOwnerRef, __swift_vm_address_t, CSStackFrameIterator) -> UInt =
     symbol(coreSymbolicationHandle, "CSSymbolOwnerForEachStackFrameAtAddress")
   static let CSSymbolOwnerGetBaseAddress:
-    @convention(c) (CSSymbolOwnerRef) -> mach_vm_address_t =
+    @convention(c) (CSSymbolOwnerRef) -> __swift_vm_address_t =
     symbol(coreSymbolicationHandle, "CSSymbolOwnerGetBaseAddress")
 
   // CSSymbol
@@ -109,6 +114,79 @@ private enum Sym {
   static let CSSourceInfoGetColumn:
     @convention(c) (CSSourceInfoRef) -> UInt32 =
     symbol(coreSymbolicationHandle, "CSSourceInfoGetColumn")
+
+  // CFString
+  static let CFStringCreateWithBytes:
+    @convention(c) (CFAllocatorRef?, UnsafeRawPointer?, CFIndex,
+                    CFStringEncoding, Bool) -> CFStringRef? =
+    symbol(coreFoundationHandle, "CFStringCreateWithBytes")
+  static let CFStringGetLength:
+    @convention(c) (CFStringRef) -> CFIndex =
+    symbol(coreFoundationHandle, "CFStringGetLength")
+  static let CFStringGetCStringPtr:
+    @convention(c) (CFStringRef, CFStringEncoding) -> UnsafePointer<CChar>? =
+    symbol(coreFoundationHandle, "CFStringGetCStringPtr")
+  static let CFStringGetBytes:
+    @convention(c) (CFStringRef, CFRange, CFStringEncoding, UInt8, Bool,
+                    UnsafeMutableRawPointer?, CFIndex,
+                    UnsafeMutablePointer<CFIndex>?) -> CFIndex =
+    symbol(coreFoundationHandle, "CFStringGetBytes")
+}
+
+// .. Core Foundation miscellany ...............................................
+
+internal typealias CFTypeRef = OpaquePointer
+internal typealias CFStringRef = CFTypeRef
+internal typealias CFAllocatorRef = CFTypeRef
+internal typealias CFIndex = __swift_backtrace_CFIndex
+internal typealias CFRange = __swift_backtrace_CFRange
+internal typealias CFUUIDBytes = __swift_backtrace_CFUUIDBytes
+internal typealias CFStringEncoding = UInt32
+
+internal enum CFStringBuiltInEncodings: UInt32 {
+  case ASCII = 0x0600
+  case UTF8 = 0x08000100
+}
+
+internal func CFRangeMake(_ location: CFIndex, _ length: CFIndex) -> CFRange {
+  return CFRange(location: location, length: length)
+}
+
+internal func CFStringCreateWithBytes(_ allocator: CFAllocatorRef?,
+                                      _ bytes: UnsafeRawPointer?,
+                                      _ length: CFIndex,
+                                      _ encoding: CFStringEncoding,
+                                      _ isExternalRepresentation: Bool)
+  -> CFStringRef? {
+  return Sym.CFStringCreateWithBytes(allocator,
+                                     bytes,
+                                     length,
+                                     encoding,
+                                     isExternalRepresentation)
+}
+
+internal func CFStringGetLength(_ s: CFStringRef) -> CFIndex {
+  return Sym.CFStringGetLength(s)
+}
+
+internal func CFStringGetCStringPtr(_ s: CFStringRef,
+                                    _ encoding: CFStringEncoding)
+  -> UnsafePointer<CChar>? {
+  return Sym.CFStringGetCStringPtr(s, encoding)
+}
+
+internal func CFStringGetBytes(_ s: CFStringRef,
+                               _ range: CFRange,
+                               _ encoding: CFStringEncoding,
+                               _ lossByte: UInt8,
+                               _ isExternalRepresentation: Bool,
+                               _ buffer: UnsafeMutableRawPointer?,
+                               _ maxBufLen: CFIndex,
+                               _ usedBufLen: UnsafeMutablePointer<CFIndex>?)
+  -> CFIndex {
+  return Sym.CFStringGetBytes(s, range, encoding, lossByte,
+                              isExternalRepresentation, buffer, maxBufLen,
+                              usedBufLen)
 }
 
 // .. Crash Reporter support ...................................................
@@ -116,7 +194,7 @@ private enum Sym {
 // We can't import swiftFoundation here, so there's no automatic bridging for
 // CFString.  As a result, we need to do the dance manually.
 
-private func toCFString(_ s: String) -> CFString! {
+private func toCFString(_ s: String) -> CFStringRef! {
   var s = s
   return s.withUTF8 {
     return CFStringCreateWithBytes(nil,
@@ -127,7 +205,7 @@ private func toCFString(_ s: String) -> CFString! {
   }
 }
 
-private func fromCFString(_ cf: CFString) -> String {
+private func fromCFString(_ cf: CFStringRef) -> String {
   let length = CFStringGetLength(cf)
   if length == 0 {
     return ""
@@ -140,23 +218,23 @@ private func fromCFString(_ cf: CFString) -> String {
   } else {
     var byteLen = CFIndex(0)
 
-    CFStringGetBytes(cf,
-                     CFRangeMake(0, length),
-                     CFStringBuiltInEncodings.UTF8.rawValue,
-                     0,
-                     false,
-                     nil,
-                     0,
-                     &byteLen)
+    _ = CFStringGetBytes(cf,
+                         CFRangeMake(0, length),
+                         CFStringBuiltInEncodings.UTF8.rawValue,
+                         0,
+                         false,
+                         nil,
+                         0,
+                         &byteLen)
 
     let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteLen)
     defer {
       buffer.deallocate()
     }
 
-    CFStringGetBytes(cf, CFRangeMake(0, length),
-                     CFStringBuiltInEncodings.UTF8.rawValue,
-                     0, false, buffer.baseAddress, buffer.count, nil)
+    _ = CFStringGetBytes(cf, CFRangeMake(0, length),
+                         CFStringBuiltInEncodings.UTF8.rawValue,
+                         0, false, buffer.baseAddress, buffer.count, nil)
 
     return String(decoding: buffer, as: UTF8.self)
   }
@@ -189,14 +267,14 @@ func CSIsNull(_ obj: CSTypeRef) -> Bool {
 let kCSSymbolicatorDisallowDaemonCommunication = UInt32(0x00000800)
 
 struct BinaryRelocationInformation {
-  var base: mach_vm_address_t
-  var extent: mach_vm_address_t
+  var base: __swift_vm_address_t
+  var extent: __swift_vm_address_t
   var name: String
 }
 
 struct BinaryImageInformation {
-  var base: mach_vm_address_t
-  var extent: mach_vm_address_t
+  var base: __swift_vm_address_t
+  var extent: __swift_vm_address_t
   var uuid: CFUUIDBytes
   var arch: CSArchitecture
   var path: String
@@ -244,7 +322,7 @@ func CSSymbolicatorCreateWithBinaryImageList(
         imageList[n].relocationCount = UInt32(image.relocations.count)
         imageList[n].flags = image.flags
 
-        pathPtr += strlen(pathPtr) + 1
+        pathPtr += _swift_backtrace_strlen(pathPtr) + 1
 
         for relocation in image.relocations {
           relocationPtr.pointee.base = relocation.base
@@ -277,7 +355,7 @@ func CSSymbolicatorCreateWithBinaryImageList(
 
 func CSSymbolicatorGetSymbolOwnerWithAddressAtTime(
   _ symbolicator: CSSymbolicatorRef,
-  _ addr: mach_vm_address_t,
+  _ addr: __swift_vm_address_t,
   _ time: CSMachineTime
 ) -> CSSymbolOwnerRef {
   return Sym.CSSymbolicatorGetSymbolOwnerWithAddressAtTime(symbolicator,
@@ -302,21 +380,21 @@ func CSSymbolOwnerGetName(_ sym: CSTypeRef) -> String? {
 
 func CSSymbolOwnerGetSymbolWithAddress(
   _ owner: CSSymbolOwnerRef,
-  _ address: mach_vm_address_t
+  _ address: __swift_vm_address_t
 ) -> CSSymbolRef {
   return Sym.CSSymbolOwnerGetSymbolWithAddress(owner, address)
 }
 
 func CSSymbolOwnerGetSourceInfoWithAddress(
   _ owner: CSSymbolOwnerRef,
-  _ address: mach_vm_address_t
+  _ address: __swift_vm_address_t
 ) -> CSSourceInfoRef {
   return Sym.CSSymbolOwnerGetSourceInfoWithAddress(owner, address)
 }
 
 func CSSymbolOwnerForEachStackFrameAtAddress(
   _ owner: CSSymbolOwnerRef,
-  _ address: mach_vm_address_t,
+  _ address: __swift_vm_address_t,
   _ iterator: CSStackFrameIterator
 ) -> UInt {
   return Sym.CSSymbolOwnerForEachStackFrameAtAddress(owner, address, iterator)
@@ -324,7 +402,7 @@ func CSSymbolOwnerForEachStackFrameAtAddress(
 
 func CSSymbolOwnerGetBaseAddress(
   _ owner: CSSymbolOwnerRef
-) -> mach_vm_address_t {
+) -> __swift_vm_address_t {
   return Sym.CSSymbolOwnerGetBaseAddress(owner)
 }
 

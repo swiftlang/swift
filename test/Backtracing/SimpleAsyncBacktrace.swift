@@ -4,9 +4,11 @@
 // RUN: %target-run %t/SimpleAsyncBacktrace | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: executable_test
-// REQUIRES: OS=macosx
 // REQUIRES: concurrency_runtime
+// REQUIRES: executable_test
+// REQUIRES: backtracing
+// REQUIRES: OS=macosx
+
 // UNSUPPORTED: back_deployment_runtime
 
 import _Backtracing
