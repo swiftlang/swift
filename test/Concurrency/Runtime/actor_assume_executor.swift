@@ -16,7 +16,7 @@ import StdlibUnittest
 
 func checkAssumeMainActor(echo: MainActorEcho) /* synchronous! */ {
   // Echo.get("any") // error: main actor isolated, cannot perform async call here
-  _assumeOnMainActorExecutor {
+  assumeOnMainActorExecutor {
     let input = "example"
     let got = echo.get(input)
     precondition(got == "example", "Expected echo to match \(input)")
@@ -40,7 +40,7 @@ actor MainFriend {
 
 func checkAssumeSomeone(someone: Someone) /* synchronous */ {
   // someone.something // can't access, would need a hop but we can't
-  _assumeOnActorExecutor(someone) { someone in
+  assumeOnActorExecutor(someone) { someone in
     let something = someone.something
     let expected = "isolated something"
     precondition(something == expected, "expected '\(expected)', got: \(something)")
@@ -103,19 +103,19 @@ final class MainActorEcho {
     if #available(SwiftStdlib 5.9, *) {
       // === MainActor --------------------------------------------------------
 
-      tests.test("_assumeOnMainActorExecutor: assume the main executor, from 'main() async'") {
+      tests.test("assumeOnMainActorExecutor: assume the main executor, from 'main() async'") {
         await checkAssumeMainActor(echo: echo)
       }
 
-      tests.test("_assumeOnMainActorExecutor: assume the main executor, from MainActor method") {
+      tests.test("assumeOnMainActorExecutor: assume the main executor, from MainActor method") {
         await mainActorCallCheck(echo: echo)
       }
 
-      tests.test("_assumeOnMainActorExecutor: assume the main executor, from actor on MainActor executor") {
+      tests.test("assumeOnMainActorExecutor: assume the main executor, from actor on MainActor executor") {
         await MainFriend().callCheck(echo: echo)
       }
 
-      tests.test("_assumeOnMainActorExecutor: wrongly assume the main executor, from actor on other executor") {
+      tests.test("assumeOnMainActorExecutor: wrongly assume the main executor, from actor on other executor") {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected 'MainActor' executor.")
         await Someone().callCheckMainActor(echo: echo)
       }
@@ -123,25 +123,25 @@ final class MainActorEcho {
       // === some Actor -------------------------------------------------------
 
       let someone = Someone()
-      tests.test("_assumeOnActorExecutor: wrongly assume someone's executor, from 'main() async'") {
+      tests.test("assumeOnActorExecutor: wrongly assume someone's executor, from 'main() async'") {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected same executor as a.Someone.")
         checkAssumeSomeone(someone: someone)
       }
 
-      tests.test("_assumeOnActorExecutor: wrongly assume someone's executor, from MainActor method") {
+      tests.test("assumeOnActorExecutor: wrongly assume someone's executor, from MainActor method") {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected same executor as a.Someone.")
         checkAssumeSomeone(someone: someone)
       }
 
-      tests.test("_assumeOnActorExecutor: assume someone's executor, from Someone") {
+      tests.test("assumeOnActorExecutor: assume someone's executor, from Someone") {
         await someone.callCheckSomeone()
       }
 
-      tests.test("_assumeOnActorExecutor: assume someone's executor, from actor on the Someone.unownedExecutor") {
+      tests.test("assumeOnActorExecutor: assume someone's executor, from actor on the Someone.unownedExecutor") {
         await SomeonesFriend(someone: someone).callCheckSomeone()
       }
 
-      tests.test("_assumeOnActorExecutor: wrongly assume the main executor, from actor on other executor") {
+      tests.test("assumeOnActorExecutor: wrongly assume the main executor, from actor on other executor") {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected same executor as a.Someone.")
         await CompleteStranger(someone: someone).callCheckSomeone()
       }

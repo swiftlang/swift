@@ -28,7 +28,7 @@ import Swift
 @available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
 @_unavailableFromAsync(message: "await the call to the @MainActor closure directly")
 public
-func _assumeOnMainActorExecutor<T>(
+func assumeOnMainActorExecutor<T>(
     _ operation: @MainActor () throws -> T,
     file: StaticString = #fileID, line: UInt = #line
 ) rethrows -> T {
@@ -66,7 +66,7 @@ func _assumeOnMainActorExecutor<T>(
 @available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
 @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
 public
-func _assumeOnActorExecutor<Act: Actor, T>(
+func assumeOnActorExecutor<Act: Actor, T>(
     _ actor: Act,
     _ operation: (isolated Act) throws -> T,
     file: StaticString = #fileID, line: UInt = #line
