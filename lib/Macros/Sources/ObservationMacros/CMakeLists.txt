@@ -118,15 +118,15 @@ if (SWIFT_SWIFT_PARSER)
   # Ensure the install directory exists before everything gets started
   add_custom_command(
       TARGET ObservationMacros PRE_BUILD
-      COMMAND ${CMAKE_COMMAND} -E make_directory "lib${LLVM_LIBDIR_SUFFIX}/host/plugins"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins"
   )
 
   swift_install_in_component(TARGETS ObservationMacros
     LIBRARY
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/host/plugins"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins"
       COMPONENT compiler
     ARCHIVE
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/host/plugins"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins"
       COMPONENT compiler)
 
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ObservationMacros)
