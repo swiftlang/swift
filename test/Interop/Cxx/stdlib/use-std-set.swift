@@ -31,6 +31,11 @@ StdSetTestSuite.test("SetOfCInt.contains") {
     expectTrue(s.contains(3))
 }
 
+StdSetTestSuite.test("SetOfCInt.insert") {
+    var s = initSetOfCInt()
+    s.insert(1)
+}
+
 StdSetTestSuite.test("UnorderedSetOfCInt.contains") {
     // This relies on the `std::unordered_set` conformance to `CxxSet` protocol.
     let s = initUnorderedSetOfCInt()
