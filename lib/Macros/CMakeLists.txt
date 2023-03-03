@@ -10,4 +10,41 @@
 #
 #===----------------------------------------------------------------------===#
 
+# The location for host plugins, i.e., macros.
+set(SWIFT_HOST_PLUGINS_DEST_DIR ${SWIFT_HOST_LIBRARIES_DEST_DIR}/plugins)
+
+# Add a new Swift macro library, which is built for the host and installed
+# into lib/swift/host/plugins.
+#
+# Usage:
+#   add_swift_macro_library(name
+#     source1 [source2 source3 ...])
+#
+# name
+#   Name of the library (e.g., SwiftMacros).
+#
+# source1 ...
+#   Sources to add into this library.
+function(add_swift_macro_library name)
+  set(ASML_SOURCES ${ARGN})
+
+  # Add the library.
+  add_pure_swift_host_library(${name} SHARED ${ASML_SOURCES})
+
+  # Install into the plugin directory.
+  set_target_properties(${name}
+    PROPERTIES
+      ARCHIVE_OUTPUT_DIRECTORY "${SWIFT_HOST_PLUGINS_DEST_DIR}"
+      LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_PLUGINS_DEST_DIR}"
+  )
+
+  swift_install_in_component(TARGETS ${name}
+    LIBRARY
+      DESTINATION "${SWIFT_HOST_PLUGINS_DEST_DIR}"
+      COMPONENT compiler
+    ARCHIVE
+      DESTINATION "${SWIFT_HOST_PLUGINS_DEST_DIR}"
+      COMPONENT compiler)
+endfunction()
+
 add_subdirectory(Sources/ObservationMacros)
