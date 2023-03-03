@@ -21,8 +21,6 @@
 #include "swift/Runtime/Win32.h"
 #include "swift/Threading/Once.h"
 
-#include <filesystem>
-
 #if !defined(_WIN32) || defined(__CYGWIN__)
 #include <sys/stat.h>
 
