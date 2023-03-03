@@ -5986,29 +5986,6 @@ public:
   }
 };
 
-/// The various spellings of ownership modifier that can be used in source.
-enum class ParamSpecifier : uint8_t {
-  /// No explicit ownership specifier was provided. The parameter will use the
-  /// default ownership convention for the declaration.
-  Default = 0,
-
-  /// `inout`, indicating exclusive mutable access to the argument for the
-  /// duration of a call.
-  InOut = 1,
-
-  /// `borrowing`, indicating nonexclusive access to the argument for the
-  /// duration of a call.
-  Borrowing = 2,
-  /// `consuming`, indicating ownership transfer of the argument from caller
-  /// to callee.
-  Consuming = 3,
-
-  /// `__shared`, a legacy spelling of `borrowing`.
-  LegacyShared = 4,
-  /// `__owned`, a legacy spelling of `consuming`.
-  LegacyOwned = 5,
-};
-
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
   friend class DefaultArgumentInitContextRequest;
@@ -6373,6 +6350,16 @@ public:
   /// Get the source code spelling of a parameter specifier value as a string.
   static StringRef getSpecifierSpelling(Specifier spec);
 };
+  
+inline ValueOwnership
+ParameterTypeFlags::getValueOwnership() const {
+  return ParamDecl::getValueOwnershipForSpecifier(getOwnershipSpecifier());
+}
+  
+inline ValueOwnership
+YieldTypeFlags::getValueOwnership() const {
+  return ParamDecl::getValueOwnershipForSpecifier(getOwnershipSpecifier());
+}
   
 /// Describes the kind of subscripting used in Objective-C.
 enum class ObjCSubscriptKind {

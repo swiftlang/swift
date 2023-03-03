@@ -304,8 +304,8 @@ private:
           if (mapIntoContext)
             valueTy = AD->mapTypeIntoContext(valueTy);
           YieldTypeFlags flags(AD->getAccessorKind() == AccessorKind::Modify
-                                 ? ValueOwnership::InOut
-                                 : ValueOwnership::Shared);
+                                 ? ParamSpecifier::InOut
+                                 : ParamSpecifier::LegacyShared);
           buffer.push_back(AnyFunctionType::Yield(valueTy, flags));
           return buffer;
         }
