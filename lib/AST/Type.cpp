@@ -729,6 +729,11 @@ static bool isLegalFormalType(CanType type) {
     return isLegalFormalType(objectType);
   }
 
+  // Expansions are legal if their pattern type is legal.
+  if (auto expansionType = dyn_cast<PackExpansionType>(type)) {
+    return isLegalFormalType(expansionType.getPatternType());
+  }
+
   return true;
 }
 

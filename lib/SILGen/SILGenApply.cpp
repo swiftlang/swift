@@ -3757,7 +3757,7 @@ private:
                              expectedEltTy, consumed,
                              packAddr, formalPackType, i);
       }
-      if (cleanup.isValid()) eltCleanups.push_back(cleanup);
+      if (consumed && cleanup.isValid()) eltCleanups.push_back(cleanup);
     }
 
     if (!consumed) {
@@ -3788,9 +3788,6 @@ private:
                                           SILValue packAddr,
                                           CanPackType formalPackType,
                                           unsigned packComponentIndex) {
-    auto expansionLoweredType =
-      expectedParamType.castTo<PackExpansionType>();
-
     // TODO: we'll need to handle already-emitted packs for things like
     // subscripts
     assert(arg.isExpr() && "emitting a non-expression pack expansion");
@@ -3830,12 +3827,18 @@ private:
       // elements in this slice of the pack (then pop it before we exit
       // this scope).
 
-      // Turn pack archetypes in the lowered pack expansion type into
-      // opened element archetypes.  This should work fine on SIL types
-      // since we're not changing any interesting structure.
-      auto expectedLoweredElementType =
-        openedElementEnv->mapPackTypeIntoElementContext(
-          expansionLoweredType.getPatternType())->getCanonicalType();
+      // Turn pack archetypes in the pattern type of the lowered pack
+      // expansion type into opened element archetypes.  These AST-level
+      // manipulations should work fine on SIL types since we're not
+      // changing any interesting structure.
+      SILType expectedElementType = [&] {
+        auto loweredPatternType =
+          expectedParamType.castTo<PackExpansionType>().getPatternType();
+        auto loweredElementType =
+          openedElementEnv->mapPackTypeIntoElementContext(
+            loweredPatternType->mapTypeOutOfContext())->getCanonicalType();
+        return SILType::getPrimitiveAddressType(loweredElementType);
+      }();
 
       // Project the tuple element.  This projection uses the
       // pack expansion index because the tuple is only for the
@@ -3843,7 +3846,7 @@ private:
       auto eltAddr =
         SGF.B.createTuplePackElementAddr(expansionExpr,
                                          packExpansionIndex, tupleAddr,
-          SILType::getPrimitiveAddressType(expectedLoweredElementType));
+                                         expectedElementType);
       auto &eltTL = SGF.getTypeLowering(eltAddr->getType());
 
       // Evaluate the pattern expression into that address.

@@ -331,11 +331,13 @@ namespace {
     RetTy visitPackExpansionType(CanPackExpansionType type,
                                  AbstractionPattern origType,
                                  IsTypeExpansionSensitive_t isSensitive) {
-      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
-                                               IsAddressOnly, IsNotResilient,
-                                               isSensitive,
-                                               DoesNotHaveRawPointer,
-                                               IsLexical});
+      RecursiveProperties props;
+      props.setAddressOnly();
+      props.addSubobject(classifyType(origType.getPackExpansionPatternType(),
+                                      type.getPatternType(),
+                                      TC, Expansion));
+      props = mergeIsTypeExpansionSensitive(isSensitive, props);
+      return asImpl().handleAddressOnly(type, props);
     }
 
     RetTy visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
@@ -2193,11 +2195,7 @@ namespace {
     TypeLowering *visitPackType(CanPackType packType,
                                 AbstractionPattern origType,
                                 IsTypeExpansionSensitive_t isSensitive) {
-      RecursiveProperties properties;
-      properties.setAddressOnly();
-      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
-
-      return handleAddressOnly(packType, properties);
+      llvm_unreachable("shouldn't get here with an unlowered type");
     }
 
     TypeLowering *visitSILPackType(CanSILPackType packType,
@@ -2205,6 +2203,12 @@ namespace {
                                    IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
       properties.setAddressOnly();
+      for (auto i : indices(packType.getElementTypes())) {
+        auto &eltLowering =
+          TC.getTypeLowering(packType->getSILElementType(i),
+                             Expansion);
+        properties.addSubobject(eltLowering.getRecursiveProperties());
+      }
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
       return handleAddressOnly(packType, properties);
@@ -2215,6 +2219,11 @@ namespace {
                                          IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
       properties.setAddressOnly();
+      auto &patternLowering =
+        TC.getTypeLowering(origType.getPackExpansionPatternType(),
+                           packExpansionType.getPatternType(),
+                           Expansion);
+      properties.addSubobject(patternLowering.getRecursiveProperties());
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
       return handleAddressOnly(packExpansionType, properties);

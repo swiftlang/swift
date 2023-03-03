@@ -559,6 +559,14 @@ public:
   /// points.
   SILValue ExpectedExecutor;
 
+  /// The pack index value for the innermost pack expansion.
+  SILValue InnermostPackIndex;
+
+  SILValue getInnermostPackIndex() const {
+    assert(InnermostPackIndex && "not inside a pack expansion!");
+    return InnermostPackIndex;
+  }
+
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
   bool allowsVoidReturn() const { return ReturnDest.getBlock()->args_empty(); }
@@ -1666,6 +1674,10 @@ public:
   ManagedValue emitManagedBufferWithCleanup(SILValue addr,
                                             const TypeLowering &lowering);
 
+  ManagedValue emitManagedPackWithCleanup(SILValue addr,
+                                          CanPackType formalPackType
+                                            = CanPackType());
+
   ManagedValue emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
                                                         SILValue value);
   ManagedValue emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
@@ -2490,14 +2502,18 @@ public:
   ///   starting at index limitWithinComponent - 1
   /// \param emitBody - a function that will be called to emit the body of
   ///   the loop. It's okay if this has paths that exit the body of the loop,
-  ///   but it should leave the insertion point set at the end. Will be
-  ///   called within a cleanups scope. The first parameter is the current
-  ///   index within the expansion component, a value of type Builtin.Word.
-  ///   The second parameter is that index as a pack indexing instruction
-  ///   that indexes into packs with the shape of the pack expasion.
-  ///   The third parameter is the current pack index within the overall
-  ///   pack, a pack indexing instruction that indexes into packs with the
-  ///   shape of formalPackType.
+  ///   but it should leave the insertion point set at the end.
+  ///
+  ///   The first parameter is the current index within the expansion
+  ///   component, a value of type Builtin.Word.  The second parameter is
+  ///   that index as a pack indexing instruction that indexes into packs
+  ///   with the shape of the pack expasion.  The third parameter is the
+  ///   current pack index within the overall pack, a pack indexing instruction
+  ///   that indexes into packs with the shape of formalPackType.
+  ///
+  ///   This function will be called within a cleanups scope and with
+  ///   InnermostPackIndex set to the pack expansion index value (the
+  ///   second parameter).
   void emitDynamicPackLoop(SILLocation loc,
                            CanPackType formalPackType,
                            unsigned componentIndex,

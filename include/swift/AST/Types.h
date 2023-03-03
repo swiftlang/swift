@@ -753,6 +753,15 @@ public:
   /// Return the root generic parameter of this type parameter type.
   GenericTypeParamType *getRootGenericParam();
 
+  /// Given that this type is the result of substituting a pack parameter,
+  /// return it as a the pack type.  We want to have a representational
+  /// invariant that these substitutions always produce PackTypes; when
+  /// that's in place, we can replace all uses of this function with
+  /// `->castTo<PackType>()`.  In the meantime, it's permitted for these
+  /// substitutions to be unadorned pack parameters or archetypes, which
+  /// this function will wrap into a pack containing a singleton expansion.
+  PackType *getPackSubstitutionAsPackType();
+
   /// Determines whether this type is an lvalue. This includes both straight
   /// lvalue types as well as tuples or optionals of lvalues.
   bool hasLValueType() {
@@ -6731,6 +6740,11 @@ public:
   static PackType *get(const ASTContext &C,
                        TypeArrayView<GenericTypeParamType> params,
                        ArrayRef<Type> args);
+
+  /// Given a type T, which must be a pack parameter, a member type
+  /// of a pack parameter, or a pack archetype, construct the type
+  /// Pack{repeat each T}.
+  static PackType *getSingletonPackExpansion(Type packParameter);
 
 public:
   /// Retrieves the number of elements in this pack.

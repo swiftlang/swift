@@ -128,23 +128,17 @@ void SILGenFunction::emitDestroyPack(SILLocation loc, SILValue packAddr,
   for (auto componentIndex : indices(packTy->getElementTypes())) {
     auto eltTy = packTy->getSILElementType(componentIndex);
 
+    // We can skip this if the whole thing is trivial.
+    auto &eltTL = getTypeLowering(eltTy);
+    if (eltTL.isTrivial()) continue;
+
     // If it's an expansion component, emit a "partial"-destroy loop.
     if (auto expansion = eltTy.getAs<PackExpansionType>()) {
-      // We can skip this if the whole thing is trivial.
-      auto &patternTypeTL = getTypeLowering(
-              SILType::getPrimitiveAddressType(expansion.getPatternType()));
-      if (patternTypeTL.isTrivial()) continue;
-
       emitPartialDestroyPack(loc, packAddr, formalPackType, componentIndex,
                              /*limit*/ nullptr);
 
     // If it's a scalar component, project and destroy it.
     } else {
-      // We can skip this if the element is trivial.
-      auto &eltTL = getTypeLowering(eltTy);
-      if (eltTL.isTrivial()) continue;
-
-      // Index into the pack and extract the component.
       auto packIndex =
         B.createScalarPackIndex(loc, componentIndex, formalPackType);
       auto eltAddr =
@@ -154,9 +148,74 @@ void SILGenFunction::emitDestroyPack(SILLocation loc, SILValue packAddr,
   }
 }
 
+static CanPackType getInducedFormalPackType(CanSILPackType packType) {
+  auto &ctx = packType->getASTContext();
+  auto loweredEltTypes = packType.getElementTypes();
+
+  // Build an array of formal element types, but be lazy about it:
+  // use the original array unless we see an element type that doesn't
+  // work as a legal format type.
+  Optional<SmallVector<CanType, 4>> formalEltTypes;
+  for (auto i : indices(loweredEltTypes)) {
+    auto loweredEltType = loweredEltTypes[i];
+    bool isLegal = loweredEltType->isLegalFormalType();
+
+    // If the type isn't legal as a formal type, substitute the empty
+    // tuple type (or an invariant expansion of it over the count type).
+    CanType formalEltType = loweredEltType;
+    if (!isLegal) {
+      formalEltType = TupleType::getEmpty(ctx);
+      if (auto expansion = dyn_cast<PackExpansionType>(loweredEltType))
+        formalEltType = CanPackExpansionType::get(formalEltType,
+                                                  expansion.getCountType());
+    }
+
+    // If we're already building an array, unconditionally append to it.
+    // Otherwise, if the type isn't legal, build the array up to this
+    // point and then append.  Otherwise, we're still being lazy.
+    if (formalEltTypes) {
+      formalEltTypes->push_back(formalEltType);
+    } else if (!isLegal) {
+      formalEltTypes.emplace();
+      formalEltTypes->reserve(loweredEltTypes.size());
+      formalEltTypes->append(loweredEltTypes.begin(),
+                             loweredEltTypes.begin() + i);
+      formalEltTypes->push_back(formalEltType);
+    }
+
+    assert(isLegal || formalEltTypes.hasValue());
+  }
+
+  // Use the array we built if we made one (if we ever saw a non-legal
+  // element type).
+  if (formalEltTypes) {
+    return CanPackType::get(ctx, *formalEltTypes);
+  } else {
+    return CanPackType::get(ctx, loweredEltTypes);
+  }
+}
+
+ManagedValue
+SILGenFunction::emitManagedPackWithCleanup(SILValue addr,
+                                           CanPackType formalPackType) {
+  // If the pack type is trivial, we're done.
+  if (getTypeLowering(addr->getType()).isTrivial())
+    return ManagedValue::forTrivialAddressRValue(addr);
+
+  // If we weren't given a formal pack type, construct one induced from
+  // the lowered pack type.
+  auto packType = addr->getType().castTo<SILPackType>();
+  if (!formalPackType)
+    formalPackType = getInducedFormalPackType(packType);
+
+  // Enter a cleanup for the pack.
+  auto cleanup = enterDestroyPackCleanup(addr, formalPackType);
+  return ManagedValue::forOwnedAddressRValue(addr, cleanup);
+}
+
 static bool isPatternInvariantToExpansion(CanType patternType,
                                           CanPackArchetypeType countArchetype) {
-  return patternType.findIf([&](CanType type) {
+  return !patternType.findIf([&](CanType type) {
     if (auto archetype = dyn_cast<PackArchetypeType>(type)) {
       return archetype == countArchetype ||
              archetype->getReducedShape() == countArchetype->getReducedShape();
@@ -185,7 +244,8 @@ deriveOpenedElementTypeForPackExpansion(SILGenModule &SGM,
     OpenedElementContext::createForContextualExpansion(SGM.getASTContext(),
                                                        expansion);
   auto elementType =
-    context.environment->mapPackTypeIntoElementContext(patternType)
+    context.environment->mapPackTypeIntoElementContext(
+                           patternType->mapTypeOutOfContext())
                        ->getCanonicalType();
   return std::make_pair(context.environment,
                         SILType::getPrimitiveAddressType(elementType));
@@ -297,6 +357,10 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
   // Emit the loop body in a scope as a convenience, since it's necessary
   // to avoid dominance problems anyway.
   {
+    // Save and restore the innermost pack expansion index.
+    llvm::SaveAndRestore<SILValue> packIndexScope(InnermostPackIndex,
+                                                  packExpansionIndex);
+
     FullExpr scope(Cleanups, CleanupLocation(loc));
     emitBody(curIndex, packExpansionIndex, packIndex);
   }
