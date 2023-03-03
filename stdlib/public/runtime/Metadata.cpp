@@ -145,13 +145,40 @@ Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
 static void installGenericArguments(Metadata *metadata,
                                     const TypeContextDescriptor *description,
                                     const void *arguments) {
-  auto &generics = description->getFullGenericContextHeader();
+  const auto &genericContext = *description->getGenericContext();
+  const auto &header = genericContext.getGenericContextHeader();
 
-  // FIXME: variadic-parameter-packs
-  memcpy(reinterpret_cast<const void **>(metadata)
-           + description->getGenericArgumentOffset(),
+  auto dst = (reinterpret_cast<const void **>(metadata) +
+              description->getGenericArgumentOffset());
+  memcpy(dst,
          reinterpret_cast<const void * const *>(arguments),
-         generics.Base.getNumArguments() * sizeof(void*));
+         header.NumKeyArguments * sizeof(void *));
+
+  // If we don't have any pack arguments, there is nothing more to do.
+  auto packShapeHeader = genericContext.getGenericPackShapeHeader();
+  if (packShapeHeader.NumPacks == 0)
+    return;
+
+  // Heap-allocate all installed metadata and witness table packs.
+  for (auto pack : genericContext.getGenericPackShapeDescriptors()) {
+    assert(pack.ShapeClass < packShapeHeader.NumShapeClasses);
+
+    size_t count = reinterpret_cast<size_t>(dst[pack.ShapeClass]);
+
+    switch (pack.Kind) {
+    case GenericPackKind::Metadata:
+      dst[pack.Index] = swift_allocateMetadataPack(
+          reinterpret_cast<const Metadata * const *>(dst[pack.Index]),
+          count);
+      break;
+
+    case GenericPackKind::WitnessTable:
+      dst[pack.Index] = swift_allocateWitnessTablePack(
+          reinterpret_cast<const WitnessTable * const *>(dst[pack.Index]),
+          count);
+      break;
+    }
+  }
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -1154,7 +1181,7 @@ namespace {
 
 class MetadataPackCacheEntry {
 public:
-  unsigned Count;
+  size_t Count;
 
   const Metadata * const * getElements() const {
     return reinterpret_cast<const Metadata * const *>(this + 1);
@@ -1166,20 +1193,20 @@ public:
 
   struct Key {
     const Metadata *const *Data;
-    const unsigned Count;
+    const size_t Count;
 
-    unsigned getCount() const {
+    size_t getCount() const {
       return Count;
     }
 
-    const Metadata *getElement(unsigned index) const {
+    const Metadata *getElement(size_t index) const {
       assert(index < Count);
       return Data[index];
     }
 
     friend llvm::hash_code hash_value(const Key &key) {
       llvm::hash_code hash = 0;
-      for (unsigned i = 0; i != key.getCount(); ++i)
+      for (size_t i = 0; i != key.getCount(); ++i)
         hash = llvm::hash_combine(hash, key.getElement(i));
       return hash;
     }
@@ -1202,7 +1229,10 @@ public:
   }
 
   friend llvm::hash_code hash_value(const MetadataPackCacheEntry &value) {
-    return hash_value(value.getElements());
+    llvm::hash_code hash = 0;
+    for (size_t i = 0; i != value.Count; ++i)
+      hash = llvm::hash_combine(hash, value.getElements()[i]);
+    return hash;
   }
 
   static size_t getExtraAllocationSize(const Key &key) {
@@ -1219,9 +1249,9 @@ public:
 };
 
 MetadataPackCacheEntry::MetadataPackCacheEntry(const Key &key) {
-  auto count = key.getCount();
+  Count = key.getCount();
 
-  for (unsigned i = 0; i < count; ++i)
+  for (unsigned i = 0; i < Count; ++i)
     getElements()[i] = key.getElement(i);
 }
 
@@ -1232,7 +1262,7 @@ static SimpleGlobalCache<MetadataPackCacheEntry, MetadataPackTag> MetadataPacks;
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 const Metadata * const *
-swift_allocateMetadataPack(const Metadata * const *ptr, unsigned count) {
+swift_allocateMetadataPack(const Metadata * const *ptr, size_t count) {
   if (MetadataPackPointer(reinterpret_cast<uintptr_t>(ptr)).getLifetime()
         == PackLifetime::OnHeap)
     return ptr;
@@ -1245,7 +1275,7 @@ swift_allocateMetadataPack(const Metadata * const *ptr, unsigned count) {
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 const WitnessTable * const *
-swift_allocateWitnessTablePack(const WitnessTable * const *ptr, unsigned count) {
+swift_allocateWitnessTablePack(const WitnessTable * const *ptr, size_t count) {
   if (WitnessTablePackPointer(reinterpret_cast<uintptr_t>(ptr)).getLifetime()
         == PackLifetime::OnHeap)
     return ptr;
@@ -6513,13 +6543,54 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
 
   // Generic types require their type arguments to be transitively complete.
   if (description->isGeneric()) {
+    auto *genericContext = description->getGenericContext();
+
     auto keyArguments = description->getGenericArguments(type);
-    for (auto &param : description->getGenericParams()) {
-      if (param.hasKeyArgument()) {
-        if (predicate(*keyArguments++))
-          return true;
-      }
+
+    // The generic argument area begins with a pack count for each
+    // shape class; skip them first.
+    auto header = genericContext->getGenericPackShapeHeader();
+    unsigned paramIdx = header.NumShapeClasses;
+
+    auto packs = genericContext->getGenericPackShapeDescriptors();
+    unsigned packIdx = 0;
+    for (auto &param : genericContext->getGenericParams()) {
       // Ignore parameters that don't have a key argument.
+      if (!param.hasKeyArgument())
+        continue;
+
+      switch (param.getKind()) {
+      case GenericParamKind::Type:
+        if (predicate(keyArguments[paramIdx]))
+          return true;
+
+        break;
+
+      case GenericParamKind::TypePack: {
+        assert(packIdx < header.NumPacks);
+        assert(packs[packIdx].Kind == GenericPackKind::Metadata);
+        assert(packs[packIdx].Index == paramIdx);
+        assert(packs[packIdx].ShapeClass < header.NumShapeClasses);
+
+        MetadataPackPointer pack(keyArguments[paramIdx]);
+        assert(pack.getLifetime() == PackLifetime::OnHeap);
+
+        uintptr_t count = reinterpret_cast<uintptr_t>(
+            keyArguments[packs[packIdx].ShapeClass]);
+        for (uintptr_t j = 0; j < count; ++j) {
+          if (predicate(pack.getElements()[j]))
+            return true;
+        }
+
+        ++packIdx;
+        break;
+      }
+
+      default:
+        llvm_unreachable("Unsupported generic parameter kind");
+      }
+
+      ++paramIdx;
     }
   }
 

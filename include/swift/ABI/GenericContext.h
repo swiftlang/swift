@@ -55,15 +55,25 @@ struct TargetGenericContextDescriptorHeader {
   uint16_t NumRequirements;
 
   /// The size of the "key" area of the argument layout, in words.
-  /// Key arguments include generic parameters and conformance
-  /// requirements which are part of the identity of the context.
+  /// Key arguments include shape classes, generic parameters and
+  /// conformance requirements which are part of the identity of
+  /// the context.
   ///
-  /// The key area of the argument layout consists of a sequence
-  /// of type metadata pointers (in the same order as the parameter
-  /// descriptors, for those parameters which satisfy hasKeyArgument())
-  /// followed by a sequence of witness table pointers (in the same
-  /// order as the requirements, for those requirements which satisfy
-  /// hasKeyArgument()).
+  /// The key area of the argument layout consists of:
+  ///
+  /// - a sequence of pack lengths, in the same order as the parameter
+  ///   descriptors which satisfy getKind() == GenericParamKind::TypePack
+  ///   and hasKeyArgument();
+  ///
+  /// - a sequence of metadata or metadata pack pointers, in the same
+  ///   order as the parameter descriptors which satisfy hasKeyArgument();
+  ///
+  /// - a sequence of witness table or witness table pack pointers, in the
+  ///   same order as the requirement descriptors which satisfy
+  ///   hasKeyArgument().
+  ///
+  /// The elements above which are packs are precisely those appearing
+  /// in the sequence of trailing GenericPackShapeDescriptors.
   uint16_t NumKeyArguments;
 
   /// Originally this was the size of the "extra" area of the argument
