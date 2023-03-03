@@ -9974,6 +9974,28 @@ MacroRoles swift::getAttachedMacroRoles() {
   return attachedMacroRoles;
 }
 
+void
+MissingDecl::forEachExpandedPeer(ExpandedPeerCallback callback) {
+  auto *macro = unexpandedPeer.macroAttr;
+  auto *attachedTo = unexpandedPeer.attachedTo;
+  if (!macro || !attachedTo)
+    return;
+
+  attachedTo->visitAuxiliaryDecls(
+      [&](Decl *auxiliaryDecl) {
+        auto *sf = auxiliaryDecl->getInnermostDeclContext()->getParentSourceFile();
+        auto *macroAttr = sf->getAttachedMacroAttribute();
+        if (macroAttr != unexpandedPeer.macroAttr)
+          return;
+
+        auto *value = dyn_cast<ValueDecl>(auxiliaryDecl);
+        if (!value)
+          return;
+
+        callback(value);
+      });
+}
+
 MacroDecl::MacroDecl(
     SourceLoc macroLoc, DeclName name, SourceLoc nameLoc,
     GenericParamList *genericParams,
@@ -10027,7 +10049,71 @@ const MacroRoleAttr *MacroDecl::getMacroRoleAttr(MacroRole role) const {
   for (auto attr : getAttrs().getAttributes<MacroRoleAttr>())
     if (attr->getMacroRole() == role)
       return attr;
-  llvm_unreachable("Macro role not declared for this MacroDecl");
+
+  return nullptr;
+}
+
+void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
+                                   SmallVectorImpl<DeclName> &names) const {
+  ASTContext &ctx = getASTContext();
+  auto *attr = getMacroRoleAttr(role);
+  if (!attr)
+    return;
+
+  for (auto expandedName : attr->getNames()) {
+    switch (expandedName.getKind()) {
+    case MacroIntroducedDeclNameKind::Named: {
+      names.push_back(DeclName(expandedName.getIdentifier()));
+      break;
+    }
+
+    case MacroIntroducedDeclNameKind::Overloaded: {
+      if (!attachedTo)
+        break;
+
+      names.push_back(attachedTo->getBaseName());
+      break;
+    }
+
+    case MacroIntroducedDeclNameKind::Prefixed: {
+      if (!attachedTo)
+        break;
+
+      auto baseName = attachedTo->getBaseName();
+      std::string prefixedName;
+      {
+        llvm::raw_string_ostream out(prefixedName);
+        out << expandedName.getIdentifier();
+        out << baseName.getIdentifier();
+      }
+
+      Identifier nameId = ctx.getIdentifier(prefixedName);
+      names.push_back(DeclName(nameId));
+      break;
+    }
+
+    case MacroIntroducedDeclNameKind::Suffixed: {
+      if (!attachedTo)
+        break;
+
+      auto baseName = attachedTo->getBaseName();
+      std::string suffixedName;
+      {
+        llvm::raw_string_ostream out(suffixedName);
+        out << baseName.getIdentifier();
+        out << expandedName.getIdentifier();
+      }
+
+      Identifier nameId = ctx.getIdentifier(suffixedName);
+      names.push_back(DeclName(nameId));
+      break;
+    }
+
+    case MacroIntroducedDeclNameKind::Arbitrary:
+      // FIXME: Indicate that the macro covers arbitrary names.
+      break;
+    }
+  }
 }
 
 MacroDefinition MacroDecl::getDefinition() const {

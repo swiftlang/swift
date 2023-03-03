@@ -170,6 +170,12 @@ class swift::SourceLookupCache {
   void addToUnqualifiedLookupCache(Range decls, bool onlyOperators);
   template<typename Range>
   void addToMemberCache(Range decls);
+
+  using AuxiliaryDeclMap = llvm::DenseMap<DeclName, TinyPtrVector<MissingDecl *>>;
+  AuxiliaryDeclMap TopLevelAuxiliaryDecls;
+  SmallVector<ValueDecl *, 4> MayHaveAuxiliaryDecls;
+  void populateAuxiliaryDeclCache();
+
 public:
   SourceLookupCache(const SourceFile &SF);
   SourceLookupCache(const ModuleDecl &Mod);
@@ -234,6 +240,10 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       if (onlyOperators ? VD->isOperator() : VD->hasName()) {
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
+
+        if (VD->getAttrs().hasAttribute<CustomAttr>()) {
+          MayHaveAuxiliaryDecls.push_back(VD);
+        }
       }
     }
 
@@ -309,6 +319,56 @@ void SourceLookupCache::addToMemberCache(Range decls) {
   }
 }
 
+void SourceLookupCache::populateAuxiliaryDeclCache() {
+  for (auto *decl : MayHaveAuxiliaryDecls) {
+    auto *dc = decl->getDeclContext();
+
+    // Gather macro-introduced peer names.
+    llvm::SmallDenseMap<CustomAttr *, llvm::SmallVector<DeclName, 2>> introducedNames;
+
+    // This code deliberately avoids `forEachAttachedMacro`, because it
+    // will perform overload resolution and possibly invoke unqualified
+    // lookup for macro arguments, which will recursively populate the
+    // auxiliary decl cache and cause request cycles.
+    //
+    // We do not need a fully resolved macro until expansion. Instead, we
+    // conservatively consider peer names for all macro declarations with a
+    // custom attribute name. Unqualified lookup for that name will later
+    // invoke expansion of the macro, and will yield no results if the resolved
+    // macro does not produce the requested name, so the only impact is possibly
+    // expanding earlier than needed / unnecessarily looking in the top-level
+    // auxiliary decl cache.
+    for (auto attrConst : decl->getSemanticAttrs().getAttributes<CustomAttr>()) {
+      auto *attr = const_cast<CustomAttr *>(attrConst);
+      UnresolvedMacroReference macroRef(attr);
+      auto moduleScopeDC = dc->getModuleScopeContext();
+      ASTContext &ctx = moduleScopeDC->getASTContext();
+      UnqualifiedLookupDescriptor descriptor(macroRef.getMacroName(), moduleScopeDC);
+      auto lookup = evaluateOrDefault(
+          ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+      for (const auto &found : lookup.allResults()) {
+        if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+          macro->getIntroducedNames(MacroRole::Peer,
+                                    decl, introducedNames[attr]);
+        }
+      }
+    }
+
+    // Add macro-introduced names to the top-level auxiliary decl cache as
+    // unexpanded peer decls represented by a MissingDecl.
+    for (auto macroNames : introducedNames) {
+      auto *macroAttr = macroNames.getFirst();
+      for (auto name : macroNames.getSecond()) {
+        auto *placeholder =
+            MissingDecl::forUnexpandedPeer(macroAttr, decl);
+        name.addToLookupTable(TopLevelAuxiliaryDecls, placeholder);
+      }
+    }
+  }
+
+  MayHaveAuxiliaryDecls.clear();
+}
+
 /// Populate our cache on the first name lookup.
 SourceLookupCache::SourceLookupCache(const SourceFile &SF) {
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
@@ -336,9 +396,35 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   auto I = TopLevelValues.find(Name);
   if (I == TopLevelValues.end()) return;
 
+  bool foundMacros = false;
   Result.reserve(I->second.size());
-  for (ValueDecl *Elt : I->second)
+  for (ValueDecl *Elt : I->second) {
     Result.push_back(Elt);
+    foundMacros = isa<MacroDecl>(Elt);
+  }
+
+  // If none of the results are macro decls, look into peers.
+  //
+  // FIXME: This approach is an approximation for whether lookup is attempting
+  // to find macro declarations, and it may cause cycles for invalid macro
+  // references. We need a more principled way to determine whether we're looking
+  // for a macro and should not look into auxiliary decls during lookup.
+  //
+  // We also need to not consider auxiliary decls if we're doing lookup from
+  // inside a macro argument at module scope.
+  if (!foundMacros) {
+    populateAuxiliaryDeclCache();
+    auto I = TopLevelAuxiliaryDecls.find(Name);
+    if (I == TopLevelAuxiliaryDecls.end()) return;
+
+    for (auto *unexpandedDecl : I->second) {
+      // Add expanded peers to the result.
+      unexpandedDecl->forEachExpandedPeer(
+          [&](ValueDecl *expandedPeer) {
+            Result.push_back(expandedPeer);
+          });
+    }
+  }
 }
 
 void SourceLookupCache::getPrecedenceGroups(

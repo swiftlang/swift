@@ -8,7 +8,7 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@attached(peer)
+@attached(peer, names: overloaded)
 macro addCompletionHandler() = #externalMacro(module: "MacroDefinition", type: "AddCompletionHandler")
 
 struct S {
@@ -23,7 +23,32 @@ struct S {
   // CHECK-DUMP:     completionHandler(await f(a: a, for: b, value))
   // CHECK-DUMP:   }
   // CHECK-DUMP: }
+
+  func useOverload() {
+    f(a: 1, for: "", 2.0) {
+      print($0)
+    }
+  }
 }
+
+// CHECK-DUMP: @__swiftmacro_18macro_expand_peers1f1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_.swift
+// CHECK-DUMP: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
+// CHECK-DUMP:   Task {
+// CHECK-DUMP:     completionHandler(await f(a: a, for: b, value))
+// CHECK-DUMP:   }
+// CHECK-DUMP: }
+
+@addCompletionHandler
+func f(a: Int, for b: String, _ value: Double) async -> String {
+  return b
+}
+
+func useOverload() {
+  f(a: 1, for: "", 2.0) {
+    print($0)
+  }
+}
+
 
 @attached(peer)
 macro wrapInType() = #externalMacro(module: "MacroDefinition", type: "WrapInType")
