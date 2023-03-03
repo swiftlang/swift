@@ -3302,6 +3302,11 @@ PackType *PackType::getEmpty(const ASTContext &C) {
   return cast<PackType>(CanType(C.TheEmptyPackType));
 }
 
+PackType *PackType::getSingletonPackExpansion(Type param) {
+  assert(param->isParameterPack() || param->is<PackArchetypeType>());
+  return get(param->getASTContext(), {PackExpansionType::get(param, param)});
+}
+
 CanPackType CanPackType::get(const ASTContext &C, ArrayRef<CanType> elements) {
   SmallVector<Type, 8> ncElements(elements.begin(), elements.end());
   return CanPackType(PackType::get(C, ncElements));

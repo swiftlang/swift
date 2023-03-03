@@ -1531,7 +1531,14 @@ RValueEmitter::visitPackExpansionExpr(PackExpansionExpr *E,
 
 RValue
 RValueEmitter::visitPackElementExpr(PackElementExpr *E, SGFContext C) {
-  llvm_unreachable("not implemented for PackElementExpr");
+  FormalEvaluationScope scope(SGF);
+
+  LValue lv = SGF.emitLValue(E, SGFAccessKind::OwnedObjectRead);
+
+  // Otherwise, we can't load at +0 without further analysis, since the formal
+  // access into the lvalue will end immediately.
+  return SGF.emitLoadOfLValue(E, std::move(lv),
+                              C.withFollowingSideEffects());
 }
 
 RValue

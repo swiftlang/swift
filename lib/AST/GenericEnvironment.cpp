@@ -177,7 +177,7 @@ void GenericEnvironment::forEachPackElementBinding(
     auto *elementArchetype =
         mapTypeIntoContext(*elementIt++)->castTo<ElementArchetypeType>();
     auto *packSubstitution = maybeApplyOuterContextSubstitutions(genericParam)
-                                 ->template castTo<PackType>();
+      ->getPackSubstitutionAsPackType();
     function(elementArchetype, packSubstitution);
   });
 

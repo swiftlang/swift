@@ -309,6 +309,8 @@ public:
                           LValueOptions options);
   LValue visitOpaqueValueExpr(OpaqueValueExpr *e, SGFAccessKind accessKind,
                               LValueOptions options);
+  LValue visitPackElementExpr(PackElementExpr *e, SGFAccessKind accessKind,
+                              LValueOptions options);
 
   // Nodes that make up components of lvalue paths
   
@@ -3311,6 +3313,42 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
   lv.add<ValueComponent>(value.formalAccessBorrow(SGF, loc), None,
                          getValueTypeData(SGF, accessKind, e));
   return lv;
+}
+
+LValue SILGenLValue::visitPackElementExpr(PackElementExpr *e,
+                                          SGFAccessKind accessKind,
+                                          LValueOptions options) {
+  auto refExpr = e->getPackRefExpr();
+
+  auto substFormalType = e->getType()->getCanonicalType();
+
+  if (auto declRefExpr = dyn_cast<DeclRefExpr>(refExpr)) {
+    if (auto var = dyn_cast<VarDecl>(declRefExpr->getDecl())) {
+      auto origFormalType = SGF.SGM.Types.getAbstractionPattern(var);
+      auto elementTy =
+        SGF.getLoweredType(origFormalType, substFormalType).getAddressType();
+      SILValue packAddr =
+        SGF.emitAddressOfLocalVarDecl(declRefExpr, var,
+                                      substFormalType,
+                                      accessKind)
+           .getLValueAddress();
+      auto packIndex = SGF.getInnermostPackIndex();
+      auto elementAddr =
+        SGF.B.createPackElementGet(e, packIndex, packAddr, elementTy);
+      return LValue::forAddress(accessKind,
+                                ManagedValue::forLValue(elementAddr),
+                                /*access enforcement*/ None,
+                                origFormalType, substFormalType);
+    }
+  }
+
+  SGF.SGM.diagnose(refExpr, diag::not_implemented,
+                   "emission of 'each' for this kind of expression");
+  auto loweredTy = SGF.getLoweredType(substFormalType).getAddressType();
+  auto fakeAddr = ManagedValue::forLValue(SILUndef::get(loweredTy, SGF.F));
+  return LValue::forAddress(accessKind, fakeAddr, /*access enforcement*/ None,
+                            AbstractionPattern(substFormalType),
+                            substFormalType);
 }
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,
