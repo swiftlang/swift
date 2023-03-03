@@ -2680,6 +2680,7 @@ function(add_swift_target_executable name)
     SWIFT_MODULE_DEPENDS_FROM_SDK
     SWIFT_MODULE_DEPENDS_MACCATALYST
     SWIFT_MODULE_DEPENDS_MACCATALYST_UNZIPPERED
+    TARGET_SDKS
   )
 
   # Parse the arguments we were given.
@@ -2706,7 +2707,16 @@ function(add_swift_target_executable name)
   # All Swift executables depend on the swiftSwiftOnoneSupport library.
   list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
 
-  foreach(sdk ${SWIFT_SDKS})
+  # If target SDKs are not specified, build for all known SDKs.
+  if("${SWIFTEXE_TARGET_TARGET_SDKS}" STREQUAL "")
+    set(SWIFTEXE_TARGET_TARGET_SDKS ${SWIFT_SDKS})
+  endif()
+  list_replace(SWIFTEXE_TARGET_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_DARWIN_PLATFORMS}")
+
+  list_intersect(
+    "${SWIFTEXE_TARGET_TARGET_SDKS}" "${SWIFT_SDKS}" SWIFTEXE_TARGET_TARGET_SDKS)
+
+  foreach(sdk ${SWIFTEXE_TARGET_TARGET_SDKS})
     set(THIN_INPUT_TARGETS)
 
     # Collect architecture agnostic SDK module dependencies

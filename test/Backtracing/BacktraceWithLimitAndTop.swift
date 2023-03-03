@@ -4,7 +4,7 @@
 // RUN: %target-run %t/BacktraceWithLimitAndTop | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=ios
+// REQUIRES: OS=macosx
 
 import _Backtracing
 

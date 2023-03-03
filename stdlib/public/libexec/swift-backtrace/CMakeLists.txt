@@ -9,4 +9,6 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_STDLIB
     _Backtracing
 
   INSTALL_IN_COMPONENT stdlib
-  COMPILE_FLAGS -parse-as-library)
+  COMPILE_FLAGS -parse-as-library
+
+  TARGET_SDKS OSX)

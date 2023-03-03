@@ -159,10 +159,7 @@ if(SWIFT_BUILD_STDLIB)
     add_subdirectory(Observation)
   endif()
 
-  # Make this macOS only for now.
-  if(OSX IN_LIST SWIFT_SDKS)
-    add_subdirectory(Backtracing)
-  endif()
+  add_subdirectory(Backtracing)
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)

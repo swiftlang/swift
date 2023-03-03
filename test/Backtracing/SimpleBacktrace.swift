@@ -4,7 +4,7 @@
 // RUN: %target-run %t/SimpleBacktrace | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=iOS || OS=watchOS || OS=tvOS
+// REQUIRES: OS=macosx
 
 func level1() {
   level2()

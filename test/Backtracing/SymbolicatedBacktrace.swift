@@ -4,7 +4,7 @@
 // RUN: %target-run %t/SymbolicatedBacktrace | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=ios || OS=watchOS || OS=tvOS
+// REQUIRES: OS=macosx
 
 import _Backtracing
 

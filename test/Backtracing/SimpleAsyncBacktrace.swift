@@ -5,7 +5,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=iOS || OS=watchOS || OS=tvOS
+// REQUIRES: OS=macosx
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
