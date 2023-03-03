@@ -7500,7 +7500,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto internalLabel = getParameterName();
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(),
-      getValueOwnership(), isIsolated(), /*isNoDerivative*/ false,
+      getSpecifier(), isIsolated(), /*isNoDerivative*/ false,
       isCompileTimeConst());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }

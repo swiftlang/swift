@@ -693,9 +693,9 @@ namespace {
 
     template <class G>
     void addParameter(const G &generator,
-                      ValueOwnership ownership = ValueOwnership::Default) {
+                      ParamSpecifier ownership = ParamSpecifier::Default) {
       Type gTyIface = generator.build(*this);
-      auto flags = ParameterTypeFlags().withValueOwnership(ownership);
+      auto flags = ParameterTypeFlags().withOwnershipSpecifier(ownership);
       InterfaceParams.emplace_back(gTyIface, Identifier(), flags);
     }
 
@@ -1097,20 +1097,20 @@ static ValueDecl *getAtomicStoreOperation(ASTContext &ctx, Identifier id,
 static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
                                       BuiltinValueKind BV) {
 
-  ValueOwnership ownership;
+  ParamSpecifier ownership;
   Type builtinTy;
   switch (BV) {
   case BuiltinValueKind::CastToNativeObject:
   case BuiltinValueKind::UnsafeCastToNativeObject:
   case BuiltinValueKind::CastFromNativeObject:
     builtinTy = Context.TheNativeObjectType;
-    ownership = ValueOwnership::Owned;
+    ownership = ParamSpecifier::LegacyOwned;
     break;
 
   case BuiltinValueKind::BridgeToRawPointer:
   case BuiltinValueKind::BridgeFromRawPointer:
     builtinTy = Context.TheRawPointerType;
-    ownership = ValueOwnership::Default;
+    ownership = ParamSpecifier::Default;
     break;
 
   default:
@@ -1208,7 +1208,7 @@ static ValueDecl *getCastReferenceOperation(ASTContext &ctx,
   // <T, U> T -> U
   // SILGen and IRGen check additional constraints during lowering.
   BuiltinFunctionBuilder builder(ctx, 2);
-  builder.addParameter(makeGenericParam(0), ValueOwnership::Owned);
+  builder.addParameter(makeGenericParam(0), ParamSpecifier::LegacyOwned);
   builder.setResult(makeGenericParam(1));
   return builder.build(name);
 }
@@ -1218,7 +1218,7 @@ static ValueDecl *getReinterpretCastOperation(ASTContext &ctx,
   // <T, U> T -> U
   // SILGen and IRGen check additional constraints during lowering.
   BuiltinFunctionBuilder builder(ctx, 2);
-  builder.addParameter(makeGenericParam(0), ValueOwnership::Owned);
+  builder.addParameter(makeGenericParam(0), ParamSpecifier::LegacyOwned);
   builder.setResult(makeGenericParam(1));
   return builder.build(name);
 }
@@ -1388,7 +1388,7 @@ static ValueDecl *getConvertStrongToUnownedUnsafe(ASTContext &ctx,
   // builtin, so we can crash.
   BuiltinFunctionBuilder builder(ctx, 2);
   builder.addParameter(makeGenericParam(0));
-  builder.addParameter(makeGenericParam(1), ValueOwnership::InOut);
+  builder.addParameter(makeGenericParam(1), ParamSpecifier::InOut);
   builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
   return builder.build(id);
 }
@@ -1404,7 +1404,7 @@ static ValueDecl *getConvertUnownedUnsafeToGuaranteed(ASTContext &ctx,
   // builtin, so we can crash.
   BuiltinFunctionBuilder builder(ctx, 3);
   builder.addParameter(makeGenericParam(0));                        // Base
-  builder.addParameter(makeGenericParam(1), ValueOwnership::InOut); // Unmanaged
+  builder.addParameter(makeGenericParam(1), ParamSpecifier::InOut); // Unmanaged
   builder.setResult(makeGenericParam(2)); // Guaranteed Result
   return builder.build(id);
 }
@@ -1632,7 +1632,7 @@ static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
   BuiltinFunctionBuilder builder(Context);
-  builder.addParameter(makeGenericParam(), ValueOwnership::InOut);
+  builder.addParameter(makeGenericParam(), ParamSpecifier::InOut);
   builder.setResult(makeConcrete(Context.TheRawPointerType));
   return builder.build(Id);
 }
@@ -1659,7 +1659,7 @@ static ValueDecl *getTypeJoinInoutOperation(ASTContext &Context,
                                             Identifier Id) {
   // <T,U,V> (inout T, U.Type) -> V.Type
   BuiltinFunctionBuilder builder(Context, 3);
-  builder.addParameter(makeGenericParam(0), ValueOwnership::InOut);
+  builder.addParameter(makeGenericParam(0), ParamSpecifier::InOut);
   builder.addParameter(makeMetatype(makeGenericParam(1)));
   builder.setResult(makeMetatype(makeGenericParam(2)));
   return builder.build(Id);

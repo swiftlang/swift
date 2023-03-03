@@ -72,6 +72,7 @@ class InOutType;
 class OpaqueTypeDecl;
 class OpenedArchetypeType;
 class PackType;
+enum class ParamSpecifier : uint8_t;
 class PlaceholderTypeRepr;
 enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
@@ -2069,6 +2070,29 @@ public:
   }
 };
 
+/// The various spellings of ownership modifier that can be used in source.
+enum class ParamSpecifier : uint8_t {
+  /// No explicit ownership specifier was provided. The parameter will use the
+  /// default ownership convention for the declaration.
+  Default = 0,
+
+  /// `inout`, indicating exclusive mutable access to the argument for the
+  /// duration of a call.
+  InOut = 1,
+
+  /// `borrowing`, indicating nonexclusive access to the argument for the
+  /// duration of a call.
+  Borrowing = 2,
+  /// `consuming`, indicating ownership transfer of the argument from caller
+  /// to callee.
+  Consuming = 3,
+
+  /// `__shared`, a legacy spelling of `borrowing`.
+  LegacyShared = 4,
+  /// `__owned`, a legacy spelling of `consuming`.
+  LegacyOwned = 5,
+};
+
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {
@@ -2077,8 +2101,8 @@ class ParameterTypeFlags {
     Variadic     = 1 << 0,
     AutoClosure  = 1 << 1,
     NonEphemeral = 1 << 2,
-    OwnershipShift = 3,
-    Ownership    = 7 << OwnershipShift,
+    SpecifierShift = 3,
+    Specifier    = 7 << SpecifierShift,
     NoDerivative = 1 << 6,
     Isolated     = 1 << 7,
     CompileTimeConst = 1 << 8,
@@ -2096,11 +2120,11 @@ public:
   }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
-                     ValueOwnership ownership, bool isolated, bool noDerivative,
+                     ParamSpecifier specifier, bool isolated, bool noDerivative,
                      bool compileTimeConst)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
-              uint8_t(ownership) << OwnershipShift |
+              uint8_t(specifier) << SpecifierShift |
               (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
               (compileTimeConst ? CompileTimeConst : 0)){}
@@ -2108,7 +2132,7 @@ public:
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
-                    bool isNonEphemeral, ValueOwnership ownership,
+                    bool isNonEphemeral, ParamSpecifier ownership,
                     bool isolated, bool isNoDerivative,
                     bool compileTimeConst);
 
@@ -2123,9 +2147,12 @@ public:
   bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
 
-  ValueOwnership getValueOwnership() const {
-    return ValueOwnership((value.toRaw() & Ownership) >> OwnershipShift);
+  /// Get the spelling of the parameter specifier used on the parameter.
+  ParamSpecifier getOwnershipSpecifier() const {
+    return ParamSpecifier((value.toRaw() & Specifier) >> SpecifierShift);
   }
+
+  ValueOwnership getValueOwnership() const;
 
   ParameterTypeFlags withVariadic(bool variadic) const {
     return ParameterTypeFlags(variadic ? value | ParameterTypeFlags::Variadic
@@ -2133,8 +2160,8 @@ public:
   }
 
   ParameterTypeFlags withInOut(bool isInout) const {
-    return withValueOwnership(isInout ? ValueOwnership::InOut
-                                      : ValueOwnership::Default);
+    return withOwnershipSpecifier(isInout ? ParamSpecifier::InOut
+                                          : ParamSpecifier::Default);
   }
 
   ParameterTypeFlags withCompileTimeConst(bool isConst) const {
@@ -2143,18 +2170,18 @@ public:
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
-    return withValueOwnership(isShared ? ValueOwnership::Shared
-                                       : ValueOwnership::Default);
+    return withOwnershipSpecifier(isShared ? ParamSpecifier::LegacyShared
+                                           : ParamSpecifier::Default);
   }
 
   ParameterTypeFlags withOwned(bool isOwned) const {
-    return withValueOwnership(isOwned ? ValueOwnership::Owned
-                                      : ValueOwnership::Default);
+    return withOwnershipSpecifier(isOwned ? ParamSpecifier::LegacyOwned
+                                          : ParamSpecifier::Default);
   }
 
-  ParameterTypeFlags withValueOwnership(ValueOwnership ownership) const {
-    return (value - ParameterTypeFlags::Ownership)
-            | ParameterFlags(uint8_t(ownership) << OwnershipShift);
+  ParameterTypeFlags withOwnershipSpecifier(ParamSpecifier specifier) const {
+    return (value - ParameterTypeFlags::Specifier)
+            | ParameterFlags(uint8_t(specifier) << SpecifierShift);
   }
 
   ParameterTypeFlags withAutoClosure(bool isAutoClosure) const {
@@ -2217,8 +2244,8 @@ enum class ParameterFlagHandling {
 class YieldTypeFlags {
   enum YieldFlags : uint8_t {
     None        = 0,
-    Ownership   = 7,
-    OwnershipShift = 0,
+    Specifier   = 7,
+    SpecifierShift = 0,
 
     NumBits = 3
   };
@@ -2234,42 +2261,44 @@ public:
     return YieldTypeFlags(OptionSet<YieldFlags>(raw));
   }
 
-  YieldTypeFlags(ValueOwnership ownership)
-      : value(uint8_t(ownership) << OwnershipShift) {}
+  YieldTypeFlags(ParamSpecifier specifier)
+      : value(uint8_t(specifier) << SpecifierShift) {}
 
   bool isInOut() const { return getValueOwnership() == ValueOwnership::InOut; }
   bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
 
-  ValueOwnership getValueOwnership() const {
-    return ValueOwnership((value.toRaw() & Ownership) >> OwnershipShift);
+  ParamSpecifier getOwnershipSpecifier() const {
+    return ParamSpecifier((value.toRaw() & Specifier) >> SpecifierShift);
   }
+  
+  ValueOwnership getValueOwnership() const;
 
   YieldTypeFlags withInOut(bool isInout) const {
-    return withValueOwnership(isInout ? ValueOwnership::InOut
-                                      : ValueOwnership::Default);
+    return withOwnershipSpecifier(isInout ? ParamSpecifier::InOut
+                                          : ParamSpecifier::Default);
   }
   
   YieldTypeFlags withShared(bool isShared) const {
-    return withValueOwnership(isShared ? ValueOwnership::Shared
-                                       : ValueOwnership::Default);
+    return withOwnershipSpecifier(isShared ? ParamSpecifier::LegacyShared
+                                           : ParamSpecifier::Default);
   }
 
   YieldTypeFlags withOwned(bool isOwned) const {
-    return withValueOwnership(isOwned ? ValueOwnership::Owned
-                                      : ValueOwnership::Default);
+    return withOwnershipSpecifier(isOwned ? ParamSpecifier::LegacyOwned
+                                          : ParamSpecifier::Default);
   }
 
-  YieldTypeFlags withValueOwnership(ValueOwnership ownership) const {
-    return (value - YieldTypeFlags::Ownership)
-            | YieldFlags(uint8_t(ownership) << OwnershipShift);
+  YieldTypeFlags withOwnershipSpecifier(ParamSpecifier ownership) const {
+    return (value - YieldTypeFlags::Specifier)
+            | YieldFlags(uint8_t(ownership) << SpecifierShift);
   }
 
   /// Return these flags interpreted as parameter flags.
   ParameterTypeFlags asParamFlags() const {
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
-                              /*nonEphemeral*/ false, getValueOwnership(),
+                              /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
                               /*compileTimeConst*/false);
   }
@@ -7087,16 +7116,16 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
-    ValueOwnership ownership, bool isolated, bool isNoDerivative,
+    ParamSpecifier ownership, bool isolated, bool isNoDerivative,
     bool compileTimeConst) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
   // ParameterTypeFlags::fromParameterType entirely.
   if (paramTy->is<InOutType>()) {
-    assert(ownership == ValueOwnership::Default ||
-           ownership == ValueOwnership::InOut);
-    ownership = ValueOwnership::InOut;
+    assert(ownership == ParamSpecifier::Default ||
+           ownership == ParamSpecifier::InOut);
+    ownership = ParamSpecifier::InOut;
   }
   return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isolated,
           isNoDerivative, compileTimeConst};

@@ -380,9 +380,10 @@ Type ASTBuilder::createFunctionType(
 
     auto label = Ctx.getIdentifier(param.getLabel());
     auto flags = param.getFlags();
-    auto ownership = flags.getValueOwnership();
+    auto ownership =
+      ParamDecl::getParameterSpecifierForValueOwnership(flags.getValueOwnership());
     auto parameterFlags = ParameterTypeFlags()
-                              .withValueOwnership(ownership)
+                              .withOwnershipSpecifier(ownership)
                               .withVariadic(flags.isVariadic())
                               .withAutoClosure(flags.isAutoClosure())
                               .withNoDerivative(flags.isNoDerivative());

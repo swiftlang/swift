@@ -2793,10 +2793,64 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   }
 }
 
+static ParamSpecifier
+getDefaultOwnership(const ValueDecl *forDecl) {
+  // `consuming` is the default ownership for initializers and setters.
+  // Everything else defaults to borrowing.
+  if (!forDecl) {
+    return ParamSpecifier::Borrowing;
+  }
+  auto forFuncDecl = dyn_cast<AbstractFunctionDecl>(forDecl);
+  if (!forFuncDecl) {
+    return ParamSpecifier::Borrowing;
+  }
+  
+  if (isa<ConstructorDecl>(forFuncDecl)) {
+    return ParamSpecifier::Consuming;
+  } else if (auto accessor = dyn_cast<AccessorDecl>(forFuncDecl)) {
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::Modify:
+    case AccessorKind::Set:
+      return ParamSpecifier::Consuming;
+    default:
+      return ParamSpecifier::Borrowing;
+    }
+  }
+  
+  return ParamSpecifier::Borrowing;
+}
+
+static ParameterTypeFlags
+getParameterFlagsForMangling(ParameterTypeFlags flags,
+                             ParamSpecifier defaultSpecifier) {
+  switch (auto specifier = flags.getOwnershipSpecifier()) {
+  // If no parameter specifier was provided, mangle as-is, because we are by
+  // definition using the default convention.
+  case ParamSpecifier::Default:
+  // If the legacy `__shared` or `__owned` modifier was provided, mangle as-is,
+  // because we need to maintain compatibility with their existing behavior.
+  case ParamSpecifier::LegacyShared:
+  case ParamSpecifier::LegacyOwned:
+  // `inout` should already be specified in the flags.
+  case ParamSpecifier::InOut:
+    return flags;
+  
+  case ParamSpecifier::Consuming:
+  case ParamSpecifier::Borrowing:
+    // Only mangle the ownership if it diverges from the default.
+    if (specifier == defaultSpecifier) {
+      flags = flags.withOwnershipSpecifier(ParamSpecifier::Default);
+    }
+    return flags;
+  }
+}
+
 void ASTMangler::appendFunctionInputType(
     ArrayRef<AnyFunctionType::Param> params,
     GenericSignature sig,
     const ValueDecl *forDecl) {
+  auto defaultSpecifier = getDefaultOwnership(forDecl);
+  
   switch (params.size()) {
   case 0:
     appendOperator("y");
@@ -2810,8 +2864,14 @@ void ASTMangler::appendFunctionInputType(
     // the parameter list as a single type.
     if (!param.hasLabel() && !param.isVariadic() &&
         !isa<TupleType>(type.getPointer())) {
-      appendTypeListElement(Identifier(), type, param.getParameterFlags(),
-                            sig, forDecl);
+      // Note that we pass `nullptr` as the `forDecl` argument, since the type
+      // of the input is no longer directly the type of the declaration, so we
+      // don't want it to pick up contextual behavior, such as default ownership,
+      // from the top-level declaration type.
+      appendTypeListElement(Identifier(), type,
+                        getParameterFlagsForMangling(param.getParameterFlags(),
+                                                     defaultSpecifier),
+                        sig, nullptr);
       break;
     }
 
@@ -2823,8 +2883,14 @@ void ASTMangler::appendFunctionInputType(
   default:
     bool isFirstParam = true;
     for (auto &param : params) {
+      // Note that we pass `nullptr` as the `forDecl` argument, since the type
+      // of the input is no longer directly the type of the declaration, so we
+      // don't want it to pick up contextual behavior, such as default ownership,
+      // from the top-level declaration type.
       appendTypeListElement(Identifier(), param.getPlainType(),
-                            param.getParameterFlags(), sig, forDecl);
+                        getParameterFlagsForMangling(param.getParameterFlags(),
+                                                     defaultSpecifier),
+                        sig, nullptr);
       appendListSeparator(isFirstParam);
     }
     appendOperator("t");

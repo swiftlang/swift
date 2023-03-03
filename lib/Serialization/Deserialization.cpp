@@ -5724,23 +5724,6 @@ getActualReferenceOwnership(serialization::ReferenceOwnership raw) {
   return None;
 }
 
-/// Translate from the serialization ValueOwnership enumerators, which are
-/// guaranteed to be stable, to the AST ones.
-static Optional<swift::ValueOwnership>
-getActualValueOwnership(serialization::ValueOwnership raw) {
-  switch (raw) {
-#define CASE(ID) \
-  case serialization::ValueOwnership::ID: \
-    return swift::ValueOwnership::ID;
-  CASE(Default)
-  CASE(InOut)
-  CASE(Shared)
-  CASE(Owned)
-#undef CASE
-  }
-  return None;
-}
-
 /// Translate from the serialization ParameterConvention enumerators,
 /// which are guaranteed to be stable, to the AST ones.
 static
@@ -6114,8 +6097,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
         isCompileTimeConst);
 
-    auto ownership =
-        getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
+    auto ownership = getActualParamDeclSpecifier(
+      (serialization::ParamDeclSpecifier)rawOwnership);
     if (!ownership)
       return MF.diagnoseFatal();
 
