@@ -75,13 +75,6 @@ protocol MyProtocol {}
 // LIBRARY-DAG: Literal[Array]/None/Flair[ExprAtFileScope]: [{#(values)#}][#Array#]; name=[]
 // LIBRARY-DAG: Literal[Dictionary]/None/Flair[ExprAtFileScope]: [{#(key)#}: {#(value)#}][#Dictionary#]; name=[: ]
 // LIBRARY-DAG: Literal[Tuple]/None/Flair[ExprAtFileScope]: ({#(values)#}); name=()
-// LIBRARY-DAG: Keyword[#fileID]/None/Flair[ExprAtFileScope]: #fileID[#String#]; name=#fileID
-// LIBRARY-DAG: Keyword[#file]/None/Flair[ExprAtFileScope]: #file[#String#]; name=#file
-// LIBRARY-DAG: Keyword[#filePath]/None/Flair[ExprAtFileScope]: #filePath[#String#]; name=#filePath
-// LIBRARY-DAG: Keyword[#function]/None/Flair[ExprAtFileScope]: #function[#String#]; name=#function
-// LIBRARY-DAG: Keyword[#line]/None/Flair[ExprAtFileScope]: #line[#Int#]; name=#line
-// LIBRARY-DAG: Keyword[#column]/None/Flair[ExprAtFileScope]: #column[#Int#]; name=#column
-// LIBRARY-DAG: Keyword[#dsohandle]/None/Flair[ExprAtFileScope]: #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
 // LIBRARY-DAG: Decl[Struct]/CurrModule/Flair[ExprAtFileScope]: MyStruct[#MyStruct#]; name=MyStruct
 // LIBRARY-DAG: Decl[Protocol]/CurrModule/Flair[RareType,ExprAtFileScope]: MyProtocol[#MyProtocol#]; name=MyProtocol
 // LIBRARY-DAG: Decl[Struct]/OtherModule[Swift]/Flair[ExprAtFileScope]/IsSystem: Int[#Int#]; name=Int
@@ -151,13 +144,6 @@ protocol MyProtocol {}
 // SCRIPT-DAG: Literal[Array]/None: [{#(values)#}][#Array#]; name=[]
 // SCRIPT-DAG: Literal[Dictionary]/None: [{#(key)#}: {#(value)#}][#Dictionary#]; name=[: ]
 // SCRIPT-DAG: Literal[Tuple]/None: ({#(values)#}); name=()
-// SCRIPT-DAG: Keyword[#fileID]/None: #fileID[#String#]; name=#fileID
-// SCRIPT-DAG: Keyword[#file]/None: #file[#String#]; name=#file
-// SCRIPT-DAG: Keyword[#filePath]/None: #filePath[#String#]; name=#filePath
-// SCRIPT-DAG: Keyword[#function]/None: #function[#String#]; name=#function
-// SCRIPT-DAG: Keyword[#line]/None: #line[#Int#]; name=#line
-// SCRIPT-DAG: Keyword[#column]/None: #column[#Int#]; name=#column
-// SCRIPT-DAG: Keyword[#dsohandle]/None: #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
 // SCRIPT-DAG: Decl[Struct]/CurrModule: MyStruct[#MyStruct#]; name=MyStruct
 // SCRIPT-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: MyProtocol[#MyProtocol#]; name=MyProtocol
 // SCRIPT-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#]; name=Int

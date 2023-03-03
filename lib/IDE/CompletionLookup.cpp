@@ -2577,58 +2577,6 @@ void CompletionLookup::addTypeRelationFromProtocol(
   }
 }
 
-void CompletionLookup::addPoundLiteralCompletions(bool needPound) {
-  CodeCompletionFlair flair;
-  if (isCodeCompletionAtTopLevelOfLibraryFile(CurrDeclContext))
-    flair |= CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope;
-
-  auto addFromProto = [&](MagicIdentifierLiteralExpr::Kind magicKind,
-                          Optional<CodeCompletionLiteralKind> literalKind) {
-    CodeCompletionKeywordKind kwKind;
-    switch (magicKind) {
-    case MagicIdentifierLiteralExpr::FileIDSpelledAsFile:
-      kwKind = CodeCompletionKeywordKind::pound_file;
-      break;
-    case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
-      // Already handled by above case.
-      return;
-#define MAGIC_IDENTIFIER_TOKEN(NAME, TOKEN)                                    \
-  case MagicIdentifierLiteralExpr::NAME:                                       \
-    kwKind = CodeCompletionKeywordKind::TOKEN;                                 \
-    break;
-#include "swift/AST/MagicIdentifierKinds.def"
-    }
-
-    StringRef name = MagicIdentifierLiteralExpr::getKindString(magicKind);
-    if (!needPound)
-      name = name.substr(1);
-
-    if (!literalKind) {
-      // Pointer type
-      addKeyword(name, "UnsafeRawPointer", kwKind, flair);
-      return;
-    }
-
-    CodeCompletionResultBuilder builder(Sink, CodeCompletionResultKind::Keyword,
-                                        SemanticContextKind::None);
-    builder.addFlair(flair);
-    builder.setLiteralKind(literalKind.value());
-    builder.setKeywordKind(kwKind);
-    builder.addBaseName(name);
-    addTypeRelationFromProtocol(builder, literalKind.value());
-  };
-
-#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                     \
-  addFromProto(MagicIdentifierLiteralExpr::NAME,                               \
-               CodeCompletionLiteralKind::StringLiteral);
-#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                        \
-  addFromProto(MagicIdentifierLiteralExpr::NAME,                               \
-               CodeCompletionLiteralKind::IntegerLiteral);
-#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                    \
-  addFromProto(MagicIdentifierLiteralExpr::NAME, None);
-#include "swift/AST/MagicIdentifierKinds.def"
-}
-
 void CompletionLookup::addValueLiteralCompletions() {
   auto &context = CurrDeclContext->getASTContext();
 
@@ -2802,7 +2750,6 @@ void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
 
   if (LiteralCompletions) {
     addValueLiteralCompletions();
-    addPoundLiteralCompletions(/*needPound=*/true);
   }
 
   addObjCPoundKeywordCompletions(/*needPound=*/true);
