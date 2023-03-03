@@ -293,8 +293,10 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 
 #endif
 
-/// Suspends the current task,
-/// then calls the given closure with an unsafe continuation for the current task.
+/// Invokes the passed in closure and provides with an unsafe continuation for the current task.
+/// The body of the closure executes synchronously on the calling task, and once it returns
+/// the calling task is suspended. It is possible to immediately resume the task, or escape the
+/// continuation in order to complete it afterwards, and thus resuming the suspended task.
 ///
 /// - Parameter fn: A closure that takes an `UnsafeContinuation` parameter.
 /// You must resume the continuation exactly once.
@@ -311,8 +313,10 @@ public func withUnsafeContinuation<T>(
   }
 }
 
-/// Suspends the current task,
-/// then calls the given closure with an unsafe throwing continuation for the current task.
+/// Invokes the passed in closure and provides with a unsafe throwing continuation for the current task.
+/// The body of the closure executes synchronously on the calling task, and once it returns
+/// the calling task is suspended. It is possible to immediately resume the task, or escape the
+/// continuation in order to complete it afterwards, and thus resuming the suspended task.
 ///
 /// - Parameter fn: A closure that takes an `UnsafeContinuation` parameter.
 /// You must resume the continuation exactly once.

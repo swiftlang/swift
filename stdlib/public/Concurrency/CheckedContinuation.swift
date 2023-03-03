@@ -252,8 +252,10 @@ extension CheckedContinuation {
   }
 }
 
-/// Suspends the current task,
-/// then calls the given closure with a checked continuation for the current task.
+/// Invokes the passed in closure and provides with a checked continuation for the current task.
+/// The body of the closure executes synchronously on the calling task, and once it returns
+/// the calling task is suspended. It is possible to immediately resume the task, or escape the
+/// continuation in order to complete it afterwards, and thus resuming the suspended task.
 ///
 /// - Parameters:
 ///   - function: A string identifying the declaration that is the notional
@@ -273,8 +275,10 @@ public func withCheckedContinuation<T>(
   }
 }
 
-/// Suspends the current task,
-/// then calls the given closure with a checked throwing continuation for the current task.
+/// Invokes the passed in closure and provides with a checked throwing continuation for the current task.
+/// The body of the closure executes synchronously on the calling task, and once it returns
+/// the calling task is suspended. It is possible to immediately resume the task, or escape the
+/// continuation in order to complete it afterwards, and thus resuming the suspended task.
 ///
 /// - Parameters:
 ///   - function: A string identifying the declaration that is the notional
