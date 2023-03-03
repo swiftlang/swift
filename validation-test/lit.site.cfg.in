@@ -105,6 +105,9 @@ if "@SWIFT_THREADING_PACKAGE@" != "none":
 if "@SWIFT_ENABLE_REFLECTION@" == "TRUE":
     config.available_features.add("reflection")
 
+if "@SWIFT_ENABLE_OBSERVATION@" == "TRUE":
+    config.available_features.add("observation")
+
 if "@SWIFT_BUILT_STANDALONE@" == "TRUE":
     config.available_features.add('standalone_build')
 
