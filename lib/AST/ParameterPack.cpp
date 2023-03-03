@@ -86,6 +86,14 @@ bool GenericTypeParamType::isParameterPack() const {
          GenericTypeParamType::TYPE_SEQUENCE_BIT;
 }
 
+PackType *TypeBase::getPackSubstitutionAsPackType() {
+  if (auto pack = getAs<PackType>()) {
+    return pack;
+  } else {
+    return PackType::getSingletonPackExpansion(this);
+  }
+}
+
 /// G<{X1, ..., Xn}, {Y1, ..., Yn}>... => {G<X1, Y1>, ..., G<Xn, Yn>}...
 PackExpansionType *PackExpansionType::expand() {
   auto countType = getCountType();

@@ -475,8 +475,10 @@ static ManagedValue createInputFunctionArgument(
     return ManagedValue::forUnmanaged(arg).copy(SGF, loc);
 
   case SILArgumentConvention::Direct_Owned:
-  case SILArgumentConvention::Pack_Owned:
     return SGF.emitManagedRValueWithCleanup(arg);
+
+  case SILArgumentConvention::Pack_Owned:
+    return SGF.emitManagedPackWithCleanup(arg);
 
   case SILArgumentConvention::Indirect_In:
     if (SGF.silConv.useLoweredAddresses())
