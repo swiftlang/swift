@@ -663,8 +663,14 @@ def enable_experimental_concise_pound_file : Flag<["-"],
 
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
-  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
+  Flags<[NoDriverOption, FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
+
+def cxx_compatibility_mode :
+  Joined<["-"], "cxx-compatibility-mode=">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Enables C++ interoperability; requires compatbility version to be"
+  "specified.">;
 
 def experimental_c_foreign_reference_types :
   Flag<["-"], "experimental-c-foreign-reference-types">,
