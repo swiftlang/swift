@@ -661,6 +661,9 @@ public:
       int result = getSortName(*rhs).compare(getSortName(*lhs));
       if (result != 0)
         return result;
+      // Two overloaded functions can have the same name when emitting C++.
+      if (isa<AbstractFunctionDecl>(*rhs) && isa<AbstractFunctionDecl>(*lhs))
+        return result;
 
       // Prefer value decls to extensions.
       assert(!(isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs)));

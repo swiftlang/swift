@@ -708,7 +708,7 @@ public:
       std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver)
       override;
 
-  void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
+  void semanticRefactoring(StringRef PrimaryFile, SemanticRefactoringInfo Info,
                            ArrayRef<const char *> Args,
                            SourceKitCancellationToken CancellationToken,
                            CategorizedEditsReceiver Receiver) override;

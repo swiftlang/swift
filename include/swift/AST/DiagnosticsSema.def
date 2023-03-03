@@ -1623,6 +1623,8 @@ ERROR(expose_generic_decl_to_cxx,none,
       "generic %0 %1 can not yet be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(expose_generic_requirement_to_cxx,none,
       "generic requirements for %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_throwing_to_cxx,none,
+      "%0 %1 can not yet be represented in C++ as it may throw an error", (DescriptiveDeclKind, ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))

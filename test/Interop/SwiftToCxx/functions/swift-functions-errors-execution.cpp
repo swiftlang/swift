@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/swift-functions-errors.swift -typecheck -module-name Functions -enable-experimental-cxx-interop -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %S/swift-functions-errors.swift -typecheck -module-name Functions -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX -emit-clang-header-path %t/functions.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-functions-errors-execution.o
-// RUN: %target-interop-build-swift %S/swift-functions-errors.swift -o %t/swift-functions-errors-execution -Xlinker %t/swift-functions-errors-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+// RUN: %target-interop-build-swift %S/swift-functions-errors.swift -o %t/swift-functions-errors-execution -Xlinker %t/swift-functions-errors-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX
 
 // RUN: %target-codesign %t/swift-functions-errors-execution
 // RUN: %target-run %t/swift-functions-errors-execution | %FileCheck %s
@@ -13,6 +13,9 @@
 
 // rdar://102167469
 // UNSUPPORTED: CPU=arm64e
+
+// for experimental feature GenerateBindingsForThrowingFunctionsInCXX:
+// REQUIRES: asserts
 
 #include <cassert>
 #include <cstdio>

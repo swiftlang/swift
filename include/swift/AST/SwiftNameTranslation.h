@@ -70,7 +70,8 @@ enum RepresentationError {
   UnrepresentableIsolatedInActor,
   UnrepresentableRequiresClientEmission,
   UnrepresentableGeneric,
-  UnrepresentableGenericRequirements
+  UnrepresentableGenericRequirements,
+  UnrepresentableThrows
 };
 
 struct DeclRepresentation {
