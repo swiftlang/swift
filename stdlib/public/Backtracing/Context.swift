@@ -219,7 +219,7 @@ extension arm_gprs {
 
   public static var registerCount: Int { return 56 }
 
-  #if (os(macOS) || os(iOS) || os(watchOS) || os(tvOS)) && arch(x86_64)
+  #if os(macOS) && arch(x86_64)
   init?(from thread: thread_t) {
     var state = darwin_x86_64_thread_state()
     let kr = mach_thread_get_state(thread, x86_THREAD_STATE64, &state)
@@ -580,7 +580,7 @@ extension arm_gprs {
 
   public static var registerCount: Int { return 40 }
 
-  #if (os(macOS) || os(iOS) || os(watchOS) || os(tvOS)) && arch(arm64)
+  #if os(macOS) && arch(arm64)
   init?(from thread: thread_t) {
     var state = darwin_arm64_thread_state()
     let kr = mach_thread_get_state(thread, ARM_THREAD_STATE64, &state)
@@ -629,7 +629,7 @@ extension arm_gprs {
   public static func withCurrentContext<T>(fn: (ARM64Context) throws -> T) throws -> T {
     throw NotYetImplemented()
   }
-  #elseif arch(arm64)
+  #elseif arch(arm64) || arch(arm64_32)
   @_silgen_name("_swift_get_cpu_context")
   static func _swift_get_cpu_context() -> ARM64Context
 
@@ -851,7 +851,7 @@ extension arm_gprs {
 
 // .. Darwin specifics .........................................................
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS)
 private func mach_thread_get_state<T>(_ thread: thread_t,
                                       _ flavor: CInt,
                                       _ result: inout T) -> kern_return_t {
@@ -878,7 +878,7 @@ private func mach_thread_get_state<T>(_ thread: thread_t,
 @_spi(Contexts) public typealias HostContext = X86_64Context
 #elseif arch(i386)
 @_spi(Contexts) public typealias HostContext = I386Context
-#elseif arch(arm64)
+#elseif arch(arm64) || arch(arm64_32)
 @_spi(Contexts) public typealias HostContext = ARM64Context
 #elseif arch(arm)
 @_spi(Contexts) public typealias HostContext = ARMContext

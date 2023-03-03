@@ -72,7 +72,7 @@ extension MemoryReader {
   }
 }
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS)
 @_implementationOnly import Darwin.Mach
 
 @_spi(MemoryReaders) public struct MachError: Error {

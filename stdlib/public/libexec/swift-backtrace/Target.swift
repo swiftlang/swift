@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS)
 
 import Darwin
 import Darwin.Mach
@@ -345,4 +345,4 @@ private func mach_thread_info<T>(_ thread: thread_t,
   }
 }
 
-#endif // os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#endif // os(macOS)
