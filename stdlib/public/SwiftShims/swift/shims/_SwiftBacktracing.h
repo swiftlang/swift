@@ -29,7 +29,9 @@
 
 #include <CoreFoundation/CFUUID.h>
 #include <CoreFoundation/CFString.h>
+#endif
 
+#if TARGET_OS_OSX
 #include <libproc.h>
 #endif
 
