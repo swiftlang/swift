@@ -3821,6 +3821,7 @@ static bool isEscaping(Type type) {
 
 static void printParameterFlags(ASTPrinter &printer,
                                 const PrintOptions &options,
+                                const ParamDecl *param,
                                 ParameterTypeFlags flags,
                                 bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
@@ -3828,21 +3829,27 @@ static void printParameterFlags(ASTPrinter &printer,
   if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
 
-  switch (flags.getValueOwnership()) {
-  case ValueOwnership::Default:
-    /* nothing */
+  switch (flags.getOwnershipSpecifier()) {
+  case ParamSpecifier::Default:
+    /*nothing*/
     break;
-  case ValueOwnership::InOut:
+  case ParamSpecifier::InOut:
     printer.printKeyword("inout", options, " ");
     break;
-  case ValueOwnership::Shared:
+  case ParamSpecifier::Borrowing:
+    printer.printKeyword("borrowing", options, " ");
+    break;
+  case ParamSpecifier::Consuming:
+    printer.printKeyword("consuming", options, " ");
+    break;
+  case ParamSpecifier::LegacyShared:
     printer.printKeyword("__shared", options, " ");
     break;
-  case ValueOwnership::Owned:
+  case ParamSpecifier::LegacyOwned:
     printer.printKeyword("__owned", options, " ");
     break;
   }
-
+  
   if (flags.isIsolated())
     printer.printKeyword("isolated", options, " ");
 
@@ -3977,7 +3984,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     if (!param->isVariadic() &&
         !willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
       auto type = TheTypeLoc.getType();
-      printParameterFlags(Printer, Options, paramFlags,
+      printParameterFlags(Printer, Options, param, paramFlags,
                           isEscaping(type));
     }
 
@@ -6266,7 +6273,7 @@ public:
         visit(type);
         Printer << "...";
       } else {
-        printParameterFlags(Printer, Options, Param.getParameterFlags(),
+        printParameterFlags(Printer, Options, nullptr, Param.getParameterFlags(),
                             isEscaping(type));
         visit(type);
       }

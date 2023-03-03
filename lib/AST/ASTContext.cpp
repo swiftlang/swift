@@ -3488,11 +3488,13 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   auto flags = ParameterTypeFlags().withIsolated(isIsolated);
   switch (selfAccess) {
   case SelfAccessKind::LegacyConsuming:
+    flags = flags.withOwnershipSpecifier(ParamSpecifier::LegacyOwned);
+    break;
   case SelfAccessKind::Consuming:
-    flags = flags.withValueOwnership(ValueOwnership::Owned);
+    flags = flags.withOwnershipSpecifier(ParamSpecifier::Consuming);
     break;
   case SelfAccessKind::Borrowing:
-    flags = flags.withValueOwnership(ValueOwnership::Shared);
+    flags = flags.withOwnershipSpecifier(ParamSpecifier::Borrowing);
     break;
   case SelfAccessKind::Mutating:
     flags = flags.withInOut(true);

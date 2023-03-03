@@ -3314,7 +3314,7 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
 
   AnyFunctionType::Param param(
       inputType, Identifier(),
-      ParameterTypeFlags().withValueOwnership(ValueOwnership::Owned));
+      ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::LegacyOwned));
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},

@@ -3201,8 +3201,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       // we've already ensured that the destination function is not
       // @differentiable.
       auto flags = param.getParameterFlags();
-      flags = flags.withValueOwnership(
-          param.isInOut() ? ValueOwnership::InOut : ValueOwnership::Default);
+      flags = flags.withOwnershipSpecifier(
+          param.isInOut() ? ParamSpecifier::InOut : ParamSpecifier::Default);
       flags = flags.withNonEphemeral(false)
                    .withNoDerivative(false);
       if (!flags.isNone())
