@@ -2939,7 +2939,48 @@ done:
   }
 }
 
-static Expr *findStorageReferenceExprForBorrow(Expr *e) {
+namespace {
+/// Container to hold the result of a search for the storage reference
+/// when determining to emit a borrow.
+struct StorageRefResult {
+private:
+  Expr *storageRef;
+  Expr *transitiveRoot;
+
+public:
+  // Represents an empty result
+  StorageRefResult() : storageRef(nullptr), transitiveRoot(nullptr) {}
+  bool isEmpty() const { return transitiveRoot == nullptr; }
+  operator bool() const { return !isEmpty(); }
+
+  /// The root of the expression that accesses the storage in \c storageRef.
+  /// When in doubt, this is probably what you want, as it includes the
+  /// entire expression tree involving the reference.
+  Expr *getTransitiveRoot() const { return transitiveRoot; }
+
+  /// The direct storage reference that was discovered.
+  Expr *getStorageRef() const { return storageRef; }
+
+  StorageRefResult(Expr *storageRef, Expr *transitiveRoot)
+      : storageRef(storageRef), transitiveRoot(transitiveRoot) {
+    assert(storageRef && transitiveRoot && "use the zero-arg init for empty");
+  }
+
+  // Initializes a storage reference where the base matches the ref.
+  StorageRefResult(Expr *storageRef)
+      : StorageRefResult(storageRef, storageRef) {}
+
+  StorageRefResult withTransitiveRoot(StorageRefResult refResult) const {
+    return withTransitiveRoot(refResult.transitiveRoot);
+  }
+
+  StorageRefResult withTransitiveRoot(Expr *newRoot) const {
+    return StorageRefResult(storageRef, newRoot);
+  }
+};
+} // namespace
+
+static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
   e = e->getSemanticsProvidingExpr();
 
   // These are basically defined as the cases implemented by SILGenLValue.
@@ -2962,71 +3003,100 @@ static Expr *findStorageReferenceExprForBorrow(Expr *e) {
   // sub-expression is a storage reference, but don't return the
   // sub-expression.
   } else if (auto tue = dyn_cast<TupleElementExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(tue->getBase()))
-      return tue;
+    if (auto result = findStorageReferenceExprForBorrow(tue->getBase()))
+      return result.withTransitiveRoot(tue);
+
   } else if (auto fve = dyn_cast<ForceValueExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(fve->getSubExpr()))
-      return fve;
+    if (auto result = findStorageReferenceExprForBorrow(fve->getSubExpr()))
+      return result.withTransitiveRoot(fve);
+
   } else if (auto boe = dyn_cast<BindOptionalExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(boe->getSubExpr()))
-      return boe;
+    if (auto result = findStorageReferenceExprForBorrow(boe->getSubExpr()))
+      return result.withTransitiveRoot(boe);
+
   } else if (auto oe = dyn_cast<OpenExistentialExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(oe->getExistentialValue()) &&
-        findStorageReferenceExprForBorrow(oe->getSubExpr()))
-      return oe;
+    if (findStorageReferenceExprForBorrow(oe->getExistentialValue()))
+      if (auto result = findStorageReferenceExprForBorrow(oe->getSubExpr()))
+        return result.withTransitiveRoot(oe);
+
   } else if (auto bie = dyn_cast<DotSyntaxBaseIgnoredExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(bie->getRHS()))
-      return bie;
+    if (auto result = findStorageReferenceExprForBorrow(bie->getRHS()))
+      return result.withTransitiveRoot(bie);
+
   } else if (auto te = dyn_cast<AnyTryExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(te->getSubExpr()))
-      return te;
+    if (auto result = findStorageReferenceExprForBorrow(te->getSubExpr()))
+      return result.withTransitiveRoot(te);
+
   } else if (auto ioe = dyn_cast<InOutExpr>(e)) {
     return ioe;
   }
 
-  return nullptr;
+  return StorageRefResult();
 }
 
-Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow(
-    SILGenFunction &SGF) && {
+Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
+    SILGenFunction &SGF, StorageReferenceOperationKind kind) && {
   if (!isExpr())
     return nullptr;
 
   auto argExpr = asKnownExpr();
-  auto *li = dyn_cast<LoadExpr>(argExpr);
-  if (!li)
-    return nullptr;
 
-  auto *lvExpr = ::findStorageReferenceExprForBorrow(li->getSubExpr());
-
-  // Claim the value of this argument if we found a storage reference that has a
-  // move only base.
-  if (lvExpr) {
-    // We want to perform a borrow if our initial type is a pure move only /or/
-    // if after looking through multiple copyable member ref expr, we get to a
-    // move only member ref expr or a move only decl ref expr.
-    //
-    // NOTE: We purposely do not look through load implying that if we have
-    // copyable types extracted from a move only class, we will not borrow.
-    auto *iterExpr = lvExpr;
-    while (true) {
-      SILType ty = SGF.getLoweredType(
-          iterExpr->getType()->getWithoutSpecifierType()->getCanonicalType());
-      if (ty.isPureMoveOnly())
-        break;
-
-      if (auto *mre = dyn_cast<MemberRefExpr>(iterExpr)) {
-        iterExpr = mre->getBase();
-        continue;
-      }
-
-      return nullptr;
-    }
-
-    (void)std::move(*this).asKnownExpr();
+  // If there's a load around the outer part of this arg expr, look past it.
+  bool sawLoad = false;
+  if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
+    argExpr = li->getSubExpr();
+    sawLoad = true;
   }
 
-  return lvExpr;
+  // If we're consuming instead, then the load _must_ have been there.
+  if (kind == StorageReferenceOperationKind::Consume && !sawLoad)
+    return nullptr;
+
+  auto result = ::findStorageReferenceExprForBorrow(argExpr);
+
+  if (!result)
+    return nullptr;
+
+  // We want to perform a borrow/consume if the first piece of storage being
+  // referenced is a move-only type.
+
+  VarDecl *storage = nullptr;
+  Type type;
+  if (auto dre = dyn_cast<DeclRefExpr>(result.getStorageRef())) {
+    storage = dyn_cast<VarDecl>(dre->getDecl());
+    type = dre->getType();
+  } else if (auto mre = dyn_cast<MemberRefExpr>(result.getStorageRef())) {
+    storage = dyn_cast<VarDecl>(mre->getDecl().getDecl());
+    type = mre->getType();
+  }
+
+  if (!storage)
+      return nullptr;
+  assert(type);
+
+  SILType ty =
+      SGF.getLoweredType(type->getWithoutSpecifierType()->getCanonicalType());
+  if (!ty.isPureMoveOnly())
+      return nullptr;
+
+  // It makes sense to borrow any kind of storage we refer to at this stage,
+  // but SILGenLValue does not currently handle some kinds of references well.
+  //
+  // When rejecting to do the LValue-style borrow here, it'll end up going thru
+  // the RValue-style emission, after which the extra copy will get eliminated.
+  //
+  // If we did not see a LoadExpr around the argument expression, then only
+  // do the borrow if the storage is non-local.
+  // FIXME: I don't have a principled reason for why this matters and hope that
+  // we can fix the AST we're working with.
+  if (!sawLoad && storage->getDeclContext()->isLocalContext())
+      return nullptr;
+
+  // Claim the value of this argument since we found a storage reference that
+  // has a move only base.
+  (void)std::move(*this).asKnownExpr();
+
+  return result.getTransitiveRoot();
 }
 
 Expr *
@@ -3054,7 +3124,8 @@ ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
   if (!borrowExpr)
     return nullptr;
 
-  auto *lvExpr = ::findStorageReferenceExprForBorrow(borrowExpr->getSubExpr());
+  Expr *lvExpr = ::findStorageReferenceExprForBorrow(borrowExpr->getSubExpr())
+                     .getTransitiveRoot();
 
   // Claim the value of this argument.
   if (lvExpr) {
@@ -3068,7 +3139,8 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
   if (!isExpr()) return nullptr;
 
   auto argExpr = asKnownExpr();
-  auto lvExpr = ::findStorageReferenceExprForBorrow(argExpr);
+  auto *lvExpr =
+      ::findStorageReferenceExprForBorrow(argExpr).getTransitiveRoot();
 
   // Claim the value of this argument if we found a storage reference.
   if (lvExpr) {
@@ -3318,8 +3390,8 @@ private:
     }
 
     if (IsYield) {
-      if (auto lvExpr = findStorageReferenceExprForBorrow(e)) {
-        emitExpandedBorrowed(lvExpr, origParamType);
+      if (auto result = findStorageReferenceExprForBorrow(e)) {
+        emitExpandedBorrowed(result.getTransitiveRoot(), origParamType);
         return;
       }
     }
@@ -3431,7 +3503,8 @@ private:
     assert(paramsSlice.size() == 1);
 
     // Try to find an expression we can emit as a borrowed l-value.
-    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnlyBorrow(SGF);
+    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnly(
+        SGF, ArgumentSource::StorageReferenceOperationKind::Borrow);
     if (!lvExpr)
       return false;
 
@@ -3503,8 +3576,9 @@ private:
                                ClaimedParamsRef paramsSlice) {
     assert(paramsSlice.size() == 1);
 
-    // Try to find an expression we can emit as a borrowed l-value.
-    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnlyBorrow(SGF);
+    // Try to find an expression we can emit as a consumed l-value.
+    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnly(
+        SGF, ArgumentSource::StorageReferenceOperationKind::Consume);
     if (!lvExpr)
       return false;
 
