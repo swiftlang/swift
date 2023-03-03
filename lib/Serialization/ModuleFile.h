@@ -107,6 +107,9 @@ public:
     bool isImplementationOnly() const {
       return Core.isImplementationOnly();
     }
+    bool isPackageOnly() const {
+      return Core.isPackageOnly();
+    }
 
     bool isHeader() const { return Core.isHeader(); }
     bool isScoped() const { return Core.isScoped(); }

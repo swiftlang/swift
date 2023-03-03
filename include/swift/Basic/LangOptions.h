@@ -396,6 +396,9 @@ namespace swift {
     /// Access or distribution level of the whole module being parsed.
     LibraryLevel LibraryLevel = LibraryLevel::Other;
 
+    /// The name of the package this module belongs to.
+    std::string PackageName;
+
     /// Warn about cases where Swift 3 would infer @objc but later versions
     /// of Swift do not.
     Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =

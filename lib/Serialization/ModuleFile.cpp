@@ -209,6 +209,10 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
       continue;
     }
 
+    if (dependency.isPackageOnly() &&
+        ctx.LangOpts.PackageName != this->getModulePackageName())
+      continue;
+
     ImportPath::Builder builder(ctx, dependency.Core.RawPath,
                                 /*separator=*/'\0');
     for (const auto &elem : builder) {

@@ -70,8 +70,7 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
            moduleName << "=" << moduleName;
 
     ModuleDecl::ImportFilter filter = {ModuleDecl::ImportFilterKind::Default,
-                           ModuleDecl::ImportFilterKind::Exported,
-                           ModuleDecl::ImportFilterKind::SPIAccessControl};
+                                       ModuleDecl::ImportFilterKind::Exported};
     if (Opts.PrintPrivateInterfaceContent)
       filter |= ModuleDecl::ImportFilterKind::SPIOnly;
 
@@ -228,8 +227,7 @@ static void printImports(raw_ostream &out,
   // it's not obvious what higher-level optimization would be factored out here.
   ModuleDecl::ImportFilter allImportFilter = {
       ModuleDecl::ImportFilterKind::Exported,
-      ModuleDecl::ImportFilterKind::Default,
-      ModuleDecl::ImportFilterKind::SPIAccessControl};
+      ModuleDecl::ImportFilterKind::Default};
 
   // With -experimental-spi-imports:
   // When printing the private swiftinterface file, print implementation-only
