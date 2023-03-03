@@ -368,6 +368,11 @@ public:
     if (kind)
       Box = SGF.B.createMarkUninitialized(decl, Box, kind.value());
 
+    // If we have a reference binding, mark it.
+    if (decl->getIntroducer() == VarDecl::Introducer::InOut)
+      Box = SGF.B.createMarkUnresolvedReferenceBindingInst(
+          decl, Box, MarkUnresolvedReferenceBindingInst::Kind::InOut);
+
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
       auto loweredType = SGF.getTypeLowering(decl->getType()).getLoweredType();
       auto lifetime = SGF.F.getLifetime(decl, loweredType);
