@@ -1828,17 +1828,12 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   assert(result.second);
   (void)result;
 
-  // When move-only types are available, add a constraint to force generic
-  // parameters to conform to a "Copyable" protocol.
-  if (getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
-    ProtocolDecl *copyable = TypeChecker::getProtocol(
-        getASTContext(), SourceLoc(), KnownProtocolKind::Copyable);
-
-    // FIXME(kavon): there's a dependency ordering issues here with the
-    // protocol being defined in the stdlib, because when trying to build
-    // the stdlib itself, or a Swift program with -parse-stdlib, we can't
-    // load the protocol to add this constraint. (rdar://104898230)
-    assert(copyable && "stdlib is missing _Copyable protocol!");
+  // Add a constraint that generic parameters conform to Copyable.
+  // This lookup only can fail if the stdlib (i.e. the Swift module) has not
+  // been loaded because you've passed `-parse-stdlib` and are not building the
+  // stdlib itself (which would have `-module-name Swift` too).
+  if (auto *copyable = TypeChecker::getProtocol(getASTContext(), SourceLoc(),
+                                                KnownProtocolKind::Copyable)) {
     addConstraint(
         ConstraintKind::ConformsTo, typeVar,
         copyable->getDeclaredInterfaceType(),

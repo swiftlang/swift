@@ -501,7 +501,19 @@ void BindingSet::finalize(
 
         if (TransitiveProtocols.has_value()) {
           for (auto *constraint : *TransitiveProtocols) {
-            auto protocolTy = constraint->getSecondType();
+            Type protocolTy = constraint->getSecondType();
+
+            // The Copyable protocol can't have members, yet will be a
+            // constraint of basically all type variables, so don't suggest it.
+            //
+            // NOTE: worth considering for all marker protocols, but keep in
+            // mind that you're allowed to extend them with members!
+            if (auto p = protocolTy->getAs<ProtocolType>()) {
+              if (ProtocolDecl *decl = p->getDecl())
+                if (decl->isSpecificProtocol(KnownProtocolKind::Copyable))
+                  continue;
+            }
+
             addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
           }
         }

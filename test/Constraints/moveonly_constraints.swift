@@ -150,7 +150,8 @@ func checkCasting(_ b: any Box, _ mo: __shared MO, _ a: Any) {
 
   let _: Sendable = (MO(), MO()) // expected-error {{move-only type '(MO, MO)' cannot be used with generics yet}}
   let _: Sendable = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
-  let _: _Copyable = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  let _: _Copyable = mo // expected-error {{'_Copyable' is unavailable}}
+                        // expected-error@-1 {{move-only type 'MO' cannot be used with generics yet}}
   let _: AnyObject = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   let _: Any = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 
@@ -162,8 +163,6 @@ func checkCasting(_ b: any Box, _ mo: __shared MO, _ a: Any) {
   _ = 5 as MO // expected-error {{cannot convert value of type 'Int' to type 'MO' in coercion}}
   _ = a as MO // expected-error {{cannot convert value of type 'Any' to type 'MO' in coercion}}
   _ = b as MO // expected-error {{cannot convert value of type 'any Box' to type 'MO' in coercion}}
-
-  // FIXME(kavon): make sure at runtime these casts actually fail, or just make them errors? (rdar://104900293)
 
   _ = MO() is AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
   // expected-error@-1 {{move-only types cannot be conditionally cast}}

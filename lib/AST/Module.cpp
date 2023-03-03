@@ -1768,9 +1768,12 @@ LookupConformanceInModuleRequest::evaluate(
       if (nominal->isMoveOnly()) {
         return ProtocolConformanceRef::forInvalid();
       } else {
-        // FIXME: this should probably follow the Sendable case in that
-        // we should synthesize and append a ProtocolConformance to the `conformances` list.
-       return ProtocolConformanceRef(protocol);
+        // Specifically do not create a concrete conformance to Copyable. At
+        // this stage, we don't even want Copyable to appear in swiftinterface
+        // files, which will happen for a marker protocol that's registered
+        // in a nominal type's conformance table. We can reconsider this
+        // decision later once there's a clearer picture of noncopyable generics
+        return ProtocolConformanceRef(protocol);
       }
     } else {
       // Was unable to infer the missing conformance.
