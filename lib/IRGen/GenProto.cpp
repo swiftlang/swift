@@ -258,15 +258,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
                                           const RequirementCallback &callback) {
   if (!signature) return;
 
-  // Get all unique pack generic parameter shapes.
-  SmallSetVector<CanType, 2> packs;
-  for (auto gp : signature.getGenericParams()) {
-    if (gp->isParameterPack()) {
-      packs.insert(signature->getReducedShape(gp)->getCanonicalType());
-    }
-  }
-
-  for (auto type : packs)
+  for (auto type : signature->getShapeClasses())
     callback(GenericRequirement::forShape(type));
 
   // Get all of the type metadata.

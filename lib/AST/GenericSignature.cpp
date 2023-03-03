@@ -544,6 +544,19 @@ GenericSignatureImpl::haveSameShape(Type type1, Type type2) const {
   return getRequirementMachine()->haveSameShape(type1, type2);
 }
 
+SmallVector<CanType, 2> GenericSignatureImpl::getShapeClasses() const {
+  SmallSetVector<CanType, 2> result;
+
+  forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+    if (!canonical || !gp->isParameterPack())
+      return;
+
+    result.insert(getReducedShape(gp)->getCanonicalType());
+  });
+
+  return result.takeVector();
+}
+
 unsigned GenericParamKey::findIndexIn(
                       TypeArrayView<GenericTypeParamType> genericParams) const {
   // For depth 0, we have random access. We perform the extra checking so that
