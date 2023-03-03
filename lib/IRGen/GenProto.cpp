@@ -4083,14 +4083,10 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         }
 
         // Generic parameters.
-        signature->forEachParam([&](GenericTypeParamType *param,
-                                    bool canonical) {
-          fields.addInt(Int8Ty,
-                        GenericParamDescriptor(GenericParamKind::Type,
-                                               canonical,
-                                               false)
-                          .getIntValue());
-        });
+        auto metadata =
+            irgen::addGenericParameters(*this, fields, signature, /*implicit=*/false);
+        assert(metadata.NumParamsEmitted == metadata.NumParams &&
+               "Implicit GenericParamDescriptors not supported here");
 
         // Need to pad the structure after generic parameters
         // up to four bytes because generic requirements that

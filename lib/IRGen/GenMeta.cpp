@@ -137,25 +137,6 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
   }
 }
 
-static GenericParamDescriptor
-getGenericParamDescriptor(GenericTypeParamType *param, bool canonical) {
-  return GenericParamDescriptor(GenericParamKind::Type,
-                                /*key argument*/ canonical,
-                                /*extra argument*/ false);
-}
-
-static bool canUseImplicitGenericParamDescriptors(CanGenericSignature sig) {
-  bool allImplicit = true;
-  unsigned count = 0;
-  sig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
-    auto descriptor = getGenericParamDescriptor(param, canonical);
-    if (descriptor != GenericParamDescriptor::implicit())
-      allImplicit = false;
-    count++;
-  });
-  return allImplicit && count <= MaxNumImplicitGenericParamDescriptors;
-}
-
 /*****************************************************************************/
 /** Metadata completion ******************************************************/
 /*****************************************************************************/
@@ -428,32 +409,23 @@ namespace {
       ConstantAggregateBuilderBase::PlaceholderPosition;
     PlaceholderPosition NumParamsPP;
     PlaceholderPosition NumRequirementsPP;
-    PlaceholderPosition NumKeyArgumentsPP;
-    PlaceholderPosition NumExtraArgumentsPP;
+    PlaceholderPosition NumGenericKeyArgumentsPP;
+    PlaceholderPosition FlagsPP;
     unsigned NumParams = 0;
     unsigned NumRequirements = 0;
-    unsigned NumKeyArguments = 0;
-    unsigned NumExtraArguments = 0;
+    unsigned NumGenericKeyArguments = 0;
 
     GenericSignatureHeaderBuilder(IRGenModule &IGM,
                                   ConstantStructBuilder &builder)
       : NumParamsPP(builder.addPlaceholderWithSize(IGM.Int16Ty)),
         NumRequirementsPP(builder.addPlaceholderWithSize(IGM.Int16Ty)),
-        NumKeyArgumentsPP(builder.addPlaceholderWithSize(IGM.Int16Ty)),
-        NumExtraArgumentsPP(builder.addPlaceholderWithSize(IGM.Int16Ty)) {}
-
-    void adjustAfterParameter(GenericParamDescriptor param) {
-      ++NumParams;
-      if (param.hasKeyArgument())
-        ++NumKeyArguments;
-      if (param.hasExtraArgument())
-        ++NumExtraArguments;
-    }
+        NumGenericKeyArgumentsPP(builder.addPlaceholderWithSize(IGM.Int16Ty)),
+        FlagsPP(builder.addPlaceholderWithSize(IGM.Int16Ty)) {}
 
     void adjustAfterRequirements(const GenericRequirementsMetadata &info) {
-      NumRequirements = info.NumRequirements;
-      NumKeyArguments += info.NumGenericKeyArguments;
-      NumExtraArguments += info.NumGenericExtraArguments;
+      NumParams += info.NumParams;
+      NumRequirements += info.NumRequirements;
+      NumGenericKeyArguments += info.NumGenericKeyArguments;
     }
 
     void finish(IRGenModule &IGM, ConstantStructBuilder &b) {
@@ -464,13 +436,14 @@ namespace {
       b.fillPlaceholderWithInt(NumRequirementsPP, IGM.Int16Ty,
                                NumRequirements);
 
-      assert(NumKeyArguments <= UINT16_MAX && "way too generic");
-      b.fillPlaceholderWithInt(NumKeyArgumentsPP, IGM.Int16Ty,
-                               NumKeyArguments);
+      assert(NumGenericKeyArguments <= UINT16_MAX && "way too generic");
+      b.fillPlaceholderWithInt(NumGenericKeyArgumentsPP, IGM.Int16Ty,
+                               NumGenericKeyArguments);
 
-      assert(NumExtraArguments <= UINT16_MAX && "way too generic");
-      b.fillPlaceholderWithInt(NumExtraArgumentsPP, IGM.Int16Ty,
-                               NumExtraArguments);
+      bool hasTypePacks = false;
+      GenericContextDescriptorFlags flags(hasTypePacks);
+      b.fillPlaceholderWithInt(FlagsPP, IGM.Int16Ty,
+                               flags.getIntValue());
     }
   };
 
@@ -533,24 +506,17 @@ namespace {
     
     void addGenericParameters() {
       GenericSignature sig = asImpl().getGenericSignature();
-      assert(sig);
-      auto canSig = sig.getCanonicalSignature();
-
-      canSig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
-        // Currently, there are only type parameters. The parameter is a key
-        // argument if it's canonical in its generic context.
-        asImpl().addGenericParameter(
-          getGenericParamDescriptor(param, canonical));
-      });
+      auto metadata =
+        irgen::addGenericParameters(IGM, B,
+                                    asImpl().getGenericSignature(),
+                                    /*implicit=*/false);
+      assert(metadata.NumParams == metadata.NumParamsEmitted &&
+             "We can't use implicit GenericParamDescriptors here");
+      SignatureHeader->adjustAfterRequirements(metadata);
 
       // Pad the structure up to four bytes for the following requirements.
       addPaddingAfterGenericParamDescriptors(IGM, B,
                                              SignatureHeader->NumParams);
-    }
-    
-    void addGenericParameter(GenericParamDescriptor param) {
-      B.addInt(IGM.Int8Ty, param.getIntValue());
-      SignatureHeader->adjustAfterParameter(param);
     }
     
     void addGenericRequirements() {
@@ -6090,6 +6056,56 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 }
 
 //===----------------------------------------------------------------------===//
+// Generic parameters.
+//===----------------------------------------------------------------------===//
+
+static GenericParamDescriptor
+getGenericParamDescriptor(GenericTypeParamType *param, bool canonical) {
+  return GenericParamDescriptor(GenericParamKind::Type,
+                                /*key argument*/ canonical);
+}
+
+static bool canUseImplicitGenericParamDescriptors(CanGenericSignature sig) {
+  bool allImplicit = true;
+  unsigned count = 0;
+  sig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
+    auto descriptor = getGenericParamDescriptor(param, canonical);
+    if (descriptor != GenericParamDescriptor::implicit())
+      allImplicit = false;
+    count++;
+  });
+  return allImplicit && count <= MaxNumImplicitGenericParamDescriptors;
+}
+
+GenericRequirementsMetadata
+irgen::addGenericParameters(IRGenModule &IGM, ConstantStructBuilder &B,
+                            GenericSignature sig, bool implicit) {
+  assert(sig);
+  auto canSig = sig.getCanonicalSignature();
+
+  GenericRequirementsMetadata metadata;
+
+  canSig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
+    // Currently, there are only type parameters. The parameter is a key
+    // argument if it's canonical in its generic context.
+    auto descriptor = getGenericParamDescriptor(param, canonical);
+    if (implicit)
+      assert(descriptor == GenericParamDescriptor::implicit());
+    else {
+      ++metadata.NumParamsEmitted;
+      B.addInt(IGM.Int8Ty, descriptor.getIntValue());
+    }
+
+    ++metadata.NumParams;
+
+    if (descriptor.hasKeyArgument())
+      ++metadata.NumGenericKeyArguments;
+  });
+
+  return metadata;
+}
+
+//===----------------------------------------------------------------------===//
 // Generic requirements.
 //===----------------------------------------------------------------------===//
 
@@ -6112,8 +6128,6 @@ static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
                                   llvm::function_ref<void ()> addReference) {
   if (flags.hasKeyArgument())
     ++metadata.NumGenericKeyArguments;
-  if (flags.hasExtraArgument())
-    ++metadata.NumGenericExtraArguments;
 
   B.addInt(IGM.Int32Ty, flags.getIntValue());
   addRelativeAddressOfTypeRef(IGM, B, paramType, nullptr);
@@ -6125,14 +6139,32 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
                                    GenericSignature sig,
                                    ArrayRef<Requirement> requirements) {
   assert(sig);
+
   GenericRequirementsMetadata metadata;
   for (auto &requirement : requirements) {
+    auto kind = requirement.getKind();
     bool isPackRequirement = requirement.getFirstType()->isParameterPack();
 
-    switch (auto kind = requirement.getKind()) {
+    GenericRequirementKind abiKind;
+    switch (kind) {
+    case RequirementKind::Conformance:
+      abiKind = GenericRequirementKind::Protocol;
+      break;
     case RequirementKind::SameShape:
-      llvm_unreachable("Same-shape requirement not supported here");
+      abiKind = GenericRequirementKind::SameShape;
+      break;
+    case RequirementKind::SameType:
+      abiKind = GenericRequirementKind::SameType;
+      break;
+    case RequirementKind::Superclass:
+      abiKind = GenericRequirementKind::BaseClass;
+      break;
+    case RequirementKind::Layout:
+      abiKind = GenericRequirementKind::Layout;
+      break;
+    }
 
+    switch (kind) {
     case RequirementKind::Layout:
       ++metadata.NumRequirements;
 
@@ -6140,9 +6172,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
                 requirement.getLayoutConstraint()->getKind()) {
       case LayoutConstraintKind::Class: {
         // Encode the class constraint.
-        auto flags = GenericRequirementFlags(GenericRequirementKind::Layout,
+        auto flags = GenericRequirementFlags(abiKind,
                                              /*key argument*/ false,
-                                             /*extra argument*/ false,
                                              isPackRequirement);
         addGenericRequirement(IGM, B, metadata, sig, flags,
                               requirement.getFirstType(),
@@ -6167,9 +6198,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
       ++metadata.NumRequirements;
       bool needsWitnessTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
-      auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
+      auto flags = GenericRequirementFlags(abiKind,
                                            /*key argument*/needsWitnessTable,
-                                           /*extra argument*/false,
                                            isPackRequirement);
       auto descriptorRef =
         IGM.getConstantReferenceForProtocolDescriptor(protocol);
@@ -6187,16 +6217,13 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
       break;
     }
 
+    case RequirementKind::SameShape:
     case RequirementKind::SameType:
     case RequirementKind::Superclass: {
       ++metadata.NumRequirements;
-      auto abiKind = kind == RequirementKind::SameType
-        ? GenericRequirementKind::SameType
-        : GenericRequirementKind::BaseClass;
 
       auto flags = GenericRequirementFlags(abiKind,
                                            /*key argument*/false,
-                                           /*extra argument*/false,
                                            isPackRequirement);
       auto typeName =
           IGM.getTypeRef(requirement.getSecondType(), nullptr,
@@ -6476,15 +6503,9 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     auto addParamDescriptors = [&](CanGenericSignature sig,
                                    GenericSignatureHeaderBuilder &header,
                                    bool implicit) {
-      sig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
-        auto descriptor = getGenericParamDescriptor(param, canonical);
-        assert(!implicit || descriptor == GenericParamDescriptor::implicit());
-        if (!implicit) {
-          b.addInt(IGM.Int8Ty, descriptor.getIntValue());
-          totalParamDescriptors++;
-        }
-        header.adjustAfterParameter(descriptor);
-      });
+      auto info = irgen::addGenericParameters(IGM, b, sig, implicit);
+      header.adjustAfterRequirements(info);
+      totalParamDescriptors += info.NumParamsEmitted;
     };
     addParamDescriptors(reqSig, reqHeader, flags.hasImplicitReqSigParams());
     if (genSig)

@@ -30,38 +30,6 @@ struct TargetProtocolConformanceDescriptor;
 template <typename Runtime>
 struct TargetGenericContext;
 
-class GenericContextDescriptorFlags {
-  uint16_t Value;
-
-public:
-  constexpr GenericContextDescriptorFlags() : Value(0) {}
-
-  explicit constexpr GenericContextDescriptorFlags(uint16_t value)
-    : Value(value) {}
-
-  constexpr GenericContextDescriptorFlags(bool hasTypePacks)
-    : GenericContextDescriptorFlags(
-        GenericContextDescriptorFlags((uint16_t)0)
-          .withHasTypePacks(hasTypePacks)) {}
-
-  /// Whether this generic context has at least one type parameter
-  /// pack, in which case the generic context will have a trailing
-  /// GenericPackShapeHeader.
-  constexpr bool hasTypePacks() const {
-    return (Value & 0x1) != 0;
-  }
-
-  constexpr GenericContextDescriptorFlags
-  withHasTypePacks(bool hasTypePacks) const {
-    return GenericContextDescriptorFlags((uint16_t)(
-      (Value & ~0x1) | (hasTypePacks ? 0x1 : 0)));
-  }
-
-  constexpr uint16_t getIntValue() const {
-    return Value;
-  }
-};
-
 template <typename Runtime>
 struct TargetGenericContextDescriptorHeader {
   /// The number of (source-written) generic parameters, and thus
@@ -87,15 +55,25 @@ struct TargetGenericContextDescriptorHeader {
   uint16_t NumRequirements;
 
   /// The size of the "key" area of the argument layout, in words.
-  /// Key arguments include generic parameters and conformance
-  /// requirements which are part of the identity of the context.
+  /// Key arguments include shape classes, generic parameters and
+  /// conformance requirements which are part of the identity of
+  /// the context.
   ///
-  /// The key area of the argument layout consists of a sequence
-  /// of type metadata pointers (in the same order as the parameter
-  /// descriptors, for those parameters which satisfy hasKeyArgument())
-  /// followed by a sequence of witness table pointers (in the same
-  /// order as the requirements, for those requirements which satisfy
-  /// hasKeyArgument()).
+  /// The key area of the argument layout consists of:
+  ///
+  /// - a sequence of pack lengths, in the same order as the parameter
+  ///   descriptors which satisfy getKind() == GenericParamKind::TypePack
+  ///   and hasKeyArgument();
+  ///
+  /// - a sequence of metadata or metadata pack pointers, in the same
+  ///   order as the parameter descriptors which satisfy hasKeyArgument();
+  ///
+  /// - a sequence of witness table or witness table pack pointers, in the
+  ///   same order as the requirement descriptors which satisfy
+  ///   hasKeyArgument().
+  ///
+  /// The elements above which are packs are precisely those appearing
+  /// in the sequence of trailing GenericPackShapeDescriptors.
   uint16_t NumKeyArguments;
 
   /// Originally this was the size of the "extra" area of the argument
@@ -258,11 +236,6 @@ struct GenericPackShapeHeader {
 
   /// The number of equivalence classes in the same-shape relation.
   uint16_t NumShapeClasses;
-};
-
-enum class GenericPackKind: uint16_t {
-  Metadata = 0,
-  WitnessTable = 1
 };
 
 /// The GenericPackShapeHeader is followed by an array of these descriptors,
@@ -534,13 +507,6 @@ public:
 
     return {this->template getTrailingObjects<GenericPackShapeDescriptor>(),
             header.NumPacks};
-  }
-
-  /// Return the amount of space that the generic arguments take up in
-  /// metadata of this type.
-  StoredSize getGenericArgumentsStorageSize() const {
-    return StoredSize(getGenericContextHeader().getNumArguments())
-             * sizeof(StoredPointer);
   }
 
   RuntimeGenericSignature<Runtime> getGenericSignature() const {
