@@ -612,6 +612,10 @@ private:
     case DeclContextKind::TopLevelCodeDecl:
       return getOrCreateContext(DC->getParent());
 
+    case DeclContextKind::Package: {
+      auto *pkg = cast<PackageUnit>(DC);
+      return getOrCreateContext(pkg);
+    }
     case DeclContextKind::Module:
       return getOrCreateModule(
           {ImportPath::Access(), cast<ModuleDecl>(DC)});

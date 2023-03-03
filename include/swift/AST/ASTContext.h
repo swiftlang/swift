@@ -103,6 +103,7 @@ namespace swift {
   class Identifier;
   class InheritedNameSet;
   class ModuleDecl;
+  class PackageUnit;
   class ModuleDependenciesCache;
   class ModuleLoader;
   class NominalTypeDecl;

@@ -603,6 +603,7 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   assert(DC && "cannot reference a null DeclContext");
 
   switch (DC->getContextKind()) {
+  case DeclContextKind::Package:
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit: // Skip up to the module
     return DeclContextID();
@@ -1830,7 +1831,6 @@ static bool shouldSerializeMember(Decl *D) {
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
-
   case DeclKind::Missing:
     llvm_unreachable("attempting to serialize a missing decl");
 
@@ -1934,6 +1934,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::MacroDecl:
     llvm_unreachable("cannot cross-reference this context");
 
+  case DeclContextKind::Package:
+    llvm_unreachable("should only cross-reference something within a module");
   case DeclContextKind::Module:
     llvm_unreachable("should only cross-reference something within a file");
 

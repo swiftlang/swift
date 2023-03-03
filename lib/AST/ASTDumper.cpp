@@ -1359,6 +1359,10 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
   }
 
   switch (dc->getContextKind()) {
+  case DeclContextKind::Package:
+    printName(os, cast<PackageUnit>(dc)->getName());
+    break;
+
   case DeclContextKind::Module:
     printName(os, cast<ModuleDecl>(dc)->getRealName());
     break;

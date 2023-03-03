@@ -26,6 +26,7 @@ class Expr;
 class ClosureExpr;
 class CustomAttr;
 class ModuleDecl;
+class PackageUnit;
 class Stmt;
 class Pattern;
 class TypeRepr;
@@ -101,7 +102,7 @@ enum class MacroWalking {
 class ASTWalker {
 public:
   enum class ParentKind {
-    Module, Decl, Stmt, Expr, Pattern, TypeRepr
+    Package, Module, Decl, Stmt, Expr, Pattern, TypeRepr
   };
 
   class ParentTy {
@@ -109,6 +110,7 @@ public:
     void *Ptr = nullptr;
 
   public:
+    ParentTy(PackageUnit *Pkg) : Kind(ParentKind::Package), Ptr(Pkg) {}
     ParentTy(ModuleDecl *Mod) : Kind(ParentKind::Module), Ptr(Mod) {}
     ParentTy(Decl *D) : Kind(ParentKind::Decl), Ptr(D) {}
     ParentTy(Stmt *S) : Kind(ParentKind::Stmt), Ptr(S) {}
@@ -123,6 +125,10 @@ public:
       return Kind;
     }
 
+    PackageUnit *getAsPackage() const {
+      return Kind == ParentKind::Package ? static_cast<PackageUnit*>(Ptr)
+                                        : nullptr;
+    }
     ModuleDecl *getAsModule() const {
       return Kind == ParentKind::Module ? static_cast<ModuleDecl*>(Ptr)
                                         : nullptr;
