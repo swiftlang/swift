@@ -23,7 +23,7 @@
 #include <TargetConditionals.h>
 #endif
 
-#if TARGET_OS_OSX
+#if TARGET_OS_OSX || TARGET_OS_IPHONE
 #include <mach/machine.h>
 #include <mach/task.h>
 
@@ -76,7 +76,7 @@ struct arm_gprs {
 
 // .. Darwin specifics .........................................................
 
-#if TARGET_OS_OSX
+#if TARGET_OS_OSX || TARGET_OS_IPHONE
 
 /* Darwin thread states.  We can't import these from the system header because
    it uses all kinds of macros and the Swift importer can't cope with that.
@@ -258,7 +258,7 @@ enum {
   kCRSanitizePathKeepFile = 0x100 << 1,
 };
 
-#endif // TARGET_OS_OSX
+#endif // TARGET_OS_OSX || TARGET_OS_IPHONE
 
 #ifdef __cplusplus
 } // extern "C"
