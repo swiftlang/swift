@@ -45,10 +45,6 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int32[#Int32#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Int64[#Int64#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem:    Bool[#Bool#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#function]/None{{(/TypeRelation\[Convertible\])?}}: #function[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#file]/None{{(/TypeRelation\[Convertible\])?}}: #file[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#line]/None{{(/TypeRelation\[Convertible\])?}}: #line[#Int#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#column]/None{{(/TypeRelation\[Convertible\])?}}: #column[#Int#]{{; name=.+$}}
 // COMMON: End completions
 
 // NO_SELF-NOT: {{[[:<:]][Ss]elf[[:>:]]}}
