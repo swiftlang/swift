@@ -21,7 +21,7 @@
 /// Use of this macro in any other context is an error.
 @freestanding(expression)
 public macro externalMacro<T>(module: String, type: String) -> T =
-    Builtin.ExternalMacro
+  Builtin.ExternalMacro
 
 // File and path-related information
 
