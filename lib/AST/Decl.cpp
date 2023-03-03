@@ -413,6 +413,16 @@ void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
     }
   }
 
+  else if (auto *med = dyn_cast<MacroExpansionDecl>(mutableThis)) {
+    if (auto bufferID = evaluateOrDefault(
+            ctx.evaluator, ExpandMacroExpansionDeclRequest{med}, {})) {
+      auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
+      auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
+      for (auto *decl : sourceFile->getTopLevelDecls())
+        callback(decl);
+    }
+  }
+
   // FIXME: fold VarDecl::visitAuxiliaryDecls into this.
 }
 
@@ -1915,7 +1925,9 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
 
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
-  SourceLoc endLoc = getPatternList().back().getSourceRange().End;
+  SourceLoc endLoc = getPatternList().empty()
+      ? SourceLoc()
+      : getPatternList().back().getSourceRange().End;
   if (startLoc.isValid() != endLoc.isValid()) return SourceRange();
   return { startLoc, endLoc };
 }
@@ -10157,13 +10169,6 @@ unsigned MacroExpansionDecl::getDiscriminator() const {
 
   assert(getRawDiscriminator() != InvalidDiscriminator);
   return getRawDiscriminator();
-}
-
-ArrayRef<Decl *> MacroExpansionDecl::getRewritten() const {
-  auto mutableThis = const_cast<MacroExpansionDecl *>(this);
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      ExpandMacroExpansionDeclRequest{mutableThis}, {});
 }
 
 NominalTypeDecl *

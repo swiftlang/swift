@@ -54,9 +54,17 @@ public:
     return RetTy();
   }
 
+  RetTy visitMacroExpansionDecl(MacroExpansionDecl *D) {
+    // Expansion already visited as auxiliary decls.
+    return RetTy();
+  }
+
   /// A convenience method to visit all the members.
   void visitMembers(NominalTypeDecl *D) {
     for (Decl *member : D->getMembers()) {
+      member->visitAuxiliaryDecls([&](Decl *decl) {
+        asImpl().visit(decl);
+      });
       asImpl().visit(member);
     }
   }
@@ -77,12 +85,6 @@ public:
       if (dd->getDeclContext() == cd && cd->getImplementationContext() != cd)
         asImpl().visit(dd);
     }
-  }
-
-  /// Visit expanded macros.
-  void visitMacroExpansionDecl(MacroExpansionDecl *D) {
-    for (auto *decl : D->getRewritten())
-      asImpl().visit(decl);
   }
 };
 

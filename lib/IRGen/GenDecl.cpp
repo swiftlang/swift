@@ -2441,6 +2441,9 @@ void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariabl
 
 /// Emit a global declaration.
 void IRGenModule::emitGlobalDecl(Decl *D) {
+  D->visitAuxiliaryDecls([&](Decl *decl) {
+    emitGlobalDecl(decl);
+  });
   switch (D->getKind()) {
   case DeclKind::Extension:
     return emitExtension(cast<ExtensionDecl>(D));
@@ -2526,8 +2529,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::MacroExpansion:
-    for (auto *rewritten : cast<MacroExpansionDecl>(D)->getRewritten())
-      emitGlobalDecl(rewritten);
+    // Expansion already visited as auxiliary decls.
     return;
   }
 
@@ -5452,6 +5454,9 @@ Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
 
 void IRGenModule::emitNestedTypeDecls(DeclRange members) {
   for (Decl *member : members) {
+    member->visitAuxiliaryDecls([&](Decl *decl) {
+      emitNestedTypeDecls({decl, nullptr});
+    });
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
@@ -5512,8 +5517,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::MacroExpansion:
-      for (auto *decl : cast<MacroExpansionDecl>(member)->getRewritten())
-        emitNestedTypeDecls({decl, nullptr});
+      // Expansion already visited as auxiliary decls.
       continue;
     }
   }

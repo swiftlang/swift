@@ -2063,12 +2063,7 @@ public:
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     // Assign a discriminator.
     (void)MED->getDiscriminator();
-
-    auto rewritten = evaluateOrDefault(
-        Ctx.evaluator, ExpandMacroExpansionDeclRequest{MED}, {});
-
-    for (auto *decl : rewritten)
-      visit(decl);
+    // Expansion already visited as auxiliary decls.
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -3763,7 +3758,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
   }
 }
 
-ArrayRef<Decl *>
+Optional<unsigned>
 ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
   auto &ctx = MED->getASTContext();
@@ -3785,8 +3780,5 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   MED->setMacroRef(macro);
 
   // Expand the macro.
-  SmallVector<Decl *, 2> expandedTemporary;
-  if (!expandFreestandingDeclarationMacro(MED, expandedTemporary))
-    return {};
-  return ctx.AllocateCopy(expandedTemporary);
+  return expandFreestandingDeclarationMacro(MED);
 }
