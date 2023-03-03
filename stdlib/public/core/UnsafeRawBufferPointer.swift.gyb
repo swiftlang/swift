@@ -322,7 +322,9 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
 
 extension Unsafe${Mutable}RawBufferPointer {
   public func _customIndexOfEquatableElement(_ element: UInt8) -> Index?? {
-    guard let ptr = baseAddress, let found = _swift_stdlib_memchr(ptr, Int32(element), count) else { return Optional(nil) }
+    guard let ptr = baseAddress, let found = _swift_stdlib_memchr(ptr, Int32(element), count) else {
+      return Optional(nil)
+    }
     return Optional(Index(UnsafeRawPointer(found) - UnsafeRawPointer(ptr)))
   }
 
