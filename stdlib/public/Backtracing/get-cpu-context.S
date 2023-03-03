@@ -91,7 +91,7 @@ FN(_swift_get_cpu_context):
         movw %dx,     44(%eax)
         movw %gs,     %dx
         movw %dx,     46(%eax)
-        movl (%esp),  %dx
+        movl (%esp),  %edx
         movl %edx,    (%eax)
         movl $0xffff, 48(%eax)
         popl %eax
