@@ -420,6 +420,23 @@ CanType irgen::getFormalTypeInPrimaryContext(CanType abstractType) {
   return abstractType;
 }
 
+SILType irgen::getLoweredTypeInPrimaryContext(IRGenModule &IGM,
+                                              CanType abstractType) {
+  if (auto boundGenericType = dyn_cast<BoundGenericType>(abstractType)) {
+    CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
+
+    auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
+    const auto *boundConcreteTI = &IGM.getTypeInfo(concreteLoweredType);
+    auto packing = boundConcreteTI->getFixedPacking(IGM);
+
+    abstractType =
+        boundGenericType->getDecl()->getDeclaredType()->getCanonicalType();
+  }
+  CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
+
+  return IGM.getLoweredType(concreteFormalType);
+}
+
 void irgen::getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
                                           CanType abstractType) {
   assert(arg->getType() == IGF.IGM.TypeMetadataPtrTy &&

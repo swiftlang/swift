@@ -1948,7 +1948,7 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
 
   // Allocate a copy of the labels string within the tuple type allocator.
   size_t labelsLen = strlen(labels);
-  size_t labelsAllocSize = roundUpToAlignment(labelsLen + 1, sizeof(void*));
+  size_t labelsAllocSize = roundUpToAlignment(labelsLen + 2, sizeof(void *));
   char *newLabels =
     (char *) MetadataAllocator(TupleCacheTag).Allocate(labelsAllocSize, alignof(char));
   _swift_strlcpy(newLabels, labels, labelsAllocSize);
@@ -2464,13 +2464,21 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   vwtable->publishLayout(layout);
 }
 
+const TypeLayout unknownWeakTypeLayout =
+    TypeLayout(sizeof(uint8_t *), alignof(uint8_t *), {}, 0);
+
 void swift::swift_initStructMetadataWithLayoutString(
     StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
     const Metadata *const *fieldTypes, uint32_t *fieldOffsets) {
   auto layout = getInitialLayoutForValueType();
   performBasicLayout(
       layout, fieldTypes, numFields,
-      [&](const Metadata *fieldType) { return fieldType->getTypeLayout(); },
+      [&](const Metadata *fieldType) {
+        if (((uintptr_t)fieldType) == 0x7) {
+          return &unknownWeakTypeLayout;
+        }
+        return fieldType->getTypeLayout();
+      },
       [&](size_t i, const Metadata *fieldType, uint32_t offset) {
         assignUnlessEqual(fieldOffsets[i], offset);
       });
@@ -2483,6 +2491,11 @@ void swift::swift_initStructMetadataWithLayoutString(
     const Metadata *fieldType = fieldTypes[i];
     unsigned fieldExtraInhabitantCount =
       fieldType->vw_getNumExtraInhabitants();
+
+    if (((uintptr_t)fieldType) == 0x7) {
+      refCountBytes += sizeof(uint64_t);
+      continue;
+    }
 
     if (fieldExtraInhabitantCount > extraInhabitantCount) {
       extraInhabitantCount = fieldExtraInhabitantCount;
@@ -2509,6 +2522,16 @@ void swift::swift_initStructMetadataWithLayoutString(
   size_t offset = 0;
   for (unsigned i = 0; i < numFields; ++i) {
     const Metadata *fieldType = fieldTypes[i];
+
+    if (((uintptr_t)fieldType) == 0x7) {
+      offset = roundUpToAlignMask(offset, alignof(uint8_t *));
+      *(uint64_t *)(layoutStr + layoutStrOffset) =
+          ((uint64_t)RefCountingKind::UnknownWeak << 56) | offset;
+      layoutStrOffset += sizeof(uint64_t);
+
+      offset = sizeof(uint8_t *);
+      continue;
+    }
 
     if (offset) {
       uint64_t alignmentMask = fieldType->vw_alignment() - 1;

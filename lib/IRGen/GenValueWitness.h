@@ -51,6 +51,9 @@ namespace irgen {
   /// unbound generic types --- return the formal type within the type's
   /// primary defining context.
   CanType getFormalTypeInPrimaryContext(CanType abstractType);
+
+  SILType getLoweredTypeInPrimaryContext(IRGenModule &IGM,
+                                         CanType abstractType);
 }
 }
 

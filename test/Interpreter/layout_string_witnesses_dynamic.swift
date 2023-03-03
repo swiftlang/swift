@@ -34,7 +34,7 @@ func testGeneric() {
         let y = TestClass()
         // CHECK: Before deinit
         print("Before deinit")
-        
+
         // CHECK-NEXT: TestClass deinitialized!
         testGenericAssign(ptr, from: y)
     }
@@ -49,6 +49,90 @@ func testGeneric() {
 }
 
 testGeneric()
+
+func testGenericTuple() {
+    let ptr = allocateInternalGenericPtr(of: GenericTupleWrapper<TestClass>.self)
+
+    do {
+        let x = TestClass()
+        testGenericInit(ptr, to: GenericTupleWrapper((x, 32)))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: GenericTupleWrapper((y, 32)))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: GenericTupleWrapper<TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testGenericTuple()
+
+func testGenericNested() {
+    let ptr = allocateInternalGenericPtr(of: GenericNestedOuter<TestClass>.Inner.self)
+
+    do {
+        let x = TestClass()
+        testGenericInit(ptr, to: GenericNestedOuter<TestClass>.Inner(x))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: GenericNestedOuter<TestClass>.Inner(y))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: GenericNestedOuter<TestClass>.Inner.self)
+
+    ptr.deallocate()
+}
+
+testGenericNested()
+
+func testGenericNestedRef() {
+    let ptr = allocateInternalGenericPtr(of: GenericNestedRefOuter<TestClass>.Inner.self)
+
+    do {
+        let x = TestClass()
+        testGenericInit(ptr, to: GenericNestedRefOuter<TestClass>.Inner(x))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: GenericNestedRefOuter<TestClass>.Inner(y))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: GenericNestedRefOuter<TestClass>.Inner.self)
+
+    ptr.deallocate()
+}
+
+testGenericNestedRef()
 
 enum TestEnum {
     case empty

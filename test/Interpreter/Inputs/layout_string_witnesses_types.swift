@@ -146,6 +146,37 @@ public enum ForwardToPayloadEnum {
     case empty
 }
 
+public struct GenericTupleWrapper<T> {
+    let x: Int = 23
+    let y: (T, Int)
+
+    public init(_ y: (T, Int)) {
+        self.y = y
+    }
+}
+
+public struct GenericNestedOuter<T> {
+    public struct Inner {
+        let x: Int = 34
+        let y: T
+
+        public init(_ y: T) {
+            self.y = y
+        }
+    }
+}
+
+public struct GenericNestedRefOuter<T: AnyObject> {
+    public struct Inner {
+        let x: Int = 34
+        let y: T
+
+        public init(_ y: T) {
+            self.y = y
+        }
+    }
+}
+
 #if os(macOS)
 import Foundation
 
