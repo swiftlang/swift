@@ -3,9 +3,9 @@
 // REQUIRES: asserts
 
 // Parsing an UnresolvedSpecializeExpr containing a PackExpansionType
-struct G<T...> {}
+struct G<each T> {}
 
-func f<T...>(_: repeat each T) {
+func f<each T>(_: repeat each T) {
   _ = G< >.self
   _ = G<Int>.self
   _ = G<Int, String>.self
@@ -14,7 +14,7 @@ func f<T...>(_: repeat each T) {
 }
 
 // Forming PackExpansionTypeReprs in simplifyTypeExpr()
-func g<T...>(_: repeat each T) {
+func g<each T>(_: repeat each T) {
   _ = (repeat each T).self
   _ = (Int, repeat each T).self
   _ = ((repeat each T) -> ()).self

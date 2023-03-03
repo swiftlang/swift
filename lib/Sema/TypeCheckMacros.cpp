@@ -569,12 +569,6 @@ Expr *swift::expandMacroExpr(
       return nullptr;
     }
 
-    // Make sure macros are enabled before we expand.
-    if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
-      ctx.Diags.diagnose(expr->getLoc(), diag::macro_experimental);
-      return nullptr;
-    }
-
 #if SWIFT_SWIFT_PARSER
     PrettyStackTraceExpr debugStack(ctx, "expanding macro", expr);
 
@@ -738,9 +732,11 @@ bool swift::expandFreestandingDeclarationMacro(
       return false;
     }
 
-    // Make sure macros are enabled before we expand.
-    if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
-      med->diagnose(diag::macro_experimental);
+    // Make sure freestanding macros are enabled before we expand.
+    if (!ctx.LangOpts.hasFeature(Feature::FreestandingMacros) &&
+        !macro->getMacroRoles().contains(MacroRole::Expression)) {
+      med->diagnose(
+          diag::macro_experimental, "freestanding", "FreestandingMacros");
       return false;
     }
 
@@ -934,12 +930,6 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
                         macro->getName()
       );
       macro->diagnose(diag::decl_declared_here, macro->getName());
-      return nullptr;
-    }
-
-    // Make sure macros are enabled before we expand.
-    if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
-      attachedTo->diagnose(diag::macro_experimental);
       return nullptr;
     }
 

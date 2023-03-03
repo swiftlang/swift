@@ -93,9 +93,11 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated 
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 LANGUAGE_FEATURE(BuiltinIntLiteralAccessors, 368, "Builtin.IntLiteral accessors", true)
+LANGUAGE_FEATURE(Macros, 0, "Macros", true)
 LANGUAGE_FEATURE(
-    FreestandingExpressionMacros, 0, "@freestanding(expression) macros",
-    langOpts.hasFeature(Feature::Macros))
+    FreestandingExpressionMacros, 382, "Expression macros",
+    true)
+LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", true)
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
@@ -107,6 +109,7 @@ EXPERIMENTAL_FEATURE(VariadicGenerics, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(MoveOnly, true)
+EXPERIMENTAL_FEATURE(FreestandingMacros, true)
 
 // FIXME: MoveOnlyClasses is not intended to be in production,
 // but our tests currently rely on it, and we want to run those
@@ -159,9 +162,6 @@ EXPERIMENTAL_FEATURE(ImplicitSome, false)
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(ParserASTGen, false)
-
-/// Enable the experimental macros feature.
-EXPERIMENTAL_FEATURE(Macros, true)
 
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.

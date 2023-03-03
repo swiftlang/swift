@@ -117,7 +117,7 @@ public:
     friend class LoweredFunctionSignature;
   };
 
-  /// Represents a generic requirement paremeter that must be passed to the
+  /// Represents a generic requirement parameter that must be passed to the
   /// function.
   class GenericRequirementParameter {
   public:

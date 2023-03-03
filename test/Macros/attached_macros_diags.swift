@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature Macros -module-name MacrosTest
+// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name MacrosTest
 
 @attached(accessor) macro m1() = #externalMacro(module: "MyMacros", type: "Macro1")
 // expected-warning@-1{{external macro implementation type 'MyMacros.Macro1' could not be found for macro 'm1()'}}
