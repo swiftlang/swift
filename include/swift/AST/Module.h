@@ -789,13 +789,13 @@ public:
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
     Exported = 1 << 0,
-    /// Include "regular" imports with no special annotation.
+    /// Include "regular" imports with an access-level of `public`.
     Default = 1 << 1,
     /// Include imports declared with `@_implementationOnly` or with an
     /// access-level of `package` or less.
     ImplementationOnly = 1 << 2,
-    /// Include imports of SPIs declared with `@_spi`.
-    SPIAccessControl = 1 << 3,
+    /// Include imports declared with `package import`.
+    PackageOnly = 1 << 3,
     /// Include imports declared with `@_spiOnly`.
     SPIOnly = 1 << 4,
     /// Include imports shadowed by a cross-import overlay. Unshadowed imports

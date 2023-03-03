@@ -29,7 +29,7 @@ private import HiddenDep
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-experimental-feature AccessLevelOnImport
 // RUN: %target-swift-frontend -emit-module %t/PackageDep.swift -o %t -I %t \
-// RUN:   -enable-library-evolution \
+// RUN:   -enable-library-evolution -package-name MyPackage \
 // RUN:   -enable-experimental-feature AccessLevelOnImport
 // RUN: %target-swift-frontend -emit-module %t/InternalDep.swift -o %t -I %t \
 // RUN:   -enable-library-evolution \
@@ -42,6 +42,7 @@ private import HiddenDep
 // RUN:   -enable-experimental-feature AccessLevelOnImport
 
 // RUN: %target-swift-frontend -typecheck %t/ClientOfPublic.swift -I %t \
+// RUN:   -enable-library-evolution -package-name MyOtherPackage \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-HIDDEN-DEP %s
 // VISIBLE-HIDDEN-DEP: source: '{{.*}}HiddenDep.swiftmodule'
 //--- ClientOfPublic.swift

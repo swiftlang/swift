@@ -113,7 +113,8 @@ static void getImmediateImports(
         ModuleDecl::ImportFilterKind::Exported,
         ModuleDecl::ImportFilterKind::Default,
         ModuleDecl::ImportFilterKind::ImplementationOnly,
-        ModuleDecl::ImportFilterKind::SPIAccessControl,
+        ModuleDecl::ImportFilterKind::PackageOnly,
+        ModuleDecl::ImportFilterKind::SPIOnly,
         ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay}) {
   SmallVector<ImportedModule, 8> importList;
   module->getImportedModules(importList, importFilter);

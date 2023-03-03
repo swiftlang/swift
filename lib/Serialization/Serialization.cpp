@@ -1215,7 +1215,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
                         {ModuleDecl::ImportFilterKind::Exported,
                          ModuleDecl::ImportFilterKind::Default,
                          ModuleDecl::ImportFilterKind::ImplementationOnly,
-                         ModuleDecl::ImportFilterKind::SPIAccessControl});
+                         ModuleDecl::ImportFilterKind::PackageOnly});
   ImportedModule::removeDuplicates(allImports);
 
   // Collect the public and private imports as a subset so that we can
@@ -1224,8 +1224,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Exported);
   ImportSet privateImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Default);
-  ImportSet spiImportSet =
-      getImportsAsSet(M, ModuleDecl::ImportFilterKind::SPIAccessControl);
+  ImportSet packageOnlyImportSet =
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::PackageOnly);
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
@@ -1271,8 +1271,10 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     // form here.
     if (publicImportSet.count(import))
       stableImportControl = ImportControl::Exported;
-    else if (privateImportSet.count(import) || spiImportSet.count(import))
+    else if (privateImportSet.count(import))
       stableImportControl = ImportControl::Normal;
+    else if (packageOnlyImportSet.count(import))
+      stableImportControl = ImportControl::PackageOnly;
     else
       stableImportControl = ImportControl::ImplementationOnly;
 
