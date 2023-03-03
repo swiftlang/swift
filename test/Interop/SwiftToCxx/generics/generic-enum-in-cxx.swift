@@ -169,7 +169,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 
 
 // CHECK: SWIFT_INLINE_THUNK GenericOpt<uint16_t> makeConcreteOpt(uint16_t x) noexcept SWIFT_SYMBOL("s:8Generics15makeConcreteOptyAA07GenericD0Oys6UInt16VGAFF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_GenericOpt<uint16_t>::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_GenericOpt<uint16_t>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::swift_interop_returnDirect_Generics_uint32_t_0_4(result, _impl::$s8Generics15makeConcreteOptyAA07GenericD0Oys6UInt16VGAFF(x));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
@@ -183,7 +183,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
-// CHECK-NEXT:   return _impl::_impl_GenericOpt<T_0_0>::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_GenericOpt<T_0_0>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::$s8Generics14makeGenericOptyAA0cD0OyxGxlF(result, swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
@@ -250,7 +250,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT:     returnValue = *reinterpret_cast<void **>(payloadFromDestruction);
 // CHECK-NEXT:     return ::swift::_impl::implClassFor<T_0_0>::type::makeRetained(returnValue);
 // CHECK-NEXT:     } else if constexpr (::swift::_impl::isValueType<T_0_0>) {
-// CHECK-NEXT:     return ::swift::_impl::implClassFor<T_0_0>::type::returnNewValue([&](void * _Nonnull returnValue) {
+// CHECK-NEXT:     return ::swift::_impl::implClassFor<T_0_0>::type::returnNewValue([&](void * _Nonnull returnValue) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    return ::swift::_impl::implClassFor<T_0_0>::type::initializeWithTake(reinterpret_cast<char * _Nonnull>(returnValue), payloadFromDestruction);
 // CHECK-NEXT:     });
 // CHECK-NEXT:     } else if constexpr (::swift::_impl::isSwiftBridgedCxxRecord<T_0_0>) {

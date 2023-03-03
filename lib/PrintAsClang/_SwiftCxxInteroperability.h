@@ -35,16 +35,18 @@
 #if defined(DEBUG) && __has_attribute(used)
 // Additional 'used' attribute is used in debug mode to make inline thunks
 // accessible to LLDB.
-#define SWIFT_INLINE_THUNK                                                     \
-  inline __attribute__((always_inline)) __attribute__((artificial))            \
+#define SWIFT_INLINE_THUNK_ATTRIBUTES                                          \
+  __attribute__((always_inline)) __attribute__((artificial))                   \
   __attribute__((used))
 #else
-#define SWIFT_INLINE_THUNK                                                     \
-  inline __attribute__((always_inline)) __attribute__((artificial))
+#define SWIFT_INLINE_THUNK_ATTRIBUTES                                          \
+  __attribute__((always_inline)) __attribute__((artificial))
 #endif
 #else
-#define SWIFT_INLINE_THUNK inline
+#define SWIFT_INLINE_THUNK_ATTRIBUTES
 #endif
+
+#define SWIFT_INLINE_THUNK inline SWIFT_INLINE_THUNK_ATTRIBUTES
 
 /// The `SWIFT_SYMBOL_MODULE` and `SWIFT_SYMBOL_MODULE_USR` macros apply
 /// `external_source_symbol` Clang attributes to C++ declarations that represent

@@ -129,13 +129,13 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 // CHECK-NEXT: return _impl::_impl_ClassWithMethods::makeRetained(_impl::$s7Methods09ClassWithA0C8deepCopyyACSiF(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct ClassWithMethods::staticFinalClassMethod(swift::Int x) {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s7Methods09ClassWithA0C011staticFinalB6Method1xAA11LargeStructVSi_tFZ(result, x, swift::TypeMetadataTrait<ClassWithMethods>::getTypeMetadata());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK LargeStruct LargeStruct::doubled() const {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV7doubledACyF(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
@@ -143,12 +143,12 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 // CHECK-NEXT: return _impl::$s7Methods11LargeStructV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::scaled(swift::Int x, swift::Int y) const {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV6scaledyACSi_SitF(result, x, y, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::added(const LargeStruct& x) const {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV5addedyA2CF(result, _impl::_impl_LargeStruct::getOpaquePointer(x), _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
@@ -157,7 +157,7 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK LargeStruct PassStructInClassMethod::retStruct(swift::Int x) {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s7Methods23PassStructInClassMethodC03retC0yAA05LargeC0VSiF(result, x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: });
 // CHECK-NEXT: }

@@ -536,8 +536,8 @@ private:
                 outOfLineOS << "::makeRetained(*reinterpret_cast<void "
                                "**>(payloadFromDestruction));\n  ";
               } else {
-                outOfLineOS
-                    << "::returnNewValue([&](char * _Nonnull result) {\n";
+                outOfLineOS << "::returnNewValue([&](char * _Nonnull result) "
+                               "SWIFT_INLINE_THUNK_ATTRIBUTES {\n";
                 outOfLineOS << "      swift::"
                             << cxx_synthesis::getCxxImplNamespaceName();
                 outOfLineOS << "::implClassFor<";

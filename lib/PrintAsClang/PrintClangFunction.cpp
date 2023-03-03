@@ -1048,7 +1048,8 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
 
     os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
        << "::implClassFor<" << resultTyName
-       << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
+       << ">::type::returnNewValue([&](void * _Nonnull returnValue) "
+          "SWIFT_INLINE_THUNK_ATTRIBUTES {\n";
     if (!initializeWithTakeFromValue) {
       invocationPrinter(/*additionalParam=*/StringRef("returnValue"));
     } else {
