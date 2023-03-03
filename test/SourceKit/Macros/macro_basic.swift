@@ -139,7 +139,8 @@ struct S4 { }
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
 // ATTACHED_EXPAND-NEXT: 24:3-24:3 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMA0_.swift) "@accessViaStorage "
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
-// ATTACHED_EXPAND-NEXT: 22:11-22:11 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMm_.swift) "
+// ATTACHED_EXPAND-NEXT: 25:1-25:1 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMm_.swift) "
+// ATTACHED_EXPAND-EMPTY:
 // ATTACHED_EXPAND-NEXT: private var _storage = _Storage()
 // ATTACHED_EXPAND-NEXT: "
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
