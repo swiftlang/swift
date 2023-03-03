@@ -1029,8 +1029,12 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
     clangDiags = clang::CompilerInstance::createDiagnostics(tempDiagOpts.get(),
                                                             tempDiagClient,
                                                             /*owned*/ true);
-    CI = clang::createInvocationFromCommandLine(invocationArgs, clangDiags, VFS,
-                                                false, CC1Args);
+    clang::CreateInvocationOptions CIOpts;
+    CIOpts.VFS = VFS;
+    CIOpts.Diags = clangDiags;
+    CIOpts.RecoverOnError = false;
+    CIOpts.CC1Args = CC1Args;
+    CI = clang::createInvocation(invocationArgs, std::move(CIOpts));
   }
 
   if (!CI) {
@@ -6335,7 +6339,7 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
        !copyConstructorIsDefaulted(decl)) ||
       (decl->hasUserDeclaredCopyAssignment() &&
        !copyAssignOperatorIsDefaulted(decl)) ||
-      (decl->hasUserDeclaredDestructor() &&
+      (decl->hasUserDeclaredDestructor() && decl->getDestructor() &&
        !decl->getDestructor()->isDefaulted()))
     return false;
 

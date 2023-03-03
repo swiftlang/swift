@@ -1,5 +1,5 @@
-// Test doesn't pass on all platforms (rdar://101420862)
-// REQUIRES: OS=macosx
+// Test doesn't pass on all platforms
+// REQUIRES: rdar101420862
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi -F %clang-importer-sdk-path/frameworks %s -import-objc-header %S/Inputs/objc_implementation.h -emit-ir > %t.ir
 // RUN: %FileCheck --input-file %t.ir %s

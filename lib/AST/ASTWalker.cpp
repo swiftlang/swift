@@ -94,37 +94,37 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
   };
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Expr *visit(Expr *E) {
     SetParentRAII SetParent(Walker, E);
     return inherited::visit(E);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Stmt *visit(Stmt *S) {
     SetParentRAII SetParent(Walker, S);
     return inherited::visit(S);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Pattern *visit(Pattern *P) {
     SetParentRAII SetParent(Walker, P);
     return inherited::visit(P);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visit(Decl *D) {
     SetParentRAII SetParent(Walker, D);
     return inherited::visit(D);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visit(TypeRepr *T) {
     SetParentRAII SetParent(Walker, T);
     return inherited::visit(T);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visit(ParameterList *PL) {
     return inherited::visit(PL);
   }
@@ -133,7 +133,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //                                 Decls
   //===--------------------------------------------------------------------===//
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visitGenericParamListIfNeeded(GenericContext *GC) {
     // Must check this first in case extensions have not been bound yet
     if (Walker.shouldWalkIntoGenericParams()) {
@@ -146,7 +146,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visitTrailingRequirements(GenericContext *GC) {
     if (const auto Where = GC->getTrailingWhereClause()) {
       for (auto &Req: Where->getRequirements())
@@ -1354,7 +1354,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   template <typename T>
   using PostWalkResult = ASTWalker::PostWalkResult<T>;
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool traverse(PreWalkAction Pre, llvm::function_ref<bool(void)> VisitChildren,
                 llvm::function_ref<PostWalkAction(void)> WalkPost) {
     switch (Pre.Action) {
@@ -1377,7 +1377,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   template <typename T>
-  LLVM_NODISCARD
+  [[nodiscard]]
   T *traverse(PreWalkResult<T *> Pre,
               llvm::function_ref<T *(T *)> VisitChildren,
               llvm::function_ref<PostWalkResult<T *>(T *)> WalkPost) {
@@ -1406,7 +1406,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     llvm_unreachable("Unhandled case in switch!");
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visitParameterList(ParameterList *PL) {
     return traverse(
         Walker.walkToParameterListPre(PL),
@@ -1424,7 +1424,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Expr *doIt(Expr *E) {
     return traverse<Expr>(
         Walker.walkToExprPre(E),
@@ -1432,7 +1432,7 @@ public:
         [&](Expr *E) { return Walker.walkToExprPost(E); });
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Stmt *doIt(Stmt *S) {
     return traverse<Stmt>(
         Walker.walkToStmtPre(S),
@@ -1464,7 +1464,7 @@ public:
   }
 
   /// Returns true on failure.
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool doIt(Decl *D) {
     if (shouldSkip(D))
       return false;
@@ -1475,7 +1475,7 @@ public:
         [&]() { return Walker.walkToDeclPost(D); });
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Pattern *doIt(Pattern *P) {
     return traverse<Pattern>(
         Walker.walkToPatternPre(P),
@@ -1483,7 +1483,7 @@ public:
         [&](Pattern *P) { return Walker.walkToPatternPost(P); });
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool doIt(const StmtCondition &C) {
     for (auto &elt : C) {
       switch (elt.getKind()) {
@@ -1524,7 +1524,7 @@ public:
   }
 
   /// Returns true on failure.
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool doIt(TypeRepr *T) {
     return traverse(
         Walker.walkToTypeReprPre(T),
@@ -1532,7 +1532,7 @@ public:
         [&]() { return Walker.walkToTypeReprPost(T); });
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool doIt(RequirementRepr &Req) {
     switch (Req.getKind()) {
     case RequirementReprKind::SameType:
@@ -1551,7 +1551,7 @@ public:
     return false;
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool doIt(GenericParamList *GPL) {
     // Visit generic params
     for (auto &P : GPL->getParams()) {
@@ -1568,7 +1568,7 @@ public:
     return false;
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   ArgumentList *visit(ArgumentList *ArgList) {
     for (auto Idx : indices(*ArgList)) {
       auto *E = doIt(ArgList->getExpr(Idx));
@@ -1578,7 +1578,7 @@ public:
     return ArgList;
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   ArgumentList *doIt(ArgumentList *ArgList) {
     return traverse<ArgumentList>(
         Walker.walkToArgumentListPre(ArgList),

@@ -2431,28 +2431,12 @@ swift::irgen::createLinkerDirectiveVariable(IRGenModule &IGM, StringRef name) {
 }
 
 void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariable *var) {
-  // Add an operand to llvm.asan.globals denylisting this global variable.
-  llvm::Metadata *metadata[] = {
-    // The global variable to denylist.
-    llvm::ConstantAsMetadata::get(var),
-    
-    // Source location. Optional, unnecessary here.
-    nullptr,
-    
-    // Name. Optional, unnecessary here.
-    nullptr,
-    
-    // Whether the global is dynamically initialized.
-    llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
-      llvm::Type::getInt1Ty(IGM.Module.getContext()), false)),
-    
-    // Whether the global is denylisted.
-    llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
-      llvm::Type::getInt1Ty(IGM.Module.getContext()), true))};
-  
-  auto *globalNode = llvm::MDNode::get(IGM.Module.getContext(), metadata);
-  auto *asanMetadata = IGM.Module.getOrInsertNamedMetadata("llvm.asan.globals");
-  asanMetadata->addOperand(globalNode);
+  llvm::GlobalVariable::SanitizerMetadata Meta;
+  if (var->hasSanitizerMetadata())
+    Meta = var->getSanitizerMetadata();
+  Meta.IsDynInit = false;
+  Meta.NoAddress = true;
+  var->setSanitizerMetadata(Meta);
 }
 
 /// Emit a global declaration.
@@ -3309,10 +3293,12 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   // This might generate new functions, so we should do it before computing
   // the insert-before point.
   llvm::Constant *clangAddr = nullptr;
+  bool isObjCDirect = false;
   if (auto clangDecl = f->getClangDecl()) {
     // If we have an Objective-C Clang declaration, it must be a direct
     // method and we want to generate the IR declaration ourselves.
     if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+      isObjCDirect = true; 
       assert(objcDecl->isDirectMethod());
     } else {
       auto globalDecl = getClangGlobalDeclForFunction(clangDecl);
@@ -3385,7 +3371,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   }
   auto fpKind = irgen::classifyFunctionPointerKind(f);
   Signature signature =
-      getSignature(f->getLoweredFunctionType(), fpKind);
+      getSignature(f->getLoweredFunctionType(), fpKind, isObjCDirect);
   addLLVMFunctionAttributes(f, signature);
 
   fn = createFunction(*this, link, signature, insertBefore,

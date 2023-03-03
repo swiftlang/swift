@@ -231,7 +231,8 @@ static void instantiateTemplatedOperator(
       clang::BinaryOperator::getOverloadedOperator(operatorKind);
   clang::OverloadCandidateSet candidateSet(
       classDecl->getLocation(), clang::OverloadCandidateSet::CSK_Operator,
-      clang::OverloadCandidateSet::OperatorRewriteInfo(opKind, false));
+      clang::OverloadCandidateSet::OperatorRewriteInfo(opKind,
+                                              clang::SourceLocation(), false));
   clangSema.LookupOverloadedBinOp(candidateSet, opKind, ops, {arg, arg}, true);
 
   clang::OverloadCandidateSet::iterator best;

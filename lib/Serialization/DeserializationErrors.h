@@ -515,7 +515,7 @@ public:
   }
 };
 
-LLVM_NODISCARD
+[[nodiscard]]
 static inline std::unique_ptr<llvm::ErrorInfoBase>
 takeErrorInfo(llvm::Error error) {
   std::unique_ptr<llvm::ErrorInfoBase> result;
