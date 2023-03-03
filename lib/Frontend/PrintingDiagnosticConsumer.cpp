@@ -1101,8 +1101,9 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     return;
 
   switch (FormattingStyle) {
-  case DiagnosticOptions::FormattingStyle::SwiftSyntax: {
+  case DiagnosticOptions::FormattingStyle::Swift: {
 #if SWIFT_SWIFT_PARSER
+    // Use the swift-syntax formatter.
     auto bufferStack = getSourceBufferStack(SM, Info.Loc);
     if (!bufferStack.empty()) {
       // If there are no enqueued diagnostics, or they are from a different
@@ -1121,33 +1122,37 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
       enqueueDiagnostic(queuedDiagnostics, Info, SM);
       break;
     }
+#endif
+
+    // Use the C++ formatter.
+    // FIXME: Once the swift-syntax formatter is enabled everywhere, we will
+    // remove this.
+    if (Info.Loc.isValid()) {
+      if (Info.Kind == DiagnosticKind::Note && currentSnippet) {
+        // If this is a note and we have an in-flight message, add it to that
+        // instead of emitting it separately.
+        annotateSnippetWithInfo(SM, Info, *currentSnippet);
+      } else {
+        // If we encounter a new error/warning/remark, flush any in-flight
+        // snippets.
+        flush(/*includeTrailingBreak*/ true);
+        currentSnippet = std::make_unique<AnnotatedSourceSnippet>(SM);
+        annotateSnippetWithInfo(SM, Info, *currentSnippet);
+      }
+      if (PrintEducationalNotes) {
+        for (auto path : Info.EducationalNotePaths) {
+          if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
+            BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
+        }
+      }
+      break;
+    }
 
     // Fall through to print using the LLVM style when there is no source
     // location.
     flush(/*includeTrailingBreak*/ false);
-#endif
     LLVM_FALLTHROUGH;
   }
-
-  case DiagnosticOptions::FormattingStyle::Swift:
-    if (Info.Kind == DiagnosticKind::Note && currentSnippet) {
-      // If this is a note and we have an in-flight message, add it to that
-      // instead of emitting it separately.
-      annotateSnippetWithInfo(SM, Info, *currentSnippet);
-    } else {
-      // If we encounter a new error/warning/remark, flush any in-flight
-      // snippets.
-      flush(/*includeTrailingBreak*/ true);
-      currentSnippet = std::make_unique<AnnotatedSourceSnippet>(SM);
-      annotateSnippetWithInfo(SM, Info, *currentSnippet);
-    }
-    if (PrintEducationalNotes) {
-      for (auto path : Info.EducationalNotePaths) {
-        if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
-          BufferedEducationalNotes.push_back(buffer->get()->getBuffer().str());
-      }
-    }
-    break;
 
   case DiagnosticOptions::FormattingStyle::LLVM:
     printDiagnostic(SM, Info);
