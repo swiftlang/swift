@@ -24,6 +24,10 @@ void initialize(void *);
 
 extern swift::once_t initializeToken;
 
+// Define a typedef "string" in swift::runtime::environment to make string
+// environment variables work
+using string = const char *;
+
 // Declare backing variables.
 #define VARIABLE(name, type, defaultValue, help) extern type name ## _variable;
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
