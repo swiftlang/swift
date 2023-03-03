@@ -1391,8 +1391,9 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
 
   // Qualified type lookup with a module base is represented as a DeclRefExpr
   // and not a TypeExpr.
-  if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
-    if (auto *TD = dyn_cast<TypeDecl>(DRE->getDecl())) {
+  auto handleNestedTypeLookup = [&](
+      TypeDecl *TD, DeclNameLoc ParentNameLoc
+    ) -> TypeExpr * {
       // See if the type has a member type with this name.
       auto Result = TypeChecker::lookupMemberType(
           DC, TD->getDeclaredInterfaceType(), Name,
@@ -1402,9 +1403,42 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       // a non-type member, so leave the expression as-is.
       if (Result.size() == 1) {
         return TypeExpr::createForMemberDecl(
-            DRE->getNameLoc(), TD, UDE->getNameLoc(), Result.front().Member);
+            ParentNameLoc, TD, UDE->getNameLoc(), Result.front().Member);
       }
+
+      return nullptr;
+  };
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+    if (auto *TD = dyn_cast<TypeDecl>(DRE->getDecl()))
+      return handleNestedTypeLookup(TD, DRE->getNameLoc());
+
+    return nullptr;
+  }
+
+  // Determine whether there is exactly one type declaration, where all
+  // other declarations are macros.
+  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(UDE->getBase())) {
+    TypeDecl *FoundTD = nullptr;
+    for (auto *D : ODRE->getDecls()) {
+      if (auto *TD = dyn_cast<TypeDecl>(D)) {
+        if (FoundTD)
+          return nullptr;
+
+        FoundTD = TD;
+        continue;
+      }
+
+        // Ignore macros; they can't have any nesting.
+      if (isa<MacroDecl>(D))
+        continue;
+
+      // Anything else prevents folding.
+      return nullptr;
     }
+
+    if (FoundTD)
+      return handleNestedTypeLookup(FoundTD, ODRE->getNameLoc());
 
     return nullptr;
   }
