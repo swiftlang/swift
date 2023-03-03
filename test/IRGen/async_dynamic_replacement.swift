@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -disable-availability-checking -disable-objc-interop | %FileCheck %s
 
-// Windows does not do swiftailcc
-// XFAIL: OS=windows-msvc
+// Windows X64 does not do swiftailcc
+// XFAIL: OS=windows-msvc && ARCH=x86_64
 
 // REQUIRES: concurrency
 
