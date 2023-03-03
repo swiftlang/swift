@@ -11,15 +11,15 @@ func test3() {
   undeclared_func( // expected-error {{cannot find 'undeclared_func' in scope}}
 } // expected-error {{expected expression in list of expressions}}
 
-func runAction() {} // expected-note {{'runAction' declared here}}
+func runAction() {} // expected-note {{did you mean 'runAction'?}}
 
 // rdar://16601779
 func foo() {
   // expected-error@+3 {{argument passed to call that takes no arguments}}
-  // expected-error@+2 {{cannot find 'SKAction' in scope; did you mean 'runAction'?}} {{13-21=runAction}}
-  // expected-error@+1 {{expected ',' separator}} {{32-32=,}}
+  // expected-error@+2 {{cannot find 'SKAction' in scope}}
+  // expected-error@+1 {{expected ',' separator}}
   runAction(SKAction.sequence()
-    
+
     skview!
     // expected-error @-1 {{cannot find 'skview' in scope}}
 }
