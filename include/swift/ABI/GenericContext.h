@@ -499,13 +499,6 @@ public:
             header.NumPacks};
   }
 
-  /// Return the amount of space that the generic arguments take up in
-  /// metadata of this type.
-  StoredSize getGenericArgumentsStorageSize() const {
-    return StoredSize(getGenericContextHeader().getNumArguments())
-             * sizeof(StoredPointer);
-  }
-
   RuntimeGenericSignature<Runtime> getGenericSignature() const {
     if (!asSelf()->isGeneric()) return RuntimeGenericSignature<Runtime>();
     return {getGenericContextHeader(),
