@@ -46,7 +46,7 @@ ParserStatus
 Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
                         SmallVectorImpl<GenericTypeParamDecl *> &GenericParams) {
   ParserStatus Result;
-  bool HasNextParam;
+  bool HasNextParam{};
   do {
     // Note that we're parsing a declaration.
     StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
@@ -58,6 +58,15 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
     parseDeclAttributeList(attributes);
 
+    // Parse the 'each' keyword for a type parameter pack 'each T'.
+    SourceLoc EachLoc;
+    if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+        Tok.isContextualKeyword("each")) {
+      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                           tok::contextual_keyword);
+      EachLoc = consumeToken();
+    }
+
     // Parse the name of the parameter.
     Identifier Name;
     SourceLoc NameLoc;
@@ -67,11 +76,20 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       break;
     }
 
-    // Parse the ellipsis for a type parameter pack  'T...'.
-    SourceLoc EllipsisLoc;
+    // Parse and diagnose the unsupported ellipsis for a type parameter pack
+    // 'T...'.
     if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
         startsWithEllipsis(Tok)) {
-      EllipsisLoc = consumeStartingEllipsis();
+      constexpr int EllipsisLength = 3;
+      const SourceRange EllipsisRange(
+          Tok.getLoc(), Tok.getLoc().getAdvancedLoc(EllipsisLength));
+      auto &Diagnostic = diagnose(Tok, diag::type_parameter_pack_ellipsis)
+                             .fixItRemove(EllipsisRange);
+      if (!EachLoc.isValid()) {
+        Diagnostic.fixItInsert(NameLoc, "each");
+      }
+      Result.setIsParseError();
+      break;
     }
 
     // Parse the ':' followed by a type.
@@ -101,9 +119,9 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
         Inherited.push_back({Ty.get()});
     }
 
-    const bool isParameterPack = EllipsisLoc.isValid();
+    const bool isParameterPack = EachLoc.isValid();
     auto *Param = GenericTypeParamDecl::createParsed(
-        CurDeclContext, Name, NameLoc, EllipsisLoc,
+        CurDeclContext, Name, NameLoc, EachLoc,
         /*index*/ GenericParams.size(), isParameterPack);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));

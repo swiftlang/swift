@@ -1,8 +1,8 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature VariadicGenerics %s | %FileCheck %s
 // REQUIRES: asserts
 
-func receive_simple<T...>(_ args: repeat each T) {}
-func receive_simple_owned<T...>(_ args: repeat __owned each T) {}
+func receive_simple<each T>(_ args: repeat each T) {}
+func receive_simple_owned<each T>(_ args: repeat __owned each T) {}
 
 // CHECK-LABEL: @$s4main12scalar_test01i1f1sySi_SfSStF
 // CHECK:         [[PACK:%.*]] = alloc_pack $Pack{Int, Float, String}
@@ -25,7 +25,7 @@ func receive_simple_owned<T...>(_ args: repeat __owned each T) {}
 // CHECK-NEXT:    pack_element_set [[STRING_TEMP]] : $*String into [[STRING_INDEX]] of [[PACK]] : $*Pack{Int, Float, String}
 //   Perform the call.
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[FN:%.*]] = function_ref @$s4main14receive_simpleyyxxQpRvzlF : $@convention(thin) <τ_0_0...> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
+// CHECK-NEXT:    [[FN:%.*]] = function_ref @$s4main14receive_simpleyyxxQpRvzlF : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
 // CHECK-NEXT:    apply [[FN]]<Pack{Int, Float, String}>([[PACK]])
 //   Clean up.
 // CHECK-NEXT:    destroy_addr [[STRING_TEMP]] : $*String
@@ -58,7 +58,7 @@ func scalar_test0(i: Int, f: Float, s: String) {
 // CHECK-NEXT:    pack_element_set [[STRING_TEMP]] : $*String into [[STRING_INDEX]] of [[PACK]] : $*Pack{Int, Float, String}
 //   Perform the call.
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[FN:%.*]] = function_ref  @$s4main20receive_simple_ownedyyxxQpnRvzlF : $@convention(thin) <τ_0_0...> (@pack_owned Pack{repeat each τ_0_0}) -> ()
+// CHECK-NEXT:    [[FN:%.*]] = function_ref  @$s4main20receive_simple_ownedyyxxQpnRvzlF : $@convention(thin) <each τ_0_0> (@pack_owned Pack{repeat each τ_0_0}) -> ()
 // CHECK-NEXT:    apply [[FN]]<Pack{Int, Float, String}>([[PACK]])
 //   Clean up.
 // CHECK-NEXT:    dealloc_stack [[STRING_TEMP]] : $*String
@@ -70,11 +70,11 @@ func scalar_test1(i: Int, f: Float, s: String) {
 }
 
 #if false
-func pack_test0<T...>(args: repeat each T) {
+func pack_test0<each T>(args: repeat each T) {
   receive_simple(repeat each args)
 }
 
-func pack_test1<T...>(args: repeat each T) {
+func pack_test1<each T>(args: repeat each T) {
   receive_simple_owned(repeat each args)
 }
 #endif

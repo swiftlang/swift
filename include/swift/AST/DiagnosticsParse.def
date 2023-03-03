@@ -1989,6 +1989,8 @@ ERROR(attr_requires_concurrency, none,
 
 ERROR(associatedtype_cannot_be_variadic,none,
       "associated types cannot be variadic", ())
+ERROR(type_parameter_pack_ellipsis,none,
+      "ellipsis operator cannot be used with a type parameter pack", ())
 
 //------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics

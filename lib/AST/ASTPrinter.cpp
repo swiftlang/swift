@@ -1713,6 +1713,8 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::interleave(
         genericParams,
         [&](GenericTypeParamType *param) {
+          if (param->isParameterPack())
+            Printer << "each ";
           if (!subMap.empty()) {
             printType(substParam(param));
           } else if (auto *GP = param->getDecl()) {
@@ -1725,8 +1727,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
           } else {
             printType(param);
           }
-          if (param->isParameterPack())
-            Printer << "...";
         },
         [&] { Printer << ", "; });
   }
@@ -1816,11 +1816,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
 void PrintAST::printRequirement(const Requirement &req) {
   switch (req.getKind()) {
   case RequirementKind::SameShape:
-    Printer << "((";
+    Printer << "(repeat (each ";
     printTransformedType(req.getFirstType());
-    Printer << ", ";
+    Printer << ", each ";
     printTransformedType(req.getSecondType());
-    Printer << ")...) : Any";
+    Printer << ")) : Any";
     return;
   case RequirementKind::Layout:
     printTransformedType(req.getFirstType());
@@ -3615,9 +3615,9 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   recordDeclLoc(decl, [&] {
-    Printer.printName(decl->getName(), PrintNameContext::GenericParameter);
     if (decl->isParameterPack())
-      Printer << "...";
+      Printer << "each ";
+    Printer.printName(decl->getName(), PrintNameContext::GenericParameter);
   });
 
   printInherited(decl);
