@@ -14,7 +14,11 @@ import CASTBridging
 import CBasicBridging
 import SwiftSyntax
 
-struct PluginError: Error {}
+enum PluginError: Error {
+  case failedToSendMessage
+  case failedToReceiveMessage
+  case invalidReponseKind
+}
 
 @_cdecl("swift_ASTGen_initializePlugin")
 public func _initializePlugin(
@@ -50,7 +54,7 @@ struct CompilerPlugin {
       return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, size: data.count))
     }
     if hadError {
-      throw PluginError()
+      throw PluginError.failedToSendMessage
     }
   }
 
@@ -59,7 +63,7 @@ struct CompilerPlugin {
     let hadError = Plugin_waitForNextMessage(opaqueHandle, &result)
     defer { BridgedData_free(result) }
     guard !hadError else {
-      throw PluginError()
+      throw PluginError.failedToReceiveMessage
     }
     let data = UnsafeBufferPointer(start: result.baseAddress, count: result.size)
 //    // FIXME: Add -dump-plugin-message option?
@@ -209,19 +213,31 @@ class PluginDiagnosticsEngine {
     SwiftDiagnostic_finish(diag)
   }
 
+  /// Emit diagnostics.
+  func emit(
+    _ diagnostics: [PluginMessage.Diagnostic],
+    messageSuffix: String? = nil
+  ) {
+    for diagnostic in diagnostics {
+      self.emit(diagnostic)
+    }
+  }
+
   /// Produce the C++ source location for a given position based on a
   /// syntax node.
   private func cxxSourceLocation(
     at offset: Int, in fileName: String
   ) -> CxxSourceLoc? {
     // Find the corresponding exported source file.
-    guard let exportedSourceFile = exportedSourceFileByName[fileName]
+    guard
+      let exportedSourceFile = exportedSourceFileByName[fileName]
     else {
       return nil
     }
 
     // Compute the resulting address.
-    guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress
+    guard
+      let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress
     else {
       return nil
     }

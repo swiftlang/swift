@@ -653,15 +653,26 @@ bool Plugin_sendMessage(PluginHandle handle, const BridgedData data) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   StringRef message(data.baseAddress, data.size);
   auto error = plugin->sendMessage(message);
-  bool hadError = bool(error);
-  llvm::consumeError(std::move(error));
-  return hadError;
+  if (error) {
+    // FIXME: Pass the error message back to the caller.
+    llvm::consumeError(std::move(error));
+//    llvm::handleAllErrors(std::move(error), [](const llvm::ErrorInfoBase &err) {
+//      llvm::errs() << err.message() << "\n";
+//    });
+    return true;
+  }
+  return false;
 }
 
 bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   auto result = plugin->waitForNextMessage();
   if (!result) {
+    // FIXME: Pass the error message back to the caller.
+    llvm::consumeError(result.takeError());
+//    llvm::handleAllErrors(result.takeError(), [](const llvm::ErrorInfoBase &err) {
+//      llvm::errs() << err.message() << "\n";
+//    });
     return true;
   }
   auto &message = result.get();
