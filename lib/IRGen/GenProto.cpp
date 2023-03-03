@@ -4079,6 +4079,8 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
             irgen::addGenericParameters(*this, fields, signature, /*implicit=*/false);
         assert(metadata.NumParamsEmitted == metadata.NumParams &&
                "Implicit GenericParamDescriptors not supported here");
+        assert(metadata.GenericPackArguments.empty() &&
+               "We don't support packs here yet");
 
         // Need to pad the structure after generic parameters
         // up to four bytes because generic requirements that
