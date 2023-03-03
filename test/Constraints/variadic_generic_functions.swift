@@ -32,7 +32,7 @@ func call() {
   }
   multipleParameters()
 
-  let x: (_: String) = multipleParameters(xs: "", ys: "")
+  let x: String = multipleParameters(xs: "", ys: "")
   let (one, two) = multipleParameters(xs: "", 5.0, ys: "", 5.0)
   multipleParameters(xs: "", 5.0, ys: 5.0, "") // expected-error {{type of expression is ambiguous without more context}}
 

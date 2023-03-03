@@ -2395,7 +2395,7 @@ public:
   
   bool containsPackExpansionType() const;
 
-  TupleType *flattenPackTypes();
+  Type flattenPackTypes();
 
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,

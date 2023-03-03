@@ -6743,22 +6743,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // If the tuple has consecutive pack expansions, packs must be
       // resolved before matching.
       auto delayMatching = [](TupleType *tuple) {
-        bool afterUnresolvedPack = false;
+        bool afterPack = false;
         for (auto element : tuple->getElements()) {
-          if (afterUnresolvedPack && !element.hasName()) {
-            return true;
-          }
-
-          if (element.getType()->is<PackExpansionType>()) {
+          if (afterPack && !element.hasName()) {
             SmallPtrSet<TypeVariableType *, 2> typeVars;
             element.getType()->getTypeVariables(typeVars);
 
-            afterUnresolvedPack = llvm::any_of(typeVars, [](auto *tv) {
+            bool hasUnresolvedPack = llvm::any_of(typeVars, [](auto *tv) {
               return tv->getImpl().canBindToPack();
             });
-          } else {
-            afterUnresolvedPack = false;
+
+            if (hasUnresolvedPack)
+              return true;
           }
+
+          afterPack = element.getType()->is<PackExpansionType>();
         }
 
         return false;
