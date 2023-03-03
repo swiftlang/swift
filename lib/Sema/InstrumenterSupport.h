@@ -49,6 +49,7 @@ protected:
   virtual ~InstrumenterBase() = default;
   virtual void anchor();
   virtual BraceStmt *transformBraceStmt(BraceStmt *BS,
+                                        const ParameterList *PL = nullptr,
                                         bool TopLevel = false) = 0;
 
   /// Create an expression which retrieves a valid ModuleIdentifier or
@@ -79,7 +80,8 @@ protected:
       if (auto *CE = dyn_cast<ClosureExpr>(E)) {
         BraceStmt *B = CE->getBody();
         if (B) {
-          BraceStmt *NB = I.transformBraceStmt(B);
+          const ParameterList *PL = CE->getParameters();
+          BraceStmt *NB = I.transformBraceStmt(B, PL);
           CE->setBody(NB, false);
           // just with the entry and exit logging this is going to
           // be more than a single expression!

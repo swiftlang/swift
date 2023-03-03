@@ -1241,7 +1241,7 @@ void DefaultActorImpl::enqueueStealer(Job *job, JobPriority priority) {
         swift_dispatch_lock_override_start_with_debounce(lockAddr, newState.currentDrainer(),
                        (qos_class_t) priority);
 
-      } else if (newState.isEnqueued()) {
+      } else if (newState.isScheduled()) {
         // We are scheduling a stealer for an actor due to priority override.
         // This extra processing job has a reference on the actor. See
         // ownership rule (2).

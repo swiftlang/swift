@@ -290,8 +290,9 @@ public:
       return D;
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
       if (BraceStmt *B = FD->getBody()) {
+        const ParameterList *PL = FD->getParameters();
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
-        BraceStmt *NB = transformBraceStmt(B);
+        BraceStmt *NB = transformBraceStmt(B, PL);
         if (NB != B) {
           FD->setBody(NB, AbstractFunctionDecl::BodyKind::TypeChecked);
           TypeChecker::checkFunctionEffects(FD);
@@ -380,7 +381,9 @@ public:
     return uniqueRef;
   }
 
-  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) override {
+  BraceStmt *transformBraceStmt(BraceStmt *BS,
+                                const ParameterList *PL = nullptr,
+                                bool TopLevel = false) override {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     using ElementVector = SmallVector<swift::ASTNode, 3>;
     ElementVector Elements(OriginalElements.begin(), OriginalElements.end());
@@ -589,6 +592,27 @@ public:
           }
         } else {
           transformDecl(D);
+        }
+      }
+    }
+
+    // If we were given any parameters that apply to this brace block, we insert
+    // log calls for them now (before any of the other statements). We only log
+    // named parameters (not `{ _ in ... }`, for example).
+    if (PL && !HighPerformance) {
+      size_t EI = 0;
+      for (const auto &PD : *PL) {
+        if (PD->hasName()) {
+          DeclBaseName Name = PD->getName();
+          Expr *PVVarRef = new (Context)
+              DeclRefExpr(PD, DeclNameLoc(), /*implicit=*/true,
+                          AccessSemantics::Ordinary, PD->getType());
+          Added<Stmt *> Log(buildLoggerCall(PVVarRef, PD->getSourceRange(),
+                                            Name.getIdentifier().str()));
+          if (*Log) {
+            Elements.insert(Elements.begin() + EI, *Log);
+            EI++;
+          }
         }
       }
     }
@@ -869,8 +893,9 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
+            const ParameterList *PL = FD->getParameters();
             Instrumenter I(ctx, FD, RNG, HighPerformance, TmpNameIndex);
-            BraceStmt *NewBody = I.transformBraceStmt(Body);
+            BraceStmt *NewBody = I.transformBraceStmt(Body, PL);
             if (NewBody != Body) {
               FD->setBody(NewBody, AbstractFunctionDecl::BodyKind::TypeChecked);
               TypeChecker::checkFunctionEffects(FD);
@@ -882,7 +907,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
             Instrumenter I(ctx, TLCD, RNG, HighPerformance, TmpNameIndex);
-            BraceStmt *NewBody = I.transformBraceStmt(Body, true);
+            BraceStmt *NewBody = I.transformBraceStmt(Body, nullptr, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
               TypeChecker::checkTopLevelEffects(TLCD);
