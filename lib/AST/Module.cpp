@@ -171,6 +171,9 @@ class swift::SourceLookupCache {
   template<typename Range>
   void addToMemberCache(Range decls);
 
+  using MacroDeclMap = llvm::DenseMap<Identifier, TinyPtrVector<MacroDecl *>>;
+  MacroDeclMap MacroDecls;
+
   using AuxiliaryDeclMap = llvm::DenseMap<DeclName, TinyPtrVector<MissingDecl *>>;
   AuxiliaryDeclMap TopLevelAuxiliaryDecls;
   SmallVector<ValueDecl *, 4> MayHaveAuxiliaryDecls;
@@ -266,6 +269,9 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
 
     if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
       PrecedenceGroups[PG->getName()].push_back(PG);
+
+    if (auto *macro = dyn_cast<MacroDecl>(D))
+      MacroDecls[macro->getBaseIdentifier()].push_back(macro);
   }
 }
 
@@ -321,8 +327,6 @@ void SourceLookupCache::addToMemberCache(Range decls) {
 
 void SourceLookupCache::populateAuxiliaryDeclCache() {
   for (auto *decl : MayHaveAuxiliaryDecls) {
-    auto *dc = decl->getDeclContext();
-
     // Gather macro-introduced peer names.
     llvm::SmallDenseMap<CustomAttr *, llvm::SmallVector<DeclName, 2>> introducedNames;
 
@@ -341,16 +345,15 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
     for (auto attrConst : decl->getSemanticAttrs().getAttributes<CustomAttr>()) {
       auto *attr = const_cast<CustomAttr *>(attrConst);
       UnresolvedMacroReference macroRef(attr);
-      auto moduleScopeDC = dc->getModuleScopeContext();
-      ASTContext &ctx = moduleScopeDC->getASTContext();
-      UnqualifiedLookupDescriptor descriptor(macroRef.getMacroName(), moduleScopeDC);
-      auto lookup = evaluateOrDefault(
-          ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
-      for (const auto &found : lookup.allResults()) {
-        if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
-          macro->getIntroducedNames(MacroRole::Peer,
-                                    decl, introducedNames[attr]);
-        }
+      auto macroName = macroRef.getMacroName().getBaseIdentifier();
+
+      auto found = MacroDecls.find(macroName);
+      if (found == MacroDecls.end())
+        continue;
+
+      for (const auto *macro : found->second) {
+        macro->getIntroducedNames(MacroRole::Peer,
+                                  decl, introducedNames[attr]);
       }
     }
 
@@ -396,34 +399,25 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   auto I = TopLevelValues.find(Name);
   if (I == TopLevelValues.end()) return;
 
-  bool foundMacros = false;
   Result.reserve(I->second.size());
-  for (ValueDecl *Elt : I->second) {
+  for (ValueDecl *Elt : I->second)
     Result.push_back(Elt);
-    foundMacros = isa<MacroDecl>(Elt);
-  }
 
-  // If none of the results are macro decls, look into peers.
+  // Add top-level auxiliary decls to the result.
   //
-  // FIXME: This approach is an approximation for whether lookup is attempting
-  // to find macro declarations, and it may cause cycles for invalid macro
-  // references. We need a more principled way to determine whether we're looking
-  // for a macro and should not look into auxiliary decls during lookup.
-  //
-  // We also need to not consider auxiliary decls if we're doing lookup from
-  // inside a macro argument at module scope.
-  if (!foundMacros) {
-    populateAuxiliaryDeclCache();
-    auto I = TopLevelAuxiliaryDecls.find(Name);
-    if (I == TopLevelAuxiliaryDecls.end()) return;
+  // FIXME: We need to not consider auxiliary decls if we're doing lookup
+  // from inside a macro argument at module scope.
+  populateAuxiliaryDeclCache();
+  auto auxDecls = TopLevelAuxiliaryDecls.find(Name);
+  if (auxDecls == TopLevelAuxiliaryDecls.end())
+    return;
 
-    for (auto *unexpandedDecl : I->second) {
-      // Add expanded peers to the result.
-      unexpandedDecl->forEachExpandedPeer(
-          [&](ValueDecl *expandedPeer) {
-            Result.push_back(expandedPeer);
-          });
-    }
+  for (auto *unexpandedDecl : auxDecls->second) {
+    // Add expanded peers to the result.
+    unexpandedDecl->forEachExpandedPeer(
+        [&](ValueDecl *expandedPeer) {
+          Result.push_back(expandedPeer);
+        });
   }
 }
 
