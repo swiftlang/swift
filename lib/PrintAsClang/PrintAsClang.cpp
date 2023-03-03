@@ -556,7 +556,6 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
     bool enableCxx = frontendOpts.ClangHeaderExposedDecls.has_value() ||
-                     frontendOpts.EnableExperimentalCxxInteropInClangHeader ||
                      M->DeclContext::getASTContext().LangOpts.EnableCXXInterop;
     if (!enableCxx)
       return;
@@ -564,14 +563,24 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
     ClangSyntaxPrinter(os).printIncludeForShimHeader(
         "_SwiftCxxInteroperability.h");
 
+    // Explicit @expose attribute is required only when the user specifies
+    // -clang-header-expose-decls flag.
+    // FIXME: should we detect any presence of @expose and require it then?
     bool requiresExplicitExpose =
+        frontendOpts.ClangHeaderExposedDecls.has_value() &&
+        (*frontendOpts.ClangHeaderExposedDecls ==
+             FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr ||
+         *frontendOpts.ClangHeaderExposedDecls ==
+             FrontendOptions::ClangHeaderExposeBehavior::
+                 HasExposeAttrOrImplicitDeps);
+    // Swift stdlib dependencies are emitted into the same header when
+    // -clang-header-expose-decls flag is not specified, or when it allows
+    // implicit dependency emission.
+    bool addStdlibDepsInline =
         !frontendOpts.ClangHeaderExposedDecls.has_value() ||
         *frontendOpts.ClangHeaderExposedDecls ==
-            FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr;
-    // Default dependency behavior is used when the -clang-header-expose-decls
-    // flag is not specified.
-    bool defaultDependencyBehavior =
-        !frontendOpts.ClangHeaderExposedDecls.has_value();
+            FrontendOptions::ClangHeaderExposeBehavior::
+                HasExposeAttrOrImplicitDeps;
 
     std::string moduleContentsBuf;
     llvm::raw_string_ostream moduleContents{moduleContentsBuf};
@@ -582,7 +591,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
     writeImports(os, deps.imports, *M, bridgingHeader, frontendOpts,
                  clangHeaderSearchInfo, /*useCxxImport=*/true);
     // Embed the standard library directly.
-    if (defaultDependencyBehavior && deps.dependsOnStandardLibrary) {
+    if (addStdlibDepsInline && deps.dependsOnStandardLibrary) {
       assert(!M->isStdlibModule());
       SwiftToClangInteropContext interopContext(
           *M->getASTContext().getStdlibModule(), irGenOpts);
@@ -593,7 +602,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
                                interopContext,
                                /*requiresExposedAttribute=*/true);
       os << "#endif // " << macroGuard << "\n";
-      }
+    }
 
       os << moduleContents.str();
   });

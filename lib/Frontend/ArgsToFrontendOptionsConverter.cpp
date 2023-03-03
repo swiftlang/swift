@@ -310,14 +310,19 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
   if (const Arg *A = Args.getLastArg(options::OPT_clang_header_expose_decls)) {
-      Opts.ClangHeaderExposedDecls =
-          llvm::StringSwitch<llvm::Optional<FrontendOptions::ClangHeaderExposeBehavior>>(A->getValue())
-              .Case("all-public", FrontendOptions::ClangHeaderExposeBehavior::AllPublic)
-              .Case("has-expose-attr", FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr)
-              .Default(llvm::None);
+    Opts.ClangHeaderExposedDecls =
+        llvm::StringSwitch<
+            llvm::Optional<FrontendOptions::ClangHeaderExposeBehavior>>(
+            A->getValue())
+            .Case("all-public",
+                  FrontendOptions::ClangHeaderExposeBehavior::AllPublic)
+            .Case("has-expose-attr",
+                  FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr)
+            .Case("has-expose-attr-or-stdlib",
+                  FrontendOptions::ClangHeaderExposeBehavior::
+                      HasExposeAttrOrImplicitDeps)
+            .Default(llvm::None);
   }
-  Opts.EnableExperimentalCxxInteropInClangHeader =
-      Args.hasArg(OPT_enable_experimental_cxx_interop_in_clang_header);
   
   Opts.StrictImplicitModuleContext = Args.hasArg(OPT_strict_implicit_module_context,
                                                  OPT_no_strict_implicit_module_context,

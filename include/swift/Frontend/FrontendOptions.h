@@ -406,16 +406,15 @@ public:
     /// Expose all public declarations in the generated header.
     AllPublic,
     /// Expose declarations only when they have expose attribute.
-    HasExposeAttr
+    HasExposeAttr,
+    /// Expose declarations only when they have expose attribute or are the
+    /// implicitly exposed Stdlib declarations.
+    HasExposeAttrOrImplicitDeps
   };
 
   /// Indicates which declarations should be exposed in the generated clang
   /// header.
   llvm::Optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
-
-  /// Emit C++ bindings for the exposed Swift declarations in the generated
-  /// clang header.
-  bool EnableExperimentalCxxInteropInClangHeader = false;
 
   /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);

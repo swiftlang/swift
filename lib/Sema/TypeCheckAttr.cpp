@@ -2058,6 +2058,10 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
       diagnose(attr->getLocation(), diag::expose_generic_requirement_to_cxx,
                VD->getDescriptiveKind(), VD);
       break;
+    case UnrepresentableThrows:
+      diagnose(attr->getLocation(), diag::expose_throwing_to_cxx,
+               VD->getDescriptiveKind(), VD);
+      break;
     }
   }
 
