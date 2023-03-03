@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_EXPR_1 -enable-experimental-feature Macros| %FileCheck %s -check-prefix=POUND_EXPR_INTCONTEXT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_EXPR_2 -enable-experimental-feature Macros | %FileCheck %s -check-prefix=POUND_EXPR_STRINGCONTEXT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BARE_EXPR_1 -enable-experimental-feature Macros| %FileCheck %s -check-prefix=BARE_EXPR_INTCONTEXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_EXPR_1 | %FileCheck %s -check-prefix=POUND_EXPR_INTCONTEXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_EXPR_2 | %FileCheck %s -check-prefix=POUND_EXPR_STRINGCONTEXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BARE_EXPR_1 | %FileCheck %s -check-prefix=BARE_EXPR_INTCONTEXT
 // REQUIRES: objc_interop
 
 import ObjectiveC
