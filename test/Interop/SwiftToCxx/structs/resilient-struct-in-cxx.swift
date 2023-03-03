@@ -62,6 +62,14 @@ public struct FirstSmallStruct {
 // CHECK-EMPTY:
 // CHECK-NEXT:  swift::_impl::OpaqueStorage _storage;
 // CHECK-NEXT:  friend class _impl::_impl_FirstSmallStruct;
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wreserved-identifier"
+// CHECK-NEXT:  typedef char $s7Structs16FirstSmallStructVD;
+// CHECK-NEXT:  static inline constexpr $s7Structs16FirstSmallStructVD __swift_mangled_name = 0;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT:};
 
 // CHECK: class _impl_FirstSmallStruct {
@@ -100,6 +108,14 @@ public struct FirstSmallStruct {
 // CHECK: class SWIFT_SYMBOL("s:7Structs12FrozenStructV") FrozenStruct final {
 // CHECK:        alignas(4) char _storage[4];
 // CHECK-NEXT:   friend class _impl::_impl_FrozenStruct;
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wreserved-identifier"
+// CHECK-NEXT:  typedef char $s7Structs12FrozenStructVD;
+// CHECK-NEXT:  static inline constexpr $s7Structs12FrozenStructVD __swift_mangled_name = 0;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: };
 
 public struct LargeStruct {
@@ -145,6 +161,14 @@ public struct LargeStruct {
 // CHECK-EMPTY:
 // CHECK-NEXT:  swift::_impl::OpaqueStorage _storage;
 // CHECK-NEXT:  friend class _impl::_impl_LargeStruct;
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wreserved-identifier"
+// CHECK-NEXT:  typedef char $s7Structs11LargeStructVD;
+// CHECK-NEXT:  static inline constexpr $s7Structs11LargeStructVD __swift_mangled_name = 0;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: };
 
 private class RefCountedClass {

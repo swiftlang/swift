@@ -178,14 +178,14 @@ public:
     return CaseLower(S0, Value).CasesLower(S1, S2, S3, S4, Value);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   R Default(T Value) {
     if (Result)
       return std::move(*Result);
     return Value;
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   operator R() {
     assert(Result && "Fell off the end of a string-switch");
     return std::move(*Result);

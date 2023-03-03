@@ -155,6 +155,12 @@ areElementsABIAccessible(ArrayRef<EnumImplStrategy::Element> elts) {
   return IsABIAccessible;
 }
 
+static APInt zextOrSelf(const APInt &i, unsigned width) {
+  if (i.getBitWidth() < width)
+    return i.zext(width);
+  return i;
+}
+
 EnumImplStrategy::EnumImplStrategy(IRGenModule &IGM,
                                    TypeInfoKind tik,
                                    IsFixedSize_t alwaysFixedSize,
@@ -1055,7 +1061,7 @@ namespace {
     getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
       Size size = cast<FixedTypeInfo>(TI)->getFixedSize();
       auto val = getDiscriminatorIdxConst(theCase)->getValue();
-      return ClusteredBitVector::fromAPInt(val.zextOrSelf(size.getValueInBits()));
+      return ClusteredBitVector::fromAPInt(zextOrSelf(val, size.getValueInBits()));
     }
 
     ClusteredBitVector
@@ -3476,7 +3482,7 @@ namespace {
       Size size = cast<FixedTypeInfo>(TI)->getFixedSize();
       if (ExtraTagBitCount > 0) {
         auto paddedWidth = size.getValueInBits() - PayloadBitCount;
-        value.append(extraPart.zextOrSelf(paddedWidth));
+        value.append(zextOrSelf(extraPart, paddedWidth));
       }
       return value.build();
     }
@@ -5639,7 +5645,7 @@ namespace {
       Size size = cast<FixedTypeInfo>(TI)->getFixedSize();
       if (ExtraTagBitCount > 0) {
         auto paddedWidth = size.getValueInBits() - PayloadBitCount;
-        auto extraPadded = extraPart.zextOrSelf(paddedWidth);
+        auto extraPadded = zextOrSelf(extraPart, paddedWidth);
         value.append(std::move(extraPadded));
       }
       return value.build();

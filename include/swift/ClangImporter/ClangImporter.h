@@ -50,7 +50,8 @@ namespace clang {
   class CompilerInvocation;
 namespace tooling {
 namespace dependencies {
-  struct FullDependenciesResult;
+  struct ModuleDeps;
+  using ModuleDepsGraph = std::vector<ModuleDeps>;
 }
 }
 }
@@ -421,7 +422,7 @@ public:
 
   void recordModuleDependencies(
       ModuleDependenciesCache &cache,
-      const clang::tooling::dependencies::FullDependenciesResult &clangDependencies);
+      const clang::tooling::dependencies::ModuleDepsGraph &clangDependencies);
 
   Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,

@@ -96,8 +96,11 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &ClangContext = Importer->getClangASTContext();
 
   auto &CGO = Importer->getClangCodeGenOpts();
-  if (CGO.OpaquePointers)
+  if (CGO.OpaquePointers) {
     LLVMContext.setOpaquePointers(true);
+  } else {
+    LLVMContext.setOpaquePointers(false);
+  }
 
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 

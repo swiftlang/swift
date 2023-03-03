@@ -322,7 +322,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:  [[T0:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* [[CONDBUFFER]], i32 0, i32 0
 // CHECK:  [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i32 0
 // CHECK:  store i8** [[TSUB]], i8*** [[T1]]
-// CHECK:  call i8** @swift_getWitnessTableRelative({{.*}}@"$s1A1XVyxGAA3SubA2aERz1SQzRszlMc"{{.*}}, %swift.type* {{.*}}, i8*** [[T0]])
+// CHECK:  call i8** @swift_getWitnessTableRelative({{.*}}@"$s1A1XVyxGAA3SubA2aERz1SQzRszlMc{{.*}}, %swift.type* {{.*}}, i8*** [[T0]])
 
 
 // CHECK: define{{.*}} void @"$s1A1XVyxGAA3SubA2aERz1SQzRszlWI"(i8** [[C0:%.*]], %swift.type* {{.*}}, i8** [[C1:%.*]])
@@ -335,7 +335,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:   [[T24:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* [[C2]], i32 0, i32 0
 // CHECK:   [[T25:%.*]] = getelementptr inbounds i8**, i8*** [[T24]], i32 0
 // CHECK:   store i8** [[TBASE]], i8*** [[T25]]
-// CHECK:   [[T26:%.*]] = call i8** @swift_getWitnessTableRelative({{.*}}@"$s1A1XVyxGAA4BaseA2aERzlMc"{{.*}}, %swift.type* {{.*}}, i8*** [[T24]])
+// CHECK:   [[T26:%.*]] = call i8** @swift_getWitnessTableRelative({{.*}}@"$s1A1XVyxGAA4BaseA2aERzlMc{{.*}}, %swift.type* {{.*}}, i8*** [[T24]])
 // CHECK:   [[T27:%.*]] = bitcast i8** [[T26]] to i8*
 // CHECK:   [[T28:%.*]] = getelementptr inbounds i8*, i8** [[C0]], i32 1
 // CHECK:   store i8* [[T27]], i8** [[T28]]

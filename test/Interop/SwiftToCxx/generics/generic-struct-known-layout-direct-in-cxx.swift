@@ -85,6 +85,14 @@
 
 // CHECK: swift::_impl::OpaqueStorage _storage;
 // CHECK-NEXT: friend class _impl::_impl_GenericPair<T_0_0, T_0_1>;
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wreserved-identifier"
+// CHECK-NEXT:  typedef char $s8Generics11GenericPairVyxq_GD;
+// CHECK-NEXT:  static inline constexpr $s8Generics11GenericPairVyxq_GD __swift_mangled_name = 0;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK void inoutConcretePair(uint16_t x, GenericPair<uint16_t, uint16_t>& y) noexcept SWIFT_SYMBOL("s:8Generics17inoutConcretePairyys6UInt16V_AA07GenericD0VyA2DGztF") {

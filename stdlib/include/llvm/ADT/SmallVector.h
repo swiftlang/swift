@@ -71,7 +71,7 @@ public:
   size_t size() const { return Size; }
   size_t capacity() const { return Capacity; }
 
-  LLVM_NODISCARD bool empty() const { return !Size; }
+  [[nodiscard]] bool empty() const { return !Size; }
 
   /// Set the array size to \p N, which the current array must have enough
   /// capacity for.
@@ -633,7 +633,7 @@ public:
     this->set_size(this->size() - NumItems);
   }
 
-  LLVM_NODISCARD T pop_back_val() {
+  [[nodiscard]] T pop_back_val() {
     T Result = ::std::move(this->back());
     this->pop_back();
     return Result;
