@@ -179,6 +179,9 @@ EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false)
 /// Generate bindings for functions that 'throw' in the C++ section of the generated Clang header.
 EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
 
+/// Enable reference bindings.
+EXPERIMENTAL_FEATURE(ReferenceBindings, false)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE

@@ -4659,8 +4659,11 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
   return OpenBraces;
 }
 
-bool swift::isKeywordPossibleDeclStart(const Token &Tok) {
+bool swift::isKeywordPossibleDeclStart(const LangOptions &options,
+                                       const Token &Tok) {
   switch (Tok.getKind()) {
+  case tok::kw_inout:
+    return options.hasFeature(Feature::ReferenceBindings);
   case tok::at_sign:
   case tok::kw_associatedtype:
   case tok::kw_case:
@@ -4672,7 +4675,6 @@ bool swift::isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_func:
   case tok::kw_import:
   case tok::kw_init:
-  case tok::kw_inout:
   case tok::kw_internal:
   case tok::kw_let:
   case tok::kw_operator:
@@ -4749,7 +4751,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
     // @rethrows does not follow the general rule of @<identifier> so
     // it is needed to short circuit this else there will be an infinite
     // loop on invalid attributes of just rethrows
-  } else if (!isKeywordPossibleDeclStart(Tok)) {
+  } else if (!isKeywordPossibleDeclStart(Context.LangOpts, Tok)) {
     // If this is obviously not the start of a decl, then we're done.
     return false;
   }
@@ -4878,7 +4880,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
     return true;
 
   // If the next token is obviously not the start of a decl, bail early.
-  if (!isKeywordPossibleDeclStart(Tok2))
+  if (!isKeywordPossibleDeclStart(Context.LangOpts, Tok2))
     return false;
   
   // Otherwise, do a recursive parse.
@@ -5091,7 +5093,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
   case tok::kw_extension:
     DeclResult = parseDeclExtension(Flags, Attributes);
     break;
-  case tok::kw_inout:
   case tok::kw_let:
   case tok::kw_var: {
     parseBindingIntroducer(/*HasLetOrVarKeyword=*/true);
@@ -5187,6 +5188,14 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   // Obvious nonsense.
   default:
+
+    // TODO: Once reference bindings is no longer experimental, move this into
+    // kw_let, kw_var.
+    if (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&
+        Tok.getKind() == tok::kw_inout) {
+      parseBindingIntroducer(/*HasLetOrVarKeyword=*/true);
+      break;
+    }
 
     if (Tok.isContextualKeyword("actor") && peekToken().is(tok::identifier)) {
       Tok.setKind(tok::contextual_keyword);

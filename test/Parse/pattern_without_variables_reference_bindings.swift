@@ -1,17 +1,22 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library -enable-experimental-feature ReferenceBindings
+
+// REQUIRES: asserts
 
 let _ = 1 // expected-error{{global variable declaration does not bind any variables}}
 
 func foo() {
   let _ = 1 // OK
+  inout _ = 1
 }
 
 struct Foo {
   let _ = 1 // expected-error{{property declaration does not bind any variables}}
   var (_, _) = (1, 2) // expected-error{{property declaration does not bind any variables}}
+  inout (_, _) = (1, 2) // expected-error{{property declaration does not bind any variables}}
 
   func foo() {
     let _ = 1 // OK
+    inout _ = 1
   }
 }
 
@@ -33,8 +38,13 @@ func testVarLetPattern(a : SimpleEnum) {
   switch (a, 42) {
   case let (_, x): _ = x; break    // ok
   }
+  switch a {
+  case inout _: break         // expected-warning {{'inout' pattern has no effect; sub-pattern didn't bind any variables}} {{8-14=}}
+  }
   // expected-warning @+1 {{'if' condition is always true}}
   if case let _ = "str" {}  // expected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}}
+  if case inout _ = "str" {}  // expected-warning {{'inout' pattern has no effect; sub-pattern didn't bind any variables}} {{11-17=}}
+  // expected-warning @-1 {{'if' condition is always true}}
 }
 
 // https://github.com/apple/swift/issues/53293
