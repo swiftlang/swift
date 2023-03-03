@@ -445,8 +445,9 @@ struct ArgumentInitHelper {
     } else if (!pd->isImmutableInFunctionBody()) {
       // If it's a locally mutable parameter, then we need to move the argument
       // value into a local box to hold the mutated value.
+      // We don't need to mark_uninitialized since we immediately initialize.
       auto mutableBox = SGF.emitLocalVariableWithCleanup(pd,
-                                                    MarkUninitializedInst::Var);
+                                                   /*uninitialized kind*/ None);
       argrv.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, mutableBox.get());
       return;
     }
