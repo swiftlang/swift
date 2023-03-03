@@ -2681,6 +2681,7 @@ function(add_swift_target_executable name)
     SWIFT_MODULE_DEPENDS_MACCATALYST
     SWIFT_MODULE_DEPENDS_MACCATALYST_UNZIPPERED
     TARGET_SDKS
+    COMPILE_FLAGS
   )
 
   # Parse the arguments we were given.
@@ -2700,6 +2701,18 @@ function(add_swift_target_executable name)
     set(install_in_component "never_install")
   else()
     set(install_in_component "${SWIFTEXE_TARGET_INSTALL_IN_COMPONENT}")
+  endif()
+
+  # Turn off implicit imports
+  list(APPEND SWIFTEXE_TARGET_COMPILE_FLAGS "-Xfrontend;-disable-implicit-concurrency-module-import")
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+    list(APPEND SWIFTEXE_TARGET_COMPILE_FLAGS
+                      "-Xfrontend;-disable-implicit-string-processing-module-import")
+  endif()
+
+  if(SWIFT_IMPLICIT_BACKTRACING_IMPORT)
+    list(APPEND SWIFTEXE_TARGET_COMPILE_FLAGS "-Xfrontend;-disable-implicit-backtracing-module-import")
   endif()
 
   # All Swift executables depend on the standard library.
@@ -2848,6 +2861,8 @@ function(add_swift_target_executable name)
             ${swiftexe_module_dependency_targets}
           SDK "${sdk}"
           ARCHITECTURE "${arch}"
+          COMPILE_FLAGS
+            ${SWIFTEXE_TARGET_COMPILE_FLAGS}
           INSTALL_IN_COMPONENT ${install_in_component})
 
       _list_add_string_suffix(
