@@ -5372,6 +5372,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
 
    case ConstraintLocator::TupleType:
+   case ConstraintLocator::GenericType:
       path = path.slice(1);
       continue;
 
