@@ -70,6 +70,7 @@ func typeReprPacks<each T>(_ t: repeat each T) where each T: ExpressibleByIntege
 
   _ = Array<each T>() // expected-error {{pack reference 'T' can only appear in pack expansion or generic requirement}}
   _ = 1 as each T // expected-error {{pack reference 'T' can only appear in pack expansion or generic requirement}}
+  repeat Invalid<String, each T>("") // expected-error {{cannot find 'Invalid' in scope}}
 }
 
 func sameShapeDiagnostics<each T, each U>(t: repeat each T, u: repeat each U) {
