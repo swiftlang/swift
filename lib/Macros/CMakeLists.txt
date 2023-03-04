@@ -46,10 +46,10 @@ function(add_swift_macro_library name)
 
   swift_install_in_component(TARGETS ${name}
     LIBRARY
-      DESTINATION "${SWIFT_HOST_PLUGINS_DEST_DIR}"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins"
       COMPONENT compiler
     ARCHIVE
-      DESTINATION "${SWIFT_HOST_PLUGINS_DEST_DIR}"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins"
       COMPONENT compiler)
 
   # Export this macro plugin target.
