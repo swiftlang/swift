@@ -294,7 +294,7 @@ class TaskDependencyStatusRecord : public TaskStatusRecord {
   //
   // The type of thing we are waiting on, is specified in the enum below
   union Dependent {
-    constexpr Dependent() {}
+    constexpr Dependent(): Task(nullptr) {}
 
     // This task is suspended waiting on another task. This could be an async
     // let child task or it could be another unstructured task.
