@@ -1,6 +1,8 @@
 
 // RUN: %target-swift-emit-silgen -parse-stdlib -module-name Swift %s | %FileCheck %s
 
+@_marker protocol _Copyable {}
+
 class C {}
 
 enum Optional<T> {
