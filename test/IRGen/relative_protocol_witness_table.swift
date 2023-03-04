@@ -190,14 +190,14 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 
 // Make sure value witness table lookup is done right.
 
-// CHECK: define{{.*}} swiftcc void @"$s1A7testVWTyyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T:%.*]])
-// CHECK:  [[T0:%.*]] = bitcast %swift.type* [[T]] to i8***
-// CHECK:  [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
-// CHECK:  [[VWT_PTR:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:  [[T1:%.*]] = getelementptr inbounds i8*, i8** [[VWT_PTR]], i32 2
-// CHECK:  [[T2:%.*]] = load i8*, i8** [[T1]]
-// CHECK:  [[T3:%.*]] = bitcast i8* [[T2]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
-// CHECK:  call %swift.opaque* [[T3]](%swift.opaque* {{.*}}, %swift.opaque* {{.*}}, %swift.type* [[T]])
+// CHECK-x86_64: define{{.*}} swiftcc void @"$s1A7testVWTyyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T:%.*]])
+// CHECK-x86_64:  [[T0:%.*]] = bitcast %swift.type* [[T]] to i8***
+// CHECK-x86_64:  [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-x86_64:  [[VWT_PTR:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK-x86_64:  [[T1:%.*]] = getelementptr inbounds i8*, i8** [[VWT_PTR]], i32 2
+// CHECK-x86_64:  [[T2:%.*]] = load i8*, i8** [[T1]]
+// CHECK-x86_64:  [[T3:%.*]] = bitcast i8* [[T2]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
+// CHECK-x86_64:  call %swift.opaque* [[T3]](%swift.opaque* {{.*}}, %swift.opaque* {{.*}}, %swift.type* [[T]])
 
 
 // Simple witness entry access.
