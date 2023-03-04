@@ -105,3 +105,14 @@ func tupleExpansion<each T, each U>(
   _ = zip(repeat each tuple1.element, with: repeat each tuple2.element)
   // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'U' and 'T' have the same shape}}
 }
+
+protocol Generatable {
+  static func generate() -> Self
+}
+
+func generateTuple<each T : Generatable>() -> (repeat each T) {
+  (each T).generate()
+  // expected-error@-1 {{pack reference 'T' can only appear in pack expansion or generic requirement}}
+
+  return (repeat (each T).generate())
+}
