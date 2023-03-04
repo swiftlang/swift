@@ -26,6 +26,8 @@
 // RUN: %FileCheck -check-prefix=CHECK-RECOMPILED-W %s < %t/output4
 // RUN: %FileCheck -check-prefix=CHECK-NOT-RECOMPILED-W %s < %t/output4
 
+// REQUIRES: rdar106170343
+
 // CHECK-RECOMPILED-W: {compile: definesAB.o <= definesAB.swift}
 // CHECK-RECOMPILED-W: {compile: usesA.o <= usesA.swift}
 

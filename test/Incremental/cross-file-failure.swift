@@ -25,5 +25,7 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-RECOMPILED %s --dump-input=always < %t/output-incremental
 
+// REQUIRES: rdar106170343
+
 // CHECK-RECOMPILED: Queuing (initial): {compile: definesA.o <= definesA.swift}
 // CHECK-RECOMPILED: Queuing because of dependencies discovered later: {compile: usesA.o <= usesA.swift}
