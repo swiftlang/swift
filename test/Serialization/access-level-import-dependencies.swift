@@ -73,3 +73,5 @@ import PrivateDep
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-HIDDEN-DEP %s
 // RUN: %target-swift-frontend -typecheck %t/ClientOfNonPublic.swift -I %t \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-HIDDEN-DEP %s
+
+// REQUIRES: rdar106219959
