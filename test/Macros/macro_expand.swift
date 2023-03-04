@@ -26,6 +26,39 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
+#if TEST_DIAGNOSTICS
+@attached(peer)
+macro Invalid() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
+
+@Invalid
+struct Bad {}
+// expected-note@-1 7 {{in expansion of macro 'Invalid' here}}
+
+// CHECK-DIAGS: error: macro expansion cannot introduce import
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3BadV7InvalidfMp_.swift
+// CHECK-DIAGS: import Swift
+
+// CHECK-DIAGS: error: macro expansion cannot introduce precedence group
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3BadV7InvalidfMp_.swift
+// CHECK-DIAGS: precedencegroup MyPrecedence {}
+
+// CHECK-DIAGS: error: macro expansion cannot introduce macro
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3BadV7InvalidfMp_.swift
+// CHECK-DIAGS: @attached(member) macro myMacro()
+
+// CHECK-DIAGS: error: macro expansion cannot introduce extension
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3BadV7InvalidfMp_.swift
+// CHECK-DIAGS: extension Int {}
+
+// CHECK-DIAGS: error: macro expansion cannot introduce '@main' type'
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3BadV7InvalidfMp_.swift
+// CHECK-DIAGS: @main
+
+// CHECK-DIAGS: error: declaration name 'MyMain' is not covered by macro 'Invalid'
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3BadV7InvalidfMp_.swift
+// CHECK-DIAGS: struct MyMain {
+#endif
+
 @freestanding(expression) macro customFileID() -> String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(expression) macro fileID<T: ExpressibleByStringLiteral>() -> T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")

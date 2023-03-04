@@ -6910,7 +6910,7 @@ ERROR(external_macro_arg_not_type_name,none,
 ERROR(attached_declaration_macro_not_supported,none,
       "attached declaration macros are not yet supported", ())
 ERROR(invalid_decl_in_macro_expansion,none,
-      "macro expansion cannot introduce %1",
+      "macro expansion cannot introduce %0",
       (DescriptiveDeclKind))
 ERROR(invalid_main_type_in_macro_expansion,none,
       "macro expansion cannot introduce '@main' type'",

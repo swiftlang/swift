@@ -764,6 +764,27 @@ public struct AddCompletionHandler: PeerMacro {
   }
 }
 
+public struct InvalidMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "import Swift",
+      "precedencegroup MyPrecedence {}",
+      "@attached(member) macro myMacro()",
+      "extension Int {}",
+      """
+      @main
+      struct MyMain {
+        static func main() {}
+      }
+      """,
+    ]
+  }
+}
+
 public struct WrapInType: PeerMacro {
   public static func expansion(
     of node: AttributeSyntax,

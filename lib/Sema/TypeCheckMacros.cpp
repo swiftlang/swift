@@ -512,13 +512,20 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
         isa<ExtensionDecl>(decl)) {
       decl->diagnose(diag::invalid_decl_in_macro_expansion,
                      decl->getDescriptiveKind());
+      decl->setInvalid();
+
+      if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+        extension->setExtendedNominal(nullptr);
+      }
+
+      continue;
     }
 
     // Diagnose `@main` types.
-    if (auto *typeDecl = dyn_cast<TypeDecl>(decl)) {
-      if (typeDecl->getAttrs().hasAttribute<MainTypeAttr>()) {
-        typeDecl->diagnose(diag::invalid_main_type_in_macro_expansion);
-      }
+    if (auto *mainAttr = decl->getAttrs().getAttribute<MainTypeAttr>()) {
+      ctx.Diags.diagnose(mainAttr->getLocation(),
+                         diag::invalid_main_type_in_macro_expansion);
+      mainAttr->setInvalid();
     }
 
     // Diagnose default literal type overrides.
