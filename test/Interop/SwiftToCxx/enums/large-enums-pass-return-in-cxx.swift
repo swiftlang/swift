@@ -46,13 +46,13 @@ public func inoutLarge(_ en: inout Large, _ x: Int) {
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Large makeLarge(swift::Int x) noexcept SWIFT_SYMBOL("s:5Enums9makeLargeyAA0C0OSiF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::$s5Enums9makeLargeyAA0C0OSiF(result, x);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Large passThroughLarge(const Large& en) noexcept SWIFT_SYMBOL("s:5Enums16passThroughLargeyAA0D0OADF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::$s5Enums16passThroughLargeyAA0D0OADF(result, _impl::_impl_Large::getOpaquePointer(en));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }

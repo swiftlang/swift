@@ -303,13 +303,13 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
-// CHECK-NEXT:   return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::$s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(result, swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK GenericPair<uint16_t, uint16_t> passThroughConcretePair(const GenericPair<uint16_t, uint16_t>& x, uint16_t y) noexcept SWIFT_SYMBOL("s:8Generics23passThroughConcretePair_1yAA07GenericE0Vys6UInt16VAGGAH_AGtF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_GenericPair<uint16_t, uint16_t>::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_GenericPair<uint16_t, uint16_t>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::swift_interop_returnDirect_Generics_uint32_t_0_4(result, _impl::$s8Generics23passThroughConcretePair_1yAA07GenericE0Vys6UInt16VAGGAH_AGtF(_impl::swift_interop_passDirect_Generics_uint32_t_0_4(_impl::_impl_GenericPair<uint16_t, uint16_t>::getOpaquePointer(x)), y));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
@@ -323,7 +323,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
-// CHECK-NEXT:   return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::$s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(result, _impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
@@ -360,7 +360,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV1yq_vg(reinterpret_cast<void *>(&returnValue), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: return ::swift::_impl::implClassFor<T_0_1>::type::makeRetained(returnValue);
 // CHECK-NEXT: } else if constexpr (::swift::_impl::isValueType<T_0_1>) {
-// CHECK-NEXT: return ::swift::_impl::implClassFor<T_0_1>::type::returnNewValue([&](void * _Nonnull returnValue) {
+// CHECK-NEXT: return ::swift::_impl::implClassFor<T_0_1>::type::returnNewValue([&](void * _Nonnull returnValue) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV1yq_vg(returnValue, swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT:   } else if constexpr (::swift::_impl::isSwiftBridgedCxxRecord<T_0_1>) {
@@ -391,7 +391,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
-// CHECK-NEXT: return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s8Generics11GenericPairVyACyxq_Gx_Siq_tcfC(result, swift::_impl::getOpaquePointer(x), i, swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
@@ -440,7 +440,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV13genericMethodyqd__qd___q_tlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), swift::TypeMetadataTrait<T_1_0>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: return ::swift::_impl::implClassFor<T_1_0>::type::makeRetained(returnValue);
 // CHECK-NEXT: } else if constexpr (::swift::_impl::isValueType<T_1_0>) {
-// CHECK-NEXT: return ::swift::_impl::implClassFor<T_1_0>::type::returnNewValue([&](void * _Nonnull returnValue) {
+// CHECK-NEXT: return ::swift::_impl::implClassFor<T_1_0>::type::returnNewValue([&](void * _Nonnull returnValue) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV13genericMethodyqd__qd___q_tlF(returnValue, swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), swift::TypeMetadataTrait<T_1_0>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: } else if constexpr (::swift::_impl::isSwiftBridgedCxxRecord<T_1_0>) {

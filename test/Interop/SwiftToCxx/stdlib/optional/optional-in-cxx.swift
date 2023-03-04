@@ -55,20 +55,20 @@ public func resetOpt<T>(_ val: inout Optional<T>) {
 
 
 // CHECK: SWIFT_INLINE_THUNK Swift::Optional<int> createCIntOpt(int val) noexcept SWIFT_SYMBOL("s:11UseOptional13createCIntOptys5Int32VSgADF") SWIFT_WARN_UNUSED_RESULT {
- // CHECK-NEXT: return Swift::_impl::_impl_Optional<int>::returnNewValue([&](char * _Nonnull result) {
+ // CHECK-NEXT: return Swift::_impl::_impl_Optional<int>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::swift_interop_returnDirect_UseOptional_[[CINTENC:[a-z0-9_]+]](result, _impl::$s11UseOptional13createCIntOptys5Int32VSgADF(val));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
 
 // CHECK: SWIFT_INLINE_THUNK Swift::Optional<Klass> createKlassOpt(int16_t val) noexcept SWIFT_SYMBOL("s:11UseOptional14createKlassOptyAA0D0CSgs5Int16VF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return Swift::_impl::_impl_Optional<Klass>::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return Swift::_impl::_impl_Optional<Klass>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT: _impl::swift_interop_returnDirect_UseOptional_[[CLASSENC:[a-z0-9_]+]](result, _impl::$s11UseOptional14createKlassOptyAA0D0CSgs5Int16VF(val));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK Swift::Optional<SmallStruct> createSmallStructOpt(int16_t val) noexcept SWIFT_SYMBOL("s:11UseOptional20createSmallStructOptyAA0dE0VSgs5Int16VF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return Swift::_impl::_impl_Optional<SmallStruct>::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return Swift::_impl::_impl_Optional<SmallStruct>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::swift_interop_returnDirect_UseOptional_uint32_t_0_4(result, _impl::$s11UseOptional20createSmallStructOptyAA0dE0VSgs5Int16VF(val));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }

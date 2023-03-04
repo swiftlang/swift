@@ -53,7 +53,7 @@ int main() {
     assert(val.getCapacity() >= 1);
     auto zeroInt = val[0];
     assert(zeroInt == -11);
-    auto firstInt = val.remove(0);
+    auto firstInt = val.removeAt(0);
     assert(firstInt == -11);
     assert(val.getCount() == 0);
     UseArray::printArray(val);

@@ -16,9 +16,10 @@
 
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/StringExtras.h"
 
 #include "clang/AST/DeclObjC.h"
@@ -162,10 +163,32 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
   if (customNamesOnly)
     return StringRef();
 
-  // FIXME: String.Index should be exposed as String::Index, not _String_Index.
-  if (VD->getModuleContext()->isStdlibModule() &&
-      VD->getBaseIdentifier().str() == "Index") {
-    return "String_Index";
+  if (VD->getModuleContext()->isStdlibModule()) {
+    // Incorporate argument labels into Stdlib API names.
+    // FIXME: This should be done more broadly.
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+      std::string result;
+      llvm::raw_string_ostream os(result);
+      os << VD->getBaseIdentifier().str();
+      if (!AFD->getParameters())
+        return os.str();
+      for (const auto *param : *AFD->getParameters()) {
+        auto paramName = param->getArgumentName();
+        if (paramName.empty())
+          continue;
+        auto paramNameStr = paramName.str();
+        os << char(std::toupper(paramNameStr[0]));
+        os << paramNameStr.drop_front(1);
+      }
+      auto r = VD->getASTContext().getIdentifier(os.str());
+      return r.str();
+    }
+
+    // FIXME: String.Index should be exposed as String::Index, not
+    // _String_Index.
+    if (VD->getBaseIdentifier().str() == "Index") {
+      return "String_Index";
+    }
   }
 
   return VD->getBaseIdentifier().str();

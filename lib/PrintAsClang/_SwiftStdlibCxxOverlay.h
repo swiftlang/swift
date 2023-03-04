@@ -63,7 +63,7 @@ SWIFT_INLINE_THUNK String::operator std::string() const {
   using IndexType = decltype(u.getStartIndex());
   for (auto s = u.getStartIndex().getEncodedOffset(),
             e = u.getEndIndex().getEncodedOffset();
-       s != e; s = u.index(IndexType::init(s), 1).getEncodedOffset()) {
+       s != e; s = u.indexOffsetBy(IndexType::init(s), 1).getEncodedOffset()) {
     result.push_back(u[IndexType::init(s)]);
   }
   return result;

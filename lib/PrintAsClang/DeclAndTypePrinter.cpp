@@ -536,8 +536,8 @@ private:
                 outOfLineOS << "::makeRetained(*reinterpret_cast<void "
                                "**>(payloadFromDestruction));\n  ";
               } else {
-                outOfLineOS
-                    << "::returnNewValue([&](char * _Nonnull result) {\n";
+                outOfLineOS << "::returnNewValue([&](char * _Nonnull result) "
+                               "SWIFT_INLINE_THUNK_ATTRIBUTES {\n";
                 outOfLineOS << "      swift::"
                             << cxx_synthesis::getCxxImplNamespaceName();
                 outOfLineOS << "::implClassFor<";
@@ -2716,7 +2716,7 @@ static bool isStringNestedType(const ValueDecl *VD, StringRef Typename) {
 
 static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
-    if (VD == VD->getASTContext().getStringDecl() && !isExtension)
+    if (VD == VD->getASTContext().getStringDecl())
       return true;
     if (VD == VD->getASTContext().getArrayDecl())
       return true;
@@ -2737,47 +2737,24 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
     // FIXME: Do not expose 'index' methods as the overloads are conflicting.
     // this should either be prohibited in the stdlib module, or the overloads
     // should be renamed automatically or using the expose attribute.
-    if (ED->getExtendedNominal() == VD->getASTContext().getArrayDecl()) {
-      if (isa<AbstractFunctionDecl>(VD) &&
-          !cast<AbstractFunctionDecl>(VD)
-               ->getName()
-               .getBaseName()
-               .isSpecial() &&
-          cast<AbstractFunctionDecl>(VD)
-              ->getName()
-              .getBaseName()
-              .getIdentifier()
-              .str()
-              .contains_insensitive("index"))
-        return false;
-    }
+    if ((ED->getExtendedNominal() == VD->getASTContext().getArrayDecl() ||
+         ED->getExtendedNominal() == VD->getASTContext().getStringDecl()) &&
+        (isa<AbstractFunctionDecl>(VD) &&
+         !cast<AbstractFunctionDecl>(VD)->getName().getBaseName().isSpecial() &&
+         cast<AbstractFunctionDecl>(VD)
+             ->getName()
+             .getBaseName()
+             .getIdentifier()
+             .str()
+             .contains_insensitive("index")))
+      return false;
+    // Limit exposition of String constructors as there's overloading conflict.
+    // FIXME: resolve it in some other way.
     if (ED->getExtendedNominal() == VD->getASTContext().getStringDecl()) {
-      if (isa<ValueDecl>(VD) &&
-          !cast<ValueDecl>(VD)->getName().getBaseName().isSpecial() &&
-          cast<ValueDecl>(VD)
-              ->getName()
-              .getBaseName()
-              .getIdentifier()
-              .str()
-              .contains_insensitive("utf8"))
-        return true;
-    }
-    if (isStringNestedType(ED->getExtendedNominal(), "UTF8View")) {
-      // Do not expose ambiguous 'index(after:' / 'index(before:' overloads.
-      if (isa<AbstractFunctionDecl>(VD) &&
-          cast<AbstractFunctionDecl>(VD)->getParameters()->size() == 1 &&
-          !cast<AbstractFunctionDecl>(VD)
-               ->getName()
-               .getBaseName()
-               .isSpecial() &&
-          cast<AbstractFunctionDecl>(VD)
-              ->getName()
-              .getBaseName()
-              .getIdentifier()
-              .str()
-              .contains_insensitive("index"))
+      if (isa<ConstructorDecl>(VD))
         return false;
     }
+
     return hasExposeAttr(ED->getExtendedNominal(), /*isExtension=*/true);
   }
   return false;

@@ -515,7 +515,8 @@ void ClangValueTypePrinter::printValueTypeReturnScaffold(
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
   os << "  return ";
   typePrinter();
-  os << "::returnNewValue([&](char * _Nonnull result) {\n    ";
+  os << "::returnNewValue([&](char * _Nonnull result) "
+        "SWIFT_INLINE_THUNK_ATTRIBUTES {\n    ";
   bodyPrinter("result");
   os << ";\n";
   os << "  });\n";
