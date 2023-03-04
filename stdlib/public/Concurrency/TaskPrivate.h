@@ -527,7 +527,6 @@ public:
     assert(!dispatch_lock_is_locked(ExecutionLock));
     return ActiveTaskStatus(Record, Flags, dispatch_lock_value_for_self());
   } else {
-    assert(dispatch_lock_is_locked_by_self(ExecutionLock));
     return ActiveTaskStatus(Record, Flags, ExecutionLock & ~DLOCK_OWNER_MASK);
   }
 #else
