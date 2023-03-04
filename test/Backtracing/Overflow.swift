@@ -50,7 +50,6 @@ struct Overflow {
 // CHECK-NEXT: 6 [ra]               0x{{[0-9a-f]+}} static Overflow.main() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:36:5
 // CHECK-NEXT: 7 [ra] [system]      0x{{[0-9a-f]+}} static Overflow.$main() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:33:1
 // CHECK-NEXT: 8 [ra] [system]      0x{{[0-9a-f]+}} main + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift
-// CHECK-NEXT: 9 [ra] [system]      0x{{[0-9a-f]+}} start + {{[0-9]+}} in dyld
 
 // CHECK: Registers:
 

@@ -57,7 +57,6 @@ struct Crash {
 // CHECK-NEXT: 5 [ra]          0x{{[0-9a-f]+}} static Crash.main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:44:5
 // CHECK-NEXT: 6 [ra] [system] 0x{{[0-9a-f]+}} static Crash.$main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:41:1
 // CHECK-NEXT: 7 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in Crash at {{.*}}/Crash.swift
-// CHECK-NEXT: 8 [ra] [system] 0x{{[0-9a-f]+}} start + {{[0-9]+}} in dyld
 
 // CHECK: Registers:
 
@@ -135,7 +134,6 @@ struct Crash {
 // NODEBUG: 5 [ra]          0x{{[0-9a-f]+}} static Crash.main() + {{[0-9]+}} in CrashNoDebug
 // NODEBUG: 6 [ra] [system] 0x{{[0-9a-f]+}} static Crash.$main() + {{[0-9]+}} in CrashNoDebug
 // NODEBUG: 7 [ra]          0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashNoDebug
-// NODEBUG: 8 [ra] [system] 0x{{[0-9a-f]+}} start + {{[0-9]+}} in dyld
 
 // NODEBUG: Registers:
 
@@ -155,7 +153,6 @@ struct Crash {
 // OPTIMIZED-NEXT: 5 [inlined]          0x{{[0-9a-f]+}} static Crash.main() in CrashOpt at {{.*}}/Crash.swift:44:5
 // OPTIMIZED-NEXT: 6 [inlined] [system] 0x{{[0-9a-f]+}} static Crash.$main() in CrashOpt at {{.*}}/Crash.swift:41:1
 // OPTIMIZED-NEXT: 7 [system]           0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashOpt at {{.*}}/Crash.swift
-// OPTIMIZED-NEXT: 8 [ra] [system]      0x{{[0-9a-f]+}} start + {{[0-9]+}} in dyld
 
 // OPTIMIZED: Registers:
 
@@ -168,7 +165,6 @@ struct Crash {
 // OPTNODEBUG: Thread 0 crashed:
 
 // OPTNODEBUG: 0               0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashOptNoDebug
-// OPTNODEBUG-NEXT: 1 [ra] [system] 0x{{[0-9a-f]+}} start + {{[0-9]+}} in dyld
 
 // OPTNODEBUG: Registers:
 

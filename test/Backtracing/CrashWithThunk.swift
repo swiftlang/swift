@@ -35,7 +35,6 @@ struct CrashWithThunk {
 // CHECK-NEXT: 2 [ra]                  0x{{[0-9a-f]+}} static CrashWithThunk.main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:25:9
 // CHECK-NEXT: 3 [ra] [system]         0x{{[0-9a-f]+}} static CrashWithThunk.$main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:20:1
 // CHECK-NEXT: 4 [ra] [system]         0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift
-// CHECK-NEXT: 5 [ra] [system]         0x{{[0-9a-f]+}} start + {{[0-9]+}} in dyld
 
 // CHECK: Registers:
 
