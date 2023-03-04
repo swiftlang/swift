@@ -9,8 +9,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if SWIFT_OBSERVATION_MACROS
-#if compiler(>=5.8) && hasAttribute(attached)
 @available(SwiftStdlib 5.9, *)
 @attached(member)
 @attached(memberAttribute)
@@ -22,5 +20,3 @@ public macro Observable() =
 @attached(accessor)
 public macro ObservableProperty() = 
   #externalMacro(module: "ObservationMacros", type: "ObservablePropertyMacro")
-#endif
-#endif
