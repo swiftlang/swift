@@ -11,7 +11,7 @@ enum OptionSetMacroDiagnostic {
 }
 
 extension OptionSetMacroDiagnostic: DiagnosticMessage {
-  func diagnose(at node: some SyntaxProtocol) -> Diagnostic {
+  func diagnose<Node: SyntaxProtocol>(at node: Node) -> Diagnostic {
     Diagnostic(node: Syntax(node), message: self)
   }
 
@@ -65,10 +65,13 @@ public struct OptionSetMacro {
   ///
   /// - Returns: the important arguments used by the various roles of this
   /// macro inhabits, or nil if an error occurred.
-  static func decodeExpansion(
+  static func decodeExpansion<
+    Decl: DeclGroupSyntax,
+    Context: MacroExpansionContext
+  >(
     of attribute: AttributeSyntax,
-    attachedTo decl: some DeclGroupSyntax,
-    in context: some MacroExpansionContext
+    attachedTo decl: Decl,
+    in context: Context
   ) -> (StructDeclSyntax, EnumDeclSyntax, TypeSyntax)? {
     // Determine the name of the options enum.
     let optionsEnumName: String
@@ -119,10 +122,13 @@ public struct OptionSetMacro {
 }
 
 extension OptionSetMacro: ConformanceMacro {
-  public static func expansion(
+  public static func expansion<
+    Decl: DeclGroupSyntax,
+    Context: MacroExpansionContext
+  >(
     of attribute: AttributeSyntax,
-    providingConformancesOf decl: some DeclGroupSyntax,
-    in context: some MacroExpansionContext
+    providingConformancesOf decl: Decl,
+    in context: Context
   ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
     // Decode the expansion arguments.
     guard let (structDecl, _, _) = decodeExpansion(of: attribute, attachedTo: decl, in: context) else {
@@ -140,10 +146,13 @@ extension OptionSetMacro: ConformanceMacro {
 }
 
 extension OptionSetMacro: MemberMacro {
-  public static func expansion(
+  public static func expansion<
+    Decl: DeclGroupSyntax,
+    Context: MacroExpansionContext
+  >(
     of attribute: AttributeSyntax,
-    providingMembersOf decl: some DeclGroupSyntax,
-    in context: some MacroExpansionContext
+    providingMembersOf decl: Decl,
+    in context: Context
   ) throws -> [DeclSyntax] {
     // Decode the expansion arguments.
     guard let (_, optionsEnum, rawType) = decodeExpansion(of: attribute, attachedTo: decl, in: context) else {
@@ -190,7 +199,7 @@ extension DeclModifierSyntax {
 extension SyntaxStringInterpolation {
   // It would be nice for SwiftSyntaxBuilder to provide this out-of-the-box.
   mutating func appendInterpolation<Node: SyntaxProtocol>(_ node: Node?) {
-    if let node {
+    if let node = node {
       appendInterpolation(node)
     }
   }
