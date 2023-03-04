@@ -4,7 +4,8 @@
 // RUN: echo 'class c : b {}' >%t/c.swift
 // RUN: echo 'class d : c {}' >%t/d.swift
 // RUN: echo 'public func main() {}' >%t/main.swift
-//
+// REQUIRES: rdar106170241 
+
 // First prime the incremental state, but note that we're building in the d c b a (reverse-alphabetical) order.
 // RUN: cd %t && %swiftc_driver-stdlib-target -enable-batch-mode -incremental -output-file-map %S/Inputs/abcd_filemap.yaml -module-name main -j 1 d.swift c.swift b.swift a.swift main.swift
 //
