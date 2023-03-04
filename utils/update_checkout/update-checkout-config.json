@@ -16,6 +16,10 @@
             "remote": { "id": "apple/swift-collections" } },
         "swift-crypto": {
             "remote": { "id": "apple/swift-crypto" } },
+        "swift-certificates": {
+            "remote": { "id": "apple/swift-certificates" } },
+        "swift-asn1": {
+            "remote": { "id": "apple/swift-asn1" } },
         "swift-driver": {
             "remote": { "id": "apple/swift-driver" } },
         "swift-numerics": {
@@ -99,7 +103,9 @@
                 "swift-argument-parser": "1.2.2",
                 "swift-atomics": "1.0.2",
                 "swift-collections": "1.0.1",
-                "swift-crypto": "2.2.3",
+                "swift-crypto": "2.3.0",
+                "swift-certificates": "main",
+                "swift-asn1": "main",
                 "swift-driver": "main",
                 "swift-numerics": "1.0.1",
                 "swift-syntax": "main",
@@ -141,7 +147,9 @@
                 "swift-argument-parser": "1.2.2",
                 "swift-atomics": "1.0.2",
                 "swift-collections": "1.0.1",
-                "swift-crypto": "2.2.3",
+                "swift-crypto": "2.3.0",
+                "swift-certificates": "main",
+                "swift-asn1": "main",
                 "swift-driver": "main",
                 "swift-numerics": "1.0.1",
                 "swift-syntax": "main",
@@ -426,7 +434,9 @@
                 "swift-argument-parser": "1.2.2",
                 "swift-atomics": "1.0.2",
                 "swift-collections": "1.0.1",                
-                "swift-crypto": "2.2.3",                
+                "swift-crypto": "2.3.0",
+                "swift-certificates": "main",
+                "swift-asn1": "main",
                 "swift-driver": "main",
                 "swift-numerics": "1.0.1",
                 "swift-syntax": "main",
