@@ -781,6 +781,17 @@ public struct InvalidMacro: PeerMacro {
         static func main() {}
       }
       """,
+      "typealias Array = Void",
+      "typealias Dictionary = Void",
+      "typealias BooleanLiteralType = Void",
+      "typealias ExtendedGraphemeClusterType = Void",
+      "typealias FloatLiteralType = Void",
+      "typealias IntegerLiteralType = Void",
+      "typealias StringLiteralType = Void",
+      "typealias UnicodeScalarType = Void",
+      "typealias _ColorLiteralType = Void",
+      "typealias _ImageLiteralType = Void",
+      "typealias _FileReferenceLiteralType = Void",
     ]
   }
 }

@@ -476,6 +476,14 @@ ExpandPeerMacroRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
   return decl->getASTContext().AllocateCopy(bufferIDs);
 }
 
+static Identifier makeIdentifier(ASTContext &ctx, StringRef name) {
+  return ctx.getIdentifier(name);
+}
+
+static Identifier makeIdentifier(ASTContext &ctx, std::nullptr_t) {
+  return Identifier();
+}
+
 /// Diagnose macro expansions that produce any of the following declarations:
 ///   - Import declarations
 ///   - Operator and precedence group declarations
@@ -530,7 +538,17 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
 
     // Diagnose default literal type overrides.
     if (auto *typeAlias = dyn_cast<TypeAliasDecl>(decl)) {
-      // TODO
+      auto name = typeAlias->getBaseIdentifier();
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(_, __, typeName,     \
+                                                  supportsOverride)    \
+      if (supportsOverride && name == makeIdentifier(ctx, typeName)) { \
+        typeAlias->diagnose(diag::literal_type_in_macro_expansion,     \
+                            makeIdentifier(ctx, typeName));            \
+        typeAlias->setInvalid();                                       \
+        continue;                                                      \
+      }
+#include "swift/AST/KnownProtocols.def"
+#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
     }
 
     // Diagnose value decls with names not covered by the macro
