@@ -5361,8 +5361,10 @@ synthesizeEmptyFunctionBody(AbstractFunctionDecl *afd, void *context) {
 
 DestructorDecl *
 GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
+  auto dc = CD->getImplementationContext();
+
   auto &ctx = CD->getASTContext();
-  auto *DD = new (ctx) DestructorDecl(CD->getLoc(), CD);
+  auto *DD = new (ctx) DestructorDecl(CD->getLoc(), dc->getAsGenericContext());
 
   DD->setImplicit();
 

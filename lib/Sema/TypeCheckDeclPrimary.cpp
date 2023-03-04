@@ -1236,7 +1236,7 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
 /// checking whether it shadows an imported declaration).
 static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
   // We check the properties instead of their accessors.
-  if (isa<AccessorDecl>(VD))
+  if (isa<AccessorDecl>(VD) || isa<DestructorDecl>(member))
     return;
 
   // Are we in an @_objcImplementation extension?
@@ -3744,7 +3744,8 @@ public:
     // Only check again for destructor decl outside of a class if our destructor
     // is not marked as invalid.
     if (!DD->isInvalid()) {
-      auto *nom = dyn_cast<NominalTypeDecl>(DD->getDeclContext());
+      auto *nom = dyn_cast<NominalTypeDecl>(
+                             DD->getDeclContext()->getImplementedObjCContext());
       if (!nom || (!isa<ClassDecl>(nom) && !nom->isMoveOnly())) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
       }
