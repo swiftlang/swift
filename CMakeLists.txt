@@ -45,7 +45,7 @@ endif()
 
 ENABLE_LANGUAGE(C)
 
-# Use C++14.
+# Use C++17.
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)

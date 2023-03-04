@@ -6375,6 +6375,14 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
     AssociatedTypeLoc = consumeToken(tok::kw_associatedtype);
   }
 
+  // Reject variadic associated types with a specific error.
+  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+      Tok.isContextualKeyword("each")) {
+    const auto EachLoc = consumeToken();
+    diagnose(EachLoc, diag::associatedtype_cannot_be_variadic)
+        .fixItRemoveChars(EachLoc, Tok.getLoc());
+  }
+
   Status = parseIdentifierDeclName(
       *this, Id, IdLoc, "associatedtype",
       [](const Token &next) { return next.isAny(tok::colon, tok::equal); });
@@ -6392,12 +6400,13 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
     }
   }
 
-  // Reject variadic associated types with a specific error.
+  // Reject (early syntax) variadic associated types with a specific error.
   if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
       startsWithEllipsis(Tok)) {
-    auto Ellipsis = consumeStartingEllipsis();
-    diagnose(Ellipsis, diag::associatedtype_cannot_be_variadic)
-      .fixItRemoveChars(Ellipsis, Tok.getLoc());
+    const auto EllipsisLoc = consumeStartingEllipsis();
+    const auto EllipsisEnd = Lexer::getLocForEndOfToken(SourceMgr, EllipsisLoc);
+    diagnose(EllipsisLoc, diag::associatedtype_cannot_be_variadic)
+        .fixItRemoveChars(EllipsisLoc, EllipsisEnd);
   }
 
   // Parse optional inheritance clause.
