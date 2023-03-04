@@ -468,6 +468,8 @@ PASS(MoveOnlyBorrowToDestructureTransform,
      "used to convert borrow+projection to destructures. Once this has run, the move "
      "only object checker runs and ensures that the destructures do not create "
      "any move only errors with respect to non-borrow+projection uses")
+PASS(ReferenceBindingTransform, "sil-reference-binding-transform",
+     "Check/transform reference bindings")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)

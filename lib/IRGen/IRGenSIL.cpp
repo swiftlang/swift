@@ -1225,6 +1225,10 @@ public:
   void visitMarkMustCheckInst(MarkMustCheckInst *i) {
     llvm_unreachable("Invalid in Lowered SIL");
   }
+  void visitMarkUnresolvedReferenceBindingInst(
+      MarkUnresolvedReferenceBindingInst *i) {
+    llvm_unreachable("Invalid in Lowered SIL");
+  }
   void visitCopyableToMoveOnlyWrapperValueInst(
       CopyableToMoveOnlyWrapperValueInst *i) {
     auto e = getLoweredExplosion(i->getOperand());

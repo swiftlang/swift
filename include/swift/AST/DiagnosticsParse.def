@@ -964,6 +964,9 @@ ERROR(no_default_arg_closure,none,
 ERROR(no_default_arg_curried,none,
       "default arguments are not allowed in curried parameter lists", ())
 ERROR(var_pattern_in_var,none,
+      "'%select{let||var}0' cannot appear nested inside another 'var' or "
+      "'let' pattern", (unsigned))
+ERROR(var_pattern_in_var_inout,none,
       "'%select{let|inout|var}0' cannot appear nested inside another 'var', "
       "'let', or 'inout' pattern", (unsigned))
 ERROR(extra_var_in_multiple_pattern_list,none,
@@ -2076,6 +2079,12 @@ ERROR(parser_round_trip_error,none,
 ERROR(parser_new_parser_errors,none,
       "new Swift parser generated errors for code that C++ parser accepted",
        ())
+
+// MARK: Reference Binding Diagnostics
+ERROR(sil_markuncheckedreferencebinding_requires_attribute,none,
+      "mark_unchecked_reference_binding requires an attribute like [inout]", ())
+ERROR(sil_markuncheckedreferencebinding_invalid_attribute,none,
+      "Attribute '[%0]' can not be applied to mark_unchecked_reference_binding", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

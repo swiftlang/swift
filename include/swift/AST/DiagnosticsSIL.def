@@ -816,5 +816,16 @@ WARNING(nontrivial_string_to_rawpointer_conversion,none,
         "forming %0 to an inout variable of type String exposes the internal representation "
         "rather than the string contents.", (Type))
 
+// MARK: Reference Binding Warnings
+ERROR(sil_referencebinding_unknown_pattern, none,
+      "reference binding that the compiler does not understand how to check. Please file a bug",
+      ())
+ERROR(sil_referencebinding_src_used_within_inout_scope, none,
+      "var bound to inout binding cannot be used within the inout binding's scope",
+      ())
+NOTE(sil_referencebinding_inout_binding_here, none,
+      "inout binding here",
+      ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
