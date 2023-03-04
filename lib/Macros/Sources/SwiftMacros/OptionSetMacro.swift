@@ -162,12 +162,11 @@ extension OptionSetMacro: MemberMacro {
     }
 
     // Find all of the case elements.
-    let caseElements: [EnumCaseElementSyntax] = optionsEnum.members.members.flatMap { member in
-      guard let caseDecl = member.decl.as(EnumCaseDeclSyntax.self) else {
-        return Array<EnumCaseElementSyntax>()
+    var caseElements: [EnumCaseElementSyntax] = []
+    for member in optionsEnum.members.members {
+      if let caseDecl = member.decl.as(EnumCaseDeclSyntax.self) {
+        caseElements.append(contentsOf: caseDecl.elements)
       }
-
-      return Array(caseDecl.elements)
     }
 
     // Dig out the access control keyword we need.
