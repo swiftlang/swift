@@ -247,6 +247,215 @@ _buildDemanglerForBuiltinType(const Metadata *type, Demangle::Demangler &Dem) {
   return nullptr;
 }
 
+// Build a demangled type tree for a type pack.
+static Demangle::NodePointer
+_buildDemanglingForMetadataPack(MetadataPackPointer pack, size_t count,
+                                Demangle::Demangler &Dem) {
+  using namespace Demangle;
+
+  auto node = Dem.createNode(Node::Kind::Pack);
+
+  for (size_t i = 0; i < count; ++i) {
+    auto elt = _swift_buildDemanglingForMetadata(pack.getElements()[i], Dem);
+    if (elt == nullptr)
+      return nullptr;
+
+    node->addChild(elt, Dem);
+  }
+
+  return node;
+}
+
+/// Demangle the given type name to a generic parameter reference, which
+/// will be returned as (depth, index).
+static llvm::Optional<std::pair<unsigned, unsigned>>
+demangleToGenericParamRef(StringRef typeName) {
+  StackAllocatedDemangler<1024> demangler;
+  NodePointer node = demangler.demangleType(typeName);
+  if (!node)
+    return None;
+
+  // Find the flat index that the right-hand side refers to.
+  if (node->getKind() == Demangle::Node::Kind::Type)
+    node = node->getChild(0);
+  if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
+    return None;
+
+  return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
+                                       node->getChild(1)->getIndex());
+}
+
+/// Build an array of demangling trees for each generic argument of the given
+/// type metadata.
+///
+/// Note:
+/// - The input array has an entry for those generic parameter descriptors which
+///   are key arguments only.
+/// - The output array has an entry for each generic parameter descriptor,
+///   whether or not it is a key argument.
+///
+/// The generic parameters which are not key arguments were made non-canonical
+/// by constraining them to a concrete type or another generic parameter.
+///
+/// We figure out their type by looking at the same-type requirements of the
+/// generic context. We demangle their type from the requirement, using the
+/// generic arguments area as the substitution map; this gives us the metadata
+/// for their argument. Then we convert the metadata to a mangling.
+///
+/// The output array is flat; the generic parameters of each depth are
+/// concatenated together.
+static bool _buildDemanglingForGenericArgs(
+    const Metadata *type,
+    const TypeContextDescriptor *description,
+    llvm::SmallVectorImpl<NodePointer> &demangledGenerics,
+    Demangle::Demangler &Dem) {
+  auto generics = description->getGenericContext();
+  if (!generics)
+    return true;
+
+  auto genericArgs = description->getGenericArguments(type);
+
+  auto packHeader = generics->getGenericPackShapeHeader();
+  auto packDescriptors = generics->getGenericPackShapeDescriptors();
+
+  unsigned packIndex = 0;
+  unsigned argIndex = packHeader.NumShapeClasses;
+
+  bool missingWrittenArguments = false;
+
+  for (auto param : generics->getGenericParams()) {
+    switch (param.getKind()) {
+    case GenericParamKind::Type:
+      // The type should have a key argument unless it's been same-typed to
+      // another type.
+      if (param.hasKeyArgument()) {
+        auto genericArg = reinterpret_cast<const Metadata *>(genericArgs[argIndex]);
+
+        auto genericArgDemangling =
+          _swift_buildDemanglingForMetadata(genericArg, Dem);
+        if (!genericArgDemangling)
+          return false;
+        demangledGenerics.push_back(genericArgDemangling);
+
+        ++argIndex;
+      } else {
+        // Leave a gap for us to fill in by looking at same-type requirements.
+        demangledGenerics.push_back(nullptr);
+        missingWrittenArguments = true;
+      }
+
+      break;
+
+    case GenericParamKind::TypePack:
+      if (param.hasKeyArgument()) {
+        auto packDescriptor = packDescriptors[packIndex];
+        assert(packDescriptor.Kind == GenericPackKind::Metadata);
+        assert(packDescriptor.ShapeClass < packHeader.NumShapeClasses);
+        assert(packDescriptor.Index == argIndex);
+
+        MetadataPackPointer pack(genericArgs[argIndex]);
+        size_t count = reinterpret_cast<size_t>(genericArgs[packDescriptor.ShapeClass]);
+
+        auto genericArgDemangling = _buildDemanglingForMetadataPack(pack, count, Dem);
+        if (genericArgDemangling == nullptr)
+          return false;
+
+        demangledGenerics.push_back(genericArgDemangling);
+
+        ++packIndex;
+        ++argIndex;
+      } else {
+        // Leave a gap for us to fill in by looking at same-type requirements.
+        demangledGenerics.push_back(nullptr);
+        missingWrittenArguments = true;
+      }
+
+      break;
+
+    default:
+      // We don't know about this kind of parameter.
+      return false;
+    }
+  }
+
+  // If there is no follow-up work to do, we're done.
+  if (!missingWrittenArguments)
+    return true;
+
+  // We have generic arguments that would be written, but have been
+  // canonicalized away. Use same-type requirements to reconstitute them.
+  SubstGenericParametersFromMetadata substitutions(
+        description, reinterpret_cast<const void * const *>(genericArgs));
+
+  // Retrieve the mapping information needed for depth/index -> flat index.
+  llvm::SmallVector<unsigned, 8> genericParamCounts;
+  (void)_gatherGenericParameterCounts(description, genericParamCounts, Dem);
+
+  // Walk through the generic requirements to evaluate same-type
+  // constraints that are needed to fill in missing generic arguments.
+  for (const auto &req : generics->getGenericRequirements()) {
+    // We only care about same-type constraints.
+    if (req.Flags.getKind() != GenericRequirementKind::SameType)
+      continue;
+
+    auto lhsParam = demangleToGenericParamRef(req.getParam());
+    if (!lhsParam)
+      continue;
+
+    assert(!req.Flags.isPackRequirement() &&
+           "Pack requirements not supported here yet");
+
+    // If we don't yet have an argument for this parameter, it's a
+    // same-type-to-concrete constraint.
+    auto lhsFlatIndex =
+      _depthIndexToFlatIndex(lhsParam->first, lhsParam->second,
+                             genericParamCounts);
+    if (!lhsFlatIndex || *lhsFlatIndex >= demangledGenerics.size())
+      return false;
+
+    if (!demangledGenerics[*lhsFlatIndex]) {
+      // Substitute into the right-hand side.
+      auto *genericArg =
+          swift_getTypeByMangledName(MetadataState::Abstract,
+            req.getMangledTypeName(),
+            reinterpret_cast<const void * const *>(genericArgs),
+            [&substitutions](unsigned depth, unsigned index) {
+              return substitutions.getMetadata(depth, index);
+            },
+            [&substitutions](const Metadata *type, unsigned index) {
+              return substitutions.getWitnessTable(type, index);
+            }).getType().getMetadata();
+      if (!genericArg)
+        return false;
+
+      demangledGenerics[*lhsFlatIndex] =
+          _swift_buildDemanglingForMetadata(genericArg, Dem);
+
+      continue;
+    }
+
+    // If we do have an argument for this parameter, it might be that
+    // the right-hand side is itself a generic parameter, which means
+    // we have a same-type constraint A == B where A is already filled in.
+    auto rhsParam = demangleToGenericParamRef(req.getMangledTypeName());
+    if (!rhsParam)
+      return false;
+
+    auto rhsFlatIndex =
+      _depthIndexToFlatIndex(rhsParam->first, rhsParam->second,
+                             genericParamCounts);
+    if (!rhsFlatIndex || *rhsFlatIndex >= demangledGenerics.size())
+      return false;
+
+    if (demangledGenerics[*rhsFlatIndex] || !demangledGenerics[*lhsFlatIndex])
+      return false;
+
+    demangledGenerics[*rhsFlatIndex] = demangledGenerics[*lhsFlatIndex];
+  }
+
+  return true;
+}
+
 /// Build a demangled type tree for a nominal type.
 static Demangle::NodePointer
 _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
@@ -293,30 +502,9 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 
   // Gather the complete set of generic arguments that must be written to
   // form this type.
-  llvm::SmallVector<const Metadata *, 8> allGenericArgs;
-  gatherWrittenGenericArgs(type, description, allGenericArgs, Dem);
-
-  // Demangle the generic arguments.
   llvm::SmallVector<NodePointer, 8> demangledGenerics;
-  for (auto genericArg : allGenericArgs) {
-    // When there is no generic argument, put in a placeholder.
-    if (!genericArg) {
-      auto placeholder = Dem.createNode(Node::Kind::Tuple);
-      auto emptyList = Dem.createNode(Node::Kind::TypeList);
-      placeholder->addChild(emptyList, Dem);
-      auto type = Dem.createNode(Node::Kind::Type);
-      type->addChild(placeholder, Dem);
-      demangledGenerics.push_back(type);
-      continue;
-    }
-
-    // Demangle this argument.
-    auto genericArgDemangling =
-      _swift_buildDemanglingForMetadata(genericArg, Dem);
-    if (!genericArgDemangling)
-      return nullptr;
-    demangledGenerics.push_back(genericArgDemangling);
-  }
+  if (!_buildDemanglingForGenericArgs(type, description, demangledGenerics, Dem))
+    return nullptr;
   
   return _buildDemanglingForContext(description, demangledGenerics, Dem);
 }

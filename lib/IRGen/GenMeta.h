@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_GENMETA_H
 #define SWIFT_IRGEN_GENMETA_H
 
+#include "swift/ABI/MetadataValues.h"
 #include <utility>
 
 namespace llvm {
@@ -169,18 +170,31 @@ namespace irgen {
   void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
                                      CanType abstractType);
 
+  struct GenericPackArgument {
+    GenericPackKind Kind;
+    unsigned Index;
+    CanType ReducedShape;
+
+    GenericPackArgument(GenericPackKind kind,
+                        unsigned index,
+                        CanType reducedShape)
+      : Kind(kind), Index(index), ReducedShape(reducedShape) {}
+  };
+
   /// Description of the metadata emitted by adding generic requirements.
-  struct GenericRequirementsMetadata {
+  struct GenericArgumentMetadata {
     unsigned NumParams = 0;
     unsigned NumParamsEmitted = 0;
     unsigned NumRequirements = 0;
     unsigned NumGenericKeyArguments = 0;
+    SmallVector<CanType, 1> ShapeClasses;
+    SmallVector<GenericPackArgument, 1> GenericPackArguments;
   };
 
   /// Add generic parameters to the given constant struct builder.
   ///
   /// \param sig The generic signature whose parameters we wish to emit.
-  GenericRequirementsMetadata addGenericParameters(
+  GenericArgumentMetadata addGenericParameters(
                                           IRGenModule &IGM,
                                           ConstantStructBuilder &B,
                                           GenericSignature sig,
@@ -192,7 +206,7 @@ namespace irgen {
   /// described.
   ///
   /// \param requirements The requirements to add.
-  GenericRequirementsMetadata addGenericRequirements(
+  GenericArgumentMetadata addGenericRequirements(
                                           IRGenModule &IGM,
                                           ConstantStructBuilder &B,
                                           GenericSignature sig,

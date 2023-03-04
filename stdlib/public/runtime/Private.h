@@ -535,7 +535,7 @@ public:
   void *allocateMetadata(size_t size, size_t align);
 
   /// Gather the set of generic arguments that would be written in the
-  /// source, as a f
+  /// source.
   ///
   /// This function computes generic arguments even when they are not
   /// directly represented in the metadata, e.g., generic parameters that
