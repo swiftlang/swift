@@ -18,5 +18,7 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-RECOMPILED %s --dump-input=always < %t/output4
 
+// REQUIRES: rdar106170343
+
 // CHECK-RECOMPILED: Queuing because of dependencies discovered later: {compile: usesPoint.o <= usesPoint.swift}
 // CHECK-RECOMPILED-NOT: Queuing because of dependencies discovered later: {compile: usesDisplay.o <= usesDisplay.swift}

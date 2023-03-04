@@ -30,5 +30,6 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-MAINAB-RECOMPILED %s < %t/output4
 
+// REQUIRES: rdar106170343
 // CHECK-MAINAB-RECOMPILED: Queuing (initial): {compile: definesAB.o <= definesAB.swift}
 // CHECK-MAINAB-RECOMPILED: Queuing because of dependencies discovered later: {compile: usesA.o <= usesA.swift}
