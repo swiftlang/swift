@@ -6,8 +6,7 @@ func bar(_: String) {}
 func foo(y: consuming String, z: String) -> () -> String {
     // CHECK: bb0(%0 : @owned $String, %1 : @guaranteed $String):
     // CHECK:   [[BOX:%.*]] = alloc_box ${ var String }
-    // CHECK:   [[BOX0:%.*]] = mark_uninitialized [var] [[BOX]]
-    // CHECK:   [[BOX1:%.*]] = begin_borrow [lexical] [[BOX0]]
+    // CHECK:   [[BOX1:%.*]] = begin_borrow [lexical] [[BOX]]
     // CHECK:   [[Y:%.*]] = project_box [[BOX1]]
     // CHECK:   store %0 to [init] [[Y]]
 
@@ -37,8 +36,7 @@ struct Butt {
     consuming func merged(with other: Butt) -> () -> Butt {
         // CHECK: bb0(%0 : @guaranteed $Butt, %1 : @owned $Butt):
         // CHECK:   [[BOX:%.*]] = alloc_box ${ var Butt }
-        // CHECK:   [[BOX0:%.*]] = mark_uninitialized [var] [[BOX]]
-        // CHECK:   [[BOX1:%.*]] = begin_borrow [lexical] [[BOX0]]
+        // CHECK:   [[BOX1:%.*]] = begin_borrow [lexical] [[BOX]]
         // CHECK:   [[SELF:%.*]] = project_box [[BOX1]]
         // CHECK:   store %1 to [init] [[SELF]]
 
