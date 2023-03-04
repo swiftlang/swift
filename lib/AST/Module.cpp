@@ -170,6 +170,15 @@ class swift::SourceLookupCache {
   void addToUnqualifiedLookupCache(Range decls, bool onlyOperators);
   template<typename Range>
   void addToMemberCache(Range decls);
+
+  using MacroDeclMap = llvm::DenseMap<Identifier, TinyPtrVector<MacroDecl *>>;
+  MacroDeclMap MacroDecls;
+
+  using AuxiliaryDeclMap = llvm::DenseMap<DeclName, TinyPtrVector<MissingDecl *>>;
+  AuxiliaryDeclMap TopLevelAuxiliaryDecls;
+  SmallVector<ValueDecl *, 4> MayHaveAuxiliaryDecls;
+  void populateAuxiliaryDeclCache();
+
 public:
   SourceLookupCache(const SourceFile &SF);
   SourceLookupCache(const ModuleDecl &Mod);
@@ -234,6 +243,10 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       if (onlyOperators ? VD->isOperator() : VD->hasName()) {
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
+
+        if (VD->getAttrs().hasAttribute<CustomAttr>()) {
+          MayHaveAuxiliaryDecls.push_back(VD);
+        }
       }
     }
 
@@ -256,6 +269,9 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
 
     if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
       PrecedenceGroups[PG->getName()].push_back(PG);
+
+    if (auto *macro = dyn_cast<MacroDecl>(D))
+      MacroDecls[macro->getBaseIdentifier()].push_back(macro);
   }
 }
 
@@ -309,6 +325,53 @@ void SourceLookupCache::addToMemberCache(Range decls) {
   }
 }
 
+void SourceLookupCache::populateAuxiliaryDeclCache() {
+  for (auto *decl : MayHaveAuxiliaryDecls) {
+    // Gather macro-introduced peer names.
+    llvm::SmallDenseMap<CustomAttr *, llvm::SmallVector<DeclName, 2>> introducedNames;
+
+    // This code deliberately avoids `forEachAttachedMacro`, because it
+    // will perform overload resolution and possibly invoke unqualified
+    // lookup for macro arguments, which will recursively populate the
+    // auxiliary decl cache and cause request cycles.
+    //
+    // We do not need a fully resolved macro until expansion. Instead, we
+    // conservatively consider peer names for all macro declarations with a
+    // custom attribute name. Unqualified lookup for that name will later
+    // invoke expansion of the macro, and will yield no results if the resolved
+    // macro does not produce the requested name, so the only impact is possibly
+    // expanding earlier than needed / unnecessarily looking in the top-level
+    // auxiliary decl cache.
+    for (auto attrConst : decl->getSemanticAttrs().getAttributes<CustomAttr>()) {
+      auto *attr = const_cast<CustomAttr *>(attrConst);
+      UnresolvedMacroReference macroRef(attr);
+      auto macroName = macroRef.getMacroName().getBaseIdentifier();
+
+      auto found = MacroDecls.find(macroName);
+      if (found == MacroDecls.end())
+        continue;
+
+      for (const auto *macro : found->second) {
+        macro->getIntroducedNames(MacroRole::Peer,
+                                  decl, introducedNames[attr]);
+      }
+    }
+
+    // Add macro-introduced names to the top-level auxiliary decl cache as
+    // unexpanded peer decls represented by a MissingDecl.
+    for (auto macroNames : introducedNames) {
+      auto *macroAttr = macroNames.getFirst();
+      for (auto name : macroNames.getSecond()) {
+        auto *placeholder =
+            MissingDecl::forUnexpandedPeer(macroAttr, decl);
+        name.addToLookupTable(TopLevelAuxiliaryDecls, placeholder);
+      }
+    }
+  }
+
+  MayHaveAuxiliaryDecls.clear();
+}
+
 /// Populate our cache on the first name lookup.
 SourceLookupCache::SourceLookupCache(const SourceFile &SF) {
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
@@ -339,6 +402,23 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   Result.reserve(I->second.size());
   for (ValueDecl *Elt : I->second)
     Result.push_back(Elt);
+
+  // Add top-level auxiliary decls to the result.
+  //
+  // FIXME: We need to not consider auxiliary decls if we're doing lookup
+  // from inside a macro argument at module scope.
+  populateAuxiliaryDeclCache();
+  auto auxDecls = TopLevelAuxiliaryDecls.find(Name);
+  if (auxDecls == TopLevelAuxiliaryDecls.end())
+    return;
+
+  for (auto *unexpandedDecl : auxDecls->second) {
+    // Add expanded peers to the result.
+    unexpandedDecl->forEachExpandedPeer(
+        [&](ValueDecl *expandedPeer) {
+          Result.push_back(expandedPeer);
+        });
+  }
 }
 
 void SourceLookupCache::getPrecedenceGroups(
