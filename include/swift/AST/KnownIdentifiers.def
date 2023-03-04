@@ -263,6 +263,9 @@ IDENTIFIER(version)
 IDENTIFIER_(StringProcessing)
 IDENTIFIER(RegexBuilder)
 
+// Backtracing
+IDENTIFIER_(Backtracing)
+
 // Distributed actors
 IDENTIFIER(ActorID)
 IDENTIFIER(ActorSystem)

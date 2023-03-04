@@ -43,7 +43,22 @@ else()
   set(CMAKE_JOB_POOL_LINK local_jobs)
 endif()
 
-ENABLE_LANGUAGE(C)
+enable_language(C)
+enable_language(CXX)
+
+# On Windows, use MASM or MARMASM
+set(SWIFT_ASM_DIALECT ASM)
+set(SWIFT_ASM_EXT S)
+if(CMAKE_SYSTEM_NAME STREQUAL Windows)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
+    set(SWIFT_ASM_DIALECT ASM_MARMASM)
+  else()
+    set(SWIFT_ASM_DIALECT ASM_MASM)
+  endif()
+  set(SWIFT_ASM_EXT asm)
+endif()
+
+enable_language(${SWIFT_ASM_DIALECT})
 
 # Use C++14.
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
@@ -560,6 +575,10 @@ option(SWIFT_IMPLICIT_CONCURRENCY_IMPORT
   "Implicitly import the Swift concurrency module"
   TRUE)
 
+option(SWIFT_IMPLICIT_BACKTRACING_IMPORT
+  "Implicitly import the Swift backtracing module"
+  FALSE)
+
 option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   "Enable build of the Swift concurrency module"
   FALSE)
@@ -618,7 +637,7 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 if(SWIFT_BUILT_STANDALONE)
-  project(Swift C CXX ASM)
+  project(Swift C CXX ${SWIFT_ASM_DIALECT})
 endif()
 
 if(MSVC OR "${CMAKE_SIMULATE_ID}" STREQUAL MSVC)
@@ -688,6 +707,7 @@ execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} ${version_flag}
 message(STATUS "CMake Make Program (${CMAKE_MAKE_PROGRAM}) Version: ${_CMAKE_MAKE_PROGRAM_VERSION}")
 message(STATUS "C Compiler (${CMAKE_C_COMPILER}) Version: ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "C++ Compiler (${CMAKE_CXX_COMPILER}) Version: ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "Assembler (${CMAKE_${SWIFT_ASM_DIALECT}_COMPILER}) Version: ${CMAKE_${SWIFT_ASM_DIALECT}_COMPILER_VERSION}")
 if (CMAKE_Swift_COMPILER)
   message(STATUS "Swift Compiler (${CMAKE_Swift_COMPILER}) Version: ${CMAKE_Swift_COMPILER_VERSION}")
 else()
