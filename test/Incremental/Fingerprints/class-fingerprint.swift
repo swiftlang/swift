@@ -28,7 +28,7 @@
 
 // only-run-for-debugging: cp %t/usesB.swiftdeps %t/usesB4.swiftdeps
 
-// cat %t/output4
+// RUN: cat %t/output4
 // RUN: %FileCheck -check-prefix=CHECK-MAINAB-RECOMPILED %s < %t/output4
 
 // CHECK-MAINAB-RECOMPILED: Queuing (initial): {compile: definesAB.o <= definesAB.swift}
