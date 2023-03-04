@@ -476,6 +476,76 @@ ExpandPeerMacroRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
   return decl->getASTContext().AllocateCopy(bufferIDs);
 }
 
+/// Diagnose macro expansions that produce any of the following declarations:
+///   - Import declarations
+///   - Operator and precedence group declarations
+///   - Macro declarations
+///   - Extensions
+///   - Types with `@main` attributes
+///   - Top-level default literal type overrides
+///   - Value decls with names not covered by the macro declaration.
+static void validateMacroExpansion(SourceFile *expansionBuffer,
+                                   MacroDecl *macro,
+                                   ValueDecl *attachedTo,
+                                   MacroRole role) {
+  // Gather macro-introduced names
+  llvm::SmallVector<DeclName, 2> introducedNames;
+  macro->getIntroducedNames(role, attachedTo, introducedNames);
+
+  llvm::SmallDenseSet<DeclName, 2> coversName(introducedNames.begin(),
+                                              introducedNames.end());
+
+  for (auto *decl : expansionBuffer->getTopLevelDecls()) {
+    auto &ctx = decl->getASTContext();
+
+    // Certain macro roles can generate special declarations.
+    if ((isa<AccessorDecl>(decl) && role == MacroRole::Accessor) ||
+        (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance)) {
+      continue;
+    }
+
+    // Diagnose invalid declaration kinds.
+    if (isa<ImportDecl>(decl) ||
+        isa<OperatorDecl>(decl) ||
+        isa<PrecedenceGroupDecl>(decl) ||
+        isa<MacroDecl>(decl) ||
+        isa<ExtensionDecl>(decl)) {
+      decl->diagnose(diag::invalid_decl_in_macro_expansion,
+                     decl->getDescriptiveKind());
+    }
+
+    // Diagnose `@main` types.
+    if (auto *typeDecl = dyn_cast<TypeDecl>(decl)) {
+      if (typeDecl->getAttrs().hasAttribute<MainTypeAttr>()) {
+        typeDecl->diagnose(diag::invalid_main_type_in_macro_expansion);
+      }
+    }
+
+    // Diagnose default literal type overrides.
+    if (auto *typeAlias = dyn_cast<TypeAliasDecl>(decl)) {
+      // TODO
+    }
+
+    // Diagnose value decls with names not covered by the macro
+    if (auto *value = dyn_cast<ValueDecl>(decl)) {
+      auto baseName = value->getBaseName();
+      if (baseName.isSpecial()) {
+        baseName = ctx.getIdentifier(baseName.userFacingName());
+      }
+
+      // $-prefixed names are unique names. These are always allowed.
+      if (baseName.getIdentifier().hasDollarPrefix()) {
+        continue;
+      }
+
+      if (!coversName.count(baseName)) {
+        value->diagnose(diag::invalid_macro_introduced_name,
+                        baseName, macro->getBaseName());
+      }
+    }
+  }
+}
+
 /// Determine whether the given source file is from an expansion of the given
 /// macro.
 static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
@@ -1102,6 +1172,8 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
   macroSourceFile->setImports(declSourceFile->getImports());
 
+  validateMacroExpansion(macroSourceFile, macro,
+                         dyn_cast<ValueDecl>(attachedTo), role);
   return macroSourceFile;
 }
 

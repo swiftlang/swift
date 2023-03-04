@@ -40,7 +40,7 @@ requireEquatable(S2())
 requireHashable(S2())
 
 @attached(conformance)
-@attached(member)
+@attached(member, names: named(requirement))
 macro DelegatedConformance() = #externalMacro(module: "MacroDefinition", type: "DelegatedConformanceMacro")
 
 protocol P {
