@@ -1,6 +1,9 @@
+// '-enable-experimental-feature Macros' requires an asserts build.
+// REQUIRES: swift_swift_parser, asserts
+
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/stringify_macro.swift -g -no-toolchain-stdlib-rpath -swift-version 5
-// RUN: %target-swift-frontend -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name Macros -emit-module -emit-module-path %t/Macros.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t/
+// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/stringify_macro.swift -g -no-toolchain-stdlib-rpath -swift-version 5
+// RUN: %target-swift-frontend -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name Macros -emit-module -emit-module-path %t/Macros.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t/
 // RUN: %{python} -m json.tool %t/Macros.symbols.json %t/Macros.formatted.symbols.json
 
 // Make sure that the `= #externalMacro(...)` doesn't show up in declaration fragments and in names fragments.
@@ -8,11 +11,6 @@
 // RUN: %FileCheck %s --input-file %t/Macros.formatted.symbols.json
 // RUN: %FileCheck %s --input-file %t/Macros.formatted.symbols.json --check-prefix NAMES
 
-// '-enable-experimental-feature Macros' requires an asserts build.
-// REQUIRES: asserts
-
-// FIXME: Swift parser is not enabled on Linux CI yet.
-// REQUIRES: OS=macosx
 
 @freestanding(expression) public macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 

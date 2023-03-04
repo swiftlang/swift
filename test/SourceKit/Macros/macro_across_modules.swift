@@ -1,6 +1,4 @@
 // REQUIRES: swift_swift_parser
-// TODO: This shouldn't be required
-// REQUIRES: OS=macosx
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/mods)
@@ -10,10 +8,10 @@
 // than generated macro buffer.
 
 // Create a plugin that adds a new function as a member
-// RUN: %target-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
 
 // Prepare a test module that uses the macro in a struct
-// RUN: %target-swift-frontend -emit-module -emit-module-source-info -module-name TestModule -o %t/mods -load-plugin-library %t/%target-library-name(MacroPlugin) -I %swift-host-lib-dir %t/TestModule.swift -index-store-path %t/idx
+// RUN: %target-swift-frontend -emit-module -emit-module-source-info -module-name TestModule -o %t/mods -load-plugin-library %t/%target-library-name(MacroPlugin) %t/TestModule.swift -index-store-path %t/idx
 
 // Check we correctly output the added `newFunc` on the line of the attached
 // macro.
@@ -70,9 +68,9 @@ public struct LocalStruct {
 
 // Check the location in cursor info is the attached macro.
 func test(l: LocalStruct, m: ModStruct) {
-  // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):5 %t/test.swift -- -I %t/mods -load-plugin-library %t/%target-library-name(MacroPlugin) -I %swift-host-lib-dir %t/test.swift | %FileCheck %s --check-prefix=LOCAL_CURSOR
+  // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):5 %t/test.swift -- -I %t/mods -load-plugin-library %t/%target-library-name(MacroPlugin) -target %target-triple %t/test.swift | %FileCheck %s --check-prefix=LOCAL_CURSOR
   l.newFunc()
 
-  // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):5 %t/test.swift -- -I %t/mods %t/test.swift | %FileCheck %s --check-prefix=MOD_CURSOR
+  // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):5 %t/test.swift -- -I %t/mods -target %target-triple %t/test.swift | %FileCheck %s --check-prefix=MOD_CURSOR
   m.newFunc()
 }
