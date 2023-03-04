@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only)
 
 // REQUIRES: executable_test
+// REQUIRES: rdar106152833
 
 import StdlibUnittest
 
