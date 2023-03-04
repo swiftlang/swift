@@ -120,7 +120,7 @@ struct PatternBindingState {
 
   PatternBindingState
   getPatternBindingStateForIntroducer(VarDecl::Introducer defaultValue) {
-    return PatternBindingState(getIntroducer().getValueOr(defaultValue));
+    return PatternBindingState(getIntroducer().value_or(defaultValue));
   }
 
   Optional<unsigned> getSelectIndexForIntroducer() const {
