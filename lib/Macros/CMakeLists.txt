@@ -56,4 +56,5 @@ function(add_swift_macro_library name)
   set_property(GLOBAL APPEND PROPERTY SWIFT_MACRO_PLUGINS ${name})
 endfunction()
 
+add_subdirectory(Sources/SwiftMacros)
 add_subdirectory(Sources/ObservationMacros)
