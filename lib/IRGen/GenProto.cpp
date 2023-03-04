@@ -258,15 +258,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
                                           const RequirementCallback &callback) {
   if (!signature) return;
 
-  // Get all unique pack generic parameter shapes.
-  SmallSetVector<CanType, 2> packs;
-  for (auto gp : signature.getGenericParams()) {
-    if (gp->isParameterPack()) {
-      packs.insert(signature->getReducedShape(gp)->getCanonicalType());
-    }
-  }
-
-  for (auto type : packs)
+  for (auto type : signature->getShapeClasses())
     callback(GenericRequirement::forShape(type));
 
   // Get all of the type metadata.
@@ -4087,6 +4079,8 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
             irgen::addGenericParameters(*this, fields, signature, /*implicit=*/false);
         assert(metadata.NumParamsEmitted == metadata.NumParams &&
                "Implicit GenericParamDescriptors not supported here");
+        assert(metadata.GenericPackArguments.empty() &&
+               "We don't support packs here yet");
 
         // Need to pad the structure after generic parameters
         // up to four bytes because generic requirements that

@@ -1288,7 +1288,7 @@ static Address createGenericArgumentsArray(IRGenFunction &IGF,
   for (unsigned i : indices(args)) {
     Address elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
                                               IGF.IGM.getPointerSize() * i);
-    auto *arg = IGF.Builder.CreateBitCast(args[i], IGF.IGM.Int8PtrTy);
+    auto *arg = IGF.Builder.CreateBitOrPointerCast(args[i], IGF.IGM.Int8PtrTy);
     IGF.Builder.CreateStore(arg, elt);
   }
 

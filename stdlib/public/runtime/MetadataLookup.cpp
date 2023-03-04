@@ -2754,6 +2754,9 @@ void swift::gatherWrittenGenericArgs(
     if (!lhsParam)
       continue;
 
+    assert(!req.Flags.isPackRequirement() &&
+           "Pack requirements not supported here yet");
+
     // If we don't yet have an argument for this parameter, it's a
     // same-type-to-concrete constraint.
     auto lhsFlatIndex =
