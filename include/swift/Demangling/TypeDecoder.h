@@ -1105,11 +1105,21 @@ protected:
                                     "fewer children (%zu) than required (2)",
                                     Node->getNumChildren());
 
+      auto countNode = Node->getChild(1);
+      switch (countNode->getKind()) {
+      case Node::Kind::Pack:
+      case Node::Kind::Variable:
+        break;
+      default:
+        return MAKE_NODE_TYPE_ERROR0(
+            Node, "missing generic context for pack expansion");
+      }
+
       auto patternType = decodeMangledType(Node->getChild(0), depth + 1);
-      auto countType = decodeMangledType(Node->getChild(1), depth + 1);
+      auto countType = decodeMangledType(countNode, depth + 1);
 
       return Builder.createPackExpansionType(patternType.getType(),
-                                             countType.getType());
+                                                      countType.getType());
     }
 
     case NodeKind::DependentGenericType: {
