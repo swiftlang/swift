@@ -27,6 +27,10 @@ add_swift_target_library(swiftObservation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+
+  C_COMPILE_FLAGS
+    ${swift_runtime_library_compile_flags}
+
   SWIFT_MODULE_DEPENDS _Concurrency
   INSTALL_IN_COMPONENT stdlib
 
