@@ -2057,7 +2057,7 @@ DeclNameRef formDeclNameRef(ASTContext &ctx,
                             bool isCxxClassTemplateSpec = false);
 
 /// Whether a given token can be the start of a decl.
-bool isKeywordPossibleDeclStart(const Token &Tok);
+bool isKeywordPossibleDeclStart(const LangOptions &options, const Token &Tok);
 
 } // end namespace swift
 

@@ -8339,6 +8339,37 @@ public:
   }
 };
 
+/// A marker instruction that states a given alloc_box or alloc_stack is a
+/// reference binding that must be transformed.
+class MarkUnresolvedReferenceBindingInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::MarkUnresolvedReferenceBindingInst,
+          SingleValueInstruction>,
+      public OwnershipForwardingMixin {
+  friend class SILBuilder;
+
+public:
+  enum class Kind : unsigned {
+    Invalid = 0,
+
+    InOut = 1,
+  };
+
+private:
+  Kind kind;
+
+  MarkUnresolvedReferenceBindingInst(SILDebugLocation debugLoc,
+                                     SILValue operand, Kind kind)
+      : UnaryInstructionBase(debugLoc, operand, operand->getType()),
+        OwnershipForwardingMixin(
+            SILInstructionKind::MarkUnresolvedReferenceBindingInst,
+            operand->getOwnershipKind()),
+        kind(kind) {}
+
+public:
+  Kind getKind() const { return kind; }
+};
+
 /// Convert from a non-trivial copyable type to an `@moveOnly` wrapper type.
 ///
 /// IMPORTANT: Unlike other forwarding instructions, the ownership of
@@ -10693,7 +10724,8 @@ inline bool OwnershipForwardingMixin::isa(SILInstructionKind kind) {
          OwnershipForwardingConversionInst::classof(kind) ||
          OwnershipForwardingSelectEnumInstBase::classof(kind) ||
          OwnershipForwardingMultipleValueInstruction::classof(kind) ||
-         kind == SILInstructionKind::MarkMustCheckInst;
+         kind == SILInstructionKind::MarkMustCheckInst ||
+         kind == SILInstructionKind::MarkUnresolvedReferenceBindingInst;
 }
 
 inline OwnershipForwardingMixin *
@@ -10716,6 +10748,8 @@ OwnershipForwardingMixin::get(SILInstruction *inst) {
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(inst))
     return result;
   if (auto *result = dyn_cast<MarkMustCheckInst>(inst))
+    return result;
+  if (auto *result = dyn_cast<MarkUnresolvedReferenceBindingInst>(inst))
     return result;
   if (auto *result = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(inst))
     return result;

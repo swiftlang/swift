@@ -40,6 +40,7 @@ target_sources(swiftSILOptimizer PRIVATE
   PredictableMemOpt.cpp
   PMOMemoryUseCollector.cpp
   RawSILInstLowering.cpp
+  ReferenceBindingTransform.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
   OSLogOptimization.cpp
