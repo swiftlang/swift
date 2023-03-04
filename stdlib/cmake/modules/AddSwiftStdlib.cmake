@@ -1824,10 +1824,9 @@ function(add_swift_target_library name)
                       "-Xfrontend;-disable-implicit-string-processing-module-import")
   endif()
 
-  # Turn off implicit import of _StringProcessing when building libraries
-  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS
-                      "-Xfrontend;-disable-implicit-string-processing-module-import")
+  # Turn off implicit import of _Backtracing when building libraries
+  if(SWIFT_IMPLICIT_BACKTRACING_IMPORT)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-backtracing-module-import")
   endif()
 
   if(SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_ENABLE_PRESPECIALIZATION)
@@ -2568,6 +2567,11 @@ function(_add_swift_target_executable_single name)
 
   string(MAKE_C_IDENTIFIER "${name}" module_name)
 
+  if(SWIFTEXE_SINGLE_SDK STREQUAL WINDOWS)
+    list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}")
+  endif()
+
   handle_swift_sources(
       dependency_target
       unused_module_dependency_target
@@ -2603,7 +2607,6 @@ function(_add_swift_target_executable_single name)
       ${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE)
     target_include_directories(${name} SYSTEM PRIVATE
       ${${SWIFTEXE_SINGLE_ARCHITECTURE}_INCLUDE})
-
     if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
       # MSVC doesn't support -Xclang. We don't need to manually specify
       # the dependent libraries as `cl` does so.
@@ -2613,6 +2616,7 @@ function(_add_swift_target_executable_single name)
         "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
     endif()
   endif()
+
   target_compile_options(${name} PRIVATE
     ${c_compile_flags})
   target_link_directories(${name} PRIVATE
@@ -2676,6 +2680,8 @@ function(add_swift_target_executable name)
     SWIFT_MODULE_DEPENDS_FROM_SDK
     SWIFT_MODULE_DEPENDS_MACCATALYST
     SWIFT_MODULE_DEPENDS_MACCATALYST_UNZIPPERED
+    TARGET_SDKS
+    COMPILE_FLAGS
   )
 
   # Parse the arguments we were given.
@@ -2697,12 +2703,33 @@ function(add_swift_target_executable name)
     set(install_in_component "${SWIFTEXE_TARGET_INSTALL_IN_COMPONENT}")
   endif()
 
+  # Turn off implicit imports
+  list(APPEND SWIFTEXE_TARGET_COMPILE_FLAGS "-Xfrontend;-disable-implicit-concurrency-module-import")
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+    list(APPEND SWIFTEXE_TARGET_COMPILE_FLAGS
+                      "-Xfrontend;-disable-implicit-string-processing-module-import")
+  endif()
+
+  if(SWIFT_IMPLICIT_BACKTRACING_IMPORT)
+    list(APPEND SWIFTEXE_TARGET_COMPILE_FLAGS "-Xfrontend;-disable-implicit-backtracing-module-import")
+  endif()
+
   # All Swift executables depend on the standard library.
   list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS Core)
   # All Swift executables depend on the swiftSwiftOnoneSupport library.
   list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
 
-  foreach(sdk ${SWIFT_SDKS})
+  # If target SDKs are not specified, build for all known SDKs.
+  if("${SWIFTEXE_TARGET_TARGET_SDKS}" STREQUAL "")
+    set(SWIFTEXE_TARGET_TARGET_SDKS ${SWIFT_SDKS})
+  endif()
+  list_replace(SWIFTEXE_TARGET_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_DARWIN_PLATFORMS}")
+
+  list_intersect(
+    "${SWIFTEXE_TARGET_TARGET_SDKS}" "${SWIFT_SDKS}" SWIFTEXE_TARGET_TARGET_SDKS)
+
+  foreach(sdk ${SWIFTEXE_TARGET_TARGET_SDKS})
     set(THIN_INPUT_TARGETS)
 
     # Collect architecture agnostic SDK module dependencies
@@ -2834,6 +2861,8 @@ function(add_swift_target_executable name)
             ${swiftexe_module_dependency_targets}
           SDK "${sdk}"
           ARCHITECTURE "${arch}"
+          COMPILE_FLAGS
+            ${SWIFTEXE_TARGET_COMPILE_FLAGS}
           INSTALL_IN_COMPONENT ${install_in_component})
 
       _list_add_string_suffix(

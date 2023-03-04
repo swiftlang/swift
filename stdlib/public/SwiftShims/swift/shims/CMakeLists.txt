@@ -21,6 +21,7 @@ set(sources
   ThreadLocalStorage.h
   UnicodeData.h
   Visibility.h
+  _SwiftBacktracing.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
   _SwiftRuntime.h

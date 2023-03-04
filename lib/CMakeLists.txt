@@ -15,22 +15,18 @@ list(APPEND LLVM_COMMON_DEPENDS intrinsics_gen clang-tablegen-targets)
 # Add generated Swift Syntax headers to global dependencies.
 list(APPEND LLVM_COMMON_DEPENDS swift-ast-generated-headers)
 
+include(SwiftImplicitImport)
+
 # Set up for linking against swift-syntax.
 if (SWIFT_SWIFT_PARSER)
-  # Pure-Swift host libraries need to not link the _StringPreprocessing
-  # module. Check whether the host compiler is new enough that we can pass this
-  # flag.
-  file(WRITE "${CMAKE_BINARY_DIR}/tmp/empty-check-string-processing.swift" "")
-  execute_process(
-    COMMAND
-      "${CMAKE_Swift_COMPILER}"
-      -Xfrontend -disable-implicit-string-processing-module-import
-      -c - -o /dev/null
-    INPUT_FILE
-      "${CMAKE_BINARY_DIR}/tmp/empty-check-string-processing.swift"
-    OUTPUT_QUIET ERROR_QUIET
-    RESULT_VARIABLE
-      SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
+  # Ensure that we do not link the _StringProcessing module. But we can
+  # only pass this flag for new-enough compilers that support it.
+  swift_supports_implicit_module("string-processing"
+    SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
+
+  # Same for _Backtracing
+  swift_supports_implicit_module("backtracing"
+    SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
 
   # Set up linking against the swift-syntax modules.
   # Link against the swift-syntax modules.
@@ -194,10 +190,17 @@ function(add_pure_swift_host_library name)
   add_library(${name} ${libkind} ${APSHL_SOURCES})
 
   # Avoid introducing an implicit dependency on the string-processing library.
-  if (NOT SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
+  if(SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
     target_compile_options(${name} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-Xfrontend>
       $<$<COMPILE_LANGUAGE:Swift>:-disable-implicit-string-processing-module-import>)
+  endif()
+
+  # Same for backtracing
+  if (SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
+    target_compile_options(${name} PRIVATE
+      $<$<COMPILE_LANGUAGE:Swift>:-Xfrontend>
+      $<$<COMPILE_LANGUAGE:Swift>:-disable-implicit-backtracing-module-import>)
   endif()
 
   # The compat56 library is not available in current toolchains. The stage-0
