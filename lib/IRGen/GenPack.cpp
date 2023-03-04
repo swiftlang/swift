@@ -458,6 +458,8 @@ irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
 
   auto pack = emitTypeMetadataPack(IGF, packType, request);
   auto *metadata = pack.getAddress().getAddress();
+  metadata = IGF.Builder.CreatePointerCast(
+      metadata, IGF.IGM.TypeMetadataPtrTy->getPointerTo());
 
   auto response = MetadataResponse::forComplete(metadata);
   IGF.setScopedLocalTypeMetadata(packType, response);
@@ -612,6 +614,8 @@ llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
   auto pack = emitWitnessTablePack(IGF, packType, conformance);
 
   auto *result = pack.getAddress().getAddress();
+  result = IGF.Builder.CreatePointerCast(
+      result, IGF.IGM.WitnessTablePtrTy->getPointerTo());
 
   IGF.setScopedLocalTypeData(packType, localDataKind, result);
 

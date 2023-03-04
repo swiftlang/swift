@@ -34,9 +34,9 @@ struct Gen2<Fwd : Q> : Q {}
 // CHECK:         [[WTABLE_PACK:%[^,]+]] = alloca [1 x i8**]
 // CHECK:         [[METADATA_ELEMENT_0:%[^,]+]] = getelementptr inbounds [1 x %swift.type*], [1 x %swift.type*]* [[METADATA_PACK]]
 // CHECK:         store %swift.type* bitcast {{.*}}$s26variadic_generic_functions3S_2VMf{{.*}}, %swift.type** [[METADATA_ELEMENT_0]]
+// CHECK:         [[METADATA_PACK_PTR:%[^,]+]] = bitcast [1 x %swift.type*]* [[METADATA_PACK]] to %swift.type**
 // CHECK:         [[WTABLE_ELEMENT_0:%[^,]+]] = getelementptr inbounds [1 x i8**], [1 x i8**]* [[WTABLE_PACK]]
 // CHECK:         store i8** getelementptr inbounds {{.*}}$s26variadic_generic_functions3S_2VAA1PAAWP{{.*}}, i8*** [[WTABLE_ELEMENT_0]]
-// CHECK:         [[METADATA_PACK_PTR:%[^,]+]] = bitcast [1 x %swift.type*]* [[METADATA_PACK]] to %swift.type**
 // CHECK:         [[WTABLE_PACK_ADDR:%[^,]+]] = bitcast [1 x i8**]* [[WTABLE_PACK]] to i8***
 // CHECK:         call swiftcc void @g([[INT]] 1, %swift.type** [[METADATA_PACK_PTR]], i8*** [[WTABLE_PACK_ADDR]])
 sil @c : $() -> () {
