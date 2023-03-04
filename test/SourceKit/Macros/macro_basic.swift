@@ -56,22 +56,16 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 
 #anonymousTypes { "hello" }
 
-// FIXME: Swift parser is not enabled on Linux CI yet.
-// REQUIRES: OS=macosx
-
-// REQUIRES: executable_test
-
-// REQUIRES=shell
+// REQUIRES: swift_swift_parser, executable_test, shell
 
 // RUN: %empty-directory(%t)
 
 //##-- Prepare the macro plugin.
-// RUN: %host-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // RUN: COMPILER_ARGS_WITHOUT_SOURCE=( \
 // RUN:   -swift-version 5 \
 // RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
-// RUN:   -I %swift-host-lib-dir \
 // RUN:   -module-name MacroUser \
 // RUN: )
 

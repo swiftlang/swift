@@ -1,5 +1,6 @@
+// REQUIRES: swift_swift_parser
+
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -module-name MacrosTest
-// REQUIRES: OS=macosx
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 // expected-note@-1 2{{'stringify' declared here}}
