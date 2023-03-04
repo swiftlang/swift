@@ -151,14 +151,14 @@ public func inoutStructDoubleAndFloat(_ s: inout StructDoubleAndFloat) {
 
 
 // CHECK: SWIFT_INLINE_THUNK StructOneI64 passThroughStructOneI64(const StructOneI64& x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_StructOneI64::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_StructOneI64::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_uint64_t_0_8(result, _impl::$s7Structs23passThroughStructOneI64yAA0deF0VADF(_impl::swift_interop_passDirect_Structs_uint64_t_0_8(_impl::_impl_StructOneI64::getOpaquePointer(x))));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: SWIFT_INLINE_THUNK StructTwoI32 passThroughStructTwoI32(int32_t i, const StructTwoI32& x, int32_t j) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_StructTwoI32::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_StructTwoI32::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_[[StructTwoI32]](result, _impl::$s7Structs23passThroughStructTwoI32yAA0deF0Vs5Int32V_AdFtF(i, _impl::swift_interop_passDirect_Structs_[[StructTwoI32]](_impl::_impl_StructTwoI32::getOpaquePointer(x)), j));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
@@ -180,35 +180,35 @@ public func inoutStructDoubleAndFloat(_ s: inout StructDoubleAndFloat) {
 
 
 // CHECK: SWIFT_INLINE_THUNK StructDoubleAndFloat returnNewStructDoubleAndFloat(float y, double x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_StructDoubleAndFloat::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_StructDoubleAndFloat::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_double_0_8_float_8_12(result, _impl::$s7Structs29returnNewStructDoubleAndFloatyAA0defG0VSf_SdtF(y, x));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: SWIFT_INLINE_THUNK StructOneI16AndOneStruct returnNewStructOneI16AndOneStruct() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_StructOneI16AndOneStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_StructOneI16AndOneStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_[[StructOneI16AndOneStruct]](result, _impl::$s7Structs024returnNewStructOneI16AndeD0AA0defgeD0VyF());
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: SWIFT_INLINE_THUNK StructOneI64 returnNewStructOneI64() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_StructOneI64::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_StructOneI64::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_uint64_t_0_8(result, _impl::$s7Structs21returnNewStructOneI64AA0deF0VyF());
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: SWIFT_INLINE_THUNK StructTwoI32 returnNewStructTwoI32(int32_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_StructTwoI32::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_StructTwoI32::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_[[StructTwoI32]](result, _impl::$s7Structs21returnNewStructTwoI32yAA0deF0Vs5Int32VF(x));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: SWIFT_INLINE_THUNK StructU16AndPointer returnNewStructU16AndPointer(void * _Nonnull x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_StructU16AndPointer::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_StructU16AndPointer::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_[[StructU16AndPointer]](result, _impl::$s7Structs28returnNewStructU16AndPointeryAA0defG0VSvF(x));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }

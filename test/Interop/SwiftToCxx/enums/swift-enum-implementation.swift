@@ -219,7 +219,7 @@ public struct S {
 // CHECK-NEXT:     alignas(E) unsigned char buffer[sizeof(E)];
 // CHECK-NEXT:     auto *thisCopy = new(buffer) E(*this);
 // CHECK-NEXT:     char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
-// CHECK-NEXT:     return swift::_impl::implClassFor<S>::type::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:     return swift::_impl::implClassFor<S>::type::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:       swift::_impl::implClassFor<S>::type::initializeWithTake(result, payloadFromDestruction);
 // CHECK-NEXT:     });
 // CHECK-NEXT:   }
@@ -268,7 +268,7 @@ public struct S {
 // CHECK-NEXT:     return *this == E::foobar;
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::init() {
-// CHECK-NEXT:     return _impl::_impl_E::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:     return _impl::_impl_E::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:       _impl::swift_interop_returnDirect_Enums[[ENUMENCODING:[a-z0-9_]+]](result, _impl::$s5Enums1EOACycfC());
 // CHECK-NEXT:     });
 // CHECK-NEXT:   }

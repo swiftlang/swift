@@ -174,7 +174,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:    return ::swift::_impl::implClassFor<T_0_0>::type::makeRetained(returnValue);
 // CHECK-NEXT:    } else if constexpr (::swift::_impl::isValueType<T_0_0>) {
-// CHECK-NEXT:    return ::swift::_impl::implClassFor<T_0_0>::type::returnNewValue([&](void * _Nonnull returnValue) {
+// CHECK-NEXT:    return ::swift::_impl::implClassFor<T_0_0>::type::returnNewValue([&](void * _Nonnull returnValue) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(returnValue, swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:    });
 // CHECK-NEXT:    } else if constexpr (::swift::_impl::isSwiftBridgedCxxRecord<T_0_0>) {
@@ -218,7 +218,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT:   _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   return ::swift::_impl::implClassFor<T_0_0>::type::makeRetained(returnValue);
 // CHECK-NEXT:   } else if constexpr (::swift::_impl::isValueType<T_0_0>) {
-// CHECK-NEXT:   return ::swift::_impl::implClassFor<T_0_0>::type::returnNewValue([&](void * _Nonnull returnValue) {
+// CHECK-NEXT:   return ::swift::_impl::implClassFor<T_0_0>::type::returnNewValue([&](void * _Nonnull returnValue) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT: _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(returnValue, swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   });
 // CHECK-NEXT:   } else if constexpr (::swift::_impl::isSwiftBridgedCxxRecord<T_0_0>) {
