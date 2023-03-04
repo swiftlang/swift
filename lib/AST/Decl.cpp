@@ -9893,7 +9893,7 @@ StringRef swift::getMacroRoleString(MacroRole role) {
     return "expression";
 
   case MacroRole::Declaration:
-    return "freestanding";
+    return "declaration";
 
   case MacroRole::Accessor:
     return "accessor";
