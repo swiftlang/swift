@@ -10110,7 +10110,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
     }
 
     case MacroIntroducedDeclNameKind::Arbitrary:
-      // FIXME: Indicate that the macro covers arbitrary names.
+      names.push_back(MacroDecl::getArbitraryName());
       break;
     }
   }

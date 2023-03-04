@@ -29,6 +29,19 @@ let s = S()
 // CHECK: Storage
 s.useSynthesized()
 
+@attached(member, names: arbitrary)
+macro addArbitraryMembers() = #externalMacro(module: "MacroDefinition", type: "AddArbitraryMembers")
+
+@addArbitraryMembers
+struct MyType {}
+
+// CHECK: MyType1
+// CHECK: MyType2
+// CHECK: MyType3
+print(MyType.MyType1.self)
+print(MyType.MyType2.self)
+print(MyType.MyType3.self)
+
 @attached(
   member,
   names: named(RawValue), named(rawValue), named(`init`)

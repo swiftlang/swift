@@ -494,6 +494,25 @@ public struct AddMembers: MemberMacro {
   }
 }
 
+public struct AddArbitraryMembers: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let identified = decl.asProtocol(IdentifiedDeclSyntax.self) else {
+      return []
+    }
+
+    let parentName = identified.identifier.trimmed
+    return [
+      "struct \(parentName)1 {}",
+      "struct \(parentName)2 {}",
+      "struct \(parentName)3 {}",
+    ]
+  }
+}
+
 /// Implementation of the `wrapStoredProperties` macro, which can be
 /// used to apply an attribute to all of the stored properties of a type.
 ///

@@ -538,10 +538,13 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
         continue;
       }
 
-      if (!coversName.count(baseName)) {
-        value->diagnose(diag::invalid_macro_introduced_name,
-                        baseName, macro->getBaseName());
+      if (coversName.count(baseName) ||
+          coversName.count(MacroDecl::getArbitraryName())) {
+        continue;
       }
+
+      value->diagnose(diag::invalid_macro_introduced_name,
+                      baseName, macro->getBaseName());
     }
   }
 }
