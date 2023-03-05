@@ -117,3 +117,7 @@ func generateTuple<each T : Generatable>() -> (repeat each T) {
 
   return (repeat (each T).generate())
 }
+
+func packElementInvalidBinding<each T>(_ arg: repeat each T) {
+  _ = (repeat print(each arg))
+}
