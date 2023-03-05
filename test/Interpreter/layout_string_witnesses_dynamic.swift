@@ -134,6 +134,34 @@ func testGenericNestedRef() {
 
 testGenericNestedRef()
 
+func testGenericEnum() {
+    let ptr = allocateInternalGenericPtr(of: GenericEnumWrapper<Int>.self)
+
+    do {
+        let x = TestClass()
+        testGenericInit(ptr, to: GenericEnumWrapper<Int>(.a(x, 32), 32))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: GenericEnumWrapper<Int>(.a(y, 45), 45))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: GenericEnumWrapper<Int>.self)
+
+    ptr.deallocate()
+}
+
+testGenericEnum()
+
 func testRecursive() {
     let ptr = allocateInternalGenericPtr(of: Recursive<TestClass>.self)
 

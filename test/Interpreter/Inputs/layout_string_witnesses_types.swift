@@ -177,9 +177,25 @@ public struct GenericNestedRefOuter<T: AnyObject> {
     }
 }
 
-public enum XX<T> {
-    indirect case a(T)
+public enum SimpleEnum {
+    case a(AnyObject, Int)
     case b
+    case c(Int, AnyObject)
+}
+
+struct SimpleEnumWrapper {
+    let x: SimpleEnum
+    let y: Int = 2
+}
+
+public struct GenericEnumWrapper<T> {
+    let x: SimpleEnumWrapper
+    let y: T
+
+    public init(_ x: SimpleEnum, _ y: T) {
+        self.x = SimpleEnumWrapper(x: x)
+        self.y = y
+    }
 }
 
 public struct Recursive3<T> {

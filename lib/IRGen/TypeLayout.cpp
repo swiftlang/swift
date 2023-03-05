@@ -194,8 +194,8 @@ private:
       case RefCountingKind::Resilient: {
         uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
         B.addInt64(op);
-        B.addCompactFunctionReference(refCounting.metaTypeRef);
-        refCountBytes += sizeof(uint64_t) + sizeof(uint32_t);
+        B.add(refCounting.metaTypeRef);
+        refCountBytes += sizeof(uint64_t) + IGM.getPointerSize().getValue();
 
         skip = 0;
         break;

@@ -60,16 +60,15 @@ Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
 typedef Metadata* (*MetadataAccessor)(const Metadata* const *);
 
 const Metadata *getResilientTypeMetadata(const Metadata* metadata, const uint8_t *layoutStr, size_t &offset) {
-  auto absolute = layoutStr + offset;
-  auto relativeOffset = (uintptr_t)(intptr_t)readBytes<int32_t>(layoutStr, offset);
+  auto fnPtr = readBytes<uintptr_t>(layoutStr, offset);
   MetadataAccessor fn;
 
 #if SWIFT_PTRAUTH
   fn = (MetadataAccessor)ptrauth_sign_unauthenticated(
-      (void *)((uintptr_t) + absolute + relativeOffset),
+      (void *)(fnPtr),
       ptrauth_key_function_pointer, 0);
 #else
-  fn = (MetadataAccessor)((uintptr_t) + absolute + relativeOffset);
+  fn = (MetadataAccessor)(fnPtr);
 #endif
 
   return fn(metadata->getGenericArgs());
