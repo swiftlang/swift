@@ -876,8 +876,10 @@ public:
   /// invoking the given callback with each auxiliary decl.
   ///
   /// Auxiliary declarations can be property wrapper backing variables,
-  /// backing variables for 'lazy' vars, or peer macro expansions.
-  void visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const;
+  /// backing variables for 'lazy' vars, or expansions of freestanding, peer or
+  /// conformance macros.
+  void visitAuxiliaryDecls(AuxiliaryDeclCallback callback,
+                           bool includeMacroExpansions = true) const;
 
   using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
 

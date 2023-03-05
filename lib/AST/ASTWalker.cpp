@@ -58,6 +58,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SourceFile.h"
 using namespace swift;
 
 void ASTWalker::anchor() {}
@@ -430,20 +431,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
-    bool shouldWalkArguments, shouldWalkExpansion;
-    std::tie(shouldWalkArguments, shouldWalkExpansion) =
+    auto [shouldWalkArguments, _] =
         Walker.shouldWalkMacroArgumentsAndExpansion();
-    if (shouldWalkArguments && MED->getArgs() && !doIt(MED->getArgs()))
-      return true;
-    // Visit auxiliary decls, which may be decls from macro expansions.
-    bool alreadyFailed = false;
-    if (shouldWalkExpansion) {
-      MED->visitAuxiliaryDecls([&](Decl *decl) {
-        if (alreadyFailed) return;
-        alreadyFailed = inherited::visit(decl);
-      });
-    }
-    return alreadyFailed;
+    return shouldWalkArguments && MED->getArgs() && !doIt(MED->getArgs());
   }
 
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
@@ -1471,7 +1461,17 @@ public:
     if (shouldSkip(D))
       return false;
 
-    return traverse(
+    // Visit auxiliary decls, which may be decls from macro expansions.
+    bool alreadyFailed = false;
+    auto shouldWalkExpansion =
+        Walker.shouldWalkMacroArgumentsAndExpansion().second;
+    D->visitAuxiliaryDecls([&](Decl *decl) {
+      if (alreadyFailed)
+        return;
+      alreadyFailed = doIt(decl);
+    }, /*includeMacroExpansions=*/shouldWalkExpansion);
+
+    return alreadyFailed || traverse(
         Walker.walkToDeclPre(D),
         [&]() { return visit(D); },
         [&]() { return Walker.walkToDeclPost(D); });

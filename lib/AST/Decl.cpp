@@ -380,11 +380,17 @@ DeclAttributes Decl::getSemanticAttrs() const {
   return getAttrs();
 }
 
-void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
+void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback,
+                               bool includeMacroExpansions) const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<Decl *>(this);
   SourceManager &sourceMgr = ctx.SourceMgr;
   auto *moduleDecl = getModuleContext();
+
+  // FIXME: fold VarDecl::visitAuxiliaryDecls into this.
+
+  if (!includeMacroExpansions)
+    return;
 
   auto peerBuffers =
       evaluateOrDefault(ctx.evaluator,
@@ -422,8 +428,6 @@ void Decl::visitAuxiliaryDecls(AuxiliaryDeclCallback callback) const {
         callback(decl);
     }
   }
-
-  // FIXME: fold VarDecl::visitAuxiliaryDecls into this.
 }
 
 void Decl::forEachAttachedMacro(MacroRole role,
