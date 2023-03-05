@@ -8463,6 +8463,11 @@ public:
   void getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
                           SmallVectorImpl<DeclName> &names) const;
 
+  /// Returns a DeclName that represents arbitrary names.
+  static DeclName getArbitraryName() {
+    return DeclName();
+  }
+
   /// Retrieve the definition of this macro.
   MacroDefinition getDefinition() const;
 

@@ -26,6 +26,55 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
+#if TEST_DIAGNOSTICS
+@attached(peer)
+macro Invalid() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
+
+@Invalid
+struct Bad {}
+// expected-note@-1 18 {{in expansion of macro 'Invalid' here}}
+
+// CHECK-DIAGS: error: macro expansion cannot introduce import
+// CHECK-DIAGS: error: macro expansion cannot introduce precedence group
+// CHECK-DIAGS: error: macro expansion cannot introduce macro
+// CHECK-DIAGS: error: macro expansion cannot introduce extension
+// CHECK-DIAGS: error: macro expansion cannot introduce '@main' type
+// CHECK-DIAGS: error: declaration name 'MyMain' is not covered by macro 'Invalid'
+// CHECK-DIAGS: error: declaration name 'Array' is not covered by macro 'Invalid'
+// CHECK-DIAGS: error: declaration name 'Dictionary' is not covered by macro 'Invalid'
+// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'BooleanLiteralType'
+// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'ExtendedGraphemeClusterType'
+// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'FloatLiteralType'
+// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'IntegerLiteralType'
+// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'StringLiteralType'
+// CHECK-DIAGS: error: macro expansion cannot introduce default literal type 'UnicodeScalarType'
+// CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_ColorLiteralType'
+// CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_ImageLiteralType'
+// CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_FileReferenceLiteralType'
+
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3BadV7InvalidfMp_.swift
+// CHECK-DIAGS: import Swift
+// CHECK-DIAGS: precedencegroup MyPrecedence {}
+// CHECK-DIAGS: @attached(member) macro myMacro()
+// CHECK-DIAGS: extension Int {}
+// CHECK-DIAGS: @main
+// CHECK-DIAGS: struct MyMain {
+// CHECK-DIAGS:   static func main() {}
+// CHECK-DIAGS: }
+// CHECK-DIAGS: typealias Array = Void
+// CHECK-DIAGS: typealias Dictionary = Void
+// CHECK-DIAGS: typealias BooleanLiteralType = Void
+// CHECK-DIAGS: typealias ExtendedGraphemeClusterType = Void
+// CHECK-DIAGS: typealias FloatLiteralType = Void
+// CHECK-DIAGS: typealias IntegerLiteralType = Void
+// CHECK-DIAGS: typealias StringLiteralType = Void
+// CHECK-DIAGS: typealias UnicodeScalarType = Void
+// CHECK-DIAGS: typealias _ColorLiteralType = Void
+// CHECK-DIAGS: typealias _ImageLiteralType = Void
+// CHECK-DIAGS: typealias _FileReferenceLiteralType = Void
+// CHECK-DIAGS: END CONTENTS OF FILE
+#endif
+
 @freestanding(expression) macro customFileID() -> String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(expression) macro fileID<T: ExpressibleByStringLiteral>() -> T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")

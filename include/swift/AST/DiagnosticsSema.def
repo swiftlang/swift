@@ -6909,6 +6909,18 @@ ERROR(external_macro_arg_not_type_name,none,
       "the external macro's %select{module|type}0", (unsigned))
 ERROR(attached_declaration_macro_not_supported,none,
       "attached declaration macros are not yet supported", ())
+ERROR(invalid_decl_in_macro_expansion,none,
+      "macro expansion cannot introduce %0",
+      (DescriptiveDeclKind))
+ERROR(invalid_main_type_in_macro_expansion,none,
+      "macro expansion cannot introduce '@main' type",
+      ())
+ERROR(literal_type_in_macro_expansion,none,
+      "macro expansion cannot introduce default literal type %0",
+      (Identifier))
+ERROR(invalid_macro_introduced_name,none,
+      "declaration name %0 is not covered by macro %1",
+      (DeclName, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors
