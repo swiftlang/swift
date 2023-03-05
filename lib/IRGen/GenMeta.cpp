@@ -4914,6 +4914,11 @@ namespace {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
         return false;
       }
+
+      if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation)) {
+        return !!getLayoutString() || needsSingletonMetadataInitialization(IGM, Target);
+      }
+
       return !!getLayoutString();
     }
 
