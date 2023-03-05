@@ -5819,6 +5819,9 @@ ERROR(borrowed_with_objc_dynamic,none,
 ERROR(borrowed_on_objc_protocol_requirement,none,
       "%0 cannot be '@_borrowed' if it is an @objc protocol requirement",
       (DescriptiveDeclKind))
+ERROR(borrowed_with_effect,none,
+      "%0 cannot be '@_borrowed' if it is 'async' or 'throws'",
+      (DescriptiveDeclKind))
 
 //------------------------------------------------------------------------------
 // MARK: dynamic
@@ -6742,6 +6745,8 @@ ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
 ERROR(noimplicitcopy_attr_invalid_in_generic_context,
       none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
 ERROR(moveonly_generics, none, "move-only type %0 cannot be used with generics yet", (Type))
+ERROR(moveonly_effectful_getter,none,
+      "%0 of move-only type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
 ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
       "'@_noImplicitCopy' has no effect when applied to a move only type", ())
 ERROR(moveonly_enums_do_not_support_indirect,none,
