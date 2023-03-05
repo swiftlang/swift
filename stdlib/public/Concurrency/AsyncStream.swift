@@ -429,6 +429,27 @@ extension AsyncStream.Continuation {
 }
 
 @available(SwiftStdlib 5.1, *)
+extension AsyncStream {
+  /// Initializes a new ``AsyncStream`` and an ``AsyncStream/Continuation``.
+  ///
+  /// - Parameters:
+  ///   - elementType: The element type of the stream.
+  ///   - limit: The buffering policy that the stream should use.
+  /// - Returns: A tuple containing the stream and its continuation. The continuation should be passed to the
+  /// producer while the stream should be passed to the consumer.
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
+  public static func makeStream(
+      of elementType: Element.Type = Element.self,
+      bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
+  ) -> (stream: AsyncStream<Element>, continuation: AsyncStream<Element>.Continuation) {
+    var continuation: AsyncStream<Element>.Continuation!
+    let stream = AsyncStream<Element>(bufferingPolicy: limit) { continuation = $0 }
+    return (stream: stream, continuation: continuation!)
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
 extension AsyncStream: @unchecked Sendable where Element: Sendable { }
 #else
 @available(SwiftStdlib 5.1, *)
