@@ -74,3 +74,9 @@ func invalidPackRef(_: each Int) {}
 
 // expected-error@+1 {{pack reference 'T' can only appear in pack expansion or generic requirement}}
 func packRefOutsideExpansion<each T>(_: each T) {}
+
+// coverage to ensure a 'repeat each' type is considered Copyable
+func golden<Z>(_ z: Z) {}
+func hour<each T>(_ t: repeat each T)  {
+  _ = repeat golden(each t)
+}

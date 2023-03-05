@@ -1241,11 +1241,6 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   // Concrete types may synthesize some conformances
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
-
-    // FIXME(kavon): make sure this conformance doesn't show up in swiftinterfaces
-    // before do this synthesis unconditionally.
-    if (dc->getASTContext().LangOpts.hasFeature(Feature::MoveOnly))
-      trySynthesize(KnownProtocolKind::Copyable);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those

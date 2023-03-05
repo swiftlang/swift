@@ -4618,7 +4618,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
   if (type->isPureMoveOnly()) {
     // describe the failure reason as it not conforming to Copyable
     auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
-    assert(copyable && "missing _Copyable from stdlib!");
+    assert(copyable && "missing _Copyable protocol!");
     return CheckTypeWitnessResult(copyable->getDeclaredInterfaceType());
   }
 
