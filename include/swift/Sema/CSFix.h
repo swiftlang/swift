@@ -425,6 +425,9 @@ enum class FixKind : uint8_t {
 
   /// Produce an error about a type that must be Copyable
   MustBeCopyable,
+
+  /// Allow 'each' applied to a non-pack type.
+  AllowInvalidPackElement,
 };
 
 class ConstraintFix {
@@ -2058,6 +2061,30 @@ public:
 
   static bool classof(ConstraintFix const* fix) {
     return fix->getKind() == FixKind::MustBeCopyable;
+  }
+};
+
+class AllowInvalidPackElement final : public ConstraintFix {
+  Type packElementType;
+
+  AllowInvalidPackElement(ConstraintSystem &cs, Type packElementType,
+                          ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPackElement, locator),
+        packElementType(packElementType) {}
+
+public:
+  std::string getName() const override {
+    return "allow concrete pack element";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowInvalidPackElement *create(ConstraintSystem &cs,
+                                         Type packElementType,
+                                         ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix const* fix) {
+    return fix->getKind() == FixKind::AllowInvalidPackElement;
   }
 };
 

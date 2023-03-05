@@ -1838,6 +1838,19 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose \c each applied to an expression that is not a pack type.
+class InvalidPackElement final : public FailureDiagnostic {
+  Type packElementType;
+
+public:
+  InvalidPackElement(const Solution &solution, Type packElementType,
+                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        packElementType(packElementType) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a contextual mismatch between expected collection element type
 /// and the one provided (e.g. source of the assignment or argument to a call)
 /// e.g.:

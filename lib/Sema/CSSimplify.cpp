@@ -8818,6 +8818,13 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
     return SolutionKind::Solved;
   }
 
+  if (shouldAttemptFixes()) {
+    auto *loc = getConstraintLocator(locator);
+    auto *fix = AllowInvalidPackElement::create(*this, packType, loc);
+    if (!recordFix(fix))
+      return SolutionKind::Solved;
+  }
+
   return SolutionKind::Error;
 }
 
@@ -14029,6 +14036,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::NotCompileTimeConst:
   case FixKind::RenameConflictingPatternVariables:
   case FixKind::MustBeCopyable:
+  case FixKind::AllowInvalidPackElement:
   case FixKind::MacroMissingPound:
   case FixKind::AllowGlobalActorMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;

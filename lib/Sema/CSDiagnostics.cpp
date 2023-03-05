@@ -5996,6 +5996,11 @@ bool NotCopyableFailure::diagnoseAsError() {
   return true;
 }
 
+bool InvalidPackElement::diagnoseAsError() {
+  emitDiagnostic(diag::each_non_pack, packElementType);
+  return true;
+}
+
 bool CollectionElementContextualFailure::diagnoseAsError() {
   auto anchor = getRawAnchor();
   auto *locator = getLocator();

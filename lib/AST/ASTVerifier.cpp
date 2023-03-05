@@ -603,6 +603,18 @@ public:
         abort();
       }
 
+      // Check for invalid pack expansion shape types.
+      if (auto *expansion = type->getAs<PackExpansionType>()) {
+        auto countType = expansion->getCountType();
+        if (!(countType->is<PackType>() ||
+              countType->is<PackArchetypeType>() ||
+              (countType->is<GenericTypeParamType>() &&
+               countType->castTo<GenericTypeParamType>()->isParameterPack()))) {
+          Out << "non-pack shape type" << countType->getString() << "\n";
+          abort();
+        }
+      }
+
       if (!type->hasArchetype())
         return;
 
