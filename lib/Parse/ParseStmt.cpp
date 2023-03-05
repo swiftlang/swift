@@ -1568,7 +1568,9 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
 
   // Parse the basic expression case.  If we have a leading let/var/case
   // keyword or an assignment, then we know this is a binding.
-  if (Tok.isNot(tok::kw_let, tok::kw_var, tok::kw_case, tok::kw_inout)) {
+  if (Tok.isNot(tok::kw_let, tok::kw_var, tok::kw_case) &&
+      (!Context.LangOpts.hasFeature(Feature::ReferenceBindings) ||
+       Tok.isNot(tok::kw_inout))) {
     // If we lack it, then this is theoretically a boolean condition.
     // However, we also need to handle migrating from Swift 2 syntax, in
     // which a comma followed by an expression could actually be a pattern
@@ -1600,7 +1602,9 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   }
 
   SourceLoc IntroducerLoc;
-  if (Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_case, tok::kw_inout)) {
+  if (Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_case) ||
+      (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&
+       Tok.isAny(tok::kw_inout))) {
     BindingKindStr = Tok.getText();
     IntroducerLoc = consumeToken();
   } else {
