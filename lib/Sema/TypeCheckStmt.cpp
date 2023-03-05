@@ -1828,6 +1828,16 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     }
   }
 
+  // Check for macro expressions whose macros are marked as
+  // @discardableResult.
+  if (auto expansion = dyn_cast<MacroExpansionExpr>(valueE)) {
+    if (auto macro = expansion->getMacroRef().getDecl()) {
+      if (macro->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+        return;
+      }
+    }
+  }
+
   // Complain about functions that aren't called.
   // TODO: What about tuples which contain functions by-value that are
   // dead?
