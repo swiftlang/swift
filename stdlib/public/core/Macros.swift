@@ -86,7 +86,7 @@ public macro dsohandle() -> UnsafeRawPointer = Builtin.DSOHandleMacro
 ///         case standard
 ///       }
 ///     }
-@attached(member)
+@attached(member, names: named(RawValue), named(rawValue), named(`init`), arbitrary)
 @attached(conformance)
 public macro OptionSet<RawType>() =
   #externalMacro(module: "SwiftMacros", type: "OptionSetMacro")
