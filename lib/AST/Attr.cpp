@@ -1365,7 +1365,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           [&](MacroIntroducedDeclName name) {
             Printer << getMacroIntroducedDeclNameString(name.getKind());
             if (macroIntroducedNameRequiresArgument(name.getKind())) {
-              Printer << "(" << name.getIdentifier() << ")";
+              StringRef nameText = name.getIdentifier().str();
+              bool shouldEscape = escapeKeywordInContext(
+                  nameText, PrintNameContext::Normal) || nameText == "$";
+              Printer << "(";
+              if (shouldEscape)
+                Printer << "`";
+              Printer << nameText;
+              if (shouldEscape)
+                Printer << "`";
+              Printer << ")";
             }
           },
           [&] {
