@@ -2855,8 +2855,11 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 }
 
 static void emitInitializeFieldOffsetVectorWithLayoutString(
-    IRGenFunction &IGF, SILType T, llvm::Value *metadata, bool isVWTMutable) {
+    IRGenFunction &IGF, SILType T, llvm::Value *metadata, bool isVWTMutable,
+    MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
+  assert(IGM.Context.LangOpts.hasFeature(
+      Feature::LayoutStringValueWitnessesInstantiation));
 
   auto *target = T.getStructOrBoundGenericStruct();
 
@@ -2870,11 +2873,12 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
   auto numFieldsV = IGM.getSize(Size(numFields));
 
   // Fill out an array with the field type metadata records.
-  Address fields =
+  Address fieldsMetadata =
       IGF.createAlloca(llvm::ArrayType::get(IGM.TypeMetadataPtrTy, numFields),
                        IGM.getPointerAlignment(), "fieldsMetadata");
-  IGF.Builder.CreateLifetimeStart(fields, IGM.getPointerSize() * numFields);
-  fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
+  IGF.Builder.CreateLifetimeStart(fieldsMetadata,
+                                  IGM.getPointerSize() * numFields);
+  fieldsMetadata = IGF.Builder.CreateStructGEP(fieldsMetadata, 0, Size(0));
 
   unsigned index = 0;
   forEachField(IGM, target, [&](Field field) {
@@ -2894,10 +2898,13 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
         llvm_unreachable("Unmanaged reference should have been lowered");
       }
     } else {
-      fieldMetatype = IGF.emitTypeMetadataRefForLayout(propTy);
+      auto request = DynamicMetadataRequest::getNonBlocking(
+          MetadataState::LayoutComplete, collector);
+      fieldMetatype = IGF.emitTypeMetadataRefForLayout(propTy, request);
     }
-    Address fieldMetatypeAddr =
-        IGF.Builder.CreateConstArrayGEP(fields, index, IGM.getPointerSize());
+
+    Address fieldMetatypeAddr = IGF.Builder.CreateConstArrayGEP(
+        fieldsMetadata, index, IGM.getPointerSize());
     IGF.Builder.CreateStore(fieldMetatype, fieldMetatypeAddr);
     ++index;
   });
@@ -2912,9 +2919,10 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
   IGF.Builder.CreateCall(
       IGM.getInitStructMetadataWithLayoutStringFunctionPointer(),
       {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
-       fields.getAddress(), fieldVector});
+       fieldsMetadata.getAddress(), fieldVector});
 
-  IGF.Builder.CreateLifetimeEnd(fields, IGM.getPointerSize() * numFields);
+  IGF.Builder.CreateLifetimeEnd(fieldsMetadata,
+                                IGM.getPointerSize() * numFields);
 }
 
 static void emitInitializeValueMetadata(IRGenFunction &IGF,
@@ -2929,9 +2937,11 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
     auto &fixedTI = IGM.getTypeInfo(loweredTy);
     if (isa<FixedTypeInfo>(fixedTI)) return;
 
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+        IGM.Context.LangOpts.hasFeature(
+            Feature::LayoutStringValueWitnessesInstantiation)) {
       emitInitializeFieldOffsetVectorWithLayoutString(IGF, loweredTy, metadata,
-                                                      isVWTMutable);
+                                                      isVWTMutable, collector);
     } else {
       emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable,
                                       collector);
@@ -4904,9 +4914,7 @@ namespace {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
         return false;
       }
-      auto lowered = getLoweredType();
-      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered, /*useStructLayouts*/true);
-      return !!getLayoutString() || !typeLayoutEntry.isFixedSize(IGM);
+      return !!getLayoutString();
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
@@ -5090,10 +5098,22 @@ namespace {
       // We just assume this might happen.
     }
 
+    bool hasLayoutString() {
+      if (!IGM.Context.LangOpts.hasFeature(
+              Feature::LayoutStringValueWitnesses)) {
+        return false;
+      }
+      return !!getLayoutString() ||
+             IGM.Context.LangOpts.hasFeature(
+                 Feature::LayoutStringValueWitnessesInstantiation);
+    }
+
     llvm::Constant *emitNominalTypeDescriptor() {
-      bool hasLayoutString = IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses);
-      return StructContextDescriptorBuilder(IGM, Target, RequireMetadata,
-                                            /*hasLayoutString*/ hasLayoutString).emit();
+
+      return StructContextDescriptorBuilder(
+                 IGM, Target, RequireMetadata,
+                 /*hasLayoutString*/ hasLayoutString())
+          .emit();
     }
 
     GenericMetadataPatternFlags getPatternFlags() {
@@ -5192,8 +5212,8 @@ namespace {
     bool hasCompletionFunction() {
       // TODO: Once we store layout string pointers on the metadata pattern, we
       //       don't have to emit completion functions for all generic types anymore.
-      return IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-             !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
+      return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())) ||
+             !!getLayoutString();
     }
   };
 
@@ -5570,8 +5590,9 @@ namespace {
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
-      return EnumContextDescriptorBuilder(IGM, Target, RequireMetadata,
-                                          /*hasLayoutString*/ false)
+      return EnumContextDescriptorBuilder(
+                 IGM, Target, RequireMetadata,
+                 /*hasLayoutString*/ !!getLayoutString())
           .emit();
     }
 
@@ -5592,7 +5613,8 @@ namespace {
     }
 
     bool hasCompletionFunction() {
-      return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
+      return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())) ||
+             !!getLayoutString();
     }
   };
 

@@ -139,7 +139,6 @@ swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
       auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
       auto *type = reinterpret_cast<Metadata*>(typePtr);
       type->vw_destroy((OpaqueValue *)(addr + addrOffset));
-      addrOffset += type->vw_size();
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
       auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
       type->vw_destroy((OpaqueValue *)(addr + addrOffset));

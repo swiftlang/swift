@@ -906,6 +906,18 @@ void addStride(ConstantStructBuilder &B, const TypeInfo *TI, IRGenModule &IGM) {
 }
 } // end anonymous namespace
 
+bool isRuntimeInstatiatedLayoutString(IRGenModule &IGM,
+                                      const TypeLayoutEntry *typeLayoutEntry) {
+  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+      IGM.Context.LangOpts.hasFeature(
+          Feature::LayoutStringValueWitnessesInstantiation)) {
+    return (typeLayoutEntry->isAlignedGroup() &&
+            !typeLayoutEntry->isFixedSize(IGM));
+  }
+
+  return false;
+}
+
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
 static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
@@ -933,7 +945,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
-            (typeLayoutEntry->isAlignedGroup() && !typeLayoutEntry->isFixedSize(IGM))) {
+            isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
           return addFunction(IGM.getGenericDestroyFn());
         }
       }
@@ -960,7 +972,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
-            (typeLayoutEntry->isAlignedGroup() && !typeLayoutEntry->isFixedSize(IGM))) {
+            isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
           return addFunction(IGM.getGenericInitWithTakeFn());
         }
       }
@@ -979,7 +991,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
-            (typeLayoutEntry->isAlignedGroup() && !typeLayoutEntry->isFixedSize(IGM))) {
+            isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
           return addFunction(IGM.getGenericAssignWithCopyFn());
         }
       }
@@ -998,7 +1010,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
-            (typeLayoutEntry->isAlignedGroup() && !typeLayoutEntry->isFixedSize(IGM))) {
+            isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
           return addFunction(IGM.getGenericAssignWithTakeFn());
         }
       }
@@ -1017,7 +1029,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
-            (typeLayoutEntry->isAlignedGroup() && !typeLayoutEntry->isFixedSize(IGM))) {
+            isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
           return addFunction(IGM.getGenericInitWithCopyFn());
         }
       }

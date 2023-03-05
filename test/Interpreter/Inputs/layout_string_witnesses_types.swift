@@ -177,6 +177,31 @@ public struct GenericNestedRefOuter<T: AnyObject> {
     }
 }
 
+public enum XX<T> {
+    indirect case a(T)
+    case b
+}
+
+public struct Recursive3<T> {
+    let x: Int
+    let y: AnyObject
+}
+
+public struct Recursive2<T> {
+    let x: Recursive3<Recursive<T>>
+    let y: AnyObject
+}
+
+public struct Recursive<T> {
+    let x: T
+    let xs: Recursive2<T>?
+
+    public init(_ x: T, _ xs: Recursive2<T>?) {
+        self.x = x
+        self.xs = xs
+    }
+}
+
 #if os(macOS)
 import Foundation
 

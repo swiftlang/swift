@@ -134,6 +134,34 @@ func testGenericNestedRef() {
 
 testGenericNestedRef()
 
+func testRecursive() {
+    let ptr = allocateInternalGenericPtr(of: Recursive<TestClass>.self)
+
+    do {
+        let x = TestClass()
+        testGenericInit(ptr, to: Recursive<TestClass>(x, nil))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: Recursive<TestClass>(y, nil))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: Recursive<TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testRecursive()
+
 enum TestEnum {
     case empty
     case nonEmpty(TestClass)

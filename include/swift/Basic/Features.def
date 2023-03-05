@@ -122,6 +122,7 @@ EXPERIMENTAL_FEATURE(AccessLevelOnImport, false)
 
 /// Whether to enable experimental layout string value witnesses
 EXPERIMENTAL_FEATURE(LayoutStringValueWitnesses, true)
+EXPERIMENTAL_FEATURE(LayoutStringValueWitnessesInstantiation, true)
 
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.
