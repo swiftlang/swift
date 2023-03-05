@@ -23,7 +23,10 @@ public struct ObservationRegistrar<Subject: Observable> {
   public func register<Value>(observable: Subject, didSet: KeyPath<Subject, Value>) {}
 }
 
-@attached(member)
+@attached(
+  member,
+  names: named(_registrar), named(addObserver), named(removeObserver), named(withTransaction), named(Storage), named(_storage)
+)
 @attached(memberAttribute)
 public macro Observable() = #externalMacro(module: "MacroDefinition", type: "ObservableMacro")
 

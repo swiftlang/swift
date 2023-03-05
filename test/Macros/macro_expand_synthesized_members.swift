@@ -9,7 +9,11 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-@attached(member) macro addMembers() = #externalMacro(module: "MacroDefinition", type: "AddMembers")
+@attached(
+  member,
+  names: named(Storage), named(storage), named(getStorage), named(method), named(`init`)
+)
+macro addMembers() = #externalMacro(module: "MacroDefinition", type: "AddMembers")
 
 @addMembers
 struct S {
@@ -24,6 +28,19 @@ let s = S()
 // CHECK: synthesized method
 // CHECK: Storage
 s.useSynthesized()
+
+@attached(member, names: arbitrary)
+macro addArbitraryMembers() = #externalMacro(module: "MacroDefinition", type: "AddArbitraryMembers")
+
+@addArbitraryMembers
+struct MyType {}
+
+// CHECK: MyType1
+// CHECK: MyType2
+// CHECK: MyType3
+print(MyType.MyType1.self)
+print(MyType.MyType2.self)
+print(MyType.MyType3.self)
 
 @attached(
   member,

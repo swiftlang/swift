@@ -6748,6 +6748,8 @@ ERROR(moveonly_enums_do_not_support_indirect,none,
       "move-only enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
 ERROR(moveonly_cast,none,
       "move-only types cannot be conditionally cast", ())
+ERROR(moveonly_failable_init,none,
+      "move-only types cannot have failable initializers yet", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
@@ -6909,6 +6911,18 @@ ERROR(external_macro_arg_not_type_name,none,
       "the external macro's %select{module|type}0", (unsigned))
 ERROR(attached_declaration_macro_not_supported,none,
       "attached declaration macros are not yet supported", ())
+ERROR(invalid_decl_in_macro_expansion,none,
+      "macro expansion cannot introduce %0",
+      (DescriptiveDeclKind))
+ERROR(invalid_main_type_in_macro_expansion,none,
+      "macro expansion cannot introduce '@main' type",
+      ())
+ERROR(literal_type_in_macro_expansion,none,
+      "macro expansion cannot introduce default literal type %0",
+      (Identifier))
+ERROR(invalid_macro_introduced_name,none,
+      "declaration name %0 is not covered by macro %1",
+      (DeclName, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

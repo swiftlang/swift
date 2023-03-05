@@ -3603,6 +3603,16 @@ public:
       addDelayedFunction(CD);
     }
 
+    // a move-only / noncopyable type cannot have a failable initializer, since
+    // that would require the ability to wrap one inside an optional
+    if (CD->isFailable()) {
+      if (auto *nom = CD->getDeclContext()->getSelfNominalTypeDecl()) {
+        if (nom->isMoveOnly()) {
+          CD->diagnose(diag::moveonly_failable_init);
+        }
+      }
+    }
+
     checkDefaultArguments(CD->getParameters());
     checkVariadicParameters(CD->getParameters(), CD);
   }

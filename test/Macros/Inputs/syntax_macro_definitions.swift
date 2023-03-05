@@ -494,6 +494,25 @@ public struct AddMembers: MemberMacro {
   }
 }
 
+public struct AddArbitraryMembers: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let identified = decl.asProtocol(IdentifiedDeclSyntax.self) else {
+      return []
+    }
+
+    let parentName = identified.identifier.trimmed
+    return [
+      "struct \(parentName)1 {}",
+      "struct \(parentName)2 {}",
+      "struct \(parentName)3 {}",
+    ]
+  }
+}
+
 /// Implementation of the `wrapStoredProperties` macro, which can be
 /// used to apply an attribute to all of the stored properties of a type.
 ///
@@ -742,6 +761,38 @@ public struct AddCompletionHandler: PeerMacro {
       .with(\.leadingTrivia, .newlines(2))
 
     return [DeclSyntax(newFunc)]
+  }
+}
+
+public struct InvalidMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "import Swift",
+      "precedencegroup MyPrecedence {}",
+      "@attached(member) macro myMacro()",
+      "extension Int {}",
+      """
+      @main
+      struct MyMain {
+        static func main() {}
+      }
+      """,
+      "typealias Array = Void",
+      "typealias Dictionary = Void",
+      "typealias BooleanLiteralType = Void",
+      "typealias ExtendedGraphemeClusterType = Void",
+      "typealias FloatLiteralType = Void",
+      "typealias IntegerLiteralType = Void",
+      "typealias StringLiteralType = Void",
+      "typealias UnicodeScalarType = Void",
+      "typealias _ColorLiteralType = Void",
+      "typealias _ImageLiteralType = Void",
+      "typealias _FileReferenceLiteralType = Void",
+    ]
   }
 }
 
