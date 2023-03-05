@@ -1366,6 +1366,20 @@ bool MustBeCopyable::diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
   return diagnose(*commonFixes.front().first);
 }
 
+bool AllowInvalidPackElement::diagnose(const Solution &solution,
+                                       bool asNote) const {
+  InvalidPackElement failure(solution, packElementType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidPackElement *
+AllowInvalidPackElement::create(ConstraintSystem &cs,
+                                Type packElementType,
+                                ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidPackElement(cs, packElementType, locator);
+}
+
 bool CollectionElementContextualMismatch::diagnose(const Solution &solution,
                                                    bool asNote) const {
   CollectionElementContextualFailure failure(

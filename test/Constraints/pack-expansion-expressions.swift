@@ -120,4 +120,8 @@ func generateTuple<each T : Generatable>() -> (repeat each T) {
 
 func packElementInvalidBinding<each T>(_ arg: repeat each T) {
   _ = (repeat print(each arg))
+
+  let x = 1
+  repeat print(each x)
+  // expected-error@-1 {{'each' cannot be applied to non-pack type 'Int'}}
 }
