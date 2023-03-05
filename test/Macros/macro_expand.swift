@@ -171,6 +171,17 @@ func testNestedDeclInExpr() {
 @freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
+// Macros adding to an enum
+@attached(member, names: named(unknown), arbitrary)
+public macro ExtendableEnum() = #externalMacro(module: "MacroDefinition", type: "ExtendableEnum")
+
+@ExtendableEnum
+enum ElementType {
+case paper
+}
+
+print(ElementType.paper.unknown())
+
 // FIXME: Declaration macro expansions in BraceStmt don't work yet.
 //#bitwidthNumberedStructs("MyIntGlobal")
 
