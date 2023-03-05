@@ -1482,6 +1482,12 @@ void PotentialBindings::infer(Constraint *constraint) {
       packType = packType->mapTypeOutOfContext();
       auto *elementEnv = CS.getPackElementEnvironment(constraint->getLocator(),
                                                       shapeClass);
+
+      // Without an opened element environment, we cannot derive the
+      // element binding.
+      if (!elementEnv)
+        break;
+
       auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
       addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});
 

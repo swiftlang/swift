@@ -661,6 +661,9 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
   if (result == PackExpansionEnvironments.end())
     return nullptr;
 
+  if (!shapeClass->is<PackArchetypeType>())
+    return nullptr;
+
   auto uuid = result->second;
   auto &ctx = getASTContext();
   auto elementSig = ctx.getOpenedElementSignature(
