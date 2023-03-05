@@ -1807,6 +1807,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       ExpectedCustomAttributeKinds |= CustomAttributeKind::ResultBuilder;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::GlobalActor;
     }
+    ExpectedCustomAttributeKinds |= CustomAttributeKind::Macro;
+
     Lookup.setExpectedTypes(/*Types=*/{},
                             /*isImplicitSingleExpressionReturn=*/false,
                             /*preferNonVoid=*/false,
@@ -1814,11 +1816,15 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
     // TypeName at attribute position after '@'.
     // - VarDecl: Property Wrappers.
-    // - ParamDecl/VarDecl/FuncDecl: Function Builders.
+    // - ParamDecl/VarDecl/FuncDecl: Result Builders.
     if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
         *AttTargetDK == DeclKind::Param || *AttTargetDK == DeclKind::Func)
       Lookup.getTypeCompletionsInDeclContext(
           P.Context.SourceMgr.getIDEInspectionTargetLoc());
+
+    // Macro name at attribute position after '@'.
+    Lookup.getToplevelCompletions(
+        /*OnlyTypes=*/false, /*OnlyMacros=*/true);
     break;
   }
   case CompletionKind::AttributeDeclParen: {
