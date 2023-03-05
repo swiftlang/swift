@@ -10,7 +10,7 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.9, *)
-@attached(member)
+@attached(member, names: named(_registrar), named(transactions), named(changes), named(_Storage), named(_storage))
 @attached(memberAttribute)
 @attached(conformance)
 public macro Observable() = 
