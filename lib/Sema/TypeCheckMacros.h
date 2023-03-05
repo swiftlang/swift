@@ -43,9 +43,8 @@ Expr *expandMacroExpr(
 /// Expands the given macro expansion declaration, type-checks the replacement
 /// declarations, and adds them to \p results.
 ///
-/// \returns true if expansion succeeded, false if failed.
-bool expandFreestandingDeclarationMacro(
-    MacroExpansionDecl *med, SmallVectorImpl<Decl *> &results);
+/// \returns Expansion buffer ID if expansion succeeded, \p None if failed.
+Optional<unsigned> expandFreestandingDeclarationMacro(MacroExpansionDecl *med);
 
 /// Expand the accessors for the given storage declaration based on the
 /// custom attribute that references the given macro.

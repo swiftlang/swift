@@ -1792,8 +1792,9 @@ void SILGenModule::visitMacroDecl(MacroDecl *d) {
 }
 
 void SILGenModule::visitMacroExpansionDecl(MacroExpansionDecl *d) {
-  // Expanded declaration macros were already added to the parent decl context
-  // for name lookup to work. Nothing to be done here.
+  d->visitAuxiliaryDecls([&](Decl *decl) {
+    visit(decl);
+  });
 }
 
 bool
