@@ -1783,8 +1783,7 @@ void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
 void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
                                          DeclVisibilityKind Reason) {
   if (!MD->hasName() || !MD->isAccessibleFrom(CurrDeclContext) ||
-      MD->shouldHideFromEditor() ||
-      !isFreestandingMacro(MD->getMacroRoles()))
+      MD->shouldHideFromEditor())
     return;
 
   CodeCompletionResultBuilder Builder(
