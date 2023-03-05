@@ -44,11 +44,12 @@ extension String {
       return String(_uninitializedCapacity: uninitializedCapacity) { buffer in
         var initialized = 0
         for i in 0..<count {
-          let offset = i &* repeatedUTF8.count
-          let range = offset ..< offset + repeatedUTF8.count
+          let lower = i &* repeatedUTF8.count
+          let upper = lower &+ repeatedUTF8.count
+          let range = Range(uncheckedBounds: (lower: lower, upper: upper))
           _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
             .initialize(from: repeatedUTF8)
-          initialized += range.count
+          initialized &+= range.count
         }
         _internalInvariant(initialized == uninitializedCapacity)
         return initialized
