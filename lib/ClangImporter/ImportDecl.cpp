@@ -7094,7 +7094,7 @@ void SwiftDeclConverter::importObjCProtocols(
       inheritedTypes.push_back(
         InheritedEntry(
           TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-          /*isUnchecked=*/false));
+          /*isUnchecked=*/false, /*isRetroactive=*/false));
     }
   }
 

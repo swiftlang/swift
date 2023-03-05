@@ -246,10 +246,10 @@ extension ASTGenVisitor {
             fallthrough
 
           case .autoclosure, .escaping, .noescape, .noDerivative, .async,
-            .sendable, .unchecked, ._local, ._noMetadata, .pack_owned,
-            .pack_guaranteed, .pack_inout, .pack_out, .pseudogeneric,
-            .yields, .yield_once, .yield_many, .thin, .thick, .count,
-            .unimplementable:
+            .sendable, .retroactive, .unchecked, ._local, ._noMetadata,
+            .pack_owned, .pack_guaranteed, .pack_inout, .pack_out,
+            .pseudogeneric, .yields, .yield_once, .yield_many, .thin, .thick,
+            .count, .unimplementable:
             TypeAttributes_addSimpleAttr(typeAttributes, typeAttrKind, atLoc, attrLoc)
 
           case .opened, .pack_element, .differentiable, .convention,

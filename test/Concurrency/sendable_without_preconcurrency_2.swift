@@ -37,7 +37,7 @@ func testA(ns: NS, mt: MyType, mt2: MyType2, sc: StrictClass, nsc: NonStrictClas
   }
 }
 
-extension NonStrictStruct: @unchecked Sendable { }
+extension NonStrictStruct: @unchecked @retroactive Sendable { }
 
 class StrictSubclass: StrictClass {
   override func send(_ body: () -> ()) {}

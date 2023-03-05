@@ -44,9 +44,9 @@ extension Hashable {
   }
 }
 
-extension CGSize: Hashable {}
-extension CGPoint: Hashable {}
-extension CGRect: Hashable {}
+extension CGSize: @retroactive Hashable {}
+extension CGPoint: @retroactive Hashable {}
+extension CGRect: @retroactive Hashable {}
 
 % for ObjectType, ValueTypes in coercionTypes.items():
 func bridgeNSNumberBackToSpecificType(object: ${ObjectType},

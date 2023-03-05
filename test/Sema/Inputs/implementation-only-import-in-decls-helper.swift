@@ -1,12 +1,12 @@
 import NormalLibrary
 
-extension NormalStruct: NormalProto {
+extension NormalStruct: @retroactive NormalProto {
   public typealias Assoc = Int
 }
-extension GenericStruct: NormalProto {
+extension GenericStruct: @retroactive NormalProto {
   public typealias Assoc = Int
 }
-extension NormalClass: NormalProto {
+extension NormalClass: @retroactive NormalProto {
   public typealias Assoc = Int
 }
 

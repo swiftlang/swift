@@ -540,6 +540,13 @@ public:
   ///  module if one exists.
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
 
+  /// Returns true if this module is the Clang overlay of \p other.
+  bool isClangOverlayOf(ModuleDecl *other);
+
+  /// Returns true if this module is the same module or either module is a clang
+  /// overlay of the other.
+  bool isSameModuleLookingThroughOverlays(ModuleDecl *other);
+
   /// Returns true if this module is an underscored cross import overlay
   /// declared by \p other or its underlying clang module, either directly or
   /// transitively (via intermediate cross-import overlays - for cross-imports

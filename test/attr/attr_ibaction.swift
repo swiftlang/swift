@@ -77,7 +77,7 @@ protocol CP2 : class { }
 
 // Teach the compiler that String is @objc-friendly without importing
 // Foundation.
-extension String: _ObjectiveCBridgeable {
+extension String: @retroactive _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC") public func _bridgeToObjectiveC() -> AnyObject { fatalError() }
   public static func _forceBridgeFromObjectiveC(_ x: AnyObject, result: inout String?) { fatalError() }
   public static func _conditionallyBridgeFromObjectiveC(_ x: AnyObject, result: inout String?) -> Bool { fatalError() }

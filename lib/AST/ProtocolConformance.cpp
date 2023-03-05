@@ -178,6 +178,26 @@ usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
+bool ProtocolConformance::isRetroactive() const {
+  auto extensionModule = getDeclContext()->getParentModule();
+  auto protocolModule = getProtocol()->getParentModule();
+  if (extensionModule->isSameModuleLookingThroughOverlays(protocolModule)) {
+    return false;
+  }
+
+  auto conformingTypeDecl =
+      ConformingType->getNominalOrBoundGenericNominal();
+  if (conformingTypeDecl) {
+    auto conformingTypeModule = conformingTypeDecl->getParentModule();
+    if (extensionModule->
+        isSameModuleLookingThroughOverlays(conformingTypeModule)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {
   switch (getKind()) {
   case ProtocolConformanceKind::Inherited:

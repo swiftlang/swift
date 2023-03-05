@@ -119,11 +119,11 @@ TypeRepr *TypeRepr::getWithoutParens() const {
   return repr;
 }
 
-SourceLoc TypeRepr::findUncheckedAttrLoc() const {
+SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   auto typeRepr = this;
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-    if (attrTypeRepr->getAttrs().has(TAK_unchecked)) {
-      return attrTypeRepr->getAttrs().getLoc(TAK_unchecked);
+    if (attrTypeRepr->getAttrs().has(kind)) {
+      return attrTypeRepr->getAttrs().getLoc(kind);
     }
 
     typeRepr = attrTypeRepr->getTypeRepr();
