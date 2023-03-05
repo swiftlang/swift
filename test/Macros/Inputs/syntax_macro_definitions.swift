@@ -1082,3 +1082,17 @@ public struct DelegatedConformanceMacro: ConformanceMacro, MemberMacro {
     return [requirement]
   }
 }
+
+public struct ExtendableEnum: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let unknownDecl: DeclSyntax =
+    """
+    func unknown() -> Int { 34 } // or something like: `case unknown`
+    """
+    return [unknownDecl]
+  }
+}
