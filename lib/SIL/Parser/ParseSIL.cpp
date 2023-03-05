@@ -1287,7 +1287,12 @@ lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
   auto descriptor = UnqualifiedLookupDescriptor(DeclNameRef(Name), &P.SF);
   auto lookup = evaluateOrDefault(ctx.evaluator,
                                   UnqualifiedLookupRequest{descriptor}, {});
+  lookup.filter([](LookupResultEntry entry, bool isOuter) -> bool {
+    return !isa<MacroDecl>(entry.getValueDecl());
+  });
+
   assert(lookup.size() == 1);
+
   return lookup.back().getValueDecl();
 }
 
