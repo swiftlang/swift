@@ -57,6 +57,8 @@ actor MyGenericGlobalActor<T> {
   static let shared = MyGenricGlobalActor<T>()
 }
 
+@attached(member)
+macro MyMacro() = #externalMacro(module: "Macros", type: "MyMacro")
 
 @available(#^AVAILABILITY1^#)
 
@@ -117,6 +119,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
 // KEYWORD2-DAG:              Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
+// KEYWORD2-DAG:              Decl[Macro]/CurrModule: MyMacro[#Void#]; name=MyMacro
 // KEYWORD2:                  End completions
 
 @#^KEYWORD3^# class C {}
@@ -138,6 +141,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD3-NEXT:             Keyword/None:                       globalActor[#Class Attribute#]; name=globalActor
 // KEYWORD3-NEXT:             Keyword/None:                       preconcurrency[#Class Attribute#]; name=preconcurrency
 // KEYWORD3-NEXT:             Keyword/None:                       runtimeMetadata[#Class Attribute#]; name=runtimeMetadata
+// KEYWORD3-NEXT:             Decl[Macro]/CurrModule: MyMacro[#Void#]; name=MyMacro
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD3_2^#IB class C2 {}
@@ -157,6 +161,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD4-NEXT:             Keyword/None:                       globalActor[#Enum Attribute#]; name=globalActor
 // KEYWORD4-NEXT:             Keyword/None:                       preconcurrency[#Enum Attribute#]; name=preconcurrency
 // KEYWORD4-NEXT:             Keyword/None:                       runtimeMetadata[#Enum Attribute#]; name=runtimeMetadata
+// KEYWORD4-NEXT:             Decl[Macro]/CurrModule: MyMacro[#Void#]; name=MyMacro
 // KEYWORD4-NEXT:             End completions
 
 @#^KEYWORD5^# struct S{}
@@ -172,6 +177,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD5-NEXT:             Keyword/None:                       globalActor[#Struct Attribute#]; name=globalActor
 // KEYWORD5-NEXT:             Keyword/None:                       preconcurrency[#Struct Attribute#]; name=preconcurrency
 // KEYWORD5-NEXT:             Keyword/None:                       runtimeMetadata[#Struct Attribute#]; name=runtimeMetadata
+// KEYWORD5-NEXT:             Decl[Macro]/CurrModule: MyMacro[#Void#]; name=MyMacro
 // KEYWORD5-NEXT:             End completions
 
 @#^ON_GLOBALVAR^# var globalVar
