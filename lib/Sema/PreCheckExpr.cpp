@@ -1469,8 +1469,13 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // Fold 'T.U' into a nested type.
 
   // Resolve the TypeRepr to get the base type for the lookup.
+  TypeResolutionOptions options(TypeResolverContext::InExpression);
+  // Pre-check always allows pack references during TypeExpr folding.
+  // CSGen will diagnose cases that appear outside of pack expansion
+  // expressions.
+  options |= TypeResolutionFlags::AllowPackReferences;
   const auto BaseTy = TypeResolution::resolveContextualType(
-      InnerTypeRepr, DC, TypeResolverContext::InExpression,
+      InnerTypeRepr, DC, options,
       [](auto unboundTy) {
         // FIXME: Don't let unbound generic types escape type resolution.
         // For now, just return the unbound generic type.
