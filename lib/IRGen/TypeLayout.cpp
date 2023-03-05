@@ -194,8 +194,8 @@ private:
       case RefCountingKind::Resilient: {
         uint64_t op = (static_cast<uint64_t>(refCounting.kind) << 56) | skip;
         B.addInt64(op);
-        B.addCompactFunctionReference(refCounting.metaTypeRef);
-        refCountBytes += sizeof(uint64_t) + sizeof(uint32_t);
+        B.add(refCounting.metaTypeRef);
+        refCountBytes += sizeof(uint64_t) + IGM.getPointerSize().getValue();
 
         skip = 0;
         break;
@@ -472,6 +472,10 @@ const EnumTypeLayoutEntry *TypeLayoutEntry::getAsEnum() const {
     return static_cast<const EnumTypeLayoutEntry *>(this);
   }
   return nullptr;
+}
+
+bool TypeLayoutEntry::isAlignedGroup() const {
+  return getKind() == TypeLayoutEntryKind::AlignedGroup;
 }
 
 llvm::Value *TypeLayoutEntry::alignmentMask(IRGenFunction &IGF) const {

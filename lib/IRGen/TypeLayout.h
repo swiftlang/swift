@@ -149,6 +149,8 @@ public:
 
   const EnumTypeLayoutEntry *getAsEnum() const;
 
+  bool isAlignedGroup() const;
+
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   LLVM_DUMP_METHOD virtual void dump() const {
     assert(isEmpty() && "Missing subclass implementation?");

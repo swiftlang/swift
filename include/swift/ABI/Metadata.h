@@ -340,7 +340,11 @@ public:
   }
 
   bool hasLayoutString() const {
-    return getTypeContextDescriptor()->hasLayoutString();
+    if (auto *contextDescriptor = getTypeContextDescriptor()) {
+      return contextDescriptor->hasLayoutString();
+    }
+
+    return false;
   }
   
   // Define forwarders for value witnesses. These invoke this metadata's value

@@ -650,6 +650,13 @@ void swift_initStructMetadata(StructMetadata *self,
                               const TypeLayout * const *fieldTypes,
                               uint32_t *fieldOffsets);
 
+SWIFT_RUNTIME_EXPORT
+void swift_initStructMetadataWithLayoutString(StructMetadata *self,
+                                              StructLayoutFlags flags,
+                                              size_t numFields,
+                                              const Metadata *const *fieldTypes,
+                                              uint32_t *fieldOffsets);
+
 /// Allocate the metadata for a class and copy fields from the given pattern.
 /// The final size of the metadata is calculated at runtime from the metadata
 /// bounds in the class descriptor.

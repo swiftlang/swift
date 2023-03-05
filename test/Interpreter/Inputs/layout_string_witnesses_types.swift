@@ -146,6 +146,78 @@ public enum ForwardToPayloadEnum {
     case empty
 }
 
+public struct GenericTupleWrapper<T> {
+    let x: Int = 23
+    let y: (T, Int)
+
+    public init(_ y: (T, Int)) {
+        self.y = y
+    }
+}
+
+public struct GenericNestedOuter<T> {
+    public struct Inner {
+        let x: Int = 34
+        let y: T
+
+        public init(_ y: T) {
+            self.y = y
+        }
+    }
+}
+
+public struct GenericNestedRefOuter<T: AnyObject> {
+    public struct Inner {
+        let x: Int = 34
+        let y: T
+
+        public init(_ y: T) {
+            self.y = y
+        }
+    }
+}
+
+public enum SimpleEnum {
+    case a(AnyObject, Int)
+    case b
+    case c(Int, AnyObject)
+}
+
+struct SimpleEnumWrapper {
+    let x: SimpleEnum
+    let y: Int = 2
+}
+
+public struct GenericEnumWrapper<T> {
+    let x: SimpleEnumWrapper
+    let y: T
+
+    public init(_ x: SimpleEnum, _ y: T) {
+        self.x = SimpleEnumWrapper(x: x)
+        self.y = y
+    }
+}
+
+public struct Recursive3<T> {
+    let x: Int
+    let y: AnyObject
+}
+
+public struct Recursive2<T> {
+    let x: Recursive3<Recursive<T>>
+    let y: AnyObject
+}
+
+public struct Recursive<T> {
+    let x: T
+    let xs: Recursive2<T>?
+
+    public init(_ x: T, _ xs: Recursive2<T>?) {
+        self.x = x
+        self.xs = xs
+    }
+}
+
 #if os(macOS)
 import Foundation
 
