@@ -2059,7 +2059,7 @@ public:
                              Type noncopyableTy,
                              ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix const* fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::MustBeCopyable;
   }
 };
@@ -2083,7 +2083,7 @@ public:
                                          Type packElementType,
                                          ConstraintLocator *locator);
 
-  static bool classof(ConstraintFix const* fix) {
+  static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInvalidPackElement;
   }
 };
