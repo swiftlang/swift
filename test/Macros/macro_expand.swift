@@ -92,6 +92,16 @@ testStringify(a: 1, b: 1)
 
 func maybeThrowing() throws -> Int { 5 }
 
+#if TEST_DIAGNOSTICS
+@freestanding(expression) @discardableResult
+macro discardableStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+func testDiscardableStringify(x: Int) {
+  #stringify(x + 1) // expected-warning{{expression of type '(Int, String)' is unused}}
+  #discardableStringify(x + 1)
+}
+#endif
+
 func testStringifyWithThrows() throws {
   // Okay, we can put the try inside or outside
   _ = try #stringify(maybeThrowing())

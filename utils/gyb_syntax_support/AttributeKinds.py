@@ -378,7 +378,7 @@ DECL_ATTR_KINDS = [
                         ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIStableToRemove,  # noqa: E501
                         code=64),
     SimpleDeclAttribute('discardableResult', 'DiscardableResult',
-                        OnFunc, OnAccessor, OnConstructor,
+                        OnFunc, OnAccessor, OnConstructor, OnMacro,
                         LongAttribute,
                         ABIStableToAdd, ABIStableToRemove, APIStableToAdd, APIStableToRemove,  # noqa: E501
                         code=65),
