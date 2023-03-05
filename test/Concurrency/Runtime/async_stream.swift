@@ -7,12 +7,8 @@
 // rdar://78109470
 // UNSUPPORTED: back_deployment_runtime
 
-// Race condition
-// REQUIRES: rdar78033828
-
 import _Concurrency
 import StdlibUnittest
-import Dispatch
 
 struct SomeError: Error, Equatable {
   var value = Int.random(in: 0..<100)
@@ -27,14 +23,34 @@ var tests = TestSuite("AsyncStream")
         var fulfilled = false
       }
 
+      tests.test("factory method") {
+        let (stream, continuation) = AsyncStream.makeStream(of: String.self)
+        continuation.yield("hello")
+
+        var iterator = stream.makeAsyncIterator()
+        expectEqual(await iterator.next(), "hello")
+      }
+
+      tests.test("throwing factory method") {
+        let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self, throwing: Error.self)
+        continuation.yield("hello")
+
+        var iterator = stream.makeAsyncIterator()
+        do {
+          expectEqual(try await iterator.next(), "hello")
+        } catch {
+          expectUnreachable("unexpected error thrown")
+        }
+      }
+
       tests.test("yield with no awaiting next") {
-        let series = AsyncStream(String.self) { continuation in
+        _ = AsyncStream(String.self) { continuation in
           continuation.yield("hello")
         }
       }
 
       tests.test("yield with no awaiting next throwing") {
-        let series = AsyncThrowingStream(String.self) { continuation in
+        _ = AsyncThrowingStream(String.self) { continuation in
           continuation.yield("hello")
         }
       }
@@ -122,7 +138,7 @@ var tests = TestSuite("AsyncStream")
         do {
           expectEqual(try await iterator.next(), "hello")
           expectEqual(try await iterator.next(), "world")
-          try await iterator.next()
+          _ = try await iterator.next()
           expectUnreachable("expected thrown error")
         } catch {
           if let failure = error as? SomeError {
@@ -134,7 +150,7 @@ var tests = TestSuite("AsyncStream")
       }
 
       tests.test("yield with no awaiting next detached") {
-        let series = AsyncStream(String.self) { continuation in
+        _ = AsyncStream(String.self) { continuation in
           detach {
             continuation.yield("hello")
           }
@@ -142,7 +158,7 @@ var tests = TestSuite("AsyncStream")
       }
 
       tests.test("yield with no awaiting next detached throwing") {
-        let series = AsyncThrowingStream(String.self) { continuation in
+        _ = AsyncThrowingStream(String.self) { continuation in
           detach {
             continuation.yield("hello")
           }
@@ -246,7 +262,7 @@ var tests = TestSuite("AsyncStream")
         do {
           expectEqual(try await iterator.next(), "hello")
           expectEqual(try await iterator.next(), "world")
-          try await iterator.next()
+          _ = try await iterator.next()
           expectUnreachable("expected thrown error")
         } catch {
           if let failure = error as? SomeError {
@@ -337,7 +353,7 @@ var tests = TestSuite("AsyncStream")
         let expectation = Expectation()
 
         func scopedLifetime(_ expectation: Expectation) {
-          let series = AsyncStream(String.self) { continuation in
+          _ = AsyncStream(String.self) { continuation in
             continuation.onTermination = { @Sendable _ in expectation.fulfilled = true }
           }
         }
@@ -351,7 +367,7 @@ var tests = TestSuite("AsyncStream")
         let expectation = Expectation()
 
         func scopedLifetime(_ expectation: Expectation) {
-          let series = AsyncStream(String.self) { continuation in
+          _ = AsyncStream(String.self) { continuation in
             continuation.onTermination = { @Sendable _ in expectation.fulfilled = true }
             continuation.finish()
           }
@@ -366,7 +382,7 @@ var tests = TestSuite("AsyncStream")
         let expectation = Expectation()
 
         func scopedLifetime(_ expectation: Expectation) {
-          let series = AsyncStream(String.self) { continuation in
+          _ = AsyncStream(String.self) { continuation in
             continuation.onTermination = { @Sendable terminal in
               switch terminal {
               case .cancelled:
@@ -386,7 +402,7 @@ var tests = TestSuite("AsyncStream")
         let expectation = Expectation()
 
         func scopedLifetime(_ expectation: Expectation) {
-          let series = AsyncThrowingStream(String.self) { continuation in
+          _ = AsyncThrowingStream(String.self) { continuation in
             continuation.onTermination = { @Sendable terminal in
               switch terminal {
               case .cancelled:
