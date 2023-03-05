@@ -3805,7 +3805,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
       : VDUC(VDUC), SF(VDUC.DC->getParentSourceFile()) {}
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::ArgumentsAndExpansion;
+      return MacroWalking::Arguments;
     }
 
     PostWalkResult<Expr *> walkToExprPost(Expr *E) override {

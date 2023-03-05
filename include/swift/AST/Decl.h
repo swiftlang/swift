@@ -8527,7 +8527,6 @@ public:
   DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
   DeclNameRef getMacroName() const { return MacroName; }
   ArgumentList *getArgs() const { return ArgList; }
-  ArrayRef<Decl *> getRewritten() const;
   ConcreteDeclRef getMacroRef() const { return macroRef; }
   void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
 

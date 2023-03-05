@@ -1526,48 +1526,70 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
                                             MemberLookupTable &table,
                                             DeclName name,
                                             NominalTypeDecl *dc) {
-  auto expandAndPopulate = [&](MacroExpansionDecl *med) {
-    auto expanded = evaluateOrDefault(med->getASTContext().evaluator,
-                                      ExpandMacroExpansionDeclRequest{med},
-                                      nullptr);
-    for (auto *decl : expanded)
-      table.addMember(decl);
-  };
-
+  auto *moduleScopeCtx = dc->getModuleScopeContext();
+  auto *module = dc->getModuleContext();
   for (auto *member : dc->getCurrentMembersWithoutLoading()) {
-    auto *med = dyn_cast<MacroExpansionDecl>(member);
-    if (!med)
-      continue;
-    auto declRef = evaluateOrDefault(
-        ctx.evaluator, ResolveMacroRequest{med, dc},
-        nullptr);
-    auto *macro = dyn_cast_or_null<MacroDecl>(declRef.getDecl());
-    if (!macro)
-      continue;
-    auto *attr = macro->getMacroRoleAttr(MacroRole::Declaration);
-    // If a macro produces arbitrary names, we have to expand it to factor its
-    // expansion results into name lookup.
-    if (attr->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary)) {
-      expandAndPopulate(med);
+    // Collect all macro introduced names, along with its corresponding macro
+    // reference. We need the macro reference to prevent adding auxiliary decls
+    // that weren't introduced by the macro.
+    llvm::SmallSet<DeclName, 4> allIntroducedNames;
+    bool introducesArbitraryNames = false;
+    if (auto *med = dyn_cast<MacroExpansionDecl>(member)) {
+      auto declRef = evaluateOrDefault(
+          ctx.evaluator, ResolveMacroRequest{med, dc},
+          nullptr);
+      if (!declRef)
+        continue;
+      auto *macro = dyn_cast<MacroDecl>(declRef.getDecl());
+      if (macro->getMacroRoleAttr(MacroRole::Declaration)
+          ->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary))
+        introducesArbitraryNames = true;
+      else {
+        SmallVector<DeclName, 4> introducedNames;
+        macro->getIntroducedNames(MacroRole::Declaration, nullptr,
+                                  introducedNames);
+        for (auto name : introducedNames)
+          allIntroducedNames.insert(name);
+      }
+    } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
+      // We intentionally avoid calling `forEachAttachedMacro` in order to avoid
+      // a request cycle.
+      for (auto attrConst : member->getSemanticAttrs().getAttributes<CustomAttr>()) {
+        auto *attr = const_cast<CustomAttr *>(attrConst);
+        UnresolvedMacroReference macroRef(attr);
+        auto macroName = macroRef.getMacroName();
+        UnqualifiedLookupDescriptor lookupDesc{macroName, moduleScopeCtx};
+        auto lookup = evaluateOrDefault(
+            ctx.evaluator, UnqualifiedLookupRequest{lookupDesc}, {});
+        for (auto result : lookup.allResults()) {
+          auto *vd = result.getValueDecl();
+          auto *macro = dyn_cast<MacroDecl>(vd);
+          if (!macro)
+            continue;
+          auto *macroRoleAttr = macro->getMacroRoleAttr(MacroRole::Peer);
+          if (!macroRoleAttr)
+            continue;
+          if (macroRoleAttr->hasNameKind(
+                  MacroIntroducedDeclNameKind::Arbitrary))
+            introducesArbitraryNames = true;
+          else {
+            SmallVector<DeclName, 4> introducedNames;
+            macro->getIntroducedNames(
+                MacroRole::Peer, dyn_cast<ValueDecl>(member), introducedNames);
+            for (auto name : introducedNames)
+              allIntroducedNames.insert(name);
+          }
+        }
+      }
     }
-    // Otherwise, we expand the macro if it has the same decl base name being
-    // looked for.
-    else {
-      auto it = llvm::find_if(attr->getNames(),
-                              [&](const MacroIntroducedDeclName &introName) {
-        // FIXME: The `Named` kind of `MacroIntroducedDeclName` should store a
-        // `DeclName` instead of `Identifier`. This is so that we can compare
-        // base identifiers when the macro specifies a compound name.
-        // Currently only simple names are allowed in a `MacroRoleAttr`.
-        if (!name.isSpecial())
-          return introName.getIdentifier() == name.getBaseIdentifier();
-        else
-          return introName.getIdentifier().str() ==
-              name.getBaseName().userFacingName();
+    // Expand macros based on the name.
+    if (introducesArbitraryNames || allIntroducedNames.contains(name))
+      member->visitAuxiliaryDecls([&](Decl *decl) {
+        auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
+        // Bail out if the auxiliary decl was not produced by a macro.
+        if (!sf || sf->Kind != SourceFileKind::MacroExpansion) return;
+        table.addMember(decl);
       });
-      if (it != attr->getNames().end())
-        expandAndPopulate(med);
-    }
   }
 }
 

@@ -95,7 +95,10 @@ enum class MacroWalking {
 
   /// Walk into both the arguments of the macro as written in the source code
   /// and also the macro expansion.
-  ArgumentsAndExpansion
+  ArgumentsAndExpansion,
+
+  /// Don't walk into macros.
+  None
 };
 
 /// An abstract class used to traverse an AST.
@@ -545,6 +548,9 @@ public:
 
     case MacroWalking::ArgumentsAndExpansion:
       return std::make_pair(true, true);
+
+    case MacroWalking::None:
+      return std::make_pair(false, false);
     }
   }
 

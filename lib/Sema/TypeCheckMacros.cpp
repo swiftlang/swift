@@ -676,9 +676,9 @@ Expr *swift::expandMacroExpr(
   return expandedExpr;
 }
 
-/// Expands the given macro expansion declaration and type-check the result.
-bool swift::expandFreestandingDeclarationMacro(
-    MacroExpansionDecl *med, SmallVectorImpl<Decl *> &results) {
+/// Expands the given macro expansion declaration.
+Optional<unsigned>
+swift::expandFreestandingDeclarationMacro(MacroExpansionDecl *med) {
   auto *dc = med->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -686,7 +686,7 @@ bool swift::expandFreestandingDeclarationMacro(
   auto moduleDecl = dc->getParentModule();
   auto sourceFile = moduleDecl->getSourceFileContainingLocation(med->getLoc());
   if (!sourceFile)
-    return false;
+    return None;
 
   // Evaluate the macro.
   NullTerminatedStringRef evaluatedSource;
@@ -697,7 +697,7 @@ bool swift::expandFreestandingDeclarationMacro(
 
   if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Declaration)) {
     med->diagnose(diag::macro_recursive, macro->getName());
-    return false;
+    return None;
   }
 
   auto macroDef = macro->getDefinition();
@@ -705,13 +705,13 @@ bool swift::expandFreestandingDeclarationMacro(
   case MacroDefinition::Kind::Undefined:
   case MacroDefinition::Kind::Invalid:
     // Already diagnosed as an error elsewhere.
-    return false;
+    return None;
 
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
       // FIXME: Error here.
-      return false;
+      return None;
     }
   }
 
@@ -729,7 +729,7 @@ bool swift::expandFreestandingDeclarationMacro(
                     macro->getName()
       );
       macro->diagnose(diag::decl_declared_here, macro->getName());
-      return false;
+      return None;
     }
 
     // Make sure freestanding macros are enabled before we expand.
@@ -737,7 +737,7 @@ bool swift::expandFreestandingDeclarationMacro(
         !macro->getMacroRoles().contains(MacroRole::Expression)) {
       med->diagnose(
           diag::macro_experimental, "freestanding", "FreestandingMacros");
-      return false;
+      return None;
     }
 
 #if SWIFT_SWIFT_PARSER
@@ -746,7 +746,7 @@ bool swift::expandFreestandingDeclarationMacro(
     // Builtin macros are handled via ASTGen.
     auto astGenSourceFile = sourceFile->exportedSourceFile;
     if (!astGenSourceFile)
-      return false;
+      return None;
 
     Mangle::ASTMangler mangler;
     auto discriminator = mangler.mangleMacroExpansion(med);
@@ -760,13 +760,13 @@ bool swift::expandFreestandingDeclarationMacro(
         med->getStartLoc().getOpaquePointerValue(), &evaluatedSourceAddress,
         &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
-      return false;
+      return None;
     evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
                                               (size_t)evaluatedSourceLength);
     break;
 #else
     med->diagnose(diag::macro_unsupported);
-    return false;
+    return None;
 #endif
   }
   }
@@ -820,12 +820,11 @@ bool swift::expandFreestandingDeclarationMacro(
     if (!decl) {
       ctx.Diags.diagnose(
           macroBufferRange.getStart(), diag::expected_macro_expansion_decls);
-      return false;
+      return None;
     }
     decl->setDeclContext(dc);
-    results.push_back(decl);
   }
-  return true;
+  return macroBufferID;
 }
 
 // If this storage declaration is a variable with an explicit initializer,
@@ -1219,17 +1218,6 @@ swift::expandPeers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
     return None;
 
   PrettyStackTraceDecl debugStack("applying expanded peer macro", decl);
-
-  auto *parent = decl->getDeclContext();
-  auto topLevelDecls = macroSourceFile->getTopLevelDecls();
-  for (auto peer : topLevelDecls) {
-    if (auto *nominal = dyn_cast<NominalTypeDecl>(parent)) {
-      nominal->addMember(peer);
-    } else if (auto *extension = dyn_cast<ExtensionDecl>(parent)) {
-      extension->addMember(peer);
-    }
-  }
-
   return macroSourceFile->getBufferID();
 }
 
