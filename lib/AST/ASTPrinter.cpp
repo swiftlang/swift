@@ -3142,6 +3142,10 @@ static bool usesFeatureLayoutStringValueWitnesses(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureLayoutStringValueWitnessesInstantiation(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureModuleInterfaceExportAs(Decl *decl) {
   return false;
 }

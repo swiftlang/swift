@@ -59,17 +59,16 @@ Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
 
 typedef Metadata* (*MetadataAccessor)(const Metadata* const *);
 
-const Metadata *getResilientTypeMetadata(Metadata* metadata, const uint8_t *layoutStr, size_t &offset) {
-  auto absolute = layoutStr + offset;
-  auto relativeOffset = (uintptr_t)(intptr_t)readBytes<int32_t>(layoutStr, offset);
+const Metadata *getResilientTypeMetadata(const Metadata* metadata, const uint8_t *layoutStr, size_t &offset) {
+  auto fnPtr = readBytes<uintptr_t>(layoutStr, offset);
   MetadataAccessor fn;
 
 #if SWIFT_PTRAUTH
   fn = (MetadataAccessor)ptrauth_sign_unauthenticated(
-      (void *)((uintptr_t) + absolute + relativeOffset),
+      (void *)(fnPtr),
       ptrauth_key_function_pointer, 0);
 #else
-  fn = (MetadataAccessor)((uintptr_t) + absolute + relativeOffset);
+  fn = (MetadataAccessor)(fnPtr);
 #endif
 
   return fn(metadata->getGenericArgs());
@@ -119,11 +118,10 @@ const DestroyFuncAndMask destroyTable[] = {
 };
 
 extern "C" void
-swift_generic_destroy(void *address, void *metadata) {
+swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
   uint8_t *addr = (uint8_t *)address;
-  Metadata *typedMetadata = (Metadata *)metadata;
 
-  const uint8_t *typeLayout = typedMetadata->getLayoutString();
+  const uint8_t *typeLayout = metadata->getLayoutString();
 
   size_t offset = layoutStringHeaderSize;
   uintptr_t addrOffset = 0;
@@ -140,9 +138,8 @@ swift_generic_destroy(void *address, void *metadata) {
       auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
       auto *type = reinterpret_cast<Metadata*>(typePtr);
       type->vw_destroy((OpaqueValue *)(addr + addrOffset));
-      addrOffset += type->vw_size();
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
-      auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
+      auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
       type->vw_destroy((OpaqueValue *)(addr + addrOffset));
     } else {
       const auto &destroyFunc = destroyTable[static_cast<uint8_t>(tag)];
@@ -202,13 +199,12 @@ const RetainFuncAndMask retainTable[] = {
   {(void*)&existential_initializeWithCopy, UINTPTR_MAX, false},
 };
 
-extern "C" void *
-swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
+extern "C" swift::OpaqueValue *
+swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata) {
   uintptr_t addrOffset = 0;
-  Metadata *typedMetadata = (Metadata *)metadata;
-  const uint8_t *typeLayout = typedMetadata->getLayoutString();
+  const uint8_t *typeLayout = metadata->getLayoutString();
 
-  size_t size = typedMetadata->vw_size();
+  size_t size = metadata->vw_size();
 
   auto offset = layoutStringHeaderSize;
 
@@ -228,7 +224,7 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
       type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
-      auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
+      auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
       type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
     } else {
@@ -242,15 +238,14 @@ swift_generic_initWithCopy(void *dest, void *src, void *metadata) {
   }
 }
 
-extern "C" void *
-swift_generic_initWithTake(void *dest, void *src, void *metadata) {
-  Metadata *typedMetadata = (Metadata *)metadata;
-  const uint8_t *typeLayout = typedMetadata->getLayoutString();
-  size_t size = typedMetadata->vw_size();
+extern "C" swift::OpaqueValue *
+swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata) {
+  const uint8_t *typeLayout = metadata->getLayoutString();
+  size_t size = metadata->vw_size();
 
   memcpy(dest, src, size);
 
-  if (SWIFT_LIKELY(typedMetadata->getValueWitnesses()->isBitwiseTakable())) {
+  if (SWIFT_LIKELY(metadata->getValueWitnesses()->isBitwiseTakable())) {
     return dest;
   }
 
@@ -286,7 +281,7 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
       break;
     }
     case RefCountingKind::Resilient: {
-      auto *type = getResilientTypeMetadata(typedMetadata, typeLayout, offset);
+      auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
       if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
         type->vw_initializeWithTake((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                     (OpaqueValue*)((uintptr_t)src + addrOffset));
@@ -303,14 +298,14 @@ swift_generic_initWithTake(void *dest, void *src, void *metadata) {
   return dest;
 }
 
-extern "C" void *
-swift_generic_assignWithCopy(void *dest, void *src, void *metadata) {
+extern "C" swift::OpaqueValue *
+swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata) {
   swift_generic_destroy(dest, metadata);
   return swift_generic_initWithCopy(dest, src, metadata);
 }
 
-extern "C" void *
-swift_generic_assignWithTake(void *dest, void *src, void *metadata) {
+extern "C" swift::OpaqueValue *
+swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata) {
   swift_generic_destroy(dest, metadata);
   return swift_generic_initWithTake(dest, src, metadata);
 }

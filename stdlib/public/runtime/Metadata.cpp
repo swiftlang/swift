@@ -22,6 +22,7 @@
 #endif
 
 #include "MetadataCache.h"
+#include "BytecodeLayouts.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
@@ -2091,7 +2092,7 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
 
   // Allocate a copy of the labels string within the tuple type allocator.
   size_t labelsLen = strlen(labels);
-  size_t labelsAllocSize = roundUpToAlignment(labelsLen + 1, sizeof(void*));
+  size_t labelsAllocSize = roundUpToAlignment(labelsLen + 2, sizeof(void *));
   char *newLabels =
     (char *) MetadataAllocator(TupleCacheTag).Allocate(labelsAllocSize, alignof(char));
   _swift_strlcpy(newLabels, labels, labelsAllocSize);
@@ -2580,17 +2581,18 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
                                      const TypeLayout *const *fieldTypes,
                                      uint32_t *fieldOffsets) {
   auto layout = getInitialLayoutForValueType();
-  performBasicLayout(layout, fieldTypes, numFields,
-    [&](const TypeLayout *fieldType) { return fieldType; },
-    [&](size_t i, const TypeLayout *fieldType, uint32_t offset) {
-      assignUnlessEqual(fieldOffsets[i], offset);
-    });
+  performBasicLayout(
+      layout, fieldTypes, numFields,
+      [&](const TypeLayout *fieldType) { return fieldType; },
+      [&](size_t i, const TypeLayout *fieldType, uint32_t offset) {
+        assignUnlessEqual(fieldOffsets[i], offset);
+      });
 
   // We have extra inhabitants if any element does. Use the field with the most.
   unsigned extraInhabitantCount = 0;
   for (unsigned i = 0; i < numFields; ++i) {
     unsigned fieldExtraInhabitantCount =
-      fieldTypes[i]->getNumExtraInhabitants();
+        fieldTypes[i]->getNumExtraInhabitants();
     if (fieldExtraInhabitantCount > extraInhabitantCount) {
       extraInhabitantCount = fieldExtraInhabitantCount;
     }
@@ -2604,6 +2606,130 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   installCommonValueWitnesses(layout, vwtable);
 
   vwtable->publishLayout(layout);
+}
+
+const TypeLayout unknownWeakTypeLayout =
+    TypeLayout(sizeof(uint8_t *), alignof(uint8_t *), {}, 0);
+
+void swift::swift_initStructMetadataWithLayoutString(
+    StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
+    const Metadata *const *fieldTypes, uint32_t *fieldOffsets) {
+  auto layout = getInitialLayoutForValueType();
+  performBasicLayout(
+      layout, fieldTypes, numFields,
+      [&](const Metadata *fieldType) {
+        if (((uintptr_t)fieldType) == 0x7) {
+          return &unknownWeakTypeLayout;
+        }
+        return fieldType->getTypeLayout();
+      },
+      [&](size_t i, const Metadata *fieldType, uint32_t offset) {
+        assignUnlessEqual(fieldOffsets[i], offset);
+      });
+
+  // We have extra inhabitants if any element does. Use the field with the most.
+  unsigned extraInhabitantCount = 0;
+  // Compute total combined size of the layout string
+  size_t refCountBytes = 0;
+  for (unsigned i = 0; i < numFields; ++i) {
+    const Metadata *fieldType = fieldTypes[i];
+    unsigned fieldExtraInhabitantCount =
+      fieldType->vw_getNumExtraInhabitants();
+
+    if (((uintptr_t)fieldType) == 0x7) {
+      refCountBytes += sizeof(uint64_t);
+      continue;
+    }
+
+    if (fieldExtraInhabitantCount > extraInhabitantCount) {
+      extraInhabitantCount = fieldExtraInhabitantCount;
+    }
+
+    if (fieldType->getValueWitnesses()->isPOD()) {
+      // no extra space required for POD
+    } else if (fieldType->hasLayoutString()) {
+      refCountBytes += *(const size_t *)fieldType->getLayoutString();
+    } else if (fieldType->isClassObject()) {
+      refCountBytes += sizeof(uint64_t);
+    } else {
+      refCountBytes += sizeof(uint64_t) + sizeof(uintptr_t);
+    }
+  }
+
+  const size_t fixedLayoutStringSize = sizeof(size_t) + sizeof(uint64_t) * 2;
+
+  uint8_t *layoutStr = (uint8_t *)malloc(fixedLayoutStringSize + refCountBytes);
+
+  ((size_t*)layoutStr)[0] = refCountBytes;
+
+  size_t layoutStrOffset = sizeof(size_t);
+  size_t offset = 0;
+  for (unsigned i = 0; i < numFields; ++i) {
+    const Metadata *fieldType = fieldTypes[i];
+
+    if (((uintptr_t)fieldType) == 0x7) {
+      offset = roundUpToAlignMask(offset, alignof(uint8_t *));
+      *(uint64_t *)(layoutStr + layoutStrOffset) =
+          ((uint64_t)RefCountingKind::UnknownWeak << 56) | offset;
+      layoutStrOffset += sizeof(uint64_t);
+
+      offset = sizeof(uint8_t *);
+      continue;
+    }
+
+    if (offset) {
+      uint64_t alignmentMask = fieldType->vw_alignment() - 1;
+      uint64_t alignedOffset = offset + alignmentMask;
+      alignedOffset &= ~alignmentMask;
+      offset = alignedOffset;
+    }
+
+    if (fieldType->getValueWitnesses()->isPOD()) {
+      // No need to handle PODs
+    } else if (fieldType->hasLayoutString()) {
+      const uint8_t *fieldLayoutStr = fieldType->getLayoutString();
+      const size_t refCountBytes = *(const size_t *)fieldLayoutStr;
+      memcpy(layoutStr + layoutStrOffset, fieldLayoutStr + sizeof(size_t),
+             refCountBytes);
+      if (offset) {
+        *(uint64_t *)(layoutStr + layoutStrOffset + sizeof(size_t)) += offset;
+        offset = 0;
+      }
+      layoutStrOffset += refCountBytes;
+    } else if (fieldType->isClassObject()) {
+      *(uint64_t*)(layoutStr + layoutStrOffset) =
+        ((uint64_t)RefCountingKind::Unknown << 56) | offset;
+      layoutStrOffset += sizeof(uint64_t);
+      offset = 0;
+    } else {
+      *(uint64_t*)(layoutStr + layoutStrOffset) =
+        ((uint64_t)RefCountingKind::Metatype << 56) | offset;
+      *(uintptr_t*)(layoutStr + layoutStrOffset + sizeof(uint64_t)) = (uintptr_t)fieldType;
+      layoutStrOffset += sizeof(uint64_t) + sizeof(uintptr_t);
+      offset = 0;
+    }
+
+    offset += fieldType->vw_size();
+  }
+
+  *(uint64_t *)(layoutStr + layoutStrOffset) = offset;
+  *(uint64_t *)(layoutStr + layoutStrOffset + sizeof(uint64_t)) = 0;
+
+  auto *vwtable = getMutableVWTableForInit(structType, layoutFlags);
+  vwtable->destroy = swift_generic_destroy;
+  vwtable->initializeWithCopy = swift_generic_initWithCopy;
+  vwtable->initializeWithTake = swift_generic_initWithTake;
+  vwtable->assignWithCopy = swift_generic_assignWithCopy;
+  vwtable->assignWithTake = swift_generic_assignWithTake;
+
+  layout.extraInhabitantCount = extraInhabitantCount;
+
+  // Substitute in better value witnesses if we have them.
+  installCommonValueWitnesses(layout, vwtable);
+
+  vwtable->publishLayout(layout);
+
+  structType->setLayoutString(layoutStr);
 }
 
 /***************************************************************************/

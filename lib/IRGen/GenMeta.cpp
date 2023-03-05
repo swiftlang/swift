@@ -2872,23 +2872,101 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
   IGF.Builder.CreateLifetimeEnd(fields, IGM.getPointerSize() * numFields);
 }
 
+static void emitInitializeFieldOffsetVectorWithLayoutString(
+    IRGenFunction &IGF, SILType T, llvm::Value *metadata, bool isVWTMutable,
+    MetadataDependencyCollector *collector) {
+  auto &IGM = IGF.IGM;
+  assert(IGM.Context.LangOpts.hasFeature(
+      Feature::LayoutStringValueWitnessesInstantiation));
+
+  auto *target = T.getStructOrBoundGenericStruct();
+
+  llvm::Value *fieldVector =
+      emitAddressOfFieldOffsetVector(IGF, metadata, target).getAddress();
+
+  // Collect the stored properties of the type.
+  unsigned numFields = getNumFields(target);
+
+  // Ask the runtime to lay out the struct or class.
+  auto numFieldsV = IGM.getSize(Size(numFields));
+
+  // Fill out an array with the field type metadata records.
+  Address fieldsMetadata =
+      IGF.createAlloca(llvm::ArrayType::get(IGM.TypeMetadataPtrTy, numFields),
+                       IGM.getPointerAlignment(), "fieldsMetadata");
+  IGF.Builder.CreateLifetimeStart(fieldsMetadata,
+                                  IGM.getPointerSize() * numFields);
+  fieldsMetadata = IGF.Builder.CreateStructGEP(fieldsMetadata, 0, Size(0));
+
+  unsigned index = 0;
+  forEachField(IGM, target, [&](Field field) {
+    assert(field.isConcrete() &&
+           "initializing offset vector for type with missing member?");
+    SILType propTy = field.getType(IGM, T);
+    llvm::Value *fieldMetatype;
+    if (auto ownership = propTy.getReferenceStorageOwnership()) {
+      switch (*ownership) {
+      case ReferenceOwnership::Weak:
+        fieldMetatype = llvm::Constant::getIntegerValue(
+            IGM.TypeMetadataPtrTy, APInt(IGM.IntPtrTy->getBitWidth(), 0x7));
+        break;
+      case ReferenceOwnership::Strong:
+      case ReferenceOwnership::Unowned:
+      case ReferenceOwnership::Unmanaged:
+        llvm_unreachable("Unmanaged reference should have been lowered");
+      }
+    } else {
+      auto request = DynamicMetadataRequest::getNonBlocking(
+          MetadataState::LayoutComplete, collector);
+      fieldMetatype = IGF.emitTypeMetadataRefForLayout(propTy, request);
+    }
+
+    Address fieldMetatypeAddr = IGF.Builder.CreateConstArrayGEP(
+        fieldsMetadata, index, IGM.getPointerSize());
+    IGF.Builder.CreateStore(fieldMetatype, fieldMetatypeAddr);
+    ++index;
+  });
+  assert(index == numFields);
+
+  // Compute struct layout flags.
+  StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;
+  if (isVWTMutable)
+    flags |= StructLayoutFlags::IsVWTMutable;
+
+  // Call swift_initStructMetadataWithLayoutString().
+  IGF.Builder.CreateCall(
+      IGM.getInitStructMetadataWithLayoutStringFunctionPointer(),
+      {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
+       fieldsMetadata.getAddress(), fieldVector});
+
+  IGF.Builder.CreateLifetimeEnd(fieldsMetadata,
+                                IGM.getPointerSize() * numFields);
+}
+
 static void emitInitializeValueMetadata(IRGenFunction &IGF,
                                         NominalTypeDecl *nominalDecl,
                                         llvm::Value *metadata,
                                         bool isVWTMutable,
                                         MetadataDependencyCollector *collector) {
-  auto loweredTy =
-    IGF.IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
+  auto &IGM = IGF.IGM;
+  auto loweredTy = IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
 
   if (isa<StructDecl>(nominalDecl)) {
-    auto &fixedTI = IGF.IGM.getTypeInfo(loweredTy);
+    auto &fixedTI = IGM.getTypeInfo(loweredTy);
     if (isa<FixedTypeInfo>(fixedTI)) return;
 
-    emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable,
-                                    collector);
+    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+        IGM.Context.LangOpts.hasFeature(
+            Feature::LayoutStringValueWitnessesInstantiation)) {
+      emitInitializeFieldOffsetVectorWithLayoutString(IGF, loweredTy, metadata,
+                                                      isVWTMutable, collector);
+    } else {
+      emitInitializeFieldOffsetVector(IGF, loweredTy, metadata, isVWTMutable,
+                                      collector);
+    }
   } else {
     assert(isa<EnumDecl>(nominalDecl));
-    auto &strategy = getEnumImplStrategy(IGF.IGM, loweredTy);
+    auto &strategy = getEnumImplStrategy(IGM, loweredTy);
     strategy.initializeMetadata(IGF, metadata, isVWTMutable, loweredTy,
                                 collector);
   }
@@ -2996,11 +3074,15 @@ namespace {
     llvm::Constant *emitLayoutString() {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
         return nullptr;
-      auto lowered = getLoweredType();
-      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered, /*useStructLayouts*/true);
+      auto lowered = getLoweredTypeInPrimaryContext(
+          IGM, Target->getDeclaredType()->getCanonicalType());
+      auto &ti = IGM.getTypeInfo(lowered);
+      auto *typeLayoutEntry =
+          ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
       auto genericSig =
           lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
-      return typeLayoutEntry.layoutString(IGM, genericSig);
+
+      return typeLayoutEntry->layoutString(IGM, genericSig);
     }
 
     llvm::Constant *getLayoutString() {
@@ -3072,12 +3154,11 @@ namespace {
         if (HasDependentMetadata)
           asImpl().emitInitializeMetadata(IGF, metadata, false, collector);
 
-
-        if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+        if (IGM.Context.LangOpts.hasFeature(
+                Feature::LayoutStringValueWitnesses)) {
           if (auto *layoutString = getLayoutString()) {
             auto layoutStringCast = IGF.Builder.CreateBitCast(layoutString,
                                                               IGM.Int8PtrTy);
-
             IGF.Builder.CreateCall(
               IGM.getGenericInstantiateLayoutStringFunctionPointer(),
               {layoutStringCast, metadata});
@@ -3650,11 +3731,15 @@ namespace {
     llvm::Constant *emitLayoutString() {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
         return nullptr;
-      auto lowered = getLoweredType();
-      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered, /*useStructLayouts*/true);
+      auto lowered = getLoweredTypeInPrimaryContext(
+          IGM, Target->getDeclaredType()->getCanonicalType());
+      auto &ti = IGM.getTypeInfo(lowered);
+      auto *typeLayoutEntry =
+          ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
       auto genericSig =
           lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
-      return typeLayoutEntry.layoutString(IGM, genericSig);
+
+      return typeLayoutEntry->layoutString(IGM, genericSig);
     }
 
     llvm::Constant *getLayoutString() {
@@ -4843,11 +4928,22 @@ namespace {
       B.addInt(IGM.MetadataKindTy, unsigned(getMetadataKind(Target)));
     }
 
+    bool hasLayoutString() {
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+        return false;
+      }
+
+      if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation)) {
+        return !!getLayoutString() || needsSingletonMetadataInitialization(IGM, Target);
+      }
+
+      return !!getLayoutString();
+    }
+
     llvm::Constant *emitNominalTypeDescriptor() {
-      auto hasLayoutString = !!getLayoutString();
       auto descriptor =
         StructContextDescriptorBuilder(IGM, Target, RequireMetadata,
-                                       hasLayoutString).emit();
+                                       hasLayoutString()).emit();
       return descriptor;
     }
 
@@ -4878,11 +4974,15 @@ namespace {
     llvm::Constant *emitLayoutString() {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
         return nullptr;
-      auto lowered = getLoweredType();
-      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered, /*useStructLayouts*/true);
+      auto lowered = getLoweredTypeInPrimaryContext(
+          IGM, Target->getDeclaredType()->getCanonicalType());
+      auto &ti = IGM.getTypeInfo(lowered);
+      auto *typeLayoutEntry =
+          ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
       auto genericSig =
           lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
-      return typeLayoutEntry.layoutString(IGM, genericSig);
+
+      return typeLayoutEntry->layoutString(IGM, genericSig);
     }
 
     llvm::Constant *getLayoutString() {
@@ -5021,9 +5121,22 @@ namespace {
       // We just assume this might happen.
     }
 
+    bool hasLayoutString() {
+      if (!IGM.Context.LangOpts.hasFeature(
+              Feature::LayoutStringValueWitnesses)) {
+        return false;
+      }
+      return !!getLayoutString() ||
+             IGM.Context.LangOpts.hasFeature(
+                 Feature::LayoutStringValueWitnessesInstantiation);
+    }
+
     llvm::Constant *emitNominalTypeDescriptor() {
-      return StructContextDescriptorBuilder(IGM, Target, RequireMetadata,
-                                            /*hasLayoutString*/ false).emit();
+
+      return StructContextDescriptorBuilder(
+                 IGM, Target, RequireMetadata,
+                 /*hasLayoutString*/ hasLayoutString())
+          .emit();
     }
 
     GenericMetadataPatternFlags getPatternFlags() {
@@ -5122,8 +5235,8 @@ namespace {
     bool hasCompletionFunction() {
       // TODO: Once we store layout string pointers on the metadata pattern, we
       //       don't have to emit completion functions for all generic types anymore.
-      return IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
-             !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
+      return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())) ||
+             !!getLayoutString();
     }
   };
 
@@ -5275,11 +5388,15 @@ namespace {
     llvm::Constant *emitLayoutString() {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
         return nullptr;
-      auto lowered = getLoweredType();
-      auto &typeLayoutEntry = IGM.getTypeLayoutEntry(lowered, /*useStructLayouts*/true);
+      auto lowered = getLoweredTypeInPrimaryContext(
+          IGM, Target->getDeclaredType()->getCanonicalType());
+      auto &ti = IGM.getTypeInfo(lowered);
+      auto *typeLayoutEntry =
+          ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
       auto genericSig =
           lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
-      return typeLayoutEntry.layoutString(IGM, genericSig);
+
+      return typeLayoutEntry->layoutString(IGM, genericSig);
     }
 
     llvm::Constant *getLayoutString() {
@@ -5496,8 +5613,9 @@ namespace {
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
-      return EnumContextDescriptorBuilder(IGM, Target, RequireMetadata,
-                                          /*hasLayoutString*/ false)
+      return EnumContextDescriptorBuilder(
+                 IGM, Target, RequireMetadata,
+                 /*hasLayoutString*/ !!getLayoutString())
           .emit();
     }
 
@@ -5518,7 +5636,8 @@ namespace {
     }
 
     bool hasCompletionFunction() {
-      return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType()));
+      return !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())) ||
+             !!getLayoutString();
     }
   };
 

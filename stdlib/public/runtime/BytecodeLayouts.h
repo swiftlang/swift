@@ -59,15 +59,15 @@ const Metadata *swift_getTypeByMangledNameInContext(
     const void *const *genericArgs);
 
 SWIFT_RUNTIME_EXPORT
-void swift_generic_destroy(void *address, void *metadata);
+void swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-void *swift_generic_assignWithCopy(void *dest, void *src, void *metadata);
+swift::OpaqueValue *swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-void *swift_generic_assignWithTake(void *dest, void *src, void *metadata);
+swift::OpaqueValue *swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-void *swift_generic_initWithCopy(void *dest, void *src, void *metadata);
+swift::OpaqueValue *swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-void *swift_generic_initWithTake(void *dest, void *src, void *metadata);
+swift::OpaqueValue *swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
 void swift_generic_instantiateLayoutString(const uint8_t* layoutStr, Metadata* type);
 } // namespace swift

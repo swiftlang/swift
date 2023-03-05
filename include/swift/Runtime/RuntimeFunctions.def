@@ -1251,6 +1251,20 @@ FUNCTION(InitStructMetadata,
          ATTRS(NoUnwind),
          EFFECT(MetaData))
 
+// void swift_initStructMetadataWithLayoutString(Metadata *structType,
+//                                               StructLayoutFlags flags,
+//                                               size_t numFields,
+//                                               Metadata * const *fieldTypes,
+//                                               uint32_t *fieldOffsets);
+FUNCTION(InitStructMetadataWithLayoutString,
+         swift_initStructMetadataWithLayoutString, C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
+              TypeMetadataPtrPtrTy,
+              Int32Ty->getPointerTo()),
+         ATTRS(NoUnwind),
+         EFFECT(MetaData))
+
 // void swift_initEnumMetadataSingleCase(Metadata *enumType,
 //                                       EnumLayoutFlags flags,
 //                                       TypeLayout *payload);
