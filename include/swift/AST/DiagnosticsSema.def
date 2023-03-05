@@ -6748,6 +6748,8 @@ ERROR(moveonly_enums_do_not_support_indirect,none,
       "move-only enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
 ERROR(moveonly_cast,none,
       "move-only types cannot be conditionally cast", ())
+ERROR(moveonly_failable_init,none,
+      "move-only types cannot have failable initializers yet", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
