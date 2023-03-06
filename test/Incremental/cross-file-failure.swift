@@ -6,7 +6,7 @@
 // RUN: touch -t 200101010101 %t/*.swift
 // RUN: cd %t
 
-// RUN: %swiftc_driver-stdlib-target -enable-batch-mode -j2 -incremental -driver-show-incremental main.swift definesA.swift usesA.swift -module-name main -output-file-map ofm.json >&output-baseline
+// RUN: %target-stdlib-swiftc_driver -enable-batch-mode -j2 -incremental -driver-show-incremental main.swift definesA.swift usesA.swift -module-name main -output-file-map ofm.json >&output-baseline
 
 // Change one type and cause a syntax error. This should cause _both_ files to
 // rebuild.
@@ -16,16 +16,14 @@
 // RUN: touch -t 200101010101 %t/*.swift
 // RUN: touch -t 200301010101 %t/definesA.swift
 
-// RUN: not %swiftc_driver-stdlib-target -enable-batch-mode -j2 -incremental -driver-show-incremental main.swift definesA.swift usesA.swift -module-name main -output-file-map ofm.json
+// RUN: not %target-stdlib-swiftc_driver -enable-batch-mode -j2 -incremental -driver-show-incremental main.swift definesA.swift usesA.swift -module-name main -output-file-map ofm.json
 
 // RUN: cp %t/definesA{-three,}.swift
 // RUN: touch -t 200401010101 %t/definesA.swift
 
-// RUN: not %swiftc_driver-stdlib-target -enable-batch-mode -j2 -incremental -driver-show-incremental main.swift definesA.swift usesA.swift -module-name main -output-file-map ofm.json >&output-incremental
+// RUN: not %target-stdlib-swiftc_driver -enable-batch-mode -j2 -incremental -driver-show-incremental main.swift definesA.swift usesA.swift -module-name main -output-file-map ofm.json >&output-incremental
 
 // RUN: %FileCheck -check-prefix=CHECK-RECOMPILED %s --dump-input=always < %t/output-incremental
-
-// REQUIRES: rdar106170343
 
 // CHECK-RECOMPILED: Queuing (initial): {compile: definesA.o <= definesA.swift}
 // CHECK-RECOMPILED: Queuing because of dependencies discovered later: {compile: usesA.o <= usesA.swift}
