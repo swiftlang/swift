@@ -121,7 +121,7 @@ EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(ModuleInterfaceExportAs, true)
-EXPERIMENTAL_FEATURE(AccessLevelOnImport, false)
+EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
 /// Whether to enable experimental layout string value witnesses
 EXPERIMENTAL_FEATURE(LayoutStringValueWitnesses, true)
