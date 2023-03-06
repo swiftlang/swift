@@ -1792,9 +1792,7 @@ void SILGenModule::visitMacroDecl(MacroDecl *d) {
 }
 
 void SILGenModule::visitMacroExpansionDecl(MacroExpansionDecl *d) {
-  d->visitAuxiliaryDecls([&](Decl *decl) {
-    visit(decl);
-  });
+  // Expansion already visited as auxiliary decls.
 }
 
 bool

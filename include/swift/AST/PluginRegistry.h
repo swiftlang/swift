@@ -78,7 +78,7 @@ class PluginRegistry {
       LoadedPluginExecutables;
 
 public:
-  llvm::Error loadLibraryPlugin(llvm::StringRef path);
+  llvm::Expected<void *> loadLibraryPlugin(llvm::StringRef path);
   llvm::Expected<LoadedExecutablePlugin *>
   loadExecutablePlugin(llvm::StringRef path);
 

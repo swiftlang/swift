@@ -61,6 +61,8 @@ struct TestMacroArgs {
   @m3(message: stringify(Nested.x).1) struct Args6 {}
   // expected-error@-1{{expansion of macro 'stringify' requires leading '#'}}
 
-  @m3(message: #stringify(Nested.x).1) struct Args7 {}
-  // expected-error@-1{{external macro implementation type 'MyMacros.StringifyMacro' could not be found for macro 'stringify'}}
+  @m3(message: #stringify().1) struct Args7 {}
+  // expected-error@-1{{missing argument for parameter #1 in macro expansion}}
+
+  @m3(message: #stringify(Nested.x).1) struct Args8 {}
 }

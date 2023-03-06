@@ -40,11 +40,10 @@ class TypeRepr;
 Expr *expandMacroExpr(
     DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType);
 
-/// Expands the given macro expansion declaration, type-checks the replacement
-/// declarations, and adds them to \p results.
+/// Expands the given macro expansion declaration.
 ///
 /// \returns Expansion buffer ID if expansion succeeded, \p None if failed.
-Optional<unsigned> expandFreestandingDeclarationMacro(MacroExpansionDecl *med);
+Optional<unsigned> expandFreestandingMacro(MacroExpansionDecl *med);
 
 /// Expand the accessors for the given storage declaration based on the
 /// custom attribute that references the given macro.

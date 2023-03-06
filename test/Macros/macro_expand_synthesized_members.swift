@@ -67,3 +67,14 @@ struct Base {
 
 @empty(.member())
 struct TestMacroTypechecking {}
+
+// Macros adding to an enum
+@attached(member, names: named(unknown), arbitrary)
+public macro ExtendableEnum() = #externalMacro(module: "MacroDefinition", type: "ExtendableEnum")
+
+@ExtendableEnum
+enum ElementType {
+  case paper
+}
+
+print(ElementType.paper.unknown())

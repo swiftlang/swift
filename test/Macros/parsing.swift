@@ -4,6 +4,7 @@ protocol Q { associatedtype Assoc }
 
 @freestanding(expression) macro m1() -> Int = #externalMacro(module: "A", type: "M1")
 // expected-warning@-1{{external macro implementation type 'A.M1' could not be found for macro 'm1()'; the type must be public and provided via '-load-plugin-library'}}
+// expected-note@-2{{'m1()' declared here}}
 @freestanding(expression) macro m2(_: Int) = #externalMacro(module: "A", type: "M2")
 // expected-warning@-1{{external macro implementation type 'A.M2' could not be found for macro 'm2'; the type must be public and provided via '-load-plugin-library'}}
 @freestanding(expression) macro m3(a b: Int) -> Int = #externalMacro(module: "A", type: "M3")
@@ -31,7 +32,6 @@ protocol Q { associatedtype Assoc }
 macro m10(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm10'; the type must be public and provided via '-load-plugin-library'}}
 
-
 @attached(
   accessor,
   names: overloaded, arbitrary, named(hello), prefixed(_), suffixed(_favorite)
@@ -48,3 +48,7 @@ macro am1()
 )
 macro am2() -> Void
 // expected-error@-1{{macro 'am2()' requires a definition}}
+
+#m1 + 1
+// expected-warning @-1 {{result of operator '+' is unused}}
+// expected-error @-2 {{external macro implementation type 'A.M1' could not be found for macro 'm1()'; the type must be public and provided via '-load-plugin-library'}}

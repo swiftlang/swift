@@ -5,8 +5,6 @@
 // Diagnostics testing
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -plugin-path %t -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS
-
 // RUN: not %target-swift-frontend -swift-version 5 -typecheck -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics > %t/macro-printing.txt
 // RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
 
@@ -22,6 +20,12 @@
 // RUN: %target-build-swift -swift-version 5 -g -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
+
+// Plugin search path and loaded module trace testing
+// RUN: %target-swift-frontend -swift-version 5 -emit-sil -enable-experimental-feature FreestandingMacros -plugin-path %t -I %swift-host-lib-dir %s -module-name MacroUser -emit-loaded-module-trace -o %t/loaded_module_trace
+// RUN: %FileCheck -check-prefix=CHECK-MODULE-TRACE %s < %t/loaded_module_trace.trace.json
+
+// CHECK-MODULE-TRACE: {{libMacroDefinition.dylib|libMacroDefinition.so|MacroDefinition.dll}}
 
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
@@ -230,19 +234,32 @@ func testNestedDeclInExpr() {
 @freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
-// Macros adding to an enum
-@attached(member, names: named(unknown), arbitrary)
-public macro ExtendableEnum() = #externalMacro(module: "MacroDefinition", type: "ExtendableEnum")
+// FIXME: Macros producing arbitrary names are not supported yet
+#if false
+#bitwidthNumberedStructs("MyIntGlobal")
 
-@ExtendableEnum
-enum ElementType {
-case paper
-}
+#bitwidthNumberedStructs("MyIntGlobalTwo", blah: false)
 
-print(ElementType.paper.unknown())
+let blah = false
+#bitwidthNumberedStructs("MyIntGlobalThree", blah: blah)
+#endif
 
-// FIXME: Declaration macro expansions in BraceStmt don't work yet.
-//#bitwidthNumberedStructs("MyIntGlobal")
+// Test unqualified lookup from within a macro expansion
+@freestanding(declaration, names: named(StructWithUnqualifiedLookup))
+macro structWithUnqualifiedLookup() = #externalMacro(module: "MacroDefinition", type: "DefineStructWithUnqualifiedLookupMacro")
+
+@freestanding(declaration)
+macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
+
+
+// FIXME: Global freestanding macros not yet supported in script mode.
+#if false
+let world = 3 // to be used by the macro expansion below
+#structWithUnqualifiedLookup()
+_ = StructWithUnqualifiedLookup().foo()
+
+#anonymousTypes { "hello" }
+#endif
 
 func testFreestandingMacroExpansion() {
   // Explicit structs to force macros to be parsed as decl.
@@ -291,14 +308,16 @@ func testFreestandingMacroExpansion() {
   }
   #endif
 
-  // FIXME: Declaration macro expansions in BraceStmt don't work yet.
-//  HECK: MyIntGlobal8
-//  print(MyIntGlobal8.self)
-//  HECK: MyIntGlobal16
-//  print(MyIntGlobal16.self)
-//  HECK: MyIntGlobal32
-//  print(MyIntGlobal32.self)
-//  HECK: MyIntGlobal64
-//  print(MyIntGlobal64.self)
+  // FIXME: Arbitrary name lookup is not yet supported.
+  // HECK: MyIntGlobal8
+  // print(MyIntGlobal8.self)
+  // HECK: MyIntGlobal16
+  // print(MyIntGlobal16.self)
+  // HECK: MyIntGlobal32
+  // print(MyIntGlobal32.self)
+  // HECK: MyIntGlobal64
+  // print(MyIntGlobal64.self)
+
+  #anonymousTypes { "hello" }
 }
 testFreestandingMacroExpansion()

@@ -4687,6 +4687,7 @@ bool swift::isKeywordPossibleDeclStart(const LangOptions &options,
   case tok::kw_subscript:
   case tok::kw_typealias:
   case tok::kw_var:
+  case tok::pound:
   case tok::pound_if:
   case tok::pound_warning:
   case tok::pound_error:
@@ -4796,6 +4797,12 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
       return true;
 
     return isStartOfSwiftDecl(allowPoundIfAttributes);
+  }
+
+  if (Tok.is(tok::pound) && peekToken().is(tok::identifier)) {
+    // Macro expansions at the top level are declarations.
+    return !isInSILMode() && SF.Kind != SourceFileKind::Interface &&
+        CurDeclContext->isModuleScopeContext() && !allowTopLevelCode();
   }
 
   // Skip a #if that contains only attributes in all branches. These will be

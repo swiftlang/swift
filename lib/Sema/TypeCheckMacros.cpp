@@ -19,6 +19,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -304,17 +305,16 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 }
 
 /// Load a plugin library based on a module name.
-static void *loadPluginByName(StringRef searchPath, StringRef moduleName, llvm::vfs::FileSystem &fs) {
+static void *loadPluginByName(StringRef searchPath,
+                              StringRef moduleName,
+                              llvm::vfs::FileSystem &fs,
+                              PluginRegistry *registry) {
   SmallString<128> fullPath(searchPath);
   llvm::sys::path::append(fullPath, "lib" + moduleName + LTDL_SHLIB_EXT);
   if (fs.getRealPath(fullPath, fullPath))
     return nullptr;
-
-#if defined(_WIN32)
-  return LoadLibraryA(fullPath.c_str());
-#else
-  return dlopen(fullPath.c_str(), RTLD_LAZY);
-#endif
+  auto loadResult = registry->loadLibraryPlugin(fullPath);
+  return loadResult ? *loadResult : nullptr;
 }
 
 void *CompilerPluginLoadRequest::evaluate(
@@ -322,8 +322,9 @@ void *CompilerPluginLoadRequest::evaluate(
 ) const {
   auto fs = ctx->SourceMgr.getFileSystem();
   auto &searchPathOpts = ctx->SearchPathOpts;
+  auto *registry = ctx->getPluginRegistry();
   for (const auto &path : searchPathOpts.PluginSearchPaths) {
-    if (auto found = loadPluginByName(path, moduleName.str(), *fs))
+    if (auto found = loadPluginByName(path, moduleName.str(), *fs, registry))
       return found;
   }
 
@@ -589,9 +590,7 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
         return true;
     } else if (auto expansionDecl = dyn_cast_or_null<MacroExpansionDecl>(
             expansion.dyn_cast<Decl *>())) {
-      // FIXME: Update once MacroExpansionDecl has a proper macro reference
-      // in it.
-      if (expansionDecl->getMacroName().getFullName() == macro->getName())
+      if (expansionDecl->getMacroRef().getDecl() == macro)
         return true;
     } else if (auto *macroAttr = sourceFile->getAttachedMacroAttribute()) {
       auto *decl = expansion.dyn_cast<Decl *>();
@@ -643,8 +642,8 @@ Expr *swift::expandMacroExpr(
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
-        ctx.Diags.diagnose(
-            expr->getLoc(), diag::external_macro_outside_macro_definition);
+      ctx.Diags.diagnose(
+          expr->getLoc(), diag::external_macro_outside_macro_definition);
       return nullptr;
     }
   }
@@ -658,10 +657,10 @@ Expr *swift::expandMacroExpr(
     auto externalDef = evaluateOrDefault(ctx.evaluator, request, None);
     if (!externalDef) {
       ctx.Diags.diagnose(
-         expr->getLoc(), diag::external_macro_not_found,
-         external.moduleName.str(),
-         external.macroTypeName.str(),
-         macro->getName()
+          expr->getLoc(), diag::external_macro_not_found,
+          external.moduleName.str(),
+          external.macroTypeName.str(),
+          macro->getName()
       );
       macro->diagnose(diag::decl_declared_here, macro->getName());
       return nullptr;
@@ -711,9 +710,9 @@ Expr *swift::expandMacroExpr(
   // Dump macro expansions to standard output, if requested.
   if (ctx.LangOpts.DumpMacroExpansions) {
     llvm::errs() << bufferName << " as " << expandedType.getString()
-      << "\n------------------------------\n"
-      << evaluatedSource
-      << "\n------------------------------\n";
+                 << "\n------------------------------\n"
+                 << evaluatedSource
+                 << "\n------------------------------\n";
   }
 
   // Create a new source buffer with the contents of the expanded macro.
@@ -742,9 +741,15 @@ Expr *swift::expandMacroExpr(
   // Retrieve the parsed expression from the list of top-level items.
   auto topLevelItems = macroSourceFile->getTopLevelItems();
   Expr *expandedExpr = nullptr;
-  if (topLevelItems.size() == 1) {
-    expandedExpr = topLevelItems.front().dyn_cast<Expr *>();
+  if (topLevelItems.size() != 1) {
+    ctx.Diags.diagnose(
+        macroBufferRange.getStart(), diag::expected_macro_expansion_expr);
+    return nullptr;
   }
+
+  auto codeItem = topLevelItems.front();
+  if (auto *expr = codeItem.dyn_cast<Expr *>())
+    expandedExpr = expr;
 
   if (!expandedExpr) {
     ctx.Diags.diagnose(
@@ -776,7 +781,7 @@ Expr *swift::expandMacroExpr(
 
 /// Expands the given macro expansion declaration.
 Optional<unsigned>
-swift::expandFreestandingDeclarationMacro(MacroExpansionDecl *med) {
+swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   auto *dc = med->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
@@ -790,10 +795,10 @@ swift::expandFreestandingDeclarationMacro(MacroExpansionDecl *med) {
   NullTerminatedStringRef evaluatedSource;
 
   MacroDecl *macro = cast<MacroDecl>(med->getMacroRef().getDecl());
-  assert(macro->getMacroRoles()
-             .contains(MacroRole::Declaration));
+  assert(macro->getMacroRoles().contains(MacroRole::Declaration));
 
-  if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Declaration)) {
+  if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Expression) ||
+      isFromExpansionOfMacro(sourceFile, macro, MacroRole::Declaration)) {
     med->diagnose(diag::macro_recursive, macro->getName());
     return None;
   }
@@ -911,16 +916,10 @@ swift::expandFreestandingDeclarationMacro(MacroExpansionDecl *med) {
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", med);
 
-  // Retrieve the parsed declarations from the list of top-level items.
   auto topLevelItems = macroSourceFile->getTopLevelItems();
   for (auto item : topLevelItems) {
-    auto *decl = item.dyn_cast<Decl *>();
-    if (!decl) {
-      ctx.Diags.diagnose(
-          macroBufferRange.getStart(), diag::expected_macro_expansion_decls);
-      return None;
-    }
-    decl->setDeclContext(dc);
+    if (auto *decl = item.dyn_cast<Decl *>())
+      decl->setDeclContext(dc);
   }
   return macroBufferID;
 }
@@ -1393,7 +1392,8 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
   }
 
   Expr *result = macroExpansion;
-  TypeChecker::typeCheckExpression(result, dc);
+  TypeChecker::typeCheckExpression(
+      result, dc, {}, TypeCheckExprFlags::DisableMacroExpansions);
 
   // If we couldn't resolve a macro decl, the attribute is invalid.
   if (!macroExpansion->getMacroRef() && macroRef.getAttr())
