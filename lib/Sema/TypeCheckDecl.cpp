@@ -2595,8 +2595,15 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     SmallVector<AnyFunctionType::Param, 4> paramTypes;
     macro->parameterList->getParams(paramTypes);
-    FunctionType::ExtInfo info;
-    return FunctionType::get(paramTypes, resultType, info);
+
+    if (auto genericSig = macro->getGenericSignature()) {
+      GenericFunctionType::ExtInfo info;
+      return GenericFunctionType::get(
+          genericSig, paramTypes, resultType, info);
+    } else {
+      FunctionType::ExtInfo info;
+      return FunctionType::get(paramTypes, resultType, info);
+    }
   }
   }
   llvm_unreachable("invalid decl kind");

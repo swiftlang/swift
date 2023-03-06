@@ -1676,13 +1676,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // Open any the generic types.
     OpenedTypeMap replacements;
-    openGeneric(macro->getParentModule(), macro->getGenericSignature(),
-                locator, replacements);
+    Type openedType = openFunctionType(
+        macroType->castTo<AnyFunctionType>(), locator, replacements,
+        macro->getDeclContext());
 
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
-
-    Type openedType = openType(macroType, replacements);
 
     // FIXME: Should we use replaceParamErrorTypeByPlaceholder() here?
 
