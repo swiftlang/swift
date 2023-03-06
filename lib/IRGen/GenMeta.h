@@ -130,6 +130,15 @@ namespace irgen {
                                            unsigned reqtIndex,
                                            llvm::Value *metadata);
 
+  /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to a the pack shape stored in the nth
+  /// requirement slot.  The type must have generic arguments.
+  llvm::Value *emitArgumentPackShapeRef(IRGenFunction &IGF,
+                                        NominalTypeDecl *theDecl,
+                                        const GenericTypeRequirements &reqts,
+                                        unsigned reqtIndex,
+                                        llvm::Value *metadata);
+
   /// Given a metatype value, read its instance type.
   llvm::Value *emitMetatypeInstanceType(IRGenFunction &IGF,
                                         llvm::Value *metatypeMetadata);

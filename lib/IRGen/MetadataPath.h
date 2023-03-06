@@ -57,6 +57,9 @@ class MetadataPath {
       /// Witness table at requirement index P of a generic nominal type.
       NominalTypeArgumentConformance,
 
+      /// Pack length at requirement index P of a generic nominal type.
+      NominalTypeArgumentShape,
+
       /// Type metadata at requirement index P of a generic nominal type.
       NominalTypeArgument,
 
@@ -104,6 +107,7 @@ class MetadataPath {
       switch (getKind()) {
       case Kind::OutOfLineBaseProtocol:
       case Kind::NominalTypeArgumentConformance:
+      case Kind::NominalTypeArgumentShape:
       case Kind::NominalTypeArgument:
       case Kind::ConditionalConformance:
         return OperationCost::Load;
@@ -157,6 +161,13 @@ public:
   /// stored at requirement index n in a generic type metadata.
   void addNominalTypeArgumentConformanceComponent(unsigned index) {
     Path.push_back(Component(Component::Kind::NominalTypeArgumentConformance,
+                             index));
+  }
+
+  /// Add a step to this path which gets the pack length stored at
+  /// requirement index n in a generic type metadata.
+  void addNominalTypeArgumentShapeComponent(unsigned index) {
+    Path.push_back(Component(Component::Kind::NominalTypeArgumentShape,
                              index));
   }
 
