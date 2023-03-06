@@ -23,7 +23,7 @@
 
 #include <TargetConditionals.h>
 
-#if TARGET_OS_OSX
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
 
 #include <mach/mach.h>
 #include <mach/task.h>
@@ -460,7 +460,7 @@ run_backtracer()
 
 } // namespace
 
-#endif // TARGET_OS_OSX
+#endif // TARGET_OS_OSX || TARGET_OS_MACCATALYST
 
 #endif // __APPLE__
 

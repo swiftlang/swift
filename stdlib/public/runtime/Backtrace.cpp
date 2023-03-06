@@ -34,8 +34,17 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
+#if __has_include(<sys/mman.h>)
 #include <sys/mman.h>
+#define PROTECT_BACKTRACE_SETTINGS 1
+#else
+#define PROTECT_BACKTRACE_SETTINGS 0
+#warning Backtracer settings will not be protected in this configuration.
+#endif
+
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
 #include <spawn.h>
+#endif
 #include <unistd.h>
 #endif
 
@@ -128,7 +137,7 @@ BacktraceInitializer backtraceInitializer;
 
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
-#if TARGET_OS_OSX
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
 posix_spawnattr_t backtraceSpawnAttrs;
 posix_spawn_file_actions_t backtraceFileActions;
 #endif
@@ -246,7 +255,7 @@ BacktraceInitializer::BacktraceInitializer() {
   if (backtracing)
     _swift_parseBacktracingSettings(backtracing);
 
-#if TARGET_OS_OSX
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
   // Make sure that all fds are closed except for stdin/stdout/stderr.
   posix_spawnattr_init(&backtraceSpawnAttrs);
   posix_spawnattr_setflags(&backtraceSpawnAttrs, POSIX_SPAWN_CLOEXEC_DEFAULT);
@@ -374,6 +383,7 @@ BacktraceInitializer::BacktraceInitializer() {
              _swift_backtraceSettings.swiftBacktracePath,
              len + 1);
 
+#if PROTECT_BACKTRACE_SETTINGS
       if (mprotect(swiftBacktracePath,
                    sizeof(swiftBacktracePath),
                    PROT_READ) < 0) {
@@ -384,10 +394,12 @@ BacktraceInitializer::BacktraceInitializer() {
                        errno);
         _swift_backtraceSettings.enabled = OnOffTty::Off;
       }
+#endif // PROTECT_BACKTRACE_SETTINGS
     }
 
     _swift_backtraceSetupEnvironment();
 
+#if PROTECT_BACKTRACE_SETTINGS
     if (mprotect(swiftBacktraceEnv,
                  sizeof(swiftBacktraceEnv),
                  PROT_READ) < 0) {
@@ -398,7 +410,9 @@ BacktraceInitializer::BacktraceInitializer() {
                        errno);
         _swift_backtraceSettings.enabled = OnOffTty::Off;
     }
-#endif
+#endif // PROTECT_BACKTRACE_SETTINGS
+
+#endif // !_WIN32
   }
 
   if (_swift_backtraceSettings.enabled == OnOffTty::On) {
@@ -753,7 +767,7 @@ _swift_isThunkFunction(const char *mangledName) {
 SWIFT_RUNTIME_STDLIB_INTERNAL bool
 _swift_spawnBacktracer(const ArgChar * const *argv)
 {
-#if TARGET_OS_OSX
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
   pid_t child;
   const char *env[BACKTRACE_MAX_ENV_VARS + 1];
 

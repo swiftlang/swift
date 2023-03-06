@@ -5,6 +5,7 @@
 // RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Overflow || true) | %FileCheck %s --check-prefix FRIENDLY
 
 // REQUIRES: executable_test
+// REQUIRES: backtracing
 // REQUIRES: OS=macosx
 var x: UInt = 0
 
@@ -42,13 +43,13 @@ struct Overflow {
 // CHECK: Thread 0 crashed:
 
 // CHECK:      0 [inlined] [system] 0x{{[0-9a-f]+}} Swift runtime failure: arithmetic overflow in Overflow at {{.*}}/<compiler-generated>
-// CHECK-NEXT: 1                    0x{{[0-9a-f]+}} level5() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:30:5
-// CHECK-NEXT: 2 [ra]               0x{{[0-9a-f]+}} level4() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:24:3
-// CHECK-NEXT: 3 [ra]               0x{{[0-9a-f]+}} level3() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:20:3
-// CHECK-NEXT: 4 [ra]               0x{{[0-9a-f]+}} level2() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:16:3
-// CHECK-NEXT: 5 [ra]               0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:12:3
-// CHECK-NEXT: 6 [ra]               0x{{[0-9a-f]+}} static Overflow.main() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:36:5
-// CHECK-NEXT: 7 [ra] [system]      0x{{[0-9a-f]+}} static Overflow.$main() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:33:1
+// CHECK-NEXT: 1                    0x{{[0-9a-f]+}} level5() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:31:5
+// CHECK-NEXT: 2 [ra]               0x{{[0-9a-f]+}} level4() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:25:3
+// CHECK-NEXT: 3 [ra]               0x{{[0-9a-f]+}} level3() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:21:3
+// CHECK-NEXT: 4 [ra]               0x{{[0-9a-f]+}} level2() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:17:3
+// CHECK-NEXT: 5 [ra]               0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:13:3
+// CHECK-NEXT: 6 [ra]               0x{{[0-9a-f]+}} static Overflow.main() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:37:5
+// CHECK-NEXT: 7 [ra] [system]      0x{{[0-9a-f]+}} static Overflow.$main() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:34:1
 // CHECK-NEXT: 8 [ra] [system]      0x{{[0-9a-f]+}} main + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift
 
 // CHECK: Registers:
@@ -61,49 +62,49 @@ struct Overflow {
 
 // FRIENDLY: Thread 0 crashed:
 
-// FRIENDLY: 0 level5() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:30:5
+// FRIENDLY: 0 level5() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:31:5
 
-// FRIENDLY: 28|   print("About to overflow")
-// FRIENDLY-NEXT: 29|
-// FRIENDLY-NEXT: 30|   x -= 1
+// FRIENDLY: 29|   print("About to overflow")
+// FRIENDLY-NEXT: 30|
+// FRIENDLY-NEXT: 31|   x -= 1
 // FRIENDLY-NEXT:   |     ^
-// FRIENDLY-NEXT: 31| }
+// FRIENDLY-NEXT: 32| }
 
-// FRIENDLY: 1 level4() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:24:3
+// FRIENDLY: 1 level4() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:25:3
 
-// FRIENDLY: 22|
-// FRIENDLY-NEXT: 23| func level4() {
-// FRIENDLY-NEXT: 24|   level5()
+// FRIENDLY: 23|
+// FRIENDLY-NEXT: 24| func level4() {
+// FRIENDLY-NEXT: 25|   level5()
 // FRIENDLY-NEXT:   |   ^
-// FRIENDLY-NEXT: 25| }
-// FRIENDLY-NEXT: 26|
+// FRIENDLY-NEXT: 26| }
+// FRIENDLY-NEXT: 27|
 
-// FRIENDLY: 2 level3() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:20:3
+// FRIENDLY: 2 level3() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:21:3
 
-// FRIENDLY: 18|
-// FRIENDLY-NEXT: 19| func level3() {
-// FRIENDLY-NEXT: 20|   level4()
+// FRIENDLY: 19|
+// FRIENDLY-NEXT: 20| func level3() {
+// FRIENDLY-NEXT: 21|   level4()
 // FRIENDLY-NEXT:   |   ^
-// FRIENDLY-NEXT: 21| }
-// FRIENDLY-NEXT: 22|
+// FRIENDLY-NEXT: 22| }
+// FRIENDLY-NEXT: 23|
 
-// FRIENDLY: 3 level2() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:16:3
+// FRIENDLY: 3 level2() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:17:3
 
-// FRIENDLY: 14|
-// FRIENDLY-NEXT: 15| func level2() {
-// FRIENDLY-NEXT: 16|   level3()
+// FRIENDLY: 15|
+// FRIENDLY-NEXT: 16| func level2() {
+// FRIENDLY-NEXT: 17|   level3()
 // FRIENDLY-NEXT:   |   ^
-// FRIENDLY-NEXT: 17| }
-// FRIENDLY-NEXT: 18|
+// FRIENDLY-NEXT: 18| }
+// FRIENDLY-NEXT: 19|
 
-// FRIENDLY: 4 level1() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:12:3
+// FRIENDLY: 4 level1() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:13:3
 
-// FRIENDLY: 10|
-// FRIENDLY-NEXT: 11| func level1() {
-// FRIENDLY-NEXT: 12|   level2()
+// FRIENDLY: 11|
+// FRIENDLY-NEXT: 12| func level1() {
+// FRIENDLY-NEXT: 13|   level2()
 // FRIENDLY-NEXT:   |   ^
-// FRIENDLY-NEXT: 13| }
-// FRIENDLY-NEXT: 14|
+// FRIENDLY-NEXT: 14| }
+// FRIENDLY-NEXT: 15|
 
 // FRIENDLY: 5 static Overflow.main() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift
 

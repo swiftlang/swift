@@ -21,10 +21,6 @@ import Swift
 
 @_implementationOnly import _SwiftBacktracingShims
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_implementationOnly import Darwin.Mach
-#endif
-
 @_spi(Contexts) public enum ContextError: Error {
   case unableToFormTLSAddress
 }
@@ -220,10 +216,12 @@ extension arm_gprs {
   public static var registerCount: Int { return 56 }
 
   #if os(macOS) && arch(x86_64)
-  init?(from thread: thread_t) {
+  init?(from thread: __swift_thread_t) {
     var state = darwin_x86_64_thread_state()
-    let kr = mach_thread_get_state(thread, x86_THREAD_STATE64, &state)
-    if kr != KERN_SUCCESS {
+    let kr = thread_get_state(thread,
+                              _SWIFT_X86_THREAD_STATE64,
+                              &state)
+    if kr != _SWIFT_KERN_SUCCESS {
       return nil
     }
 
@@ -260,7 +258,7 @@ extension arm_gprs {
   }
 
   public static func fromHostThread(_ thread: Any) -> HostContext? {
-    return X86_64Context(from: thread as! thread_t)
+    return X86_64Context(from: thread as! __swift_thread_t)
   }
 
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
@@ -581,10 +579,12 @@ extension arm_gprs {
   public static var registerCount: Int { return 40 }
 
   #if os(macOS) && arch(arm64)
-  init?(from thread: thread_t) {
+  init?(from thread: __swift_thread_t) {
     var state = darwin_arm64_thread_state()
-    let kr = mach_thread_get_state(thread, ARM_THREAD_STATE64, &state)
-    if kr != KERN_SUCCESS {
+    let kr = thread_get_state(thread,
+                              _SWIFT_ARM_THREAD_STATE64,
+                              &state)
+    if kr != _SWIFT_KERN_SUCCESS {
       return nil
     }
 
@@ -616,7 +616,7 @@ extension arm_gprs {
   }
 
   public static func fromHostThread(_ thread: Any) -> HostContext? {
-    return ARM64Context(from: thread as! thread_t)
+    return ARM64Context(from: thread as! __swift_thread_t)
   }
 
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
@@ -851,20 +851,21 @@ extension arm_gprs {
 
 // .. Darwin specifics .........................................................
 
-#if os(macOS)
-private func mach_thread_get_state<T>(_ thread: thread_t,
-                                      _ flavor: CInt,
-                                      _ result: inout T) -> kern_return_t {
-  var count: mach_msg_type_number_t
-    = mach_msg_type_number_t(MemoryLayout<T>.stride
-                               / MemoryLayout<natural_t>.stride)
+#if (os(macOS) || os(iOS) || os(watchOS) || os(tvOS))
+private func thread_get_state<T>(_ thread: __swift_thread_t,
+                                 _ flavor: CInt,
+                                 _ result: inout T) -> __swift_kern_return_t {
+  var count: __swift_msg_type_number_t
+    = __swift_msg_type_number_t(MemoryLayout<T>.stride
+                                / MemoryLayout<__swift_natural_t>.stride)
 
   return withUnsafeMutablePointer(to: &result) { ptr in
-    ptr.withMemoryRebound(to: natural_t.self, capacity: Int(count)) { intPtr in
-      return thread_get_state(thread,
-                              thread_state_flavor_t(flavor),
-                              intPtr,
-                              &count)
+    ptr.withMemoryRebound(to: __swift_natural_t.self,
+                          capacity: Int(count)) { intPtr in
+      return _swift_backtrace_thread_get_state(thread,
+                                               __swift_thread_state_flavor_t(flavor),
+                                               intPtr,
+                                               &count)
     }
   }
 }

@@ -21,10 +21,27 @@
 #include "swift/Runtime/Win32.h"
 #include "swift/Threading/Once.h"
 
-#if !defined(_WIN32) || defined(__CYGWIN__)
-#include <sys/stat.h>
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 
-#include <dlfcn.h>
+#if !defined(_WIN32) || defined(__CYGWIN__)
+#if __has_include(<sys/stat.h>)
+#  include <sys/stat.h>
+
+#  ifdef S_IFMT
+#    define HAS_STAT 1
+#  else
+#    define HAS_STAT 0
+#  endif
+#else
+#  define HAS_STAT 0
+#endif
+
+#if SWIFT_STDLIB_HAS_DLADDR
+ #include <dlfcn.h>
+#endif
+
 #else
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -120,6 +137,10 @@ const char *
 _swift_getDefaultRootPath()
 {
   const char *runtimePath = swift_getRuntimeLibraryPath();
+
+  if (!runtimePath)
+    return nullptr;
+
   size_t runtimePathLen = std::strlen(runtimePath);
 
   // Scan backwards until we find a path separator
@@ -359,6 +380,9 @@ swift_copyAuxiliaryExecutablePath(const char *name)
 {
   const char *rootPath = swift_getRootPath();
 
+  if (!rootPath)
+    return nullptr;
+
   const char *platformName = SWIFT_LIB_SUBDIR;
   const char *archName = SWIFT_ARCH;
 
@@ -470,11 +494,11 @@ _swift_tryAuxExePath(const char *name, const char *path, ...)
 #if !defined(_WIN32) || defined(__CYGWIN__)
 void
 _swift_initRuntimePath(void *) {
-  const char *path;
-
 #if APPLE_OS_SYSTEM
-  path = dyld_image_path_containing_address(_swift_initRuntimePath);
-#else
+  const char *path = dyld_image_path_containing_address(_swift_initRuntimePath);
+
+  runtimePath = ::strdup(path);
+#elif SWIFT_STDLIB_HAS_DLADDR
   Dl_info dli;
   int ret = ::dladdr((void *)_swift_initRuntimePath, &dli);
 
@@ -483,10 +507,10 @@ _swift_initRuntimePath(void *) {
                       "Unable to obtain Swift runtime path\n");
   }
 
-  path = dli.dli_fname;
+  runtimePath = ::strdup(dli.dli_fname);
+#else
+  runtimePath = nullptr;
 #endif
-
-  runtimePath = ::strdup(path);
 }
 #else
 
@@ -539,8 +563,12 @@ _swift_initRuntimePath(void *) {
 bool _swift_exists(const char *path)
 {
 #if !defined(_WIN32)
+#  if !HAS_STAT
+  return false;
+#  else
   struct stat st;
   return stat(path, &st) == 0;
+#  endif
 #else
   wchar_t *wszPath = _swift_win32_copyWideFromUTF8(path);
   bool result = GetFileAttributesW(wszPath) != INVALID_FILE_ATTRIBUTES;

@@ -1825,7 +1825,7 @@ function(add_swift_target_library name)
   endif()
 
   # Turn off implicit import of _Backtracing when building libraries
-  if(SWIFT_IMPLICIT_BACKTRACING_IMPORT)
+  if(SWIFT_COMPILER_SUPPORTS_BACKTRACING)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-backtracing-module-import")
   endif()
 
@@ -2658,7 +2658,8 @@ endfunction()
 function(add_swift_target_executable name)
   set(SWIFTEXE_options
     EXCLUDE_FROM_ALL
-    BUILD_WITH_STDLIB)
+    BUILD_WITH_STDLIB
+    BUILD_WITH_LIBEXEC)
   set(SWIFTEXE_single_parameter_options
     INSTALL_IN_COMPONENT)
   set(SWIFTEXE_multiple_parameter_options
@@ -2715,10 +2716,12 @@ function(add_swift_target_executable name)
     list(APPEND SWIFTEXE_TARGET_COMPILE_FLAGS "-Xfrontend;-disable-implicit-backtracing-module-import")
   endif()
 
-  # All Swift executables depend on the standard library.
-  list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS Core)
-  # All Swift executables depend on the swiftSwiftOnoneSupport library.
-  list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
+  if(SWIFT_BUILD_STDLIB)
+    # All Swift executables depend on the standard library.
+    list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS Core)
+    # All Swift executables depend on the swiftSwiftOnoneSupport library.
+    list(APPEND SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
+  endif()
 
   # If target SDKs are not specified, build for all known SDKs.
   if("${SWIFTEXE_TARGET_TARGET_SDKS}" STREQUAL "")
@@ -2897,15 +2900,23 @@ function(add_swift_target_executable name)
       list(APPEND THIN_INPUT_TARGETS ${VARIANT_NAME})
     endforeach()
 
-    set(library_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-    if(maccatalyst_build_flavor STREQUAL "ios-like")
-      set(library_subdir "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}")
+    if(SWIFTEXE_TARGET_BUILD_WITH_LIBEXEC)
+      set(library_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+      if(maccatalyst_build_flavor STREQUAL "ios-like")
+        set(library_subdir "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}")
+      endif()
+
+      set(lipo_target_dir "${SWIFTLIBEXEC_DIR}/${library_subdir}")
+      set(lipo_suffix "")
+    else()
+      set(lipo_target_dir "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+      set(lipo_suffix "-${sdk}")
     endif()
 
     if("${sdk}" STREQUAL "WINDOWS")
-      set(UNIVERSAL_NAME "${SWIFTLIBEXEC_DIR}/${library_subdir}/${name}.exe")
+      set(UNIVERSAL_NAME "${lipo_target_dir}/${name}${lipo_suffix}.exe")
     else()
-      set(UNIVERSAL_NAME "${SWIFTLIBEXEC_DIR}/${library_subdir}/${name}")
+      set(UNIVERSAL_NAME "${lipo_target_dir}/${name}${lipo_suffix}")
     endif()
 
     set(lipo_target "${name}-${sdk}")
@@ -2986,6 +2997,15 @@ function(add_swift_target_executable name)
            TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
           add_dependencies("swift-stdlib${variant}" ${lipo_target})
           add_dependencies("swift-test-stdlib${variant}" ${lipo_target})
+        endif()
+      endforeach()
+    endif()
+
+    if(SWIFTEXE_TARGET_BUILD_WITH_LIBEXEC)
+      foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+        set(variant "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+        if(TARGET "swift-libexec${variant}")
+          add_dependencies("swift-libexec${variant}" ${lipo_target})
         endif()
       endforeach()
     endif()

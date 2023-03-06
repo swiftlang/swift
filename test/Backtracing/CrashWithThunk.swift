@@ -5,6 +5,7 @@
 // RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/CrashWithThunk || true) | %FileCheck %s --check-prefix FRIENDLY
 
 // REQUIRES: executable_test
+// REQUIRES: backtracing
 // REQUIRES: OS=macosx
 
 struct Foo<T> {
@@ -30,10 +31,10 @@ struct CrashWithThunk {
 
 // CHECK: Thread 0 crashed:
 
-// CHECK: 0                       0x{{[0-9a-f]+}} crash() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:17:15
+// CHECK: 0                       0x{{[0-9a-f]+}} crash() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:18:15
 // CHECK-NEXT: 1 [ra] [thunk] [system] 0x{{[0-9a-f]+}} thunk for @escaping @callee_guaranteed () -> () + {{[0-9]+}} in CrashWithThunk at {{.*}}/Backtracing/<compiler-generated>
-// CHECK-NEXT: 2 [ra]                  0x{{[0-9a-f]+}} static CrashWithThunk.main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:25:9
-// CHECK-NEXT: 3 [ra] [system]         0x{{[0-9a-f]+}} static CrashWithThunk.$main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:20:1
+// CHECK-NEXT: 2 [ra]                  0x{{[0-9a-f]+}} static CrashWithThunk.main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:26:9
+// CHECK-NEXT: 3 [ra] [system]         0x{{[0-9a-f]+}} static CrashWithThunk.$main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:21:1
 // CHECK-NEXT: 4 [ra] [system]         0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift
 
 // CHECK: Registers:
@@ -46,20 +47,20 @@ struct CrashWithThunk {
 
 // FRIENDLY: Thread 0 crashed:
 
-// FRIENDLY: 0 crash() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:17:15
+// FRIENDLY: 0 crash() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:18:15
 
-// FRIENDLY: 15|   print("I'm going to crash here")
-// FRIENDLY-NEXT: 16|   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
-// FRIENDLY-NEXT: 17|   ptr.pointee = 42
+// FRIENDLY: 16|   print("I'm going to crash here")
+// FRIENDLY-NEXT: 17|   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
+// FRIENDLY-NEXT: 18|   ptr.pointee = 42
 // FRIENDLY-NEXT:   |               ^
-// FRIENDLY-NEXT: 18| }
-// FRIENDLY-NEXT: 19|
+// FRIENDLY-NEXT: 19| }
+// FRIENDLY-NEXT: 20|
 
-// FRIENDLY: 1 static CrashWithThunk.main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:25:9
+// FRIENDLY: 1 static CrashWithThunk.main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:26:9
 
-// FRIENDLY: 23|     let foo = Foo(value: crash)
-// FRIENDLY-NEXT: 24|
-// FRIENDLY-NEXT: 25|     foo.value()
+// FRIENDLY: 24|     let foo = Foo(value: crash)
+// FRIENDLY-NEXT: 25|
+// FRIENDLY-NEXT: 26|     foo.value()
 // FRIENDLY-NEXT:   |         ^
-// FRIENDLY-NEXT: 26|   }
-// FRIENDLY-NEXT: 27| }
+// FRIENDLY-NEXT: 27|   }
+// FRIENDLY-NEXT: 28| }

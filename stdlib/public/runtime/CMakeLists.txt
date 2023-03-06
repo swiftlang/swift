@@ -30,11 +30,9 @@ set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
     AutoDiffSupport.cpp
-    Backtrace.cpp
     Bincompat.cpp
     BytecodeLayouts.cpp
     Casting.cpp
-    CrashHandlerMacOS.cpp
     CrashReporter.cpp
     Demangle.cpp
     DynamicCast.cpp
@@ -76,13 +74,22 @@ set(swift_runtime_sources
     AccessibleFunction.cpp
     Win32.cpp)
 
+set(swift_runtime_backtracing_sources
+  Backtrace.cpp
+  CrashHandlerMacOS.cpp)
+
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
     SwiftRT-COFF.cpp
     SwiftRT-ELF.cpp
     ${swift_runtime_sources}
     ${swift_runtime_objc_sources}
-    ${swift_runtime_leaks_sources})
+    ${swift_runtime_leaks_sources}
+    ${swift_runtime_backtracing_sources})
+
+if(SWIFT_ENABLE_BACKTRACING)
+  list(APPEND swift_runtime_sources ${swift_runtime_backtracing_sources})
+endif()
 
 set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
