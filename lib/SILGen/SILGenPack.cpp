@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGenFunction.h"
+#include "Initialization.h"
 #include "Scope.h"
+#include "SILGenFunction.h"
 #include "swift/AST/GenericEnvironment.h"
 
 using namespace swift;
@@ -94,6 +95,40 @@ public:
 #endif
   }
 };
+
+/// Cleanup to destroy the preceding values in a pack-expansion
+/// component of a tuple.
+class PartialDestroyTupleCleanup : public Cleanup {
+  SILValue Addr;
+  unsigned ComponentIndex;
+  SILValue LimitWithinComponent;
+  CanPackType InducedPackType;
+public:
+  PartialDestroyTupleCleanup(SILValue tupleAddr,
+                             CanPackType inducedPackType,
+                             unsigned componentIndex,
+                             SILValue limitWithinComponent)
+    : Addr(tupleAddr), ComponentIndex(componentIndex),
+      LimitWithinComponent(limitWithinComponent),
+      InducedPackType(inducedPackType) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.emitPartialDestroyTuple(l, Addr, InducedPackType, ComponentIndex,
+                                LimitWithinComponent);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "PartialDestroyTupleCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Addr:" << Addr << "\n"
+                 << "InducedPackType:" << InducedPackType << "\n"
+                 << "ComponentIndex:" << ComponentIndex << "\n"
+                 << "LimitWithinComponent:" << LimitWithinComponent << "\n";
+#endif
+  }
+};
 } // end anonymous namespace
 
 CleanupHandle SILGenFunction::enterDeallocPackCleanup(SILValue temp) {
@@ -117,6 +152,17 @@ SILGenFunction::enterPartialDestroyPackCleanup(SILValue addr,
   Cleanups.pushCleanup<PartialDestroyPackCleanup>(addr, formalPackType,
                                                   packComponentIndex,
                                                   limitWithinComponent);
+  return Cleanups.getTopCleanup();
+}
+
+CleanupHandle
+SILGenFunction::enterPartialDestroyTupleCleanup(SILValue addr,
+                                                CanPackType inducedPackType,
+                                                unsigned componentIndex,
+                                                SILValue limitWithinComponent) {
+  Cleanups.pushCleanup<PartialDestroyTupleCleanup>(addr, inducedPackType,
+                                                   componentIndex,
+                                                   limitWithinComponent);
   return Cleanups.getTopCleanup();
 }
 
@@ -273,6 +319,30 @@ void SILGenFunction::emitPartialDestroyPack(SILLocation loc, SILValue packAddr,
   });
 }
 
+void SILGenFunction::emitPartialDestroyTuple(SILLocation loc,
+                                             SILValue tupleAddr,
+                                             CanPackType inducedPackType,
+                                             unsigned componentIndex,
+                                             SILValue limitWithinComponent) {
+  auto tupleTy = tupleAddr->getType().castTo<TupleType>();
+  auto packExpansionTy =
+    cast<PackExpansionType>(tupleTy.getElementType(componentIndex));
+
+  auto result = deriveOpenedElementTypeForPackExpansion(SGM, packExpansionTy);
+  auto elementEnv = result.first;
+  auto elementTy = result.second;
+
+  emitDynamicPackLoop(loc, inducedPackType, componentIndex, limitWithinComponent,
+                      elementEnv, /*reverse*/ true,
+                      [&](SILValue indexWithinComponent,
+                          SILValue packExpansionIndex,
+                          SILValue packIndex) {
+    auto eltAddr =
+      B.createTuplePackElementAddr(loc, packIndex, tupleAddr, elementTy);
+    B.createDestroyAddr(loc, eltAddr);
+  });
+}
+
 void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
                                          CanPackType formalPackType,
                                          unsigned componentIndex,
@@ -357,9 +427,13 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
   // Emit the loop body in a scope as a convenience, since it's necessary
   // to avoid dominance problems anyway.
   {
-    // Save and restore the innermost pack expansion index.
-    llvm::SaveAndRestore<SILValue> packIndexScope(InnermostPackIndex,
-                                                  packExpansionIndex);
+    // Save and restore the innermost pack expansion.
+    ActivePackExpansion activeExpansionRecord = {
+      packExpansionIndex,
+      openedElementEnv
+    };
+    llvm::SaveAndRestore<ActivePackExpansion*>
+      packExpansionScope(InnermostPackExpansion, &activeExpansionRecord);
 
     FullExpr scope(Cleanups, CleanupLocation(loc));
     emitBody(curIndex, packExpansionIndex, packIndex);
@@ -376,4 +450,152 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
 
   // End block:
   B.emitBlock(endBB);
+}
+
+void InPlacePackExpansionInitialization::
+       performPackExpansionInitialization(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          SILValue indexWithinComponent,
+                        llvm::function_ref<void(Initialization *into)> fn) {
+  // Enter a cleanup to destroy elements of the expansion up to the
+  // current index.  We only need to do this if the elements are
+  // non-trivial, which we've already checked in order to decide whether
+  // to set up the dormant full-expansion cleanup.  So we can just check
+  // that instead of looking at type properties again.
+  bool needCleanups = ExpansionCleanup.isValid();
+
+  CleanupHandle packCleanup = CleanupHandle::invalid();
+  if (needCleanups)
+    packCleanup = enterPartialDestroyCleanup(SGF, indexWithinComponent);
+
+  // The pack index from the active pack expansion is just into the
+  // expansion component; wrap it as necessary to index into the larger
+  // pack/tuple element list.
+  auto activeExpansion = SGF.getInnermostPackExpansion();
+  auto packIndex = activeExpansion->ExpansionIndex;
+  if (FormalPackType->getNumElements() > 1) {
+    packIndex = SGF.B.createPackPackIndex(loc, ComponentIndex, packIndex,
+                                          FormalPackType);
+  }
+
+  // Translate the pattern type into the environment of the innermost
+  // pack expansion.
+  auto loweredPatternTy = getLoweredExpansionType().getPatternType();
+  if (auto env = activeExpansion->OpenedElementEnv) {
+    // This AST-level transformation is fine on lowered types because
+    // we're just replacing pack archetypes with element archetypes.
+    loweredPatternTy =
+      env->mapPackTypeIntoElementContext(
+        loweredPatternTy->mapTypeOutOfContext())->getCanonicalType();
+  }
+  auto eltAddrTy = SILType::getPrimitiveAddressType(loweredPatternTy);
+
+  // Project the element address.
+  auto eltAddr = getElementAddress(SGF, loc, packIndex, eltAddrTy);
+
+  // Enter a dormant address for the element, under the same condition
+  // as above.
+  CleanupHandle eltCleanup = CleanupHandle::invalid();
+  if (needCleanups) {
+    eltCleanup = SGF.enterDestroyCleanup(eltAddr);
+    SGF.Cleanups.setCleanupState(eltCleanup, CleanupState::Dormant);
+  }
+
+  // Emit the initialization into the temporary.
+  TemporaryInitialization eltInit(eltAddr, eltCleanup);
+  fn(&eltInit);
+
+  // Deactivate the cleanups before continuing the loop.
+  if (needCleanups) {
+    SGF.Cleanups.forwardCleanup(packCleanup);
+    SGF.Cleanups.forwardCleanup(eltCleanup);
+  }
+}
+
+void InPlacePackExpansionInitialization::
+       finishInitialization(SILGenFunction &SGF) {
+  if (ExpansionCleanup.isValid())
+    SGF.Cleanups.setCleanupState(ExpansionCleanup, CleanupState::Active);
+}
+
+void InPlacePackExpansionInitialization::
+       enterDormantExpansionCleanup(SILGenFunction &SGF) {
+  assert(!ExpansionCleanup.isValid());
+  auto loweredExpansionTy = getLoweredExpansionType();
+  auto loweredPatternTy = loweredExpansionTy.getPatternType();
+
+  // Enter a dormant cleanup to destroy the pack expansion elements
+  // if they're non-trivial.
+  if (!SGF.getTypeLowering(loweredPatternTy).isTrivial()) {
+    ExpansionCleanup = enterPartialDestroyCleanup(SGF, /*limit*/SILValue());
+    SGF.Cleanups.setCleanupState(ExpansionCleanup, CleanupState::Dormant);
+  }
+}
+
+std::unique_ptr<PackExpansionInitialization>
+PackExpansionInitialization::create(SILGenFunction &SGF, SILValue packAddr,
+                                    CanPackType formalPackType,
+                                    unsigned componentIndex) {
+  auto init =
+    std::make_unique<PackExpansionInitialization>(packAddr, formalPackType,
+                                                  componentIndex);
+  init->enterDormantExpansionCleanup(SGF);
+  return init;
+}
+
+CanPackExpansionType
+PackExpansionInitialization::getLoweredExpansionType() const {
+  auto loweredPackTy = PackAddr->getType().castTo<SILPackType>();
+  auto loweredComponentTy = loweredPackTy->getElementType(ComponentIndex);
+  return cast<PackExpansionType>(loweredComponentTy);
+}
+
+CleanupHandle
+PackExpansionInitialization::enterPartialDestroyCleanup(SILGenFunction &SGF,
+                                              SILValue limitWithinComponent) {
+  return SGF.enterPartialDestroyPackCleanup(PackAddr, FormalPackType,
+                                            ComponentIndex,
+                                            limitWithinComponent);
+}
+
+SILValue PackExpansionInitialization::getElementAddress(SILGenFunction &SGF,
+                                                        SILLocation loc,
+                                                        SILValue packIndex,
+                                                        SILType eltAddrTy) {
+  return SGF.B.createPackElementGet(loc, packIndex, PackAddr, eltAddrTy);
+}
+
+std::unique_ptr<TuplePackExpansionInitialization>
+TuplePackExpansionInitialization::create(SILGenFunction &SGF,
+                                         SILValue tupleAddr,
+                                         CanPackType inducedPackType,
+                                         unsigned componentIndex) {
+  auto init = std::make_unique<TuplePackExpansionInitialization>(tupleAddr,
+                                                            inducedPackType,
+                                                            componentIndex);
+  init->enterDormantExpansionCleanup(SGF);
+  return init;
+}
+
+CanPackExpansionType
+TuplePackExpansionInitialization::getLoweredExpansionType() const {
+  auto loweredTupleTy = TupleAddr->getType().castTo<SILPackType>();
+  auto loweredComponentTy = loweredTupleTy.getElementType(ComponentIndex);
+  return cast<PackExpansionType>(loweredComponentTy);
+}
+
+CleanupHandle TuplePackExpansionInitialization::
+                enterPartialDestroyCleanup(SILGenFunction &SGF,
+                                           SILValue limitWithinComponent) {
+  return SGF.enterPartialDestroyTupleCleanup(TupleAddr, FormalPackType,
+                                             ComponentIndex,
+                                             limitWithinComponent);
+}
+
+SILValue
+TuplePackExpansionInitialization::getElementAddress(SILGenFunction &SGF,
+                                                    SILLocation loc,
+                                                    SILValue packIndex,
+                                                    SILType eltAddrTy) {
+  return SGF.B.createTuplePackElementAddr(loc, packIndex, TupleAddr, eltAddrTy);
 }

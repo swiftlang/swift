@@ -559,12 +559,17 @@ public:
   /// points.
   SILValue ExpectedExecutor;
 
-  /// The pack index value for the innermost pack expansion.
-  SILValue InnermostPackIndex;
+  struct ActivePackExpansion {
+    SILValue ExpansionIndex;
+    GenericEnvironment *OpenedElementEnv;
+  };
 
-  SILValue getInnermostPackIndex() const {
-    assert(InnermostPackIndex && "not inside a pack expansion!");
-    return InnermostPackIndex;
+  /// The innermost active pack expansion.
+  ActivePackExpansion *InnermostPackExpansion = nullptr;
+
+  ActivePackExpansion *getInnermostPackExpansion() const {
+    assert(InnermostPackExpansion && "not inside a pack expansion!");
+    return InnermostPackExpansion;
   }
 
   /// True if 'return' without an operand or falling off the end of the current
@@ -626,6 +631,21 @@ public:
   }
   SILType getLoweredType(Type t) {
     return F.getLoweredType(t);
+  }
+  SILType getLoweredType(AbstractionPattern orig, Type subst,
+                         SILValueCategory category) {
+    return SILType::getPrimitiveType(F.getLoweredRValueType(orig, subst),
+                                     category);
+  }
+  SILType getLoweredType(Type t, SILValueCategory category) {
+    return SILType::getPrimitiveType(F.getLoweredRValueType(t), category);
+  }
+  CanType getLoweredRValueType(AbstractionPattern orig,
+                               Type subst) {
+    return F.getLoweredRValueType(orig, subst);
+  }
+  CanType getLoweredRValueType(Type t) {
+    return F.getLoweredRValueType(t);
   }
   SILType getLoweredTypeForFunctionArgument(Type t) {
     auto typeForConv =
@@ -694,7 +714,8 @@ public:
   void leaveDebugScope();
 
   std::unique_ptr<Initialization>
-  prepareIndirectResultInit(AbstractionPattern origResultType,
+  prepareIndirectResultInit(SILLocation loc,
+                            AbstractionPattern origResultType,
                             CanType formalResultType,
                             SmallVectorImpl<SILValue> &directResultsBuffer,
                             SmallVectorImpl<CleanupHandle> &cleanups);
@@ -1793,6 +1814,13 @@ public:
   ManagedValue getManagedValue(SILLocation loc,
                                ConsumableManagedValue value);
 
+  /// Do the initial work common to all emissions of a pack
+  /// expansion expression.  This is a placeholder meant to mark
+  /// places that will need to support any sort of future feature
+  /// where e.g. certain `each` operands need to be evaluated once
+  /// for the entire expansion.
+  void prepareToEmitPackExpansionExpr(PackExpansionExpr *E) {}
+
   //
   // Helpers for emitting ApplyExpr chains.
   //
@@ -2379,10 +2407,25 @@ public:
 
   /// Enter a cleanup to destroy the preceding values in a pack-expansion
   /// component of a pack.
+  ///
+  /// \param limitWithinComponent - if non-null, the number of elements
+  ///   to destroy in the pack expansion component; defaults to the
+  ///   dynamic length of the expansion component
   CleanupHandle enterPartialDestroyPackCleanup(SILValue addr,
                                                CanPackType formalPackType,
                                                unsigned componentIndex,
                                                SILValue limitWithinComponent);
+
+  /// Enter a cleanup to destroy the preceding values in a pack-expansion
+  /// component of a tuple.
+  ///
+  /// \param limitWithinComponent - if non-null, the number of elements
+  ///   to destroy in the pack expansion component; defaults to the
+  ///   dynamic length of the expansion component
+  CleanupHandle enterPartialDestroyTupleCleanup(SILValue addr,
+                                                CanPackType inducedPackType,
+                                                unsigned componentIndex,
+                                                SILValue limitWithinComponent);
 
   /// Return an owned managed value for \p value that is cleaned up using an end_lifetime instruction.
   ///
@@ -2512,8 +2555,7 @@ public:
   ///   that indexes into packs with the shape of formalPackType.
   ///
   ///   This function will be called within a cleanups scope and with
-  ///   InnermostPackIndex set to the pack expansion index value (the
-  ///   second parameter).
+  ///   InnermostPackExpansion set up properly for the context.
   void emitDynamicPackLoop(SILLocation loc,
                            CanPackType formalPackType,
                            unsigned componentIndex,
@@ -2549,6 +2591,23 @@ public:
   void emitDestroyPack(SILLocation loc,
                        SILValue packAddr,
                        CanPackType formalPackType);
+
+  /// Emit a loop which destroys a prefix of a pack expansion component
+  /// of a tuple value.
+  ///
+  /// \param tupleAddr - the address of the overall tuple value
+  /// \param inducedPackType - a pack type with the same shape as the
+  ///   element types of the overall tuple value
+  /// \param componentIndex - the index of the pack expansion component
+  ///   within the tuple
+  /// \param limitWithinComponent - the number of elements in a prefix of
+  ///   the expansion component to destroy; if null, all elements in the
+  ///   component will be destroyed
+  void emitPartialDestroyTuple(SILLocation loc,
+                               SILValue tupleAddr,
+                               CanPackType inducedPackType,
+                               unsigned componentIndex,
+                               SILValue limitWithinComponent);
 };
 
 

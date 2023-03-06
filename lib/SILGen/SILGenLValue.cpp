@@ -3332,7 +3332,7 @@ LValue SILGenLValue::visitPackElementExpr(PackElementExpr *e,
                                       substFormalType,
                                       accessKind)
            .getLValueAddress();
-      auto packIndex = SGF.getInnermostPackIndex();
+      auto packIndex = SGF.getInnermostPackExpansion()->ExpansionIndex;
       auto elementAddr =
         SGF.B.createPackElementGet(e, packIndex, packAddr, elementTy);
       return LValue::forAddress(accessKind,

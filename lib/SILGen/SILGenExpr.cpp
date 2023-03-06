@@ -1526,7 +1526,35 @@ RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
 RValue
 RValueEmitter::visitPackExpansionExpr(PackExpansionExpr *E,
                                       SGFContext C) {
-  llvm_unreachable("not implemented for PackExpansionExpr");
+  // The contexts where PackExpansionExpr can occur are expected to
+  // set up for pack-expansion emission by either recognizing them
+  // and treating them specially or setting up an appropriate context
+  // to emit into.
+  auto init = C.getEmitInto();
+  assert(init && init->canPerformPackExpansionInitialization() &&
+         "cannot emit a PackExpansionExpr without an appropriate context");
+
+  SGF.prepareToEmitPackExpansionExpr(E);
+
+  auto type = E->getType()->getCanonicalType();
+  assert(isa<PackExpansionType>(type));
+  auto formalPackType = CanPackType::get(SGF.getASTContext(), {type});
+
+  SGF.emitDynamicPackLoop(E, formalPackType, /*component index*/ 0,
+                          /*limit within component*/ SILValue(),
+                          E->getGenericEnvironment(), /*reverse*/ false,
+                          [&](SILValue indexWithinComponent,
+                              SILValue packExpansionIndex,
+                              SILValue packIndex) {
+    init->performPackExpansionInitialization(SGF, E, indexWithinComponent,
+                                             [&](Initialization *eltInit) {
+      SGF.emitExprInto(E->getPatternExpr(), eltInit);
+    });
+  });
+
+  init->finishInitialization(SGF);
+
+  return RValue::forInContext();
 }
 
 RValue
@@ -2337,6 +2365,19 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
       I->finishInitialization(SGF);
       return RValue::forInContext();
     }
+  }
+
+  // If the tuple has a pack expansion in it, initialize an object in
+  // memory (and recurse; this pattern should reliably enter the above,
+  // though).
+  if (type.containsPackExpansionType()) {
+    auto &tupleTL = SGF.getTypeLowering(type);
+    auto initialization = SGF.emitTemporary(E, tupleTL);
+    {
+      RValue result = visitTupleExpr(E, SGFContext(initialization.get()));
+      assert(result.isInContext()); (void) result;
+    }
+    return RValue(SGF, E, type, initialization->getManagedAddress());
   }
 
   llvm::SmallVector<RValue, 8> tupleElts;
@@ -6157,6 +6198,24 @@ RValue SILGenFunction::emitPlusZeroRValue(Expr *E) {
   return emitPlusOneRValue(E).borrow(*this, SILLocation(E));
 }
 
+static void emitIgnoredPackExpansion(SILGenFunction &SGF,
+                                     PackExpansionExpr *E) {
+  SGF.prepareToEmitPackExpansionExpr(E);
+
+  auto expansionType =
+    cast<PackExpansionType>(E->getType()->getCanonicalType());
+  auto formalPackType = CanPackType::get(SGF.getASTContext(), expansionType);
+  auto openedElementEnv = E->getGenericEnvironment();
+  SGF.emitDynamicPackLoop(E, formalPackType, /*component index*/ 0,
+                          /*limit*/ SILValue(), openedElementEnv,
+                          /*reverse*/ false,
+                          [&](SILValue indexWithinComponent,
+                              SILValue packExpansionIndex,
+                              SILValue packIndex) {
+    SGF.emitIgnoredExpr(E->getPatternExpr());
+  });
+}
+
 // Evaluate the expression as an lvalue or rvalue, discarding the result.
 void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // If this is a tuple expression, recursively ignore its elements.
@@ -6165,6 +6224,12 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
     for (auto *elt : TE->getElements())
       emitIgnoredExpr(elt);
     return;
+  }
+
+  // Pack expansions can come up in tuples, and potentially elsewhere
+  // if we ever emit e.g. ignored call arguments with a builtin.
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
+    return emitIgnoredPackExpansion(*this, expansion);
   }
   
   // TODO: Could look through arbitrary implicit conversions that don't have
