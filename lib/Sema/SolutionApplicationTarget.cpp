@@ -281,50 +281,84 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   llvm_unreachable("invalid contextual type");
 }
 
-SolutionApplicationTarget SolutionApplicationTarget::walk(ASTWalker &walker) {
+Optional<SolutionApplicationTarget>
+SolutionApplicationTarget::walk(ASTWalker &walker) const {
+  SolutionApplicationTarget result = *this;
   switch (kind) {
   case Kind::expression: {
-    SolutionApplicationTarget result = *this;
-    result.setExpr(getAsExpr()->walk(walker));
-    return result;
+    if (isForInitialization()) {
+      if (auto *newPattern = getInitializationPattern()->walk(walker)) {
+        result.setPattern(newPattern);
+      } else {
+        return None;
+      }
+    }
+    if (auto *newExpr = getAsExpr()->walk(walker)) {
+      result.setExpr(newExpr);
+    } else {
+      return None;
+    }
+    break;
   }
-
-  case Kind::closure:
-    return *this;
-
-  case Kind::function:
-    return SolutionApplicationTarget(
-        *getAsFunction(),
-        cast_or_null<BraceStmt>(getFunctionBody()->walk(walker)));
-
-  case Kind::stmtCondition:
-    for (auto &condElement : stmtCondition.stmtCondition) {
+  case Kind::closure: {
+    if (auto *newClosure = closure.closure->walk(walker)) {
+      result.closure.closure = cast<ClosureExpr>(newClosure);
+    } else {
+      return None;
+    }
+    break;
+  }
+  case Kind::function: {
+    if (auto *newBody = getFunctionBody()->walk(walker)) {
+      result.function.body = cast<BraceStmt>(newBody);
+    } else {
+      return None;
+    }
+    break;
+  }
+  case Kind::stmtCondition: {
+    for (auto &condElement : stmtCondition.stmtCondition)
       condElement = *condElement.walk(walker);
-    }
-    return *this;
 
-  case Kind::caseLabelItem:
-    if (auto newPattern =
-            caseLabelItem.caseLabelItem->getPattern()->walk(walker)) {
-      caseLabelItem.caseLabelItem->setPattern(
-          newPattern, caseLabelItem.caseLabelItem->isPatternResolved());
-    }
-    if (auto guardExpr = caseLabelItem.caseLabelItem->getGuardExpr()) {
-      if (auto newGuardExpr = guardExpr->walk(walker))
-        caseLabelItem.caseLabelItem->setGuardExpr(newGuardExpr);
-    }
-
-    return *this;
-
-  case Kind::patternBinding:
-    return *this;
-
-  case Kind::uninitializedVar:
-    return *this;
-
-  case Kind::forEachStmt:
-    return *this;
+    break;
   }
-
-  llvm_unreachable("invalid target kind");
+  case Kind::caseLabelItem: {
+    auto *item = caseLabelItem.caseLabelItem;
+    if (auto *newPattern = item->getPattern()->walk(walker)) {
+      item->setPattern(newPattern, item->isPatternResolved());
+    } else {
+      return None;
+    }
+    if (auto guardExpr = item->getGuardExpr()) {
+      if (auto newGuardExpr = guardExpr->walk(walker)) {
+        item->setGuardExpr(newGuardExpr);
+      } else {
+        return None;
+      }
+    }
+    break;
+  }
+  case Kind::patternBinding: {
+    if (getAsPatternBinding()->walk(walker))
+      return None;
+    break;
+  }
+  case Kind::uninitializedVar: {
+    if (auto *P = getAsUninitializedVar()->walk(walker)) {
+      result.setPattern(P);
+    } else {
+      return None;
+    }
+    break;
+  }
+  case Kind::forEachStmt: {
+    if (auto *newStmt = getAsForEachStmt()->walk(walker)) {
+      result.forEachStmt.stmt = cast<ForEachStmt>(newStmt);
+    } else {
+      return None;
+    }
+    break;
+  }
+  }
+  return result;
 }
