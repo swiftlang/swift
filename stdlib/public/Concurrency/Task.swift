@@ -190,6 +190,7 @@ extension Task: Equatable {
 extension Task where Failure == Error {
     @_spi(MainActorUtilities)
     @MainActor
+    @available(SwiftStdlib 5.9, *)
     public static func startOnMainActor(
         priority: TaskPriority? = nil,
         @_inheritActorContext @_implicitSelfCapture _ work: __owned @Sendable @escaping @MainActor() async throws -> Success
@@ -208,6 +209,7 @@ extension Task where Failure == Error {
 extension Task where Failure == Never {
     @_spi(MainActorUtilities)
     @MainActor
+    @available(SwiftStdlib 5.9, *)
     public static func startOnMainActor(
         priority: TaskPriority? = nil,
         @_inheritActorContext @_implicitSelfCapture _ work: __owned @Sendable @escaping @MainActor() async -> Success
