@@ -11,6 +11,7 @@
 
 // CHECK: struct LoadableBoolWrapper {
 // CHECK:   prefix static func ! (lhs: inout LoadableBoolWrapper) -> LoadableBoolWrapper
+// CHECK:   func __convertToBool() -> Bool
 // CHECK: }
 
 // CHECK: struct AddressOnlyIntWrapper {

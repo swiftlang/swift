@@ -155,6 +155,9 @@ static bool isErrorOutParameter(const clang::ParmVarDecl *param,
 
 static bool isBoolType(clang::ASTContext &ctx, clang::QualType type) {
   do {
+    if (type->isBooleanType())
+      return true;
+
     // Check whether we have a typedef for "BOOL" or "Boolean".
     if (auto typedefType = dyn_cast<clang::TypedefType>(type.getTypePtr())) {
       auto typedefDecl = typedefType->getDecl();
@@ -1848,7 +1851,20 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     break;
   }
 
-  case clang::DeclarationName::CXXConversionFunctionName:
+  case clang::DeclarationName::CXXConversionFunctionName: {
+    auto conversionDecl = dyn_cast<clang::CXXConversionDecl>(D);
+    if (!conversionDecl)
+      return ImportedName();
+    auto toType = conversionDecl->getConversionType();
+    // Only import `operator bool()` for now.
+    if (isBoolType(clangSema.Context, toType)) {
+      isFunction = true;
+      baseName = "__convertToBool";
+      addEmptyArgNamesForClangFunction(conversionDecl, argumentNames);
+      break;
+    }
+    return ImportedName();
+  }
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
