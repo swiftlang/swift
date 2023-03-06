@@ -6242,9 +6242,10 @@ void ASTContext::loadCompilerPlugins() {
                      err.message());
       continue;
     }
-    if (auto error = getPluginRegistry()->loadLibraryPlugin(resolvedPath)) {
+    auto loaded = getPluginRegistry()->loadLibraryPlugin(resolvedPath);
+    if (!loaded) {
       Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                     llvm::toString(std::move(error)));
+                     llvm::toString(loaded.takeError()));
     }
   }
 

@@ -5,8 +5,6 @@
 // Diagnostics testing
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -plugin-path %t -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS
-
 // RUN: not %target-swift-frontend -swift-version 5 -typecheck -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics > %t/macro-printing.txt
 // RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
 
@@ -22,6 +20,12 @@
 // RUN: %target-build-swift -swift-version 5 -g -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
 // RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
+
+// Plugin search path and loaded module trace testing
+// RUN: %target-swift-frontend -swift-version 5 -emit-sil -enable-experimental-feature FreestandingMacros -plugin-path %t -I %swift-host-lib-dir %s -module-name MacroUser -emit-loaded-module-trace -o %t/loaded_module_trace
+// RUN: %FileCheck -check-prefix=CHECK-MODULE-TRACE %s < %t/loaded_module_trace.trace.json
+
+// CHECK-MODULE-TRACE: {{libMacroDefinition.dylib|libMacroDefinition.so|MacroDefinition.dll}}
 
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx

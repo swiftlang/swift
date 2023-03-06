@@ -304,17 +304,16 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 }
 
 /// Load a plugin library based on a module name.
-static void *loadPluginByName(StringRef searchPath, StringRef moduleName, llvm::vfs::FileSystem &fs) {
+static void *loadPluginByName(StringRef searchPath,
+                              StringRef moduleName,
+                              llvm::vfs::FileSystem &fs,
+                              PluginRegistry *registry) {
   SmallString<128> fullPath(searchPath);
   llvm::sys::path::append(fullPath, "lib" + moduleName + LTDL_SHLIB_EXT);
   if (fs.getRealPath(fullPath, fullPath))
     return nullptr;
-
-#if defined(_WIN32)
-  return LoadLibraryA(fullPath.c_str());
-#else
-  return dlopen(fullPath.c_str(), RTLD_LAZY);
-#endif
+  auto loadResult = registry->loadLibraryPlugin(fullPath);
+  return loadResult ? *loadResult : nullptr;
 }
 
 void *CompilerPluginLoadRequest::evaluate(
@@ -322,8 +321,9 @@ void *CompilerPluginLoadRequest::evaluate(
 ) const {
   auto fs = ctx->SourceMgr.getFileSystem();
   auto &searchPathOpts = ctx->SearchPathOpts;
+  auto *registry = ctx->getPluginRegistry();
   for (const auto &path : searchPathOpts.PluginSearchPaths) {
-    if (auto found = loadPluginByName(path, moduleName.str(), *fs))
+    if (auto found = loadPluginByName(path, moduleName.str(), *fs, registry))
       return found;
   }
 
