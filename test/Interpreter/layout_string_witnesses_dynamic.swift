@@ -288,3 +288,44 @@ func testGenericResilient() {
 }
 
 testGenericResilient()
+
+#if os(macOS)
+
+import Foundation
+
+@objc
+final class ObjcClass: NSObject {
+    deinit {
+        print("ObjcClass deinitialized!")
+    }
+}
+
+func testGenericObjc() {
+    let ptr = allocateInternalGenericPtr(of: ObjcClass.self)
+
+    do {
+        let x = ObjcClass()
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = ObjcClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ObjcClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: ObjcClass deinitialized!
+    testGenericDestroy(ptr, of: ObjcClass.self)
+
+    ptr.deallocate()
+}
+
+testGenericObjc()
+
+#endif

@@ -2608,8 +2608,28 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   vwtable->publishLayout(layout);
 }
 
+
 const TypeLayout unknownWeakTypeLayout =
     TypeLayout(sizeof(uint8_t *), alignof(uint8_t *), {}, 0);
+
+enum LayoutStringFlags : uint64_t {
+  Empty = 0,
+  // TODO: Track other useful information tha can be used to optimize layout
+  //       strings, like different reference kinds contained in the string
+  //       number of ref counting operations (maybe up to 4), so we can
+  //       use witness functions optimized for these cases.
+  HasRelativePointers = (1ULL << 63),
+};
+
+inline bool operator&(LayoutStringFlags a, LayoutStringFlags b) {
+  return (uint64_t(a) & uint64_t(b)) != 0;
+}
+inline LayoutStringFlags operator|(LayoutStringFlags a, LayoutStringFlags b) {
+  return LayoutStringFlags(uint64_t(a) | uint64_t(b));
+}
+inline LayoutStringFlags &operator|=(LayoutStringFlags &a, LayoutStringFlags b) {
+  return a = (a | b);
+}
 
 void swift::swift_initStructMetadataWithLayoutString(
     StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
@@ -2648,7 +2668,8 @@ void swift::swift_initStructMetadataWithLayoutString(
     if (fieldType->getValueWitnesses()->isPOD()) {
       // no extra space required for POD
     } else if (fieldType->hasLayoutString()) {
-      refCountBytes += *(const size_t *)fieldType->getLayoutString();
+      refCountBytes += *(const size_t *)(fieldType->getLayoutString() +
+                                         sizeof(uint64_t));
     } else if (fieldType->isClassObject()) {
       refCountBytes += sizeof(uint64_t);
     } else {
@@ -2656,14 +2677,18 @@ void swift::swift_initStructMetadataWithLayoutString(
     }
   }
 
-  const size_t fixedLayoutStringSize = sizeof(size_t) + sizeof(uint64_t) * 2;
+  const size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
+  const size_t fixedLayoutStringSize = layoutStringHeaderSize +
+                                       sizeof(uint64_t) * 2;
 
-  uint8_t *layoutStr = (uint8_t *)malloc(fixedLayoutStringSize + refCountBytes);
+  uint8_t *layoutStr = (uint8_t *)malloc(fixedLayoutStringSize +
+                                         refCountBytes);
 
-  ((size_t*)layoutStr)[0] = refCountBytes;
+  *((size_t*)(layoutStr + sizeof(uint64_t))) = refCountBytes;
 
-  size_t layoutStrOffset = sizeof(size_t);
+  size_t layoutStrOffset = sizeof(uint64_t) + sizeof(size_t);
   size_t offset = 0;
+  LayoutStringFlags flags = LayoutStringFlags::Empty;
   for (unsigned i = 0; i < numFields; ++i) {
     const Metadata *fieldType = fieldTypes[i];
 
@@ -2688,23 +2713,38 @@ void swift::swift_initStructMetadataWithLayoutString(
       // No need to handle PODs
     } else if (fieldType->hasLayoutString()) {
       const uint8_t *fieldLayoutStr = fieldType->getLayoutString();
-      const size_t refCountBytes = *(const size_t *)fieldLayoutStr;
-      memcpy(layoutStr + layoutStrOffset, fieldLayoutStr + sizeof(size_t),
+      const LayoutStringFlags fieldFlags =
+          *(const LayoutStringFlags *)fieldLayoutStr;
+      const size_t refCountBytes =
+          *(const size_t *)(fieldLayoutStr + sizeof(uint64_t));
+      flags |= fieldFlags;
+      memcpy(layoutStr + layoutStrOffset, fieldLayoutStr + layoutStringHeaderSize,
              refCountBytes);
       if (offset) {
         *(uint64_t *)(layoutStr + layoutStrOffset + sizeof(size_t)) += offset;
         offset = 0;
       }
+
+      if (flags & LayoutStringFlags::HasRelativePointers) {
+        swift_resolve_resilientAccessors(layoutStr, layoutStrOffset,
+                                         fieldLayoutStr, refCountBytes,
+                                         fieldType);
+      }
+
       layoutStrOffset += refCountBytes;
-    } else if (fieldType->isClassObject()) {
+    } else if (auto *cls = fieldType->getClassObject()) {
+      auto tag = (cls->getFlags() & ClassFlags::UsesSwiftRefcounting) ?
+                    RefCountingKind::NativeStrong :
+                    RefCountingKind::ObjC;
       *(uint64_t*)(layoutStr + layoutStrOffset) =
-        ((uint64_t)RefCountingKind::Unknown << 56) | offset;
+        ((uint64_t)tag << 56) | offset;
       layoutStrOffset += sizeof(uint64_t);
       offset = 0;
     } else {
       *(uint64_t*)(layoutStr + layoutStrOffset) =
         ((uint64_t)RefCountingKind::Metatype << 56) | offset;
-      *(uintptr_t*)(layoutStr + layoutStrOffset + sizeof(uint64_t)) = (uintptr_t)fieldType;
+      *(uintptr_t*)(layoutStr + layoutStrOffset + sizeof(uint64_t)) =
+          (uintptr_t)fieldType;
       layoutStrOffset += sizeof(uint64_t) + sizeof(uintptr_t);
       offset = 0;
     }
@@ -2714,6 +2754,10 @@ void swift::swift_initStructMetadataWithLayoutString(
 
   *(uint64_t *)(layoutStr + layoutStrOffset) = offset;
   *(uint64_t *)(layoutStr + layoutStrOffset + sizeof(uint64_t)) = 0;
+
+  // we mask out HasRelativePointers, because at this point they have all been
+  // resolved to metadata pointers
+  *(uint64_t *)(layoutStr) = (uint64_t)flags & ~(LayoutStringFlags::HasRelativePointers);
 
   auto *vwtable = getMutableVWTableForInit(structType, layoutFlags);
   vwtable->destroy = swift_generic_destroy;
