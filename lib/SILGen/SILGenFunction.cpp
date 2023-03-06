@@ -1248,7 +1248,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     Scope scope(Cleanups, CleanupLocation(var));
 
     SmallVector<CleanupHandle, 4> cleanups;
-    auto init = prepareIndirectResultInit(AbstractionPattern(resultType),
+    auto init = prepareIndirectResultInit(loc, AbstractionPattern(resultType),
                                           resultType, directResults, cleanups);
 
     emitApplyOfStoredPropertyInitializer(loc, anchorVar, subs, resultType,

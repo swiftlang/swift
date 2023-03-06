@@ -2451,6 +2451,20 @@ BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
   CanTupleEltTypeArrayRef getElementTypes() const {
     return CanTupleEltTypeArrayRef(getPointer()->getElements());
   }
+
+  bool containsPackExpansionType() const {
+    return containsPackExpansionTypeImpl(*this);
+  }
+
+  /// Induce a pack type from a range of the elements of this tuple type.
+  inline CanTypeWrapper<PackType>
+  getInducedPackType(unsigned start, unsigned count) const;
+
+private:
+  static bool containsPackExpansionTypeImpl(CanTupleType tuple);
+
+  static CanTypeWrapper<PackType>
+  getInducedPackTypeImpl(CanTupleType tuple, unsigned start, unsigned count);
 END_CAN_TYPE_WRAPPER(TupleType, Type)
 
 /// UnboundGenericType - Represents a generic type where the type arguments have
@@ -4233,6 +4247,11 @@ public:
     return !isIndirectFormalResult(getConvention());
   }
 
+  /// Is this a pack result?  Pack results are always indirect.
+  bool isPack() const {
+    return getConvention() == ResultConvention::Pack;
+  }
+
   /// Transform this SILResultInfo by applying the user-provided
   /// function to its type.
   ///
@@ -4408,8 +4427,9 @@ private:
 
   // These are *normal* results if this is not a coroutine and *yield* results
   // otherwise.
-  unsigned NumAnyResults : 16;         // Not including the ErrorResult.
-  unsigned NumAnyIndirectFormalResults : 16; // Subset of NumAnyResults.
+  unsigned NumAnyResults;         // Not including the ErrorResult.
+  unsigned NumAnyIndirectFormalResults; // Subset of NumAnyResults.
+  unsigned NumPackResults; // Subset of NumAnyIndirectFormalResults.
 
   // [NOTE: SILFunctionType-layout]
   // The layout of a SILFunctionType in memory is:
@@ -4589,6 +4609,9 @@ public:
   unsigned getNumDirectFormalResults() const {
     return isCoroutine() ? 0 : NumAnyResults - NumAnyIndirectFormalResults;
   }
+  unsigned getNumPackResults() const {
+    return isCoroutine() ? 0 : NumPackResults;
+  }
 
   struct IndirectFormalResultFilter {
     bool operator()(SILResultInfo result) const {
@@ -4618,6 +4641,21 @@ public:
     return llvm::make_filter_range(getResults(), DirectFormalResultFilter());
   }
 
+  struct PackResultFilter {
+    bool operator()(SILResultInfo result) const {
+      return result.isPack();
+    }
+  };
+  using PackResultIter =
+      llvm::filter_iterator<const SILResultInfo *, PackResultFilter>;
+  using PackResultRange = iterator_range<PackResultIter>;
+
+  /// A range of SILResultInfo for all pack results.  Pack results are also
+  /// included in the set of indirect results.
+  PackResultRange getPackResults() const {
+    return llvm::make_filter_range(getResults(), PackResultFilter());
+  }
+
   /// Get a single non-address SILType that represents all formal direct
   /// results. The actual SIL result type of an apply instruction that calls
   /// this function depends on the current SIL stage and is known by
@@ -4635,6 +4673,9 @@ public:
   }
   unsigned getNumDirectFormalYields() const {
     return isCoroutine() ? NumAnyResults - NumAnyIndirectFormalResults : 0;
+  }
+  unsigned getNumPackYields() const {
+    return isCoroutine() ? NumPackResults : 0;
   }
 
   struct IndirectFormalYieldFilter {
@@ -6797,6 +6838,11 @@ BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
     return CanTypeArrayRef(getPointer()->getElementTypes());
   }
 END_CAN_TYPE_WRAPPER(PackType, Type)
+
+inline CanPackType
+CanTupleType::getInducedPackType(unsigned start, unsigned end) const {
+  return getInducedPackTypeImpl(*this, start, end);
+}
 
 /// PackExpansionType - The interface type of the explicit expansion of a
 /// corresponding set of variadic generic parameters.

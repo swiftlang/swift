@@ -913,6 +913,10 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
       /*parsingOpts=*/{}, /*isPrimary=*/false);
   macroSourceFile->setImports(sourceFile->getImports());
 
+  validateMacroExpansion(macroSourceFile, macro,
+                         /*attachedTo*/nullptr,
+                         MacroRole::Declaration);
+
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", med);
 

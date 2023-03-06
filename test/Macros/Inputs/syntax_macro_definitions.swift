@@ -764,7 +764,7 @@ public struct AddCompletionHandler: PeerMacro {
   }
 }
 
-public struct InvalidMacro: PeerMacro {
+public struct InvalidMacro: PeerMacro, DeclarationMacro {
   public static func expansion(
     of node: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
@@ -792,6 +792,15 @@ public struct InvalidMacro: PeerMacro {
       "typealias _ColorLiteralType = Void",
       "typealias _ImageLiteralType = Void",
       "typealias _FileReferenceLiteralType = Void",
+    ]
+  }
+
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "var value: Int"
     ]
   }
 }

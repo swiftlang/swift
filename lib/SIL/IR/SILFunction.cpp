@@ -472,6 +472,16 @@ SILType SILFunction::getLoweredType(Type t) const {
   return getModule().Types.getLoweredType(t, TypeExpansionContext(*this));
 }
 
+CanType
+SILFunction::getLoweredRValueType(AbstractionPattern orig, Type subst) const {
+  return getModule().Types.getLoweredRValueType(TypeExpansionContext(*this),
+                                                orig, subst);
+}
+
+CanType SILFunction::getLoweredRValueType(Type t) const {
+  return getModule().Types.getLoweredRValueType(TypeExpansionContext(*this), t);
+}
+
 SILType SILFunction::getLoweredLoadableType(Type t) const {
   auto &M = getModule();
   return M.Types.getLoweredLoadableType(t, TypeExpansionContext(*this), M);
