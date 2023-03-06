@@ -18,16 +18,18 @@
 #ifndef SWIFT_CRASHINFO_H
 #define SWIFT_CRASHINFO_H
 
+#include "SwiftStdint.h"
+
 #ifdef __cplusplus
 namespace swift {
 extern "C" {
 #endif
 
 struct CrashInfo {
-  uint64_t crashing_thread;
-  uint64_t signal;
-  uint64_t fault_address;
-  uint64_t mctx;
+  __swift_uint64_t crashing_thread;
+  __swift_uint64_t signal;
+  __swift_uint64_t fault_address;
+  __swift_uint64_t mctx;
 };
 
 #ifdef __cplusplus

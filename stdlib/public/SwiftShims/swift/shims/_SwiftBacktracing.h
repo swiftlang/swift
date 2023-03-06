@@ -22,23 +22,6 @@
 #include "SwiftStdint.h"
 #include "Target.h"
 
-// Replace the stdint types for the rest of this file; we have to use the
-// preprocessor for this, because e.g. __swift_int8_t might be a typedef of
-// int8_t, and so we can't re-typedef int8_t.
-//
-// Mainly we're doing this so CrashInfo.h can use the normal type names, but
-// it also avoids a lot of underscores later on in this file.
-#define int8_t __swift_int8_t
-#define uint8_t __swift_uint8_t
-#define int16_t __swift_int16_t
-#define uint16_t __swift_uint16_t
-#define int32_t __swift_int32_t
-#define uint32_t __swift_uint32_t
-#define int64_t __swift_int64_t
-#define uint64_t __swift_uint64_t
-#define intptr_t __swift_intptr_t
-#define uintptr_t __swift_uintptr_t
-
 #include "CrashInfo.h"
 
 #ifdef __cplusplus
@@ -97,22 +80,22 @@ struct __swift_backtrace_CFRange {
  };
 
 typedef struct {
-  uint8_t byte0;
-  uint8_t byte1;
-  uint8_t byte2;
-  uint8_t byte3;
-  uint8_t byte4;
-  uint8_t byte5;
-  uint8_t byte6;
-  uint8_t byte7;
-  uint8_t byte8;
-  uint8_t byte9;
-  uint8_t byte10;
-  uint8_t byte11;
-  uint8_t byte12;
-  uint8_t byte13;
-  uint8_t byte14;
-  uint8_t byte15;
+  __swift_uint8_t byte0;
+  __swift_uint8_t byte1;
+  __swift_uint8_t byte2;
+  __swift_uint8_t byte3;
+  __swift_uint8_t byte4;
+  __swift_uint8_t byte5;
+  __swift_uint8_t byte6;
+  __swift_uint8_t byte7;
+  __swift_uint8_t byte8;
+  __swift_uint8_t byte9;
+  __swift_uint8_t byte10;
+  __swift_uint8_t byte11;
+  __swift_uint8_t byte12;
+  __swift_uint8_t byte13;
+  __swift_uint8_t byte14;
+  __swift_uint8_t byte15;
 } __swift_backtrace_CFUUIDBytes;
 
 #endif // SWIFT_TARGET_OS_DARWIN
@@ -120,30 +103,30 @@ typedef struct {
 // .. Processor specifics ......................................................
 
 struct x86_64_gprs {
-  uint64_t _r[16];
-  uint64_t rflags;
-  uint16_t cs, fs, gs, _pad0;
-  uint64_t rip;
-  uint64_t valid;
+  __swift_uint64_t _r[16];
+  __swift_uint64_t rflags;
+  __swift_uint16_t cs, fs, gs, _pad0;
+  __swift_uint64_t rip;
+  __swift_uint64_t valid;
 };
 
 struct i386_gprs {
-  uint32_t _r[8];
-  uint32_t eflags;
-  uint16_t segreg[6];
-  uint32_t eip;
-  uint32_t valid;
+  __swift_uint32_t _r[8];
+  __swift_uint32_t eflags;
+  __swift_uint16_t segreg[6];
+  __swift_uint32_t eip;
+  __swift_uint32_t valid;
 };
 
 struct arm64_gprs {
-  uint64_t _x[32];
-  uint64_t pc;
-  uint64_t valid;
+  __swift_uint64_t _x[32];
+  __swift_uint64_t pc;
+  __swift_uint64_t valid;
 };
 
 struct arm_gprs {
-  uint32_t _r[16];
-  uint32_t valid;
+  __swift_uint32_t _r[16];
+  __swift_uint32_t valid;
 };
 
 // .. Darwin specifics .........................................................
@@ -151,26 +134,26 @@ struct arm_gprs {
 #if SWIFT_TARGET_OS_DARWIN
 
 // From libproc
-int proc_name(int pid, void * buffer, uint32_t buffersize);
+int proc_name(int pid, void * buffer, __swift_uint32_t buffersize);
 
 /* Darwin thread states.  We can't import these from the system header because
    it uses all kinds of macros and the Swift importer can't cope with that.
    So declare them here in a form it can understand. */
 #define ARM_THREAD_STATE64 6
 struct darwin_arm64_thread_state {
-  uint64_t _x[29];
-  uint64_t fp;
-  uint64_t lr;
-  uint64_t sp;
-  uint64_t pc;
-  uint32_t cpsr;
-  uint32_t __pad;
+  __swift_uint64_t _x[29];
+  __swift_uint64_t fp;
+  __swift_uint64_t lr;
+  __swift_uint64_t sp;
+  __swift_uint64_t pc;
+  __swift_uint32_t cpsr;
+  __swift_uint32_t __pad;
 };
 
 struct darwin_arm64_exception_state {
-  uint64_t far;
-  uint32_t esr;
-  uint32_t exception;
+  __swift_uint64_t far;
+  __swift_uint32_t esr;
+  __swift_uint32_t exception;
 };
 
 struct darwin_arm64_mcontext {
@@ -181,34 +164,34 @@ struct darwin_arm64_mcontext {
 
 #define x86_THREAD_STATE64 4
 struct darwin_x86_64_thread_state {
-  uint64_t rax;
-  uint64_t rbx;
-  uint64_t rcx;
-  uint64_t rdx;
-  uint64_t rdi;
-  uint64_t rsi;
-  uint64_t rbp;
-  uint64_t rsp;
-  uint64_t r8;
-  uint64_t r9;
-  uint64_t r10;
-  uint64_t r11;
-  uint64_t r12;
-  uint64_t r13;
-  uint64_t r14;
-  uint64_t r15;
-  uint64_t rip;
-  uint64_t rflags;
-  uint64_t cs;
-  uint64_t fs;
-  uint64_t gs;
+  __swift_uint64_t rax;
+  __swift_uint64_t rbx;
+  __swift_uint64_t rcx;
+  __swift_uint64_t rdx;
+  __swift_uint64_t rdi;
+  __swift_uint64_t rsi;
+  __swift_uint64_t rbp;
+  __swift_uint64_t rsp;
+  __swift_uint64_t r8;
+  __swift_uint64_t r9;
+  __swift_uint64_t r10;
+  __swift_uint64_t r11;
+  __swift_uint64_t r12;
+  __swift_uint64_t r13;
+  __swift_uint64_t r14;
+  __swift_uint64_t r15;
+  __swift_uint64_t rip;
+  __swift_uint64_t rflags;
+  __swift_uint64_t cs;
+  __swift_uint64_t fs;
+  __swift_uint64_t gs;
 };
 
 struct darwin_x86_64_exception_state {
-  uint16_t trapno;
-  uint16_t cpu;
-  uint32_t err;
-  uint64_t faultvaddr;
+  __swift_uint16_t trapno;
+  __swift_uint16_t cpu;
+  __swift_uint32_t err;
+  __swift_uint64_t faultvaddr;
 };
 
 struct darwin_x86_64_mcontext {
@@ -221,8 +204,8 @@ typedef unsigned int __swift_task_t;
 typedef unsigned int __swift_thread_t;
 typedef unsigned int __swift_kern_return_t;
 typedef unsigned char __swift_uuid_t[16];
-typedef uint64_t __swift_vm_address_t;
-typedef uint64_t __swift_vm_size_t;
+typedef __swift_uint64_t __swift_vm_address_t;
+typedef __swift_uint64_t __swift_vm_size_t;
 typedef int __swift_thread_state_flavor_t;
 typedef unsigned int __swift_natural_t;
 typedef __swift_natural_t __swift_msg_type_number_t;
@@ -273,23 +256,23 @@ _swift_backtrace_thread_get_state(__swift_thread_t target_act,
    not work how you expect, and are generally dangerous to use. */
 struct dyld_process_cache_info {
   __swift_uuid_t cacheUUID;
-  uint64_t       cacheBaseAddress;
+  __swift_uint64_t       cacheBaseAddress;
   __swift_bool   noCache;
   __swift_bool   privateCache;
 };
 typedef struct dyld_process_cache_info dyld_process_cache_info;
 typedef const struct dyld_process_info_base* dyld_process_info;
 
-extern dyld_process_info _dyld_process_info_create(__swift_task_t task, uint64_t timestamp, __swift_kern_return_t* kernelError);
+extern dyld_process_info _dyld_process_info_create(__swift_task_t task, __swift_uint64_t timestamp, __swift_kern_return_t* kernelError);
 extern void  _dyld_process_info_release(dyld_process_info info);
 extern void  _dyld_process_info_retain(dyld_process_info info);
 extern void  _dyld_process_info_get_cache(dyld_process_info info, dyld_process_cache_info* cacheInfo);
-extern void _dyld_process_info_for_each_image(dyld_process_info info, void (^callback)(uint64_t machHeaderAddress, const __swift_uuid_t uuid, const char* path));
-extern void _dyld_process_info_for_each_segment(dyld_process_info info, uint64_t machHeaderAddress, void (^callback)(uint64_t segmentAddress, uint64_t segmentSize, const char* segmentName));
+extern void _dyld_process_info_for_each_image(dyld_process_info info, void (^callback)(__swift_uint64_t machHeaderAddress, const __swift_uuid_t uuid, const char* path));
+extern void _dyld_process_info_for_each_segment(dyld_process_info info, __swift_uint64_t machHeaderAddress, void (^callback)(__swift_uint64_t segmentAddress, __swift_uint64_t segmentSize, const char* segmentName));
 
 /* DANGER!  CoreSymbolication is a private framework.  This is all SPI. */
-typedef int32_t cpu_type_t;
-typedef int32_t cpu_subtype_t;
+typedef __swift_int32_t cpu_type_t;
+typedef __swift_int32_t cpu_subtype_t;
 
 struct _CSArchitecture {
   cpu_type_t	cpu_type;
@@ -331,11 +314,11 @@ typedef struct _CSBinaryImageInformation {
   CSArchitecture arch;
   const char *path;
   CSBinaryRelocationInformation *relocations;
-  uint32_t relocationCount;
-  uint32_t flags;
+  __swift_uint32_t relocationCount;
+  __swift_uint32_t flags;
 } CSBinaryImageInformation;
 
-typedef uint64_t CSMachineTime;
+typedef __swift_uint64_t CSMachineTime;
 
 static const CSMachineTime kCSBeginningOfTime = 0;
 static const CSMachineTime kCSEndOfTime = (1ull<<63) - 1;
@@ -343,8 +326,8 @@ static const CSMachineTime kCSNow = (1ull<<63);
 static const CSMachineTime kCSAllTimes = (1ull<<63) + 1;
 
 struct _CSTypeRef {
-  uintptr_t _opaque_1;
-  uintptr_t _opaque_2;
+  __swift_uintptr_t _opaque_1;
+  __swift_uintptr_t _opaque_2;
 };
 
 typedef struct _CSTypeRef CSTypeRef;
@@ -364,7 +347,7 @@ typedef struct _CSNotificationData {
     CSSymbolicatorRef symbolicator;
     union {
         struct Ping {
-            uint32_t value;
+            __swift_uint32_t value;
         } ping;
 
         struct DyldLoad {
@@ -377,7 +360,7 @@ typedef struct _CSNotificationData {
     } u;
 } CSNotificationData;
 
-typedef void (^CSNotificationBlock)(uint32_t type, CSNotificationData data);
+typedef void (^CSNotificationBlock)(__swift_uint32_t type, CSNotificationData data);
 
 struct _CSRange {
   __swift_vm_address_t	location;
