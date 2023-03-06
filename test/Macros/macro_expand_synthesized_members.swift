@@ -74,7 +74,7 @@ public macro ExtendableEnum() = #externalMacro(module: "MacroDefinition", type: 
 
 @ExtendableEnum
 enum ElementType {
-case paper
+  case paper
 }
 
 print(ElementType.paper.unknown())

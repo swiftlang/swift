@@ -1177,7 +1177,8 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
       """
 
       class \(context.createUniqueName("name")) {
-        func hello() {
+        func hello() -> String {
+          \(body.statements)
         }
       }
       """,
@@ -1187,7 +1188,8 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
         case apple
         case banana
 
-        func hello() {
+        func hello() -> String {
+          \(body.statements)
         }
       }
       """

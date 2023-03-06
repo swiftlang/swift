@@ -109,7 +109,6 @@ namespace swift {
   class VarDecl;
   class OpaqueReturnTypeRepr;
   class Witness;
-  class MacroExpansionExpr;
 
   namespace ast_scope {
   class AbstractPatternEntryScope;

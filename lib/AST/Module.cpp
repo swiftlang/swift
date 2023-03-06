@@ -3911,18 +3911,16 @@ void FileUnit::getTopLevelDeclsWhereAttributesMatch(
   Results.erase(newEnd, Results.end());
 }
 
-void FileUnit::getExpandedTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
+void FileUnit::getTopLevelDeclsWithAuxiliaryDecls(
+    SmallVectorImpl<Decl*> &results) const {
   SmallVector<Decl *, 32> nonExpandedDecls;
   nonExpandedDecls.reserve(results.capacity());
   getTopLevelDecls(nonExpandedDecls);
   for (auto *decl : nonExpandedDecls) {
-    if (auto *med = dyn_cast<MacroExpansionDecl>(decl)) {
-      med->visitAuxiliaryDecls([&](Decl *decl) {
-        results.push_back(decl);
-      });
-    } else {
-      results.push_back(decl);
-    }
+    decl->visitAuxiliaryDecls([&](Decl *auxDecl) {
+      results.push_back(auxDecl);
+    });
+    results.push_back(decl);
   }
 }
 

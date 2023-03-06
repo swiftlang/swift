@@ -6133,7 +6133,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     // FIXME: Switch to a visitor interface?
     SmallVector<Decl *, 32> fileDecls;
-    nextFile->getExpandedTopLevelDecls(fileDecls);
+    nextFile->getTopLevelDeclsWithAuxiliaryDecls(fileDecls);
 
     for (auto D : fileDecls) {
       if (isa<ImportDecl>(D) || isa<IfConfigDecl>(D) ||
