@@ -643,6 +643,20 @@ public:
   }
 };
 
+class LocatorPathElt::GenericType : public StoredPointerElement<TypeBase> {
+public:
+  GenericType(Type type)
+      : StoredPointerElement(PathElementKind::GenericType, type.getPointer()) {
+    assert(type->getDesugaredType()->is<BoundGenericType>());
+  }
+
+  Type getType() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::GenericType;
+  }
+};
+
 /// Abstract superclass for any kind of tuple element.
 class LocatorPathElt::AnyTupleElement : public StoredIntegerElement<1> {
 protected:

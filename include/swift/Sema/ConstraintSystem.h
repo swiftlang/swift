@@ -4655,6 +4655,10 @@ public:
     /// Indicates that we are attempting a possible type for
     /// a type variable.
     TMF_BindingTypeVariable = 0x04,
+
+    /// Indicates that the solver is matching one of the
+    /// generic argument pairs as part of matching two generic types.
+    TMF_MatchingGenericArguments = 0x08,
   };
 
   /// Options that govern how type matching should proceed.
@@ -5257,6 +5261,7 @@ public:
   /// \return true if at least some of the failures has been repaired
   /// successfully, which allows type matcher to continue.
   bool repairFailures(Type lhs, Type rhs, ConstraintKind matchKind,
+                      TypeMatchOptions flags,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
 
