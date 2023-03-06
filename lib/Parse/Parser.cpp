@@ -747,7 +747,9 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
       
       // Could have encountered something like `_ var:` 
       // or `let foo:` or `var:`
-      if (Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_inout)) {
+      if (Tok.isAny(tok::kw_var, tok::kw_let) ||
+          (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&
+           Tok.isAny(tok::kw_inout))) {
         if (possibleDeclStartsLine && !hasDelimiter) {
           break;
         }
