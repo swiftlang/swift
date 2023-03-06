@@ -44,6 +44,8 @@ public struct UnownedJob: Sendable {
 
   @_alwaysEmitIntoClient
   @inlinable
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
   public func runSynchronously(on executor: UnownedSerialExecutor) {
       _swiftJobRun(self, executor)
   }
