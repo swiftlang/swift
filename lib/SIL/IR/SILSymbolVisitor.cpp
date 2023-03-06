@@ -395,6 +395,13 @@ public:
       addMainIfNecessary(file);
 
       for (auto D : decls) {
+        D->visitAuxiliaryDecls([&](Decl *decl) {
+          if (Ctx.getOpts().LinkerDirectivesOnly && !requiresLinkerDirective(decl))
+            return;
+
+          visit(decl);
+        });
+
         if (Ctx.getOpts().LinkerDirectivesOnly && !requiresLinkerDirective(D))
           continue;
 
@@ -573,6 +580,20 @@ public:
     visitAbstractStorageDecl(SD);
   }
 
+  template<typename NominalOrExtension>
+  void visitMembers(NominalOrExtension *D) {
+    if (!Ctx.getOpts().VisitMembers)
+      return;
+
+    for (auto member : D->getMembers()) {
+      member->visitAuxiliaryDecls([&](Decl *decl) {
+        visit(decl);
+      });
+
+      visit(member);
+    }
+  }
+
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
@@ -591,9 +612,7 @@ public:
 
     addRuntimeDiscoverableAttrGenerators(NTD);
 
-    if (Ctx.getOpts().VisitMembers)
-      for (auto member : NTD->getMembers())
-        visit(member);
+    visitMembers(NTD);
   }
 
   void visitClassDecl(ClassDecl *CD) {
@@ -682,9 +701,7 @@ public:
       addConformances(ED);
     }
 
-    if (Ctx.getOpts().VisitMembers)
-      for (auto member : ED->getMembers())
-        visit(member);
+    visitMembers(ED);
   }
 
 #ifndef NDEBUG
