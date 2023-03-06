@@ -42,6 +42,14 @@ set TMPDIR=%BuildRoot%\tmp
 
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
+rem TODO(compnerd) remove this clean up code once we have had enough time for
+rem the injection to soak.
+:: Clean up old deployments as that breaks the tests
+del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap"
+del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap"
+del /f /q "%VCToolsInstallDir%\include\module.modulemap"
+del /f /q "%VCToolsInstallDir%\include\vcruntime.apinotes"
+
 call :CloneDependencies || (exit /b)
 call :CloneRepositories || (exit /b)
 
@@ -178,12 +186,6 @@ cmake ^
 cmake --build "%BuildRoot%\curl" || (exit /b)
 cmake --build "%BuildRoot%\curl" --target install || (exit /b)
 
-:: Prepare system modules
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\ucrt.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" || (exit /b)
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\winsdk.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" || (exit /b)
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\vcruntime.modulemap" "%VCToolsInstallDir%\include\module.modulemap" || (exit /b)
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\vcruntime.apinotes" "%VCToolsInstallDir%\include\vcruntime.apinotes" || (exit /b)
-
 :: Build Toolchain
 cmake ^
   -B "%BuildRoot%\1" ^
@@ -275,6 +277,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -298,6 +301,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -333,6 +337,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -360,6 +365,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -381,6 +387,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -408,6 +415,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy -Xclang -fno-split-cold-code" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -436,6 +444,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -462,7 +471,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
-  -D CMAKE_Swift_FLAGS="-Xcc -DYAML_DECLARE_EXPORT -Xcc -DWIN32" ^
+  -D CMAKE_Swift_FLAGS="-Xcc -DYAML_DECLARE_EXPORT -Xcc -DWIN32 -vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -487,6 +496,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -520,6 +530,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -543,6 +554,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -616,6 +628,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -653,6 +666,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy -Xclang -fno-split-cold-code" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -696,6 +710,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy -Xclang -fno-split-cold-code" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
