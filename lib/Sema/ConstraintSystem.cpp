@@ -6463,9 +6463,9 @@ ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
   return choice.getDecl();
 }
 
-void SolutionApplicationTargetsKey::dump() const { dump(llvm::errs()); }
+void SyntacticElementTargetKey::dump() const { dump(llvm::errs()); }
 
-void SolutionApplicationTargetsKey::dump(raw_ostream &OS) const {
+void SyntacticElementTargetKey::dump(raw_ostream &OS) const {
   switch (kind) {
   case Kind::empty:
     OS << "<empty>\n";
@@ -6516,7 +6516,7 @@ void SolutionApplicationTargetsKey::dump(raw_ostream &OS) const {
 ///
 /// This is guaranteed to always emit an error message.
 ///
-void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
+void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
   setPhase(ConstraintSystemPhase::Diagnostics);
 
   SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
@@ -6611,7 +6611,7 @@ bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conforman
 /// If we aren't certain that we've emitted a diagnostic, emit a fallback
 /// diagnostic.
 void ConstraintSystem::maybeProduceFallbackDiagnostic(
-    SolutionApplicationTarget target) const {
+    SyntacticElementTarget target) const {
   if (Options.contains(ConstraintSystemFlags::SuppressDiagnostics))
     return;
 

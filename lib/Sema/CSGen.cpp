@@ -4113,7 +4113,7 @@ namespace {
 
         auto &CS = CG.getConstraintSystem();
         for (const auto &capture : captureList->getCaptureList()) {
-          SolutionApplicationTarget target(capture.PBD);
+          SyntacticElementTarget target(capture.PBD);
           if (CS.generateConstraints(target))
             return Action::Stop();
         }
@@ -4286,8 +4286,9 @@ bool ConstraintSystem::generateWrappedPropertyTypeConstraints(
 }
 
 /// Generate additional constraints for the pattern of an initialization.
-static bool generateInitPatternConstraints(
-    ConstraintSystem &cs, SolutionApplicationTarget target, Expr *initializer) {
+static bool generateInitPatternConstraints(ConstraintSystem &cs,
+                                           SyntacticElementTarget target,
+                                           Expr *initializer) {
   auto pattern = target.getInitializationPattern();
   auto locator = cs.getConstraintLocator(
       initializer, LocatorPathElt::ContextualType(CTP_Initialization));
@@ -4310,9 +4311,9 @@ static bool generateInitPatternConstraints(
   return false;
 }
 
-static Optional<SolutionApplicationTarget>
-generateForEachStmtConstraints(
-  ConstraintSystem &cs, SolutionApplicationTarget target) {
+static Optional<SyntacticElementTarget>
+generateForEachStmtConstraints(ConstraintSystem &cs,
+                               SyntacticElementTarget target) {
   ASTContext &ctx = cs.getASTContext();
   auto forEachStmtInfo = target.getForEachStmtInfo();
   ForEachStmt *stmt = target.getAsForEachStmt();
@@ -4358,7 +4359,7 @@ generateForEachStmtConstraints(
     auto *PB = PatternBindingDecl::createImplicit(
         ctx, StaticSpellingKind::None, pattern, makeIteratorCall, dc);
 
-    auto makeIteratorTarget = SolutionApplicationTarget::forInitialization(
+    auto makeIteratorTarget = SyntacticElementTarget::forInitialization(
         makeIteratorCall, dc, /*patternType=*/Type(), PB, /*index=*/0,
         /*shouldBindPatternsOneWay=*/false);
 
@@ -4393,7 +4394,7 @@ generateForEachStmtConstraints(
       forEachStmtInfo.sequenceType = cs.getType(sequenceExpr);
     }
 
-    cs.setSolutionApplicationTarget({PB, /*index=*/0}, makeIteratorTarget);
+    cs.setTargetFor({PB, /*index=*/0}, makeIteratorTarget);
   }
 
   // Now, result type of `.makeIterator()` is used to form a call to
@@ -4429,14 +4430,14 @@ generateForEachStmtConstraints(
           CTP_ForEachSequence);
     }
 
-    SolutionApplicationTarget nextTarget(nextCall, dc, CTP_Unused,
-                                         /*contextualType=*/Type(),
-                                         /*isDiscarded=*/false);
+    SyntacticElementTarget nextTarget(nextCall, dc, CTP_Unused,
+                                      /*contextualType=*/Type(),
+                                      /*isDiscarded=*/false);
     if (cs.generateConstraints(nextTarget, FreeTypeVariableBinding::Disallow))
       return None;
 
     forEachStmtInfo.nextCall = nextTarget.getAsExpr();
-    cs.setSolutionApplicationTarget(forEachStmtInfo.nextCall, nextTarget);
+    cs.setTargetFor(forEachStmtInfo.nextCall, nextTarget);
   }
 
   Pattern *pattern = TypeChecker::resolvePattern(stmt->getPattern(), dc,
@@ -4486,13 +4487,12 @@ generateForEachStmtConstraints(
     if (!boolType)
       return None;
 
-    SolutionApplicationTarget whereTarget(whereExpr, dc, CTP_Condition,
-                                          boolType,
-                                          /*isDiscarded=*/false);
+    SyntacticElementTarget whereTarget(whereExpr, dc, CTP_Condition, boolType,
+                                       /*isDiscarded=*/false);
     if (cs.generateConstraints(whereTarget, FreeTypeVariableBinding::Disallow))
       return None;
 
-    cs.setSolutionApplicationTarget(whereExpr, whereTarget);
+    cs.setTargetFor(whereExpr, whereTarget);
     cs.setContextualType(whereExpr, TypeLoc::withoutLoc(boolType),
                          CTP_Condition);
   }
@@ -4506,7 +4506,7 @@ generateForEachStmtConstraints(
 }
 
 bool ConstraintSystem::generateConstraints(
-    SolutionApplicationTarget &target,
+    SyntacticElementTarget &target,
     FreeTypeVariableBinding allowFreeTypeVariables) {
   if (Expr *expr = target.getAsExpr()) {
     // If the target requires an optional of some type, form a new appropriate
@@ -4604,16 +4604,16 @@ bool ConstraintSystem::generateConstraints(
   }
 
   switch (target.kind) {
-  case SolutionApplicationTarget::Kind::expression:
+  case SyntacticElementTarget::Kind::expression:
     llvm_unreachable("Handled above");
 
-  case SolutionApplicationTarget::Kind::closure:
-  case SolutionApplicationTarget::Kind::caseLabelItem:
-  case SolutionApplicationTarget::Kind::function:
-  case SolutionApplicationTarget::Kind::stmtCondition:
+  case SyntacticElementTarget::Kind::closure:
+  case SyntacticElementTarget::Kind::caseLabelItem:
+  case SyntacticElementTarget::Kind::function:
+  case SyntacticElementTarget::Kind::stmtCondition:
     llvm_unreachable("Handled separately");
 
-  case SolutionApplicationTarget::Kind::patternBinding: {
+  case SyntacticElementTarget::Kind::patternBinding: {
     auto patternBinding = target.getAsPatternBinding();
     auto dc = target.getDeclContext();
     bool hadError = false;
@@ -4646,10 +4646,10 @@ bool ConstraintSystem::generateConstraints(
         init = TypeChecker::buildDefaultInitializer(patternType);
       }
 
-      auto target = init ? SolutionApplicationTarget::forInitialization(
+      auto target = init ? SyntacticElementTarget::forInitialization(
                                init, dc, patternType, patternBinding, index,
                                /*bindPatternVarsOneWay=*/true)
-                         : SolutionApplicationTarget::forUninitializedVar(
+                         : SyntacticElementTarget::forUninitializedVar(
                                patternBinding, index, patternType);
 
       if (generateConstraints(target)) {
@@ -4658,13 +4658,13 @@ bool ConstraintSystem::generateConstraints(
       }
 
       // Keep track of this binding entry.
-      setSolutionApplicationTarget({patternBinding, index}, target);
+      setTargetFor({patternBinding, index}, target);
     }
 
     return hadError;
   }
 
-  case SolutionApplicationTarget::Kind::uninitializedVar: {
+  case SyntacticElementTarget::Kind::uninitializedVar: {
     if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
       auto propertyType = getVarType(wrappedVar);
       if (propertyType->hasError())
@@ -4688,7 +4688,7 @@ bool ConstraintSystem::generateConstraints(
     }
   }
 
-  case SolutionApplicationTarget::Kind::forEachStmt: {
+  case SyntacticElementTarget::Kind::forEachStmt: {
     // For a for-each statement, generate constraints for the pattern, where
     // clause, and sequence traversal.
     auto resultTarget = generateForEachStmtConstraints(*this, target);
@@ -4734,25 +4734,25 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
     case StmtConditionElement::CK_HasSymbol: {
       Expr *symbolExpr = condElement.getHasSymbolInfo()->getSymbolExpr();
-      auto target = SolutionApplicationTarget(symbolExpr, dc, CTP_Unused,
-                                              Type(), /*isDiscarded=*/false);
+      auto target = SyntacticElementTarget(symbolExpr, dc, CTP_Unused, Type(),
+                                           /*isDiscarded=*/false);
 
       if (generateConstraints(target))
         return true;
 
-      setSolutionApplicationTarget(&condElement, target);
+      setTargetFor(&condElement, target);
       continue;
     }
 
     case StmtConditionElement::CK_Boolean: {
       Expr *condExpr = condElement.getBoolean();
-      auto target = SolutionApplicationTarget(condExpr, dc, CTP_Condition,
-                                              boolTy, /*isDiscarded=*/false);
+      auto target = SyntacticElementTarget(condExpr, dc, CTP_Condition, boolTy,
+                                           /*isDiscarded=*/false);
 
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
         return true;
 
-      setSolutionApplicationTarget(&condElement, target);
+      setTargetFor(&condElement, target);
       continue;
     }
 
@@ -4762,13 +4762,13 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
       if (!pattern)
         return true;
 
-      auto target = SolutionApplicationTarget::forInitialization(
-          condElement.getInitializer(), dc, Type(),
-          pattern, /*bindPatternVarsOneWay=*/true);
+      auto target = SyntacticElementTarget::forInitialization(
+          condElement.getInitializer(), dc, Type(), pattern,
+          /*bindPatternVarsOneWay=*/true);
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
         return true;
 
-      setSolutionApplicationTarget(&condElement, target);
+      setTargetFor(&condElement, target);
       continue;
     }
     }
@@ -4809,14 +4809,14 @@ bool ConstraintSystem::generateConstraints(
     Expr *guardExpr = caseLabelItem.getGuardExpr();
     if (guardExpr) {
       auto &ctx = dc->getASTContext();
-      SolutionApplicationTarget guardTarget(
+      SyntacticElementTarget guardTarget(
           guardExpr, dc, CTP_Condition, ctx.getBoolType(), /*discarded*/ false);
 
       if (generateConstraints(guardTarget))
         return true;
 
       guardExpr = guardTarget.getAsExpr();
-      setSolutionApplicationTarget(guardExpr, guardTarget);
+      setTargetFor(guardExpr, guardTarget);
     }
 
     // Save this info.

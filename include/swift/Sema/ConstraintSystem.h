@@ -30,15 +30,15 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Sema/CSBindings.h"
+#include "swift/Sema/CSFix.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintGraphScope.h"
 #include "swift/Sema/ConstraintLocator.h"
-#include "swift/Sema/CSBindings.h"
-#include "swift/Sema/CSFix.h"
 #include "swift/Sema/OverloadChoice.h"
-#include "swift/Sema/SolutionApplicationTarget.h"
 #include "swift/Sema/SolutionResult.h"
+#include "swift/Sema/SyntacticElementTarget.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
@@ -66,7 +66,7 @@ namespace constraints {
 class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
-class SolutionApplicationTarget;
+class SyntacticElementTarget;
 
 } // end namespace constraints
 
@@ -78,12 +78,12 @@ Optional<BraceStmt *> applyResultBuilderBodyTransform(
     FuncDecl *func, Type builderType,
     bool ClosuresInResultBuilderDontParticipateInInference);
 
-Optional<constraints::SolutionApplicationTarget>
-typeCheckExpression(constraints::SolutionApplicationTarget &target,
+Optional<constraints::SyntacticElementTarget>
+typeCheckExpression(constraints::SyntacticElementTarget &target,
                     OptionSet<TypeCheckExprFlags> options);
 
-Optional<constraints::SolutionApplicationTarget>
-typeCheckTarget(constraints::SolutionApplicationTarget &target,
+Optional<constraints::SyntacticElementTarget>
+typeCheckTarget(constraints::SyntacticElementTarget &target,
                 OptionSet<TypeCheckExprFlags> options);
 
 Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool);
@@ -1201,8 +1201,8 @@ struct CaseLabelItemInfo {
 };
 
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
-/// solution application targets.
-class SolutionApplicationTargetsKey {
+/// target.
+class SyntacticElementTargetKey {
 public:
   enum class Kind {
     empty,
@@ -1240,55 +1240,55 @@ private:
   } storage;
 
 public:
-  SolutionApplicationTargetsKey(Kind kind) {
+  SyntacticElementTargetKey(Kind kind) {
     assert(kind == Kind::empty || kind == Kind::tombstone);
     this->kind = kind;
   }
 
-  SolutionApplicationTargetsKey(const StmtConditionElement *stmtCondElement) {
+  SyntacticElementTargetKey(const StmtConditionElement *stmtCondElement) {
     kind = Kind::stmtCondElement;
     storage.stmtCondElement = stmtCondElement;
   }
 
-  SolutionApplicationTargetsKey(const Expr *expr) {
+  SyntacticElementTargetKey(const Expr *expr) {
     kind = Kind::expr;
     storage.expr = expr;
   }
 
-  SolutionApplicationTargetsKey(const ClosureExpr *closure) {
+  SyntacticElementTargetKey(const ClosureExpr *closure) {
     kind = Kind::closure;
     storage.expr = closure;
   }
 
-  SolutionApplicationTargetsKey(const Stmt *stmt) {
+  SyntacticElementTargetKey(const Stmt *stmt) {
     kind = Kind::stmt;
     storage.stmt = stmt;
   }
 
-  SolutionApplicationTargetsKey(const Pattern *pattern) {
+  SyntacticElementTargetKey(const Pattern *pattern) {
     kind = Kind::pattern;
     storage.pattern = pattern;
   }
 
-  SolutionApplicationTargetsKey(
-      const PatternBindingDecl *patternBinding, unsigned index) {
+  SyntacticElementTargetKey(const PatternBindingDecl *patternBinding,
+                            unsigned index) {
     kind = Kind::patternBindingEntry;
     storage.patternBindingEntry.patternBinding = patternBinding;
     storage.patternBindingEntry.index = index;
   }
 
-  SolutionApplicationTargetsKey(const VarDecl *varDecl) {
+  SyntacticElementTargetKey(const VarDecl *varDecl) {
     kind = Kind::varDecl;
     storage.varDecl = varDecl;
   }
 
-  SolutionApplicationTargetsKey(const AnyFunctionRef functionRef) {
+  SyntacticElementTargetKey(const AnyFunctionRef functionRef) {
     kind = Kind::functionRef;
     storage.functionRef = functionRef.getAsDeclContext();
   }
 
-  friend bool operator==(
-      SolutionApplicationTargetsKey lhs, SolutionApplicationTargetsKey rhs) {
+  friend bool operator==(SyntacticElementTargetKey lhs,
+                         SyntacticElementTargetKey rhs) {
     if (lhs.kind != rhs.kind)
       return false;
 
@@ -1322,11 +1322,11 @@ public:
     case Kind::functionRef:
       return lhs.storage.functionRef == rhs.storage.functionRef;
     }
-    llvm_unreachable("invalid SolutionApplicationTargetsKey kind");
+    llvm_unreachable("invalid SyntacticElementTargetKey kind");
   }
 
-  friend bool operator!=(
-      SolutionApplicationTargetsKey lhs, SolutionApplicationTargetsKey rhs) {
+  friend bool operator!=(SyntacticElementTargetKey lhs,
+                         SyntacticElementTargetKey rhs) {
     return !(lhs == rhs);
   }
 
@@ -1506,9 +1506,8 @@ public:
   /// Contextual types introduced by this solution.
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
 
-  /// Maps AST nodes to their solution application targets.
-  llvm::MapVector<SolutionApplicationTargetsKey, SolutionApplicationTarget>
-    solutionApplicationTargets;
+  /// Maps AST nodes to their target.
+  llvm::MapVector<SyntacticElementTargetKey, SyntacticElementTarget> targets;
 
   /// Maps case label items to information tracked about them as they are
   /// being solved.
@@ -1928,10 +1927,10 @@ struct DynamicCallableMethods {
   }
 };
 
-/// A function that rewrites a solution application target in the context
+/// A function that rewrites a syntactic element target in the context
 /// of solution application.
-using RewriteTargetFn = std::function<
-    Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>;
+using RewriteTargetFn =
+    std::function<Optional<SyntacticElementTarget>(SyntacticElementTarget)>;
 
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
@@ -2142,9 +2141,8 @@ private:
       std::tuple<const KeyPathExpr *, /*component index=*/unsigned, Type>>
       addedKeyPathComponentTypes;
 
-  /// Maps AST entries to their solution application targets.
-  llvm::MapVector<SolutionApplicationTargetsKey, SolutionApplicationTarget>
-    solutionApplicationTargets;
+  /// Maps AST entries to their targets.
+  llvm::MapVector<SyntacticElementTargetKey, SyntacticElementTarget> targets;
 
   /// Contextual type information for expressions that are part of this
   /// constraint system. The second type, if valid, contains the type as it
@@ -2740,8 +2738,8 @@ public:
     /// The length of \c contextualTypes.
     unsigned numContextualTypes;
 
-    /// The length of \c solutionApplicationTargets.
-    unsigned numSolutionApplicationTargets;
+    /// The length of \c targets.
+    unsigned numTargets;
 
     /// The length of \c caseLabelItems.
     unsigned numCaseLabelItems;
@@ -2820,12 +2818,12 @@ private:
       FuncDecl *func, Type builderType,
       bool ClosuresInResultBuilderDontParticipateInInference);
 
-  friend Optional<SolutionApplicationTarget>
+  friend Optional<SyntacticElementTarget>
   swift::TypeChecker::typeCheckExpression(
-      SolutionApplicationTarget &target, OptionSet<TypeCheckExprFlags> options);
+      SyntacticElementTarget &target, OptionSet<TypeCheckExprFlags> options);
 
-  friend Optional<SolutionApplicationTarget>
-  swift::TypeChecker::typeCheckTarget(SolutionApplicationTarget &target,
+  friend Optional<SyntacticElementTarget>
+  swift::TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
                                       OptionSet<TypeCheckExprFlags> options);
 
   friend Type swift::TypeChecker::typeCheckParameterDefault(Expr *&,
@@ -3118,17 +3116,16 @@ public:
     return CTP_Unused;
   }
 
-  void setSolutionApplicationTarget(
-      SolutionApplicationTargetsKey key, SolutionApplicationTarget target) {
-    assert(solutionApplicationTargets.count(key) == 0 &&
-           "Already set this solution application target");
-    solutionApplicationTargets.insert({key, target});
+  void setTargetFor(SyntacticElementTargetKey key,
+                    SyntacticElementTarget target) {
+    assert(targets.count(key) == 0 && "Already set this target");
+    targets.insert({key, target});
   }
 
-  Optional<SolutionApplicationTarget> getSolutionApplicationTarget(
-      SolutionApplicationTargetsKey key) const {
-    auto known = solutionApplicationTargets.find(key);
-    if (known == solutionApplicationTargets.end())
+  Optional<SyntacticElementTarget>
+  getTargetFor(SyntacticElementTargetKey key) const {
+    auto known = targets.find(key);
+    if (known == targets.end())
       return None;
     return known->second;
   }
@@ -3416,7 +3413,7 @@ public:
   ///
   /// Assuming that this constraint system is actually erroneous, this *always*
   /// emits an error message.
-  void diagnoseFailureFor(SolutionApplicationTarget target);
+  void diagnoseFailureFor(SyntacticElementTarget target);
 
   bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(SmallVectorImpl<Solution> &solutions);
@@ -4275,10 +4272,10 @@ public:
   /// Generate constraints for the given solution target.
   ///
   /// \returns true if an error occurred, false otherwise.
-  [[nodiscard]]
-  bool generateConstraints(SolutionApplicationTarget &target,
-                           FreeTypeVariableBinding allowFreeTypeVariables =
-                               FreeTypeVariableBinding::Disallow);
+  [[nodiscard]] bool
+  generateConstraints(SyntacticElementTarget &target,
+                      FreeTypeVariableBinding allowFreeTypeVariables =
+                          FreeTypeVariableBinding::Disallow);
 
   /// Generate constraints for the body of the given function or closure.
   ///
@@ -5018,9 +5015,9 @@ private:
   /// \param target The target to generate constraints from.
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
-  SolutionResult solveImpl(SolutionApplicationTarget &target,
-                           FreeTypeVariableBinding allowFreeTypeVariables
-                             = FreeTypeVariableBinding::Disallow);
+  SolutionResult solveImpl(SyntacticElementTarget &target,
+                           FreeTypeVariableBinding allowFreeTypeVariables =
+                               FreeTypeVariableBinding::Disallow);
 
 public:
   /// Pre-check the target, validating any types that occur in it
@@ -5028,7 +5025,7 @@ public:
   ///
   /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
   /// to replace any discovered invalid member references with `ErrorExpr`.
-  static bool preCheckTarget(SolutionApplicationTarget &target,
+  static bool preCheckTarget(SyntacticElementTarget &target,
                              bool replaceInvalidRefsWithErrors,
                              bool leaveClosureBodiesUnchecked);
 
@@ -5050,10 +5047,10 @@ public:
   ///
   /// \returns the set of solutions, if any were found, or \c None if an
   /// error occurred. When \c None, an error has been emitted.
-  Optional<std::vector<Solution>> solve(
-      SolutionApplicationTarget &target,
-      FreeTypeVariableBinding allowFreeTypeVariables
-        = FreeTypeVariableBinding::Disallow);
+  Optional<std::vector<Solution>>
+  solve(SyntacticElementTarget &target,
+        FreeTypeVariableBinding allowFreeTypeVariables =
+            FreeTypeVariableBinding::Disallow);
 
   /// Solve the system of constraints.
   ///
@@ -5100,7 +5097,7 @@ public:
   ///
   /// \returns `false` if this call fails (e.g. pre-check or constraint
   /// generation fails), `true` otherwise.
-  bool solveForCodeCompletion(SolutionApplicationTarget &target,
+  bool solveForCodeCompletion(SyntacticElementTarget &target,
                               SmallVectorImpl<Solution> &solutions);
 
 private:
@@ -5153,8 +5150,8 @@ public:
   /// type-checked target or \c None if an error occurred.
   ///
   /// \param target the target to which the solution will be applied.
-  Optional<SolutionApplicationTarget> applySolution(
-      Solution &solution, SolutionApplicationTarget target);
+  Optional<SyntacticElementTarget> applySolution(Solution &solution,
+                                                 SyntacticElementTarget target);
 
   /// Apply the given solution to the given statement-condition.
   Optional<StmtCondition> applySolution(
@@ -5167,14 +5164,12 @@ public:
   /// \param fn The function to which the solution is being applied.
   /// \param currentDC The declaration context in which transformations
   /// will be applied.
-  /// \param rewriteTarget Function that performs a rewrite of any
-  /// solution application target within the context.
+  /// \param rewriteTarget Function that performs a rewrite of any targets
+  /// within the context.
   ///
   SolutionApplicationToFunctionResult applySolution(
-      Solution &solution, AnyFunctionRef fn,
-      DeclContext *&currentDC,
-      std::function<
-        Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
+      Solution &solution, AnyFunctionRef fn, DeclContext *&currentDC,
+      std::function<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
           rewriteTarget);
 
   /// Apply the given solution to the given closure body.
@@ -5184,15 +5179,14 @@ public:
   /// \param fn The function or closure to which the solution is being applied.
   /// \param currentDC The declaration context in which transformations
   /// will be applied.
-  /// \param rewriteTarget Function that performs a rewrite of any
-  /// solution application target within the context.
+  /// \param rewriteTarget Function that performs a rewrite of any targets
+  /// within the context.
   ///
   /// \returns true if solution cannot be applied.
-  bool applySolutionToBody(Solution &solution, AnyFunctionRef fn,
-                           DeclContext *&currentDC,
-                           std::function<Optional<SolutionApplicationTarget>(
-                               SolutionApplicationTarget)>
-                               rewriteTarget);
+  bool applySolutionToBody(
+      Solution &solution, AnyFunctionRef fn, DeclContext *&currentDC,
+      std::function<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
+          rewriteTarget);
 
   /// Apply the given solution to the given SingleValueStmtExpr.
   ///
@@ -5200,14 +5194,13 @@ public:
   /// \param SVE The SingleValueStmtExpr to rewrite.
   /// \param DC The declaration context in which transformations will be
   /// applied.
-  /// \param rewriteTarget Function that performs a rewrite of any
-  /// solution application target within the context.
+  /// \param rewriteTarget Function that performs a rewrite of any targets
+  /// within the context.
   ///
   /// \returns true if solution cannot be applied.
   bool applySolutionToSingleValueStmt(
       Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
-      std::function<
-          Optional<SolutionApplicationTarget>(SolutionApplicationTarget)>
+      std::function<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
           rewriteTarget);
 
   /// Reorder the disjunctive clauses for a given expression to
@@ -5289,7 +5282,7 @@ public:
 
   /// If we aren't certain that we've emitted a diagnostic, emit a fallback
   /// diagnostic.
-  void maybeProduceFallbackDiagnostic(SolutionApplicationTarget target) const;
+  void maybeProduceFallbackDiagnostic(SyntacticElementTarget target) const;
 
   /// Check whether given AST node represents an argument of an application
   /// of some sort (call, operator invocation, subscript etc.)
@@ -6062,8 +6055,8 @@ bool hasExplicitResult(ClosureExpr *closure);
 /// Emit diagnostics for syntactic restrictions within a given solution
 /// application target.
 void performSyntacticDiagnosticsForTarget(
-    const SolutionApplicationTarget &target,
-    bool isExprStmt,bool disableExprAvailabilityChecking = false);
+    const SyntacticElementTarget &target, bool isExprStmt,
+    bool disableExprAvailabilityChecking = false);
 
 /// Given a member of a protocol, check whether `Self` type of that
 /// protocol is contextually bound to some concrete type via same-type
@@ -6220,19 +6213,16 @@ std::string describeGenericType(ValueDecl *GP, bool includeName = false);
 /// \param applied The applied builder transform.
 /// \param body The body to transform
 /// \param dc The context in which the transform occurs.
-/// \param rewriteTarget Rewrites a solution application target to its final,
-/// type-checked version.
+/// \param rewriteTarget Rewrites a target to its final, type-checked version.
 ///
 /// \returns the transformed body
 BraceStmt *applyResultBuilderTransform(
     const constraints::Solution &solution,
-    constraints::AppliedBuilderTransform applied,
-    BraceStmt *body,
+    constraints::AppliedBuilderTransform applied, BraceStmt *body,
     DeclContext *dc,
-    std::function<
-        Optional<constraints::SolutionApplicationTarget> (
-          constraints::SolutionApplicationTarget)>
-            rewriteTarget);
+    std::function<Optional<constraints::SyntacticElementTarget>(
+        constraints::SyntacticElementTarget)>
+        rewriteTarget);
 
 /// Whether the given parameter requires an argument.
 bool parameterRequiresArgument(
@@ -6243,9 +6233,9 @@ bool parameterRequiresArgument(
 } // end namespace swift
 
 namespace llvm {
-template<>
-struct DenseMapInfo<swift::constraints::SolutionApplicationTargetsKey> {
-  using Key = swift::constraints::SolutionApplicationTargetsKey;
+template <>
+struct DenseMapInfo<swift::constraints::SyntacticElementTargetKey> {
+  using Key = swift::constraints::SyntacticElementTargetKey;
 
   static inline Key getEmptyKey() {
     return Key(Key::Kind::empty);

@@ -1,4 +1,4 @@
-//===--- SolutionApplicationTarget.cpp - Solution Target ------------------===//
+//===--- SyntacticElementTarget.cpp - Syntactic Element Target ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements SolutionApplicationTarget
+// This file implements SyntacticElementTarget
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Sema/SolutionApplicationTarget.h"
+#include "swift/Sema/SyntacticElementTarget.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeRepr.h"
 #include "TypeChecker.h"
@@ -22,9 +22,9 @@
 using namespace swift;
 using namespace constraints;
 
-#define DEBUG_TYPE "SolutionApplicationTarget"
+#define DEBUG_TYPE "SyntacticElementTarget"
 
-SolutionApplicationTarget::SolutionApplicationTarget(
+SyntacticElementTarget::SyntacticElementTarget(
     Expr *expr, DeclContext *dc, ContextualTypePurpose contextualPurpose,
     TypeLoc convertType, ConstraintLocator *convertTypeLocator,
     bool isDiscarded) {
@@ -61,7 +61,7 @@ SolutionApplicationTarget::SolutionApplicationTarget(
   expression.initialization.patternBindingIndex = 0;
 }
 
-void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
+void SyntacticElementTarget::maybeApplyPropertyWrapper() {
   assert(kind == Kind::expression);
   assert(expression.contextualPurpose == CTP_Initialization);
 
@@ -99,8 +99,7 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
 
     backingInitializer = wrappedInitializer;
   } else {
-    Type outermostWrapperType =
-        singleVar->getAttachedPropertyWrapperType(0);
+    Type outermostWrapperType = singleVar->getAttachedPropertyWrapperType(0);
     if (!outermostWrapperType)
       return;
 
@@ -111,8 +110,8 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
     auto outermostArgs = outermostWrapperAttr->getArgs();
     if (!outermostArgs) {
       SourceLoc fakeParenLoc = outermostWrapperAttr->getRange().End;
-      outermostArgs = ArgumentList::createImplicit(ctx, fakeParenLoc, {},
-                                                   fakeParenLoc);
+      outermostArgs =
+          ArgumentList::createImplicit(ctx, fakeParenLoc, {}, fakeParenLoc);
       isImplicit = true;
     }
 
@@ -135,9 +134,10 @@ void SolutionApplicationTarget::maybeApplyPropertyWrapper() {
                             outermostWrapperAttr->getType()};
 }
 
-SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
-    Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
-    bool bindPatternVarsOneWay) {
+SyntacticElementTarget
+SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
+                                          Type patternType, Pattern *pattern,
+                                          bool bindPatternVarsOneWay) {
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
@@ -157,7 +157,7 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
     }
   }
 
-  SolutionApplicationTarget target(
+  SyntacticElementTarget target(
       initializer, dc, CTP_Initialization, contextualType,
       /*convertTypeLocator*/ nullptr, /*isDiscarded=*/false);
   target.expression.pattern = pattern;
@@ -166,32 +166,31 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
   return target;
 }
 
-SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
+SyntacticElementTarget SyntacticElementTarget::forInitialization(
     Expr *initializer, DeclContext *dc, Type patternType,
     PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
     bool bindPatternVarsOneWay) {
-    auto result = forInitialization(
-        initializer, dc, patternType,
-        patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
-    result.expression.initialization.patternBinding = patternBinding;
-    result.expression.initialization.patternBindingIndex = patternBindingIndex;
-    return result;
+  auto result = forInitialization(
+      initializer, dc, patternType,
+      patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
+  result.expression.initialization.patternBinding = patternBinding;
+  result.expression.initialization.patternBindingIndex = patternBindingIndex;
+  return result;
 }
 
-SolutionApplicationTarget
-SolutionApplicationTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
-                                          bool bindPatternVarsOneWay) {
-  SolutionApplicationTarget target(
+SyntacticElementTarget
+SyntacticElementTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
+                                       bool bindPatternVarsOneWay) {
+  SyntacticElementTarget target(
       stmt, dc, bindPatternVarsOneWay || bool(stmt->getWhere()));
   return target;
 }
 
-SolutionApplicationTarget
-SolutionApplicationTarget::forPropertyWrapperInitializer(
+SyntacticElementTarget SyntacticElementTarget::forPropertyWrapperInitializer(
     VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
-  SolutionApplicationTarget target(
-      initializer, dc, CTP_Initialization, wrappedVar->getType(),
-      /*isDiscarded=*/false);
+  SyntacticElementTarget target(initializer, dc, CTP_Initialization,
+                                wrappedVar->getType(),
+                                /*isDiscarded=*/false);
   target.expression.propertyWrapper.wrappedVar = wrappedVar;
   if (auto *patternBinding = wrappedVar->getParentPatternBinding()) {
     auto index = patternBinding->getPatternEntryIndexForVarDecl(wrappedVar);
@@ -203,8 +202,7 @@ SolutionApplicationTarget::forPropertyWrapperInitializer(
   return target;
 }
 
-ContextualPattern
-SolutionApplicationTarget::getContextualPattern() const {
+ContextualPattern SyntacticElementTarget::getContextualPattern() const {
   if (kind == Kind::uninitializedVar) {
     assert(patternBinding);
     return ContextualPattern::forPatternBindingDecl(patternBinding,
@@ -228,7 +226,7 @@ SolutionApplicationTarget::getContextualPattern() const {
   return ContextualPattern::forRawPattern(expression.pattern, expression.dc);
 }
 
-bool SolutionApplicationTarget::infersOpaqueReturnType() const {
+bool SyntacticElementTarget::infersOpaqueReturnType() const {
   assert(kind == Kind::expression);
   switch (expression.contextualPurpose) {
   case CTP_Initialization:
@@ -242,7 +240,7 @@ bool SolutionApplicationTarget::infersOpaqueReturnType() const {
   }
 }
 
-bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
+bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   assert(kind == Kind::expression);
   switch (expression.contextualPurpose) {
   case CTP_Initialization:
@@ -281,9 +279,9 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   llvm_unreachable("invalid contextual type");
 }
 
-Optional<SolutionApplicationTarget>
-SolutionApplicationTarget::walk(ASTWalker &walker) const {
-  SolutionApplicationTarget result = *this;
+Optional<SyntacticElementTarget>
+SyntacticElementTarget::walk(ASTWalker &walker) const {
+  SyntacticElementTarget result = *this;
   switch (kind) {
   case Kind::expression: {
     if (isForInitialization()) {

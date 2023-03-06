@@ -343,7 +343,7 @@ namespace {
     ConstraintSystem &cs;
     DeclContext *dc;
     Solution &solution;
-    Optional<SolutionApplicationTarget> target;
+    Optional<SyntacticElementTarget> target;
     bool SuppressDiagnostics;
 
     /// Coerce the given tuple to another tuple type.
@@ -2532,7 +2532,7 @@ namespace {
     
   public:
     ExprRewriter(ConstraintSystem &cs, Solution &solution,
-                 Optional<SolutionApplicationTarget> target,
+                 Optional<SyntacticElementTarget> target,
                  bool suppressDiagnostics)
         : cs(cs), dc(target ? target->getDeclContext() : cs.DC),
           solution(solution), target(target),
@@ -8479,7 +8479,7 @@ namespace {
         if (cs.participatesInInference(closure)) {
           hadError |= cs.applySolutionToBody(
               solution, closure, Rewriter.dc,
-              [&](SolutionApplicationTarget target) {
+              [&](SyntacticElementTarget target) {
                 auto resultTarget = rewriteTarget(target);
                 if (resultTarget) {
                   if (auto expr = resultTarget->getAsExpr())
@@ -8544,7 +8544,7 @@ namespace {
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
         // Rewrite captures.
         for (const auto &capture : captureList->getCaptureList()) {
-          (void)rewriteTarget(SolutionApplicationTarget(capture.PBD));
+          (void)rewriteTarget(SyntacticElementTarget(capture.PBD));
         }
       }
 
@@ -8571,8 +8571,8 @@ namespace {
     }
 
     /// Rewrite the target, producing a new target.
-    Optional<SolutionApplicationTarget>
-    rewriteTarget(SolutionApplicationTarget target);
+    Optional<SyntacticElementTarget>
+    rewriteTarget(SyntacticElementTarget target);
 
     AutoClosureExpr *rewriteClosure(ClosureExpr *closure) {
       auto &solution = Rewriter.solution;
@@ -8623,7 +8623,7 @@ namespace {
     bool rewriteFunction(AnyFunctionRef fn) {
       auto result = Rewriter.cs.applySolution(
           Rewriter.solution, fn, Rewriter.dc,
-          [&](SolutionApplicationTarget target) {
+          [&](SyntacticElementTarget target) {
             auto resultTarget = rewriteTarget(target);
             if (resultTarget) {
               if (auto expr = resultTarget->getAsExpr())
@@ -8666,7 +8666,7 @@ namespace {
         exprBranches.insert(branch);
 
       return Rewriter.cs.applySolutionToSingleValueStmt(
-          solution, SVE, solution.getDC(), [&](SolutionApplicationTarget target) {
+          solution, SVE, solution.getDC(), [&](SyntacticElementTarget target) {
             // We need to fixup the conversion type to the full result type,
             // not the branch result type. This is necessary as there may be
             // an additional conversion required for the branch.
@@ -8819,9 +8819,9 @@ static Expr *wrapAsyncLetInitializer(
 /// Apply the given solution to the initialization target.
 ///
 /// \returns the resulting initialization expression.
-static Optional<SolutionApplicationTarget> applySolutionToInitialization(
-    Solution &solution, SolutionApplicationTarget target,
-    Expr *initializer) {
+static Optional<SyntacticElementTarget>
+applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
+                              Expr *initializer) {
   auto wrappedVar = target.getInitializationWrappedVar();
   Type initType;
   if (wrappedVar) {
@@ -8844,7 +8844,7 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   if (!initializer)
     return None;
 
-  SolutionApplicationTarget resultTarget = target;
+  SyntacticElementTarget resultTarget = target;
   resultTarget.setExpr(initializer);
 
   // Record the property wrapper type and note that the initializer has
@@ -8932,10 +8932,9 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
 /// Apply the given solution to the for-each statement target.
 ///
 /// \returns the resulting initialization expression.
-static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
-    Solution &solution, SolutionApplicationTarget target,
-    llvm::function_ref<
-        Optional<SolutionApplicationTarget>(SolutionApplicationTarget)>
+static Optional<SyntacticElementTarget> applySolutionToForEachStmt(
+    Solution &solution, SyntacticElementTarget target,
+    llvm::function_ref<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
         rewriteTarget) {
   auto resultTarget = target;
   auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
@@ -8958,8 +8957,7 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   {
     auto *makeIteratorVar = forEachStmtInfo.makeIteratorVar;
 
-    auto makeIteratorTarget =
-        *cs.getSolutionApplicationTarget({makeIteratorVar, /*index=*/0});
+    auto makeIteratorTarget = *cs.getTargetFor({makeIteratorVar, /*index=*/0});
 
     auto rewrittenTarget = rewriteTarget(makeIteratorTarget);
     if (!rewrittenTarget)
@@ -8976,8 +8974,7 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
 
   // Now, `$iterator.next()` call.
   {
-    auto nextTarget =
-        *cs.getSolutionApplicationTarget(forEachStmtInfo.nextCall);
+    auto nextTarget = *cs.getTargetFor(forEachStmtInfo.nextCall);
 
     auto rewrittenTarget = rewriteTarget(nextTarget);
     if (!rewrittenTarget)
@@ -9052,7 +9049,7 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
 
   // Apply the solution to the filtering condition, if there is one.
   if (auto *whereExpr = stmt->getWhere()) {
-    auto whereTarget = *cs.getSolutionApplicationTarget(whereExpr);
+    auto whereTarget = *cs.getTargetFor(whereExpr);
 
     auto rewrittenTarget = rewriteTarget(whereTarget);
     if (!rewrittenTarget)
@@ -9104,8 +9101,8 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
   return resultTarget;
 }
 
-Optional<SolutionApplicationTarget>
-ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
+Optional<SyntacticElementTarget>
+ExprWalker::rewriteTarget(SyntacticElementTarget target) {
   // Rewriting the target might abort in case one of visit methods returns
   // nullptr. In this case, no more walkToExprPost calls are issues and thus
   // nodes which were pushed on the Rewriter's ExprStack in walkToExprPre are
@@ -9120,7 +9117,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
   auto &solution = Rewriter.solution;
 
   // Apply the solution to the target.
-  SolutionApplicationTarget result = target;
+  SyntacticElementTarget result = target;
   if (auto expr = target.getAsExpr()) {
     Expr *rewrittenExpr = expr->walk(*this);
     if (!rewrittenExpr)
@@ -9179,7 +9176,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
       case StmtConditionElement::CK_HasSymbol: {
         auto info = condElement.getHasSymbolInfo();
-        auto target = *cs.getSolutionApplicationTarget(&condElement);
+        auto target = *cs.getTargetFor(&condElement);
         auto resolvedTarget = rewriteTarget(target);
         if (!resolvedTarget) {
           info->setInvalid();
@@ -9194,7 +9191,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       }
 
       case StmtConditionElement::CK_Boolean: {
-        auto target = *cs.getSolutionApplicationTarget(&condElement);
+        auto target = *cs.getTargetFor(&condElement);
         auto resolvedTarget = rewriteTarget(target);
         if (!resolvedTarget)
           return None;
@@ -9204,7 +9201,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       }
 
       case StmtConditionElement::CK_PatternBinding: {
-        auto target = *cs.getSolutionApplicationTarget(&condElement);
+        auto target = *cs.getTargetFor(&condElement);
         auto resolvedTarget = rewriteTarget(target);
         if (!resolvedTarget)
           return None;
@@ -9227,7 +9224,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
     // Check whether this enum element is resolved via ~= application.
     if (auto *enumElement = dyn_cast<EnumElementPattern>(info.pattern)) {
-      if (auto target = cs.getSolutionApplicationTarget(enumElement)) {
+      if (auto target = cs.getTargetFor(enumElement)) {
         auto *EP = target->getExprPattern();
         auto enumType = solution.getResolvedType(EP);
 
@@ -9265,7 +9262,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
     // If there is a guard expression, coerce that.
     if (auto *guardExpr = info.guardExpr) {
-      auto target = *cs.getSolutionApplicationTarget(guardExpr);
+      auto target = *cs.getTargetFor(guardExpr);
       auto resultTarget = rewriteTarget(target);
       if (!resultTarget)
         return None;
@@ -9280,9 +9277,8 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       if (patternBinding->isInitializerChecked(index))
         continue;
 
-      // Find the solution application target for this.
-      auto knownTarget = *cs.getSolutionApplicationTarget(
-          {patternBinding, index});
+      // Find the target for this.
+      auto knownTarget = *cs.getTargetFor({patternBinding, index});
 
       // Rewrite the target.
       auto resultTarget = rewriteTarget(knownTarget);
@@ -9340,7 +9336,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     return None;
   } else if (auto *forEach = target.getAsForEachStmt()) {
     auto forEachResultTarget = applySolutionToForEachStmt(
-        solution, target, [&](SolutionApplicationTarget target) {
+        solution, target, [&](SyntacticElementTarget target) {
           auto resultTarget = rewriteTarget(target);
           if (resultTarget) {
             if (auto expr = resultTarget->getAsExpr())
@@ -9480,8 +9476,9 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
-    Solution &solution, SolutionApplicationTarget target) {
+Optional<SyntacticElementTarget>
+ConstraintSystem::applySolution(Solution &solution,
+                                SyntacticElementTarget target) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   unsigned numResolvableFixes = 0;

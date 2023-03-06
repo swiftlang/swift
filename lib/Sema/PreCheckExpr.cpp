@@ -2259,7 +2259,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
              : nullptr;
 }
 
-bool ConstraintSystem::preCheckTarget(SolutionApplicationTarget &target,
+bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target,
                                       bool replaceInvalidRefsWithErrors,
                                       bool leaveClosureBodiesUnchecked) {
   auto *DC = target.getDeclContext();

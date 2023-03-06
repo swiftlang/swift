@@ -336,18 +336,18 @@ public:
 } // end anonymous namespace
 
 void constraints::performSyntacticDiagnosticsForTarget(
-    const SolutionApplicationTarget &target,
-    bool isExprStmt, bool disableExprAvailabilityChecking) {
+    const SyntacticElementTarget &target, bool isExprStmt,
+    bool disableExprAvailabilityChecking) {
   auto *dc = target.getDeclContext();
   switch (target.kind) {
-  case SolutionApplicationTarget::Kind::expression: {
+  case SyntacticElementTarget::Kind::expression: {
     // First emit diagnostics for the main expression.
     performSyntacticExprDiagnostics(target.getAsExpr(), dc,
                                     isExprStmt, disableExprAvailabilityChecking);
     return;
   }
 
-  case SolutionApplicationTarget::Kind::forEachStmt: {
+  case SyntacticElementTarget::Kind::forEachStmt: {
     auto *stmt = target.getAsForEachStmt();
 
     // First emit diagnostics for the main expression.
@@ -360,16 +360,16 @@ void constraints::performSyntacticDiagnosticsForTarget(
     return;
   }
 
-  case SolutionApplicationTarget::Kind::function: {
+  case SyntacticElementTarget::Kind::function: {
     FunctionSyntacticDiagnosticWalker walker(dc);
     target.getFunctionBody()->walk(walker);
     return;
   }
-  case SolutionApplicationTarget::Kind::closure:
-  case SolutionApplicationTarget::Kind::stmtCondition:
-  case SolutionApplicationTarget::Kind::caseLabelItem:
-  case SolutionApplicationTarget::Kind::patternBinding:
-  case SolutionApplicationTarget::Kind::uninitializedVar:
+  case SyntacticElementTarget::Kind::closure:
+  case SyntacticElementTarget::Kind::stmtCondition:
+  case SyntacticElementTarget::Kind::caseLabelItem:
+  case SyntacticElementTarget::Kind::patternBinding:
+  case SyntacticElementTarget::Kind::uninitializedVar:
     // Nothing to do for these.
     return;
   }
@@ -380,7 +380,7 @@ void constraints::performSyntacticDiagnosticsForTarget(
 Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       ContextualTypeInfo contextualInfo,
                                       TypeCheckExprOptions options) {
-  SolutionApplicationTarget target(
+  SyntacticElementTarget target(
       expr, dc, contextualInfo.purpose, contextualInfo.getType(),
       options.contains(TypeCheckExprFlags::IsDiscarded));
   auto resultTarget = typeCheckExpression(target, options);
@@ -396,8 +396,8 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 /// FIXME: In order to remote this function both \c FrontendStatsTracer
 /// and \c PrettyStackTrace* have to be updated to accept `ASTNode`
 // instead of each individual syntactic element types.
-Optional<SolutionApplicationTarget>
-TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
+Optional<SyntacticElementTarget>
+TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
                                  TypeCheckExprOptions options) {
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
@@ -408,8 +408,8 @@ TypeChecker::typeCheckExpression(SolutionApplicationTarget &target,
   return typeCheckTarget(target, options);
 }
 
-Optional<SolutionApplicationTarget>
-TypeChecker::typeCheckTarget(SolutionApplicationTarget &target,
+Optional<SyntacticElementTarget>
+TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
                              TypeCheckExprOptions options) {
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
@@ -506,7 +506,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
   // First, let's try to type-check default expression using interface
   // type of the parameter, if that succeeds - we are done.
-  SolutionApplicationTarget defaultExprTarget(
+  SyntacticElementTarget defaultExprTarget(
       defaultValue, DC,
       isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter,
       paramType, /*isDiscarded=*/false);
@@ -769,13 +769,13 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                    PatternBindingDecl *PBD,
                                    unsigned patternNumber,
                                    TypeCheckExprOptions options) {
-  SolutionApplicationTarget target =
-    PBD ? SolutionApplicationTarget::forInitialization(
-            initializer, DC, patternType, PBD, patternNumber,
-            /*bindPatternVarsOneWay=*/false)
-        : SolutionApplicationTarget::forInitialization(
-            initializer, DC, patternType, pattern,
-            /*bindPatternVarsOneWay=*/false);
+  SyntacticElementTarget target =
+      PBD ? SyntacticElementTarget::forInitialization(
+                initializer, DC, patternType, PBD, patternNumber,
+                /*bindPatternVarsOneWay=*/false)
+          : SyntacticElementTarget::forInitialization(
+                initializer, DC, patternType, pattern,
+                /*bindPatternVarsOneWay=*/false);
 
   if (DC->getASTContext().LangOpts.CheckAPIAvailabilityOnly &&
       PBD && !DC->getAsDecl()) {
@@ -887,7 +887,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     return true;
   };
 
-  auto target = SolutionApplicationTarget::forForEachStmt(
+  auto target = SyntacticElementTarget::forForEachStmt(
       stmt, dc, /*bindPatternVarsOneWay=*/false);
   if (!typeCheckTarget(target))
     return failed();
@@ -943,8 +943,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 
   // Result of `~=` should always be a boolean.
   auto contextualTy = Context.getBoolDecl()->getDeclaredInterfaceType();
-  auto target = SolutionApplicationTarget::forExprPattern(matchCall, DC, EP,
-                                                          contextualTy);
+  auto target =
+      SyntacticElementTarget::forExprPattern(matchCall, DC, EP, contextualTy);
 
   // Check the expression as a condition.
   auto result = typeCheckExpression(target);

@@ -1,4 +1,4 @@
-//===--- SolutionApplicationTarget.h - Solution Target ----------*- C++ -*-===//
+//===--- SyntacticElementTarget.h - Syntactic Element Target ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines the SolutionApplicationTarget class.
+//  This file defines the SyntacticElementTarget class.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SEMA_SOLUTION_APPLICATION_TARGET_H
-#define SWIFT_SEMA_SOLUTION_APPLICATION_TARGET_H
+#ifndef SWIFT_SEMA_SYNTACTIC_ELEMENT_TARGET_H
+#define SWIFT_SEMA_SYNTACTIC_ELEMENT_TARGET_H
 
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Expr.h"
@@ -48,7 +48,7 @@ struct ForEachStmtInfo {
 
 /// Describes the target to which a constraint system's solution can be
 /// applied.
-class SolutionApplicationTarget {
+class SyntacticElementTarget {
 public:
   enum class Kind {
     expression,
@@ -169,68 +169,67 @@ private:
   void maybeApplyPropertyWrapper();
 
 public:
-  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
-                            ContextualTypePurpose contextualPurpose,
-                            Type convertType,
-                            ConstraintLocator *convertTypeLocator,
-                            bool isDiscarded)
-      : SolutionApplicationTarget(expr, dc, contextualPurpose,
-                                  TypeLoc::withoutLoc(convertType),
-                                  convertTypeLocator, isDiscarded) {}
+  SyntacticElementTarget(Expr *expr, DeclContext *dc,
+                         ContextualTypePurpose contextualPurpose,
+                         Type convertType,
+                         ConstraintLocator *convertTypeLocator,
+                         bool isDiscarded)
+      : SyntacticElementTarget(expr, dc, contextualPurpose,
+                               TypeLoc::withoutLoc(convertType),
+                               convertTypeLocator, isDiscarded) {}
 
-  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
-                            ContextualTypePurpose contextualPurpose,
-                            Type convertType, bool isDiscarded)
-      : SolutionApplicationTarget(expr, dc, contextualPurpose, convertType,
-                                  /*convertTypeLocator*/ nullptr, isDiscarded) {
-  }
+  SyntacticElementTarget(Expr *expr, DeclContext *dc,
+                         ContextualTypePurpose contextualPurpose,
+                         Type convertType, bool isDiscarded)
+      : SyntacticElementTarget(expr, dc, contextualPurpose, convertType,
+                               /*convertTypeLocator*/ nullptr, isDiscarded) {}
 
-  SolutionApplicationTarget(Expr *expr, DeclContext *dc,
-                            ContextualTypePurpose contextualPurpose,
-                            TypeLoc convertType,
-                            ConstraintLocator *convertTypeLocator,
-                            bool isDiscarded);
+  SyntacticElementTarget(Expr *expr, DeclContext *dc,
+                         ContextualTypePurpose contextualPurpose,
+                         TypeLoc convertType,
+                         ConstraintLocator *convertTypeLocator,
+                         bool isDiscarded);
 
-  SolutionApplicationTarget(Expr *expr, DeclContext *dc, ExprPattern *pattern,
-                            Type patternType)
-      : SolutionApplicationTarget(expr, dc, CTP_ExprPattern, patternType,
-                                  /*isDiscarded=*/false) {
+  SyntacticElementTarget(Expr *expr, DeclContext *dc, ExprPattern *pattern,
+                         Type patternType)
+      : SyntacticElementTarget(expr, dc, CTP_ExprPattern, patternType,
+                               /*isDiscarded=*/false) {
     setPattern(pattern);
   }
 
-  SolutionApplicationTarget(ClosureExpr *closure, Type convertType) {
+  SyntacticElementTarget(ClosureExpr *closure, Type convertType) {
     kind = Kind::closure;
     this->closure.closure = closure;
     this->closure.convertType = convertType;
   }
 
-  SolutionApplicationTarget(AnyFunctionRef fn)
-      : SolutionApplicationTarget(fn, fn.getBody()) { }
+  SyntacticElementTarget(AnyFunctionRef fn)
+      : SyntacticElementTarget(fn, fn.getBody()) {}
 
-  SolutionApplicationTarget(StmtCondition stmtCondition, DeclContext *dc) {
+  SyntacticElementTarget(StmtCondition stmtCondition, DeclContext *dc) {
     kind = Kind::stmtCondition;
     this->stmtCondition.stmtCondition = stmtCondition;
     this->stmtCondition.dc = dc;
   }
 
-  SolutionApplicationTarget(AnyFunctionRef fn, BraceStmt *body) {
+  SyntacticElementTarget(AnyFunctionRef fn, BraceStmt *body) {
     kind = Kind::function;
     function.function = fn;
     function.body = body;
   }
 
-  SolutionApplicationTarget(CaseLabelItem *caseLabelItem, DeclContext *dc) {
+  SyntacticElementTarget(CaseLabelItem *caseLabelItem, DeclContext *dc) {
     kind = Kind::caseLabelItem;
     this->caseLabelItem.caseLabelItem = caseLabelItem;
     this->caseLabelItem.dc = dc;
   }
 
-  SolutionApplicationTarget(PatternBindingDecl *patternBinding) {
+  SyntacticElementTarget(PatternBindingDecl *patternBinding) {
     kind = Kind::patternBinding;
     this->patternBinding = patternBinding;
   }
 
-  SolutionApplicationTarget(VarDecl *uninitializedWrappedVar)
+  SyntacticElementTarget(VarDecl *uninitializedWrappedVar)
       : kind(Kind::uninitializedVar) {
     if (auto *PDB = uninitializedWrappedVar->getParentPatternBinding()) {
       uninitializedVar.binding = PDB;
@@ -245,8 +244,8 @@ public:
     uninitializedVar.type = Type();
   }
 
-  SolutionApplicationTarget(PatternBindingDecl *binding, unsigned index,
-                            Pattern *var, Type patternTy)
+  SyntacticElementTarget(PatternBindingDecl *binding, unsigned index,
+                         Pattern *var, Type patternTy)
       : kind(Kind::uninitializedVar) {
     uninitializedVar.binding = binding;
     uninitializedVar.index = index;
@@ -254,51 +253,52 @@ public:
     uninitializedVar.type = patternTy;
   }
 
-  SolutionApplicationTarget(ForEachStmt *stmt, DeclContext *dc,
-                            bool bindPatternVarsOneWay)
-    : kind(Kind::forEachStmt) {
+  SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc,
+                         bool bindPatternVarsOneWay)
+      : kind(Kind::forEachStmt) {
     forEachStmt.stmt = stmt;
     forEachStmt.dc = dc;
     forEachStmt.bindPatternVarsOneWay = bindPatternVarsOneWay;
   }
 
   /// Form a target for the initialization of a pattern from an expression.
-  static SolutionApplicationTarget forInitialization(
-      Expr *initializer, DeclContext *dc, Type patternType, Pattern *pattern,
-      bool bindPatternVarsOneWay);
+  static SyntacticElementTarget
+  forInitialization(Expr *initializer, DeclContext *dc, Type patternType,
+                    Pattern *pattern, bool bindPatternVarsOneWay);
 
   /// Form a target for the initialization of a pattern binding entry from
   /// an expression.
-  static SolutionApplicationTarget forInitialization(
-      Expr *initializer, DeclContext *dc, Type patternType,
-      PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
-      bool bindPatternVarsOneWay);
+  static SyntacticElementTarget
+  forInitialization(Expr *initializer, DeclContext *dc, Type patternType,
+                    PatternBindingDecl *patternBinding,
+                    unsigned patternBindingIndex, bool bindPatternVarsOneWay);
 
   /// Form a target for a for-in loop.
-  static SolutionApplicationTarget forForEachStmt(
-      ForEachStmt *stmt, DeclContext *dc,
-      bool bindPatternVarsOneWay);
+  static SyntacticElementTarget forForEachStmt(ForEachStmt *stmt,
+                                               DeclContext *dc,
+                                               bool bindPatternVarsOneWay);
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
-  static SolutionApplicationTarget
+  static SyntacticElementTarget
   forUninitializedWrappedVar(VarDecl *wrappedVar) {
     return {wrappedVar};
   }
 
-  static SolutionApplicationTarget
-  forUninitializedVar(PatternBindingDecl *binding, unsigned index,
-                      Type patternTy) {
+  static SyntacticElementTarget forUninitializedVar(PatternBindingDecl *binding,
+                                                    unsigned index,
+                                                    Type patternTy) {
     return {binding, index, binding->getPattern(index), patternTy};
   }
 
   /// Form a target for a synthesized property wrapper initializer.
-  static SolutionApplicationTarget forPropertyWrapperInitializer(
-      VarDecl *wrappedVar, DeclContext *dc, Expr *initializer);
+  static SyntacticElementTarget
+  forPropertyWrapperInitializer(VarDecl *wrappedVar, DeclContext *dc,
+                                Expr *initializer);
 
-  static SolutionApplicationTarget forExprPattern(Expr *expr, DeclContext *dc,
-                                                  ExprPattern *pattern,
-                                                  Type patternTy) {
+  static SyntacticElementTarget forExprPattern(Expr *expr, DeclContext *dc,
+                                               ExprPattern *pattern,
+                                               Type patternTy) {
     return {expr, dc, pattern, patternTy};
   }
 
@@ -373,8 +373,7 @@ public:
       return patternBinding->getDeclContext();
 
     case Kind::uninitializedVar: {
-      if (auto *wrappedVar =
-              uninitializedVar.declaration.dyn_cast<VarDecl *>())
+      if (auto *wrappedVar = uninitializedVar.declaration.dyn_cast<VarDecl *>())
         return wrappedVar->getDeclContext();
 
       return uninitializedVar.binding->getInitContext(uninitializedVar.index);
@@ -472,9 +471,7 @@ public:
   ContextualPattern getContextualPattern() const;
 
   /// Whether this target is for a for-in statement.
-  bool isForEachStmt() const {
-    return kind == Kind::forEachStmt;
-  }
+  bool isForEachStmt() const { return kind == Kind::forEachStmt; }
 
   /// Whether this is an initialization for an Optional.Some pattern.
   bool isOptionalSomePatternInit() const {
@@ -516,8 +513,8 @@ public:
     if (!apply || !wrappedVar)
       return false;
 
-    // Don't create property wrapper generator functions for static variables and
-    // local variables with initializers.
+    // Don't create property wrapper generator functions for static variables
+    // and local variables with initializers.
     bool hasInit = expression.propertyWrapper.hasInitialWrappedValue;
     if (wrappedVar->isStatic() ||
         (hasInit && wrappedVar->getDeclContext()->isLocalContext()))
@@ -856,7 +853,7 @@ public:
 
     case Kind::uninitializedVar: {
       if (auto *wrappedVar =
-          uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
+              uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
         return wrappedVar->getLoc();
       }
       return uninitializedVar.declaration.get<Pattern *>()->getLoc();
@@ -869,10 +866,10 @@ public:
   }
 
   /// Walk the contents of the application target.
-  Optional<SolutionApplicationTarget> walk(ASTWalker &walker) const;
+  Optional<SyntacticElementTarget> walk(ASTWalker &walker) const;
 };
 
-}
-}
+} // namespace constraints
+} // namespace swift
 
-#endif /* SWIFT_SEMA_SOLUTION_APPLICATION_TARGET_H */
+#endif /* SWIFT_SEMA_SYNTACTIC_ELEMENT_TARGET_H */
