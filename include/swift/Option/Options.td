@@ -224,6 +224,25 @@ def parseable_output : Flag<["-"], "parseable-output">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit textual output in a parseable format">;
 
+// Windows Options
+
+def windows_sdk_root : Separate<["-"], "windows-sdk-root">,
+  Flags<[ArgumentIsPath, FrontendOption, SwiftAPIExtractOption,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"Windows SDK Root">, MetaVarName<"<root>">;
+def windows_sdk_version : Separate<["-"], "windows-sdk-version">,
+  Flags<[ArgumentIsPath, FrontendOption, SwiftAPIExtractOption,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"Windows SDK Version">, MetaVarName<"<version>">;
+def visualc_tools_root : Separate<["-"], "visualc-tools-root">,
+  Flags<[ArgumentIsPath, FrontendOption, SwiftAPIExtractOption,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"VisualC++ Tools Root">, MetaVarName<"<root>">;
+def visualc_tools_version : Separate<["-"], "visualc-tools-version">,
+  Flags<[ArgumentIsPath, FrontendOption, SwiftAPIExtractOption,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"VisualC++ ToolSet Version">, MetaVarName<"<version>">;
+
 // Standard Options
 def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>;

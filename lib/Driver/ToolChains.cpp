@@ -211,6 +211,24 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
   }
 
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_windows_sdk_root)) {
+    arguments.push_back("-windows-sdk-root");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_windows_sdk_version)) {
+    arguments.push_back("-windows-sdk-version");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_visualc_tools_root)) {
+    arguments.push_back("-visualc-tools-root");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_visualc_tools_version)) {
+    arguments.push_back("-visualc-tools-version");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+
+
   if (llvm::sys::Process::StandardErrHasColors()) {
     arguments.push_back("-color-diagnostics");
   }

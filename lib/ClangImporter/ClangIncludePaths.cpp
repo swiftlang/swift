@@ -339,7 +339,8 @@ GetWindowsFileMappings(ASTContext &Context) {
     std::string LibraryVersion;
     int MajorVersion;
   } WindowsSDK;
-  if (llvm::getWindowsSDKDir(VFS, {}, {}, {},
+  if (llvm::getWindowsSDKDir(VFS, SearchPathOpts.getWinSDKRoot(),
+                             SearchPathOpts.getWinSDKVersion(), {},
                              WindowsSDK.Path, WindowsSDK.MajorVersion,
                              WindowsSDK.IncludeVersion,
                              WindowsSDK.LibraryVersion)) {
@@ -358,7 +359,8 @@ GetWindowsFileMappings(ASTContext &Context) {
     std::string Path;
     std::string Version;
   } UCRTSDK;
-  if (llvm::getUniversalCRTSdkDir(VFS, {}, {}, {},
+  if (llvm::getUniversalCRTSdkDir(VFS, SearchPathOpts.getWinSDKRoot(),
+                                  SearchPathOpts.getWinSDKVersion(), {},
                                   UCRTSDK.Path, UCRTSDK.Version)) {
     llvm::SmallString<261> UCRTInjection{UCRTSDK.Path};
     llvm::sys::path::append(UCRTInjection, "Include", UCRTSDK.Version, "ucrt");
@@ -373,9 +375,13 @@ GetWindowsFileMappings(ASTContext &Context) {
     std::string Path;
     llvm::ToolsetLayout Layout;
   } VCTools;
-  if (llvm::findVCToolChainViaCommandLine(VFS, {}, {}, {}, VCTools.Path, VCTools.Layout) ||
+  if (llvm::findVCToolChainViaCommandLine(VFS, SearchPathOpts.getVCToolsRoot(),
+                                          SearchPathOpts.getVCToolsVersion(),
+                                          {}, VCTools.Path, VCTools.Layout) ||
       llvm::findVCToolChainViaEnvironment(VFS, VCTools.Path, VCTools.Layout) ||
-      llvm::findVCToolChainViaSetupConfig(VFS, VCTools.Path, VCTools.Layout)) {
+      llvm::findVCToolChainViaSetupConfig(VFS,
+                                          SearchPathOpts.getVCToolsVersion(),
+                                          VCTools.Path, VCTools.Layout)) {
     assert(VCTools.Layout == llvm::ToolsetLayout::VS2017OrNewer &&
            "unsupported toolset layout (VS2017+ required)");
 
