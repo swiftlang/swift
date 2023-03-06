@@ -1062,6 +1062,10 @@ ConvertingInitialization::finishEmission(SILGenFunction &SGF,
   case Initialized:
     llvm_unreachable("initialization never finished");
 
+  case PackExpanding:
+  case FinishedPackExpanding:
+    llvm_unreachable("cannot mix this with pack emission");
+
   case Finished:
     assert(formalResult.isInContext());
     assert(!Value.isInContext() || FinalContext.getEmitInto());
@@ -1072,6 +1076,26 @@ ConvertingInitialization::finishEmission(SILGenFunction &SGF,
     llvm_unreachable("value already extracted");
   }
   llvm_unreachable("bad state");
+}
+
+void ConvertingInitialization::
+       performPackExpansionInitialization(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          SILValue indexWithinComponent,
+                      llvm::function_ref<void(Initialization *into)> fn) {
+  // Bookkeeping.
+  assert(getState() == Uninitialized);
+  State = PackExpanding;
+
+  auto finalInit = FinalContext.getEmitInto();
+  assert(finalInit); // checked by canPerformPackExpansionInitialization
+  finalInit->performPackExpansionInitialization(
+                                      SGF, loc, indexWithinComponent,
+                                      [&](Initialization *subEltInit) {
+    // FIXME: translate the subst types into the element context.
+    ConvertingInitialization eltInit(getConversion(), SGFContext(subEltInit));
+    fn(&eltInit);
+  });
 }
 
 static ManagedValue
