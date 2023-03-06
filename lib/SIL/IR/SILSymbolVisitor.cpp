@@ -395,6 +395,13 @@ public:
       addMainIfNecessary(file);
 
       for (auto D : decls) {
+        D->visitAuxiliaryDecls([&](Decl *decl) {
+          if (Ctx.getOpts().LinkerDirectivesOnly && !requiresLinkerDirective(decl))
+            return;
+
+          visit(decl);
+        });
+
         if (Ctx.getOpts().LinkerDirectivesOnly && !requiresLinkerDirective(D))
           continue;
 
