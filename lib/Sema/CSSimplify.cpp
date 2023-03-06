@@ -8880,8 +8880,8 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
 
   if (shouldAttemptFixes()) {
     auto *loc = getConstraintLocator(locator);
-    auto *fix = AllowInvalidPackElement::create(*this, packType, loc);
-    if (!recordFix(fix))
+    if (elementType->isPlaceholder() ||
+        !recordFix(AllowInvalidPackElement::create(*this, packType, loc)))
       return SolutionKind::Solved;
   }
 
@@ -12979,6 +12979,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
 
     return SolutionKind::Unsolved;
   };
+
+  // Don't try computing the shape of a type variable.
+  if (type1->isTypeVariableOrMember())
+    return formUnsolved();
 
   // We can't compute a reduced shape if the input type still
   // contains type variables that might bind to pack archetypes.
