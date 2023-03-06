@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if $Macros && hasAttribute(attached)
+
 /// Specifies the module and type name for an externally-defined macro, which
 /// must conform to the appropriate set of `Macro` protocols.
 ///
@@ -90,3 +92,5 @@ public macro dsohandle() -> UnsafeRawPointer = Builtin.DSOHandleMacro
 @attached(conformance)
 public macro OptionSet<RawType>() =
   #externalMacro(module: "SwiftMacros", type: "OptionSetMacro")
+
+#endif
