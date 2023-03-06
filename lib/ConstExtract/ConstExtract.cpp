@@ -12,6 +12,7 @@
 
 #include "swift/ConstExtract/ConstExtract.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -73,6 +74,10 @@ std::string toFullyQualifiedTypeNameString(const swift::Type &Type) {
   Type.print(OutputStream, Options);
   OutputStream.flush();
   return TypeNameOutput;
+}
+
+std::string toMangledTypeNameString(const swift::Type &Type) {
+  return Mangle::ASTMangler().mangleTypeWithoutPrefix(Type);
 }
 
 } // namespace
@@ -623,10 +628,13 @@ void writeValue(llvm::json::OStream &JSON,
 
   case CompileTimeValue::ValueKind::Type: {
     auto typeValue = cast<TypeValue>(value);
+    Type type = typeValue->getType();
     JSON.attribute("valueKind", "Type");
     JSON.attributeObject("value", [&]() {
       JSON.attribute("type",
-                     toFullyQualifiedTypeNameString(typeValue->getType()));
+                     toFullyQualifiedTypeNameString(type));
+      JSON.attribute("mangledName",
+                     toMangledTypeNameString(type));
     });
     break;
   }
