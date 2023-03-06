@@ -43,10 +43,11 @@ extern "C" void swift_ASTGen_destroyCompilerPluginCapability(void *value);
 
 using namespace swift;
 
-llvm::Error PluginRegistry::loadLibraryPlugin(StringRef path) {
-  if (LoadedPluginLibraries.find(path) != LoadedPluginLibraries.end()) {
+llvm::Expected<void *> PluginRegistry::loadLibraryPlugin(StringRef path) {
+  auto found = LoadedPluginLibraries.find(path);
+  if (found != LoadedPluginLibraries.end()) {
     // Already loaded.
-    return llvm::Error::success();
+    return found->second;
   }
   void *lib = nullptr;
 #if defined(_WIN32)
@@ -62,7 +63,7 @@ llvm::Error PluginRegistry::loadLibraryPlugin(StringRef path) {
   }
 #endif
   LoadedPluginLibraries.insert({path, lib});
-  return llvm::Error::success();
+  return lib;
 }
 
 llvm::Expected<LoadedExecutablePlugin *>
