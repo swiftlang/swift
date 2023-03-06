@@ -30,8 +30,8 @@ case var a:
   a = 1
 case let a:
   a = 1         // expected-error {{cannot assign}}
-case inout a:
-  a = 1
+case inout a: // expected-error {{'inout' may only be used on parameters}} expected-error {{'is' keyword required to pattern match against type name}}
+  a = 1 // expected-error {{cannot find 'a' in scope}}
 case var var a: // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
   a += 1
 case var let a: // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
@@ -52,14 +52,6 @@ case (var a, var a): // expected-error {{invalid redeclaration of 'a'}} expected
   fallthrough
 case _: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
-}
-
-switch (x,x) {
-case (inout a, inout a): // expected-error {{invalid redeclaration of 'a'}}
-    // expected-note @-1 {{'a' previously declared here}}
-    // xpected-warning @-2 {{variable 'a' was never used; consider replacing with '_' or removing it}}
-    // xpected-warning @-3 {{variable 'a' was never used; consider replacing with '_' or removing it}}
-  break
 }
 
 var e : Any = 0
@@ -128,12 +120,6 @@ if case let .Naught(value) = n {} // expected-error{{pattern with associated val
 if case let .Naught(value1, value2, value3) = n {} // expected-error{{pattern with associated values does not match enum case 'Naught'}}
                                                    // expected-note@-1 {{remove associated values to make the pattern match}} {{20-44=}}
 
-if case inout .Naught(value) = n {} // expected-error{{pattern with associated values does not match enum case 'Naught'}}
-                                  // expected-note@-1 {{remove associated values to make the pattern match}} {{22-29=}}
-if case inout .Naught(value1, value2, value3) = n {} // expected-error{{pattern with associated values does not match enum case 'Naught'}}
-                                                   // expected-note@-1 {{remove associated values to make the pattern match}} {{22-46=}}
-
-
 
 switch n {
 case Foo.A: // expected-error{{enum case 'A' is not a member of type 'Voluntary<Int>'}}
@@ -156,7 +142,7 @@ case Voluntary<Int>.Mere,
   ()
 case .Twain,
      .Twain(_), // expected-warning {{enum case 'Twain' has 2 associated values; matching them as a tuple is deprecated}}
-                // expected-note@-74 {{'Twain' declared here}}
+                // expected-note@-68 {{'Twain' declared here}}
      .Twain(_, _),
      .Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(Int, Int)'}}
   ()
@@ -299,9 +285,6 @@ case (_, var e, 3) +++ (1, 2, 3):
 // expected-error@-1{{'_' can only appear in a pattern or on the left side of an assignment}}
   ()
 case (let (_, _, _)) + 1:
-// expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
-  ()
-case (inout (_, _, 2)) + 1:
 // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
   ()
 }
