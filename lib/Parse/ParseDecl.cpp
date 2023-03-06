@@ -4801,7 +4801,8 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
 
   if (Tok.is(tok::pound) && peekToken().is(tok::identifier)) {
     // Macro expansions at the top level are declarations.
-    return CurDeclContext->isModuleScopeContext() && !allowTopLevelCode();
+    return !isInSILMode() && SF.Kind != SourceFileKind::Interface &&
+        CurDeclContext->isModuleScopeContext() && !allowTopLevelCode();
   }
 
   // Skip a #if that contains only attributes in all branches. These will be

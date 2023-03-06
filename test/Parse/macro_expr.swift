@@ -29,7 +29,7 @@ _ = #trailing(x, y, z) {
 }
 
 _ = #another {
-  // expected-error @+1 {{expected a macro identifier for a pound literal expression}}
+  // expected-error @+1 {{expected a macro identifier}}
   #-
 }
 
