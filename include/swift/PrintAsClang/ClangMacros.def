@@ -133,7 +133,7 @@ CLANG_MACRO_BODY("SWIFT_CLASS", \
         "SWIFT_RUNTIME_NAME(SWIFT_NAME) __attribute__((objc_subclassing_restricted)) " \
         "SWIFT_CLASS_EXTRA\n" \
     "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) " \
-        "__attribute((objc_subclassing_restricted)) SWIFT_COMPILE_NAME(SWIFT_NAME) " \
+        "__attribute__((objc_subclassing_restricted)) SWIFT_COMPILE_NAME(SWIFT_NAME) " \
         "SWIFT_CLASS_EXTRA\n" \
     "# else\n" \
     "#  define SWIFT_CLASS(SWIFT_NAME) " \
@@ -175,7 +175,7 @@ CLANG_MACRO_CONDITIONAL("SWIFT_ENUM_ATTR", "(_extensibility)", \
 CLANG_MACRO_BODY("SWIFT_ENUM", \
     "# define SWIFT_ENUM(_type, _name, _extensibility) " \
         "enum _name : _type _name; " \
-        "enum SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA _name: _type\n" \
+        "enum SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA _name : _type\n" \
     "# if __has_feature(generalized_swift_name)\n" \
     "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, _extensibility) " \
         "enum _name : _type _name SWIFT_COMPILE_NAME(SWIFT_NAME); " \
@@ -197,7 +197,7 @@ CLANG_MACRO("SWIFT_DEPRECATED", , "__attribute__((deprecated))")
 CLANG_MACRO("SWIFT_DEPRECATED_MSG", "(...)", "__attribute__((deprecated(__VA_ARGS__)))")
 
 CLANG_MACRO_ALTERNATIVE("SWIFT_DEPRECATED_OBJC", "(Msg)", \
-                        "__has_feature(attribute_diagnost_if_objc)", \
+                        "__has_feature(attribute_diagnose_if_objc)", \
                         "__attribute__((diagnose_if(1, Msg, \"warning\")))", \
                         "SWIFT_DEPRECATED_MSG(Msg)")
 
