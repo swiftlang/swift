@@ -12,7 +12,13 @@
 
 set(swift_backtracing_link_libraries
   swiftCore
+  swift_Concurrency
 )
+
+set(concurrency)
+if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+  set(concurrency _Concurrency)
+endif()
 
 set(BACKTRACING_SOURCES
   Backtrace.swift
@@ -24,6 +30,7 @@ set(BACKTRACING_SOURCES
   Registers.swift
   SymbolicatedBacktrace.swift
   Utils.swift
+  Shims.cpp
 
   get-cpu-context.${SWIFT_ASM_EXT}
 )
@@ -45,13 +52,7 @@ set(LLVM_OPTIONAL_SOURCES
 add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${BACKTRACING_SOURCES}
 
-  SWIFT_MODULE_DEPENDS_IOS Darwin _Concurrency
-  SWIFT_MODULE_DEPENDS_OSX Darwin _Concurrency
-  SWIFT_MODULE_DEPENDS_TVOS Darwin _Concurrency
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin _Concurrency
-  SWIFT_MODULE_DEPENDS_MACCATALYST Darwin _Concurrency
-  SWIFT_MODULE_DEPENDS_LINUX Glibc _Concurrency
-  SWIFT_MODULE_DEPENDS_WINDOWS CRT _Concurrency
+  SWIFT_MODULE_DEPENDS ${concurrency}
 
   LINK_LIBRARIES ${swift_backtracing_link_libraries}
 

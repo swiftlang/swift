@@ -58,6 +58,7 @@ class SwiftTestCase(unittest.TestCase):
             enable_experimental_distributed=False,
             enable_experimental_reflection=False,
             enable_experimental_observation=False,
+            swift_enable_backtracing=False,
             build_early_swiftsyntax=False,
             build_swift_stdlib_static_print=False,
             build_swift_stdlib_unicode_data=True,
@@ -99,6 +100,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_REFLECTION:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
+            '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
@@ -124,6 +126,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_REFLECTION:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
+            '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
@@ -393,6 +396,19 @@ class SwiftTestCase(unittest.TestCase):
              'TRUE'],
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION' in x])
+
+    def test_backtracing_flags(self):
+        self.args.swift_enable_backtracing = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_BACKTRACING:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+             if 'DSWIFT_ENABLE_BACKTRACING' in x])
 
     def test_freestanding_is_darwin_flags(self):
         self.args.swift_freestanding_is_darwin = True

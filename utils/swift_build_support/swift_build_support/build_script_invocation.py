@@ -132,6 +132,9 @@ class BuildScriptInvocation(object):
             "--build-args=%s" % ' '.join(
                 pipes.quote(arg) for arg in cmake.build_args()),
             "--dsymutil-jobs", str(args.dsymutil_jobs),
+            '--build-swift-libexec', str(args.build_swift_libexec).lower(),
+            '--swift-enable-backtracing', str(args.swift_enable_backtracing).lower(),
+            '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
         ]
 
         # Compute any product specific cmake arguments.
@@ -529,6 +532,8 @@ class BuildScriptInvocation(object):
                     config.sdks_to_configure)),
                 "SWIFT_STDLIB_TARGETS": " ".join(
                     config.swift_stdlib_build_targets),
+                "SWIFT_LIBEXEC_TARGETS": " ".join(
+                    config.swift_libexec_build_targets),
                 "SWIFT_BENCHMARK_TARGETS": " ".join(
                     config.swift_benchmark_build_targets),
                 "SWIFT_RUN_BENCHMARK_TARGETS": " ".join(

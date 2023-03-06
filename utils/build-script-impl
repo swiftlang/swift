@@ -147,6 +147,7 @@ KNOWN_SETTINGS=(
     build-swift-static-stdlib                     ""                "set to 1 to build static variants of the Swift standard library"
     build-swift-stdlib-unittest-extra             "0"               "set to 1 to build optional StdlibUnittest components"
     build-swift-tools                             "1"               "set to 1 to build Swift host tools"
+    build-swift-libexec                           "1"               "set to 1 to build auxiliary executables"
 
     ## Skip cleaning build directories ...
     skip-clean-libdispatch                        "0"               "skip cleaning the libdispatch build"
@@ -234,6 +235,7 @@ KNOWN_SETTINGS=(
     common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
     swift-enable-experimental-string-processing   "1"               "whether to build experimental string processing feature"
     swift-earlyswiftsyntax                        "0"               "use the early SwiftSyntax"
+    swift-enable-backtracing                      "1"               "whether to build the backtracing support"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-flavor                     ""                "when building the FREESTANDING stdlib, which build style to use (options: apple, linux)"
@@ -1235,6 +1237,7 @@ function get_host_specific_variable() {
 function calculate_targets_for_host() {
     # Get the values passed by `build-script`.
     SWIFT_STDLIB_TARGETS=($(get_host_specific_variable ${host} SWIFT_STDLIB_TARGETS))
+    SWIFT_LIBEXEC_TARGETS=($(get_host_specific_variable ${host} SWIFT_LIBEXEC_TARGETS))
     SWIFT_SDKS=($(get_host_specific_variable ${host} SWIFT_SDKS))
     SWIFT_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_BENCHMARK_TARGETS))
     SWIFT_RUN_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_RUN_BENCHMARK_TARGETS))
@@ -1534,6 +1537,9 @@ for host in "${ALL_HOSTS[@]}"; do
         if ! [[ "${SKIP_TEST_BENCHMARKS}" ]] &&
              [[ "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" ]]; then
             echo "Running Swift benchmarks for: ${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
+        fi
+        if [ $(true_false "${BUILD_SWIFT_LIBEXEC}") == "TRUE" ]; then
+            echo "Building the auxiliary executables for: ${SWIFT_LIBEXEC_TARGETS[@]}"
         fi
     fi
 
@@ -1844,12 +1850,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_STATIC_SDK_OVERLAY}")
                     -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")
                     -DSWIFT_BUILD_EXAMPLES:BOOL=$(true_false "${BUILD_SWIFT_EXAMPLES}")
+                    -DSWIFT_BUILD_LIBEXEC:BOOL=$(true_false "${BUILD_SWIFT_LIBEXEC}")
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
                     -DSWIFT_TOOLS_ENABLE_LTO:STRING="${SWIFT_TOOLS_ENABLE_LTO}"
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH="${SWIFT_SYNTAX_SOURCE_DIR}"
+                    -DSWIFT_ENABLE_BACKTRACING:BOOL=$(true_false "${SWIFT_ENABLE_BACKTRACING}")
                     "${swift_cmake_options[@]}"
                 )
 
@@ -2076,7 +2084,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
+                build_targets=(
+                    all
+                    "${SWIFT_STDLIB_TARGETS[@]}"
+                    "${SWIFT_LIBEXEC_TARGETS[@]}"
+                )
                 if [[ $(true_false "${build_perf_testsuite_this_time}") == "TRUE" ]]; then
                     native_swift_tools_path="$(build_directory_bin ${LOCAL_HOST} swift)"
                     cmake_options=(

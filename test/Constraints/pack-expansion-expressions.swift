@@ -125,3 +125,14 @@ func packElementInvalidBinding<each T>(_ arg: repeat each T) {
   repeat print(each x)
   // expected-error@-1 {{'each' cannot be applied to non-pack type 'Int'}}
 }
+
+func copyIntoTuple<each T>(_ arg: repeat each T) -> (repeat each T) {
+  return (repeat each arg)
+}
+func callCopyAndBind<T>(_ arg: repeat each T) {
+  // expected-error@-1 {{'each' cannot be applied to non-pack type 'T'}}
+  // expected-error@-2 {{variadic expansion 'T' must contain at least one variadic generic parameter}}
+
+  // Don't propagate errors for invalid declaration reference
+  let result = copyIntoTuple(repeat each arg)
+}

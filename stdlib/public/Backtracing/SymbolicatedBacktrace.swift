@@ -19,10 +19,6 @@ import Swift
 
 @_implementationOnly import _SwiftBacktracingShims
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_implementationOnly import CoreFoundation
-#endif
-
 @_silgen_name("_swift_isThunkFunction")
 func _swift_isThunkFunction(
   _ rawName: UnsafePointer<CChar>?
@@ -243,17 +239,15 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   /// Convert a build ID to a CFUUIDBytes.
-  private static func uuidBytesFromBuildID(_ buildID: [UInt8]) -> CFUUIDBytes {
-    var result = CFUUIDBytes()
-    withUnsafeMutablePointer(to: &result) {
-      $0.withMemoryRebound(to: UInt8.self,
-                           capacity: MemoryLayout<CFUUIDBytes>.size) {
-        let bp = UnsafeMutableBufferPointer(start: $0,
-                                            count: MemoryLayout<CFUUIDBytes>.size)
-        _ = bp.initialize(from: buildID)
+  private static func uuidBytesFromBuildID(_ buildID: [UInt8])
+    -> __swift_backtrace_CFUUIDBytes {
+    return withUnsafeTemporaryAllocation(of: __swift_backtrace_CFUUIDBytes.self,
+                                         capacity: 1) { buf in
+      buf.withMemoryRebound(to: UInt8.self) {
+        _ = $0.initialize(from: buildID)
       }
+      return buf[0]
     }
-    return result
   }
 
   /// Create a symbolicator.
@@ -263,15 +257,15 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                           fn: (CSSymbolicatorRef) throws -> T) rethrows -> T {
     let binaryImageList = images.map{ image in
       BinaryImageInformation(
-        base: mach_vm_address_t(image.baseAddress),
-        extent: mach_vm_address_t(image.endOfText),
+        base: __swift_vm_address_t(image.baseAddress),
+        extent: __swift_vm_address_t(image.endOfText),
         uuid: uuidBytesFromBuildID(image.buildID!),
         arch: HostContext.coreSymbolicationArchitecture,
         path: image.path,
         relocations: [
           BinaryRelocationInformation(
-            base: mach_vm_address_t(image.baseAddress),
-            extent: mach_vm_address_t(image.endOfText),
+            base: __swift_vm_address_t(image.baseAddress),
+            extent: __swift_vm_address_t(image.endOfText),
             name: "__TEXT"
           )
         ],
@@ -381,7 +375,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
           case .omittedFrames(_), .truncated:
             frames.append(Frame(captured: frame, symbol: nil))
           default:
-            let address = mach_vm_address_t(frame.adjustedProgramCounter)
+            let address = __swift_vm_address_t(frame.adjustedProgramCounter)
             let owner
               = CSSymbolicatorGetSymbolOwnerWithAddressAtTime(symbolicator,
                                                               address,

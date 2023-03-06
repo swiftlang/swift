@@ -150,7 +150,7 @@ class Target {
       exit(1)
     }
 
-    reader = RemoteMemoryReader(task: task)
+    reader = RemoteMemoryReader(task: __swift_task_t(task))
 
     name = Self.getProcessName(pid: pid)
 

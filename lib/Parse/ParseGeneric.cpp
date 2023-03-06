@@ -80,13 +80,15 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // 'T...'.
     if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
         startsWithEllipsis(Tok)) {
+      const auto EllipsisLoc = consumeStartingEllipsis();
+      // TODO: token length hardcoded because calculation for ellipsis
+      // incorrectly includes '>' if one follows (as can occur in this parse).
       constexpr int EllipsisLength = 3;
-      const SourceRange EllipsisRange(
-          Tok.getLoc(), Tok.getLoc().getAdvancedLoc(EllipsisLength));
-      auto &Diagnostic = diagnose(Tok, diag::type_parameter_pack_ellipsis)
-                             .fixItRemove(EllipsisRange);
+      const auto EllipsisEnd = EllipsisLoc.getAdvancedLoc(EllipsisLength);
+      auto Diag = diagnose(Tok, diag::type_parameter_pack_ellipsis);
+      Diag.fixItRemoveChars(EllipsisLoc, EllipsisEnd);
       if (!EachLoc.isValid()) {
-        Diagnostic.fixItInsert(NameLoc, "each");
+        Diag.fixItInsert(NameLoc, "each ");
       }
       Result.setIsParseError();
       break;

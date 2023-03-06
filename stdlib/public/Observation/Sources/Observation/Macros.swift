@@ -9,6 +9,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if $Macros && hasAttribute(attached)
+
 @available(SwiftStdlib 5.9, *)
 @attached(member, names: named(_registrar), named(transactions), named(changes), named(_Storage), named(_storage))
 @attached(memberAttribute)
@@ -20,3 +22,5 @@ public macro Observable() =
 @attached(accessor)
 public macro ObservableProperty() = 
   #externalMacro(module: "ObservationMacros", type: "ObservablePropertyMacro")
+
+#endif

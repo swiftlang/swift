@@ -4,6 +4,7 @@
 // RUN: %target-run %t/SimpleBacktrace | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: backtracing
 // REQUIRES: OS=macosx
 
 func level1() {
