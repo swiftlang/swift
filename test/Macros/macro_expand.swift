@@ -31,6 +31,19 @@
 // REQUIRES: OS=macosx
 
 #if TEST_DIAGNOSTICS
+@freestanding(declaration)
+macro NotCovered() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
+
+struct MemberNotCovered {
+  #NotCovered
+  // expected-note@-1 {{in expansion of macro 'NotCovered' here}}
+
+  // CHECK-DIAGS: error: declaration name 'value' is not covered by macro 'NotCovered'
+  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser16MemberNotCoveredV0dE0fMf0_.swift
+  // CHECK-DIAGS: var value: Int
+  // CHECK-DIAGS: END CONTENTS OF FILE
+}
+
 @attached(peer)
 macro Invalid() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
 
