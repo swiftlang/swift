@@ -40,6 +40,7 @@ add_swift_host_library(swiftSema STATIC
   PlaygroundTransform.cpp
   PreCheckExpr.cpp
   ResilienceDiagnostics.cpp
+  SolutionApplicationTarget.cpp
   SourceLoader.cpp
   TypeCheckAccess.cpp
   TypeCheckAttr.cpp
