@@ -1311,12 +1311,9 @@ namespace {
     void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
       printCommon(MED, "macro_expansion_decl ");
       OS << MED->getMacroName();
-      if (MED->getArgs()) {
-        OS << '\n';
-        OS.indent(Indent + 2);
-        printArgumentList(OS, MED->getArgs(), Indent,
-                          [&](Expr *E) { printRec(E); });
-      }
+      OS << '\n';
+      printArgumentList(OS, MED->getArgs(), Indent,
+                        [&](Expr *E) { printRec(E); });
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
   };
@@ -3050,7 +3047,7 @@ public:
       printArgumentList(E->getArgs());
     }
     if (auto rewritten = E->getRewritten()) {
-      OS << '\n';
+      OS << " rewritten=\n";
       printRec(rewritten);
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';

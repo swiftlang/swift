@@ -6123,14 +6123,17 @@ RValue RValueEmitter::visitMoveExpr(MoveExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
                                               SGFContext C) {
-  auto *rewritten = E->getRewritten();
-  assert(rewritten && "Macro should have been rewritten by SILGen");
-  Mangle::ASTMangler mangler;
-  auto name =
-      SGF.getASTContext().getIdentifier(mangler.mangleMacroExpansion(E));
-  MacroScope scope(SGF, CleanupLocation(rewritten), E, name.str(),
-                   E->getMacroRef().getDecl());
-  return visit(rewritten, C);
+  if (auto *rewritten = E->getRewritten()) {
+    Mangle::ASTMangler mangler;
+    auto name =
+        SGF.getASTContext().getIdentifier(mangler.mangleMacroExpansion(E));
+    MacroScope scope(SGF, CleanupLocation(rewritten), E, name.str(),
+                     E->getMacroRef().getDecl());
+    return visit(rewritten, C);
+  } else {
+    assert(E->getSubstituteDecl());
+    return RValue();
+  }
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

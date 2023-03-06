@@ -343,23 +343,31 @@ func expandFreestandingMacroInProcess(
     // Handle declaration macro. The resulting decls are wrapped in a
     // `CodeBlockItemListSyntax`.
     case let declMacro as DeclarationMacro.Type:
-      guard let parentExpansion = macroSyntax.as(MacroExpansionDeclSyntax.self) else {
-        print("not on a macro expansion node: \(macroSyntax.recursiveDescription)")
+      guard let parentExpansion = macroSyntax.asProtocol(
+        FreestandingMacroExpansionSyntax.self
+      ) else {
+        print("not on a macro expansion decl: \(macroSyntax.recursiveDescription)")
         return nil
       }
       macroName = parentExpansion.macro.text
-      let decls = try declMacro.expansion(
-        of: sourceManager.detach(
-          parentExpansion,
-          foldingWith: OperatorTable.standardOperators
-        ),
-        in: context
-      )
+
+      func expandDeclarationMacro<Node: FreestandingMacroExpansionSyntax>(
+        _ node: Node
+      ) throws -> [DeclSyntax] {
+        return try declMacro.expansion(
+          of: sourceManager.detach(
+            node,
+            foldingWith: OperatorTable.standardOperators
+          ),
+          in: context
+        )
+      }
+      let decls = try _openExistential(parentExpansion, do: expandDeclarationMacro)
       evaluatedSyntax = Syntax(CodeBlockItemListSyntax(
         decls.map { CodeBlockItemSyntax(item: .decl($0)) }))
 
     default:
-      print("not an expression macro or a freestanding declaration macro")
+      print("not an expression macro or a declaration macro")
       return nil
     }
   } catch {

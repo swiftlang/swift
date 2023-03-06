@@ -433,14 +433,28 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     bool shouldWalkArguments, shouldWalkExpansion;
     std::tie(shouldWalkArguments, shouldWalkExpansion) =
         Walker.shouldWalkMacroArgumentsAndExpansion();
-    if (shouldWalkArguments && MED->getArgs() && !doIt(MED->getArgs()))
-      return true;
+    if (shouldWalkArguments && MED->getArgs()) {
+      if (auto *argList = doIt(MED->getArgs()))
+        MED->setArgs(argList);
+      else
+        return true;
+    }
     // Visit auxiliary decls, which may be decls from macro expansions.
     bool alreadyFailed = false;
     if (shouldWalkExpansion) {
       MED->visitAuxiliaryDecls([&](Decl *decl) {
         if (alreadyFailed) return;
         alreadyFailed = inherited::visit(decl);
+      });
+      MED->forEachExpandedExprOrStmt([&](ASTNode expandedNode) {
+        if (alreadyFailed) return;
+        if (auto *expr = expandedNode.dyn_cast<Expr *>()) {
+          if (!doIt(expr))
+            alreadyFailed = true;
+        } else if (auto *stmt = expandedNode.dyn_cast<Stmt *>()) {
+          if (!doIt(stmt))
+            alreadyFailed = true;
+        }
       });
     }
     return alreadyFailed;

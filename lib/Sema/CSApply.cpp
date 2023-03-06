@@ -5377,16 +5377,38 @@ namespace {
       ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
       E->setMacroRef(macroRef);
 
-      // For now, only expand macro expansion expressions that fulfill
-      // `MacroRole::Expression` exactly. Freestanding code item macros
-      // have a `getMacroRoles()` value equal to `getFreestandingMacroRoles()`,
-      // which includes expression macros, and they are expanded in a separate
-      // request.
-      if (E->getMacroRoles() == MacroRole::Expression &&
-          !cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
-        if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
-          E->setRewritten(newExpr);
+      if (!cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
+        if (macro->getMacroRoles().contains(MacroRole::Expression)) {
+          if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
+            E->setRewritten(newExpr);
+          }
         }
+        // For a non-expression macro, expand it as a declaration.
+        else if (macro->getMacroRoles().contains(MacroRole::Declaration)) {
+          if (!E->getSubstituteDecl()) {
+            auto *med = E->createSubstituteDecl();
+            E->setSubstituteDecl(med);
+            TypeChecker::typeCheckDecl(med);
+          }
+          // To prevent AST nodes from being visited twice, we've sunk the
+          // original argument list down to the substitute macro expansion decl,
+          // and we'll replace the expr's arguments with opaque values.
+          SmallVector<Argument, 4> newArguments;
+          for (auto arg : *E->getArgs()) {
+            arg.setExpr(new (cs.getASTContext()) OpaqueValueExpr(
+                arg.getSourceRange(), cs.getType(arg.getExpr())));
+            newArguments.push_back(arg);
+          }
+          auto newArgList = ArgumentList::create(
+              cs.getASTContext(), E->getArgs()->getLParenLoc(), newArguments,
+              E->getArgs()->getRParenLoc(),
+              E->getArgs()->getFirstTrailingClosureIndex(),
+              E->getArgs()->isImplicit());
+          E->setArgs(newArgList);
+          cs.setType(E, cs.getASTContext().getVoidType());
+        }
+        // Other macro roles may also be encountered here, as they use
+        // `MacroExpansionExpr` for resolution. In those cases, do not expand.
       }
 
       cs.cacheExprTypes(E);

@@ -234,19 +234,32 @@ func testNestedDeclInExpr() {
 @freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
-// Macros adding to an enum
-@attached(member, names: named(unknown), arbitrary)
-public macro ExtendableEnum() = #externalMacro(module: "MacroDefinition", type: "ExtendableEnum")
+// FIXME: Macros producing arbitrary names are not supported yet
+#if false
+#bitwidthNumberedStructs("MyIntGlobal")
 
-@ExtendableEnum
-enum ElementType {
-case paper
-}
+#bitwidthNumberedStructs("MyIntGlobalTwo", blah: false)
 
-print(ElementType.paper.unknown())
+let blah = false
+#bitwidthNumberedStructs("MyIntGlobalThree", blah: blah)
+#endif
 
-// FIXME: Declaration macro expansions in BraceStmt don't work yet.
-//#bitwidthNumberedStructs("MyIntGlobal")
+// Test unqualified lookup from within a macro expansion
+@freestanding(declaration, names: named(StructWithUnqualifiedLookup))
+macro structWithUnqualifiedLookup() = #externalMacro(module: "MacroDefinition", type: "DefineStructWithUnqualifiedLookupMacro")
+
+@freestanding(declaration)
+macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
+
+
+// FIXME: Global freestanding macros not yet supported in script mode.
+#if false
+let world = 3 // to be used by the macro expansion below
+#structWithUnqualifiedLookup()
+_ = StructWithUnqualifiedLookup().foo()
+
+#anonymousTypes { "hello" }
+#endif
 
 func testFreestandingMacroExpansion() {
   // Explicit structs to force macros to be parsed as decl.
@@ -295,14 +308,16 @@ func testFreestandingMacroExpansion() {
   }
   #endif
 
-  // FIXME: Declaration macro expansions in BraceStmt don't work yet.
-//  HECK: MyIntGlobal8
-//  print(MyIntGlobal8.self)
-//  HECK: MyIntGlobal16
-//  print(MyIntGlobal16.self)
-//  HECK: MyIntGlobal32
-//  print(MyIntGlobal32.self)
-//  HECK: MyIntGlobal64
-//  print(MyIntGlobal64.self)
+  // FIXME: Arbitrary name lookup is not yet supported.
+  // HECK: MyIntGlobal8
+  // print(MyIntGlobal8.self)
+  // HECK: MyIntGlobal16
+  // print(MyIntGlobal16.self)
+  // HECK: MyIntGlobal32
+  // print(MyIntGlobal32.self)
+  // HECK: MyIntGlobal64
+  // print(MyIntGlobal64.self)
+
+  #anonymousTypes { "hello" }
 }
 testFreestandingMacroExpansion()

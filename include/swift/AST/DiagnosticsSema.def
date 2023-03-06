@@ -6928,6 +6928,9 @@ ERROR(literal_type_in_macro_expansion,none,
 ERROR(invalid_macro_introduced_name,none,
       "declaration name %0 is not covered by macro %1",
       (DeclName, DeclName))
+ERROR(global_freestanding_macro_script,none,
+      "global freestanding macros not yet supported in script mode",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors
