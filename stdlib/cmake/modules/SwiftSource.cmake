@@ -131,6 +131,7 @@ function(handle_swift_sources
         list(APPEND swift_compile_flags "${_lto_flag_out}")
       endif()
     endif()
+    list(APPEND swift_compile_flags "-color-diagnostics")
     _compile_swift_files(
         dependency_target
         module_dependency_target
