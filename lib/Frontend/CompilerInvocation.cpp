@@ -705,8 +705,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::NamedOpaqueTypes);
   if (Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures))
     Opts.Features.insert(Feature::FlowSensitiveConcurrencyCaptures);
-  if (Args.hasArg(OPT_enable_experimental_move_only))
-    Opts.Features.insert(Feature::MoveOnly);
+  
+  // if (Args.hasArg(OPT_enable_experimental_move_only))
+  Opts.Features.insert(Feature::MoveOnly);
+
   if (Args.hasArg(OPT_experimental_one_way_closure_params))
     Opts.Features.insert(Feature::OneWayClosureParameters);
   if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
@@ -1795,13 +1797,15 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.CopyPropagation = *specifiedCopyPropagationOption;
   }
 
-  Optional<bool> enableLexicalBorrowScopesFlag;
   if (Arg *A = Args.getLastArg(OPT_enable_lexical_borrow_scopes)) {
-    enableLexicalBorrowScopesFlag =
+    Optional<bool> enableLexicalBorrowScopesFlag =
         llvm::StringSwitch<Optional<bool>>(A->getValue())
             .Case("true", true)
             .Case("false", false)
             .Default(None);
+    if (!enableLexicalBorrowScopesFlag.value_or(true)) {
+      llvm_unreachable("cannot disable lexical borrow scopes");
+    }
   }
 
   // Allow command line flags to override the default value of
@@ -1828,26 +1832,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     }
   }
 
-  if (enableLexicalLifetimesFlag.value_or(false) &&
-      !enableLexicalBorrowScopesFlag.value_or(true)) {
-    // Error if lexical lifetimes have been enabled but lexical borrow scopes--
-    // on which they are dependent--have been disabled.
-    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
-                   "enable-lexical-lifetimes=true",
-                   "enable-lexical-borrow-scopes=false");
-    return true;
-  }
-
-  if (Args.hasArg(OPT_enable_experimental_move_only) &&
-      !enableLexicalBorrowScopesFlag.value_or(true)) {
-    // Error if move-only is enabled and lexical borrow scopes--on which it
-    // depends--has been disabled.
-    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
-                   "enable-experimental-move-only",
-                   "enable-lexical-borrow-scopes=false");
-    return true;
-  }
-
   // Unless overridden below, enabling copy propagation means enabling lexical
   // lifetimes.
   if (Opts.CopyPropagation == CopyPropagationOption::On) {
@@ -1864,23 +1848,23 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   // If move-only is enabled, always enable lexical lifetime as well.  Move-only
   // depends on lexical lifetimes.
-  if (Args.hasArg(OPT_enable_experimental_move_only))
-    Opts.LexicalLifetimes = LexicalLifetimesOption::On;
+  // if (Args.hasArg(OPT_enable_experimental_move_only))
+  Opts.LexicalLifetimes = LexicalLifetimesOption::On;
 
-  if (enableLexicalLifetimesFlag) {
-    if (*enableLexicalLifetimesFlag) {
-      Opts.LexicalLifetimes = LexicalLifetimesOption::On;
-    } else {
-      Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
-    }
-  }
-  if (enableLexicalBorrowScopesFlag) {
-    if (*enableLexicalBorrowScopesFlag) {
-      Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
-    } else {
-      Opts.LexicalLifetimes = LexicalLifetimesOption::Off;
-    }
-  }
+  // if (enableLexicalLifetimesFlag) {
+  //   if (*enableLexicalLifetimesFlag) {
+  //     Opts.LexicalLifetimes = LexicalLifetimesOption::On;
+  //   } else {
+  //     Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
+  //   }
+  // }
+  // if (enableLexicalBorrowScopesFlag) {
+  //   if (*enableLexicalBorrowScopesFlag) {
+  //     Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
+  //   } else {
+  //     Opts.LexicalLifetimes = LexicalLifetimesOption::Off;
+  //   }
+  // }
   if (specifiedDestroyHoistingOption)
     Opts.DestroyHoisting = *specifiedDestroyHoistingOption;
 
