@@ -63,6 +63,15 @@ func overloaded1(_ p: Any) { }
 @freestanding(expression) macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingOtherType") // expected-error{{invalid redeclaration of 'notOverloaded1'}}
 // expected-warning@-1{{external macro implementation type}}
 
+// Overloading based on generic constraint.
+public protocol ResultBuilder {
+}
+
+@freestanding(expression) public macro ApplyBuilder<R: ResultBuilder>(resultBuilder: R.Type, to closure: () -> Void) -> (() -> String) = #externalMacro(module: "MacroExamplesPlugin", type: "ResultBuilderMacro")
+// expected-warning@-1{{external macro implementation type}}
+@freestanding(expression)  public macro ApplyBuilder<R>(resultBuilder: R.Type, to closure: () -> Void) -> (() -> String) = #externalMacro(module: "MacroExamplesPlugin", type: "ResultBuilderMacro2")
+// expected-warning@-1{{external macro implementation type}}
+
 @freestanding(expression) macro intIdentity(value: Int, _: Float) -> Int = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-note@-1{{'intIdentity(value:_:)' declared here}}
 // expected-warning@-2{{external macro implementation type}}
