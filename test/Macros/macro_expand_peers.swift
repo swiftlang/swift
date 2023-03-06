@@ -7,6 +7,9 @@
 // RUN: %target-build-swift -swift-version 5 -Xfrontend -disable-availability-checking -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
 // RUN: %target-run %t/main | %FileCheck %s -check-prefix=CHECK-EXEC
 
+// Emit module while skipping function bodies
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -I %swift-host-lib-dir %s -disable-availability-checking -o %t/macro_expand_peers.swiftmodule -experimental-skip-non-inlinable-function-bodies-without-types
+
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
