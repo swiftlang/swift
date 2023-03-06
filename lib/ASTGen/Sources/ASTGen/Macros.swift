@@ -523,22 +523,7 @@ func expandAttachedMacro(
   }
 
   // Fixup the source.
-  var expandedSource: String
-  switch MacroRole(rawValue: rawMacroRole)! {
-  case .Accessor:
-    expandedSource = expandedSources.joined(separator: "\n\n")
-  case .Member:
-    expandedSource = expandedSources.joined(separator: "\n\n")
-  case .MemberAttribute:
-    expandedSource = expandedSources.joined(separator: " ")
-  case .Peer:
-    expandedSource = expandedSources.joined(separator: "\n\n")
-  case .Conformance:
-    expandedSource = expandedSources.joined(separator: "\n\n")
-  case .Expression,
-      .FreestandingDeclaration:
-    fatalError("unreachable")
-  }
+  var expandedSource: String = collapse(expansions: expandedSources, for: MacroRole(rawValue: rawMacroRole)!, attachedTo: declarationNode)
 
   // Form the result buffer for our caller.
   expandedSource.withUTF8 { utf8 in
@@ -836,4 +821,45 @@ func expandAttachedMacroInProcess(
   }
 
   return expandedSources
+}
+
+fileprivate func collapse<Node: SyntaxProtocol>(
+  expansions: [String],
+  for role: MacroRole,
+  attachedTo declarationNode: Node
+) -> String {
+  var separator: String = "\n\n"
+  var prefix: String = ""
+  var suffix: String = ""
+
+  switch role {
+  case .Accessor:
+    if let varDecl = declarationNode.as(VariableDeclSyntax.self),
+       let binding = varDecl.bindings.first,
+       binding.accessor == nil {
+      prefix = "{\n"
+      suffix = "\n}"
+    }
+  case .Member:
+    prefix = "\n\n"
+    suffix = "\n"
+  case .MemberAttribute:
+    separator = " "
+    suffix = " "
+  case .Peer:
+    prefix = "\n\n"
+    suffix = "\n"
+  case .Conformance:
+    prefix = "\n\n"
+    suffix = "\n"
+  case .Expression,
+      .FreestandingDeclaration:
+    fatalError("unreachable")
+  }
+
+  let separated = expansions.joined(separator: separator)
+  if separated.isEmpty {
+    return separated
+  }
+  return prefix + separated + suffix
 }

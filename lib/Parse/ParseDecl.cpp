@@ -7098,11 +7098,13 @@ void Parser::parseTopLevelAccessors(
     staticLoc = binding->getStaticLoc();
   }
 
+  bool hadLBrace = consumeIf(tok::l_brace);
+
   ParserStatus status;
   ParsedAccessors accessors;
   bool hasEffectfulGet = false;
   bool parsingLimitedSyntax = false;
-  while (!Tok.is(tok::eof)) {
+  while (!Tok.isAny(tok::r_brace, tok::eof)) {
     DeclAttributes attributes;
     AccessorKind kind = AccessorKind::Get;
     SourceLoc loc;
@@ -7114,6 +7116,10 @@ void Parser::parseTopLevelAccessors(
         loc, kind, accessors, hasEffectfulGet, indices, parsingLimitedSyntax,
         attributes, PD_Default, storage, staticLoc, status
     );
+  }
+
+  if (hadLBrace && Tok.is(tok::r_brace)) {
+    consumeToken(tok::r_brace);
   }
 
   // Consume remaining tokens.
