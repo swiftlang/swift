@@ -698,6 +698,9 @@ public:
   FuncDecl *getMakeInvocationEncoderOnDistributedActorSystem(
       AbstractFunctionDecl *thunk) const;
 
+  /// Indicates whether move-only / noncopyable types are supported.
+  bool supportsMoveOnlyTypes() const;
+
   // Retrieve the declaration of
   // DistributedInvocationEncoder.recordGenericSubstitution(_:).
   //
