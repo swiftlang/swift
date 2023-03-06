@@ -4,17 +4,16 @@
 // RUN: echo 'class c : b {}' >%t/c.swift
 // RUN: echo 'class d : c {}' >%t/d.swift
 // RUN: echo 'public func main() {}' >%t/main.swift
-// REQUIRES: rdar106170241 
 
 // First prime the incremental state, but note that we're building in the d c b a (reverse-alphabetical) order.
-// RUN: cd %t && %swiftc_driver-stdlib-target -enable-batch-mode -incremental -output-file-map %S/Inputs/abcd_filemap.yaml -module-name main -j 1 d.swift c.swift b.swift a.swift main.swift
+// RUN: cd %t && %target-stdlib-swiftc_driver -enable-batch-mode -incremental -output-file-map %S/Inputs/abcd_filemap.yaml -module-name main -j 1 d.swift c.swift b.swift a.swift main.swift
 //
 // Now perturb the interface of a.swift and delete its output
 // RUN: echo 'class a { var x : Int = 10 }' >%t/a.swift
 // RUN: rm %t/a.o
 //
 // Now rebuild, which will rebuild a.swift then do a cascading dep-graph invalidation
-// RUN: cd %t && %swiftc_driver-stdlib-target -enable-batch-mode -incremental -output-file-map %S/Inputs/abcd_filemap.yaml -module-name main -j 1 d.swift c.swift b.swift a.swift main.swift -driver-show-incremental -driver-show-job-lifecycle >%t/out.txt 2>&1
+// RUN: cd %t && %target-stdlib-swiftc_driver -enable-batch-mode -incremental -output-file-map %S/Inputs/abcd_filemap.yaml -module-name main -j 1 d.swift c.swift b.swift a.swift main.swift -driver-show-incremental -driver-show-job-lifecycle >%t/out.txt 2>&1
 // RUN: %FileCheck %s <%t/out.txt
 //
 // Check that we saw invalidation happen in command-line argument order
