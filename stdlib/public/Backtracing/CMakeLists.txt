@@ -28,6 +28,15 @@ set(BACKTRACING_SOURCES
   get-cpu-context.${SWIFT_ASM_EXT}
 )
 
+set(BACKTRACING_COMPILE_FLAGS)
+
+if(SWIFT_ASM_AVAILABLE)
+  list(APPEND BACKTRACING_SOURCES get-cpu-context.${SWIFT_ASM_EXT})
+  list(APPEND BACKTRACING_COMPILE_FLAGS "-DSWIFT_ASM_AVAILABLE")
+else()
+  message(warning "Assembly language not available on this platform; backtracing will fail.")
+endif()
+
 set(LLVM_OPTIONAL_SOURCES
   get-cpu-context.S
   get-cpu-context.asm
@@ -48,6 +57,7 @@ add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+    ${BACKTRACING_COMPILE_FLAGS}
     -parse-stdlib
 
   LINK_FLAGS
