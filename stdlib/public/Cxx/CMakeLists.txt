@@ -7,6 +7,7 @@ add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDL
     CxxConvertibleToCollection.swift
     CxxDictionary.swift
     CxxPair.swift
+    CxxOptional.swift
     CxxSet.swift
     CxxRandomAccessCollection.swift
     CxxSequence.swift
