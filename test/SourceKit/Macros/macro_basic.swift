@@ -93,7 +93,7 @@ struct S4 { }
 // CURSOR_MACRONAME-LABEL: SYMBOL GRAPH BEGIN
 // CURSOR_MACRONAME: "identifier": {
 // CURSOR_MACRONAME-NEXT:   "interfaceLanguage": "swift",
-// CURSOR_MACRONAME-NEXT:   "precise": "s:9MacroUser9stringifyyx_SStxcfm"
+// CURSOR_MACRONAME-NEXT:   "precise": "s:9MacroUser9stringifyyx_SStxclufm"
 // CURSOR_MACRONAME-NEXT: },
 // CURSOR_MACRONAME-NEXT: "kind": {
 // CURSOR_MACRONAME-NEXT:   "displayName": "Macro",

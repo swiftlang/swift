@@ -1808,7 +1808,7 @@ void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
   Type macroType = MD->getInterfaceType();
   if (MD->parameterList && MD->parameterList->size() > 0) {
     Builder.addLeftParen();
-    addCallArgumentPatterns(Builder, macroType->castTo<FunctionType>(),
+    addCallArgumentPatterns(Builder, macroType->castTo<AnyFunctionType>(),
                             MD->parameterList,
                             MD->getGenericSignature());
     Builder.addRightParen();
