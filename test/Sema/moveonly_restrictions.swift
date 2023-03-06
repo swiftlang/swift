@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses
+
+// REQUIRES: concurrency
 
 class CopyableKlass {}
 
@@ -226,6 +228,19 @@ enum StrengthLevel: Int { // ensure move-only raw enums do not conform to RawRep
     }
 }
 
+public class Holder {
+    var one: MoveOnlyStruct {
+        get async {  } // expected-error {{getter of move-only type cannot be 'async' or 'throws'}}
+    }
+    var two: MoveOnlyKlass {
+        get throws {  } // expected-error {{getter of move-only type cannot be 'async' or 'throws'}}
+    }
+}
 
+struct StructHolder {
+    var three: EMoveOnly {
+        get async throws {  } // expected-error {{getter of move-only type cannot be 'async' or 'throws'}}
+    }
+}
 
 

@@ -135,12 +135,11 @@ enum E: Error { case err }
   }
 
   var validFile: File {
-    __consuming get throws {
+    __consuming get {
       if case let .valid(f) = self {
         return f
       }
       _forget self
-      throw E.err
     }
   }
 
