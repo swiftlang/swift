@@ -67,6 +67,14 @@ set SWIFTPM_MODULECACHE_OVERRIDE=%build_root%\tmp\org.swift.package-manager
 set RunTest=1
 if "%1"=="-notest" set RunTest=0
 
+rem TODO(compnerd) remove this clean up code once we have had enough time for
+rem the injection to soak.
+:: Clean up old deployments as that breaks the tests
+del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap"
+del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap"
+del /f /q "%VCToolsInstallDir%\include\module.modulemap"
+del /f /q "%VCToolsInstallDir%\include\vcruntime.apinotes"
+
 call :clone_repositories %exitOnError%
 :: TODO: Disabled until we need Foundation in this build script.
 :: call :download_icu %exitOnError%
@@ -227,12 +235,6 @@ endlocal
 :build_swift
 :: Configures, builds, and installs Swift and the Swift Standard Library
 setlocal enableextensions enabledelayedexpansion
-
-:: Clean up old deployments as that breaks the tests
-del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap"
-del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap"
-del /f /q "%VCToolsInstallDir%\include\module.modulemap"
-del /f /q "%VCToolsInstallDir%\include\vcruntime.apinotes"
 
 :: SWIFT_PARALLEL_LINK_JOBS=8 allows the build machine to use as many CPU as
 :: possible, while not exhausting the RAM.
