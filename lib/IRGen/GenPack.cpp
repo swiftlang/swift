@@ -30,6 +30,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
+#include "ResilientTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;

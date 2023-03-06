@@ -3198,7 +3198,7 @@ public:
   }
 
   CanType visitPackExpansionType(CanPackExpansionType ty) {
-    llvm_unreachable("");
+    return ty;
   }
 
   CanType visitTupleType(CanTupleType ty) {
@@ -3533,6 +3533,10 @@ namespace {
 
     llvm::Value *visitTupleType(CanTupleType type,
                                 DynamicMetadataRequest request) {
+      // Tuples containing pack expansion types are completely dynamic.
+      if (type->containsPackExpansionType())
+        return emitFromTypeMetadata(type, request);
+
       // Single-element tuples have exactly the same layout as their elements.
       if (type->getNumElements() == 1) {
         return visit(type.getElementType(0), request);

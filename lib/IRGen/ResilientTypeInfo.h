@@ -20,6 +20,7 @@
 #define SWIFT_IRGEN_RESILIENTTYPEINFO_H
 
 #include "NonFixedTypeInfo.h"
+#include "Outlining.h"
 
 namespace swift {
 namespace irgen {

@@ -123,6 +123,8 @@ private:
     {nullptr, nullptr},
     {nullptr, nullptr},
   };
+
+  const TypeInfo *DynamicTupleTI[2] = {nullptr, nullptr};
   
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     OpaqueStorageTypes;
@@ -177,6 +179,7 @@ private:
   const LoadableTypeInfo *convertBuiltinBridgeObject();
   const TypeInfo *convertResilientStruct(IsCopyable_t copyable,
                                          IsABIAccessible_t abiAccessible);
+  const TypeInfo *convertDynamicTupleType(IsCopyable_t copyable);
 #define REF_STORAGE(Name, ...) \
   const TypeInfo *convert##Name##StorageType(Name##StorageType *T);
 #include "swift/AST/ReferenceStorage.def"
@@ -210,6 +213,7 @@ public:
   const LoadableTypeInfo &getIntegerLiteralTypeInfo();
   const TypeInfo &getResilientStructTypeInfo(IsCopyable_t copyable,
                                              IsABIAccessible_t abiAccessible);
+  const TypeInfo &getDynamicTupleTypeInfo(IsCopyable_t isCopyable);
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P, ProtocolInfoKind kind);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,
                                                    Alignment storageAlign);
