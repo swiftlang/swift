@@ -2782,7 +2782,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
                                                DynamicMetadataRequest request) {
   switch (component.getKind()) {
   case Component::Kind::NominalTypeArgument:
-  case Component::Kind::NominalTypeArgumentConformance: {
+  case Component::Kind::NominalTypeArgumentConformance:
+  case Component::Kind::NominalTypeArgumentShape: {
     assert(sourceKey.Kind == LocalTypeDataKind::forFormalTypeMetadata());
     auto type = sourceKey.Type;
     if (auto archetypeTy = dyn_cast<ArchetypeType>(type))
@@ -2820,9 +2821,24 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       // Do a dynamic check if necessary to satisfy the request.
       return emitCheckTypeMetadataState(IGF, request, response);
 
+    // If this is a shape class, load the value.
+    } else if (component.getKind() == Component::Kind::NominalTypeArgumentShape) {
+      assert(requirement.isShape() && "index mismatch!");
+
+      sourceKey.Kind = LocalTypeDataKind::forPackShapeExpression();
+
+      if (!source) return MetadataResponse();
+
+      auto sourceMetadata = source.getMetadata();
+      auto shape = emitArgumentPackShapeRef(IGF, nominal,
+                                            requirements, reqtIndex,
+                                            sourceMetadata);
+
+      return MetadataResponse::forComplete(shape);
+
     // Otherwise, we need to switch sourceKey.Kind to the appropriate
     // conformance kind.
-    } else {
+    } else if (component.getKind() == Component::Kind::NominalTypeArgumentConformance) {
       assert(requirement.isWitnessTable() && "index mismatch!");
       auto conformance = subs.lookupConformance(requirement.getTypeParameter(),
                                                 requirement.getProtocol());
@@ -2840,6 +2856,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
       return MetadataResponse::forComplete(wtable);
     }
+
+    llvm_unreachable("Bad component kind");
   }
 
   case Component::Kind::OutOfLineBaseProtocol: {
@@ -3060,6 +3078,10 @@ void MetadataPath::print(llvm::raw_ostream &out) const {
       break;
     case Component::Kind::NominalTypeArgumentConformance:
       out << "nominal_type_argument_conformance["
+          << component.getPrimaryIndex() << "]";
+      break;
+    case Component::Kind::NominalTypeArgumentShape:
+      out << "nominal_type_argument_shape["
           << component.getPrimaryIndex() << "]";
       break;
     case Component::Kind::ConditionalConformance:

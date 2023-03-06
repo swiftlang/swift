@@ -291,30 +291,44 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
     if (!keys.hasInterestingType(arg))
       continue;
 
-    // If the fulfilled value is type metadata, refine the path.
-    if (requirement.isMetadata()) {
+    switch (requirement.getKind()) {
+    case GenericRequirement::Kind::Shape: {
+      // If the fulfilled value is a shape class, refine the path.
+      MetadataPath argPath = path;
+      argPath.addNominalTypeArgumentShapeComponent(reqtIndex);
+
+      // Add the fulfillment.
+      hadFulfillment |= addFulfillment(GenericRequirement::forShape(arg),
+                                       source, std::move(argPath),
+                                       MetadataState::Complete);
+      break;
+    }
+    case GenericRequirement::Kind::Metadata:
+    case GenericRequirement::Kind::MetadataPack: {
+      // If the fulfilled value is type metadata, refine the path.
       auto argState =
           getPresumedMetadataStateForTypeArgument(metadataState);
       MetadataPath argPath = path;
       argPath.addNominalTypeArgumentComponent(reqtIndex);
       hadFulfillment |= searchTypeMetadata(
           IGM, arg, IsExact, argState, source, std::move(argPath), keys);
-      continue;
+      break;
     }
+    case GenericRequirement::Kind::WitnessTable:
+    case GenericRequirement::Kind::WitnessTablePack: {
+      // Ignore it unless the type itself is interesting.
+      if (!keys.isInterestingType(arg))
+        continue;
 
-    // Otherwise, it's a conformance.
-    assert(requirement.isWitnessTable());
+      // Refine the path.
+      MetadataPath argPath = path;
+      argPath.addNominalTypeArgumentConformanceComponent(reqtIndex);
 
-    // Ignore it unless the type itself is interesting.
-    if (!keys.isInterestingType(arg))
-      continue;
-
-    // Refine the path.
-    MetadataPath argPath = path;
-    argPath.addNominalTypeArgumentConformanceComponent(reqtIndex);
-
-    hadFulfillment |= searchWitnessTable(IGM, arg, requirement.getProtocol(),
-                                         source, std::move(argPath), keys);
+      hadFulfillment |= searchWitnessTable(IGM, arg, requirement.getProtocol(),
+                                           source, std::move(argPath), keys);
+      break;
+    }
+    }
   }
 
   return hadFulfillment;
