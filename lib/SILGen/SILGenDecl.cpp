@@ -1450,9 +1450,6 @@ void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
   MacroScope scope(*this, CleanupLocation(D), D,
                    D->getMacroName().getBaseIdentifier().str(),
                    D->getMacroRef().getDecl());
-  D->visitAuxiliaryDecls([&](Decl *decl) {
-    visit(decl);
-  });
   D->forEachExpandedExprOrStmt([&](ASTNode node) {
     if (auto *expr = node.dyn_cast<Expr *>())
       emitIgnoredExpr(expr);

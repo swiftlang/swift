@@ -1343,9 +1343,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
       E->setRewritten(rewritten);
     }
-    if (auto *decl = E->getSubstituteDecl())
-      if (doIt(decl))
-        return nullptr;
     return E;
   }
 

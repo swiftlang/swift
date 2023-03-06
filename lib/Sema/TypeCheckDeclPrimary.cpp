@@ -3791,5 +3791,12 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
 
   // Otherwise, we treat it as a declaration macro.
   assert(roles.contains(MacroRole::Declaration));
+
+  // For now, restrict global freestanding macros in script mode.
+  if (dc->isModuleScopeContext() &&
+      dc->getParentSourceFile()->isScriptMode()) {
+    MED->diagnose(diag::global_freestanding_macro_script);
+  }
+
   return expandFreestandingMacro(MED);
 }

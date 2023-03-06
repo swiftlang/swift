@@ -275,23 +275,6 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
 
     else if (auto *MED = dyn_cast<MacroExpansionDecl>(D))
       MayHaveAuxiliaryDecls.push_back(MED);
-
-    // Top-level macro expansion expressions can actually produce declarations,
-    // when they resolve to a substitute macro expansion decl.
-    else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      for (auto node : TLCD->getBody()->getElements()) {
-        if (auto *E = node.dyn_cast<Expr *>()) {
-          if (auto *MEE = dyn_cast<MacroExpansionExpr>(E)) {
-            auto *MED = MEE->getSubstituteDecl();
-            if (!MED) {
-              MED = MEE->createSubstituteDecl();
-              MEE->setSubstituteDecl(MED);
-            }
-            MayHaveAuxiliaryDecls.push_back(MED);
-          }
-        }
-      }
-    }
   }
 }
 
