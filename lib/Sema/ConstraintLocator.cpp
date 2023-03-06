@@ -67,6 +67,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::GenericParameter:
   case ConstraintLocator::GenericArgument:
   case ConstraintLocator::TupleType:
+  case ConstraintLocator::GenericType:
   case ConstraintLocator::NamedTupleElement:
   case ConstraintLocator::TupleElement:
   case ConstraintLocator::ProtocolRequirement:
@@ -239,6 +240,12 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   case ConstraintLocator::TupleType: {
     auto tupleElt = elt.castTo<LocatorPathElt::TupleType>();
     out << "tuple type '" << tupleElt.getType()->getString(PO) << "'";
+    break;
+  }
+
+  case ConstraintLocator::GenericType: {
+    auto genericTyElt = elt.castTo<LocatorPathElt::GenericType>();
+    out << "generic type '" << genericTyElt.getType()->getString(PO) << "'";
     break;
   }
 

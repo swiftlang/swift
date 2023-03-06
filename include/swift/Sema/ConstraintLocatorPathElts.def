@@ -181,6 +181,10 @@ CUSTOM_LOCATOR_PATH_ELT(SynthesizedArgument)
 /// path components.
 CUSTOM_LOCATOR_PATH_ELT(TupleType)
 
+/// A generic type, which provides context for subsequent generic
+/// argument path components.
+CUSTOM_LOCATOR_PATH_ELT(GenericType)
+
 /// Tuple elements.
 ABSTRACT_LOCATOR_PATH_ELT(AnyTupleElement)
   /// A tuple element referenced by position.
