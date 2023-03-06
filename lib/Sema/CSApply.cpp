@@ -396,8 +396,7 @@ namespace {
     /// Coerce an expression of (possibly unchecked) optional
     /// type to have a different (possibly unchecked) optional type.
     Expr *coerceOptionalToOptional(Expr *expr, Type toType,
-                                   ConstraintLocatorBuilder locator,
-                                   Optional<Pattern*> typeFromPattern = None);
+                                   ConstraintLocatorBuilder locator);
 
     /// Peephole an array upcast.
     void peepholeArrayUpcast(ArrayExpr *expr, Type toType, bool bridged,
@@ -2035,13 +2034,10 @@ namespace {
     /// \param expr The expression to coerce.
     /// \param toType The type to coerce the expression to.
     /// \param locator Locator used to describe where in this expression we are.
-    /// \param typeFromPattern Optionally, the caller can specify the pattern
-    ///   from where the toType is derived, so that we can deliver better fixit.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
     Expr *coerceToType(Expr *expr, Type toType,
-                       ConstraintLocatorBuilder locator,
-                       Optional<Pattern*> typeFromPattern = None);
+                       ConstraintLocatorBuilder locator);
 
     /// Coerce the arguments in the provided argument list to their matching
     /// parameter types.
@@ -5738,8 +5734,7 @@ static unsigned getOptionalEvaluationDepth(Expr *expr, Expr *target) {
 }
 
 Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
-                                             ConstraintLocatorBuilder locator,
-                                          Optional<Pattern*> typeFromPattern) {
+                                             ConstraintLocatorBuilder locator) {
   auto &ctx = cs.getASTContext();
   Type fromType = cs.getType(expr);
 
@@ -5781,7 +5776,7 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
 
   expr = cs.cacheType(bindOptional);
   expr->setImplicit(true);
-  expr = coerceToType(expr, toValueType, locator, typeFromPattern);
+  expr = coerceToType(expr, toValueType, locator);
   if (!expr) return nullptr;
 
   unsigned depth = getOptionalEvaluationDepth(expr, bindOptional);
@@ -6702,8 +6697,7 @@ Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
 }
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
-                                 ConstraintLocatorBuilder locator,
-                                 Optional<Pattern*> typeFromPattern) {
+                                 ConstraintLocatorBuilder locator) {
   auto &ctx = cs.getASTContext();
 
   // Diagnose conversions to invalid function types that couldn't be performed
@@ -6818,7 +6812,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::OptionalToOptional:
-      return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
+      return coerceOptionalToOptional(expr, toType, locator);
 
     case ConversionRestrictionKind::ArrayUpcast: {
       // Build the value conversion.
@@ -7439,7 +7433,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     TypeChecker::requireOptionalIntrinsics(ctx, expr->getLoc());
 
     if (cs.getType(expr)->getOptionalObjectType())
-      return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
+      return coerceOptionalToOptional(expr, toType, locator);
 
     Type valueType = toGenericType->getGenericArgs()[0];
     expr = coerceToType(expr, valueType, locator);
@@ -9563,12 +9557,11 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   return resultTarget;
 }
 
-Expr *Solution::coerceToType(Expr *expr, Type toType,
-                             ConstraintLocator *locator,
-                             Optional<Pattern*> typeFromPattern) {
+Expr *
+Solution::coerceToType(Expr *expr, Type toType, ConstraintLocator *locator) {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this, None, /*suppressDiagnostics=*/false);
-  Expr *result = rewriter.coerceToType(expr, toType, locator, typeFromPattern);
+  Expr *result = rewriter.coerceToType(expr, toType, locator);
   if (!result)
     return nullptr;
 

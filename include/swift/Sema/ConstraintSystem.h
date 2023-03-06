@@ -1572,13 +1572,8 @@ public:
   /// \param toType The type to coerce the expression to.
   /// \param locator Locator used to describe the location of this expression.
   ///
-  /// \param typeFromPattern Optionally, the caller can specify the pattern
-  /// from where the toType is derived, so that we can deliver better fixit.
-  ///
   /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(Expr *expr, Type toType,
-                     ConstraintLocator *locator,
-                     Optional<Pattern*> typeFromPattern = None);
+  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator);
 
   /// Compute the set of substitutions for a generic signature opened at the
   /// given locator.
