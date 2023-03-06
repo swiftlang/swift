@@ -24,16 +24,16 @@ func _lockUnlock(_: UnsafeRawPointer)
 
 @available(SwiftStdlib 5.9, *)
 internal struct _ManagedCriticalState<State> {
-  final private class LockedBuffer: ManagedBuffer<State, UInt8> { }
+  final private class LockedBuffer: ManagedBuffer<State, UnsafeRawPointer> { }
 
-  private let buffer: ManagedBuffer<State, UInt8>
+  private let buffer: ManagedBuffer<State, UnsafeRawPointer>
 
-  internal init(_ buffer: ManagedBuffer<State, UInt8>) {
+  internal init(_ buffer: ManagedBuffer<State, UnsafeRawPointer>) {
     self.buffer = buffer
   }
   
   internal init(_ initial: State) {
-    self.init(LockedBuffer.create(minimumCapacity: _lockSize()) { buffer in
+    self.init(LockedBuffer.create(minimumCapacity: Swift.max(_lockSize() / MemoryLayout<UnsafeRawPointer>.size, 1)) { buffer in
       buffer.withUnsafeMutablePointerToElements { _lockInit(UnsafeRawPointer($0)) }
       return initial
     })
@@ -44,7 +44,9 @@ internal struct _ManagedCriticalState<State> {
   ) rethrows -> R {
     try buffer.withUnsafeMutablePointers { header, lock in
       _lockLock(UnsafeRawPointer(lock))
-      defer { _lockUnlock(UnsafeRawPointer(lock)) }
+      defer {
+        _lockUnlock(UnsafeRawPointer(lock))
+      }
       return try critical(&header.pointee)
     }
   }
@@ -58,7 +60,7 @@ internal protocol _Deinitializable {
 @available(SwiftStdlib 5.9, *)
 extension _ManagedCriticalState where State: _Deinitializable {
   final private class DeinitializingLockedBuffer: 
-    ManagedBuffer<State, UInt8> {
+    ManagedBuffer<State, UnsafeRawPointer> {
     deinit {
       withUnsafeMutablePointers { header, lock in
         header.pointee.deinitialize()
@@ -67,7 +69,7 @@ extension _ManagedCriticalState where State: _Deinitializable {
   }
   
   internal init(managing initial: State) {
-    self.init(DeinitializingLockedBuffer.create(minimumCapacity: _lockSize()) { buffer in
+    self.init(DeinitializingLockedBuffer.create(minimumCapacity: Swift.max(_lockSize() / MemoryLayout<UnsafeRawPointer>.size, 1)) { buffer in
       buffer.withUnsafeMutablePointerToElements { _lockInit(UnsafeRawPointer($0)) }
       return initial
     })
