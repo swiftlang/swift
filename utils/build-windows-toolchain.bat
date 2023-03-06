@@ -577,6 +577,7 @@ cmake --build %BuildRoot%\13 --target install || (exit /b)
    -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
    -D CMAKE_MT=mt ^
    -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+   -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
    -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
    -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -602,6 +603,7 @@ cmake --build %BuildRoot%\13 --target install || (exit /b)
    -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
    -D CMAKE_MT=mt ^
    -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+   -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
    -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
    -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
