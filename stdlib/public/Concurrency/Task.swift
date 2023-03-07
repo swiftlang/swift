@@ -186,6 +186,44 @@ extension Task: Equatable {
   }
 }
 
+@available(SwiftStdlib 5.9, *)
+extension Task where Failure == Error {
+    @_spi(MainActorUtilities)
+    @MainActor
+    @available(SwiftStdlib 5.9, *)
+    public static func startOnMainActor(
+        priority: TaskPriority? = nil,
+        @_inheritActorContext @_implicitSelfCapture _ work: __owned @Sendable @escaping @MainActor() async throws -> Success
+    ) -> Task<Success, Error> {
+        let flags = taskCreateFlags(priority: priority, isChildTask: false,
+                                    copyTaskLocals: true, inheritContext: true,
+                                    enqueueJob: false,
+                                    addPendingGroupTaskUnconditionally: false)
+        let (task, _) = Builtin.createAsyncTask(flags, work)
+        _startTaskOnMainActor(task)
+        return Task<Success, Error>(task)
+    }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension Task where Failure == Never {
+    @_spi(MainActorUtilities)
+    @MainActor
+    @available(SwiftStdlib 5.9, *)
+    public static func startOnMainActor(
+        priority: TaskPriority? = nil,
+        @_inheritActorContext @_implicitSelfCapture _ work: __owned @Sendable @escaping @MainActor() async -> Success
+    ) -> Task<Success, Never> {
+        let flags = taskCreateFlags(priority: priority, isChildTask: false,
+                                    copyTaskLocals: true, inheritContext: true,
+                                    enqueueJob: false,
+                                    addPendingGroupTaskUnconditionally: false)
+        let (task, _) = Builtin.createAsyncTask(flags, work)
+        _startTaskOnMainActor(task)
+        return Task(task)
+    }
+}
+
 // ==== Task Priority ----------------------------------------------------------
 
 /// The priority of a task.
@@ -879,6 +917,9 @@ extension UnsafeCurrentTask: Equatable {
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getCurrent")
 func _getCurrentAsyncTask() -> Builtin.NativeObject?
+
+@_silgen_name("swift_task_startOnMainActor")
+fileprivate func _startTaskOnMainActor(_ task: Builtin.NativeObject) -> Builtin.NativeObject?
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getJobFlags")
