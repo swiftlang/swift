@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins)
+// RUN: %target-run-simple-swift(-Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins -emit-tbd -emit-tbd-path %t.tbd)
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
