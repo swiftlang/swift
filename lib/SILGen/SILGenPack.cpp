@@ -447,6 +447,26 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
   B.emitBlock(endBB);
 }
 
+/// Given that we're within a dynamic pack loop with the same expansion
+/// shape as a pack expansion component of the given formal pack type,
+/// produce a pack index for the current component within the formal pack.
+///
+/// Note that the *outer* pack index for the dynamic pack loop
+/// isn't necessarily correct for the given pack, just the *expansion*
+/// pack index.
+static SILValue emitPackPackIndexForActiveExpansion(SILGenFunction &SGF,
+                                                    SILLocation loc,
+                                                    CanPackType formalPackType,
+                                                    unsigned componentIndex) {
+  auto activeExpansion = SGF.getInnermostPackExpansion();
+  auto packIndex = activeExpansion->ExpansionIndex;
+  if (formalPackType->getNumElements() != 1) {
+    packIndex = SGF.B.createPackPackIndex(loc, componentIndex, packIndex,
+                                          formalPackType);
+  }
+  return packIndex;
+}
+
 void InPlacePackExpansionInitialization::
        performPackExpansionInitialization(SILGenFunction &SGF,
                                           SILLocation loc,
@@ -466,17 +486,14 @@ void InPlacePackExpansionInitialization::
   // The pack index from the active pack expansion is just into the
   // expansion component; wrap it as necessary to index into the larger
   // pack/tuple element list.
-  auto activeExpansion = SGF.getInnermostPackExpansion();
-  auto packIndex = activeExpansion->ExpansionIndex;
-  if (FormalPackType->getNumElements() > 1) {
-    packIndex = SGF.B.createPackPackIndex(loc, ComponentIndex, packIndex,
-                                          FormalPackType);
-  }
+  auto packIndex = emitPackPackIndexForActiveExpansion(SGF, loc,
+                                                       FormalPackType,
+                                                       ComponentIndex);
 
   // Translate the pattern type into the environment of the innermost
   // pack expansion.
   auto loweredPatternTy = getLoweredExpansionType().getPatternType();
-  if (auto env = activeExpansion->OpenedElementEnv) {
+  if (auto env = SGF.getInnermostPackExpansion()->OpenedElementEnv) {
     // This AST-level transformation is fine on lowered types because
     // we're just replacing pack archetypes with element archetypes.
     loweredPatternTy =
@@ -504,6 +521,28 @@ void InPlacePackExpansionInitialization::
     SGF.Cleanups.forwardCleanup(packCleanup);
     SGF.Cleanups.forwardCleanup(eltCleanup);
   }
+}
+
+bool InPlacePackExpansionInitialization::
+       canPerformInPlacePackInitialization(GenericEnvironment *env,
+                                           SILType eltAddrTy) const {
+  auto loweredPatternTy = getLoweredExpansionType().getPatternType();
+  if (env) {
+    loweredPatternTy =
+      env->mapContextualPackTypeIntoElementContext(loweredPatternTy);
+  }
+
+  return loweredPatternTy == eltAddrTy.getASTType();
+}
+
+SILValue InPlacePackExpansionInitialization::
+           getAddressForInPlacePackInitialization(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  SILType eltAddrTy) {
+  auto packIndex = emitPackPackIndexForActiveExpansion(SGF, loc,
+                                                       FormalPackType,
+                                                       ComponentIndex);
+  return getElementAddress(SGF, loc, packIndex, eltAddrTy);
 }
 
 void InPlacePackExpansionInitialization::
