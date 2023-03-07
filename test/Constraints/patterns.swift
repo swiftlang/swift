@@ -557,3 +557,10 @@ extension [EWithIdent<Int>] {
     }
   }
 }
+
+struct TestIUOMatchOp {
+  static func ~= (lhs: TestIUOMatchOp, rhs: TestIUOMatchOp) -> Bool! { nil }
+  func foo() {
+    if case self = self {}
+  }
+}

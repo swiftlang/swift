@@ -781,10 +781,6 @@ ExprPatternMatchRequest::evaluate(Evaluator &evaluator,
       DeclNameLoc(EP->getLoc()));
   matchOp->setImplicit();
 
-  // FIXME: This matches what the previous code had, but it doesn't seems like
-  // it should be set to this.
-  matchOp->setFunctionRefKind(FunctionRefKind::Compound);
-
   // Note we use getEndLoc here to have the BinaryExpr source range be the same
   // as the expr pattern source range.
   auto *matchVarRef =
