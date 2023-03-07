@@ -3229,11 +3229,8 @@ public:
 
       // Otherwise we need to emit a pack argument.
       } else {
-        SmallVector<AbstractionPattern, 4> origPackEltPatterns;
-        origFormalParamType.forEachPackExpandedComponent(
-                              [&](AbstractionPattern pattern) {
-          origPackEltPatterns.push_back(pattern);
-        });
+        auto origPackEltPatterns =
+          origFormalParamType.getPackExpandedComponents();
 
         auto argSourcesSlice =
           argSources.slice(nextArgSourceIndex, origPackEltPatterns.size());
@@ -3837,8 +3834,8 @@ private:
         auto loweredPatternType =
           expectedParamType.castTo<PackExpansionType>().getPatternType();
         auto loweredElementType =
-          openedElementEnv->mapPackTypeIntoElementContext(
-            loweredPatternType->mapTypeOutOfContext())->getCanonicalType();
+          openedElementEnv->mapContextualPackTypeIntoElementContext(
+            loweredPatternType);
         return SILType::getPrimitiveAddressType(loweredElementType);
       }();
 
@@ -5041,7 +5038,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   // Then finish our value.
   if (resultPlan.has_value()) {
     return std::move(*resultPlan)
-        ->finish(SGF, loc, formalResultType, directResultsFinal, SILValue());
+        ->finish(SGF, loc, directResultsFinal, SILValue());
   } else {
     return RValue(
         SGF, *uncurriedLoc, formalResultType, directResultsFinal[0]);
@@ -5248,7 +5245,6 @@ RValue SILGenFunction::emitApply(
     ApplyOptions options, SGFContext evalContext,
     Optional<ActorIsolation> implicitActorHopTarget) {
   auto substFnType = calleeTypeInfo.substFnType;
-  auto substResultType = calleeTypeInfo.substResultType;
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
@@ -5500,8 +5496,8 @@ RValue SILGenFunction::emitApply(
   }
 
   auto directResultsArray = makeArrayRef(directResults);
-  RValue result = resultPlan->finish(*this, loc, substResultType,
-                                     directResultsArray, bridgedForeignError);
+  RValue result = resultPlan->finish(*this, loc, directResultsArray,
+                                     bridgedForeignError);
   assert(directResultsArray.empty() && "didn't claim all direct results");
 
   return result;

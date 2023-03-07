@@ -2532,6 +2532,12 @@ public:
     return SGM.getAccessorDeclRef(accessor, F.getResilienceExpansion());
   }
 
+  /// Given a lowered pack expansion type, produce a generic environment
+  /// sufficient for doing value operations on it and map the type into
+  /// the environment.
+  std::pair<GenericEnvironment*, SILType>
+  createOpenedElementValueEnvironment(SILType packExpansionTy);
+
   /// Emit a dynamic loop over a single pack-expansion component of a pack.
   ///
   /// \param formalPackType - a pack type with the right shape for the

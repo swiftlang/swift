@@ -504,11 +504,7 @@ preparePackResultInit(SILGenFunction &SGF, SILLocation loc,
                       SmallVectorImpl<CleanupHandle> &cleanups,
                       SmallVectorImpl<InitializationPtr> &inits) {
   assert(origExpansionType.isPackExpansion());
-  SmallVector<AbstractionPattern, 4> origComponentTypes;
-  origExpansionType.forEachPackExpandedComponent(
-      [&](AbstractionPattern component) {
-    origComponentTypes.push_back(component);
-  });
+  auto origComponentTypes = origExpansionType.getPackExpandedComponents();
 
   auto loweredPackType = packAddr->getType().castTo<SILPackType>();
   assert(loweredPackType->getNumElements() == origComponentTypes.size() &&

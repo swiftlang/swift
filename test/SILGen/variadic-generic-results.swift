@@ -1,6 +1,8 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature VariadicGenerics %s | %FileCheck %s
 // REQUIRES: asserts
 
+func sequence() {}
+
 func copyOrThrow<T>(value: T) throws -> T { return value }
 
 // CHECK-LABEL: @$s4main13copyIntoTupleyxxQp_txxQpRvzlF : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> @pack_out Pack{repeat each T} {
@@ -79,5 +81,134 @@ func copyIntoTuple<each T>(_ args: repeat each T) -> (repeat each T) {
 // CHECK-NEXT:    throw [[ERROR]] : $any Error
 func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each T) {
   return (repeat try copyOrThrow(value: each args))
+}
+
+// CHECK-LABEL: @$s4main22callCopyAndDestructure1a1b1cySi_S2StF
+//   Set up the result pack.
+// CHECK:         [[RESULT_PACK:%.*]] = alloc_pack $Pack{Int, String, String}
+// CHECK-NEXT:    [[R0:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[R0_IDX:%.*]] = scalar_pack_index 0 of $Pack{Int, String, String}
+// CHECK-NEXT:    pack_element_set [[R0]] : $*Int into [[R0_IDX]] of [[RESULT_PACK]] : $*Pack{Int, String, String}
+// CHECK-NEXT:    [[R1:%.*]] = alloc_stack $String
+// CHECK-NEXT:    [[R1_IDX:%.*]] = scalar_pack_index 1 of $Pack{Int, String, String}
+// CHECK-NEXT:    pack_element_set [[R1]] : $*String into [[R1_IDX]] of [[RESULT_PACK]] : $*Pack{Int, String, String}
+// CHECK-NEXT:    [[R2:%.*]] = alloc_stack $String
+// CHECK-NEXT:    [[R2_IDX:%.*]] = scalar_pack_index 2 of $Pack{Int, String, String}
+// CHECK-NEXT:    pack_element_set [[R2]] : $*String into [[R2_IDX]] of [[RESULT_PACK]] : $*Pack{Int, String, String}
+//   Set up the argument pack.
+// CHECK:         [[ARG_PACK:%.*]] = alloc_pack $Pack{Int, String, String}
+// CHECK-NEXT:    [[ARG0:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    store %0 to [trivial] [[ARG0]] : $*Int
+// CHECK-NEXT:    [[ARG0_IDX:%.*]] = scalar_pack_index 0 of $Pack{Int, String, String}
+// CHECK-NEXT:    pack_element_set [[ARG0]] : $*Int into [[ARG0_IDX]] of [[ARG_PACK]] : $*Pack{Int, String, String}
+// CHECK-NEXT:    [[ARG1:%.*]] = alloc_stack $String
+// CHECK-NEXT:    [[COPY1:%.*]] = copy_value %1 : $String
+// CHECK-NEXT:    store [[COPY1]] to [init] [[ARG1]] : $*String
+// CHECK-NEXT:    [[ARG1_IDX:%.*]] = scalar_pack_index 1 of $Pack{Int, String, String}
+// CHECK-NEXT:    pack_element_set [[ARG1]] : $*String into [[ARG1_IDX]] of [[ARG_PACK]] : $*Pack{Int, String, String}
+// CHECK-NEXT:    [[ARG2:%.*]] = alloc_stack $String
+// CHECK-NEXT:    [[COPY2:%.*]] = copy_value %2 : $String
+// CHECK-NEXT:    store [[COPY2]] to [init] [[ARG2]] : $*String
+// CHECK-NEXT:    [[ARG2_IDX:%.*]] = scalar_pack_index 2 of $Pack{Int, String, String}
+// CHECK-NEXT:    pack_element_set [[ARG2]] : $*String into [[ARG2_IDX]] of [[ARG_PACK]] : $*Pack{Int, String, String}
+//   Perform the call.
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[FN:%.*]] = function_ref @$s4main13copyIntoTupleyxxQp_txxQpRvzlF
+// CHECK-NEXT:    apply [[FN]]<Pack{Int, String, String}>([[RESULT_PACK]], [[ARG_PACK]])
+//   Destroy the argument pack.
+// CHECK-NEXT:    destroy_addr [[ARG2]] : $*String
+// CHECK-NEXT:    dealloc_stack [[ARG2]] : $*String
+// CHECK-NEXT:    destroy_addr [[ARG1]] : $*String
+// CHECK-NEXT:    dealloc_stack [[ARG1]] : $*String
+// CHECK-NEXT:    dealloc_stack [[ARG0]] : $*Int
+// CHECK-NEXT:    dealloc_pack [[ARG_PACK]] : $*Pack{Int, String, String}
+//   Load from the pack and bind the locals.
+// CHECK-NEXT:    [[A:%.*]] = load [trivial] [[R0]] : $*Int
+// CHECK-NEXT:    debug_value [[A]] : $Int
+// CHECK-NEXT:    [[B:%.*]] = load [take] [[R1]] : $*String
+// CHECK-NEXT:    [[C:%.*]] = load [take] [[R2]] : $*String
+// CHECK-NEXT:    [[C_BORROW:%.*]] = begin_borrow [lexical] [[C]] : $String
+// CHECK-NEXT:    debug_value [[C_BORROW]] : $String
+// CHECK-NEXT:    destroy_value [[B]] : $String
+//   End of statement.
+// CHECK-NEXT:    dealloc_stack [[R2]] : $*String
+// CHECK-NEXT:    dealloc_stack [[R1]] : $*String
+// CHECK-NEXT:    dealloc_stack [[R0]] : $*Int
+// CHECK-NEXT:    dealloc_pack [[RESULT_PACK]] : $*Pack{Int, String, String}
+//   Sequence marker.
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[SEQUENCE_FN:%.*]] = function_ref @$s4main8sequenceyyF
+// CHECK-NEXT:    apply [[SEQUENCE_FN]]()
+//   Leave the function.
+// CHECK-NEXT:    end_borrow [[C_BORROW]] : $String
+// CHECK-NEXT:    destroy_value [[C]] : $String
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    return [[RET]] : $()
+func callCopyAndDestructure(a: Int, b: String, c: String) {
+  let (a,_,c) = copyIntoTuple(a, b, c)
+  sequence()
+}
+
+// CHECK-LABEL: @$s4main15callCopyAndBind4argsyxxQp_tRvzlF
+//   Set up the result pack to initialize the elements of the tuple
+//   we're going to bind the local variable to.
+// CHECK:         [[TUPLE:%.*]] = alloc_stack [lexical] $(repeat each T), let, name "result"
+// CHECK-NEXT:    [[RESULT_PACK:%.*]] = alloc_pack $Pack{repeat each T}
+// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}
+// CHECK-NEXT:    br bb1([[ZERO]] : $Builtin.Word)
+// CHECK:       bb1([[IDX:%.*]] : $Builtin.Word)
+// CHECK-NEXT:    [[IDX_EQ_LEN:%.*]] = builtin "cmp_eq_Word"([[IDX]] : $Builtin.Word, [[LEN]] : $Builtin.Word) : $Builtin.Int1
+// CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
+// CHECK:       bb2:
+// CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <T>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    pack_element_set [[ELT_ADDR]] : $*@pack_element([[UUID]]) T into [[INDEX]] of [[RESULT_PACK]] : $*Pack{repeat each T}
+// CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
+// CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
+// CHECK:       bb3:
+//   Set up the argument pack with copies of the parameter pack.
+// CHECK-NEXT:    [[ARG_PACK:%.*]] = alloc_pack $Pack{repeat each T}
+// CHECK-NEXT:    [[ARG_TUPLE:%.*]] = alloc_stack $(repeat each T)
+// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}
+// CHECK-NEXT:    br bb4([[ZERO]] : $Builtin.Word)
+// CHECK:       bb4([[IDX:%.*]] : $Builtin.Word)
+// CHECK-NEXT:    [[IDX_EQ_LEN:%.*]] = builtin "cmp_eq_Word"([[IDX]] : $Builtin.Word, [[LEN]] : $Builtin.Word) : $Builtin.Int1
+// CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb6, bb5
+// CHECK:       bb5:
+// CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <T>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[DEST_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[ARG_TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    [[SRC_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    copy_addr [[SRC_ADDR]] to [init] [[DEST_ADDR]] : $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    pack_element_set [[DEST_ADDR]] : $*@pack_element([[UUID]]) T into [[INDEX]] of [[ARG_PACK]] : $*Pack{repeat each T}
+// CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
+// CHECK-NEXT:    br bb4([[NEXT_IDX]] : $Builtin.Word)
+// CHECK:       bb6:
+//   Perform the call.
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[FN:%.*]] = function_ref @$s4main13copyIntoTupleyxxQp_txxQpRvzlF
+// CHECK-NEXT:    apply [[FN]]<Pack{repeat each T}>([[RESULT_PACK]], [[ARG_PACK]])
+//   End of statement.
+// CHECK-NEXT:    destroy_addr [[ARG_TUPLE]] : $*(repeat each T)
+// CHECK-NEXT:    dealloc_stack [[ARG_TUPLE]] : $*(repeat each T)
+// CHECK-NEXT:    dealloc_pack [[ARG_PACK]] : $*Pack{repeat each T}
+// CHECK-NEXT:    dealloc_pack [[RESULT_PACK]] : $*Pack{repeat each T}
+//   Sequence point.
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[SEQUENCE_FN:%.*]] = function_ref @$s4main8sequenceyyF
+// CHECK-NEXT:    apply [[SEQUENCE_FN]]()
+//   Leave the function.
+// CHECK-NEXT:    destroy_addr [[TUPLE]] : $*(repeat each T)
+// CHECK-NEXT:    dealloc_stack [[TUPLE]] : $*(repeat each T)
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    return [[RET]] : $()
+func callCopyAndBind<each T>(args: repeat each T) {
+  let result = copyIntoTuple(repeat each args)
+  sequence()
 }
 

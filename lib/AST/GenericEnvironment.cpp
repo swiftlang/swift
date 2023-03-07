@@ -584,6 +584,29 @@ Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
 }
 
 Type
+GenericEnvironment::mapContextualPackTypeIntoElementContext(Type type) const {
+  if (!type->hasArchetype()) return type;
+
+  // FIXME: this is potentially wrong if there are multiple
+  // openings in play at once, because we really shouldn't touch
+  // other element archetypes.
+  return mapPackTypeIntoElementContext(type->mapTypeOutOfContext());
+}
+
+CanType
+GenericEnvironment::mapContextualPackTypeIntoElementContext(CanType type) const {
+  if (!type->hasArchetype()) return type;
+
+  // FIXME: this is potentially wrong if there are multiple
+  // openings in play at once, because we really shouldn't touch
+  // other element archetypes.
+  // FIXME: if we do this properly, there's no way for this rewrite
+  // to produce a non-canonical type.
+  return mapPackTypeIntoElementContext(type->mapTypeOutOfContext())
+           ->getCanonicalType();
+}
+
+Type
 GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
   assert(getKind() == Kind::OpenedElement);
   assert(!type->hasArchetype());
