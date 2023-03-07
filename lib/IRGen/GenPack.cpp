@@ -217,8 +217,13 @@ static llvm::Value *bindMetadataAtIndex(IRGenFunction &IGF,
   if (auto response = IGF.tryGetLocalTypeMetadata(elementArchetype, request))
     return response.getMetadata();
 
+  // If the pack is on the heap, the LSB is set, so mask it off.
   patternPack =
-      IGF.Builder.CreatePointerCast(patternPack, IGF.IGM.TypeMetadataPtrPtrTy);
+      IGF.Builder.CreatePtrToInt(patternPack, IGF.IGM.SizeTy);
+  patternPack =
+      IGF.Builder.CreateAnd(patternPack, llvm::ConstantInt::get(IGF.IGM.SizeTy, -2));
+  patternPack =
+      IGF.Builder.CreateIntToPtr(patternPack, IGF.IGM.TypeMetadataPtrPtrTy);
 
   Address patternPackAddress(patternPack, IGF.IGM.TypeMetadataPtrTy,
                              IGF.IGM.getPointerAlignment());
@@ -245,8 +250,14 @@ static llvm::Value *bindWitnessTableAtIndex(IRGenFunction &IGF,
   auto key = LocalTypeDataKind::forProtocolWitnessTable(conf);
   if (auto *wtable = IGF.tryGetLocalTypeData(elementArchetype, key))
     return wtable;
+
+  // If the pack is on the heap, the LSB is set, so mask it off.
   wtablePack =
-      IGF.Builder.CreatePointerCast(wtablePack, IGF.IGM.WitnessTablePtrPtrTy);
+      IGF.Builder.CreatePtrToInt(wtablePack, IGF.IGM.SizeTy);
+  wtablePack =
+      IGF.Builder.CreateAnd(wtablePack, llvm::ConstantInt::get(IGF.IGM.SizeTy, -2));
+  wtablePack =
+      IGF.Builder.CreateIntToPtr(wtablePack, IGF.IGM.WitnessTablePtrPtrTy);
 
   Address patternPackAddress(wtablePack, IGF.IGM.WitnessTablePtrTy,
                              IGF.IGM.getPointerAlignment());
