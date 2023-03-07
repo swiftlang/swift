@@ -2547,6 +2547,13 @@ public:
       }
     }
 
+    // -----
+    // NonCopyableChecks
+    //
+
+    if (ED->isObjC() && ED->isMoveOnly()) {
+      ED->diagnose(diag::moveonly_objc_enum_banned);
+    }
     // FIXME(kavon): see if these can be integrated into other parts of Sema
     diagnoseCopyableTypeContainingMoveOnlyType(ED);
     diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
