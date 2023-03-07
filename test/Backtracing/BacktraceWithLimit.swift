@@ -3,6 +3,8 @@
 // RUN: %target-codesign %t/BacktraceWithLimit
 // RUN: %target-run %t/BacktraceWithLimit | %FileCheck %s
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx
