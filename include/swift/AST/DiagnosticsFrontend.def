@@ -520,7 +520,7 @@ ERROR(dont_enable_interop_and_compat,none,
       
 ERROR(invalid_interop_compat_mode,none,
       "invalid option passed to -cxx-interoperability-mode. Please select either "
-      "'off' or 'swift-5.7'.", ())
+      "'off' or 'swift-5.9'.", ())
 NOTE(swift_will_maintain_compat,none,
      "Swift will maintain source compatibility for imported APIs based on the "
      "selected compatibility mode, so updating the Swift compiler will not "
