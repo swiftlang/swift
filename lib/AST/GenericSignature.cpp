@@ -579,10 +579,13 @@ unsigned GenericParamKey::findIndexIn(
 
 SubstitutionMap GenericSignatureImpl::getIdentitySubstitutionMap() const {
   return SubstitutionMap::get(const_cast<GenericSignatureImpl *>(this),
-                              [](SubstitutableType *t) -> Type {
-                                return Type(cast<GenericTypeParamType>(t));
-                              },
-                              MakeAbstractConformanceForGenericType());
+    [](SubstitutableType *t) -> Type {
+      auto param = cast<GenericTypeParamType>(t);
+      if (!param->isParameterPack())
+        return param;
+      return PackType::getSingletonPackExpansion(param);
+    },
+    MakeAbstractConformanceForGenericType());
 }
 
 GenericTypeParamType *GenericSignatureImpl::getSugaredType(

@@ -4972,7 +4972,7 @@ public:
   void visitPackType(const PackType *packTy) {
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[PackTypeLayout::Code];
-    TupleTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
+    PackTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
 
     abbrCode = S.DeclTypeAbbrCodes[PackTypeEltLayout::Code];
     for (auto elt : packTy->getElementTypes()) {

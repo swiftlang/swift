@@ -649,29 +649,31 @@ std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
   return {result, opened};
 }
 
-void ConstraintSystem::addPackElementEnvironment(PackExpansionExpr *expr) {
-  auto *locator = getConstraintLocator(expr);
-  PackExpansionEnvironments[locator] = UUID::fromTime();
-}
-
 GenericEnvironment *
 ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
                                             CanType shapeClass) {
+  assert(locator->directlyAt<PackExpansionExpr>());
+
+  std::pair<UUID, Type> uuidAndShape;
   auto result = PackExpansionEnvironments.find(locator);
-  if (result == PackExpansionEnvironments.end())
+  if (result == PackExpansionEnvironments.end()) {
+    uuidAndShape = std::make_pair(UUID::fromTime(), shapeClass);
+    PackExpansionEnvironments[locator] = uuidAndShape;
+  } else {
+    uuidAndShape = result->second;
+  }
+
+  if (!shapeClass->is<PackArchetypeType>() ||
+      !shapeClass->isEqual(uuidAndShape.second))
     return nullptr;
 
-  if (!shapeClass->is<PackArchetypeType>())
-    return nullptr;
-
-  auto uuid = result->second;
   auto &ctx = getASTContext();
   auto elementSig = ctx.getOpenedElementSignature(
       DC->getGenericSignatureOfContext().getCanonicalSignature(), shapeClass);
   auto *contextEnv = DC->getGenericEnvironmentOfContext();
   auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-  return GenericEnvironment::forOpenedElement(elementSig, uuid, shapeClass,
-                                              contextSubs);
+  return GenericEnvironment::forOpenedElement(elementSig, uuidAndShape.first,
+                                              shapeClass, contextSubs);
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions

@@ -1712,7 +1712,12 @@ public:
     auto gp = GenericTypeParamType::get(isParameterPack, 0, paramIndex,
                                         TC.Context);
     substGenericParams.push_back(gp);
-    substReplacementTypes.push_back(substTy);
+    if (isParameterPack) {
+      substReplacementTypes.push_back(
+          PackType::getSingletonPackExpansion(substTy));
+    } else {
+      substReplacementTypes.push_back(substTy);
+    }
     
     if (auto layout = pattern.getLayoutConstraint()) {
       // Look at the layout constraint on this position in the abstraction pattern

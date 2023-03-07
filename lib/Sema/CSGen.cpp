@@ -1101,7 +1101,6 @@ namespace {
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
     void addPackElementEnvironment(PackExpansionExpr *expr) {
-      CS.addPackElementEnvironment(expr);
       PackElementEnvironments.push_back(expr);
     }
 

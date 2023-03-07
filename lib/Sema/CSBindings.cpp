@@ -1501,6 +1501,7 @@ void PotentialBindings::infer(Constraint *constraint) {
         break;
 
       auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
+      assert(!elementType->is<PackType>());
       addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});
 
       break;

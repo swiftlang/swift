@@ -15,7 +15,7 @@ func copyOrThrow<T>(value: T) throws -> T { return value }
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <T>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
 // CHECK-NEXT:    [[DEST_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of [[OUT]] : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
 // CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of [[IN]] : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
 // CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DEST_ELT_ADDR]] : $*@pack_element([[UUID]]) T
@@ -41,7 +41,7 @@ func copyIntoTuple<each T>(_ args: repeat each T) -> (repeat each T) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb4, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <T>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
 // CHECK-NEXT:    [[DEST_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of [[OUT]] : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
 // CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of [[IN]] : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
 //   FIXME: make this a borrow
@@ -71,7 +71,7 @@ func copyIntoTuple<each T>(_ args: repeat each T) -> (repeat each T) {
 // CHECK:       bb7:
 // CHECK-NEXT:    [[DESTROY_IDX:%.*]] = builtin "sub_Word"([[LAST_IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    [[DESTROY_INDEX:%.*]] = dynamic_pack_index [[DESTROY_IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[DESTROY_INDEX]] of <each T> at <T>, shape $T, uuid [[DESTROY_UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[DESTROY_INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[DESTROY_UUID:".*"]]
 // CHECK-NEXT:    [[DESTROY_ELT_ADDR:%.*]] = pack_element_get [[DESTROY_INDEX]] of [[OUT]] : $*Pack{repeat each T} as $*@pack_element([[DESTROY_UUID]]) T
 // CHECK-NEXT:    destroy_addr [[DESTROY_ELT_ADDR]] : $*@pack_element([[DESTROY_UUID]]) T
 // CHECK-NEXT:    br bb6([[DESTROY_IDX]] : $Builtin.Word)

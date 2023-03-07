@@ -920,6 +920,10 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       auto arg = found->rhs;
       if (auto *expansionType = arg->getAs<PackExpansionType>())
         arg = expansionType->getPatternType();
+
+      if (arg->isParameterPack())
+        arg = PackType::getSingletonPackExpansion(arg);
+
       args.push_back(arg);
     }
   }

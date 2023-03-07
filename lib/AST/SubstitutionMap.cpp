@@ -226,6 +226,11 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
 
     // Record the replacement.
     Type replacement = Type(gp).subst(subs, lookupConformance);
+
+    assert((!replacement || replacement->hasError() ||
+            gp->isParameterPack() == replacement->is<PackType>()) &&
+           "replacement for pack parameter must be a pack type");
+
     replacementTypes.push_back(replacement);
   });
 
