@@ -153,3 +153,8 @@ extension Zip2Sequence: Sequence {
     )
   }
 }
+
+extension Zip2Sequence: Sendable where Sequence1: Sendable,
+                                       Sequence2: Sendable { }
+extension Zip2Sequence.Iterator: Sendable where Sequence1.Iterator: Sendable,
+                                                Sequence2.Iterator: Sendable { }
