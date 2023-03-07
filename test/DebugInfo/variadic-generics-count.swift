@@ -36,9 +36,9 @@ public func f4<each U, each V>(us: repeat (each U, each V)) {
 }
 
 // CHECK-LABEL: !DICompileUnit
-// CHECK-DAG: [[COUNT1_1_VAR]] = !DILocalVariable(name: "$pack_count_1",{{.*}} flags: DIFlagArtificial)
-// CHECK-DAG: [[COUNT2_1_VAR]] = !DILocalVariable(name: "$pack_count_1",{{.*}} flags: DIFlagArtificial)
-// CHECK-DAG: [[COUNT2_2_VAR]] = !DILocalVariable(name: "$pack_count_2",{{.*}} flags: DIFlagArtificial)
-// CHECK-DAG: [[COUNT3_1_VAR]] = !DILocalVariable(name: "$pack_count_1",{{.*}} flags: DIFlagArtificial)
-// CHECK-DAG: [[COUNT4_1_VAR]] = !DILocalVariable(name: "$pack_count_1",{{.*}} flags: DIFlagArtificial)
+// CHECK-DAG: [[COUNT1_1_VAR]] = !DILocalVariable(name: "$pack_count_0",{{.*}} flags: DIFlagArtificial)
+// CHECK-DAG: [[COUNT2_1_VAR]] = !DILocalVariable(name: "$pack_count_0",{{.*}} flags: DIFlagArtificial)
+// CHECK-DAG: [[COUNT2_2_VAR]] = !DILocalVariable(name: "$pack_count_1",{{.*}} flags: DIFlagArtificial)
+// CHECK-DAG: [[COUNT3_1_VAR]] = !DILocalVariable(name: "$pack_count_0",{{.*}} flags: DIFlagArtificial)
+// CHECK-DAG: [[COUNT4_1_VAR]] = !DILocalVariable(name: "$pack_count_0",{{.*}} flags: DIFlagArtificial)
 
