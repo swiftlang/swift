@@ -588,6 +588,15 @@ AbstractionPattern AbstractionPattern::getPackExpansionCountType() const {
   llvm_unreachable("bad kind");
 }
 
+SmallVector<AbstractionPattern, 4>
+AbstractionPattern::getPackExpandedComponents() const {
+  SmallVector<AbstractionPattern, 4> result;
+  forEachPackExpandedComponent([&](AbstractionPattern pattern) {
+    result.push_back(pattern);
+  });
+  return result;
+}
+
 void AbstractionPattern::forEachPackExpandedComponent(
           llvm::function_ref<void (AbstractionPattern)> fn) const {
   assert(isPackExpansion());

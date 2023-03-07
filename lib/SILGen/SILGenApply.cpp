@@ -3229,11 +3229,8 @@ public:
 
       // Otherwise we need to emit a pack argument.
       } else {
-        SmallVector<AbstractionPattern, 4> origPackEltPatterns;
-        origFormalParamType.forEachPackExpandedComponent(
-                              [&](AbstractionPattern pattern) {
-          origPackEltPatterns.push_back(pattern);
-        });
+        auto origPackEltPatterns =
+          origFormalParamType.getPackExpandedComponents();
 
         auto argSourcesSlice =
           argSources.slice(nextArgSourceIndex, origPackEltPatterns.size());

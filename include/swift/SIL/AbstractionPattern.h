@@ -18,6 +18,7 @@
 #ifndef SWIFT_SIL_ABSTRACTIONPATTERN_H
 #define SWIFT_SIL_ABSTRACTIONPATTERN_H
 
+#include "swift/Basic/IndexedViewRange.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 
@@ -1332,6 +1333,17 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  static AbstractionPattern
+  projectTupleElementType(const AbstractionPattern *base, size_t index) {
+    return base->getTupleElementType(index);
+  }
+
+  IndexedViewRange<const AbstractionPattern *, AbstractionPattern,
+                   projectTupleElementType> getTupleElementTypes() const {
+    assert(isTuple());
+    return { { this, 0 }, { this, getNumTupleElements() } };
+  }
+
   /// Is the given pack type a valid substitution of this abstraction
   /// pattern?
   bool matchesPack(CanPackType substType);
@@ -1471,6 +1483,8 @@ public:
   /// component.
   void forEachPackExpandedComponent(
       llvm::function_ref<void(AbstractionPattern pattern)> fn) const;
+
+  SmallVector<AbstractionPattern, 4> getPackExpandedComponents() const;
 
   /// If this pattern refers to a foreign ObjC method that was imported as 
   /// async, return the bridged-back-to-ObjC completion handler type.
