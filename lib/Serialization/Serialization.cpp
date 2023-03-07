@@ -6137,7 +6137,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     for (auto D : fileDecls) {
       if (isa<ImportDecl>(D) || isa<IfConfigDecl>(D) ||
-          isa<PoundDiagnosticDecl>(D) || isa<TopLevelCodeDecl>(D)) {
+          isa<PoundDiagnosticDecl>(D) || isa<TopLevelCodeDecl>(D) ||
+          isa<MacroExpansionDecl>(D)) {
         continue;
       }
 
